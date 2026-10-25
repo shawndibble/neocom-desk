@@ -390,6 +390,15 @@ describe('ImprovePanel', () => {
     expect(screen.queryByRole('group', { name: 'Improve Reach' })).not.toBeInTheDocument();
   });
 
+  it('names the settings toggle with its label and summary, and toggles on click', async () => {
+    renderPanel(search({ status: 'idle' }));
+    const toggle = screen.getByRole('button', { name: /^Search settings.*Upgrade/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
+  });
+
   it('says nothing could be added on a fit with no modules', () => {
     const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
     renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });

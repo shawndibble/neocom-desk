@@ -49,7 +49,7 @@ export function Collapse({ open, id, children, className }: CollapseProps) {
       )}
       style={{ transitionDuration: `${COLLAPSE_MS}ms` }}
     >
-      <div className={cx('min-h-0', phase !== 'open' && 'overflow-hidden')}>
+      <div className={cx('min-h-0 min-w-0', phase !== 'open' && 'overflow-hidden')}>
         {phase !== 'closed' && <div className={className}>{children}</div>}
       </div>
     </div>
