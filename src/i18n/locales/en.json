@@ -10909,6 +10909,8 @@
     "offerCount_one": "{{count}} offer",
     "offerCount_other": "{{count}} offers",
     "colItem": "Item",
+    "colSellsPerDay": "Sells/day",
+    "sellsNone": "None",
     "colProfit": "Profit",
     "colIskPerLp": "ISK / LP",
     "emptyTitle": "No offers",

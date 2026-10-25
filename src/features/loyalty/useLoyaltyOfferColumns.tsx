@@ -46,6 +46,21 @@ export function useLoyaltyOfferColumns({
     Record<LoyaltyStoreOffersColumnId, DataTableColumn<LoyaltyOfferRow>>
   >(
     () => ({
+      sellsPerDay: {
+        id: 'sellsPerDay',
+        header: t('loyaltyStore.colSellsPerDay'),
+        align: 'right',
+        width: '12ch',
+        headerClassName: 'whitespace-nowrap',
+        // Unavailable sorts last, apart from a real zero.
+        sortValue: (row) => row.sellsPerDay ?? undefined,
+        cellClassName: () => 'tabular-nums',
+        render: (row) => {
+          if (row.sellsPerDay === null) return '—';
+          if (row.sellsPerDay === 0) return t('loyaltyStore.sellsNone');
+          return row.sellsPerDay < 10 ? fixed1(row.sellsPerDay) : formatCount(row.sellsPerDay);
+        },
+      },
       profit: {
         id: 'profit',
         header: t('loyaltyStore.colProfit'),

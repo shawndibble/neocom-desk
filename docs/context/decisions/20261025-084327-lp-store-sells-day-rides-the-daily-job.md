@@ -1,0 +1,5 @@
+# Scope decisions — LP store Sells/day rides the daily job as per-hub volume objects from EVE Ref (issue #5127)
+
+_Recorded 2026-10-25 · issue #5127._
+
+- **The LP Store's Sells/day column reads one `lp-store-volume/<regionId>.json` object per Trade Hub region, published by the daily `public-data-lp-store` job from EVE Ref's daily market-history files (30 small `.csv.bz2` downloads), not from ESI `/markets/{region}/history`.** ESI would cost about five hubs times thousands of types in calls a day, past the job's 30-minute budget; EVE Ref carries every region and type in one file a day. The object holds every traded type, so a blueprint offer's product needs no blueprint-to-product map in the job. Units per day is total volume over the days read divided by those days (the hauling engine's `dailyVolume` maths). A type absent from a loaded object reads as `None`; an object that fails to load reads as `—` (unavailable, never 0). The job publishes nothing when fewer than 20 days read or any day fails. The column is off in a pilot's stored column list until they tick it in the picker.
