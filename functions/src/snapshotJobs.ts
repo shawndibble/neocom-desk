@@ -1,7 +1,6 @@
-import { setTimeout as sleep } from 'node:timers/promises';
 import { info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { firestore } from './firestore.js';
-import { createR2Get, createR2Put, publicContractsRunVerdict } from './r2Publisher.js';
+import { publicContractsRunVerdict } from './r2Publisher.js';
 import {
   publishCourierToR2,
   publishOffersToR2,
@@ -23,9 +22,6 @@ import {
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
-import { runWorkbenchSync } from './workbenchFits.js';
-import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
-import { PUBLIC_HOST_USER_AGENT } from './marketHistoryJob.js';
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
 const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
@@ -153,29 +149,4 @@ export async function runSyncPublicContractOffers(): Promise<void> {
   if (fingerprint !== null && verdict.storeFingerprint) {
     await fingerprintRef.set({ fingerprint, updatedAt: Date.now() });
   }
-}
-
-const WORKBENCH_FETCH_BUDGET_MS = 360_000;
-const WORKBENCH_REQUEST_GAP_MS = 250;
-
-/** Body of syncWorkbenchFits (see its doc in index.ts). */
-export async function runSyncWorkbenchFits(): Promise<void> {
-  const r2 = r2ConfigOrThrow();
-  const db = firestore();
-  const hulls = r2WorkbenchHulls({ get: createR2Get(r2), put: createR2Put(r2) });
-  const result = await runWorkbenchSync({
-    store: workbenchFitsStore(db, hulls),
-    fetchJson: async (url) => {
-      const response = await fetch(url, {
-        headers: { 'User-Agent': PUBLIC_HOST_USER_AGENT, Accept: 'application/json' },
-      });
-      const body: unknown = response.ok ? await response.json().catch(() => null) : null;
-      return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
-    },
-    now: Date.now,
-    sleep,
-    budgetMs: WORKBENCH_FETCH_BUDGET_MS,
-    requestGapMs: WORKBENCH_REQUEST_GAP_MS,
-  });
-  logInfo('EVE Workbench fits sync', { ...result });
 }

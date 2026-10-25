@@ -1,6 +1,6 @@
 /**
  * EVE Workbench fits for one hull (issue #2484): the read half of the
- * `syncWorkbenchFits` Cloud Function (`functions/src/workbenchFits.ts`),
+ * `public-data-workbench-fits` GitHub Actions job (`functions/src/workbenchFits.ts`),
  * which keeps every public Workbench fit grouped by hull — Workbench's own
  * list can't be filtered by hull, and its API sends no CORS headers anyway.
  *

@@ -13,12 +13,12 @@
  * Everything here is fetch- and storage-free: `runWorkbenchSync` takes the
  * HTTP call, the clock and the store as arguments, so paging, stop-at-known,
  * checkpointing, retry and changed-only writes are all unit-tested.
- * `workbenchFitsStore.ts` is the storage side (hulls in R2, the checkpoint in
- * Firestore); `index.ts` only schedules.
+ * `workbenchFitsStore.ts` is the storage side (hulls and the checkpoint, all in
+ * R2); `publicDataWorkbenchFits.ts` runs it from the GitHub Actions workflow.
  *
  * **Passes.** A pass walks the list from page 1 until it reaches a fit an
  * earlier pass already stored (or the end of the list). The first pass walks
- * all ~385 pages and fetches ~38k EFTs — far more than one 540s invocation —
+ * all ~385 pages and fetches ~38k EFTs — far more than one run —
  * so a pass is checkpointed after every run: `pass.nextPage` is where the next
  * run resumes. New fits arriving mid-pass push older ones *down* the list, so a
  * resumed page re-sees a few fits rather than skipping any; re-storing one is
@@ -33,9 +33,8 @@
 
 /** One public R2 object per hull under this prefix: `workbench-fits/<shipTypeId>.json`. */
 export const WORKBENCH_FITS_R2_PREFIX = 'workbench-fits/';
-/** Sync bookkeeping: an admin-only Firestore doc no client rule reaches. */
-export const WORKBENCH_SYNC_STATE_COLLECTION = 'workbenchFitsSync';
-export const WORKBENCH_SYNC_STATE_DOC = 'state';
+/** Sync bookkeeping: an R2 object outside the `workbench-fits/` prefix the client reads. */
+export const WORKBENCH_SYNC_STATE_R2_KEY = 'workbench-fits-state/state.json';
 export const WORKBENCH_API_BASE = 'https://api.eveworkbench.com/v1';
 
 /** Attempts per request before a run gives up on it (and stops, checkpointed). */

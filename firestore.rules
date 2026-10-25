@@ -249,7 +249,7 @@ service cloud.firestore {
     // in Cloudflare R2 (decision
     // 20261018-232147-eve-workbench-fits-live-in-r2). The workbenchFits rule
     // is gone, so the implicit deny covers the stale collection, and
-    // workbenchFitsSync (the sync's admin-only checkpoint) never had one.
+    // workbenchFitsSync (the old sync checkpoint, now an R2 object) never had one.
     // Stored Share Links (src/features/share/shareStore.ts): a short
     // /s/{id} URL whose content lives here for a week. Not per-Character
     // data, and the person opening a link may have no account at all — so
