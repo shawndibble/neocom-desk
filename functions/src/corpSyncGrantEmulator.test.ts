@@ -509,6 +509,91 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       ).toBe(true);
     });
 
+    describe('settled rows (#5048)', () => {
+      const H = 3_600_000;
+      const row = (date: string, quantity: number, character = 50) => ({
+        character_id: character,
+        recorded_corporation_id: CORP,
+        type_id: 45490,
+        quantity,
+        last_updated: date,
+      });
+      const readAt = (rows: unknown[], truncated = false): EsiRead<unknown[]> => ({
+        kind: 'ok',
+        data: rows,
+        fetchedAt: new Date(now).toISOString(),
+        truncated,
+      });
+      const quantity = async (date: string, structureId = 5000, character = 50) =>
+        (
+          await book().collection('observed').doc(`${character}_45490_${date}_${structureId}`).get()
+        ).data()?.quantity;
+      const through = async () => (await book().get()).data()?.observedThrough;
+
+      it('records a full read, then leaves rows final at that read out of the merge', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100), row('2026-10-17', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await through()).toEqual({ '5000': now });
+        const first = now;
+
+        now = T0 + 12 * H;
+        // A closed day cannot really grow; 999 only shows the row was left out of the merge.
+        esiState.ledger = readAt([row('2026-10-10', 999), row('2026-10-17', 150)]);
+        expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
+        expect(await quantity('2026-10-10')).toBe(100);
+        // Yesterday is inside the grace: its growth still lands.
+        expect(await quantity('2026-10-17')).toBe(150);
+        expect(await through()).toEqual({ '5000': now });
+        expect(now).toBeGreaterThan(first);
+        // The settled row's Character still gets its billed-by pointer.
+        const pointer = await db.collection('corpTaxBookBilledBy').doc('char:50').get();
+        expect(pointer.data()?.books).toHaveProperty(String(CORP));
+      });
+
+      it('merges a new refinery’s old rows in full: it has no read on record', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+
+        now = T0 + 12 * H;
+        esiState.observers = ok([5000, 6000]);
+        esiState.ledger = readAt([row('2026-10-10', 100), row('2026-10-09', 40, 51)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-09', 6000, 51)).toBe(40);
+        expect(await through()).toEqual({ '5000': now, '6000': now });
+      });
+
+      it('records no read for a truncated ledger, so the next run merges all of it', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)], true);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await through()).toBeUndefined();
+
+        now = T0 + 12 * H;
+        // The first read missed pages: the rest of that closed day turns up now.
+        esiState.ledger = readAt([row('2026-10-10', 160)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-10')).toBe(160);
+      });
+
+      it('records no read when the run’s merge fails, so the next run merges everything again', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        // A row the upload refuses fails the whole run before anything is merged.
+        esiState.ledger = readAt([row('2026-10-10', 100), row('2026-12-01', 1)]);
+        expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(0);
+        expect(await through()).toBeUndefined();
+
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-10')).toBe(100);
+      });
+    });
+
     it('syncs a book with no refineries of its own once it has moon owners (#4616)', async () => {
       esiState.observers = ok([]);
       await optIn(ACCOUNTANT);
