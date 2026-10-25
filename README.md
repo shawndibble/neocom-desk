@@ -60,7 +60,7 @@ Live: https://neocomdesk.com
 ## Architecture
 
 - Static browser SPA (React 19 + TypeScript + Vite), hosted on GitHub Pages
-  — no app server.
+  (production) and Cloudflare Pages (the `develop` preview) — no app server.
 - EVE SSO with PKCE straight from the browser. Refresh tokens never leave
   the device (stored in Dexie only).
 - Local-first: all API-derived data (skills, wallet, assets, mail, ...) is
@@ -106,5 +106,148 @@ typecheck` and `npx vitest run <path>` for the file(s) you're touching.
 `test` job runs the unit suite across four shards, and an `e2e` job runs
 Playwright across four more; that's the gate, not a local pre-PR run.
 
-Copy `.env.example` to `.env` and set `VITE_EVE_CLIENT_ID` (EVE developer
-application client ID, https://developers.eveonline.com).
+Copy `.env.example` to `.env` and fill it in — see
+[Run your own copy](#run-your-own-copy) for where each value comes from.
+
+## Run your own copy
+
+This is everything needed to fork the repo and get a working site of your own.
+Only step 1 is needed to run locally; steps 2 to 4 add sync, push alerts and
+hosting. Nothing is hardcoded to the original deployment except the optional
+shared public data (see "What a fork does not get").
+
+You need Node 24, a GitHub account, an EVE account, and a Google account for
+Firebase.
+
+### 1. Register an EVE application and run locally
+
+1. Create an application at https://developers.eveonline.com with
+   **Authentication & API access**. Enable the ESI scopes the app requests
+   (the list is built from `src/esi/registry.ts`; enabling all of them is the
+   simplest choice).
+2. Add callback URLs. The app uses PKCE with no client secret, and builds the
+   callback from the page origin: `http://localhost:5173/callback` for
+   development, and `https://<your-domain>/callback` for production. A callback
+   belongs to one application, so a separate dev or preview site needs its own
+   EVE application.
+3. Fork and clone, then:
+
+   ```sh
+   npm install
+   npm run verify-hooks -- --fix
+   cp .env.example .env     # set VITE_EVE_CLIENT_ID
+   npm run dev
+   ```
+
+With only `VITE_EVE_CLIENT_ID` set you get sign-in, every character view,
+skill plans, build plans and the market, with data cached on the device.
+Leave the other variables blank: Firebase sync and Sentry switch themselves off.
+
+### 2. Firebase: cross-device sync, push alerts and corp tools
+
+Firebase holds Skill Plans, Build Plans and synced settings, plus the Cloud
+Functions behind push alerts, the Corp Tax Book, SRP and community features.
+It never receives a refresh token except the opt-in grants listed in
+`CLAUDE.md`. Full detail is in `docs/SYNC-SETUP.md`.
+
+1. Create a Firebase project and upgrade it to the **Blaze** plan (Cloud
+   Functions v2 requires it; hobby use stays inside the free quotas).
+2. Enable **Authentication** (Get started; no provider is needed, since sign-in
+   uses custom tokens) and create a **Firestore** database in production mode.
+3. Add a **Web app** under Project settings and copy its config into `.env`:
+   `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID`,
+   `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`. For push notifications also
+   generate a Web Push key pair (Project settings, Cloud Messaging) and set
+   `VITE_FIREBASE_VAPID_KEY`. `VITE_FIREBASE_MEASUREMENT_ID` (Google Analytics)
+   and `VITE_SENTRY_DSN` are optional; leave them empty to disable both.
+4. Point the CLI at your project: edit `.firebaserc` and replace
+   `neocom-desk` with your project ID (or run `firebase use --add`).
+5. Tell the functions which EVE applications they trust. Create
+   `functions/.env` (gitignored):
+
+   ```sh
+   # comma-separated: every EVE application client ID that signs users in
+   EVE_CLIENT_ID=<dev client id>,<prod client id>
+   ```
+
+   The functions refuse to deploy or start without it, so tokens minted for
+   other EVE apps are rejected.
+
+6. Create the alerts encryption key. It is a secret holding 32 random bytes,
+   base64-encoded:
+
+   ```sh
+   openssl rand -base64 32 | firebase functions:secrets:set ALERTS_TOKEN_KEY
+   ```
+
+7. Deploy:
+
+   ```sh
+   npm install -g firebase-tools && firebase login
+   npm ci --prefix functions
+   firebase deploy --only functions,firestore
+   ```
+
+   When asked to delete functions that the source no longer exports, answer
+   yes. Cloud Functions are not deployed by CI, so rerun this whenever
+   `functions/` or `firestore.rules` changes.
+
+### 3. Host the site
+
+Production is built and published by `.github/workflows/deploy.yml` on every
+push to `main`.
+
+1. In your fork, enable **Settings > Pages > Source: GitHub Actions**.
+2. Add the build values as **repository variables** (Settings > Secrets and
+   variables > Actions > Variables), using the same names as `.env`:
+   `VITE_EVE_CLIENT_ID` and the `VITE_FIREBASE_*` variables. Optional:
+   `VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, and the secret
+   `SENTRY_AUTH_TOKEN` for source maps.
+3. Custom domain: change `public/CNAME` to your domain, or delete the file to
+   serve from `https://<user>.github.io/<repo>/`. Subpath hosting needs
+   `base` in `vite.config.ts` changed from `'/'` to `'/<repo>/'`, and the
+   callback URL in the EVE application updated to match.
+4. In the Firebase console, add your domain under Authentication > Settings >
+   Authorized domains.
+5. Edit `deploy.yml`: the `keep-old-assets.mjs` step names
+   `https://neocomdesk.com`, so point it at your site.
+6. Push to `main`. The `deploy-dev` job (Cloudflare Pages) is the original
+   author's preview channel for `develop`; it needs `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID` secrets in a `dev` environment, and you can delete
+   the job if you do not want a preview site.
+
+CI (`.github/workflows/ci.yml`) needs no secrets.
+
+### 4. Branding to replace
+
+These still carry the original identity and are worth changing for a public
+fork:
+
+- `USER_AGENT` in `src/esi/userAgent.ts`: ESI and EVE Workbench ask for a
+  descriptive user agent that points at the real operator. Never use a
+  personal email address.
+- Icons and screenshots in `public/` (`brand/`, `icons/`, `screenshots/`),
+  the app name in `package.json`, and `public/privacy.html`, which
+  names the operator and links the original repository.
+- The Android wrapper in `twa/` and `docs/ANDROID-TWA.md` (package
+  `com.neocomdesk.app`) is optional. Skip it unless you publish to the Play
+  Store.
+
+### What a fork does not get
+
+The app reads a few shared public datasets (active wars, lawless systems,
+public contract snapshots, market open prices) from
+`https://data.neocomdesk.com`, a Cloudflare R2 bucket. That origin only allows
+the original site and local development, so on your domain those fetches are
+blocked and the app treats them as "no snapshot" and carries on: the
+affected panels show less data, nothing breaks.
+
+To produce them yourself, create an R2 bucket with a public custom domain and
+GET-only CORS for your origin, then replace the origin in
+`src/features/contractSearch/r2OfferSnapshot.ts`, `src/features/wars/activeWars.ts`,
+`src/features/travel/lawlessSystems.ts` and `src/lib/swRoutes.ts`. Set
+`R2_ENDPOINT` and `R2_BUCKET` in `functions/.env`, and the
+secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` for the functions
+(`firebase functions:secrets:set`) and as GitHub repository secrets alongside
+`R2_ENDPOINT` and `R2_BUCKET`, which the scheduled `public-data-*.yml`
+workflows use. Design notes are in `docs/adr/0019-contract-snapshots-served-from-r2-not-firestore.md`.
