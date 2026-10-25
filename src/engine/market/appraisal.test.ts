@@ -410,6 +410,18 @@ describe('computeAppraisalRefine', () => {
     });
   });
 
+  it("refines at the pilot's own facility yield and takes the tax off the value", () => {
+    const refine = computeAppraisalRefine({
+      quantity: 1000,
+      reprocessing: veldspar,
+      modifiers: NO_CHARACTER_MODIFIERS,
+      materialPrices: { 34: 5 },
+      refining: { stationRate: 0.6, taxRate: 0.1 },
+    });
+    // 10 batches x floor(415 x 10 x 0.6) Tritanium x 5 ISK, less 10% tax
+    expect(refine?.valueAtFullPrice).toBeCloseTo(Math.floor(415 * 10 * 0.6) * 5 * 0.9, 6);
+  });
+
   it('reports a part-portion quantity as zero units refined, not omitted', () => {
     const refine = computeAppraisalRefine({
       quantity: 50,

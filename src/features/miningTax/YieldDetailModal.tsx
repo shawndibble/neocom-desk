@@ -45,6 +45,8 @@ import {
   type YieldRefinedRow as RefinedRow,
 } from './yieldCsv';
 import { formatCount } from '@/lib/formatCount';
+import { formatPercent } from '@/features/refining/formatPercent';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 
 interface YieldDetailModalProps {
   open: boolean;
@@ -106,6 +108,7 @@ export function YieldDetailModal({
   today,
 }: YieldDetailModalProps) {
   const { t } = useTranslation();
+  const { setup: refiningSetup } = useRefiningSetup();
   const { valuation, entry } = row;
 
   const typeName = (typeId: number) => typeNames.get(typeId) ?? `#${typeId}`;
@@ -381,6 +384,7 @@ export function YieldDetailModal({
                 <p className={CARD_HINT}>
                   {t('miningTax.overview.detail.refineCardHint', {
                     efficiency: fixed1(valuation.efficiency * 100),
+                    tax: formatPercent(refiningSetup.taxRate, false),
                   })}
                 </p>
               </div>
@@ -505,6 +509,8 @@ export function YieldDetailModal({
                   <p>
                     {t('miningTax.overview.detail.refineBasisHint', {
                       character: row.characterName,
+                      rate: formatPercent(refiningSetup.stationRate, false),
+                      tax: formatPercent(refiningSetup.taxRate, false),
                       efficiency: fixed1(valuation.efficiency * 100),
                     })}
                   </p>

@@ -28,6 +28,11 @@ import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { TradeHub } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';
 import { reprocessingValue, reprocessingYield } from '@/engine/industry/reprocessing';
+import {
+  DEFAULT_REFINING_SETUP,
+  netOfReprocessingTax,
+  type RefiningSetup,
+} from '@/engine/industry/refiningSetup';
 import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { undercutPrice } from '@/engine/market/priceTick';
 
@@ -52,6 +57,8 @@ export interface ReprocessingInput {
   modifiers: CharacterModifiers;
   /** materialTypeId -> ISK a unit at this station, generally the best buy order. */
   materialPrices: Readonly<Record<number, number>>;
+  /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
+  refining?: RefiningSetup;
 }
 
 export interface OrderExitsInput {
@@ -90,7 +97,12 @@ function bestLocalBuyPrice(
  */
 function reprocessExit(row: OpenOrderRow, input: ReprocessingInput): OrderExit | null {
   if (!row.floor) return null;
-  const efficiency = refiningEfficiency(input.modifiers, input.entry.specialisationSkillID);
+  const refining = input.refining ?? DEFAULT_REFINING_SETUP;
+  const efficiency = refiningEfficiency(
+    input.modifiers,
+    input.entry.specialisationSkillID,
+    refining.stationRate
+  );
   const yielded = reprocessingYield({
     portionSize: input.entry.portionSize,
     materials: input.entry.materials.map((m) => ({ typeId: m.typeID, quantity: m.quantity })),
@@ -106,7 +118,7 @@ function reprocessExit(row: OpenOrderRow, input: ReprocessingInput): OrderExit |
     };
   }
   const value = reprocessingValue(yielded.outputs, input.materialPrices);
-  const price = value.total / yielded.unitsRefined;
+  const price = netOfReprocessingTax(value.total, refining.taxRate) / yielded.unitsRefined;
   return {
     kind: 'reprocess',
     price,

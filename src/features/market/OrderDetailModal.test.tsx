@@ -1043,7 +1043,7 @@ describe('OrderDetailModal', () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Assumes a 50% station and no station tax, valued against the buy orders here.'
+          'Refined at a 50% facility yield with 0% reprocessing tax, valued against the buy orders here. Set both in Appraisal.'
         )
       ).toBeInTheDocument();
       expect(screen.queryByText('Reprocess and sell the minerals')).not.toBeInTheDocument();

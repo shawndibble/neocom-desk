@@ -104,6 +104,7 @@ import { ItemSkillsDisclosure } from '@/features/market/ItemSkillsDisclosure';
 import { useOrderBookOrchestration } from '@/features/market/useOrderBookOrchestration';
 import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
 import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import {
   SELL_ORDER_COLUMN_IDS,
   BUY_ORDER_COLUMN_IDS,
@@ -532,7 +533,14 @@ export function Market() {
 
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
-  const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
+  const { setup: refiningSetup, hydrated: refiningHydrated } = useRefiningSetup();
+  const appraisal = useAppraisal(
+    effectiveHub,
+    pricePercent,
+    activeCharacterId,
+    refiningSetup,
+    refiningHydrated
+  );
   // A Fitting's Export menu, or a page-level paste (`app/GlobalPasteRouter.tsx`),
   // lands here with a list to appraise. Keyed on the navigation itself so a
   // re-render never re-submits it.

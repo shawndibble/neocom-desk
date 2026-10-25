@@ -14,6 +14,7 @@ import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/apprai
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { FullIskTotal } from './FullIskTotal';
+import { RefiningSetupChips } from '@/features/refining/RefiningSetupChips';
 
 interface AppraisalHeaderStatsProps {
   totals: AppraisalTotals;
@@ -90,6 +91,7 @@ export function AppraisalHeaderStats({
           }
         />
       )}
+      {!pricesUnavailable && showRefine && <RefiningSetupChips />}
       {!pricesUnavailable && showCheapest && (
         <StatChip
           label={t('market.appraisal.cheapestBuy')}

@@ -66,6 +66,7 @@ import { loadMarketTypesById } from '@/sde/marketTypesById';
 import { loadMutaplasmids, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { splitAbyssalUnmatched } from '@/engine/market/abyssalValuation';
 import type { ReprocessingType } from '@/sde/types';
+import type { RefiningSetup } from '@/engine/industry/refiningSetup';
 
 export interface AppraisalOutcome {
   appraisal: Appraisal;
@@ -141,6 +142,8 @@ export interface AppraiseOptions {
    * makes the manual button one of the two things allowed to bypass a TTL.
    */
   force?: boolean;
+  /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
+  refining?: RefiningSetup;
 }
 
 /** Every abyssal type's name, lower-case: read only when a paste has unmatched lines. */
@@ -164,7 +167,7 @@ export async function appraisePaste(
   hub: TradeHub,
   pricePercent: number,
   characterId: number | null = null,
-  { force = false }: AppraiseOptions = {}
+  { force = false, refining }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
   const { entries, unreadable } = parseAppraisalPasteDetailed(text);
   const [catalogue, typesById] = await Promise.all([
@@ -238,6 +241,7 @@ export async function appraisePaste(
               specialisationSkillId: reprocessing.specialisationSkillID,
             },
             modifiers,
+            refining,
             materialPrices: Object.fromEntries(
               reprocessing.materials
                 .map((m): [number, number | undefined] => [

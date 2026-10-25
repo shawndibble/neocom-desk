@@ -5,12 +5,8 @@
  * Pure. Yields come from `reprocessing.ts`, which refuses to guess the
  * facility or the tax; the caller states those assumptions.
  */
-import {
-  BASE_STATION_REPROCESSING_RATE,
-  reprocessingValue,
-  reprocessingYield,
-  type ReprocessingMaterial,
-} from './reprocessing';
+import { reprocessingValue, reprocessingYield, type ReprocessingMaterial } from './reprocessing';
+import { netOfReprocessingTax } from './refiningSetup';
 
 export interface OreStack {
   typeId: number;
@@ -130,17 +126,6 @@ export function planCoverage(
     });
 }
 
-/** The facility's own rate: an NPC station is the 50% base; only 'My structure' takes a typed rate. */
-export function resolveRefiningRate(input: {
-  facility: 'npc' | 'structure';
-  typedRate?: number;
-}): number {
-  if (input.facility === 'structure' && input.typedRate !== undefined && input.typedRate > 0) {
-    return input.typedRate;
-  }
-  return BASE_STATION_REPROCESSING_RATE;
-}
-
 export interface OreExitValues {
   /** Net of sales tax, at the buy price given. 0 when unpriced. */
   sellRaw: number;
@@ -157,14 +142,16 @@ export function valueOreExits(input: {
   stack: Pick<OreStack, 'units' | 'portionSize' | 'materials' | 'efficiency' | 'rawUnitPrice'>;
   mineralPrices: Readonly<Record<number, number>>;
   salesTaxPct: number;
+  /** The facility's reprocessing tax as a fraction of the refined value; absent = none. */
+  reprocessingTaxRate?: number;
 }): OreExitValues {
-  const { stack, mineralPrices, salesTaxPct } = input;
+  const { stack, mineralPrices, salesTaxPct, reprocessingTaxRate = 0 } = input;
   const net = 1 - salesTaxPct / 100;
   const y = reprocessingYield(stack);
   const refined = reprocessingValue(y.outputs, mineralPrices);
   return {
     sellRaw: Math.max(0, stack.rawUnitPrice) * stack.units * net,
-    refineThenSell: refined.total * net,
+    refineThenSell: netOfReprocessingTax(refined.total, reprocessingTaxRate) * net,
     outputs: y.outputs,
     unitsLeftOver: y.unitsLeftOver,
     pricedAll: refined.pricedAll && stack.rawUnitPrice > 0,
