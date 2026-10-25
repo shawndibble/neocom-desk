@@ -101,3 +101,12 @@ export const NoneHereTop = drawer({ state: 'noneHere' });
 export const NoneHereText = drawer({ state: 'noneHere', placeMode: 'text' });
 /** @summary Nothing owned, on a phone. */
 export const NoneHereTopPhone = onPhone(NoneHereTop);
+
+/** @summary Chosen: Search settings on two lines, the summary naming the place; the control inside, picker sentence, cost line replaced. */
+export const Chosen = drawer({ placement: 'settings' });
+/** @summary Chosen on a phone. */
+export const ChosenPhone = onPhone(Chosen);
+/** @summary Chosen with Search settings open. */
+export const ChosenOpen = drawer({ placement: 'settings', settingsOpen: true });
+/** @summary Chosen, settings open, on a phone. */
+export const ChosenOpenPhone = onPhone(ChosenOpen);
