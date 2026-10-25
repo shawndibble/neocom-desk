@@ -392,23 +392,15 @@ interface SliceShapeProps {
   width?: number;
   height?: number;
   fill?: string;
-  fillOpacity?: number;
 }
 
 /** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. */
-function SliceShape({ x, y, width, height, fill, fillOpacity }: SliceShapeProps) {
+function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
   if (x === undefined || y === undefined || width === undefined || height === undefined) {
     return <g />;
   }
   return (
-    <rect
-      x={x}
-      y={y + 1}
-      width={Math.max(0, width)}
-      height={Math.max(0, height - 2)}
-      fill={fill}
-      fillOpacity={fillOpacity}
-    />
+    <rect x={x} y={y + 1} width={Math.max(0, width)} height={Math.max(0, height - 2)} fill={fill} />
   );
 }
 
@@ -416,8 +408,7 @@ function SliceShape({ x, y, width, height, fill, fillOpacity }: SliceShapeProps)
  * The Depletion view's pace chart: one 100% bar per scan interval, from scan to scan on the shared
  * time axis, split into each mined ore's share of that interval's progress. Slices keep the
  * legend's order and colours with the first (most valuable) ore at the bottom; each is inset
- * 1px top and bottom (see SliceShape), leaving a 2px gap. Quiet intervals fade. The caller wraps it in its figure and table; only the
- * plot is here.
+ * 1px top and bottom (see SliceShape), leaving a 2px gap. The caller wraps it in its figure and table; only the plot is here.
  */
 export function PaceByOreChart({
   summary,
@@ -445,7 +436,6 @@ export function PaceByOreChart({
             to: i.to,
             y1: floor,
             y2: floor + share,
-            opacity: i.opacity,
           };
           floor += share;
           return [slice];
@@ -486,7 +476,6 @@ export function PaceByOreChart({
             y1={s.y1}
             y2={s.y2}
             fill={oreTone(toneIndex[s.ore])}
-            fillOpacity={s.opacity}
             shape={SliceShape}
             ifOverflow="visible"
           />
