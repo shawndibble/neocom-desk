@@ -130,12 +130,21 @@ export function planAlertsWalk(
   return steps;
 }
 
-/** How many Characters need a sign-in, and for which permissions in all. */
+/**
+ * Whether to nag about this Character's sign-in: only one that is on (holds a
+ * grant) and is missing something. Off is the player's choice, so an off
+ * Character is never counted; its own row still offers Log in….
+ */
+export function nagsForSignIn(need: CharacterAlertsNeed): boolean {
+  return need.needsWalk && need.held.length > 0;
+}
+
+/** How many Characters that are on need a sign-in, and for which permissions in all. */
 export function summarizeAlertsNeeds(needs: readonly CharacterAlertsNeed[]): {
   characters: number;
   permissions: AlertsPermission[];
 } {
-  const walking = needs.filter((need) => need.needsWalk);
+  const walking = needs.filter(nagsForSignIn);
   return {
     characters: walking.length,
     permissions: ordered(new Set(walking.flatMap((need) => need.missing))),

@@ -218,39 +218,41 @@ export async function writeDeviceRegistration(
   // drift check then never sees a fresh row for a Character the registration
   // does not list yet, and if a batch below fails, the next upload still
   // sweeps. The marker is set only once every batch has committed.
-  await registrationRef.set(
-    {
-      fcmToken: write.fcmToken,
-      characterIds: write.characterIds,
-      // Firestore map keys are strings; a Character dropped from the roster
-      // falls out because the whole map is rebuilt on every upload.
-      eveTypesByCharacter: Object.fromEntries(
-        write.characterIds.map((id) => [
-          String(id),
-          write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
-        ])
-      ),
-      ...(quietHours ? { quietHours } : {}),
-      [SERVER_EVENTS_FIELD]: serverEventsByCharacter,
-      [SERVER_INPUTS_FIELD]: keep(previousServerInputs, write.serverInputsByCharacter),
-      // The tick's readings for Characters still held, for events still enabled: a
-      // re-registration must not reset them, or the next tick would seed silently
-      // and miss a crossing.
-      [SERVER_BASELINES_FIELD]: Object.fromEntries(
-        Object.entries(keep(previousBaselines)).map(([id, baseline]) => [
-          id,
-          trimBaseline(baseline, serverEventsByCharacter[id] ?? []),
-        ])
-      ),
-      [POLLED_EVENTS_FIELD]: polledEventsOf(serverEventsByCharacter),
-      ...(routeRules ? { [ROUTE_RULES_FIELD]: routeRules } : {}),
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    {
-      // A listed field left out is deleted, as a plain `set` would; an unlisted one is kept.
-      mergeFields: REGISTRATION_FIELDS,
-    }
-  );
+  const registration: Record<string, unknown> = {
+    fcmToken: write.fcmToken,
+    characterIds: write.characterIds,
+    // Firestore map keys are strings; a Character dropped from the roster
+    // falls out because the whole map is rebuilt on every upload.
+    eveTypesByCharacter: Object.fromEntries(
+      write.characterIds.map((id) => [
+        String(id),
+        write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
+      ])
+    ),
+    ...(quietHours ? { quietHours } : {}),
+    [SERVER_EVENTS_FIELD]: serverEventsByCharacter,
+    [SERVER_INPUTS_FIELD]: keep(previousServerInputs, write.serverInputsByCharacter),
+    // The tick's readings for Characters still held, for events still enabled: a
+    // re-registration must not reset them, or the next tick would seed silently
+    // and miss a crossing.
+    [SERVER_BASELINES_FIELD]: Object.fromEntries(
+      Object.entries(keep(previousBaselines)).map(([id, baseline]) => [
+        id,
+        trimBaseline(baseline, serverEventsByCharacter[id] ?? []),
+      ])
+    ),
+    [POLLED_EVENTS_FIELD]: polledEventsOf(serverEventsByCharacter),
+    ...(routeRules ? { [ROUTE_RULES_FIELD]: routeRules } : {}),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  // A listed field left out is deleted, as a plain `set` would; an unlisted one
+  // is kept. `mergeFields` does not do the deleting itself: a listed field
+  // missing from the data throws ("Input data is missing for field …"), so
+  // each one is written as an explicit delete — the marker always, here.
+  for (const field of REGISTRATION_FIELDS) {
+    if (!(field in registration)) registration[field] = FieldValue.delete();
+  }
+  await registrationRef.set(registration, { mergeFields: REGISTRATION_FIELDS });
 
   await Promise.all([
     ...write.projections.map(async ({ characterId, rows }) => {

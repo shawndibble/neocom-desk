@@ -13187,7 +13187,7 @@
         },
         "needsSignInCount_one": "{{count}} needs a login",
         "needsSignInCount_other": "{{count}} need a login",
-        "needsNone": "Every Character has what its ticked Device alerts need.",
+        "needsNone": "Every Character that is on has what its ticked Device alerts need.",
         "needsLine_one": "{{count}} Character needs a login for: {{list}}.",
         "needsLine_other": "{{count}} Characters need a login for: {{list}}.",
         "need": {

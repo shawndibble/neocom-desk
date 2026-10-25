@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import {
   dispatchDueProjections,
   purgeFiredProjections,
@@ -60,12 +60,17 @@ class FakeFirestore {
       get: async () => this.snapshotOf(name, id),
       set: async (data: Data, options?: { mergeFields?: string[] }) => {
         if (!options?.mergeFields) return void store.set(id, { ...data });
-        // Real Firestore: listed fields are written, a listed field absent from
-        // `data` is deleted, every other field is kept.
+        // The Admin SDK: listed fields are written, a listed field set to
+        // `FieldValue.delete()` is deleted, every other field is kept — and a
+        // listed field absent from `data` throws ("Input data is missing for
+        // field …") before anything is written.
+        const missing = options.mergeFields.find((field) => !(field in data));
+        if (missing) throw new Error(`Input data is missing for field "${missing}".`);
         const next: Data = { ...(store.get(id) ?? {}) };
         for (const field of options.mergeFields) {
-          if (field in data) next[field] = data[field];
-          else delete next[field];
+          const value = data[field];
+          if (value instanceof FieldValue && value.isEqual(FieldValue.delete())) delete next[field];
+          else next[field] = value;
         }
         store.set(id, next);
       },
