@@ -2853,6 +2853,8 @@
     "bpAcqAtHub": "At {{hub}}",
     "bpAcqLpPriced": "{{isk}} ISK with LP at your {{rate}} ISK/LP",
     "bpAcqLpPricedMarket": "{{isk}} ISK with LP at the store’s market {{rate}} ISK/LP",
+    "bpAcqLpFree": "{{isk}} ISK, LP counted as already earned",
+    "bpAcqLpValueHint": "Blank (0) counts your LP as already earned, so a copy costs only the store’s ISK and the turn-ins you still need. Type a rate to charge for the LP too.",
     "bpAcqLpIskOnly": "ISK only — no market rate for this store’s LP",
     "bpAcqLpLoading": "Loading LP Store offers…",
     "bpAcqLpUnavailable": "Couldn't load LP Store offers.",

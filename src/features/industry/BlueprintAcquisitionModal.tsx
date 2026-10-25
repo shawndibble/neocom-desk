@@ -34,8 +34,7 @@ import { idSetKey } from '@/lib/idSetKey';
  */
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { lpRate } from '@/engine/loyalty/marketLpValue';
-import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
+import { blueprintLpRate } from '@/engine/loyalty/marketLpValue';
 import {
   useCallback,
   useEffect,
@@ -309,31 +308,18 @@ export function BlueprintAcquisitionModal({
     () => loadLpTurnInPricer(hub, lpOffers),
     `${hub.id}:${lpOffers.map((o) => o.offer_id).join(',')}`
   );
-  // Each store's own market LP Value, for when the pilot has set none.
-  const lpCorpIds = lp.status === 'ready' ? [...new Set(lp.data.map((m) => m.corporationId))] : [];
-  const marketLpValues = useLoad(
-    () =>
-      lpValue > 0
-        ? Promise.resolve(new Map<number, number | null>())
-        : loadMarketLpValues(lpCorpIds, hub),
-    `${hub.id}:${lpValue > 0}:${lpCorpIds.join(',')}`
-  );
-  // Rows wait for the rates, so none flashes as unpriced while they load.
-  const lpRatesLoading = lp.status === 'ready' && marketLpValues.status === 'loading';
+  // A blueprint's LP is priced at the pilot's own LP Value, else free (LP
+  // already earned) — never a store's market rate.
   const lpRows = useMemo(
     () =>
-      lp.status === 'ready' && marketLpValues.status !== 'loading'
+      lp.status === 'ready'
         ? lpOfferRows(
             lp.data,
-            (corp) =>
-              lpRate(
-                lpValue,
-                marketLpValues.status === 'ready' ? (marketLpValues.data.get(corp) ?? null) : null
-              ),
+            () => blueprintLpRate(lpValue),
             turnIns.status === 'ready' ? turnIns.data : () => null
           )
         : [],
-    [lp, lpValue, marketLpValues, turnIns]
+    [lp, lpValue, turnIns]
   );
   const lpSection = sectionRows(lpRows, (r) => r.pickable);
   const inventRows = useMemo(
@@ -431,14 +417,16 @@ export function BlueprintAcquisitionModal({
         lp: formatIsk(row.lpCost),
       }),
       tier(row),
-      row.lpPriced && row.lpRate !== null
-        ? t(
-            row.lpRateSource === 'market'
-              ? 'industry.bpAcqLpPricedMarket'
-              : 'industry.bpAcqLpPriced',
-            { isk: formatIsk(row.price), rate: formatIsk(row.lpRate) }
-          )
-        : t('industry.bpAcqLpIskOnly'),
+      row.lpRateSource === 'free'
+        ? t('industry.bpAcqLpFree', { isk: formatIsk(row.price) })
+        : row.lpPriced && row.lpRate !== null
+          ? t(
+              row.lpRateSource === 'market'
+                ? 'industry.bpAcqLpPricedMarket'
+                : 'industry.bpAcqLpPriced',
+              { isk: formatIsk(row.price), rate: formatIsk(row.lpRate) }
+            )
+          : t('industry.bpAcqLpIskOnly'),
     ];
     if (row.quantity > 1)
       parts.push(t('industry.blueprintAcquisitionLpQuantity', { count: row.quantity }));
@@ -798,14 +786,13 @@ export function BlueprintAcquisitionModal({
         <section className={SECTION_CLASS}>
           <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionLpHeading')}</h3>
           {lp.status !== 'loading' &&
-          !lpRatesLoading &&
           lp.status !== 'unavailable' &&
           lpSection.total === 0 ? null : (
             <>
-              <LpValueField id="bp-acq-lp-value" />
+              <LpValueField id="bp-acq-lp-value" note={t('industry.bpAcqLpValueHint')} />
             </>
           )}
-          {lp.status === 'loading' || lpRatesLoading ? (
+          {lp.status === 'loading' ? (
             <p className="flex items-center gap-2 text-text-dim">
               <Spinner
                 size="sm"

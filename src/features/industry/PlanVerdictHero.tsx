@@ -151,6 +151,8 @@ interface PlanVerdictHeroProps {
   locationBlock?: ReactionLocationBlock;
   /** The one-line setup summary under the verdict, with its Edit setup link. */
   footer?: ReactNode;
+  /** The setup form that slides open under the footer, attached to this card. */
+  expansion?: ReactNode;
 }
 
 export interface ReactionLocationBlock {
@@ -197,6 +199,7 @@ export function PlanVerdictHero({
   locationBlock,
   vs90dPct = null,
   footer,
+  expansion,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -432,6 +435,7 @@ export function PlanVerdictHero({
           {footer}
         </div>
       )}
+      {expansion}
 
       <CalculationBreakdown
         open={breakdownOpen}

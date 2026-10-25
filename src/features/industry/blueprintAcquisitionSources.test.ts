@@ -400,6 +400,25 @@ describe('lpOfferRows', () => {
     ]);
   });
 
+  it('charges only the ISK and turn-ins when the LP is free, and stays pickable', () => {
+    const [row] = lpOfferRows(
+      [lpMatch({ offer: WITH_TURN_IN })],
+      () => ({ rate: 0, source: 'free' }),
+      () => 300_000
+    );
+    expect(row).toMatchObject({
+      price: 12_300_000,
+      lpPriced: true,
+      lpRateSource: 'free',
+      pickable: true,
+    });
+  });
+
+  it('rounds a computed price to whole ISK', () => {
+    const [row] = lpOfferRows([lpMatch()], yours(2_883.563_888_9), () => 88_800_000.4);
+    expect(Number.isInteger(row.price)).toBe(true);
+  });
+
   it('adds the turn-ins still to buy, so the row costs what automatic pricing charges', () => {
     const [row] = lpOfferRows([lpMatch({ offer: WITH_TURN_IN })], unpriced, () => 300_000);
     expect(row).toMatchObject({ price: 12_300_000, turnInCost: 300_000 });

@@ -241,6 +241,11 @@ function usableRate(iskPerLp: number | null): number {
   return iskPerLp !== null && Number.isFinite(iskPerLp) && iskPerLp > 0 ? iskPerLp : 0;
 }
 
+/** A rate that prices the LP, a deliberate 0 (LP counted as free) included; null is unpriced. */
+function pricesLp(iskPerLp: number | null): boolean {
+  return iskPerLp !== null && Number.isFinite(iskPerLp) && iskPerLp >= 0;
+}
+
 /**
  * One LP Store offer that hands out this blueprint. ESI's offer carries no
  * ME/TE, and an LP Store copy is issued unresearched, so it is ME0/TE0.
@@ -296,13 +301,15 @@ export function lpOfferRows(
         quantity: m.offer.quantity,
         requiredItemCount: m.offer.required_items.length,
         turnInCost,
-        price: lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, rate) + (turnInCost ?? 0),
-        lpPriced: usableRate(rate) > 0 && m.offer.lp_cost > 0,
+        // Whole ISK: an ISK/LP rate carries a long fraction, and the picked
+        // price is written into the plan's price box as is.
+        price: Math.round(lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, rate) + (turnInCost ?? 0)),
+        lpPriced: pricesLp(rate) && m.offer.lp_cost > 0,
         lpRate: rate,
         lpRateSource: source,
         me: 0,
         te: 0,
-        pickable: m.offer.lp_cost === 0 || usableRate(rate) > 0,
+        pickable: m.offer.lp_cost === 0 || pricesLp(rate),
       };
     })
   );

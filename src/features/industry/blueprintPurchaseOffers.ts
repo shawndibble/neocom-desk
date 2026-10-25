@@ -8,9 +8,9 @@ import { useKeyedLoad } from '@/lib/useAsyncLoad';
  * never opens with an empty blueprint price while the market or an LP Store
  * sells the blueprint.
  *
- * An LP redemption is priced ISK + LP × its LP Value (`lpRate`: the pilot's
- * own when set, else the store's market value; a redemption nothing prices
- * the LP of is left out rather than counted free) + whatever turn-in items
+ * An LP redemption is priced ISK + LP × the pilot's LP Value
+ * (`blueprintLpRate`: their own when set, else free — LP already earned)
+ * + whatever turn-in items
  * the pilot does not already hold in their assets, at hub sell price (`loadLpTurnInPricer`) — the same number the Blueprint
  * Acquisition modal's LP rows and an LP Store "Plan in Industry" use. One
  * Fuzzwork call per region covers every blueprint in the plan, and the LP
@@ -30,7 +30,7 @@ import { detectOwnedStock } from '@/engine/industry/ownedStock';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
 import { loadGlobalMarketOverrides } from '@/features/market/orderBookView';
-import { loadLpRates } from '@/features/loyalty/lpRates';
+import { loadBlueprintLpRate } from '@/features/loyalty/lpRates';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { getHubPrices, getRegionSellPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
@@ -166,15 +166,12 @@ export async function loadBlueprintPurchaseOffers(
     accountCharacterIds(characterId).then((characterIds) => accountLpMatches(characterIds, ids)),
   ]);
   const matches = [...lpByType.values()].flat();
-  const [turnIns, rateFor] = await Promise.all([
+  const [turnIns, lpRate] = await Promise.all([
     loadLpTurnInPricer(
       hub,
       matches.map((match) => match.offer)
     ),
-    loadLpRates(
-      matches.map((match) => match.corporationId),
-      hub
-    ),
+    loadBlueprintLpRate(),
   ]);
 
   const byType = new Map<number, BpcOffer[]>();
@@ -182,13 +179,12 @@ export async function loadBlueprintPurchaseOffers(
     const offers: BpcOffer[] = [];
     const sell = marketSellOffer(market.get(typeId) ?? null);
     if (sell) offers.push(sell);
-    for (const { offer, corporationId } of lpByType.get(typeId) ?? []) {
+    for (const { offer } of lpByType.get(typeId) ?? []) {
       const turnInsCost = turnIns(offer);
-      const { rate } = rateFor(corporationId);
-      if (turnInsCost === null || (rate === null && offer.lp_cost > 0)) continue;
+      if (turnInsCost === null) continue;
       const redemption = lpRedemptionOffer(
         { quantity: offer.quantity, requiredItems: [] },
-        lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost,
+        Math.round(lpPickPrice(offer.isk_cost, offer.lp_cost, lpRate.rate) + turnInsCost),
         () => undefined,
         () => 0
       );
@@ -204,21 +200,19 @@ export async function loadBlueprintPurchaseOffers(
  * Store "Plan in Industry" seeds the plan with (`parseBlueprintPriceSeed`).
  * Priced exactly as automatic selection and the modal price it: ISK + LP ×
  * its LP Value + the turn-ins the pilot doesn't already own, at `hub`.
- * `null` when a turn-in still to buy has no price, or nothing prices the LP.
+ * `null` when a turn-in still to buy has no price.
  */
 export async function lpBlueprintPickPrice(
   offer: LoyaltyStoreOffer,
-  corporationId: number,
   hub: TradeHub
 ): Promise<number | null> {
-  const [rateFor, turnIns] = await Promise.all([
-    loadLpRates([corporationId], hub),
+  const [{ rate }, turnIns] = await Promise.all([
+    loadBlueprintLpRate(),
     loadLpTurnInPricer(hub, [offer]),
   ]);
   const turnInsCost = turnIns(offer);
-  const { rate } = rateFor(corporationId);
-  if (turnInsCost === null || (rate === null && offer.lp_cost > 0)) return null;
-  return lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost;
+  if (turnInsCost === null) return null;
+  return Math.round(lpPickPrice(offer.isk_cost, offer.lp_cost, rate) + turnInsCost);
 }
 
 /** `useBlueprintPurchaseOffers`' result: the offers, and whether they are the ones for the current inputs. */

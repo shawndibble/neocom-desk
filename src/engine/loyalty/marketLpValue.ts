@@ -43,8 +43,11 @@ export function marketLpValue(candidates: readonly LpValueCandidate[]): number |
 export interface LpRate {
   /** ISK per LP; null when nothing prices the LP — the offer's LP is then left unpriced, never free. */
   rate: number | null;
-  /** `'yours'`: the pilot's own LP Value; `'market'`: this store's market value. */
-  source: 'yours' | 'market' | null;
+  /**
+   * `'yours'`: the pilot's own LP Value; `'market'`: this store's market value;
+   * `'free'`: LP counted as already earned (a blueprint with no LP Value set).
+   */
+  source: 'yours' | 'market' | 'free' | null;
 }
 
 /** The rate an LP Store pick's LP is priced at: the pilot's own LP Value when set, else the store's market value. */
@@ -54,4 +57,15 @@ export function lpRate(ownValue: number, marketValue: number | null): LpRate {
     return { rate: marketValue, source: 'market' };
   }
   return { rate: null, source: null };
+}
+
+/**
+ * The rate a blueprint bought from an LP Store prices its LP at: the pilot's
+ * own LP Value when set, else free. A builder redeeming a blueprint spends LP
+ * already earned, so with no rate of their own the plan charges only the cash
+ * the store and its turn-ins take, never a market ISK/LP guess.
+ */
+export function blueprintLpRate(ownValue: number): LpRate {
+  if (Number.isFinite(ownValue) && ownValue > 0) return { rate: ownValue, source: 'yours' };
+  return { rate: 0, source: 'free' };
 }
