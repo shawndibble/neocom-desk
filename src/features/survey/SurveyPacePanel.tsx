@@ -1,10 +1,10 @@
 /**
  * The pace figures under the Survey's charts, on the same time axis as the chart
  * above them: `TotalPaceFigure` (Ore left) is the mining rate between each pair
- * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per ore, the percent of
- * its starting total mined in each interval. Each carries its hidden data table.
- * Statically imports `recharts`, so — same rule as `SurveyCharts.tsx` — this must only be reached through a dynamic
- * `import()` from `SurveyBoard.tsx`.
+ * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per ore, the percent
+ * of its starting total mined in each interval. Each carries its hidden data table.
+ * Statically imports `recharts`, so — same rule as `SurveyCharts.tsx` — this must only
+ * be reached through a dynamic `import()` from `SurveyBoard.tsx`.
  */
 import { scalePx } from '@/lib/fontScale';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -161,7 +161,7 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
         header: ore,
         render: (i: PaceInterval) =>
           i.percents[ore] === undefined
-            ? ''
+            ? '–'
             : t('survey.paceTablePercent', { percent: formatPace(i.percents[ore]) }),
       })),
     ],

@@ -112,6 +112,12 @@ export function thinLabels(
   );
 }
 
-/** A percent for display: whole numbers from 10 up, one decimal below, so small ores stay readable. */
-export const formatPace = (v: number): string =>
-  String(v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
+/**
+ * A percent for display: whole numbers from 10 up, one decimal below, and "<0.1" for a positive
+ * sliver that would round to 0 while its line still draws.
+ */
+export const formatPace = (v: number): string => {
+  if (v >= 10) return String(Math.round(v));
+  const r = Math.round(v * 10) / 10;
+  return r === 0 && v > 0 ? '<0.1' : String(r);
+};

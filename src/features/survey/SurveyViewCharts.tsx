@@ -21,7 +21,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   YAxis,
-  type DotItemDotProps,
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
@@ -30,6 +29,7 @@ import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import {
   depletionSeries,
   iskSeries,
+  paceAxisMax,
   type PaceByOreSeries,
   type SurveySeriesRow,
 } from '@/engine/survey/chartViews';
@@ -333,11 +333,31 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
-/** The smallest 1, 2, 2.5, 5 or 10 times a power of ten that holds `v`, so the top tick is round. */
-function niceCeiling(v: number): number {
-  if (v <= 0) return 1;
-  const base = 10 ** Math.floor(Math.log10(v));
-  return base * ([1, 2, 2.5, 5, 10].find((m) => m * base >= v) ?? 10);
+/** What Recharts hands a pace line's dot. */
+interface PaceDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: SurveySeriesRow;
+}
+
+/** Dots only on an interval's middle row: a lone interval between idle ones is still visible. */
+function makePaceDot(tone: string) {
+  return function PaceDot({ cx, cy, payload }: PaceDotProps): ReactElement<SVGElement> {
+    if (payload?.mid === undefined || typeof cx !== 'number' || typeof cy !== 'number') {
+      return <g key={`none-${payload?.at ?? 'x'}`} />;
+    }
+    return (
+      <circle
+        key={payload.at}
+        cx={cx}
+        cy={cy}
+        r={3}
+        fill={tone}
+        stroke="var(--color-panel)"
+        strokeWidth={2}
+      />
+    );
+  };
 }
 
 /**
@@ -392,34 +412,13 @@ export function PaceByOreChart({
     );
   }
 
-  // Dots only on an interval's middle row: a lone interval between idle ones is still visible.
-  function dot(tone: string) {
-    return function PaceDot({ cx, cy, payload }: DotItemDotProps) {
-      const mid = (payload as SurveySeriesRow | undefined)?.mid;
-      if (mid === undefined || typeof cx !== 'number' || typeof cy !== 'number') {
-        return <g key={`${cx}-${cy}-none`} />;
-      }
-      return (
-        <circle
-          key={`${cx}-${cy}`}
-          cx={cx}
-          cy={cy}
-          r={3}
-          fill={tone}
-          stroke="var(--color-panel)"
-          strokeWidth={2}
-        />
-      );
-    };
-  }
-
   return (
     <ResponsiveContainer>
       <ComposedChart key={activeOres.join('|')} data={rows} margin={{ ...MARGIN, top: 20 }}>
         <CartesianGrid stroke="var(--color-line)" vertical={false} />
         {xAxis(false)}
         {yAxis({
-          domain: [0, niceCeiling(maxPercent * 1.1)],
+          domain: [0, paceAxisMax(maxPercent)],
           label: {
             value: t('survey.paceAxis'),
             position: 'insideTopLeft',
@@ -437,7 +436,7 @@ export function PaceByOreChart({
             stroke={oreTone(toneIndex[ore])}
             strokeWidth={1.5}
             connectNulls={false}
-            dot={dot(oreTone(toneIndex[ore]))}
+            dot={makePaceDot(oreTone(toneIndex[ore]))}
             activeDot={false}
             isAnimationActive={false}
             legendType="none"

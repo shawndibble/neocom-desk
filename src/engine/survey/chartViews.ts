@@ -94,8 +94,6 @@ export interface PaceInterval {
    * (not per hour: a long gap reads as a tall value). Only ores mined in it are present.
    */
   percents: Record<string, number>;
-  /** m³ mined per ore, for the tooltip's secondary figure. */
-  minedByOre: Record<string, number>;
 }
 
 export interface PaceByOreSeries {
@@ -132,17 +130,17 @@ export function paceByOreSeries(summary: SurveySummary): PaceByOreSeries {
 
   const intervals: PaceInterval[] = summary.intervals.map((i) => {
     const percents: Record<string, number> = {};
-    const minedByOre: Record<string, number> = {};
     for (const [ore, volume] of Object.entries(i.minedByOre)) {
       const start = startOf.get(ore) ?? 0;
+      // A start of 0 cannot come out of summarizeSurvey with mining against it; skip rather than divide.
       if (volume <= 0 || start <= 0) continue;
+      // Clamped as depletionSeries is, so a rounding quirk can never push a line past the axis.
       const percent = clampPercent((volume / start) * 100);
       percents[ore] = percent;
-      minedByOre[ore] = volume;
       active.add(ore);
       maxPercent = Math.max(maxPercent, percent);
     }
-    return { from: i.from, to: i.to, percents, minedByOre };
+    return { from: i.from, to: i.to, percents };
   });
   const rows = intervals.flatMap((i) => {
     const row = { from: i.from, to: i.to, ...i.percents };
@@ -154,4 +152,17 @@ export function paceByOreSeries(summary: SurveySummary): PaceByOreSeries {
   });
   const activeOres = summary.oreNames.filter((o) => active.has(o));
   return { intervals, rows, activeOres, toneIndex, maxPercent };
+}
+
+/**
+ * The top of the pace chart's Y axis: the smallest 1, 2, 5 or 10 times a power of ten that holds
+ * `maxPercent` plus 10% headroom, never over 100 (an ore cannot lose more than all of itself in
+ * one interval). Round steps keep the axis ticks round too.
+ */
+export function paceAxisMax(maxPercent: number): number {
+  if (!(maxPercent > 0)) return 10;
+  const want = maxPercent * 1.1;
+  const base = 10 ** Math.floor(Math.log10(want));
+  const step = [1, 2, 5, 10].find((m) => m * base >= want * (1 - 1e-9)) ?? 10;
+  return Math.min(100, step * base);
 }

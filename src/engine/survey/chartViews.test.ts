@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { availableChartViews, depletionSeries, iskSeries, paceByOreSeries } from './chartViews';
+import {
+  availableChartViews,
+  depletionSeries,
+  iskSeries,
+  paceAxisMax,
+  paceByOreSeries,
+} from './chartViews';
 import { summarizeSurvey, type SurveyScan } from './series';
 
 const MIN = 60_000;
@@ -179,7 +185,21 @@ describe('paceByOreSeries', () => {
     expect(intervals[1].percents.B).toBeCloseTo((50 / startB) * 100);
   });
 
-  it('never divides by zero and never exceeds 100', () => {
+  it('skips an ore with no start volume and clamps a percent over 100 (hand-built summary)', () => {
+    const base = summarizeSurvey([scan(0, ['A', 100], ['B', 100]), scan(5, ['A', 50], ['B', 50])])!;
+    const s = {
+      ...base,
+      ores: base.ores.map((o) =>
+        o.ore === 'A' ? { ...o, startVolume: 0 } : { ...o, startVolume: 10 }
+      ),
+    };
+    const { intervals, maxPercent } = paceByOreSeries(s);
+    expect('A' in intervals[0].percents).toBe(false);
+    expect(intervals[0].percents.B).toBe(100);
+    expect(maxPercent).toBe(100);
+  });
+
+  it('never divides by zero through a real survey', () => {
     const s = summarizeSurvey([scan(0, ['A', 0], ['B', 100]), scan(5, ['A', 0], ['B', 0])])!;
     const { intervals, maxPercent } = paceByOreSeries(s);
     expect(intervals[0].percents.B).toBeCloseTo(100);
@@ -222,5 +242,23 @@ describe('paceByOreSeries', () => {
     const { activeOres, toneIndex } = paceByOreSeries(s);
     expect(activeOres).toEqual(['C']);
     expect(toneIndex.C).toBe(2);
+  });
+});
+
+describe('paceAxisMax', () => {
+  it('rounds up to 1, 2, 5 or 10 times a power of ten with headroom', () => {
+    expect(paceAxisMax(0.3)).toBe(0.5);
+    expect(paceAxisMax(6)).toBe(10);
+    expect(paceAxisMax(1.5)).toBe(2);
+    expect(paceAxisMax(30)).toBe(50);
+  });
+
+  it('never goes over 100', () => {
+    expect(paceAxisMax(100)).toBe(100);
+    expect(paceAxisMax(60)).toBe(100);
+  });
+
+  it('has a sane default with nothing mined', () => {
+    expect(paceAxisMax(0)).toBe(10);
   });
 });
