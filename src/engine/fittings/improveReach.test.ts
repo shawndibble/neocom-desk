@@ -4,6 +4,7 @@ import {
   bestScore,
   findImprovements,
   improveCandidates,
+  onlyNeutral,
   onlySide,
   type CandidateOptions,
   type ImproveCandidate,
@@ -519,5 +520,15 @@ describe('onlySide', () => {
       rejected: [],
     };
     expect(bestScore(onlySide(shieldOnly, 'armor', groupOf))).toBeNull();
+  });
+
+  it('onlyNeutral keeps only options on neither side', () => {
+    const mixed = { ...result, noDownside: [option(2, 0.1), option(9, 0.2), option(5, 0.1)] };
+    const neutral = onlyNeutral(mixed, groupOf);
+    expect(neutral.noDownside.map((o) => o.candidate.toTypeId)).toEqual([9]);
+    expect(bestScore(neutral)).toBe(0.2);
+    expect(
+      bestScore(onlyNeutral({ ...mixed, noDownside: [option(2, 0.1)], tradeOffs: [] }, groupOf))
+    ).toBeNull();
   });
 });

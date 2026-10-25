@@ -1126,17 +1126,25 @@ export function ImprovePanel({
 
       {state.status === 'done' && state.sides && (
         <p className="text-sm" data-testid="improve-sides">
-          {(['shield', 'armor'] as const)
-            .map((side) => {
-              const score = bestScore(state.sides![side]);
-              return t('fittings.improve.sideResult', {
-                side: t(`fittings.improve.defense.${side}`),
+          {[
+            ...(['shield', 'armor'] as const).map((side) => ({
+              label: t(`fittings.improve.defense.${side}`),
+              score: bestScore(state.sides![side]),
+            })),
+            // Neutral rows (Damage Control, hull) help either side; shown only when there are some.
+            ...(state.neutral && bestScore(state.neutral) !== null
+              ? [{ label: t('fittings.improve.defense.either'), score: bestScore(state.neutral) }]
+              : []),
+          ]
+            .map(({ label, score }) =>
+              t('fittings.improve.sideResult', {
+                side: label,
                 result:
                   score === null
                     ? t('fittings.improve.sideNone')
                     : t('fittings.improve.sideGain', { percent: Math.round(score * 100) }),
-              });
-            })
+              })
+            )
             .join(' · ')}
         </p>
       )}

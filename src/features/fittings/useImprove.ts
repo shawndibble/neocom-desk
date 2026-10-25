@@ -18,6 +18,7 @@ import {
   IMPROVE_REACHES,
   improveCandidates,
   type DefenseChoice,
+  onlyNeutral,
   onlySide,
   type ImproveCandidate,
   type ImproveGoal,
@@ -229,6 +230,8 @@ export type ImproveState =
       elapsedMs: number;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
+      /** With `sides`: the options on neither side (Damage Control, hull), shown as "Either". */
+      neutral?: ImproveResult;
       /** Mine more: the fit as it is, whose yield is the real "Now"; `before` is scored with the best crystals. */
       fitAsIs?: FittingStats;
       /** Mine more: the best crystal's key, and the miners that hold none of the ore's crystals. */
@@ -566,7 +569,7 @@ export function useImprove(
             : {}),
           fitTotal,
           elapsedMs: performance.now() - started,
-          ...(sideResults ? { sides: sideResults } : {}),
+          ...(sideResults ? { sides: sideResults, neutral: onlyNeutral(results[0], groupOf) } : {}),
         });
       } catch {
         if (!cancelled) setState({ status: 'failed' });
