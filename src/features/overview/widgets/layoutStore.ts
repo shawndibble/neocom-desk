@@ -62,7 +62,6 @@ function parseWidget(stored: unknown): Widget | null {
   if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
   if (!def.hasCalendarEvents || raw.calendarEvents !== 'all') delete out.calendarEvents;
   if (!def.hasRaidsWhere || raw.raidsWhere !== 'near') delete out.raidsWhere;
-  if (!def.hasStructuresShow || raw.structuresShow !== 'problems') delete out.structuresShow;
   if (
     !def.hasRaidsWhere ||
     !isRaidsRadius(raw.raidsRadius) ||
@@ -72,6 +71,8 @@ function parseWidget(stored: unknown): Widget | null {
   }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
   if (!def.hasProfitSource) delete out.profitSource;
+  // The default Show is never stored, so an older build's layout and this one's read alike.
+  if (!def.shows.includes(raw.show as never) || raw.show === def.shows[0]) delete out.show;
   const items = cleanTrendItems(raw.trendItems);
   if (!def.hasTrendSources || items.length === 0) delete out.trendItems;
   else out.trendItems = items;

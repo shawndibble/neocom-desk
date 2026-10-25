@@ -5,9 +5,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { TFunction } from 'i18next';
-import { WIDGET_KINDS, getKind, isAddable } from '../kinds';
+import { WIDGET_KINDS, getKind, isAddable, type WidgetKindDef } from '../kinds';
 import { sampleView } from '../gallerySamples';
-import { OPENS_ON_ALL } from '../layout';
+import { OPENS_ON_ALL, seedKind } from '../layout';
 import { BASE_KINDS, ROLES } from '../roles';
 import { CORP_DEFS } from './corpModels';
 import { FEED_SOURCES } from './feedSources';
@@ -20,7 +20,7 @@ import {
   registerKindDefs,
   buildView,
 } from './models';
-import { VIEW_SETTINGS, viewKey, type ViewRequest } from './viewSettings';
+import { VIEW_SETTINGS, settingsContext, viewKey, type ViewRequest } from './viewSettings';
 import type { FeedId } from './types';
 
 registerKindDefs(CORP_DEFS);
@@ -83,7 +83,7 @@ describe('kind declarations', () => {
 
   it('draws every kind a role or the base set brings, and each has a gallery preview', () => {
     const t = ((key: string) => key) as unknown as TFunction;
-    const kinds = new Set([...BASE_KINDS, ...Object.values(ROLES).flat()]);
+    const kinds = new Set([...BASE_KINDS, ...Object.values(ROLES).flat().map(seedKind)]);
     for (const kind of kinds) {
       expect(isAddable(kind), kind).toBe(true);
       expect(kindDef(kind), kind).toBeDefined();
@@ -127,7 +127,8 @@ describe('kind declarations', () => {
   });
 });
 
-const ALT: Record<keyof typeof VIEW_SETTINGS, ViewRequest[]> = {
+type Variant = ViewRequest | ((kind: WidgetKindDef) => ViewRequest);
+const ALT: Record<keyof typeof VIEW_SETTINGS, Variant[]> = {
   range: [
     { kind: '', scopeAll: false, range: 7 },
     { kind: '', scopeAll: false, range: 90 },
@@ -138,11 +139,12 @@ const ALT: Record<keyof typeof VIEW_SETTINGS, ViewRequest[]> = {
     { kind: '', scopeAll: false, raidsWhere: 'near' },
     { kind: '', scopeAll: false, raidsWhere: 'near', raidsRadius: 15 },
   ],
-  structuresShow: [{ kind: '', scopeAll: false, structuresShow: 'problems' }],
   profitSource: [
     { kind: '', scopeAll: false, profitSource: 'trading' },
     { kind: '', scopeAll: false, profitSource: 'both' },
   ],
+  // Each kind's own second Show: the options differ by kind.
+  show: [(k) => ({ kind: '', scopeAll: false, show: k.shows[1] })],
   trend: [
     { kind: '', scopeAll: false, trendItems: [34] },
     { kind: '', scopeAll: false, trendHubs: ['amarr'] },
@@ -158,7 +160,8 @@ describe('view key', () => {
       for (const k of kinds) {
         const base = viewKey({ kind: k.id, scopeAll: false });
         for (const variant of variants) {
-          expect(viewKey({ ...variant, kind: k.id }), `${k.id} ${setting}`).not.toBe(base);
+          const request = typeof variant === 'function' ? variant(k) : variant;
+          expect(viewKey({ ...request, kind: k.id }), `${k.id} ${setting}`).not.toBe(base);
         }
       }
     }
@@ -171,13 +174,16 @@ describe('view key', () => {
         !k.hasPlexPlan &&
         !k.hasCalendarEvents &&
         !k.hasRaidsWhere &&
-        !k.hasStructuresShow &&
         !k.hasProfitSource &&
-        !k.hasTrendSources
+        !k.hasTrendSources &&
+        k.shows.length === 0
     )!;
     const base = viewKey({ kind: plain.id, scopeAll: false });
     for (const variants of Object.values(ALT)) {
-      for (const v of variants) expect(viewKey({ ...v, kind: plain.id })).toBe(base);
+      for (const v of variants) {
+        const request = typeof v === 'function' ? v(plain) : v;
+        expect(viewKey({ ...request, kind: plain.id })).toBe(base);
+      }
     }
   });
 
@@ -191,6 +197,17 @@ describe('view key', () => {
     // A Profit widget saved before the Source setting is a Builds one.
     expect(viewKey({ kind: 'profit', scopeAll: false })).toBe(
       viewKey({ kind: 'profit', scopeAll: false, profitSource: 'builds' })
+    );
+  });
+
+  it("hands the builder the kind's default Show for a missing or unknown one", () => {
+    expect(settingsContext('wallet', {}).show).toBe('balance');
+    expect(settingsContext('wallet', { show: 'flow' }).show).toBe('flow');
+    expect(settingsContext('wallet', { show: 'sources' }).show).toBe('balance');
+    expect(settingsContext('corpWallet', {}).show).toBe('divisions');
+    expect(settingsContext('orders', { show: 'flow' }).show).toBeUndefined();
+    expect(viewKey({ kind: 'wallet', scopeAll: false, show: 'balance' })).toBe(
+      viewKey({ kind: 'wallet', scopeAll: false })
     );
   });
 

@@ -3,8 +3,17 @@
  * each one brings. Pure data plus the builders that turn an answer (or none)
  * into an Overview Layout.
  */
+import { presetSeed } from './galleryPresets';
 import { isAddable, type WidgetKindId } from './kinds';
-import { MAX_WIDGETS, newWidget, type MakeId, type OverviewLayout, type Widget } from './layout';
+import {
+  MAX_WIDGETS,
+  seedKind,
+  seedWidget,
+  type MakeId,
+  type OverviewLayout,
+  type Widget,
+  type WidgetSeed,
+} from './layout';
 
 export const ROLE_IDS = [
   'trader',
@@ -16,8 +25,9 @@ export const ROLE_IDS = [
 ] as const;
 export type RoleId = (typeof ROLE_IDS)[number];
 
-export const ROLES: Record<RoleId, readonly WidgetKindId[]> = {
-  trader: ['orders', 'priceWatch', 'stock', 'walletFlow', 'netWorth'],
+export const ROLES: Record<RoleId, readonly WidgetSeed[]> = {
+  // Wallet flow: the Wallet on its Flow, beside the base set's Wallet on its Balance.
+  trader: ['orders', 'priceWatch', 'stock', presetSeed('walletFlow'), 'netWorth'],
   industrialist: ['industry', 'profit', 'stock', 'structures'],
   planetaryIndustry: ['planetary'],
   miner: ['miningYield', 'survey', 'miningTax', 'moonChunks'],
@@ -34,13 +44,16 @@ export function seqId(prefix: string): MakeId {
   return () => `${prefix}${++n}`;
 }
 
-function fromKinds(kinds: readonly WidgetKindId[], makeId: MakeId): OverviewLayout {
+function fromKinds(seeds: readonly WidgetSeed[], makeId: MakeId): OverviewLayout {
   const widgets: Widget[] = [];
-  const seen = new Set<WidgetKindId>();
-  for (const kind of kinds) {
-    if (seen.has(kind) || !isAddable(kind) || widgets.length >= MAX_WIDGETS) continue;
-    seen.add(kind);
-    const w = newWidget(kind, makeId());
+  const seen = new Set<string>();
+  for (const seed of seeds) {
+    const kind = seedKind(seed);
+    // One widget per kind and Show: the base Wallet and a Role's Wallet flow both stay.
+    const key = typeof seed === 'string' ? kind : `${kind}:${seed.show ?? ''}`;
+    if (seen.has(key) || !isAddable(kind) || widgets.length >= MAX_WIDGETS) continue;
+    seen.add(key);
+    const w = seedWidget(seed, makeId());
     if (w) widgets.push(w);
   }
   return { version: 1, widgets };
@@ -51,7 +64,7 @@ export function buildLayoutFromRoles(
   roles: readonly RoleId[],
   makeId: MakeId = seqId('r')
 ): OverviewLayout {
-  const kinds: WidgetKindId[] = [...BASE_KINDS];
+  const kinds: WidgetSeed[] = [...BASE_KINDS];
   for (const role of roles) kinds.push(...(ROLES[role] ?? []));
   return fromKinds(kinds, makeId);
 }

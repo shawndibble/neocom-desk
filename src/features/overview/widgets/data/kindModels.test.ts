@@ -41,8 +41,9 @@ const iso = (ms: number) => new Date(ms).toISOString();
 describe('feeds for the later kinds', () => {
   it('reads each kind from its own feed, and wallet from the journal as well', () => {
     expect(feedsOf('netWorth')).toEqual(['netWorth']);
-    expect(feedsOf('walletFlow')).toEqual(['journal']);
-    expect(feedsFor(['wallet', 'walletFlow']).sort()).toEqual(['journal', 'wallet']);
+    // Its Flow reads the journal only, its Balance the wallet too: the kind reads both.
+    expect(feedsOf('wallet')).toEqual(['wallet', 'journal']);
+    expect(feedsFor(['wallet', 'netWorth']).sort()).toEqual(['journal', 'netWorth', 'wallet']);
   });
 });
 
@@ -52,7 +53,9 @@ describe('humanizeRefType', () => {
   });
 });
 
-describe('walletFlow', () => {
+describe('wallet, Show Flow', () => {
+  const flowView = (feeds: Feeds, c: BuildContext) =>
+    buildView('wallet', feeds, { ...c, show: 'flow' });
   const entry = (id: number, ago: number, amount: number, refType: string) => ({
     id,
     date: iso(NOW - ago),
@@ -68,8 +71,7 @@ describe('walletFlow', () => {
   });
 
   it('nets income against spending over the range, as net bars and a table by type', () => {
-    const view = buildView(
-      'walletFlow',
+    const view = flowView(
       journal([
         entry(1, DAY, 300, 'bounty_prize'),
         entry(2, 2 * DAY, -100, 'market_fee'),
@@ -91,33 +93,32 @@ describe('walletFlow', () => {
   });
 
   it('compares with the previous window when the journal is long enough, else names the top source', () => {
-    const long = buildView(
-      'walletFlow',
+    const long = flowView(
       journal([entry(1, DAY, 300, 'a'), entry(2, 9 * DAY, 100, 'a'), entry(3, 20 * DAY, 1, 'a')]),
       ctx({ range: 7 })
     );
     expect(long.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
-    const short = buildView('walletFlow', journal([entry(1, DAY, 300, 'a')]), ctx({ range: 30 }));
+    const short = flowView(journal([entry(1, DAY, 300, 'a')]), ctx({ range: 30 }));
     expect(short.number.secondary?.direction).toBeUndefined();
     expect(short.number.secondary?.text).toContain('walletFlow.top');
   });
 
   it('applies the widget range over the same data, not in the loader', () => {
     const feeds = journal([entry(1, DAY, 300, 'a'), entry(2, 20 * DAY, 1000, 'b')]);
-    expect(buildView('walletFlow', feeds, ctx({ range: 7 })).number.iskAmount).toBe(300);
-    expect(buildView('walletFlow', feeds, ctx({ range: 30 })).number.iskAmount).toBe(1300);
+    expect(flowView(feeds, ctx({ range: 7 })).number.iskAmount).toBe(300);
+    expect(flowView(feeds, ctx({ range: 30 })).number.iskAmount).toBe(1300);
   });
 
   it('says how far the journal really reaches when the range asks for more', () => {
-    const view = buildView('walletFlow', journal([entry(1, 29 * DAY, 5, 'a')]), ctx({ range: 90 }));
+    const view = flowView(journal([entry(1, 29 * DAY, 5, 'a')]), ctx({ range: 90 }));
     expect(view.chart?.note).toContain('noteCovered');
     expect(view.chart?.note).toContain('"covered":29');
   });
 
   it('asks for the grant when the journal says so, and is empty with no entries', () => {
     const lapsed: Feeds = { journal: ok({ result: null, needsReauth: true }) };
-    expect(stateOf(buildView('walletFlow', lapsed, ctx()))).toBe('needsPermission');
-    expect(stateOf(buildView('walletFlow', journal([]), ctx()))).toBe('empty');
+    expect(stateOf(flowView(lapsed, ctx()))).toBe('needsPermission');
+    expect(stateOf(flowView(journal([]), ctx()))).toBe('empty');
   });
 });
 

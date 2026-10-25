@@ -40,7 +40,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOverviewRefresh } from './data/refreshContext';
 import type { KindView, NumberModel, NumberSecondary } from './data/types';
 import { useWidgetView } from './data/useWidgetView';
-import { getKind } from './kinds';
+import { getKind, widgetKeys } from './kinds';
 import { endpointsOf } from './data/models';
 import { Chart } from './charts/Chart';
 import type { Widget as WidgetModel } from './layout';
@@ -335,7 +335,8 @@ function WidgetFrame({
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
   if (!kind) return null;
-  const title = widget.title ?? t(kind.titleKey);
+  const keys = widgetKeys(kind, widget.show);
+  const title = widget.title ?? t(keys.titleKey);
   const endpoints = endpointsOf(widget.kind, widget);
 
   let body;
@@ -388,7 +389,7 @@ function WidgetFrame({
   } else if (state === 'empty') {
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
-        <b>{view.emptyMessage ?? t(kind.emptyMessageKey)}</b>
+        <b>{view.emptyMessage ?? t(keys.emptyMessageKey)}</b>
         {!view.emptyHealthy && (
           <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
         )}

@@ -42,10 +42,12 @@ import {
   STOCK_PATH,
   UNKNOWN,
   ageText,
+  byShow,
   type Builder,
   type KindDef,
 } from './builderKit';
 import { walletArea } from './chartBuilders';
+import { walletFlow } from './kindModels';
 import { dailyBalanceSeries } from './chartSeries';
 import { contractsTable, mailTable } from './characterTables';
 import {
@@ -445,7 +447,12 @@ const priceWatch: Builder = (feeds, { t }) => {
 
 /** The account-money and inbox kinds: the feeds each reads and the builder that draws it. */
 export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
-  wallet: { feeds: ['wallet', 'journal'], scope: 'character', build: wallet },
+  // Balance reads both feeds, Flow the journal alone.
+  wallet: {
+    feeds: ['wallet', 'journal'],
+    scope: 'character',
+    build: byShow({ balance: wallet, flow: walletFlow }, wallet),
+  },
   mail: { feeds: ['mail'], scope: 'character', build: mail },
   orders: { feeds: ['orders', 'skills'], scope: 'account', build: orders },
   contracts: { feeds: ['contracts'], scope: 'character', build: contracts },

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DAY_MS } from '@/lib/age';
 import type { CorpJournalLine, CorpWalletFeed } from './corpFeeds';
 import { corpCashFlow, corpIncome, corpWallet } from './corpMoneyModels';
+import { CORP_DEFS } from './corpModels';
 import type { BuildContext, Feeds } from './types';
 
 const t = (key: string, options?: Record<string, unknown>) => {
@@ -182,5 +183,26 @@ describe('corpIncome', () => {
     expect(unknown.number.value).toBe('—');
     expect(unknown.number.notes).toContain('overview.widgets.corpIncome.unavailable');
     expect(corpIncome(feed({ journal: [line(1, -5)] }), ctx()).status.isEmpty).toBe(true);
+  });
+});
+
+describe('the corp wallet kind, by Show', () => {
+  const build = CORP_DEFS.corpWallet!.build;
+  const journal = [line(1, 900), line(2, -300, 'market_transaction'), line(40, 50)];
+
+  it('draws Divisions by default, and for an unknown Show', () => {
+    expect(build(feed({ journal }), ctx())).toEqual(corpWallet(feed({ journal }), ctx()));
+    expect(build(feed({ journal }), { ...ctx(), show: 'balance' })).toEqual(
+      corpWallet(feed({ journal }), ctx())
+    );
+  });
+
+  it('draws Flow as Cash flow did and Sources as Income by source did', () => {
+    expect(build(feed({ journal }), { ...ctx(7), show: 'flow' })).toEqual(
+      corpCashFlow(feed({ journal }), ctx(7))
+    );
+    expect(build(feed({ journal }), { ...ctx(90), show: 'sources' })).toEqual(
+      corpIncome(feed({ journal }), ctx(90))
+    );
   });
 });

@@ -257,7 +257,7 @@ describe('Widget menu', () => {
     await user.click(screen.getByRole('button', { name: 'Settings for Structures' }));
     expect(screen.getByRole('menuitemradio', { name: 'All structures' })).toBeChecked();
     await user.click(screen.getByRole('menuitemradio', { name: 'Problems only' }));
-    expect(seen.current.widgets[0].structuresShow).toBe('problems');
+    expect(seen.current.widgets[0].show).toBe('problems');
   });
 
   it('offers Source to Profit, and All characters only on Trading', async () => {
@@ -296,6 +296,29 @@ describe('Widget menu', () => {
     expect(screen.getByRole('menuitemradio', { name: '8 jumps' })).toBeChecked();
     await user.click(screen.getByRole('menuitemradio', { name: '15 jumps' }));
     expect(seen.current.widgets[0].raidsRadius).toBe(15);
+  });
+
+  it('switches the Wallet to Flow, keeping its view and range, and names it after the Show', async () => {
+    const wallet: OverviewLayout = {
+      version: 1,
+      widgets: [w('a', 'wallet', { view: 'table', range: 90 })],
+    };
+    const { user, seen } = setup({ initial: wallet });
+    await user.click(screen.getByRole('button', { name: 'Settings for Wallet' }));
+    expect(screen.getByRole('menuitemradio', { name: 'Balance' })).toBeChecked();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Flow' }));
+    expect(seen.current.widgets[0]).toMatchObject({ show: 'flow', view: 'table', range: 90 });
+
+    await user.click(screen.getByRole('button', { name: 'Settings for Wallet flow' }));
+    expect(screen.getByRole('menuitemradio', { name: 'Flow' })).toBeChecked();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Balance' }));
+    expect('show' in seen.current.widgets[0]).toBe(false);
+  });
+
+  it('gives a kind with no Show setting no Show group', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));
+    expect(screen.queryByRole('menuitemradio', { name: 'Flow' })).toBeNull();
   });
 
   it('gives a kind with no Where setting no Where group', async () => {

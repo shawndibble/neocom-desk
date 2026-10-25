@@ -104,7 +104,7 @@ function problemsNumber(
   };
 }
 
-export const structures: Builder = (feeds, { t, now, structuresShow }) => {
+export const structures: Builder = (feeds, { t, now, show }) => {
   const feed = feeds.structures;
   const raw = feed?.data ?? null;
   // No structures page exists: a plain title, not a link back to /corp.
@@ -166,7 +166,7 @@ export const structures: Builder = (feeds, { t, now, structuresShow }) => {
       (a.tone === b.tone ? 0 : worstSeverity([a.tone, b.tone]) === a.tone ? -1 : 1) ||
       a.remaining - b.remaining
   );
-  const problemsOnly = structuresShow === 'problems';
+  const problemsOnly = show === 'problems';
   const rows = problemsOnly ? all.filter((row) => row.problem) : all;
   // Problems only reads the board of the structures it lists, so no hidden one sets a deadline or the summary.
   const shown = problemsOnly ? rows.flatMap((row) => row.items) : items;

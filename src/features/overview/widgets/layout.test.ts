@@ -26,8 +26,8 @@ import {
   setRowsPerPage,
   newWidget,
   setScope,
+  setShow,
   setShowOnPhone,
-  setStructuresShow,
   setView,
   snapshotLayout,
   stepWidget,
@@ -323,6 +323,32 @@ describe('setProfitSource', () => {
   });
 });
 
+describe('setShow', () => {
+  it('stores a Show other than the default and drops it on the default, keeping view and range', () => {
+    const l = layoutOf(w('a', 'corpWallet', { view: 'chart', range: 90 }));
+    const sources = setShow(l, 'a', 'sources');
+    expect(sources.widgets[0]).toEqual({ ...l.widgets[0], show: 'sources' });
+    expect('show' in setShow(sources, 'a', 'divisions').widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the current Show, one the kind lacks, or a kind without one', () => {
+    const l = layoutOf(w('a', 'wallet'), w('b', 'orders'));
+    expect(setShow(l, 'a', 'balance')).toBe(l);
+    expect(setShow(l, 'a', 'divisions')).toBe(l);
+    expect(setShow(l, 'b', 'flow')).toBe(l);
+  });
+});
+
+describe('newWidget and addWidget with a Show', () => {
+  it('opens on the chosen Show, stored only when it is not the default', () => {
+    expect(newWidget('wallet', 'a', 'flow')).toMatchObject({ kind: 'wallet', show: 'flow' });
+    expect('show' in newWidget('wallet', 'a', 'balance')!).toBe(false);
+    expect('show' in newWidget('orders', 'a', 'flow')!).toBe(false);
+    const added = addWidget(layoutOf(), 'corpWallet', counter(), { show: 'sources' });
+    expect(added.widgets[0]).toMatchObject({ kind: 'corpWallet', show: 'sources', range: 30 });
+  });
+});
+
 describe('setCalendarEvents', () => {
   it('stores All events and drops the field when it goes back to the default', () => {
     const l = layoutOf(w('a', 'comingUp'));
@@ -338,18 +364,13 @@ describe('setCalendarEvents', () => {
   });
 });
 
-describe('setStructuresShow', () => {
+describe('the Structures Show', () => {
   it('stores Problems only and drops the field when it goes back to All', () => {
     const l = layoutOf(w('a', 'structures'));
-    const problems = setStructuresShow(l, 'a', 'problems');
-    expect(problems.widgets[0].structuresShow).toBe('problems');
-    expect('structuresShow' in setStructuresShow(problems, 'a', 'all').widgets[0]).toBe(false);
-  });
-
-  it('changes nothing for the default or a kind with no Show choice', () => {
-    const l = layoutOf(w('a', 'structures'), w('b', 'orders'));
-    expect(setStructuresShow(l, 'a', 'all')).toBe(l);
-    expect(setStructuresShow(l, 'b', 'problems')).toBe(l);
+    const problems = setShow(l, 'a', 'problems');
+    expect(problems.widgets[0].show).toBe('problems');
+    expect('show' in setShow(problems, 'a', 'all').widgets[0]).toBe(false);
+    expect(setShow(l, 'a', 'all')).toBe(l);
   });
 });
 

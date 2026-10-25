@@ -151,7 +151,7 @@ Overview** and **Just the basics**. The union of the Roles' Widget Kinds plus th
 base four becomes the Layout. "Start from a role" in Customize reuses it.
 "New" tags are not shown on a first-run Layout.
 
-Role → kinds: Trader: orders, priceWatch, stock, walletFlow, netWorth ·
+Role → kinds: Trader: orders, priceWatch, stock, wallet on Flow (Wallet flow), netWorth ·
 Industrialist: industry, profit, stock, structures · Planetary industry:
 planetary · Miner: miningYield, survey, miningTax, moonChunks · Fighter:
 location, kills, jumpTimers, incursions · Explorer and hauler: routeSafety,
@@ -334,8 +334,7 @@ Reset and the Gallery all follow it. A saved layout keeps the view it stored
 | sp | Number | S | Number, Table |
 | location | Number | S | Number, Table |
 | clones | Table | M | Number, Table |
-| wallet | Chart | S | Number, Chart, Table |
-| walletFlow | Chart | M | Number, Chart, Table |
+| wallet (Show: Balance, Flow) | Chart | S (Wallet flow preset: M) | Number, Chart, Table |
 | netWorth | Chart | M | Number, Chart, Table |
 | orders | Table | L | Number, Chart, Table |
 | priceWatch | Table | M | Number, Table |
