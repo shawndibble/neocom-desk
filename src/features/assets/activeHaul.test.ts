@@ -108,6 +108,34 @@ describe('useActiveHaul parse', () => {
     await db.settings.delete('activeHaul');
   });
 
+  it('keeps a limit, leg values and stack prices across a reload', async () => {
+    const priced = {
+      ...withLeg({
+        isk: 600,
+        stacks: [{ typeId: 34, name: 'Tritanium', quantity: 6, unitM3: 1, unitIsk: 100 }],
+      }),
+      maxIskPerHaul: 600,
+    };
+    await db.settings.put({ key: 'activeHaul', value: priced });
+    useActiveHaul.setState({ value: null, hydrated: false });
+    await useActiveHaul.getState().hydrate();
+    expect(useActiveHaul.getState().value).toEqual(priced);
+    await db.settings.delete('activeHaul');
+  });
+
+  it('ignores a haul whose leg value or stack price is not a number', async () => {
+    for (const extra of [
+      { isk: 'x' },
+      { stacks: [{ typeId: 1, name: 'a', quantity: 1, unitM3: 1, unitIsk: 'x' }] },
+    ]) {
+      await db.settings.put({ key: 'activeHaul', value: withLeg(extra) });
+      useActiveHaul.setState({ value: null, hydrated: false });
+      await useActiveHaul.getState().hydrate();
+      expect(useActiveHaul.getState().value).toBeNull();
+    }
+    await db.settings.delete('activeHaul');
+  });
+
   it('ignores a stored value that is not a haul', async () => {
     await db.settings.put({ key: 'activeHaul', value: { id: 1 } });
     useActiveHaul.setState({ value: null, hydrated: false });
@@ -152,6 +180,34 @@ describe('carriableStacks', () => {
     expect(carriableStacks(plan, 1, 7, lines, name)).toEqual([
       { typeId: 34, name: 'T34', quantity: 1000, unitM3: 0.01 },
       { typeId: 99, name: 'T99', quantity: 2, unitM3: 10 },
+    ]);
+  });
+
+  it('leaves out over-limit stacks and carries each stack price', () => {
+    const limited = {
+      ...plan,
+      active: {
+        pickups: [
+          {
+            characterId: 1,
+            locationId: 7,
+            hauls: [],
+            unfit: [],
+            overLimit: [{ typeId: 99, quantity: 3, unitM3: 10, unitIsk: 900 }],
+            tooBigShips: [],
+          },
+        ],
+      },
+    } as unknown as MovePlan;
+    expect(
+      carriableStacks(limited, 1, 7, lines, name, new Map([[34, 5]])).map((x) => [
+        x.typeId,
+        x.quantity,
+        x.unitIsk,
+      ])
+    ).toEqual([
+      [34, 1000, 5],
+      [648, 2, undefined],
     ]);
   });
 

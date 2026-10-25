@@ -71,6 +71,8 @@ export interface PickupHauls {
   hauls: Haul[];
   /** Non-ship stacks whose single unit is bigger than the hull's biggest hold. */
   unfit: PackLine[];
+  /** Stacks whose single unit is worth more than the ISK limit: never hauled. */
+  overLimit: PackLine[];
   /** Packed ships bigger than the hull's biggest hold: they have to be flown. */
   tooBigShips: PackLine[];
 }
@@ -82,6 +84,8 @@ export interface HaulerOption {
   pickups: PickupHauls[];
   /** Stacks this hull cannot carry at all; a hull with any ranks behind every one with none. */
   unfitCount: number;
+  /** Stacks left behind over the ISK limit; the same for every hull, so it never ranks them. */
+  overLimitCount: number;
   /** Packed ships this hull cannot carry; each is a flight of its own. */
   tooBigCount: number;
 }
@@ -112,6 +116,8 @@ export interface MovePlan {
     shipsToFly: number;
     /** Stacks left out for want of a packaged volume. */
     unknownVolumeCount: number;
+    /** Hold-bound stacks with no known ISK price: counted as 0 ISK against a limit. */
+    unpricedCount: number;
     /** Trips with the active hauler; null without one. */
     trips: number | null;
   };
@@ -141,6 +147,10 @@ export function planMove(input: {
   /** Assembled ships (by itemID) to haul packaged instead of flying. */
   packedShipIds?: ReadonlySet<number>;
   hulls: readonly MoveHull[];
+  /** ISK of one unit by typeID, at the default Trade Hub's sell price; a type absent is unpriced. */
+  unitIsk?: ReadonlyMap<number, number>;
+  /** Most a single haul may be worth, in ISK; null or absent for no limit. */
+  maxIskPerHaul?: number | null;
   /** The pilot's own pick; an unknown hull or a typed size that is not a positive number is ignored. */
   haulerOverride?: HaulerOverride;
 }): MovePlan {
@@ -209,8 +219,9 @@ export function planMove(input: {
             typeId: l.typeId,
             quantity: l.quantity,
             unitM3: l.m3! / l.quantity,
+            ...(input.unitIsk?.has(l.typeId) ? { unitIsk: input.unitIsk.get(l.typeId) } : {}),
           }));
-        const { hauls, unfit } = packHauls(lines, hull.holds);
+        const { hauls, unfit, overLimit } = packHauls(lines, hull.holds, input.maxIskPerHaul);
         // A packed ship that fits no hold is flown instead; loose packaged stock cannot be.
         const tooBigShips: PackLine[] = [];
         const stillUnfit: PackLine[] = [];
@@ -225,6 +236,7 @@ export function planMove(input: {
           locationId: p.locationId,
           hauls,
           unfit: stillUnfit,
+          overLimit,
           tooBigShips,
         };
       })
@@ -232,10 +244,15 @@ export function planMove(input: {
     return {
       hull,
       pickups: packed.filter(
-        (p) => p.hauls.length > 0 || p.unfit.length > 0 || p.tooBigShips.length > 0
+        (p) =>
+          p.hauls.length > 0 ||
+          p.unfit.length > 0 ||
+          p.overLimit.length > 0 ||
+          p.tooBigShips.length > 0
       ),
       trips: packed.reduce((sum, p) => sum + p.hauls.length, 0),
       unfitCount: packed.reduce((sum, p) => sum + p.unfit.length, 0),
+      overLimitCount: packed.reduce((sum, p) => sum + p.overLimit.length, 0),
       tooBigCount: packed.reduce(
         (sum, p) => sum + p.tooBigShips.reduce((n, u) => n + u.quantity, 0),
         0
@@ -286,6 +303,10 @@ export function planMove(input: {
       characters: perCharacter.length,
       shipsToFly: pickups.reduce((sum, p) => sum + p.ships.length, 0),
       unknownVolumeCount: pickups.reduce((sum, p) => sum + p.unknownVolume.length, 0),
+      unpricedCount: pickups.reduce(
+        (sum, p) => sum + p.lines.filter((l) => !input.unitIsk?.has(l.typeId)).length,
+        0
+      ),
       trips: active?.trips ?? null,
     },
     suggested,

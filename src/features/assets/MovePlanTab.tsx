@@ -11,6 +11,8 @@ import { useUrlParams } from '@/lib/useUrlState';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { ActiveHaulView } from './ActiveHaulView';
 import { buildActiveHaul, replanActiveHaul, useActiveHaul } from './activeHaul';
+import { loadHaulPrices } from './haulPrices';
+import { useMaxIskPerHaul } from './maxIskPerHaul';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import {
@@ -262,8 +264,11 @@ function MovePlanTabBody({
   /** What the shown plan was worked out from, so packing a ship can re-plan it. */
   const planBase = useRef<Omit<
     Parameters<typeof planMove>[0],
-    'packedShipIds' | 'haulerOverride'
+    'packedShipIds' | 'haulerOverride' | 'maxIskPerHaul'
   > | null>(null);
+  const maxIsk = useMaxIskPerHaul((st) => st.value);
+  const setMaxIsk = useMaxIskPerHaul((st) => st.setValue);
+  const maxIskReady = useHydratedStore(useMaxIskPerHaul);
   /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
   const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
   const savedHaul = useActiveHaul((st) => st.value);
@@ -467,14 +472,22 @@ function MovePlanTabBody({
               .catch(() => null)
           : system;
     const { hulls, sizing } = await loadHulls();
+    const characters = selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, inputs.selected);
+    const prices = await loadHaulPrices(characters.flatMap((c) => c.assets.map((a) => a.typeId)));
     const base = {
       destinationLocationIds: atPlace,
-      characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, inputs.selected),
+      characters,
       unitM3: loaded.unitM3,
+      unitIsk: prices.unitIsk,
       shipTypeIds: loaded.shipTypeIds,
       hulls,
     };
-    const plan = planMove({ ...base, packedShipIds: packedIds, haulerOverride: override });
+    const plan = planMove({
+      ...base,
+      packedShipIds: packedIds,
+      haulerOverride: override,
+      maxIskPerHaul: maxIsk,
+    });
     const state: PlanState = {
       plan,
       destinationSystem,
@@ -482,6 +495,7 @@ function MovePlanTabBody({
         station !== null ? (loaded.places.get(station) ?? searched?.name ?? null) : null,
       pickupSystems: loaded.systems,
       haulerSizing: sizing,
+      pricesUnavailable: prices.unavailable,
     };
     return { base, state };
   }
@@ -556,6 +570,8 @@ function MovePlanTabBody({
       return;
     }
     if (urlKey === shownKey || urlKey === restoring.current || !loaded || !urlPlan) return;
+    // The saved limit shapes the plan, so a link's plan waits for it.
+    if (!maxIskReady) return;
     restoring.current = urlKey;
     const mine = session.current;
     void (async () => {
@@ -582,7 +598,7 @@ function MovePlanTabBody({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the URL's plan or the loaded assets change; the helpers close over `loaded`
-  }, [urlKey, loaded, shownKey]);
+  }, [urlKey, loaded, shownKey, maxIskReady]);
 
   /** Works the shown plan out again for a changed ship choice or hauler. */
   function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {
@@ -597,7 +613,32 @@ function MovePlanTabBody({
       r
         ? {
             ...r,
-            plan: planMove({ ...base, packedShipIds: nextPacked, haulerOverride: nextOverride }),
+            plan: planMove({
+              ...base,
+              packedShipIds: nextPacked,
+              haulerOverride: nextOverride,
+              maxIskPerHaul: maxIsk,
+            }),
+          }
+        : r
+    );
+  }
+
+  /** Saves the new limit and works the shown plan out again under it. */
+  function changeMaxIsk(next: number | null) {
+    void setMaxIsk(next);
+    const base = planBase.current;
+    if (!base) return;
+    setResult((r) =>
+      r
+        ? {
+            ...r,
+            plan: planMove({
+              ...base,
+              packedShipIds: packed,
+              haulerOverride,
+              maxIskPerHaul: next,
+            }),
           }
         : r
     );
@@ -635,6 +676,8 @@ function MovePlanTabBody({
         places: loaded.places,
         systems: loaded.systems,
         stationIds,
+        unitIsk: planBase.current?.unitIsk,
+        maxIskPerHaul: maxIsk,
         name: (typeId) => loaded.typeNames.get(typeId) ?? `#${typeId}`,
       });
       if (mine !== session.current) return;
@@ -719,6 +762,8 @@ function MovePlanTabBody({
             onToggleCompare={() => setCompareOpen((v) => !v)}
             haulerOverride={haulerOverride}
             onPickHauler={(next) => replan(packed, next)}
+            maxIsk={maxIsk}
+            onChangeMaxIsk={changeMaxIsk}
             headingRef={planHeadingRef}
             onBack={() => {
               // The URL closes the plan (see the effect above): step out of the entry this tab pushed, else drop the plan from the one it is on.

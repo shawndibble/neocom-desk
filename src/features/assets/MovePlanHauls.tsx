@@ -1,6 +1,7 @@
 import { formatCount } from '@/lib/formatCount';
 import { useTranslation } from 'react-i18next';
 import type { PickupHauls } from '@/engine/assets/movePlan';
+import { formatIsk } from '@/lib/isk';
 import { formatCubicMetres } from '@/lib/volume';
 import { PlanLine } from './MovePlanLine';
 import { foldHauls } from './movePlanView';
@@ -26,6 +27,11 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
             {run.from === run.to
               ? t('assets.movePlan.haulHeading', { n: run.from, total })
               : t('assets.movePlan.haulRangeHeading', { from: run.from, to: run.to, total })}
+            {run.haul.iskValue > 0 && (
+              <span className="ml-2 normal-case">
+                {t('assets.movePlan.haulValue', { value: formatIsk(run.haul.iskValue) })}
+              </span>
+            )}
           </h4>
           {run.haul.holds
             .filter((hold) => hold.lines.length > 0)
@@ -68,6 +74,26 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
                 name={name(u.typeId)}
                 qty={`× ${formatCount(u.quantity)}`}
                 trailing={t('assets.movePlan.unfitLine', { unit: formatCubicMetres(u.unitM3) })}
+                dim
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+      {pickup.overLimit.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h4 className="m-0 text-xs font-semibold tracking-wide text-warning uppercase">
+            {t('assets.movePlan.overLimitHeading')}
+          </h4>
+          <ul className="m-0 flex list-none flex-col p-0">
+            {pickup.overLimit.map((u) => (
+              <PlanLine
+                key={u.typeId}
+                name={name(u.typeId)}
+                qty={`× ${formatCount(u.quantity)}`}
+                trailing={t('assets.movePlan.overLimitLine', {
+                  value: formatIsk(u.unitIsk ?? 0),
+                })}
                 dim
               />
             ))}
