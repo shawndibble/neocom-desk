@@ -14,9 +14,9 @@
  * nothing for) is cargo instead — that is what "cargo" *means* once slot
  * membership is known, not a fallback for whatever position parsing missed.
  *
- * `parseEftFit` strips a module's `/offline` suffix without exposing it
- * (matching in-game import, per its own doc comment) — every resolved module
- * here loads `'active'`, since there is no signal left to say otherwise. A
+ * `parseEftFit` strips a module's `/offline` suffix without exposing it, so
+ * this reads it back off the source line: a module line ending in `/OFFLINE`
+ * loads `'offline'`, every other module loads `'active'`. A
  * drone-bay stack loads `'online'` (carried, not deployed): an EFT paste
  * describes what a fit *carries*, not which drones happen to be in space
  * right now. The workspace then launches what the pilot can field once the
@@ -59,6 +59,7 @@ export type EftSlotLookup = Readonly<Record<string, FittingSlotAssignment>>;
  * in cargo (EVE's own export always writes one, even for `x1`).
  */
 const HAS_QUANTITY_SUFFIX = /^.*\S\s+x\d+$/i;
+const OFFLINE_SUFFIX = /\s*\/offline\s*$/i;
 
 export function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
   return typeByName.get(name.toLowerCase())?.typeID ?? null;
@@ -168,10 +169,9 @@ export function loadEftFitting(
     const chargeTypeId = nextIsCharge ? resolveCharge(items[i + 1]) : undefined;
     if (nextIsCharge) i++; // its charge, already handled either way
 
-    const rawLine = (lines[item.line - 1] ?? '')
-      .trim()
-      .replace(MUTATION_REF_SUFFIX, '')
-      .replace(/\s*\/offline\s*$/i, '');
+    const withoutRef = (lines[item.line - 1] ?? '').trim().replace(MUTATION_REF_SUFFIX, '');
+    const isOffline = OFFLINE_SUFFIX.test(withoutRef);
+    const rawLine = withoutRef.replace(OFFLINE_SUFFIX, '');
     const hasExplicitQuantity = HAS_QUANTITY_SUFFIX.test(rawLine);
 
     const namedTypeId = resolveTypeId(item.name, typeByName);
@@ -218,7 +218,7 @@ export function loadEftFitting(
         slot: rack,
         slotIndex,
         typeId,
-        state: 'active',
+        state: isOffline ? 'offline' : 'active',
         ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
         ...mutation,
       });

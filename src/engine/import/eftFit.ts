@@ -15,8 +15,8 @@
  *   emitted as two items (both matter for skill requirements, e.g. T2 ammo).
  * - Drone bay / cargo lines may carry a count suffix: "Item Name xN".
  * - Empty slots render as "[Empty <slot> slot]" — skipped entirely.
- * - Offline modules carry a "/offline" suffix — stripped; in-game import
- *   ignores it too, so we don't track offline state.
+ * - Offline modules carry a "/offline" suffix — stripped here; `eftLoader`
+ *   reads it back off the source line.
  * - Pyfa's mutated items (reconstructed from Pyfa's service/port/eft.py and
  *   muta.py, not from a real export sample): the fitted line names the base
  *   module and ends in a ` [N]` reference, after any charge and `/offline`

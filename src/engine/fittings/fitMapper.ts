@@ -10,14 +10,17 @@ const SLOT_INDEX_START = 1;
 
 /**
  * The engine's `Mutation`, checked here whatever the source (`normaliseMutation`).
- * No rolls: the engine states the base module. Fails the check, or no data
- * loaded: the item goes in bare, the engine knowing only its slot.
+ * No rolls: the engine states the base module. No data loaded to check it
+ * against: base only, so the base module's stats apply rather than an
+ * attribute-less item. Fails the check (base, mutaplasmid and type don't
+ * belong together): the item goes in bare, the engine knowing only its slot.
  */
 function toEngineMutation(
   typeId: number,
   mutation: ItemMutation | undefined,
   mutaplasmids: MutaplasmidLookup | null
 ): Pick<FitItem, 'mutation'> {
+  if (mutation && !mutaplasmids) return { mutation: { base: mutation.baseTypeId } };
   const checked = mutation && normaliseMutation(typeId, mutation, mutaplasmids);
   if (!checked) return {};
   const rolled = Object.keys(checked.attributes).length > 0;
