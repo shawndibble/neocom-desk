@@ -13241,7 +13241,7 @@
         },
         "needsSignInCount_one": "{{count}} needs a login",
         "needsSignInCount_other": "{{count}} need a login",
-        "needsNone": "Every Character has what its ticked Device alerts need.",
+        "needsNone": "Every Character that is on has what its ticked Device alerts need.",
         "needsLine_one": "{{count}} Character needs a login for: {{list}}.",
         "needsLine_other": "{{count}} Characters need a login for: {{list}}.",
         "need": {
@@ -13286,6 +13286,7 @@
         "server-rejected": "The server turned down this device's background alert setup, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
         "unknown": "Background alert setup failed, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work."
       },
+      "pushFailedAt": "Last tried at {{time}}.",
       "pushRetryButton": "Retry",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",

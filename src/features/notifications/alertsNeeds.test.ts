@@ -155,6 +155,7 @@ describe('summarizeAlertsNeeds', () => {
     const needs = alertsNeeds({
       ...base,
       characters: [{ characterId: 1 }, { characterId: 2 }],
+      grants: { 1: on, 2: on },
       deviceScopes: new Map([
         [1, new Set([MAIL])],
         [2, new Set([LOC])],
@@ -162,7 +163,26 @@ describe('summarizeAlertsNeeds', () => {
     });
     expect(summarizeAlertsNeeds(needs)).toEqual({
       characters: 2,
-      permissions: ['notifications', 'location', 'mail'],
+      permissions: ['location', 'mail'],
+    });
+  });
+
+  it('leaves out a Character that is off: off is a choice, so only one that is on is nagged', () => {
+    const needs = alertsNeeds({
+      ...base,
+      characters: [{ characterId: 1 }, { characterId: 2 }],
+      grants: { 1: on },
+      deviceScopes: new Map([
+        [1, new Set([MAIL])],
+        [2, new Set([MAIL])],
+      ]),
+    });
+    // Both still need a sign-in (an off row keeps its own Log in…)…
+    expect(needs.map((need) => need.needsWalk)).toEqual([true, true]);
+    // …but only the one that is on counts.
+    expect(summarizeAlertsNeeds(needs)).toEqual({
+      characters: 1,
+      permissions: ['mail'],
     });
   });
 });

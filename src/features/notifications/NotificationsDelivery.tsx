@@ -23,6 +23,7 @@ import { Link } from 'react-router-dom';
 import { Button, Checkbox, InfoTooltip } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { formatTimeOfDay } from '@/lib/timestamp';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { tabPath } from '@/lib/pageTabs';
 import { SETTINGS_TABS } from '@/app/pageTabs';
@@ -127,7 +128,11 @@ export function NotificationsDelivery({
       {pushFailure && permission === 'granted' && (
         <div className="flex flex-wrap items-center gap-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
           <p role="status" className="min-w-0 flex-1 text-xs text-warning">
-            {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}
+            {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}{' '}
+            {/* Restamped by every failed attempt, so a Retry that fails again still changes it. */}
+            {t('settings.notifications.pushFailedAt', {
+              time: formatTimeOfDay(new Date(pushFailure.at)),
+            })}
           </p>
           <Button
             size="sm"

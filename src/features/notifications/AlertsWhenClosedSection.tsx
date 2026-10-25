@@ -48,6 +48,7 @@ import {
 import {
   alertsNeeds,
   planAlertsWalk,
+  nagsForSignIn,
   summarizeAlertsNeeds,
   type AlertsPermission,
   type AlertsWalkStep,
@@ -158,7 +159,8 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
   }, [returned, navigate, location.pathname, location.search]);
 
   if (characters.length === 0) return null;
-  const walking = needs.filter((need) => need.needsWalk);
+  // Off Characters are left out: off is a choice (`nagsForSignIn`).
+  const walking = needs.filter(nagsForSignIn);
   const summaryNeeds = summarizeAlertsNeeds(needs);
 
   const startWalk = (
@@ -259,7 +261,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
       >
         {confirming !== null ? (
           <AlertsSignInConfirm
-            needs={walking.filter((need) => confirming.includes(need.characterId))}
+            needs={needs.filter((need) => need.needsWalk && confirming.includes(need.characterId))}
             names={new Map(characters.map((character) => [character.characterId, character.name]))}
             busy={busyId !== null}
             onCancel={() => setConfirming(null)}
@@ -271,14 +273,16 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
               {t('settings.notifications.alertsWhenClosed.hint')}
             </p>
             <QuietTimeRows />
-            <p className="text-xs text-text">
-              {summaryNeeds.characters === 0
-                ? t('settings.notifications.alertsWhenClosed.needsNone')
-                : t('settings.notifications.alertsWhenClosed.needsLine', {
-                    count: summaryNeeds.characters,
-                    list: list(summaryNeeds.permissions.map(permissionLabel)),
-                  })}
-            </p>
+            {(summaryNeeds.characters > 0 || enabled.length > 0) && (
+              <p className="text-xs text-text">
+                {summaryNeeds.characters === 0
+                  ? t('settings.notifications.alertsWhenClosed.needsNone')
+                  : t('settings.notifications.alertsWhenClosed.needsLine', {
+                      count: summaryNeeds.characters,
+                      list: list(summaryNeeds.permissions.map(permissionLabel)),
+                    })}
+              </p>
+            )}
             {summaryNeeds.characters > 0 && (
               <NeedsConnection>
                 <Button
