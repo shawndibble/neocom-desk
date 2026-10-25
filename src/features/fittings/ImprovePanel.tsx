@@ -14,6 +14,7 @@ import {
   goalAvailability,
   type ImproveGoal,
   type ImproveOption,
+  type ImproveResult,
   type RejectedOption,
 } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
@@ -25,6 +26,8 @@ import type { ImproveSearch } from './useImprove';
 
 /** How many stat changes a row spells out before counting the rest. */
 const CHANGES_SHOWN = 4;
+
+const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
 const optionKey = (option: ImproveOption) =>
   `${option.candidate.fromTypeId}-${option.candidate.toTypeId}`;
@@ -40,8 +43,17 @@ interface Props {
 export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }: Props) {
   const { t } = useTranslation();
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
-  const [ticked, setTicked] = useState<ReadonlyMap<number, ImproveOption>>(new Map());
+  // Ticks belong to the result they were made in: a new search (a goal
+  // change, an edit to the fit) starts with none.
+  const [ticks, setTicks] = useState<{
+    result: ImproveResult | null;
+    byModule: ReadonlyMap<number, ImproveOption>;
+  }>({ result: null, byModule: new Map() });
   const { state, before } = search;
+  const result = state.status === 'done' ? state.result : null;
+  const ticked = ticks.result === result ? ticks.byModule : new Map<number, ImproveOption>();
+  const setTicked = (byModule: ReadonlyMap<number, ImproveOption>) =>
+    setTicks({ result, byModule });
   const name = (typeId: number) => catalogueTypeName(catalogue, typeId);
 
   const swapLabel = (option: ImproveOption) =>
@@ -52,7 +64,10 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
     });
 
   function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): string {
-    const changes = diffFittingStats(own, option.after).changes;
+    // What the swap does first; the CPU, powergrid and calibration it takes after.
+    const changes = [...diffFittingStats(own, option.after).changes].sort(
+      (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
+    );
     const shown = changes.slice(0, CHANGES_SHOWN).map((change) => changeLabel(change, t));
     const rest = changes.length - shown.length;
     if (rest > 0) shown.push(t('fittings.makeItFit.otherStats', { count: rest }));
@@ -74,13 +89,11 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
   }
 
   function toggle(option: ImproveOption) {
-    setTicked((current) => {
-      const next = new Map(current);
-      const from = option.candidate.fromTypeId;
-      if (next.get(from) === option) next.delete(from);
-      else next.set(from, option);
-      return next;
-    });
+    const next = new Map(ticked);
+    const from = option.candidate.fromTypeId;
+    if (next.get(from) === option) next.delete(from);
+    else next.set(from, option);
+    setTicked(next);
   }
 
   function rows(options: ImproveOption[], own: FittingStats) {
