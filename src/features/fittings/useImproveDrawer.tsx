@@ -327,7 +327,10 @@ export function useImproveDrawer({
                       : { ...ownedPref, everywhere: false, stationId: place }
                   ),
                 otherPlaces: otherPlaceIds.map((id) => ({ id, label: placeLabel(id) })),
-                placeLabel: ownedPlace === 'all' ? '' : placeLabel(ownedPlace),
+                placeLabel:
+                  ownedPlace === 'all'
+                    ? t('market.appraisal.minusOwnedEverywhere')
+                    : placeLabel(ownedPlace),
               },
             }
           : {}),

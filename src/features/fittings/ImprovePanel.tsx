@@ -345,7 +345,9 @@ export function ImprovePanel({
   function isk(option: ImproveOption) {
     const stock = state.status === 'done' ? state.owned?.stock : undefined;
     if (counting && stock && option.iskDelta !== null) {
-      const own = stock.owned.get(option.candidate.toTypeId) ?? 0;
+      // Units the fit already uses are covered by the stock first.
+      const toId = option.candidate.toTypeId;
+      const own = Math.max(0, (stock.owned.get(toId) ?? 0) - (stock.fitCounts.get(toId) ?? 0));
       if (own > 0)
         return <OwnedCostLine need={option.candidate.at.length} own={own} isk={option.iskDelta} />;
     }
@@ -835,10 +837,6 @@ export function ImprovePanel({
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
   // Planning counts owned stock while the switch is on and the Character may read assets.
   const counting = settings.mode === 'buy' && Boolean(settings.owned?.on);
-  const ownedPlaceText =
-    settings.owned?.place === 'all'
-      ? t('market.appraisal.minusOwnedEverywhere')
-      : (settings.owned?.placeLabel ?? '');
   const settingsSummary = [
     t(`fittings.improve.reach.${settings.reach}`),
     t(`fittings.improve.mode.${settings.mode}`),
@@ -848,7 +846,7 @@ export function ImprovePanel({
           cap: formatIskCompact(settings.spendCap),
         }),
     ...(counting && settings.owned
-      ? [t('fittings.improve.owned.summary', { place: ownedPlaceText })]
+      ? [t('fittings.improve.owned.summary', { place: settings.owned.placeLabel })]
       : []),
   ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
