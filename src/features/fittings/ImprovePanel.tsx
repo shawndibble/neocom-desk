@@ -1096,7 +1096,7 @@ export function ImprovePanel({
                 {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
-            <div className="bg-surface border-line sticky bottom-0 space-y-2 border-t pt-2">
+            <div className="bg-panel border-line sticky bottom-0 space-y-2 border-t pt-2">
               {chosen.length > 0 && checkable && (
                 <div className="space-y-1 text-sm" data-testid="improve-selection">
                   {summary ? (
