@@ -36,7 +36,7 @@ AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni,
 Canopus, Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
 Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
 PvP Corp Activity Search, Forge Ledger, New Eden Trade, Keystar, AstraCore,
-evehelper.pages.dev, eve-webtools PI. EVE Crews (lore roleplay layer, no
+evehelper.pages.dev, eve-webtools PI, LedgerParser, IntelParser and Fitlab (roadmap.json and changelog.json per app; every item shipped here or killed: mining history = 90-day overview, PI alerts/forecast/ISK-hr = Advisor, Local threat/Pilot lookup, fit cost + Improve). EVE Crews (lore roleplay layer, no
 market endpoint) and Isktracker Incursions (non-pipeline) are out of remit.
 Weak gaps noted, never filed: J-space class/effect/statics in Place Info
 (Anoik.is, ellatha.com); a downtime-vs-ESI-outage stale-data line
@@ -315,4 +315,5 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   SDE-wide list, no decision value, collector minority); Hubs on route (thin
   filter over Hauling Trip Plan; cheap fix is hubs as optional Trip Plan
   stops); gate-camp check, D-Scan, live map (intel, kill-test 2).
+- **IntelParser leftover:** per-pilot cyno/hot-drop/bait/FC chips on Local rows from zKillboard stats (non-ISK, thin; only revive if intel gets asked for).
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
