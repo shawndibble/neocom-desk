@@ -1351,12 +1351,18 @@
         "speed": "Faster",
         "reach": "Longer reach",
         "cheaper": "Cheaper",
-        "mining": "Mine more"
+        "mining": "Mine more",
+        "haul": "Carry more",
+        "align": "Align faster",
+        "warp": "Align and warp faster"
       },
       "unavailable": {
         "noWeapons": "Nothing on this fit deals damage",
         "noGunsOrLaunchers": "No guns or launchers on this fit",
-        "noMiners": "No miners on this fit"
+        "noMiners": "No miners on this fit",
+        "noHold": "This hull has no cargo or other hold",
+        "noAlign": "This hull has no align time to improve",
+        "noWarp": "This hull has no align time or warp speed to improve"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
@@ -1388,7 +1394,10 @@
         "speed": "No variation of a fitted module makes this fit faster.",
         "reach": "No variation of a fitted module adds reach.",
         "cheaper": "No variation of a fitted module saves ISK within the guardrails.",
-        "mining": "No variation of a fitted miner mines more of this ore."
+        "mining": "No variation of a fitted miner mines more of this ore.",
+        "haul": "No variation of a fitted module adds to this hold.",
+        "align": "No variation of a fitted module makes this fit align faster.",
+        "warp": "No variation of a fitted module helps this fit align and warp faster."
       },
       "closest": "Closest swaps",
       "broke": {
@@ -1440,6 +1449,25 @@
       "oreLabel": "Ore",
       "oreOption": "{{ores}} ({{family}} crystals)",
       "oreHint": "Every miner is scored with the best crystal for this ore, so rows compare like for like. Apply swaps the miners and leaves the loaded crystals alone.",
+      "holdLabel": "Hold",
+      "holdOption": "{{hold}} ({{size}} m³)",
+      "holdHint": "Rows are scored on this hold's size alone.",
+      "holdLine": "{{hold}} {{before}} → {{after}} m³",
+      "alignLine": "Align {{before}} → {{after}} s",
+      "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
+      "hold": {
+        "cargo": "Cargo hold",
+        "fleetHangar": "Fleet hangar",
+        "miningHold": "Ore hold",
+        "ammoHold": "Ammo hold",
+        "planetaryHold": "Planetary commodities hold",
+        "commandCenterHold": "Command center hold",
+        "mineralHold": "Mineral hold",
+        "gasHold": "Gas hold",
+        "iceHold": "Ice hold",
+        "fuelBay": "Fuel bay",
+        "infrastructureHold": "Infrastructure hold"
+      },
       "oreLine": "Mines {{before}} → {{after}} m³/s of {{ores}} ({{family}} crystals)"
     },
     "variations": {

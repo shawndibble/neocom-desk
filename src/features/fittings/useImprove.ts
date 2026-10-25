@@ -8,15 +8,19 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  DEFAULT_IMPROVE_HOLD,
   findImprovements,
   goalAvailability,
+  effectiveHold,
   IMPROVE_GOALS,
+  IMPROVE_HOLDS,
   IMPROVE_MODES,
   IMPROVE_REACHES,
   improveCandidates,
   type DefenseChoice,
   type ImproveCandidate,
   type ImproveGoal,
+  type ImproveHold,
   type ImproveMode,
   type ImproveReach,
   type ImproveResult,
@@ -82,6 +86,16 @@ export const useImproveOre = createLocalSetting<string>({
     typeof raw === 'string' && raw in CRYSTAL_FAMILY_ORES ? raw : DEFAULT_ORE_FAMILY,
 });
 
+/** The hold Carry more scores; remembered on this device. */
+export const useImproveHold = createLocalSetting<ImproveHold>({
+  key: 'fittingsImproveHold',
+  defaultValue: DEFAULT_IMPROVE_HOLD,
+  parse: (raw) =>
+    typeof raw === 'string' && (IMPROVE_HOLDS as readonly string[]).includes(raw)
+      ? (raw as ImproveHold)
+      : DEFAULT_IMPROVE_HOLD,
+});
+
 /** The total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
 export const useImproveSpendCap = createLocalSetting<number | null>({
   key: 'fittingsImproveSpendCap',
@@ -99,6 +113,8 @@ export interface ImproveConfig {
   includeOfficer: boolean;
   /** Mine more: the crystal family (ore) every miner is scored with. */
   oreFamily: string;
+  /** Carry more: the hold scored. */
+  hold: ImproveHold;
 }
 
 /** After this long a search offers "Show best so far". */
@@ -253,7 +269,7 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
-  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily } = config;
+  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
 
   useEffect(() => {
     if (!enabled || !variants || !catalogue) return;
@@ -300,7 +316,7 @@ export function useImprove(
             variants,
             catalogue,
             searched,
-            { reach, mode, spendCap, defense: side, includeRigs, includeOfficer, oreFamily },
+            { reach, mode, spendCap, defense: side, includeRigs, includeOfficer, oreFamily, hold },
             own.slotCounts
           ),
         }));
@@ -344,6 +360,7 @@ export function useImprove(
             fitting: variants.fitting,
             before: scoredBefore,
             goal: searched,
+            hold: effectiveHold(own.holds, hold),
             candidates: set.candidates,
             stats: async (fitting) => {
               const { after } = await variants.compare(load(fitting), controller.signal);
@@ -417,6 +434,7 @@ export function useImprove(
     includeRigs,
     includeOfficer,
     oreFamily,
+    hold,
   ]);
 
   const cancel = useCallback(() => cancelRef.current(), []);

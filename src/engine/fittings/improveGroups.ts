@@ -42,6 +42,12 @@ const CAP_GROUPS: readonly number[] = [43, 767, 768, 781];
 /** Mining Laser, Strip Miner (and Ice Harvester), Deep Core Strip Miner, Mining Laser Upgrade, mining rigs (1232). */
 const MINING_GROUPS: readonly number[] = [54, 464, 483, 546, 1232];
 
+/** Expanded Cargohold, and the cargo-and-navigation rig group 782 (Cargohold Optimization, Polycarbon Engine Housing and the like). */
+const HAUL_GROUPS: readonly number[] = [765, 782];
+
+/** Inertial Stabilizers, Nanofiber Internal Structure, and the navigation rigs (782) that cut inertia or mass. */
+const ALIGN_GROUPS: readonly number[] = [762, 763, 782];
+
 /** The module groups, beyond a module's own, that Rework tries for each Improve Goal. The tank groups are added per Defense Choice. */
 const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   overall: [...DAMAGE_GROUPS, ...REACH_GROUPS, ...SPEED_GROUPS, ...CAP_GROUPS],
@@ -51,6 +57,9 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   reach: REACH_GROUPS,
   cheaper: [],
   mining: MINING_GROUPS,
+  haul: HAUL_GROUPS,
+  align: ALIGN_GROUPS,
+  warp: ALIGN_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */

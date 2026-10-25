@@ -17,6 +17,7 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 import {
   useImprove,
   useImproveGoal,
+  useImproveHold,
   useImproveMode,
   useImproveOre,
   useImproveReach,
@@ -67,6 +68,8 @@ export function useImproveDrawer({
   const setMode = useImproveMode((state) => state.setValue);
   const oreFamily = useImproveOre((state) => state.value);
   const setOreFamily = useImproveOre((state) => state.setValue);
+  const hold = useImproveHold((state) => state.value);
+  const setHold = useImproveHold((state) => state.setValue);
   const spendCap = useImproveSpendCap((state) => state.value);
   const setSpendCap = useImproveSpendCap((state) => state.setValue);
   // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
@@ -92,7 +95,7 @@ export function useImproveDrawer({
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
     isOpen,
-    { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily }
+    { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold }
   );
 
   function apply(options: ImproveOption[]) {
@@ -167,6 +170,8 @@ export function useImproveDrawer({
         onIncludeOfficerChange: setIncludeOfficer,
         oreFamily,
         onOreFamilyChange: (next) => void setOreFamily(next),
+        hold,
+        onHoldChange: (next) => void setHold(next),
       }}
     />
   );
