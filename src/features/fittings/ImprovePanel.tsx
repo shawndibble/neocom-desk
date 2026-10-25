@@ -30,11 +30,14 @@ import {
   bestScore,
   DEFENSE_CHOICES,
   goalAvailability,
+  heldHold,
   IMPROVE_GOALS,
+  IMPROVE_HOLDS,
   IMPROVE_MODES,
   IMPROVE_REACHES,
   type DefenseChoice,
   type ImproveGoal,
+  type ImproveHold,
   type ImproveMode,
   type ImproveReach,
   type ImproveOption,
@@ -44,6 +47,7 @@ import {
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import { createNumberFormat } from '@/lib/numberLocale';
+import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { FittingStats } from '@/engine/fittings/types';
 import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -57,6 +61,11 @@ import type { ImproveSearch } from './useImprove';
 const CHANGES_SHOWN = 4;
 
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
+const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
+const secondsFormat = createNumberFormat({ maximumFractionDigits: 2 });
+const auFormat = createNumberFormat({ maximumFractionDigits: 2 });
+
+const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
@@ -90,6 +99,9 @@ export interface ImproveSettings {
   /** Mine more: the crystal family (ore) the miners are scored with. */
   oreFamily: string;
   onOreFamilyChange: (family: string) => void;
+  /** Carry more: the hold scored. */
+  hold: ImproveHold;
+  onHoldChange: (hold: ImproveHold) => void;
 }
 
 interface Props {
@@ -184,6 +196,31 @@ export function ImprovePanel({
     });
   }
 
+  /** Carry more, Align faster, Align and warp faster: the figure the goal scores, before and after. */
+  function moveLine(option: ImproveOption | RejectedOption, own: FittingStats): string | null {
+    const align = () =>
+      t('fittings.improve.alignLine', {
+        before: secondsFormat(alignOf(own)),
+        after: secondsFormat(alignOf(option.after)),
+      });
+    if (goal === 'haul') {
+      const hold = heldHold(own.holds, settings.hold) ?? settings.hold;
+      return t('fittings.improve.holdLine', {
+        hold: t(`fittings.improve.hold.${hold}`),
+        before: m3Format(own.holds[hold]),
+        after: m3Format(option.after.holds[hold]),
+      });
+    }
+    if (goal === 'align') return align();
+    if (goal === 'warp')
+      return t('fittings.improve.warpLine', {
+        align: align(),
+        before: auFormat(own.navigation.warpSpeed),
+        after: auFormat(option.after.navigation.warpSpeed),
+      });
+    return null;
+  }
+
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
     const key = optionKey(option);
@@ -218,6 +255,9 @@ export function ImprovePanel({
                   <span className="block font-medium">{swapLabel(option)}</span>
                   {goal === 'mining' && (
                     <span className="block text-xs">{oreLine(option, own)}</span>
+                  )}
+                  {moveLine(option, own) && (
+                    <span className="block text-xs">{moveLine(option, own)}</span>
                   )}
                   <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
                   {option.downsides.length > 0 && (
@@ -319,6 +359,30 @@ export function ImprovePanel({
               </SelectContent>
             </Select>
             <p className="text-text-dim text-xs">{t('fittings.improve.oreHint')}</p>
+          </div>
+        )}
+        {goal === 'haul' && before && (
+          <div className="space-y-1 text-sm">
+            <span aria-hidden="true">{t('fittings.improve.holdLabel')}</span>
+            <Select
+              value={heldHold(before.holds, settings.hold) ?? settings.hold}
+              onValueChange={(value) => settings.onHoldChange(value as ImproveHold)}
+            >
+              <SelectTrigger aria-label={t('fittings.improve.holdLabel')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {IMPROVE_HOLDS.filter((hold) => before.holds[hold] > 0).map((hold) => (
+                  <SelectItem key={hold} value={hold}>
+                    {t('fittings.improve.holdOption', {
+                      hold: t(`fittings.improve.hold.${hold}`),
+                      size: m3Format(before.holds[hold]),
+                    })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-text-dim text-xs">{t('fittings.improve.holdHint')}</p>
           </div>
         )}
       </div>
@@ -477,6 +541,9 @@ export function ImprovePanel({
                       <p className="font-medium">{swapLabel(option)}</p>
                       {goal === 'mining' && (
                         <p className="text-xs">{oreLine(option, state.before)}</p>
+                      )}
+                      {moveLine(option, state.before) && (
+                        <p className="text-xs">{moveLine(option, state.before)}</p>
                       )}
                       <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
                       <p className="text-warning text-xs">

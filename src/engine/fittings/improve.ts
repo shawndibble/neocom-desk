@@ -35,13 +35,39 @@ import {
 import { gainMetrics, type GainMetric } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
-import type { Fitting, FittingModule, FittingSlotKind, FittingStats } from './types';
+import { alignTimeSeconds } from './stats';
+import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats } from './types';
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, then Mine more. */
-export const IMPROVE_GOALS = [...COMBAT_GOALS, 'mining'] as const;
+/** Every Improve Goal: the combat ones, Mine more, then the hauling and movement ones. */
+export const IMPROVE_GOALS = [...COMBAT_GOALS, 'mining', 'haul', 'align', 'warp'] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
+
+/** The holds Carry more can score, as `HoldStats` fields: the pilot picks one. */
+export const IMPROVE_HOLDS = [
+  'cargo',
+  'fleetHangar',
+  'miningHold',
+  'ammoHold',
+  'planetaryHold',
+  'commandCenterHold',
+  'mineralHold',
+  'gasHold',
+  'iceHold',
+  'fuelBay',
+  'infrastructureHold',
+] as const satisfies readonly (keyof HoldStats)[];
+export type ImproveHold = (typeof IMPROVE_HOLDS)[number];
+
+/** The hold Carry more scores when the pilot has not picked one the hull has. */
+export const DEFAULT_IMPROVE_HOLD: ImproveHold = 'cargo';
+
+/** The first hold in `IMPROVE_HOLDS` order the hull has, for a pick this hull lacks; null with none. */
+export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold | null {
+  if (holds[preferred] > 0) return preferred;
+  return IMPROVE_HOLDS.find((hold) => holds[hold] > 0) ?? null;
+}
 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
@@ -147,9 +173,13 @@ const DOWNSIDE_METRICS: readonly GainMetric[] = [
 
 export type GoalAvailability =
   | { available: true }
-  | { available: false; reason: 'noWeapons' | 'noGunsOrLaunchers' | 'noMiners' };
+  | {
+      available: false;
+      reason: 'noWeapons' | 'noGunsOrLaunchers' | 'noMiners' | 'noHold' | 'noAlign' | 'noWarp';
+    };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
+const canAlign = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility) > 0;
 const hasShipWeapons = (s: FittingStats) =>
   s.applied.weapons.some((w) => w.kind === 'turret' || w.kind === 'missile');
 
@@ -161,6 +191,11 @@ export function goalAvailability(goal: ImproveGoal, before: FittingStats): GoalA
   // Swaps are module swaps: mining drones alone give nothing to change.
   if (goal === 'mining' && !before.mining.rows.some((row) => !row.isDrone))
     return { available: false, reason: 'noMiners' };
+  if (goal === 'haul' && heldHold(before.holds, DEFAULT_IMPROVE_HOLD) === null)
+    return { available: false, reason: 'noHold' };
+  if (goal === 'align' && !canAlign(before)) return { available: false, reason: 'noAlign' };
+  if (goal === 'warp' && !(canAlign(before) && before.navigation.warpSpeed > 0))
+    return { available: false, reason: 'noWarp' };
   return { available: true };
 }
 
@@ -185,7 +220,8 @@ function scoreOf(
   before: FittingStats,
   after: FittingStats,
   iskDelta: number | null,
-  target: TargetProfile | undefined
+  target: TargetProfile | undefined,
+  hold: ImproveHold
 ): number | null {
   const metrics = gainMetrics(before, after);
   switch (goal) {
@@ -203,6 +239,12 @@ function scoreOf(
       return iskDelta === null ? null : -iskDelta;
     case 'mining':
       return relative(before.mining.perSecond, after.mining.perSecond);
+    case 'haul':
+      return relative(before.holds[hold], after.holds[hold]);
+    case 'align':
+      return metrics.align;
+    case 'warp':
+      return metrics.align + relative(before.navigation.warpSpeed, after.navigation.warpSpeed);
   }
 }
 
@@ -466,6 +508,8 @@ export interface FindImprovementsParams {
   priceOf: (typeId: number) => number | null;
   /** The page's Target Profile, for More damage's applied DPS. */
   target?: TargetProfile;
+  /** Carry more: the hold scored (default the cargo hold). */
+  hold?: ImproveHold;
   /** Planning to buy (default) or Refitting a ship the pilot owns. */
   mode?: ImproveMode;
   /** Planning: the total fit price may not pass it. Refitting: the extra spend may not. Null: no limit. */
@@ -492,6 +536,7 @@ export async function findImprovements({
   stats,
   priceOf,
   target,
+  hold = DEFAULT_IMPROVE_HOLD,
   mode = 'buy',
   spendCap = null,
   fitTotal = null,
@@ -510,7 +555,7 @@ export async function findImprovements({
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
   function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats) {
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
-    const score = scoreOf(goal, before, after, iskDelta, target);
+    const score = scoreOf(goal, before, after, iskDelta, target, hold);
     if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
     const metrics = gainMetrics(before, after);
     const option: ImproveOption = {

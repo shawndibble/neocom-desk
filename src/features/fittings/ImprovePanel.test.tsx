@@ -67,6 +67,8 @@ const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   onIncludeOfficerChange: vi.fn(),
   oreFamily: 'Simple Asteroid',
   onOreFamilyChange: vi.fn(),
+  hold: 'cargo',
+  onHoldChange: vi.fn(),
   ...patch,
 });
 
@@ -298,5 +300,49 @@ describe('ImprovePanel', () => {
     await userEvent.click(screen.getByRole('combobox', { name: 'Ore' }));
     await userEvent.click(await screen.findByRole('option', { name: /Rare Moon/ }));
     expect(onOreFamilyChange).toHaveBeenCalledWith('Rare Moon');
+  });
+
+  it('disables Carry more, Align faster and Align and warp faster with their reasons on a hull without them', async () => {
+    const bare = {
+      ...before,
+      navigation: { ...before.navigation, agility: 0, warpSpeed: 0 },
+    };
+    renderPanel(search({ status: 'idle' }, bare));
+    for (const [name, reason] of [
+      [/Carry more/, 'This hull has no cargo or other hold'],
+      [/^Align faster/, 'This hull has no align time to improve'],
+      [/Align and warp faster/, 'This hull has no warp speed to improve'],
+    ] as const) {
+      const chip = screen.getByRole('button', { name });
+      expect(chip).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.hover(chip);
+      expect(await screen.findByText(reason)).toBeInTheDocument();
+    }
+  });
+
+  it('shows the hold before and after on a Carry more row, and reports the hold the pilot picks', async () => {
+    const own = { ...before, holds: { ...before.holds, cargo: 1000, iceHold: 400 } };
+    const gain = option(10, { holds: { ...own.holds, cargo: 1250 } });
+    const onHoldChange = vi.fn();
+    renderPanel(
+      search(done({ noDownside: [gain] }, own), own),
+      vi.fn(),
+      vi.fn(),
+      settings({ onHoldChange }),
+      { goal: 'haul' }
+    );
+    expect(screen.getByText('Cargo hold 1,000 → 1,250 m³')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('combobox', { name: 'Hold' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Ice hold/ }));
+    expect(onHoldChange).toHaveBeenCalledWith('iceHold');
+  });
+
+  it('shows align time and warp speed on an Align and warp faster row', () => {
+    const own = { ...before, navigation: { ...before.navigation, warpSpeed: 3 } };
+    const gain = option(10, { navigation: { ...own.navigation, agility: 2, warpSpeed: 3.6 } });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'warp',
+    });
+    expect(screen.getByText(/Align 55\.45 → 27\.73 s · Warp 3 → 3\.6 AU\/s/)).toBeInTheDocument();
   });
 });

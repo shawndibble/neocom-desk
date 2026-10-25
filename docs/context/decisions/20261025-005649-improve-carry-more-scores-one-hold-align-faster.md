@@ -1,0 +1,8 @@
+# Scope decisions — Improve: Carry more scores one hold, Align faster and warp read the hull's own figures (issue #5029)
+
+_Recorded 2026-10-25 · issue #5029._
+
+- **<Decision>.** <Why, and what it rules out.>
+
+- **Carry more scores one hold the pilot picks, by its size alone.** The picker lists only the holds the hull has (cargo, fleet hangar, ore, ammo, ice and the other Specialised Holds), each with its size, and is remembered on this device (`fittingsImproveHold`). A remembered hold the hull lacks falls back to the first one it has. The score is the relative gain of that hold's m³; other holds are not summed, because a cargo gain and an ice-hold gain do not trade one for one. Disabled with "This hull has no cargo or other hold" when every hold is 0.
+- **Align faster scores the cut in align time; Align and warp faster adds the warp speed gain to it.** Both read the engine's own figures (`alignTimeSeconds`, `navigation.warpSpeed`) as fractions of the fit's own, so the two add on one scale. Each row shows the figures before and after. Disabled with a reason when the hull has no align time or no warp speed. Rework's groups: Expanded Cargohold and the cargo-and-navigation rig group for Carry more; Inertial Stabilizers, Nanofiber Internal Structure and that rig group for the two movement goals. The last propulsion module is never dropped (these goals do not score the propulsion job). Jump range and fuel stay out.
