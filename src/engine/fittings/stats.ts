@@ -483,8 +483,10 @@ function spoolFigures(attributes: AttributeMap, quantity: number): SpoolFigures 
   const read = (id: number) => readAttribute(attributes, id);
   const perCycle = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusPerCycle);
   const cycleSeconds = read(ITEM_DOGMA_ATTRIBUTE.rateOfFire) / 1000;
-  if (perCycle <= 0 || cycleSeconds <= 0) return null;
-  const cycles = Math.ceil(read(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax) / perCycle - 1e-6);
+  const max = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax);
+  if (perCycle <= 0 || max <= 0 || cycleSeconds <= 0) return null;
+  // Single-precision attributes: 2.1/0.07 must not tip a whole cycle count up.
+  const cycles = Math.ceil(max / perCycle - 1e-6);
   return {
     unspooledDps: (read(ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity) / cycleSeconds,
     secondsToFull: cycles * cycleSeconds,
@@ -589,6 +591,10 @@ export function extractOffense(
       row.overheated.dps += heatedFigures.dps;
       row.overheated.sustainedDps += heatedFigures.sustainedDps;
       row.overheated.volley += heatedFigures.volley;
+      const heatedSpool = spoolFigures(heated.attributes, item.quantity);
+      if (heatedSpool) {
+        row.overheated.unspooledDps = (row.overheated.unspooledDps ?? 0) + heatedSpool.unspooledDps;
+      }
     }
   });
 

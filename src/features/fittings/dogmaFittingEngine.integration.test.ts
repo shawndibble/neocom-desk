@@ -73,7 +73,6 @@ const CARACAL = 621;
 const VEDMAK = 47270;
 const HEAVY_ENTROPIC_DISINTEGRATOR_II = 47918;
 const VOID_M = 12789;
-// Looked up by exact name in `public/data/types.json`, 2026-10-25.
 const BUZZARD = 11192;
 const CORE_PROBE_LAUNCHER_I = 17938;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;

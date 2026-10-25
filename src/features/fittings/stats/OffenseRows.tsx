@@ -55,7 +55,7 @@ function DamageFigures({
           format={(s) =>
             spool
               ? t('fittings.stats.weaponDpsSpooled', {
-                  from: fmt1(spool.unspooledDps),
+                  from: fmt1(figures(s).unspooledDps ?? spool.unspooledDps),
                   to: fmt1(figures(s).dps),
                 })
               : t('fittings.stats.weaponDps', { value: fmt1(figures(s).dps) })
@@ -69,9 +69,9 @@ function DamageFigures({
         <HeatFigure
           stats={stats}
           format={(s) =>
-            t(spool ? 'fittings.stats.weaponVolleyUnspooled' : 'fittings.stats.weaponVolley', {
-              value: fmt0(figures(s).volley),
-            })
+            spool
+              ? t('fittings.stats.weaponVolleyUnspooled', { value: fmt0(figures(s).volley) })
+              : t('fittings.stats.weaponVolley', { value: fmt0(figures(s).volley) })
           }
           keys={previewed ? ['totalVolley'] : undefined}
         />

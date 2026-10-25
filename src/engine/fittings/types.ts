@@ -439,6 +439,8 @@ export interface DamageFigures {
    */
   sustainedDps: number;
   volley: number;
+  /** A spool weapon's first-cycle DPS at these figures (heated, under overheat). */
+  unspooledDps?: number;
 }
 
 export interface OffenseStats {
