@@ -518,7 +518,7 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('No miners on this fit')).toBeInTheDocument();
   });
 
-  it('shows the ore on every Mine more row and in the closest swaps, with the m³/s it gives', () => {
+  it('shows the m³/s on every Mine more row and in the closest swaps, without repeating the ore', () => {
     const mining = (perSecond: number) => ({
       rows: [],
       perSecond,
@@ -549,15 +549,61 @@ describe('ImprovePanel', () => {
       own
     );
     renderPanel(noGain, vi.fn(), vi.fn(), settings(), { goal: 'mining' });
-    const lines = screen.getAllByText(/Mines 10 → 12\.5 m³\/s of Veldspar, Scordite/);
+    const lines = screen.getAllByText('Mines 10 → 12.5 m³/s');
     // Two rows plus the best-found header.
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toHaveTextContent('(Simple Asteroid crystals)');
+    // The ore name lives in the Ore picker only: rows don't repeat it.
+    expect(screen.getAllByText(/Veldspar/)).toHaveLength(1);
     cleanup();
     renderPanel(search(done({ rejected: [broke] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'mining',
     });
-    expect(screen.getByText(/Mines 10 → 11 m³\/s of Veldspar/)).toBeInTheDocument();
+    expect(screen.getByText('Mines 10 → 11 m³/s')).toBeInTheDocument();
+  });
+
+  it('warns about miners with no crystal, offers Load best crystal, and keeps Now at the fit as it is', async () => {
+    const mining = (perSecond: number) => ({
+      rows: [],
+      perSecond,
+      perHour: perSecond * 3600,
+      wastePerSecond: 0,
+      wastePct: 0,
+    });
+    const asIs = { ...before, mining: mining(24.7) };
+    const withBest = { ...before, mining: mining(55.6) };
+    const gain = option(10, { mining: mining(57.1) });
+    const onLoadBestCrystal = vi.fn();
+    const state = {
+      ...done({ noDownside: [gain] }, withBest),
+      fitAsIs: asIs,
+      crystals: {
+        bestKey: 'B2',
+        unloaded: { count: 2, steps: [] },
+      },
+    } as ImproveState;
+    render(
+      <ImprovePanel
+        goal="mining"
+        onGoalChange={vi.fn()}
+        search={search(state, withBest)}
+        catalogue={null}
+        onApply={vi.fn()}
+        settings={settings()}
+        onFixFirst={vi.fn()}
+        onLoadBestCrystal={onLoadBestCrystal}
+      />
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '2 miners have no crystal for Simple Asteroid ore, so they mine 24.7 m³/s; with Type B II, 55.6.'
+    );
+    expect(screen.getByTestId('improve-best-found')).toHaveTextContent(
+      'Now → best found Mines 24.7 → 57.1 m³/s'
+    );
+    expect(screen.getByTestId('improve-best-found')).toHaveTextContent(
+      'Rows use the best crystals for Veldspar'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Load best crystal' }));
+    expect(onLoadBestCrystal).toHaveBeenCalled();
   });
 
   it('reports the ore the pilot picks', async () => {

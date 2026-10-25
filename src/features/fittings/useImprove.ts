@@ -40,7 +40,10 @@ import {
   crystalKeyOf,
   crystalsOfFamily,
   loadCrystals,
+  minerWithoutCrystal,
+  unloadedMiners,
 } from '@/engine/fittings/improveMining';
+import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
@@ -226,6 +229,10 @@ export type ImproveState =
       elapsedMs: number;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
+      /** Mine more: the fit as it is, whose yield is the real "Now"; `before` is scored with the best crystals. */
+      fitAsIs?: FittingStats;
+      /** Mine more: the best crystal's key, and the miners that hold none of the ore's crystals. */
+      crystals?: { bestKey: string; unloaded: { count: number; steps: ChargeLoadStep[] } | null };
     };
 
 export interface ImproveSearch {
@@ -288,6 +295,13 @@ function searchCandidates(
   });
 }
 
+/** Mine more's ore plan: what each miner loads, the best crystal's key, and which crystals each miner type takes. */
+interface CrystalPlan {
+  crystalFor: (moduleTypeId: number) => number | null;
+  bestKey: string;
+  crystalsOf: (moduleTypeId: number) => number[];
+}
+
 /**
  * Mine more's ore: which crystal each miner type loads, for `family`. The
  * crystal letter and tech level that mine the most on the open Fitting is
@@ -300,7 +314,7 @@ async function crystalPlan(
   family: string,
   own: FittingStats,
   signal: AbortSignal
-): Promise<((moduleTypeId: number) => number | null) | null> {
+): Promise<CrystalPlan | null> {
   const nameOf = (typeId: number) => catalogue.types[String(typeId)]?.name;
   const known = new Map<number, number[]>();
   const crystalsFor = (typeId: number): number[] => {
@@ -335,7 +349,9 @@ async function crystalPlan(
     const { after } = await variants.compare(loadCrystals(variants.fitting, forKey(key)), signal);
     return after.mining.perSecond;
   });
-  return best === null ? null : forKey(best);
+  return best === null
+    ? null
+    : { crystalFor: forKey(best), bestKey: best, crystalsOf: crystalsFor };
 }
 
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
@@ -454,11 +470,11 @@ export function useImprove(
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
         let scoredBefore = own;
         let load = (fitting: Fitting) => fitting;
-        let plan: ((moduleTypeId: number) => number | null) | null = null;
+        let plan: CrystalPlan | null = null;
         if (searched === 'mining') {
           plan = await crystalPlan(variants, catalogue, oreFamily, own, controller.signal);
           if (cancelled) return;
-          const crystalFor = plan;
+          const crystalFor = plan?.crystalFor;
           if (crystalFor) {
             load = (fitting) => loadCrystals(fitting, crystalFor);
             scoredBefore = (await variants.compare(load(variants.fitting), controller.signal))
@@ -468,10 +484,7 @@ export function useImprove(
         const stats = async (fitting: Fitting) => {
           const { after } = await variants.compare(load(fitting), controller.signal);
           // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
-          if (
-            plan &&
-            after.mining.rows.some((row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId))
-          )
+          if (plan && minerWithoutCrystal(after.mining.rows, plan.crystalFor))
             throw new Error('A miner takes no crystal of this ore');
           return after;
         };
@@ -532,6 +545,15 @@ export function useImprove(
           status: 'done',
           result: { ...listed, checked },
           before: scoredBefore,
+          ...(plan
+            ? {
+                fitAsIs: own,
+                crystals: {
+                  bestKey: plan.bestKey,
+                  unloaded: unloadedMiners(variants.fitting, plan.crystalsOf, plan.crystalFor),
+                },
+              }
+            : {}),
           fitTotal,
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults } : {}),

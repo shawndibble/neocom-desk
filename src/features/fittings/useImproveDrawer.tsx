@@ -164,6 +164,24 @@ export function useImproveDrawer({
     });
   }
 
+  const crystals = search.state.status === 'done' ? search.state.crystals : undefined;
+  const crystalSteps = crystals?.unloaded?.steps ?? [];
+
+  function loadBestCrystal() {
+    if (!fitting || !crystals?.unloaded) return;
+    const applied = charges.loadSteps(crystalSteps);
+    if (applied === null) return;
+    setUndo({
+      before: fitting,
+      applied,
+      message: t('fittings.improve.crystalsLoaded', {
+        // `accepts` can skip a miner the calculation has not reached yet.
+        count: applied.modules.filter((m, i) => m.chargeTypeId !== fitting.modules[i]?.chargeTypeId)
+          .length,
+      }),
+    });
+  }
+
   function apply(options: ImproveOption[]) {
     if (!fitting) return;
     // One edit for every ticked row, so Back undoes them together.
@@ -191,6 +209,7 @@ export function useImproveDrawer({
       onPreview={setPreview}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
+      onLoadBestCrystal={crystalSteps.length > 0 ? loadBestCrystal : undefined}
       onFixFirst={(resource) => {
         setIsOpen(false);
         openMakeItFit(resource);
