@@ -17,6 +17,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -29,8 +30,7 @@ import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import {
   depletionSeries,
   iskSeries,
-  paceAxisMax,
-  type PaceByOreSeries,
+  type PaceShareSeries,
   type SurveySeriesRow,
 } from '@/engine/survey/chartViews';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -333,80 +333,103 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
-/** What Recharts hands a pace line's dot. */
-interface PaceDotProps {
-  cx?: number;
-  cy?: number;
-  payload?: SurveySeriesRow;
-}
-
-/** Dots only on an interval's middle row: a lone interval between idle ones is still visible. */
-function makePaceDot(tone: string) {
-  return function PaceDot({ cx, cy, payload }: PaceDotProps): ReactElement<SVGElement> {
-    if (payload?.mid === undefined || typeof cx !== 'number' || typeof cy !== 'number') {
-      return <g key={`none-${payload?.at ?? 'x'}`} />;
-    }
-    return (
-      <circle
-        key={payload.at}
-        cx={cx}
-        cy={cy}
-        r={3}
-        fill={tone}
-        stroke="var(--color-panel)"
-        strokeWidth={2}
-      />
-    );
-  };
+/** One plot row of the pace chart: where the tooltip snaps, and which interval it reads. */
+interface PaceRow {
+  at: number;
+  interval: number;
+  idle: 0;
 }
 
 /**
- * The Depletion view's pace chart: one line per ore in the legend's colours, each interval a flat
- * step at the percent of that ore's starting total mined during it. An ore not mined in an
- * interval has no value there, so its line breaks instead of resting on the baseline. The caller
- * wraps it in its figure and table; only the plot is here.
+ * The Depletion view's pace chart: one 100% bar per scan interval, from scan to scan on the shared
+ * time axis, split into each mined ore's share of that interval's progress. Slices keep the
+ * legend's order and colours with the first (most valuable) ore at the bottom; a 2px surface-coloured
+ * stroke separates them. Quiet intervals fade. The caller wraps it in its figure and table; only the
+ * plot is here.
  */
 export function PaceByOreChart({
   summary,
   pace,
 }: {
   summary: SurveySummary;
-  pace: PaceByOreSeries;
+  pace: PaceShareSeries;
 }) {
   const { t } = useTranslation();
-  const { rows, activeOres, toneIndex, maxPercent } = pace;
+  const { intervals, activeOres, toneIndex } = pace;
   const { xAxis } = timeAxis(summary);
 
+  // The tooltip needs plot rows to snap to: each interval's start, middle and 1 ms before its end.
+  const rows = useMemo<PaceRow[]>(
+    () =>
+      intervals.flatMap((i, interval) => [
+        { at: i.from, interval, idle: 0 as const },
+        { at: (i.from + i.to) / 2, interval, idle: 0 as const },
+        { at: i.to - 1, interval, idle: 0 as const },
+      ]),
+    [intervals]
+  );
+  // The bars themselves: each ore's slice runs from the shares of the ores below it to its own top.
+  const slices = useMemo(
+    () =>
+      intervals.flatMap((i) => {
+        let floor = 0;
+        return activeOres.flatMap((ore) => {
+          const share = i.shares[ore];
+          if (share === undefined) return [];
+          const slice = {
+            key: `${i.from}:${ore}`,
+            ore,
+            from: i.from,
+            to: i.to,
+            y1: floor,
+            y2: floor + share,
+            opacity: i.opacity,
+          };
+          floor += share;
+          return [slice];
+        });
+      }),
+    [intervals, activeOres]
+  );
+
   function Tip({ active, payload }: TooltipContentProps) {
-    const row = payload?.[0]?.payload as SurveySeriesRow | undefined;
-    if (!active || !row || row.from === undefined || row.to === undefined) return null;
-    const slices = activeOres
-      .map((ore) => ({ ore, percent: row[ore] }))
-      .filter((s): s is { ore: string; percent: number } => s.percent !== undefined)
-      .sort((a, b) => b.percent - a.percent);
+    const row = payload?.[0]?.payload as PaceRow | undefined;
+    const interval = row === undefined ? undefined : intervals[row.interval];
+    if (!active || interval === undefined) return null;
+    const ranked = activeOres
+      .filter((ore) => interval.shares[ore] !== undefined)
+      .sort((a, b) => interval.shares[b] - interval.shares[a]);
     return (
       <ChartTooltipShell>
         <div className="min-w-48 space-y-1 text-xs">
           <div className="font-semibold text-text">
             {t('survey.paceRange', {
-              from: formatEveClock(row.from),
-              to: formatEveClock(row.to),
+              from: formatEveClock(interval.from),
+              to: formatEveClock(interval.to),
             })}
           </div>
           <div className="text-text-dim">
-            {t('survey.paceLength', { length: formatDuration(row.to - row.from) })}
+            {t('survey.paceLength', { length: formatDuration(interval.to - interval.from) })}
           </div>
-          <div className="space-y-0.5 border-t border-line pt-1">
-            {slices.map(({ ore, percent }) => (
-              <div key={ore} className="flex items-center gap-2">
-                <Swatch tone={oreTone(toneIndex[ore])} />
-                <span className="min-w-0 flex-1 truncate">{ore}</span>
-                <span className="text-text">
-                  {t('survey.pacePercentOf', { percent: formatPace(percent), ore })}
-                </span>
-              </div>
-            ))}
-          </div>
+          <div>{t('survey.paceProgress', { percent: formatPace(interval.progress) })}</div>
+          {ranked.length > 0 && (
+            <div className="space-y-0.5 border-t border-line pt-1">
+              {ranked.map((ore) => (
+                <div key={ore} className="flex items-center gap-2">
+                  <Swatch tone={oreTone(toneIndex[ore])} />
+                  <span className="w-9 shrink-0 text-right font-semibold text-text">
+                    {t('survey.paceShare', { percent: formatPace(interval.shares[ore]) })}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-text-dim">
+                    {t('survey.pacePercentOf', {
+                      percent: formatPace(interval.percents[ore]),
+                      ore,
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </ChartTooltipShell>
     );
@@ -414,35 +437,43 @@ export function PaceByOreChart({
 
   return (
     <ResponsiveContainer>
-      <ComposedChart key={activeOres.join('|')} data={rows} margin={{ ...MARGIN, top: 20 }}>
+      <ComposedChart data={rows} margin={{ ...MARGIN, top: 28 }}>
         <CartesianGrid stroke="var(--color-line)" vertical={false} />
         {xAxis(false)}
         {yAxis({
-          domain: [0, paceAxisMax(maxPercent)],
+          domain: [0, 100],
           label: {
             value: t('survey.paceAxis'),
             position: 'insideTopLeft',
             offset: 8,
+            dy: -22,
             fill: 'var(--color-text-dim)',
             fontSize: '0.625rem',
           },
         })}
-        {activeOres.map((ore) => (
-          <Line
-            key={ore}
-            type="linear"
-            dataKey={ore}
-            name={ore}
-            stroke={oreTone(toneIndex[ore])}
-            strokeWidth={1.5}
-            connectNulls={false}
-            dot={makePaceDot(oreTone(toneIndex[ore]))}
-            activeDot={false}
-            isAnimationActive={false}
-            legendType="none"
+        {slices.map((s) => (
+          <ReferenceArea
+            key={s.key}
+            x1={s.from}
+            x2={s.to}
+            y1={s.y1}
+            y2={s.y2}
+            fill={oreTone(toneIndex[s.ore])}
+            fillOpacity={s.opacity}
+            stroke="var(--color-panel)"
+            strokeWidth={2}
+            ifOverflow="visible"
           />
         ))}
-        <Tooltip content={Tip} isAnimationActive={false} />
+        <Line
+          dataKey="idle"
+          stroke="none"
+          dot={false}
+          activeDot={false}
+          isAnimationActive={false}
+          legendType="none"
+        />
+        <Tooltip content={Tip} cursor={false} isAnimationActive={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );

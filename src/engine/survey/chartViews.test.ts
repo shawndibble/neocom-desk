@@ -3,8 +3,9 @@ import {
   availableChartViews,
   depletionSeries,
   iskSeries,
-  paceAxisMax,
-  paceByOreSeries,
+  PACE_FADE_FLOOR,
+  paceFade,
+  paceShareSeries,
 } from './chartViews';
 import { summarizeSurvey, type SurveyScan } from './series';
 
@@ -138,39 +139,60 @@ describe('iskSeries', () => {
   });
 });
 
-describe('paceByOreSeries', () => {
+describe('paceShareSeries', () => {
   it('is empty before a second scan', () => {
     const s = summarizeSurvey([scan(0, ['A', 100])])!;
-    expect(paceByOreSeries(s)).toEqual({
+    expect(paceShareSeries(s)).toEqual({
       intervals: [],
-      rows: [],
       activeOres: [],
       toneIndex: { A: 0 },
-      maxPercent: 0,
     });
   });
 
-  it('gives each interval the percent of each ore start mined, raw per interval', () => {
+  it('keeps each ore percent of its own start, and turns them into shares summing to 100', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 1000], ['B', 500]),
       scan(5, ['A', 700], ['B', 400]), // A 30%, B 20%
-      scan(65, ['A', 700], ['B', 100]), // a long gap: B 60%
     ])!;
-    const { intervals, activeOres, toneIndex, maxPercent } = paceByOreSeries(s);
+    const { intervals, activeOres, toneIndex } = paceShareSeries(s);
     expect(activeOres).toEqual(['A', 'B']);
     expect(toneIndex).toEqual({ A: 0, B: 1 });
-    expect(intervals).toHaveLength(2);
-    expect(intervals[0].percents.A).toBeCloseTo(30);
-    expect(intervals[0].percents.B).toBeCloseTo(20);
-    expect(intervals[1].percents.B).toBeCloseTo(60);
-    expect(maxPercent).toBeCloseTo(60);
+    const [i] = intervals;
+    expect(i.percents.A).toBeCloseTo(30);
+    expect(i.percents.B).toBeCloseTo(20);
+    expect(i.shares.A).toBeCloseTo(60);
+    expect(i.shares.B).toBeCloseTo(40);
+    expect(i.shares.A + i.shares.B).toBeCloseTo(100);
   });
 
-  it('leaves an ore out of an interval where none of it was mined', () => {
+  it('measures progress as m3 mined over the whole starting volume', () => {
+    const s = summarizeSurvey([
+      scan(0, ['A', 1000], ['B', 500]),
+      scan(5, ['A', 700], ['B', 400]), // 400 of 1500 m3
+    ])!;
+    expect(paceShareSeries(s).intervals[0].progress).toBeCloseTo((400 / 1500) * 100);
+  });
+
+  it('leaves an idle ore out of an interval and out of activeOres when never mined', () => {
     const s = summarizeSurvey([scan(0, ['A', 100], ['B', 100]), scan(5, ['A', 50], ['B', 100])])!;
-    const { intervals, activeOres } = paceByOreSeries(s);
+    const { intervals, activeOres } = paceShareSeries(s);
     expect('B' in intervals[0].percents).toBe(false);
+    expect('B' in intervals[0].shares).toBe(false);
+    expect(intervals[0].shares.A).toBeCloseTo(100);
     expect(activeOres).toEqual(['A']);
+  });
+
+  it('gives an interval where nothing was mined no shares, no progress and the floor opacity', () => {
+    const s = summarizeSurvey([
+      scan(0, ['A', 100]),
+      scan(5, ['A', 100], ['B', 50]), // B appears: added, nothing mined
+      scan(10, ['A', 50], ['B', 50]),
+    ])!;
+    const [idle, busy] = paceShareSeries(s).intervals;
+    expect(idle.shares).toEqual({});
+    expect(idle.progress).toBe(0);
+    expect(idle.opacity).toBe(PACE_FADE_FLOOR);
+    expect(busy.opacity).toBe(1);
   });
 
   it('measures an ore that came into range later against its own start volume', () => {
@@ -179,10 +201,8 @@ describe('paceByOreSeries', () => {
       scan(5, ['A', 100], ['B', 200]),
       scan(10, ['A', 100], ['B', 150]),
     ])!;
-    const { intervals } = paceByOreSeries(s);
     const startB = s.ores.find((o) => o.ore === 'B')!.startVolume;
-    expect(startB).toBeGreaterThan(0);
-    expect(intervals[1].percents.B).toBeCloseTo((50 / startB) * 100);
+    expect(paceShareSeries(s).intervals[1].percents.B).toBeCloseTo((50 / startB) * 100);
   });
 
   it('skips an ore with no start volume and clamps a percent over 100 (hand-built summary)', () => {
@@ -193,41 +213,17 @@ describe('paceByOreSeries', () => {
         o.ore === 'A' ? { ...o, startVolume: 0 } : { ...o, startVolume: 10 }
       ),
     };
-    const { intervals, maxPercent } = paceByOreSeries(s);
-    expect('A' in intervals[0].percents).toBe(false);
-    expect(intervals[0].percents.B).toBe(100);
-    expect(maxPercent).toBe(100);
+    const [i] = paceShareSeries(s).intervals;
+    expect('A' in i.percents).toBe(false);
+    expect(i.percents.B).toBe(100);
+    expect(i.shares).toEqual({ B: 100 });
   });
 
   it('never divides by zero through a real survey', () => {
     const s = summarizeSurvey([scan(0, ['A', 0], ['B', 100]), scan(5, ['A', 0], ['B', 0])])!;
-    const { intervals, maxPercent } = paceByOreSeries(s);
-    expect(intervals[0].percents.B).toBeCloseTo(100);
-    expect(Number.isFinite(maxPercent)).toBe(true);
-    expect(maxPercent).toBeLessThanOrEqual(100);
-  });
-
-  it('plots three rows per interval, flat from start to 1 ms before its end, empty when idle', () => {
-    const s = summarizeSurvey([
-      scan(0, ['A', 1000], ['B', 100]),
-      scan(5, ['A', 700], ['B', 100]),
-      scan(15, ['A', 700], ['B', 50]),
-    ])!;
-    const { rows } = paceByOreSeries(s);
-    expect(rows).toHaveLength(6);
-    expect(rows.map((r) => r.at)).toEqual([
-      T0,
-      T0 + 2.5 * MIN,
-      T0 + 5 * MIN - 1,
-      T0 + 5 * MIN,
-      T0 + 10 * MIN,
-      T0 + 15 * MIN - 1,
-    ]);
-    expect(rows[1]).toMatchObject({ from: T0, to: T0 + 5 * MIN, A: 30, mid: 1 });
-    expect(rows[0].mid).toBeUndefined();
-    expect('B' in rows[0]).toBe(false);
-    expect('A' in rows[3]).toBe(false);
-    expect(rows[4]).toMatchObject({ B: 50 });
+    const [i] = paceShareSeries(s).intervals;
+    expect(i.shares.B).toBeCloseTo(100);
+    expect(Number.isFinite(i.progress)).toBe(true);
   });
 
   it('keeps the colour index of the full ore list and drops ores never mined', () => {
@@ -239,26 +235,22 @@ describe('paceByOreSeries', () => {
         ['C', 1],
       ])
     )!;
-    const { activeOres, toneIndex } = paceByOreSeries(s);
+    const { activeOres, toneIndex } = paceShareSeries(s);
     expect(activeOres).toEqual(['C']);
     expect(toneIndex.C).toBe(2);
   });
 });
 
-describe('paceAxisMax', () => {
-  it('rounds up to 1, 2, 5 or 10 times a power of ten with headroom', () => {
-    expect(paceAxisMax(0.3)).toBe(0.5);
-    expect(paceAxisMax(6)).toBe(10);
-    expect(paceAxisMax(1.5)).toBe(2);
-    expect(paceAxisMax(30)).toBe(50);
+describe('paceFade', () => {
+  it('runs from the floor at nothing to 1 at the busiest interval, linearly', () => {
+    expect(paceFade(0, 10)).toBe(PACE_FADE_FLOOR);
+    expect(paceFade(10, 10)).toBe(1);
+    expect(paceFade(5, 10)).toBeCloseTo((PACE_FADE_FLOOR + 1) / 2);
   });
 
-  it('never goes over 100', () => {
-    expect(paceAxisMax(100)).toBe(100);
-    expect(paceAxisMax(60)).toBe(100);
-  });
-
-  it('has a sane default with nothing mined', () => {
-    expect(paceAxisMax(0)).toBe(10);
+  it('is never below the floor or above 1, and is 1 when nothing was ever mined', () => {
+    expect(paceFade(-3, 10)).toBe(PACE_FADE_FLOOR);
+    expect(paceFade(20, 10)).toBe(1);
+    expect(paceFade(0, 0)).toBe(1);
   });
 });

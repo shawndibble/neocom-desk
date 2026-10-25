@@ -85,7 +85,7 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   return { rows, pricedOres, unpricedOres, toneIndex };
 }
 
-/** One scan interval: how much of each ore's starting total was mined in it. */
+/** One scan interval of the pace chart. */
 export interface PaceInterval {
   from: number;
   to: number;
@@ -94,75 +94,75 @@ export interface PaceInterval {
    * (not per hour: a long gap reads as a tall value). Only ores mined in it are present.
    */
   percents: Record<string, number>;
+  /** Each mined ore's share of the interval's progress, 0-100; sums to 100, or `{}` when idle. */
+  shares: Record<string, number>;
+  /** m³ mined in the interval as a percent of every ore's starting volume together. */
+  progress: number;
+  /** Bar opacity for this interval, from `paceFade`: quiet intervals fade. */
+  opacity: number;
 }
 
-export interface PaceByOreSeries {
-  /** One entry per interval, for tables and the tooltip. */
+export interface PaceShareSeries {
+  /** One entry per interval, for the bars, the tooltip and the table. */
   intervals: PaceInterval[];
-  /**
-   * Plot rows for per-ore lines: three per interval (its start, its middle and 1 ms before its
-   * end), each with `from`/`to` and a key per ore mined in it. An ore not mined in an interval
-   * has no key, so its line breaks. The middle row carries `mid: 1`, where a lone interval gets
-   * its dot.
-   */
-  rows: SurveySeriesRow[];
   /** Ores mined in at least one interval, in `oreNames` order. */
   activeOres: string[];
   /** Each ore's index in `summary.oreNames`, for its colour. */
   toneIndex: Record<string, number>;
-  /** The largest percent in any interval; 0 when nothing was mined. */
-  maxPercent: number;
+}
+
+/** The faintest a bar gets, so a quiet interval stays visible. */
+export const PACE_FADE_FLOOR = 0.35;
+
+/**
+ * Bar opacity for an interval: linear from `PACE_FADE_FLOOR` at nothing mined to 1 at the busiest
+ * interval (`maxProgress`). With nothing mined anywhere there is no quiet-versus-busy to show: 1.
+ */
+export function paceFade(progress: number, maxProgress: number): number {
+  if (!(maxProgress > 0)) return 1;
+  const t = Math.min(1, Math.max(0, progress / maxProgress));
+  return PACE_FADE_FLOOR + (1 - PACE_FADE_FLOOR) * t;
 }
 
 /**
- * The Depletion view's pace chart: per scan interval, the percent of each ore's starting total
- * that was mined. The denominator is fixed per ore (its `startVolume`, as the depletion lines
- * use), so ores of any size read on the same scale.
+ * The Depletion view's pace chart: per scan interval, each ore's share of that interval's
+ * progress. Progress per ore is the percent of its starting total mined (the denominator is fixed
+ * per ore, `startVolume`, as the depletion lines use), so ores of any size count alike; shares are
+ * those percents normalised to sum to 100.
  */
-export function paceByOreSeries(summary: SurveySummary): PaceByOreSeries {
+export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
   const toneIndex: Record<string, number> = {};
   summary.oreNames.forEach((ore, i) => {
     toneIndex[ore] = i;
   });
   const startOf = new Map(summary.ores.map((o) => [o.ore, o.startVolume]));
   const active = new Set<string>();
-  let maxPercent = 0;
 
-  const intervals: PaceInterval[] = summary.intervals.map((i) => {
+  const raw = summary.intervals.map((i) => {
     const percents: Record<string, number> = {};
+    let sum = 0;
     for (const [ore, volume] of Object.entries(i.minedByOre)) {
       const start = startOf.get(ore) ?? 0;
       // A start of 0 cannot come out of summarizeSurvey with mining against it; skip rather than divide.
       if (volume <= 0 || start <= 0) continue;
-      // Clamped as depletionSeries is, so a rounding quirk can never push a line past the axis.
+      // Clamped as depletionSeries is, so a rounding quirk can never push a percent past 100.
       const percent = clampPercent((volume / start) * 100);
       percents[ore] = percent;
+      sum += percent;
       active.add(ore);
-      maxPercent = Math.max(maxPercent, percent);
     }
-    return { from: i.from, to: i.to, percents };
+    const shares: Record<string, number> = {};
+    if (sum > 0)
+      for (const [ore, percent] of Object.entries(percents)) shares[ore] = (percent / sum) * 100;
+    const progress =
+      summary.startVolume > 0 ? clampPercent((i.mined / summary.startVolume) * 100) : 0;
+    return { from: i.from, to: i.to, percents, shares, progress };
   });
-  const rows = intervals.flatMap((i) => {
-    const row = { from: i.from, to: i.to, ...i.percents };
-    return [
-      { ...row, at: i.from },
-      { ...row, at: (i.from + i.to) / 2, mid: 1 },
-      { ...row, at: i.to - 1 },
-    ];
-  });
+  const maxProgress = Math.max(0, ...raw.map((r) => r.progress));
+  const intervals: PaceInterval[] = raw.map((r) => ({
+    ...r,
+    opacity: paceFade(r.progress, maxProgress),
+  }));
   const activeOres = summary.oreNames.filter((o) => active.has(o));
-  return { intervals, rows, activeOres, toneIndex, maxPercent };
-}
-
-/**
- * The top of the pace chart's Y axis: the smallest 1, 2, 5 or 10 times a power of ten that holds
- * `maxPercent` plus 10% headroom, never over 100 (an ore cannot lose more than all of itself in
- * one interval). Round steps keep the axis ticks round too.
- */
-export function paceAxisMax(maxPercent: number): number {
-  if (!(maxPercent > 0)) return 10;
-  const want = maxPercent * 1.1;
-  const base = 10 ** Math.floor(Math.log10(want));
-  const step = [1, 2, 5, 10].find((m) => m * base >= want * (1 - 1e-9)) ?? 10;
-  return Math.min(100, step * base);
+  return { intervals, activeOres, toneIndex };
 }
