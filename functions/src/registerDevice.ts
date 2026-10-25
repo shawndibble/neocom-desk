@@ -13,6 +13,7 @@
 import { verifyEveAccessToken, type VerifyOptions } from './verifyEveToken.js';
 import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
+import { parseServerEvents, parseServerInputs, type ServerEventInputs } from './serverEvents.js';
 
 export type { ProjectionRowInput };
 
@@ -32,6 +33,15 @@ export interface DeviceCharacterInput {
    * client) leaves the stored list untouched.
    */
   eveTypes?: string[];
+  /**
+   * The server-pushed Notification Events (issue #5121) this device enabled
+   * for the browser channel for this Character: sorted, de-duplicated ids.
+   * Same per-device rule as `eveTypes`; absent (an older client) leaves the
+   * stored list untouched. Ids this server does not handle are stored anyway.
+   */
+  serverEvents?: string[];
+  /** What the server needs to evaluate them (price targets, the ship-lost minimum). Absent keeps the stored inputs. */
+  serverInputs?: ServerEventInputs;
 }
 
 /** Bounds a hostile or buggy client's `eveTypes` upload; the real list is a few dozen. */
@@ -73,6 +83,10 @@ export interface RegisterDeviceResult {
   projections: CharacterProjection[];
   /** Each verified character's enabled browser types, keyed by characterId; absent when the client sent none. */
   eveTypesByCharacter: Record<number, string[]>;
+  /** Each verified character's server-pushed event ids; absent when the client sent none. */
+  serverEventsByCharacter: Record<number, string[]>;
+  /** Each verified character's server inputs; absent when the client sent none. */
+  serverInputsByCharacter: Record<number, ServerEventInputs>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -151,7 +165,8 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
 
   const parsedCharacters = characters.map((entry, i) => {
     if (!isRecord(entry)) throw new Error(`characters[${i}] must be an object`);
-    const { characterId, accessToken, projectionRows, eveTypes } = entry;
+    const { characterId, accessToken, projectionRows, eveTypes, serverEvents, serverInputs } =
+      entry;
     if (typeof characterId !== 'number' || !Number.isFinite(characterId)) {
       throw new Error(`characters[${i}].characterId must be a number`);
     }
@@ -164,11 +179,15 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
     const rows = projectionRows.map((row, j) =>
       parseProjectionRow(row, `characters[${i}].projectionRows[${j}]`)
     );
+    const parsedServerEvents = parseServerEvents(serverEvents, `characters[${i}].serverEvents`);
+    const parsedServerInputs = parseServerInputs(serverInputs, `characters[${i}].serverInputs`);
     return {
       characterId,
       accessToken,
       projectionRows: rows,
       eveTypes: parseEveTypes(eveTypes, `characters[${i}].eveTypes`),
+      ...(parsedServerEvents !== undefined ? { serverEvents: parsedServerEvents } : {}),
+      ...(parsedServerInputs !== undefined ? { serverInputs: parsedServerInputs } : {}),
     };
   });
 
@@ -195,6 +214,8 @@ export async function buildDeviceRegistration(
   const rejected: number[] = [];
   const projections: CharacterProjection[] = [];
   const eveTypesByCharacter: Record<number, string[]> = {};
+  const serverEventsByCharacter: Record<number, string[]> = {};
+  const serverInputsByCharacter: Record<number, ServerEventInputs> = {};
 
   for (const character of input.characters) {
     try {
@@ -206,6 +227,12 @@ export async function buildDeviceRegistration(
       projections.push({ characterId: character.characterId, rows: character.projectionRows });
       if (character.eveTypes !== undefined) {
         eveTypesByCharacter[character.characterId] = character.eveTypes;
+      }
+      if (character.serverEvents !== undefined) {
+        serverEventsByCharacter[character.characterId] = character.serverEvents;
+      }
+      if (character.serverInputs !== undefined) {
+        serverInputsByCharacter[character.characterId] = character.serverInputs;
       }
     } catch (err) {
       logError('Device registration: character access token rejected', {
@@ -221,5 +248,7 @@ export async function buildDeviceRegistration(
     rejected,
     projections,
     eveTypesByCharacter,
+    serverEventsByCharacter,
+    serverInputsByCharacter,
   };
 }

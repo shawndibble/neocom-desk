@@ -29,10 +29,12 @@ import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
+import type { ServerEventRegistration } from './serverEvents';
 
 export async function uploadProjectionRows(
   rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
-  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
+  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+  serverEventsByCharacter: ReadonlyMap<number, ServerEventRegistration> = new Map()
 ): Promise<void> {
   if (webPushSupport() !== 'supported') return;
   if (readNotificationPermission() !== 'granted') return;
@@ -44,6 +46,7 @@ export async function uploadProjectionRows(
     const result = await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
       skipIfUnchanged: true,
       eveTypesByCharacter,
+      serverEventsByCharacter,
       quietHours: quietHoursPayload(useNotificationPreferences.getState().value),
     });
     settlePushRegistration(result);

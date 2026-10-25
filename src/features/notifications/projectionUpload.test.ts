@@ -56,8 +56,21 @@ describe('uploadProjectionRows', () => {
       expect.any(String),
       readyRegistration,
       rows,
-      { skipIfUnchanged: true, eveTypesByCharacter: TYPES, quietHours: null }
+      {
+        skipIfUnchanged: true,
+        eveTypesByCharacter: TYPES,
+        serverEventsByCharacter: new Map(),
+        quietHours: null,
+      }
     );
+  });
+
+  it('passes each Character’s server events through to the registration (issue #5121)', async () => {
+    const server = new Map([[1, { serverEvents: ['shipLost' as const], serverInputs: {} }]]);
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES, server);
+    expect(vi.mocked(registerDeviceForWebPush).mock.calls[0][3]).toMatchObject({
+      serverEventsByCharacter: server,
+    });
   });
 
   it('keeps the types the server reports as seen, for the next Settings open', async () => {

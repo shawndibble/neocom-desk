@@ -242,6 +242,45 @@ describe('writeDeviceRegistration', () => {
     });
   });
 
+  it('stores server-pushed events and inputs per device, keeps them when omitted, and lists the polled ones (issue #5121)', async () => {
+    const db = new FakeFirestore();
+    const other = CHAR + 1;
+    await writeDeviceRegistration(asFirestore(db), {
+      deviceId: 'A',
+      fcmToken: 'token-A',
+      characterIds: [CHAR, other],
+      projections: [],
+      eveTypesByCharacter: {},
+      serverEventsByCharacter: { [CHAR]: ['communityJoinRequest', 'shipLost'], [other]: [] },
+      serverInputsByCharacter: { [CHAR]: { shipLostMinimumIsk: 5 } },
+    });
+    const first = db.get('deviceRegistrations', 'A');
+    expect(first?.serverEventsByCharacter).toEqual({
+      [String(CHAR)]: ['communityJoinRequest', 'shipLost'],
+      [String(other)]: [],
+    });
+    expect(first?.serverInputsByCharacter).toEqual({ [String(CHAR)]: { shipLostMinimumIsk: 5 } });
+    expect(first?.polledServerEvents).toEqual(['shipLost']);
+
+    // The tick's baselines survive a re-registration for Characters still held.
+    db.seed('deviceRegistrations', 'A', {
+      ...first,
+      serverEventBaselines: {
+        [String(CHAR)]: { shipLossIds: [1], priceAlerts: [] },
+        [String(other)]: {},
+      },
+    });
+    // An older client omits both: this device's stored lists stay.
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    const second = db.get('deviceRegistrations', 'A');
+    expect(second?.serverEventsByCharacter).toEqual({
+      [String(CHAR)]: ['communityJoinRequest', 'shipLost'],
+    });
+    expect(second?.serverInputsByCharacter).toEqual({ [String(CHAR)]: { shipLostMinimumIsk: 5 } });
+    expect(second?.serverEventBaselines).toEqual({ [String(CHAR)]: { shipLossIds: [1] } });
+    expect(second?.polledServerEvents).toEqual(['shipLost']);
+  });
+
   it("keeps device A's unfired rows when device B uploads for the same Character", async () => {
     const db = new FakeFirestore();
     const jobA = row('industryJobComplete');
