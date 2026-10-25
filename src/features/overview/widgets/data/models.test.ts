@@ -539,7 +539,7 @@ describe('the Number view says one new thing', () => {
       characterCount: 2,
     };
 
-    it('keeps the figures and asks the Character missing the permission, by name', () => {
+    it('shows the Characters that granted it, and never asks about the one that did not', () => {
       const view = buildView(
         'miningTax',
         {
@@ -553,9 +553,8 @@ describe('the Number view says one new thing', () => {
       );
       expect(view.status.needsPermission).toBe(false);
       expect(view.number.iskAmount).toBe(10_900_000);
-      expect(view.grantEndpoints).toEqual(['getCharacterMining']);
-      expect(view.grantCharacterId).toBe(2);
-      expect(view.grantHint).toContain('Shadow Ruler');
+      expect(view.grantEndpoints).toBeUndefined();
+      expect(view.grantCharacterId).toBeUndefined();
     });
 
     it('needs permission only when no Character can read, and asks one of them', () => {
@@ -572,6 +571,7 @@ describe('the Number view says one new thing', () => {
       );
       expect(view.status.needsPermission).toBe(true);
       expect(view.grantCharacterId).toBe(2);
+      expect(view.grantHint).toContain('Shadow Ruler, Krish Mero');
     });
 
     it('a snapshot cached before the ids were kept reads as before', () => {

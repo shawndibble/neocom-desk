@@ -350,21 +350,22 @@ const miningTax: Builder = (feeds, { t }) => {
   const data = feed?.data ?? null;
   const to = '/mining/tax';
   if (!data) return blank(to, statusOf(feed));
-  // Account-wide, like Mining yield: one Character without the permission leaves its
-  // ledger out of the figures rather than blanking them, and the grant asks that
-  // Character, not the active one, which may hold it already.
+  // Account-wide, like Mining yield: the figures are the Characters that granted the
+  // permission, and a Character that did not is simply left out, never asked about.
+  // Only when none can read does the widget ask, and then a Character that lacks it,
+  // not the active one, which may hold it already.
   const missing = data.missingCharacterIds;
   const known = missing !== undefined && missing.length > 0;
   const everyoneMissing = known ? missing.length >= data.characterCount : data.needsReauth;
-  const grant = known
-    ? {
-        grantCharacterId: missing[0],
-        grantHint: t('overview.widgets.miningTax.leavesOut', {
-          names: data.missingCharacterNames.join(', '),
-        }),
-        ...(everyoneMissing ? {} : { grantEndpoints: ['getCharacterMining' as const] }),
-      }
-    : {};
+  const grant =
+    known && everyoneMissing
+      ? {
+          grantCharacterId: missing[0],
+          grantHint: t('overview.widgets.miningTax.needsFor', {
+            names: data.missingCharacterNames.join(', '),
+          }),
+        }
+      : {};
   return {
     ...blank(to, statusOf(feed, { needsPermission: everyoneMissing })),
     ...grant,
