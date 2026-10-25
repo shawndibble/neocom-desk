@@ -28,7 +28,7 @@ function option(
     score: 0.1,
     iskDelta: 1000,
     destroysRigs: false,
-    downsides: [],
+    lost: [],
     ...extra,
   } as ImproveOption;
 }
@@ -169,12 +169,19 @@ describe('ImprovePanel', () => {
 
   it('sections No downside and Trade-offs, and applies the ticked rows together', async () => {
     const gain = option(11, { ehp: 1100 });
-    const trade = option(21, { ehp: 1200 }, { downsides: ['speed'] });
+    const trade = option(
+      21,
+      { ehp: 1200 },
+      {
+        lost: [{ kind: 'stat', change: { key: 'maxVelocity', before: 300, after: 250 } }],
+      }
+    );
     const onApply = vi.fn();
     renderPanel(search(done({ noDownside: [gain], tradeOffs: [trade] })), onApply);
     expect(screen.getByText('No downside')).toBeInTheDocument();
     expect(screen.getByText('Trade-offs')).toBeInTheDocument();
-    expect(screen.getByText('Gives up: Speed')).toBeInTheDocument();
+    expect(screen.getByText(/Gives up:/)).toBeInTheDocument();
+    expect(screen.getByText(/Max velocity 300 to 250 m\/s, worse/)).toBeInTheDocument();
     const apply = screen.getByRole('button', { name: 'Apply' });
     expect(apply).toBeDisabled();
     const boxes = screen.getAllByRole('checkbox');

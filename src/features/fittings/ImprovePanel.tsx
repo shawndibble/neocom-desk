@@ -266,6 +266,24 @@ export function ImprovePanel({
     return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
   }
 
+  /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
+  function lostLine(option: ImproveOption): ReactNode {
+    return option.lost.flatMap(({ kind, change }, i): ReactNode[] => {
+      const node =
+        kind === 'stat' ? (
+          <StatChange key={change.key} change={change} />
+        ) : (
+          <span key={change.key}>
+            {t(`fittings.whatToTrain.role.${change.key}`, {
+              before: change.before,
+              after: change.after,
+            })}
+          </span>
+        );
+      return i === 0 ? [node] : [', ', node];
+    });
+  }
+
   function isk(option: ImproveOption) {
     if (option.iskDelta === null)
       return <span className="text-text-dim">{t('fittings.improve.noPrice')}</span>;
@@ -446,13 +464,9 @@ export function ImprovePanel({
             <span className="text-text-dim block text-xs">
               {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey))}
             </span>
-            {option.downsides.length > 0 && (
+            {option.lost.length > 0 && (
               <span className="text-warning block text-xs">
-                {t('fittings.improve.givesUp', {
-                  stats: option.downsides
-                    .map((metric) => t(`fittings.whatToTrain.sort.${metric}`))
-                    .join(', '),
-                })}
+                {t('fittings.improve.givesUp')} {lostLine(option)}
               </span>
             )}
             <span className="block text-xs">{isk(option)}</span>

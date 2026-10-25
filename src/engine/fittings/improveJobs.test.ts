@@ -130,7 +130,7 @@ describe('a weaker module in an unscored job', () => {
     });
     expect(result!.noDownside.map((o) => o.candidate.toTypeId)).toEqual([3]);
     expect(result!.tradeOffs.map((o) => o.candidate.toTypeId)).toEqual([2]);
-    expect(result!.tradeOffs[0]!.downsides).toContain('miningYield');
+    expect(result!.tradeOffs[0]!.lost.map((l) => l.change.key)).toContain('miningYield');
   });
 
   it('Mine more is unchanged: it keeps only swaps that raise the yield', async () => {
