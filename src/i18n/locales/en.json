@@ -11917,6 +11917,7 @@
       "columnSellAfterTax": "Sell after tax",
       "removeRow": "Remove",
       "minusOwnedEverywhere": "any location",
+      "minusOwnedUnknownStructure": "Unknown structure #{{id}}",
       "minusOwnedChipEverywhere": "Minus owned · all locations",
       "volumeUnit": "m³",
       "totalVolume": "Volume",

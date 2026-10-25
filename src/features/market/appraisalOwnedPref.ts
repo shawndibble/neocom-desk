@@ -7,7 +7,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export interface AppraisalOwnedPref {
   enabled: boolean;
-  /** A Trade Hub's station id; null means the header hub's station. */
+  /** A station or structure id (a Trade Hub's by default); null means the header hub's station. */
   stationId: number | null;
   /** Count stock wherever it sits, containers and structures included; `stationId` is then ignored. */
   everywhere: boolean;

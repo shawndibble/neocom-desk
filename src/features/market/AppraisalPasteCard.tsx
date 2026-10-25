@@ -42,6 +42,8 @@ interface AppraisalPasteCardProps {
   ownedPref: AppraisalOwnedPref;
   setOwnedPref: (next: AppraisalOwnedPref) => Promise<void>;
   ownedStationId: number;
+  /** Non-hub places holding stock (stations, structures), beside the Trade Hubs. */
+  otherPlaces: readonly { id: number; label: string }[];
   recent: readonly RecentAppraisal[];
   setRecent: (next: readonly RecentAppraisal[]) => Promise<void>;
   /** Ages in the Recent list are read against when the panel opened. */
@@ -63,6 +65,7 @@ export function AppraisalPasteCard({
   ownedPref,
   setOwnedPref,
   ownedStationId,
+  otherPlaces,
   recent,
   setRecent,
   openedAt,
@@ -218,6 +221,12 @@ export function AppraisalPasteCard({
                 {TRADE_HUBS.map((h) => (
                   <SelectItem key={h.id} value={String(h.stationId)}>
                     {h.systemName}
+                  </SelectItem>
+                ))}
+                {otherPlaces.length > 0 && <SelectSeparator />}
+                {otherPlaces.map((place) => (
+                  <SelectItem key={place.id} value={String(place.id)}>
+                    {place.label}
                   </SelectItem>
                 ))}
               </SelectContent>

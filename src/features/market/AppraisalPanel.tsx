@@ -136,11 +136,20 @@ export function AppraisalPanel({
   const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
   const minusOwned = ownedPref.enabled && !lacksAssets && characterId !== null;
   const ownedStationId = ownedPref.stationId ?? hub.stationId;
-  const ownedStation = TRADE_HUBS.find((h) => h.stationId === ownedStationId) ?? hub;
-  const { owned } = useOwnedAtStation(
+  const { owned, places, placeNames } = useOwnedAtStation(
     minusOwned,
     ownedPref.everywhere ? OWNED_EVERYWHERE : ownedStationId
   );
+  const placeLabel = (id: number) =>
+    TRADE_HUBS.find((h) => h.stationId === id)?.systemName ??
+    placeNames.get(id) ??
+    t('market.appraisal.minusOwnedUnknownStructure', { id });
+  // Trade Hubs are always offered; any other place that holds stock joins them, and so does a saved pick not read yet.
+  const otherPlaceIds = [
+    ...places.map((place) => place.id),
+    ...(places.some((place) => place.id === ownedStationId) ? [] : [ownedStationId]),
+  ].filter((id, i, ids) => ids.indexOf(id) === i && !TRADE_HUBS.some((h) => h.stationId === id));
+  const otherPlaces = otherPlaceIds.map((id) => ({ id, label: placeLabel(id) }));
 
   const {
     columns,
@@ -242,7 +251,7 @@ export function AppraisalPanel({
     ? null
     : ownedPref.everywhere
       ? t('market.appraisal.minusOwnedChipEverywhere')
-      : t('market.appraisal.minusOwnedChip', { station: ownedStation.systemName });
+      : t('market.appraisal.minusOwnedChip', { station: placeLabel(ownedStationId) });
 
   const summaryReady =
     !(loading && result === null) &&
@@ -287,6 +296,7 @@ export function AppraisalPanel({
           ownedPref={ownedPref}
           setOwnedPref={setOwnedPref}
           ownedStationId={ownedStationId}
+          otherPlaces={otherPlaces}
           recent={recent}
           setRecent={setRecent}
           openedAt={openedAt}
