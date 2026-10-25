@@ -24,7 +24,7 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
-import { DataTable, type DataTableColumn } from '@/components/ui';
+import { DataTable, SegmentedControl, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -38,10 +38,12 @@ import {
   yAxis,
   Y_AXIS_WIDTH,
 } from './surveyChartParts';
-import { DepletionChart, IskChart } from './SurveyViewCharts';
+import { DepletionChart, IskChart, PaceByOreChart } from './SurveyViewCharts';
 import { oreTone } from './surveyTones';
 import { formatCount } from '@/lib/formatCount';
 import { createNumberFormat } from '@/lib/numberLocale';
+
+type PaceView = 'total' | 'ore';
 
 const formatVolume = createNumberFormat({ maximumFractionDigits: 3 });
 
@@ -103,6 +105,7 @@ export function SurveyCharts({
   const { t } = useTranslation();
   const compact = compactHeight !== undefined;
   const [plotWidth, setPlotWidth] = useState(0);
+  const [paceView, setPaceView] = useState<PaceView>('total');
   const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
   // The rate is one flat block per pair of scans, from the earlier scan to the
@@ -183,6 +186,21 @@ export function SurveyCharts({
     ],
     [t]
   );
+  const rateByOreColumns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
+    () => [
+      ...rateColumns.slice(0, 2),
+      { ...rateColumns[2], header: t('survey.chartTotal') },
+      ...summary.oreNames
+        .filter((ore) => summary.intervals.some((i) => ore in i.minedByOre))
+        .map((ore) => ({
+          id: `ore:${ore}`,
+          header: ore,
+          render: (i: SurveySummary['intervals'][number]) =>
+            `${formatCount((i.minedByOre[ore] ?? 0) / ((i.to - i.from) / 1000))} m³/s`,
+        })),
+    ],
+    [rateColumns, summary.oreNames, summary.intervals, t]
+  );
 
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as VolumeRow | undefined;
@@ -234,6 +252,7 @@ export function SurveyCharts({
   }
 
   const nodeDot = makeScanDot(onRemoveScan);
+  const rateLabel = paceView === 'ore' ? t('survey.chartRateByOre') : t('survey.chartRate');
 
   const plot = (
     <div className="w-full" style={{ height: compactHeight ?? FULL_HEIGHT }}>
@@ -335,67 +354,83 @@ export function SurveyCharts({
       </figure>
 
       {rateSteps.length > 0 && (
-        <figure aria-label={t('survey.chartRate')} className="m-0">
-          <div className="h-32 w-full">
-            <ResponsiveContainer>
-              <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
-                <CartesianGrid stroke="var(--color-line)" vertical={false} />
-                {xAxis(false)}
-                {yAxis({
-                  label: {
-                    value: t('survey.chartRateAxis'),
-                    position: 'insideTopLeft',
-                    offset: 8,
-                    fill: 'var(--color-text-dim)',
-                    fontSize: '0.625rem',
-                  },
-                })}
-                <Area
-                  data={rateSteps}
-                  dataKey="rate"
-                  type="stepAfter"
-                  stroke="var(--color-accent)"
-                  fill="var(--color-accent-dim)"
-                  fillOpacity={0.75}
-                  isAnimationActive={false}
-                />
-                <Line
-                  data={shownRateLabels}
-                  dataKey="rate"
-                  stroke="none"
-                  dot={false}
-                  isAnimationActive={false}
-                  legendType="none"
-                >
-                  <LabelList
-                    dataKey="rate"
-                    position="top"
-                    offset={4}
-                    fill="var(--color-text)"
-                    fontSize="0.625rem"
-                    formatter={(value: unknown) =>
-                      typeof value === 'number' ? formatCount(value) : ''
-                    }
-                  />
-                </Line>
-                {summary.pace !== null && (
-                  <ReferenceLine
-                    y={summary.pace}
-                    stroke="var(--color-text)"
-                    strokeDasharray="5 4"
-                  />
-                )}
-              </ComposedChart>
-            </ResponsiveContainer>
+        <figure aria-label={rateLabel} className="m-0">
+          <div className="flex justify-end">
+            <SegmentedControl
+              label={t('survey.paceView')}
+              size="sm"
+              value={paceView}
+              onChange={setPaceView}
+              options={[
+                { value: 'total', label: t('survey.paceTotal') },
+                { value: 'ore', label: t('survey.paceByOre') },
+              ]}
+            />
           </div>
-          <figcaption className="sr-only">{t('survey.chartRate')}</figcaption>
+          <div className="h-32 w-full">
+            {paceView === 'ore' ? (
+              <PaceByOreChart summary={summary} />
+            ) : (
+              <ResponsiveContainer>
+                <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
+                  <CartesianGrid stroke="var(--color-line)" vertical={false} />
+                  {xAxis(false)}
+                  {yAxis({
+                    label: {
+                      value: t('survey.chartRateAxis'),
+                      position: 'insideTopLeft',
+                      offset: 8,
+                      fill: 'var(--color-text-dim)',
+                      fontSize: '0.625rem',
+                    },
+                  })}
+                  <Area
+                    data={rateSteps}
+                    dataKey="rate"
+                    type="stepAfter"
+                    stroke="var(--color-accent)"
+                    fill="var(--color-accent-dim)"
+                    fillOpacity={0.75}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    data={shownRateLabels}
+                    dataKey="rate"
+                    stroke="none"
+                    dot={false}
+                    isAnimationActive={false}
+                    legendType="none"
+                  >
+                    <LabelList
+                      dataKey="rate"
+                      position="top"
+                      offset={4}
+                      fill="var(--color-text)"
+                      fontSize="0.625rem"
+                      formatter={(value: unknown) =>
+                        typeof value === 'number' ? formatCount(value) : ''
+                      }
+                    />
+                  </Line>
+                  {summary.pace !== null && (
+                    <ReferenceLine
+                      y={summary.pace}
+                      stroke="var(--color-text)"
+                      strokeDasharray="5 4"
+                    />
+                  )}
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          <figcaption className="sr-only">{rateLabel}</figcaption>
           <div className="sr-only">
             <DataTable
-              columns={rateColumns}
+              columns={paceView === 'ore' ? rateByOreColumns : rateColumns}
               responsive="table"
               rows={summary.intervals}
               rowKey={(i) => i.from}
-              label={t('survey.chartRate')}
+              label={rateLabel}
             />
           </div>
         </figure>

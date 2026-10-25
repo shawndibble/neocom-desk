@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availableChartViews, depletionSeries, iskSeries } from './chartViews';
+import { availableChartViews, depletionSeries, iskSeries, paceByOreSeries } from './chartViews';
 import { summarizeSurvey, type SurveyScan } from './series';
 
 const MIN = 60_000;
@@ -129,5 +129,49 @@ describe('iskSeries', () => {
     const r = iskSeries(s);
     expect(r.rows).toHaveLength(1);
     expect(r.rows[0].projected).toBeUndefined();
+  });
+});
+
+describe('paceByOreSeries', () => {
+  it('is empty before a second scan', () => {
+    const s = summarizeSurvey([scan(0, ['A', 100])])!;
+    expect(paceByOreSeries(s)).toEqual({ rows: [], activeOres: [], toneIndex: { A: 0 } });
+  });
+
+  it('gives each interval a step per ore in m3/s that sums to the total pace', () => {
+    const s = summarizeSurvey([
+      scan(0, ['A', 1000], ['B', 500]),
+      scan(5, ['A', 700], ['B', 400]), // 300 s: A 1, B 1/3
+      scan(15, ['A', 700], ['B', 100]), // 600 s: B 0.5
+    ])!;
+    const { rows, activeOres, toneIndex } = paceByOreSeries(s);
+    expect(activeOres).toEqual(['A', 'B']);
+    expect(toneIndex).toEqual({ A: 0, B: 1 });
+    expect(rows).toHaveLength(3);
+    expect(rows[0].at).toBe(T0);
+    expect(rows[0].A).toBeCloseTo(1);
+    expect(rows[0].B).toBeCloseTo(1 / 3);
+    expect(rows[0].total).toBeCloseTo(4 / 3);
+    // an ore not being mined adds zero height
+    expect(rows[1].A).toBe(0);
+    expect(rows[1].B).toBeCloseTo(0.5);
+    expect(rows[1].total).toBeCloseTo(0.5);
+    // closing row repeats the last step at the last scan
+    expect(rows[2].at).toBe(T0 + 15 * MIN);
+    expect(rows[2].B).toBeCloseTo(0.5);
+  });
+
+  it('keeps the colour index of the full ore list and drops ores never mined', () => {
+    const s = summarizeSurvey(
+      [scan(0, ['A', 100], ['B', 100], ['C', 100]), scan(1, ['A', 100], ['B', 100], ['C', 40])],
+      new Map([
+        ['A', 3],
+        ['B', 2],
+        ['C', 1],
+      ])
+    )!;
+    const { activeOres, toneIndex } = paceByOreSeries(s);
+    expect(activeOres).toEqual(['C']);
+    expect(toneIndex.C).toBe(2);
   });
 });

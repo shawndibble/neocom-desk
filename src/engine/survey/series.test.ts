@@ -40,8 +40,24 @@ describe('summarizeSurvey', () => {
     ])!;
     expect(s.percent).toBe(60);
     expect(s.intervals).toEqual([
-      { from: T0, to: T0 + 5 * MIN, mined: 300, added: 0, rate: 1, minedIsk: 0 },
-      { from: T0 + 5 * MIN, to: T0 + 10 * MIN, mined: 300, added: 0, rate: 1, minedIsk: 0 },
+      {
+        from: T0,
+        to: T0 + 5 * MIN,
+        mined: 300,
+        added: 0,
+        rate: 1,
+        minedIsk: 0,
+        minedByOre: { Sylvite: 300 },
+      },
+      {
+        from: T0 + 5 * MIN,
+        to: T0 + 10 * MIN,
+        mined: 300,
+        added: 0,
+        rate: 1,
+        minedIsk: 0,
+        minedByOre: { Sylvite: 300 },
+      },
     ]);
     expect(s.pace).toBe(1);
     expect(s.etaAt).toBe(T0 + 10 * MIN + 400 * 1000);
@@ -291,5 +307,19 @@ describe('ISK per ore and ISK mined', () => {
   it('is 0 for an unpriced ore', () => {
     const s = summarizeSurvey([scan(0, ['A', 100]), scan(5, ['A', 40])])!;
     expect(s.intervals[0].minedIsk).toBe(0);
+  });
+});
+
+describe('interval minedByOre', () => {
+  it('splits the mined volume by ore and sums back to mined', () => {
+    const s = summarizeSurvey([scan(0, ['A', 1000], ['B', 500]), scan(5, ['A', 700], ['B', 500])])!;
+    expect(s.intervals[0].minedByOre).toEqual({ A: 300 });
+    expect(s.intervals[0].mined).toBe(300);
+  });
+
+  it('counts a rock that vanished as fully mined, and ignores rocks that came into range', () => {
+    const s = summarizeSurvey([scan(0, ['A', 400], ['B', 100]), scan(5, ['A', 300], ['C', 900])])!;
+    expect(s.intervals[0].minedByOre).toEqual({ A: 100, B: 100 });
+    expect(s.intervals[0].added).toBe(900);
   });
 });
