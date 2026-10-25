@@ -18,6 +18,7 @@ import {
   IMPROVE_REACHES,
   improveCandidates,
   type DefenseChoice,
+  onlySide,
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveHold,
@@ -41,7 +42,7 @@ import {
   loadCrystals,
 } from '@/engine/fittings/improveMining';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
-import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
@@ -366,9 +367,9 @@ export function useImprove(
         const searched = searchableGoal(goal, own, hull);
         // A tank goal under Shield or Armor runs both sides, the chosen one first, to compare them.
         const sides: DefenseChoice[] =
-          defense !== 'keep' && TANK_GOALS.has(searched)
+          defense !== 'keep' && reach !== 'upgrade' && TANK_GOALS.has(searched)
             ? [defense, defense === 'shield' ? 'armor' : 'shield']
-            : [defense];
+            : [reach === 'upgrade' ? 'keep' : defense];
         const sets = sides.map((side) => ({
           side,
           candidates: searchCandidates(
@@ -455,16 +456,29 @@ export function useImprove(
           // "Show best so far" ends the whole search: the other side was not searched, so it is not compared.
           if (stopRef.current) break;
         }
+        // A side counts only the options that put its own tank modules on the fit.
+        const groupOf = (typeId: number) => catalogue.types[String(typeId)]?.groupID;
+        const bySide = sets.length === 2;
+        // "Show best so far" can end the search with one side done: it is filtered but not compared.
+        const sided = bySide
+          ? results.map((result, i) => onlySide(result, sets[i].side as DefenseSide, groupOf))
+          : results;
+        // The list drops only the other side's swaps; a weapon or Damage Control swap still counts for Best overall.
+        const listed = bySide
+          ? onlySide(results[0], sets[0].side as DefenseSide, groupOf, false)
+          : results[0];
+        // One count for both side runs, the same total the progress bar showed.
+        const checked = results.reduce((sum, result) => sum + result.checked, 0);
         const sideResults =
-          sets.length === 2 && results.length === 2
+          bySide && results.length === 2
             ? ({
-                [sets[0].side]: results[0],
-                [sets[1].side]: results[1],
-              } as Record<'shield' | 'armor', ImproveResult>)
+                [sets[0].side]: sided[0],
+                [sets[1].side]: sided[1],
+              } as Record<DefenseSide, ImproveResult>)
             : undefined;
         setState({
           status: 'done',
-          result: results[0],
+          result: { ...listed, checked },
           before: scoredBefore,
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults } : {}),

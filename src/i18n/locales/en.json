@@ -1441,7 +1441,7 @@
       },
       "defenseLabel": "Defense Choice",
       "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
-      "defenseHint": "Defense Choice only changes Tankier and Best overall.",
+      "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
       "sideGain": "up to +{{percent}}%",

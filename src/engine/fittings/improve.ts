@@ -588,6 +588,32 @@ export function bestScore(result: ImproveResult): number | null {
   return scores.length > 0 ? Math.max(...scores) : null;
 }
 
+/**
+ * The result cut to the options that suit `side`, so a side is never credited
+ * with a swap that only moves the other side's module. `strict` also drops
+ * options that touch no tank module (a weapon, a Damage Control) and is how a
+ * side's figure is counted; the list keeps them. `checked` is kept: it counts
+ * the search, not the options.
+ */
+export function onlySide(
+  result: ImproveResult,
+  side: DefenseSide,
+  groupOf: (typeId: number) => number | undefined,
+  strict = true
+): ImproveResult {
+  const keep = (option: ImproveOption) => {
+    const group = groupOf(option.candidate.toTypeId);
+    const own = group === undefined ? null : sideOf(group);
+    return own === side || (!strict && own === null);
+  };
+  return {
+    ...result,
+    noDownside: result.noDownside.filter(keep),
+    tradeOffs: result.tradeOffs.filter(keep),
+    rejected: result.rejected.filter(keep),
+  };
+}
+
 export interface FindImprovementsParams {
   fitting: Fitting;
   /** The open Fitting's own stats, under the same conditions as `stats`. */

@@ -208,8 +208,8 @@ describe('ImprovePanel', () => {
   });
 
   it('shows Reach, mode, Defense Choice and the spend cap, and reports a pick', async () => {
-    const config = settings();
-    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config);
+    const config = settings({ reach: 'rebalance' });
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config, { goal: 'tank' });
     expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Defense Choice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Rework' }));
@@ -218,6 +218,18 @@ describe('ImprovePanel', () => {
     expect(config.onModeChange).toHaveBeenCalledWith('refit');
     await userEvent.click(screen.getByRole('button', { name: 'Armor' }));
     expect(config.onDefenseChange).toHaveBeenCalledWith('armor');
+  });
+
+  it('hides Defense Choice on goals it does not change', () => {
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings(), { goal: 'mining' });
+    expect(screen.queryByRole('group', { name: 'Defense Choice' })).not.toBeInTheDocument();
+  });
+
+  it('disables Shield and Armor under Upgrade, with the reason', () => {
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings(), { goal: 'tank' });
+    expect(screen.getByRole('button', { name: 'Armor' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Shield' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Pick Rebalance or Rework to change tank side')).toBeInTheDocument();
   });
 
   it('keeps Rigs and Officer behind a collapsed, unticked group', async () => {
