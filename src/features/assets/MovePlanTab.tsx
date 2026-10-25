@@ -1,3 +1,4 @@
+import { cx } from '@/lib/cx';
 import { idSetKey } from '@/lib/idSetKey';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -762,10 +763,16 @@ function MovePlanTabBody({
     .filter(Boolean)
     .join(' + ');
 
+  const planView = !!result && !failed && !(showingHaul && savedHaul) && !!loaded;
+
   return (
     <section
       aria-label={t('assets.movePlan.title')}
-      className="min-h-0 flex-1 scroll-pb-32 overflow-y-auto rounded-xs max-sm:scroll-pt-48 border border-line bg-panel p-3"
+      className={cx(
+        'min-h-0 flex-1 scroll-pb-32 overflow-y-auto rounded-xs max-sm:scroll-pt-48',
+        // The plan's cards sit on the page; its own panel starts at the packaged volume.
+        planView ? '' : 'border border-line bg-panel p-3'
+      )}
     >
       <div className="flex min-h-full flex-col gap-3 text-sm">
         <HullSource characterId={activeCharacterId} intoRef={hullSource} />

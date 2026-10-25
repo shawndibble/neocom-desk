@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -279,7 +279,7 @@ describe('PlanResult', () => {
         />
       </MemoryRouter>
     );
-    expect(screen.getByText(/leaves 1 stack behind/)).toBeTruthy();
+    expect(screen.getByText(/Can't carry 1 stack/)).toBeTruthy();
   });
 
   it('lists a packed ship with Fly instead, and flags one too big for the hauler', async () => {
@@ -346,7 +346,7 @@ describe('PlanResult', () => {
       .click(screen.getByRole('button', { name: 'Fly Praxis instead of packing it' }));
     expect(onUnpackShip).toHaveBeenCalledWith(9);
     // 1 haul + 1 forced flight
-    expect(screen.getByText('trips').parentElement?.textContent).toBe('2trips');
+    expect(screen.getAllByText('trips')[0].parentElement?.textContent).toBe('2trips');
   });
 
   describe('Pack instead', () => {
@@ -385,18 +385,18 @@ describe('PlanResult', () => {
     it('counts each flown ship as a trip on top of the hauls', () => {
       setup(0);
       expect(screen.getByText('2 hauls + 1 ship')).toBeTruthy();
-      expect(screen.getByText('trips').parentElement?.textContent).toBe('3trips');
+      expect(screen.getAllByText('trips')[0].parentElement?.textContent).toBe('3trips');
     });
 
     it('names each ship being flown under one labelled section', () => {
       setup(0);
-      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+      expect(screen.getByRole('region', { name: 'Flying yourself' }).textContent).toContain(
         'Badger'
       );
       expect(screen.queryByText('Fly Badger')).toBeNull();
     });
 
-    it('groups duplicate hulls with a count', () => {
+    it('lists each flown ship of a duplicate hull on its own', () => {
       const two = {
         ...shipPlan,
         perCharacter: [
@@ -441,9 +441,9 @@ describe('PlanResult', () => {
           />
         </MemoryRouter>
       );
-      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
-        'Badger ×2'
-      );
+      expect(
+        within(screen.getByRole('region', { name: 'Flying yourself' })).getAllByText('Badger')
+      ).toHaveLength(2);
     });
 
     it('still names the ship when nothing is hauled', () => {
@@ -488,21 +488,21 @@ describe('PlanResult', () => {
           />
         </MemoryRouter>
       );
-      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+      expect(screen.getByRole('region', { name: 'Flying yourself' }).textContent).toContain(
         'Badger'
       );
-      expect(screen.getByText('1 ship')).toBeTruthy();
+      expect(screen.getAllByText('1 ship').length).toBeGreaterThan(0);
     });
 
     it('packs a ship with no rigs straight away', async () => {
       const onPackShip = setup(0);
-      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Pack it' }));
       expect(onPackShip).toHaveBeenCalledWith(77);
     });
 
     it('warns about fitted rigs first, and packs only once confirmed', async () => {
       const onPackShip = setup(2);
-      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Pack it' }));
       expect(onPackShip).not.toHaveBeenCalled();
       expect(await screen.findByText(/2 rigs fitted/)).toBeTruthy();
       expect(screen.getByRole('checkbox', { name: "Don't remind me again" })).toBeTruthy();
@@ -558,8 +558,8 @@ describe('PlanResult', () => {
 
     it('lands on the pickup heading when the ship packs straight away', async () => {
       render(<Harness rigs={0} />);
-      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
-      expect(screen.queryByRole('button', { name: 'Pack instead' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Pack it' }));
+      expect(screen.queryByRole('button', { name: 'Pack it' })).toBeNull();
       await waitFor(() =>
         expect(document.activeElement).toBe(screen.getByRole('heading', { name: /Jita 4-4/ }))
       );
@@ -567,7 +567,7 @@ describe('PlanResult', () => {
 
     it('lands on the pickup heading after the rig warning closes', async () => {
       render(<Harness rigs={2} />);
-      await userEvent.click(screen.getByRole('button', { name: 'Pack instead' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Pack it' }));
       await userEvent.click(await screen.findByRole('button', { name: 'Pack anyway' }));
       await waitFor(() =>
         expect(document.activeElement).toBe(screen.getByRole('heading', { name: /Jita 4-4/ }))
@@ -755,10 +755,9 @@ describe('PlanResult', () => {
       renderCrowded();
       const names = () =>
         screen
-          .getAllByRole('listitem')
-          .map((li) => li.textContent ?? '')
-          .filter((x) => /^(Alpha|Bravo|Charlie|Delta|Echo) ·/.test(x))
-          .map((x) => x.split(' ·')[0]);
+          .getAllByRole('radio')
+          .map((r) => r.getAttribute('aria-label') ?? '')
+          .filter((x) => /^(Alpha|Bravo|Charlie|Delta|Echo)$/.test(x));
       expect(names()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo']);
       await userEvent.click(screen.getByRole('button', { name: 'Owned first' }));
       expect(names()).toEqual(['Bravo', 'Charlie', 'Delta', 'Alpha', 'Echo']);

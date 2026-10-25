@@ -44,21 +44,22 @@ export function MaxIskInput({ value, onChange }: MaxIskInputProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="flex flex-wrap items-center gap-2">
+      <label title={t('assets.movePlan.maxIskHint')} className="flex flex-wrap items-center gap-2">
         <span className="text-xs tracking-wide text-text-dim uppercase">
           {t('assets.movePlan.maxIskLabel')}
         </span>
         <TextInput
           size="sm"
+          aria-label={t('assets.movePlan.maxIskAria')}
           inputMode="decimal"
-          className="w-40"
+          className="w-40 font-mono tabular-nums"
           placeholder={t('assets.movePlan.maxIskPlaceholder')}
           value={text}
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
           onChange={(e) => onType(e.target.value)}
         />
-        <span className="text-sm text-text-dim">{t('assets.movePlan.maxIskUnit')}</span>
+        {!blank && <span className="text-sm text-text-dim">{t('assets.movePlan.maxIskUnit')}</span>}
       </label>
       {invalid && (
         <FieldError id={errorId} className="text-xs">

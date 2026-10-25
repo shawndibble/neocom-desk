@@ -1,24 +1,27 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  FieldError,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  TextInput,
-} from '@/components/ui';
+import { FieldError, Radio, SegmentedControl, TextInput } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
+import { cx } from '@/lib/cx';
 import {
   customM3Problem,
   MAX_CUSTOM_HAULS,
+  type HaulerOption,
   type HaulerOverride,
   type MovePlan,
 } from '@/engine/assets/movePlan';
-import { ownedFirstOrder, ownedText } from './ownedHullText';
+import { ownedFirstOrder } from './ownedHullText';
+import { OwnedMark } from './MovePlanOwnedMark';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 
 const CUSTOM = 'custom';
+
+/** Rows shown before "Show more"; the chosen hauler is always among them. */
+const INLINE_ROWS = 4;
+
+/** A phone stacks the carry note and the owned mark under the name; from `sm` up each gets a column. */
+const ROW_COLUMNS =
+  'grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[1rem_minmax(0,11rem)_7.5rem_minmax(0,1fr)_auto]';
 
 interface HaulerPickerProps {
   plan: MovePlan;
@@ -27,15 +30,31 @@ interface HaulerPickerProps {
   onPick: (override: HaulerOverride | undefined) => void;
   /** List owned hulls first; the plan's own ranking is untouched. */
   ownedFirst?: boolean;
+  onOwnedFirstChange?: (on: boolean) => void;
+  /** Every hauler is listed, not just the first few. */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
+  /** Trips a hauler takes, counting the ships flown. */
+  tripsOf?: (option: HaulerOption) => number;
 }
 
 /**
- * Per-plan hauler choice: the suggested hull, any other listed hull, or one
- * typed m³. Lives only as long as the plan; the saved Cargo Space is never touched.
+ * Per-plan hauler choice: one row per hauler (trips, what it cannot carry, whether you own one),
+ * or one typed m³. Lives only as long as the plan; the saved Cargo Space is never touched.
  */
-export function HaulerPicker({ plan, override, onPick, ownedFirst = false }: HaulerPickerProps) {
+export function HaulerPicker({
+  plan,
+  override,
+  onPick,
+  ownedFirst = false,
+  onOwnedFirstChange,
+  expanded = false,
+  onToggleExpanded,
+  tripsOf = (o) => o.trips,
+}: HaulerPickerProps) {
   const { t } = useTranslation();
   const errorId = useId();
+  const groupName = useId();
   const [customMode, setCustomMode] = useState(override !== undefined && 'customM3' in override);
   const [text, setText] = useState(
     override && 'customM3' in override ? maskNumber(override.customM3) : ''
@@ -49,6 +68,15 @@ export function HaulerPicker({ plan, override, onPick, ownedFirst = false }: Hau
   const shown = customMode ? problem(text) : null;
   const suggestedId = plan.suggested?.hull.typeId;
   const activeId = plan.active?.hull.typeId;
+  const selected = customMode ? CUSTOM : activeId === undefined ? '' : String(activeId);
+
+  const ordered = ownedFirstOrder(plan.comparison, ownedFirst);
+  const visible = expanded
+    ? ordered
+    : ordered.filter((o, i) => i < INLINE_ROWS || (!customMode && o.hull.typeId === activeId));
+  const hidden = ordered.length - visible.length;
+  const mostTrips = Math.max(1, ...ordered.map(tripsOf));
+  const anyOwned = plan.comparison.some((o) => o.hull.owned);
 
   function choose(value: string) {
     if (value === CUSTOM) {
@@ -71,61 +99,141 @@ export function HaulerPicker({ plan, override, onPick, ownedFirst = false }: Hau
   }
 
   return (
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-      <label className="flex flex-wrap items-center gap-2">
-        <span aria-hidden className="text-xs tracking-wide text-text-dim uppercase">
+    <section
+      aria-label={t('assets.movePlan.haulerLabel')}
+      className="rounded-xs border border-line bg-panel-2"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+        <span className="text-xs font-semibold tracking-wide text-text-dim uppercase">
           {t('assets.movePlan.haulerLabel')}
         </span>
-        <Select
-          value={customMode ? CUSTOM : activeId === undefined ? '' : String(activeId)}
-          onValueChange={choose}
-        >
-          <SelectTrigger size="sm" aria-label={t('assets.movePlan.haulerLabel')}>
-            <SelectValue placeholder={t('assets.movePlan.noHaulerOption')} />
-          </SelectTrigger>
-          <SelectContent>
-            {ownedFirstOrder(plan.comparison, ownedFirst).map((o) => (
-              <SelectItem key={o.hull.typeId} value={String(o.hull.typeId)}>
-                {[
-                  o.hull.typeId === suggestedId
-                    ? t('assets.movePlan.haulerSuggestedOption', { hull: o.hull.name })
-                    : o.hull.name,
-                  ownedText(t, o.hull),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </SelectItem>
-            ))}
-            <SelectItem value={CUSTOM}>{t('assets.movePlan.customOption')}</SelectItem>
-          </SelectContent>
-        </Select>
-      </label>
-      {customMode && (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <TextInput
-              aria-label={t('assets.movePlan.customAria')}
-              size="sm"
-              inputMode="decimal"
-              className="w-32"
-              value={text}
-              aria-invalid={shown !== null || undefined}
-              aria-describedby={shown !== null ? errorId : undefined}
-              onChange={(e) => onType(e.target.value)}
+        {anyOwned && onOwnedFirstChange && (
+          <SegmentedControl
+            size="sm"
+            label={t('assets.movePlan.haulerOrder')}
+            value={ownedFirst ? 'owned' : 'trips'}
+            onChange={(v) => onOwnedFirstChange(v === 'owned')}
+            options={[
+              { value: 'owned', label: t('assets.movePlan.ownedFirst') },
+              { value: 'trips', label: t('assets.movePlan.fewestTrips') },
+            ]}
+          />
+        )}
+      </div>
+      <ul
+        role="radiogroup"
+        aria-label={t('assets.movePlan.haulerLabel')}
+        className="m-0 list-none p-0"
+      >
+        {visible.map((o) => {
+          const id = String(o.hull.typeId);
+          const trips = tripsOf(o);
+          return (
+            <li key={id} className="border-b border-line last:border-b-0">
+              <label
+                className={cx(
+                  ROW_COLUMNS,
+                  'min-h-9 cursor-pointer px-3 py-1.5 hover:bg-panel',
+                  selected === id && 'bg-accent/10'
+                )}
+              >
+                <Radio
+                  name={groupName}
+                  value={id}
+                  checked={selected === id}
+                  onChange={() => choose(id)}
+                  aria-label={o.hull.name}
+                />
+                <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 font-semibold">
+                  {o.hull.name}
+                  {o.hull.typeId === suggestedId && (
+                    <Pill tone="neutral">{t('assets.movePlan.suggestedTag')}</Pill>
+                  )}
+                </span>
+                <span className="flex items-baseline gap-2 text-sm tabular-nums">
+                  <span className="min-w-5 text-right font-bold sm:text-left sm:font-normal">
+                    {trips}
+                  </span>
+                  <span className="text-xs text-text-dim sm:sr-only">
+                    {t('assets.movePlan.tripsLabel', { count: trips })}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="hidden h-1.5 w-20 self-center overflow-hidden rounded-xs bg-line sm:block"
+                  >
+                    <span
+                      className="block h-full bg-accent"
+                      style={{ width: `${(trips / mostTrips) * 100}%` }}
+                    />
+                  </span>
+                </span>
+                <span className="col-span-2 col-start-2 flex flex-wrap items-baseline justify-between gap-x-3 text-sm sm:contents">
+                  <span className={o.unfitCount > 0 ? 'text-warning' : 'text-text-dim'}>
+                    {o.unfitCount > 0
+                      ? t('assets.movePlan.cantCarry', { count: o.unfitCount })
+                      : t('assets.movePlan.carriesAll')}
+                  </span>
+                  <OwnedMark t={t} hull={o.hull} />
+                </span>
+              </label>
+            </li>
+          );
+        })}
+        <li className="border-t border-line">
+          <label
+            className={cx(
+              'flex min-h-9 cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-panel',
+              selected === CUSTOM && 'bg-accent/10'
+            )}
+          >
+            <Radio
+              name={groupName}
+              value={CUSTOM}
+              checked={selected === CUSTOM}
+              onChange={() => choose(CUSTOM)}
             />
-            <span className="text-sm text-text-dim">m³</span>
-          </div>
-          {shown && (
-            <FieldError id={errorId} className="text-xs">
-              {shown === 'tooSmall'
-                ? t('assets.movePlan.customTooSmall', {
-                    min: maskNumber(Math.ceil(totalM3 / MAX_CUSTOM_HAULS)),
-                  })
-                : t('assets.movePlan.customInvalid')}
-            </FieldError>
+            <span className="font-semibold">{t('assets.movePlan.customOption')}</span>
+          </label>
+          {customMode && (
+            <div className="flex flex-col gap-1 px-3 pb-2 pl-10">
+              <div className="flex items-center gap-2">
+                <TextInput
+                  aria-label={t('assets.movePlan.customAria')}
+                  size="sm"
+                  inputMode="decimal"
+                  className="w-32"
+                  value={text}
+                  aria-invalid={shown !== null || undefined}
+                  aria-describedby={shown !== null ? errorId : undefined}
+                  onChange={(e) => onType(e.target.value)}
+                />
+                <span className="text-sm text-text-dim">m³</span>
+              </div>
+              {shown && (
+                <FieldError id={errorId} className="text-xs">
+                  {shown === 'tooSmall'
+                    ? t('assets.movePlan.customTooSmall', {
+                        min: maskNumber(Math.ceil(totalM3 / MAX_CUSTOM_HAULS)),
+                      })
+                    : t('assets.movePlan.customInvalid')}
+                </FieldError>
+              )}
+            </div>
           )}
-        </div>
+        </li>
+      </ul>
+      {onToggleExpanded && (hidden > 0 || expanded) && ordered.length > INLINE_ROWS && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggleExpanded}
+          className="w-full border-t border-line px-3 py-2 text-xs font-semibold tracking-wide text-text-dim uppercase hover:text-text"
+        >
+          {expanded
+            ? t('assets.movePlan.showFewerHaulers')
+            : t('assets.movePlan.showMoreHaulers', { count: hidden })}
+        </button>
       )}
-    </div>
+    </section>
   );
 }
