@@ -502,3 +502,60 @@ describe('damageOf', () => {
     );
   });
 });
+
+describe('findImprovements owned stock (Planning)', () => {
+  const table = { 1: {}, 2: { dps: 50 } };
+  const prices = { 1: 10, 2: 100 };
+  const run = async (
+    stock: { owned: Map<number, number>; fitCounts: Map<number, number> } | undefined,
+    extra: { spendCap?: number | null; fitTotal?: number | null; mode?: 'buy' | 'refit' } = {},
+    at = [{ slot: 'low' as const, slotIndex: 0 }]
+  ) => {
+    const base = fit([1]);
+    const stat = calc(table);
+    const result = await findImprovements({
+      fitting: base,
+      before: await stat(base),
+      goal: 'damage',
+      candidates: [{ fromTypeId: 1, toTypeId: 2, at }],
+      stats: stat,
+      priceOf: (typeId) => prices[typeId as 1 | 2] ?? null,
+      ...(stock ? { stock } : {}),
+      ...extra,
+    });
+    if (result === null) throw new Error('cancelled');
+    return result;
+  };
+
+  it('charges nothing for an owned part: the swap only frees the old one', async () => {
+    const result = await run({ owned: new Map([[2, 1]]), fitCounts: new Map([[1, 1]]) });
+    expect(result.noDownside[0].iskDelta).toBe(-10);
+  });
+
+  it('charges only the units not covered when part of the stock is owned', async () => {
+    const at = [
+      { slot: 'low' as const, slotIndex: 0 },
+      { slot: 'low' as const, slotIndex: 1 },
+    ];
+    const result = await run({ owned: new Map([[2, 1]]), fitCounts: new Map([[1, 2]]) }, {}, at);
+    expect(result.noDownside[0].iskDelta).toBe(100 - 20);
+  });
+
+  it('keeps an option whose full price is over the budget but whose still-to-buy is not', async () => {
+    const withOwned = await run(
+      { owned: new Map([[2, 1]]), fitCounts: new Map([[1, 1]]) },
+      { spendCap: 50, fitTotal: 10 }
+    );
+    expect(withOwned.noDownside).toHaveLength(1);
+    const without = await run(undefined, { spendCap: 50, fitTotal: 10 });
+    expect(without.noDownside).toHaveLength(0);
+  });
+
+  it('ignores stock when Refitting', async () => {
+    const result = await run(
+      { owned: new Map([[2, 1]]), fitCounts: new Map([[1, 1]]) },
+      { mode: 'refit' }
+    );
+    expect(result.noDownside[0].iskDelta).toBe(100 - 10);
+  });
+});

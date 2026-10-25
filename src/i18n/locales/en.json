@@ -1464,6 +1464,7 @@
       "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
       "cap": {
         "buy": "Total budget (ISK)",
+        "buyOwned": "Budget for what is still to buy (ISK)",
         "refit": "Extra spend cap (ISK)"
       },
       "defenseLabel": "Defense Choice",
@@ -1475,6 +1476,14 @@
       "moreLabel": "Rigs and officer modules",
       "moreGoals": "More goals ({{count}})",
       "settingsLabel": "Search settings",
+      "owned": {
+        "label": "Count what I own at",
+        "summary": "minus owned at {{place}}",
+        "noneHere": "You own none of these modules at {{place}}. Pick another place, or any location.",
+        "all": "You own all {{count}}",
+        "nothingToBuy": "nothing to buy",
+        "some": "You own {{own}} of {{need}} · buy {{buy}} for"
+      },
       "summaryNoCap": "no budget",
       "summaryCap": {
         "buy": "budget {{cap}}",
@@ -1500,6 +1509,8 @@
         "changes_one": "{{count}} change",
         "changes_other": "{{count}} changes",
         "total": "fit costs",
+        "stillToBuy": "still to buy",
+        "ofBudget": "of a {{cap}} budget",
         "unpriced_one": "{{count}} unpriced",
         "unpriced_other": "{{count}} unpriced",
         "dps": "DPS {{before}} → {{after}}",
