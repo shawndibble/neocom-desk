@@ -47,6 +47,7 @@ import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import { buildVariationIndex } from '@/engine/market/variations';
+import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -144,12 +145,40 @@ export const useImproveHold = createLocalSetting<ImproveHold>({
       : DEFAULT_IMPROVE_HOLD,
 });
 
-/** The total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
-export const useImproveSpendCap = createLocalSetting<number | null>({
-  key: 'fittingsImproveSpendCap',
+const parseCap = (raw: unknown) =>
+  typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+
+/** Planning's total budget in ISK; null is no limit. Its own setting: a refit cap is not a budget. */
+export const useImproveBudget = createLocalSetting<number | null>({
+  key: 'fittingsImproveBudget',
   defaultValue: null,
-  parse: (raw) => (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null),
+  parse: parseCap,
 });
+
+/** Refitting's extra-spend cap in ISK; null is no limit. */
+export const useImproveRefitCap = createLocalSetting<number | null>({
+  key: 'fittingsImproveRefitCap',
+  defaultValue: null,
+  parse: parseCap,
+});
+
+const LEGACY_SPEND_CAP_KEY = 'fittingsImproveSpendCap';
+
+/**
+ * One shared cap used to serve both modes. Moves it to the mode that was active (Planning when none is stored: it is the default), once, then drops the old row.
+ */
+export async function migrateSpendCap(): Promise<void> {
+  const legacy = await db.settings.get(LEGACY_SPEND_CAP_KEY);
+  if (!legacy) return;
+  const cap = parseCap(legacy.value);
+  if (cap !== null) {
+    const stored = (await db.settings.get('fittingsImproveMode'))?.value;
+    const store = stored === undefined || stored === 'buy' ? useImproveBudget : useImproveRefitCap;
+    await store.getState().hydrate();
+    if (store.getState().value === null) await store.getState().setValue(cap);
+  }
+  await db.settings.delete(LEGACY_SPEND_CAP_KEY);
+}
 
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
@@ -174,6 +203,8 @@ export type ImproveState =
   | { status: 'cancelled' }
   /** The fit is over a budget: Improve hands over to Make it fit and searches nothing. */
   | { status: 'overBudget'; resources: Resource[] }
+  /** Planning's budget is under the fit's own price: nothing is searched until it changes. */
+  | { status: 'belowPrice'; budget: number; fitTotal: number }
   | { status: 'failed' }
   | {
       status: 'done';
@@ -405,6 +436,10 @@ export function useImprove(
         // A cap that cannot be checked is not silently waived.
         if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
           throw new Error('Prices unavailable for the spend cap');
+        if (mode === 'buy' && spendCap !== null && fitTotal !== null && spendCap < fitTotal) {
+          setState({ status: 'belowPrice', budget: spendCap, fitTotal });
+          return;
+        }
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
         let scoredBefore = own;
         let load = (fitting: Fitting) => fitting;

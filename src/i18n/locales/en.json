@@ -1398,6 +1398,7 @@
         "tradeOffs": "Trade-offs"
       },
       "nothing": {
+        "noModules": "Nothing could be added to this fit within the guardrails.",
         "overall": "No variation of a fitted module improves this fit overall.",
         "damage": "No variation of a fitted module adds damage.",
         "tank": "No variation of a fitted module adds tank.",
@@ -1414,12 +1415,15 @@
         "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails.",
         "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails."
       },
+      "belowPrice": "Your budget ({{budget}}) is below this fit's price ({{price}}). Raise it to search.",
       "closest": "Closest swaps",
       "broke": {
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
         "keepsStats": "Loses more than 5% of damage, tank or speed",
-        "spend": "Costs more than your budget or spend cap"
+        "spend": "Costs more than your budget or spend cap",
+        "spendBudget": "Over your {{cap}} budget by {{over}}",
+        "spendCap": "{{over}} over your {{cap}} cap"
       },
       "widen": {
         "upgrade": "Only variations of the modules already fitted are tried. Rebalance or Rework tries more.",

@@ -202,6 +202,40 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('Goes over CPU, powergrid or calibration')).toBeInTheDocument();
   });
 
+  it('names the overage on a swap over the budget or the cap', () => {
+    const rejected = {
+      ...option(11, { ehp: 1100 }, { iskDelta: 12_300_000 }),
+      guardrail: 'spend' as const,
+    };
+    const state = { ...done({ rejected: [rejected] }), fitTotal: 40_000_000 } as ImproveState;
+    const { unmount } = renderPanel(
+      search(state),
+      vi.fn(),
+      vi.fn(),
+      settings({ mode: 'buy', spendCap: 50_000_000 })
+    );
+    expect(screen.getByText('Over your 50M budget by 2.3M')).toBeInTheDocument();
+    unmount();
+    renderPanel(search(state), vi.fn(), vi.fn(), settings({ mode: 'refit', spendCap: 5_000_000 }));
+    expect(screen.getByText('7.3M over your 5M cap')).toBeInTheDocument();
+  });
+
+  it('shows a notice and no results when the budget is below the fit price', () => {
+    renderPanel(search({ status: 'belowPrice', budget: 5_000_000, fitTotal: 40_100_000 }));
+    expect(
+      screen.getByText(/Your budget \(5M\) is below this fit's price \(40\.1M\)/)
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing could be added on a fit with no modules', () => {
+    const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
+    renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });
+    expect(
+      screen.getByText('Nothing could be added to this fit within the guardrails.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No variation of a fitted/)).not.toBeInTheDocument();
+  });
+
   it('disables a goal the fit cannot score', () => {
     const unarmed = { ...before, offense: { ...before.offense, dps: 0, sustainedDps: 0 } };
     renderPanel(search({ status: 'idle' }, unarmed));
