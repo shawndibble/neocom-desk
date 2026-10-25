@@ -1407,7 +1407,7 @@ describe('Mail', () => {
         })
       );
       await user.click(screen.getByRole('button', { name: 'Reply' }));
-      await user.click(await screen.findByRole('button', { name: /send/i }));
+      await user.click(await screen.findByRole('button', { name: /^send$/i }));
       await waitFor(() => expect(posts).toHaveLength(1));
     });
 
