@@ -19,11 +19,6 @@ export function availableChartViews(summary: SurveySummary): SurveyChartView[] {
 /** One chart row: a time, plus a value per series key. */
 export type SurveySeriesRow = { at: number } & Record<string, number | undefined>;
 
-/** Each ore's index in `summary.oreNames`, for its colour. */
-function oreToneIndex(summary: SurveySummary): Record<string, number> {
-  return Object.fromEntries(summary.oreNames.map((ore, i) => [ore, i]));
-}
-
 const clampPercent = (v: number): number => Math.min(100, Math.max(0, v));
 
 /**
@@ -66,7 +61,10 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   const priced = new Set(summary.ores.filter((o) => o.unitPrice !== null).map((o) => o.ore));
   const pricedOres = summary.oreNames.filter((o) => priced.has(o));
   const unpricedOres = summary.oreNames.filter((o) => !priced.has(o));
-  const toneIndex = oreToneIndex(summary);
+  const toneIndex: Record<string, number> = {};
+  summary.oreNames.forEach((ore, i) => {
+    toneIndex[ore] = i;
+  });
 
   const rows: SurveySeriesRow[] = summary.points.map((p, i) => {
     const row: SurveySeriesRow = { at: p.at, total: 0 };
@@ -132,7 +130,10 @@ export interface PaceShareSeries {
  * those percents normalised to sum to 100.
  */
 export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
-  const toneIndex = oreToneIndex(summary);
+  const toneIndex: Record<string, number> = {};
+  summary.oreNames.forEach((ore, i) => {
+    toneIndex[ore] = i;
+  });
   const startOf = new Map(summary.ores.map((o) => [o.ore, o.startVolume]));
   const active = new Set<string>();
 
@@ -165,68 +166,5 @@ export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
   ]);
   const last = intervals[intervals.length - 1];
   if (last !== undefined) rows.push({ at: last.to, interval: -1, idle: 0 });
-  return { intervals, rows, activeOres, toneIndex };
-}
-
-/** One scan interval of the Ore left view's rate chart. */
-export interface RateInterval {
-  from: number;
-  to: number;
-  /** m³/s over the interval, all ores. */
-  rate: number;
-  /** m³/s per ore mined in the interval; only those ores are present, and they sum to `rate`. */
-  rates: Record<string, number>;
-}
-
-/** One plot row of the rate chart: every active ore's m³/s (0 when idle) so the stack lines up. */
-export type RateRow = {
-  at: number;
-  /** Index into `intervals`, or -1 for the tail row at the last scan (no tooltip there). */
-  interval: number;
-  total: number;
-} & Record<string, number>;
-
-export interface RateByOreSeries {
-  /** One entry per interval, for the tooltip and the table. */
-  intervals: RateInterval[];
-  /**
-   * Step rows: each interval's start, middle and 1 ms before its end, so the tooltip snaps to the
-   * interval under the pointer, then a tail row at the last scan that closes the last step.
-   */
-  rows: RateRow[];
-  /** Ores mined in at least one interval, in `oreNames` order. */
-  activeOres: string[];
-  /** Each ore's index in `summary.oreNames`, for its colour. */
-  toneIndex: Record<string, number>;
-}
-
-/** The Ore left view's rate chart: each interval's m³/s, split by the ore mined in it. */
-export function rateByOreSeries(summary: SurveySummary): RateByOreSeries {
-  const toneIndex = oreToneIndex(summary);
-  const active = new Set<string>();
-  const intervals: RateInterval[] = summary.intervals.map((i) => {
-    const seconds = (i.to - i.from) / 1000;
-    const rates: Record<string, number> = {};
-    for (const [ore, volume] of Object.entries(i.minedByOre)) {
-      if (volume <= 0 || seconds <= 0) continue;
-      rates[ore] = volume / seconds;
-      active.add(ore);
-    }
-    return { from: i.from, to: i.to, rate: i.rate, rates };
-  });
-  const activeOres = summary.oreNames.filter((o) => active.has(o));
-
-  const row = (at: number, interval: number, source: RateInterval): RateRow => {
-    const r = { at, interval, total: source.rate } as RateRow;
-    for (const ore of activeOres) r[ore] = source.rates[ore] ?? 0;
-    return r;
-  };
-  const rows = intervals.flatMap((i, n) => [
-    row(i.from, n, i),
-    row((i.from + i.to) / 2, n, i),
-    row(i.to - 1, n, i),
-  ]);
-  const last = intervals[intervals.length - 1];
-  if (last !== undefined) rows.push(row(last.to, -1, last));
   return { intervals, rows, activeOres, toneIndex };
 }

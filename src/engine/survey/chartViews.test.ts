@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  availableChartViews,
-  depletionSeries,
-  iskSeries,
-  paceShareSeries,
-  rateByOreSeries,
-} from './chartViews';
+import { availableChartViews, depletionSeries, iskSeries, paceShareSeries } from './chartViews';
 import { summarizeSurvey, type SurveyScan } from './series';
 
 const MIN = 60_000;
@@ -263,68 +257,5 @@ describe('paceShareSeries', () => {
     const { activeOres, toneIndex } = paceShareSeries(s);
     expect(activeOres).toEqual(['C']);
     expect(toneIndex.C).toBe(2);
-  });
-});
-
-describe('rateByOreSeries', () => {
-  it('is empty before a second scan', () => {
-    const s = summarizeSurvey([scan(0, ['A', 100])])!;
-    expect(rateByOreSeries(s)).toEqual({
-      intervals: [],
-      rows: [],
-      activeOres: [],
-      toneIndex: { A: 0 },
-    });
-  });
-
-  it('splits each interval rate into m3/s per mined ore, summing to the total', () => {
-    const s = summarizeSurvey([
-      scan(0, ['A', 1000], ['B', 500]),
-      scan(5, ['A', 700], ['B', 400]), // 300 + 100 m3 over 300 s
-    ])!;
-    const { intervals, activeOres, toneIndex } = rateByOreSeries(s);
-    expect(activeOres).toEqual(['A', 'B']);
-    expect(toneIndex).toEqual({ A: 0, B: 1 });
-    const [i] = intervals;
-    expect(i.rates.A).toBeCloseTo(1);
-    expect(i.rates.B).toBeCloseTo(1 / 3);
-    expect(i.rate).toBeCloseTo(s.intervals[0].rate);
-    expect(i.rates.A + i.rates.B).toBeCloseTo(i.rate);
-  });
-
-  it('leaves an ore out of an interval it was not mined in, and out of activeOres when never mined', () => {
-    const s = summarizeSurvey([
-      scan(0, ['A', 100], ['B', 100], ['C', 100]),
-      scan(5, ['A', 50], ['B', 100], ['C', 100]),
-      scan(10, ['A', 50], ['B', 40], ['C', 100]),
-    ])!;
-    const { intervals, activeOres } = rateByOreSeries(s);
-    expect(Object.keys(intervals[0].rates)).toEqual(['A']);
-    expect(Object.keys(intervals[1].rates)).toEqual(['B']);
-    expect(activeOres).toEqual(['A', 'B']);
-  });
-
-  it('gives every row each active ore so the stack lines up, 0 where it was not mined', () => {
-    const s = summarizeSurvey([
-      scan(0, ['A', 100], ['B', 100]),
-      scan(5, ['A', 40], ['B', 100]),
-      scan(10, ['A', 40], ['B', 70]),
-    ])!;
-    const { rows } = rateByOreSeries(s);
-    const t5 = T0 + 5 * MIN;
-    const t10 = T0 + 10 * MIN;
-    expect(rows.map((r) => [r.at, r.interval])).toEqual([
-      [T0, 0],
-      [(T0 + t5) / 2, 0],
-      [t5 - 1, 0],
-      [t5, 1],
-      [(t5 + t10) / 2, 1],
-      [t10 - 1, 1],
-      [t10, -1],
-    ]);
-    expect(rows[0]).toMatchObject({ A: 0.2, B: 0, total: 0.2 });
-    expect(rows[3]).toMatchObject({ A: 0, B: 0.1, total: 0.1 });
-    // The tail row closes the last step at the last scan with its values; no tooltip there.
-    expect(rows[6]).toMatchObject({ A: 0, B: 0.1, total: 0.1 });
   });
 });

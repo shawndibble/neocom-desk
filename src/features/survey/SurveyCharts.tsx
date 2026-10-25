@@ -2,7 +2,7 @@
  * The Survey tab's charts, drawn with Recharts on one shared time axis. Ore left
  * (the default) is the volume left in the field, stacked by ore with a dot and a
  * total-volume label on every scan and a dashed run to zero at the current pace,
- * and under it the mining rate between each pair of scans, stacked by ore. Depletion by
+ * and under it the total mining rate between each pair of scans. Depletion by
  * ore is its chart with the mining rate stacked by ore under it; ISK left is one
  * chart. Statically imports
  * `recharts`, so — same rule as `miningTax/MiningYieldCharts.tsx` — this must
