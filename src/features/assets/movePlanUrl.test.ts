@@ -6,7 +6,7 @@ import {
   type MovePlanUrlValues,
 } from './movePlanUrl';
 
-const EMPTY: MovePlanUrlValues = { mv: [], mvd: null, mvp: [], mvh: null, mvr: false };
+const EMPTY: MovePlanUrlValues = { mv: [], mvd: null, mvp: [], mvh: null, mvr: false, mvc: false };
 
 function parse(search: string): MovePlanUrlValues {
   const params = new URLSearchParams(search);
@@ -30,6 +30,7 @@ const FULL: MovePlanUrlValues = {
   mvp: [11, 12],
   mvh: { customM3: 12500 },
   mvr: true,
+  mvc: false,
 };
 
 describe('move plan URL', () => {
@@ -76,6 +77,18 @@ describe('move plan URL', () => {
     it('is the values when a plan can be rebuilt', () => {
       expect(planFromUrl(FULL)).toEqual(FULL);
     });
+
+    it('never rebuilds a personal link on the corporation tab, nor a corp link on the personal one', () => {
+      expect(planFromUrl(FULL, true)).toBeNull();
+      expect(planFromUrl({ ...FULL, mvc: true })).toBeNull();
+      expect(planFromUrl({ ...FULL, mvc: true }, true)).toEqual({ ...FULL, mvc: true });
+    });
+  });
+
+  it('round-trips the corp flag', () => {
+    const values = { ...FULL, mvc: true };
+    expect(parse(write(values))).toEqual(values);
+    expect(write(FULL)).not.toContain('mvc');
   });
 
   it('keys the same plan the same way and different plans differently', () => {

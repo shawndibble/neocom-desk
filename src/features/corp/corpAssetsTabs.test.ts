@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { corpAssetTabFromPath, corpAssetTabPath, tabForState } from './corpAssetsTabs';
+import {
+  corpAssetsPageTabFromPath,
+  corpAssetsPageTabPath,
+  corpAssetTabFromPath,
+  corpAssetTabPath,
+  tabForState,
+} from './corpAssetsTabs';
 
 describe('corp assets tabs', () => {
   it('reads the bare path as All and each segment as its tab', () => {
@@ -38,5 +44,20 @@ describe('corp assets tabs', () => {
   it('lists the fallback state under All', () => {
     expect(tabForState('other')).toBe('all');
     expect(tabForState('impounded')).toBe('impounded');
+  });
+
+  it('reads /corp/assets/move as the Move tab, and keeps the ledger links as they were', () => {
+    expect(corpAssetsPageTabFromPath('move')).toBe('move');
+    expect(corpAssetsPageTabFromPath('/move/')).toBe('move');
+    expect(corpAssetsPageTabFromPath('')).toBe('all');
+    expect(corpAssetsPageTabFromPath('impounded')).toBe('impounded');
+    expect(corpAssetsPageTabFromPath('moves')).toBeNull();
+    expect(corpAssetsPageTabPath('move')).toBe('/corp/assets/move');
+    expect(corpAssetsPageTabPath('impounded')).toBe('/corp/assets/impounded');
+    expect(corpAssetsPageTabPath('all')).toBe('/corp/assets');
+  });
+
+  it('does not send Move to the ledger path reader', () => {
+    expect(corpAssetTabFromPath('move')).toBeNull();
   });
 });
