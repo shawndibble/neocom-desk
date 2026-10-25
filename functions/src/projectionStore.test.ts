@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   dispatchDueProjections,
+  purgeFiredProjections,
   projectionDocId,
   writeDeviceRegistration,
   type PushSender,
@@ -74,11 +75,12 @@ class FakeFirestore {
     };
   }
 
-  private query(name: string, filters: [string, Op, unknown][]) {
+  private query(name: string, filters: [string, Op, unknown][], max = Infinity) {
     return {
       doc: (id: string) => this.ref(name, id),
       where: (field: string, op: Op, value: unknown) =>
-        this.query(name, [...filters, [field, op, value]]),
+        this.query(name, [...filters, [field, op, value]], max),
+      limit: (n: number) => this.query(name, filters, n),
       get: async () => {
         const docs = [...this.store(name).entries()]
           .filter(([, data]) =>
@@ -91,8 +93,9 @@ class FakeFirestore {
               return Array.isArray(actual) && actual.includes(value);
             })
           )
+          .slice(0, max)
           .map(([id]) => this.snapshotOf(name, id));
-        return { docs, empty: docs.length === 0 };
+        return { docs, empty: docs.length === 0, size: docs.length };
       },
     };
   }
@@ -503,7 +506,7 @@ describe('dispatchDueProjections', () => {
   });
 });
 
-// The Firestore queries in `dispatchDueProjections` re-express `isDue` and
+// The Firestore queries in `dispatchDueProjections` and `purgeFiredProjections` re-express `isDue` and
 // `isPastRetention` as `where` filters (a query cannot call them), so these
 // pin each query's boundary to the function it mirrors.
 describe('dispatchDueProjections query boundaries', () => {
@@ -532,11 +535,27 @@ describe('dispatchDueProjections query boundaries', () => {
       expect(db.get('projections', id)).toMatchObject({ fired: true, firedAt: NOW });
 
       const later = NOW + FIRED_RETENTION_MS + d;
-      await dispatchDueProjections(asFirestore(db), new FakeMessaging(), later);
+      await purgeFiredProjections(asFirestore(db), later);
 
       expect(db.get('projections', id) === undefined).toBe(isPastRetention(NOW, later));
     }
   );
+});
+
+describe('purgeFiredProjections', () => {
+  it('purges in bounded pages and says when a backlog is left for the next day', async () => {
+    const db = new FakeFirestore();
+    const old = NOW - FIRED_RETENTION_MS - 1;
+    for (let i = 0; i < 5; i += 1) db.seed('projections', `r${i}`, { fired: true, firedAt: old });
+    db.seed('projections', 'recent', { fired: true, firedAt: NOW });
+    expect(
+      await purgeFiredProjections(asFirestore(db), NOW, { pageSize: 2, maxPasses: 2 })
+    ).toEqual({ deleted: 4, truncated: true });
+    expect(
+      await purgeFiredProjections(asFirestore(db), NOW, { pageSize: 2, maxPasses: 2 })
+    ).toEqual({ deleted: 1, truncated: false });
+    expect(db.ids('projections')).toEqual(['recent']);
+  });
 });
 
 describe('quiet time (issue #4566)', () => {

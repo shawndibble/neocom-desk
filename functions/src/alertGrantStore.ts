@@ -34,10 +34,25 @@ export function firestorePollerStore(
       const data = snap.data() as AlertGrantDoc | undefined;
       if (data?.encryptedRefreshToken === guardBlob) tx.update(ref(characterId), update);
     });
+  // The store lives for one poll run. The listing already read every active
+  // grant in full, so `refresh` starts from that copy instead of reading each
+  // doc again; the rotated-token write below still re-reads it in its
+  // transaction, so a re-grant since the listing is never overwritten. The
+  // copy can be minutes old by the end of a run: a grant the user deleted
+  // meanwhile is still tried once, but deleting it also revoked the token at
+  // SSO, so that refresh fails and every write stays guarded on the old blob.
+  const listed = new Map<number, AlertGrantDoc>();
   return {
     async listActive() {
       const snap = await grants.where('status', '==', 'active').get();
-      return snap.docs.map((d) => Number(d.id)).filter(Number.isSafeInteger);
+      const ids: number[] = [];
+      for (const d of snap.docs) {
+        const id = Number(d.id);
+        if (!Number.isSafeInteger(id)) continue;
+        listed.set(id, d.data() as AlertGrantDoc);
+        ids.push(id);
+      }
+      return ids;
     },
 
     // SSO rotates the token, so the SSO call must not run inside a retryable
@@ -46,9 +61,13 @@ export function firestorePollerStore(
     // a transaction that re-reads the doc: if a re-grant replaced the token in
     // the meantime, the rotated one is discarded instead of overwriting it.
     async refresh(characterId) {
-      const snap = await ref(characterId).get();
-      if (!snap.exists) return { kind: 'skip' };
-      const grant = snap.data() as AlertGrantDoc;
+      let grant = listed.get(characterId);
+      listed.delete(characterId);
+      if (!grant) {
+        const snap = await ref(characterId).get();
+        if (!snap.exists) return { kind: 'skip' };
+        grant = snap.data() as AlertGrantDoc;
+      }
       if (grant.status !== 'active') return { kind: 'skip' };
       const key = deps.key();
       const current = decryptRefreshToken(grant.encryptedRefreshToken, characterId, key);

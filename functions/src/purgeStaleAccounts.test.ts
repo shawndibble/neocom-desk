@@ -5,6 +5,7 @@ import {
   STALE_ACCOUNT_MAX_PASSES,
   decideAccountAction,
   isAccountStale,
+  isFullScanDay,
   lastSyncedAtOf,
   staleAccountCutoff,
 } from './purgeStaleAccounts.js';
@@ -67,5 +68,15 @@ describe('bounds', () => {
   it('keeps a batch within the Firestore write cap', () => {
     expect(STALE_ACCOUNT_BATCH_SIZE).toBeLessThanOrEqual(500);
     expect(STALE_ACCOUNT_MAX_PASSES).toBeGreaterThan(0);
+  });
+});
+
+describe('isFullScanDay', () => {
+  it('is one UTC weekday a week, whatever the hour', () => {
+    const days = Array.from({ length: 7 }, (_, d) =>
+      isFullScanDay(Date.UTC(2026, 9, 18 + d, 23, 59))
+    );
+    expect(days.filter(Boolean)).toHaveLength(1);
+    expect(isFullScanDay(Date.UTC(2026, 9, 18, 0, 0))).toBe(days[0]);
   });
 });
