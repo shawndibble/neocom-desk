@@ -32,6 +32,7 @@ import {
   usedOf,
   type Resource,
 } from './makeItFit';
+import { commandGain, hasCommand } from './improveCommand';
 import { ewarOf, tackleOf } from './improveTackle';
 import { gainMetrics, type GainMetric } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
@@ -41,7 +42,7 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats }
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR. */
+/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, then command and fleet. */
 export const IMPROVE_GOALS = [
   ...COMBAT_GOALS,
   'mining',
@@ -52,6 +53,7 @@ export const IMPROVE_GOALS = [
   'transfer',
   'tackle',
   'ewar',
+  'command',
 ] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
@@ -200,7 +202,8 @@ export type GoalAvailability =
         | 'noRemoteRepair'
         | 'noCapTransfer'
         | 'noTackle'
-        | 'noEwar';
+        | 'noEwar'
+        | 'noCommand';
     };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
@@ -236,6 +239,7 @@ export function goalAvailability(goal: ImproveGoal, before: FittingStats): GoalA
   }
   if (goal === 'ewar' && ewarOf(before).strength <= 0)
     return { available: false, reason: 'noEwar' };
+  if (goal === 'command' && !hasCommand(before)) return { available: false, reason: 'noCommand' };
   return { available: true };
 }
 
@@ -306,6 +310,8 @@ function scoreOf(
         [was.range, now.range],
       ]);
     }
+    case 'command':
+      return commandGain(before, after);
     case 'ewar': {
       const [was, now] = [ewarOf(before), ewarOf(after)];
       return meanGain([
