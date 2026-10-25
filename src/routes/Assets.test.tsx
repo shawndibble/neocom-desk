@@ -258,7 +258,11 @@ async function openLocation(
   name: string | RegExp
 ): Promise<void> {
   const matcher = typeof name === 'string' ? new RegExp(escapeRegExp(name)) : name;
-  await user.click(await screen.findByRole('link', { name: matcher }));
+  // Every test opens a location first, and a CI worker running this 111-test
+  // file (~210s) can take longer than the 5s default to paint the first row;
+  // that surfaced as a flake in the "no bulk Add to Compare" test. A wait that
+  // returns the moment the link renders, not a longer test budget.
+  await user.click(await screen.findByRole('link', { name: matcher }, { timeout: 15_000 }));
 }
 
 /** The single back control in the breadcrumb header — steps up exactly one level. */
