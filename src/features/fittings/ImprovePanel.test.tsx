@@ -311,7 +311,7 @@ describe('ImprovePanel', () => {
     for (const [name, reason] of [
       [/Carry more/, 'This hull has no cargo or other hold'],
       [/^Align faster/, 'This hull has no align time to improve'],
-      [/Align and warp faster/, 'This hull has no warp speed to improve'],
+      [/Align and warp faster/, 'This hull has no align time or warp speed to improve'],
     ] as const) {
       const chip = screen.getByRole('button', { name });
       expect(chip).toHaveAttribute('aria-disabled', 'true');

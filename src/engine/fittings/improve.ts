@@ -63,6 +63,10 @@ export type ImproveHold = (typeof IMPROVE_HOLDS)[number];
 /** The hold Carry more scores when the pilot has not picked one the hull has. */
 export const DEFAULT_IMPROVE_HOLD: ImproveHold = 'cargo';
 
+/** The hold Carry more scores on this hull: `preferred` if it has it, else the first it has, else `preferred`. */
+export const effectiveHold = (holds: HoldStats, preferred: ImproveHold): ImproveHold =>
+  heldHold(holds, preferred) ?? preferred;
+
 /** The first hold in `IMPROVE_HOLDS` order the hull has, for a pick this hull lacks; null with none. */
 export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold | null {
   if (holds[preferred] > 0) return preferred;

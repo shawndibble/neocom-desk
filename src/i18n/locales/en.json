@@ -1362,7 +1362,7 @@
         "noMiners": "No miners on this fit",
         "noHold": "This hull has no cargo or other hold",
         "noAlign": "This hull has no align time to improve",
-        "noWarp": "This hull has no warp speed to improve"
+        "noWarp": "This hull has no align time or warp speed to improve"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",

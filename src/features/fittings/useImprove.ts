@@ -11,7 +11,7 @@ import {
   DEFAULT_IMPROVE_HOLD,
   findImprovements,
   goalAvailability,
-  heldHold,
+  effectiveHold,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
   IMPROVE_MODES,
@@ -360,7 +360,7 @@ export function useImprove(
             fitting: variants.fitting,
             before: scoredBefore,
             goal: searched,
-            hold: heldHold(own.holds, hold) ?? hold,
+            hold: effectiveHold(own.holds, hold),
             candidates: set.candidates,
             stats: async (fitting) => {
               const { after } = await variants.compare(load(fitting), controller.signal);

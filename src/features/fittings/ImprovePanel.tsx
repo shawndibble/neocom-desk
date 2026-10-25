@@ -30,7 +30,7 @@ import {
   bestScore,
   DEFENSE_CHOICES,
   goalAvailability,
-  heldHold,
+  effectiveHold,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
   IMPROVE_MODES,
@@ -62,8 +62,7 @@ const CHANGES_SHOWN = 4;
 
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
-const secondsFormat = createNumberFormat({ maximumFractionDigits: 2 });
-const auFormat = createNumberFormat({ maximumFractionDigits: 2 });
+const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
 
 const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
@@ -200,11 +199,11 @@ export function ImprovePanel({
   function moveLine(option: ImproveOption | RejectedOption, own: FittingStats): string | null {
     const align = () =>
       t('fittings.improve.alignLine', {
-        before: secondsFormat(alignOf(own)),
-        after: secondsFormat(alignOf(option.after)),
+        before: twoDecimals(alignOf(own)),
+        after: twoDecimals(alignOf(option.after)),
       });
     if (goal === 'haul') {
-      const hold = heldHold(own.holds, settings.hold) ?? settings.hold;
+      const hold = effectiveHold(own.holds, settings.hold);
       return t('fittings.improve.holdLine', {
         hold: t(`fittings.improve.hold.${hold}`),
         before: m3Format(own.holds[hold]),
@@ -215,8 +214,8 @@ export function ImprovePanel({
     if (goal === 'warp')
       return t('fittings.improve.warpLine', {
         align: align(),
-        before: auFormat(own.navigation.warpSpeed),
-        after: auFormat(option.after.navigation.warpSpeed),
+        before: twoDecimals(own.navigation.warpSpeed),
+        after: twoDecimals(option.after.navigation.warpSpeed),
       });
     return null;
   }
@@ -239,6 +238,7 @@ export function ImprovePanel({
       <ul className="space-y-1">
         {options.map((option) => {
           const id = `improve-${optionKey(option)}`;
+          const line = moveLine(option, own);
           return (
             <li key={optionKey(option)} className="border-line rounded-xs border p-2 text-sm">
               <label
@@ -256,9 +256,7 @@ export function ImprovePanel({
                   {goal === 'mining' && (
                     <span className="block text-xs">{oreLine(option, own)}</span>
                   )}
-                  {moveLine(option, own) && (
-                    <span className="block text-xs">{moveLine(option, own)}</span>
-                  )}
+                  {line && <span className="block text-xs">{line}</span>}
                   <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
                   {option.downsides.length > 0 && (
                     <span className="text-warning block text-xs">
@@ -365,7 +363,7 @@ export function ImprovePanel({
           <div className="space-y-1 text-sm">
             <span aria-hidden="true">{t('fittings.improve.holdLabel')}</span>
             <Select
-              value={heldHold(before.holds, settings.hold) ?? settings.hold}
+              value={effectiveHold(before.holds, settings.hold)}
               onValueChange={(value) => settings.onHoldChange(value as ImproveHold)}
             >
               <SelectTrigger aria-label={t('fittings.improve.holdLabel')} className="w-full">
@@ -533,24 +531,25 @@ export function ImprovePanel({
             {state.result.rejected.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.closest')}>
                 <ul className="space-y-1">
-                  {state.result.rejected.map((option) => (
-                    <li
-                      key={optionKey(option)}
-                      className="border-line rounded-xs border p-2 text-sm"
-                    >
-                      <p className="font-medium">{swapLabel(option)}</p>
-                      {goal === 'mining' && (
-                        <p className="text-xs">{oreLine(option, state.before)}</p>
-                      )}
-                      {moveLine(option, state.before) && (
-                        <p className="text-xs">{moveLine(option, state.before)}</p>
-                      )}
-                      <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
-                      <p className="text-warning text-xs">
-                        {t(`fittings.improve.broke.${option.guardrail}`)}
-                      </p>
-                    </li>
-                  ))}
+                  {state.result.rejected.map((option) => {
+                    const line = moveLine(option, state.before);
+                    return (
+                      <li
+                        key={optionKey(option)}
+                        className="border-line rounded-xs border p-2 text-sm"
+                      >
+                        <p className="font-medium">{swapLabel(option)}</p>
+                        {goal === 'mining' && (
+                          <p className="text-xs">{oreLine(option, state.before)}</p>
+                        )}
+                        {line && <p className="text-xs">{line}</p>}
+                        <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
+                        <p className="text-warning text-xs">
+                          {t(`fittings.improve.broke.${option.guardrail}`)}
+                        </p>
+                      </li>
+                    );
+                  })}
                 </ul>
               </MakeItFitSection>
             )}
