@@ -39,7 +39,7 @@ import {
   Y_AXIS_WIDTH,
 } from './surveyChartParts';
 import { DepletionChart, IskChart } from './SurveyViewCharts';
-import { SurveyPacePanel, type PaceView } from './SurveyPacePanel';
+import { SurveyPacePanel } from './SurveyPacePanel';
 import { oreTone } from './surveyTones';
 import { createNumberFormat } from '@/lib/numberLocale';
 
@@ -102,8 +102,6 @@ export function SurveyCharts({
   const { t } = useTranslation();
   const compact = compactHeight !== undefined;
   const [plotWidth, setPlotWidth] = useState(0);
-  // Lives here, not in the panel, so the choice survives Ore left <-> Depletion.
-  const [paceView, setPaceView] = useState<PaceView>('total');
   const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
   // Scans can bunch up in time, so labels are thinned to the ones that fit.
@@ -287,9 +285,7 @@ export function SurveyCharts({
     return (
       <div className="space-y-1">
         <DepletionChart summary={summary} />
-        {summary.intervals.length > 0 && (
-          <SurveyPacePanel summary={summary} paceView={paceView} onPaceViewChange={setPaceView} />
-        )}
+        {summary.intervals.length > 0 && <SurveyPacePanel summary={summary} paceView="ore" />}
       </div>
     );
   }
@@ -314,9 +310,7 @@ export function SurveyCharts({
         </div>
       </figure>
 
-      {summary.intervals.length > 0 && (
-        <SurveyPacePanel summary={summary} paceView={paceView} onPaceViewChange={setPaceView} />
-      )}
+      {summary.intervals.length > 0 && <SurveyPacePanel summary={summary} paceView="total" />}
     </div>
   );
 }

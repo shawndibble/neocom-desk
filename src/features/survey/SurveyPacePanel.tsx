@@ -1,10 +1,9 @@
 /**
  * The pace panel under the Survey's volume and depletion charts: the mining rate
- * between each pair of scans, as one Total area or stacked By ore, on the same
+ * between each pair of scans, as one Total area or stacked by ore, on the same
  * time axis as the chart above it. Statically imports `recharts`, so — same rule
  * as `SurveyCharts.tsx` — this must only be reached through a dynamic `import()`
- * from `SurveyBoard.tsx`. The caller owns the Total / By ore choice so it
- * survives switching views.
+ * from `SurveyBoard.tsx`. Which of the two it draws is the caller's `paceView`.
  */
 import { scalePx } from '@/lib/fontScale';
 import { useMemo, useState } from 'react';
@@ -18,7 +17,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
-import { DataTable, SegmentedControl, type DataTableColumn } from '@/components/ui';
+import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -27,6 +26,7 @@ import { formatCount } from '@/lib/formatCount';
 import { MARGIN, timeAxis, yAxis, Y_AXIS_WIDTH } from './surveyChartParts';
 import { PaceByOreChart } from './SurveyViewCharts';
 
+/** `total`: the one-area rate (Ore left view); `ore`: stacked by ore (Depletion view). */
 export type PaceView = 'total' | 'ore';
 
 /** Room a rate label needs, in px: "1,116" at 10px. */
@@ -35,11 +35,9 @@ const RATE_LABEL_GAP = 34;
 export function SurveyPacePanel({
   summary,
   paceView,
-  onPaceViewChange,
 }: {
   summary: SurveySummary;
   paceView: PaceView;
-  onPaceViewChange: (view: PaceView) => void;
 }) {
   const { t } = useTranslation();
   const [plotWidth, setPlotWidth] = useState(0);
@@ -73,7 +71,6 @@ export function SurveyPacePanel({
     <PaceFigure
       summary={summary}
       paceView={paceView}
-      onPaceViewChange={onPaceViewChange}
       rateLabel={rateLabel}
       paceByOre={paceByOre}
       totalChart={
@@ -131,14 +128,12 @@ export function SurveyPacePanel({
 function PaceFigure({
   summary,
   paceView,
-  onPaceViewChange,
   rateLabel,
   paceByOre,
   totalChart,
 }: {
   summary: SurveySummary;
   paceView: PaceView;
-  onPaceViewChange: (view: PaceView) => void;
   rateLabel: string;
   paceByOre: ReturnType<typeof paceByOreSeries>;
   totalChart: React.ReactElement;
@@ -172,18 +167,6 @@ function PaceFigure({
 
   return (
     <figure aria-label={rateLabel} className="m-0">
-      <div className="flex justify-end">
-        <SegmentedControl
-          label={t('survey.paceView')}
-          size="sm"
-          value={paceView}
-          onChange={onPaceViewChange}
-          options={[
-            { value: 'total', label: t('survey.paceTotal') },
-            { value: 'ore', label: t('survey.paceByOre') },
-          ]}
-        />
-      </div>
       <div className="h-32 w-full">
         {paceView === 'ore' ? <PaceByOreChart summary={summary} /> : totalChart}
       </div>

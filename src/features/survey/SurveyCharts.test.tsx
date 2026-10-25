@@ -1,5 +1,4 @@
 import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
 import { summarizeSurvey, type SurveyScan } from '@/engine/survey/series';
@@ -97,61 +96,27 @@ describe('SurveyCharts pace panel', () => {
     ]),
   ])!;
 
-  it('defaults to Total and switches to a by-ore table, back again', async () => {
-    const user = userEvent.setup();
+  it('Ore left ends with the Total pace chart and no toggle', () => {
     render(<SurveyCharts summary={summary} />);
-    const total = screen.getByRole('button', { name: 'Total' });
-    expect(total).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'By ore' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: /mining rate by ore/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'By ore' })).toBeNull();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'By ore' }));
+  it('Depletion ends with the by-ore pace chart and table, no toggle', () => {
+    render(<SurveyCharts summary={summary} view="depletion" />);
+    expect(screen.getByRole('table', { name: /ore left by percent/i })).toBeInTheDocument();
     const table = screen.getByRole('table', { name: /mining rate by ore/i });
     expect(within(table).getAllByRole('row')).toHaveLength(1 + 1);
     expect(within(table).getByRole('columnheader', { name: 'Veldspar' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
     expect(within(table).getByRole('cell', { name: '5 m³/s' })).toBeInTheDocument();
-    expect(within(table).getByRole('cell', { name: '1 m³/s' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Total' }));
-    expect(screen.queryByRole('table', { name: /mining rate by ore/i })).toBeNull();
-    expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
-  });
-});
-
-describe('SurveyCharts pace panel on the Depletion view', () => {
-  const summary = summarizeSurvey([
-    scan(0, [
-      ['Veldspar', 1000],
-      ['Scordite', 500],
-    ]),
-    scan(60_000, [
-      ['Veldspar', 700],
-      ['Scordite', 440],
-    ]),
-  ])!;
-
-  it('shows the pace panel and toggle under the depletion chart', async () => {
-    const user = userEvent.setup();
-    render(<SurveyCharts summary={summary} view="depletion" />);
-    expect(screen.getByRole('table', { name: /ore left by percent/i })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'By ore' }));
-    expect(screen.getByRole('table', { name: /mining rate by ore/i })).toBeInTheDocument();
-  });
-
-  it('keeps the Total / By ore choice when switching views', async () => {
-    const user = userEvent.setup();
-    const { rerender } = render(<SurveyCharts summary={summary} view="depletion" />);
-    await user.click(screen.getByRole('button', { name: 'By ore' }));
-    rerender(<SurveyCharts summary={summary} view="ore" />);
-    expect(screen.getByRole('button', { name: 'By ore' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('table', { name: /mining rate by ore/i })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: /^mining rate$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'By ore' })).toBeNull();
   });
 
   it('draws no pace panel with a single scan', () => {
     const one = summarizeSurvey([scan(0, [['Veldspar', 1000]])])!;
     render(<SurveyCharts summary={one} view="depletion" />);
-    expect(screen.queryByRole('button', { name: 'By ore' })).toBeNull();
+    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
   });
 });
