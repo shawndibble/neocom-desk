@@ -30,7 +30,7 @@ import {
 import type { FittingWorkspace } from './useFittingWorkspace';
 
 const moduleKey = (f: Fitting) =>
-  f.modules.map((m) => `${m.slot}${m.slotIndex}:${m.typeId}`).join();
+  f.modules.map((m) => `${m.slot}${m.slotIndex}:${m.typeId}:${m.chargeTypeId ?? ''}`).join();
 const sameModules = (a: Fitting, b: Fitting) => a === b || moduleKey(a) === moduleKey(b);
 
 interface UseImproveDrawerArgs {
@@ -127,7 +127,9 @@ export function useImproveDrawer({
       before: fitting,
       applied,
       message: t('fittings.improve.chargesLoaded', {
-        count: chargeSteps.reduce((sum, step) => sum + step.at.length, 0),
+        // Cargo can run out before every empty weapon is loaded.
+        count: applied.modules.filter((m, i) => m.chargeTypeId !== fitting.modules[i]?.chargeTypeId)
+          .length,
       }),
     });
   }

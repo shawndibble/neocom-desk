@@ -513,7 +513,7 @@ export function ImprovePanel({
 
       {unloaded && (
         <div className="space-y-2">
-          <p className="text-warning text-sm">
+          <p role="status" className="text-warning text-sm">
             {t(`fittings.improve.unloaded.${unloaded.kind}`, { count: unloaded.count })}
           </p>
           {onLoadBestCharge && (

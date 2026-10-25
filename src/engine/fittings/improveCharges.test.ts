@@ -64,6 +64,12 @@ describe('unloadedWeapons', () => {
     ).toBeNull();
   });
 
+  it('skips offline modules and groups with no charges to choose from', () => {
+    const offline = { ...module(0, 500), state: 'offline' as const };
+    expect(unloadedWeapons(fit([offline]), [launchers([choice(900)])])).toBeNull();
+    expect(unloadedWeapons(fit([module(0, 500)]), [launchers([])])).toBeNull();
+  });
+
   it('names turrets for guns with falloff, and weapons when mixed', () => {
     const gun = launchers([choice(901, { falloff: 5000 })], { moduleTypeId: 501 });
     expect(unloadedWeapons(fit([module(0, 501)]), [gun])?.kind).toBe('turret');
