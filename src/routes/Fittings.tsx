@@ -419,15 +419,16 @@ function FittingsPage() {
     openMakeItFit: makeItFit.open,
   });
   // Improve and the Add browser share the left of the page: the last one opened wins.
-  const opened = useRef({ add: addOpen, improve: improve.docked });
+  const { docked: improveDocked, close: closeImprove } = improve;
+  const opened = useRef({ add: addOpen, improve: improveDocked });
   useEffect(() => {
     const was = opened.current;
-    opened.current = { add: addOpen, improve: improve.docked };
-    if (addOpen && improve.docked) {
-      if (!was.add) improve.close();
+    opened.current = { add: addOpen, improve: improveDocked };
+    if (addOpen && improveDocked) {
+      if (!was.add) closeImprove();
       else if (!was.improve) setAddOpen(false);
     }
-  }, [addOpen, improve]);
+  }, [addOpen, improveDocked, closeImprove]);
   const itemActionsWithImprove = useMemo(
     () => (itemActions === null ? null : { ...itemActions, openImprove: improve.open }),
     [itemActions, improve.open]
@@ -528,6 +529,7 @@ function FittingsPage() {
     addMode: layoutAddMode,
     addOpen: layoutAddOpen,
     pushed,
+    statsFirst,
   } = leftColumn(addMode, addOpen, improve.docked);
   const headerCompact = addMode === 'sheet' || pushed;
   const subtitle = [
@@ -546,7 +548,8 @@ function FittingsPage() {
         <RuleBreakFlags.Provider value={ruleBreaks.flagged}>
           {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
         panel (scope decision `20261016-171349`). */}
-          <div className={`mx-auto max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : ''}`}>
+          {/* Pushed: from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
+          <div className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'}`}>
             <FittingEditorHeader
               workspace={workspace}
               fitting={fitting}
@@ -589,6 +592,7 @@ function FittingsPage() {
               onViewChange={(next) => void setView(next)}
               editor={editor}
               statsSections={statsSections}
+              statsFirst={statsFirst}
             />
             {makeItFit.dialog}
             {improve.drawer}

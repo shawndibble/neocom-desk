@@ -39,8 +39,10 @@ describe('editorColumnClass', () => {
 });
 
 describe('leftColumn', () => {
+  const base = { statsFirst: false };
   it('leaves the page alone with nothing open', () => {
     expect(leftColumn('docked', false, false)).toEqual({
+      ...base,
       addMode: 'docked',
       addOpen: false,
       pushed: false,
@@ -49,6 +51,7 @@ describe('leftColumn', () => {
 
   it('pushes the page aside for the Add slide-out', () => {
     expect(leftColumn('slideOut', true, false)).toEqual({
+      ...base,
       addMode: 'slideOut',
       addOpen: true,
       pushed: true,
@@ -57,22 +60,32 @@ describe('leftColumn', () => {
 
   it('gives Improve the docked browser column: the browser steps aside, the page makes room', () => {
     expect(leftColumn('docked', false, true)).toEqual({
+      ...base,
       addMode: 'slideOut',
       addOpen: false,
       pushed: true,
     });
   });
 
-  it('keeps an Add slide-out shut while Improve holds the column', () => {
+  it('on a narrower desktop, Improve pushes the page and puts the stats above the editor', () => {
+    // 26rem gone leaves no room for both side by side; the stats are what Improve changes.
     expect(leftColumn('slideOut', true, true)).toEqual({
       addMode: 'slideOut',
       addOpen: false,
       pushed: true,
+      statsFirst: true,
     });
   });
 
-  it('changes nothing on a phone, where both are sheets', () => {
+  it('never pushes below desktop, where the stats are a tab of their own', () => {
+    expect(leftColumn('sheet', true, true)).toEqual({
+      ...base,
+      addMode: 'sheet',
+      addOpen: true,
+      pushed: false,
+    });
     expect(leftColumn('sheet', true, false)).toEqual({
+      ...base,
       addMode: 'sheet',
       addOpen: true,
       pushed: false,

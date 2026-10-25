@@ -135,7 +135,7 @@ export function useImproveDrawer({
   const [implantApplied, setImplantApplied] = useState<string | null>(null);
   useTimedToast(implantApplied, () => setImplantApplied(null));
   const open = useCallback(() => setIsOpen(true), []);
-  const close = () => setIsOpen(false);
+  const close = useCallback(() => setIsOpen(false), []);
   // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
   const { groups: chargeGroups } = useChargeChoices({
     fitting: isOpen ? fitting : null,
@@ -275,8 +275,12 @@ export function useImproveDrawer({
     />
   );
 
-  // Only once a search is done: the bar has nothing to hold before, and an empty footer is a stray line.
-  const footer = search.state.status === 'done' && <div ref={setFooterTarget} />;
+  // Only once a search found something: the bar (ImprovePanel's ImproveFooter) is
+  // drawn for results alone, and an empty footer is a stray line.
+  const found =
+    search.state.status === 'done' &&
+    search.state.result.noDownside.length + search.state.result.tradeOffs.length > 0;
+  const footer = found && <div ref={setFooterTarget} />;
 
   const drawer = fitting && (
     <>
