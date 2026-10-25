@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
   type FocusEvent,
-  type ReactNode,
   type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,10 +28,12 @@ import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/ty
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
-import { unmaskCount, unmaskNumber } from '@/lib/numberMask';
+import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import { buildMaterialsColumns } from './MaterialsColumns';
 import { NotApplicable } from './NotApplicable';
+import { EditableValue } from './EditableValue';
+import { whenFocusLeaves } from './focusLeaves';
 import { materialRowState } from './materialRow';
 import { DepthPriceLine } from './DepthPriceLine';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
@@ -105,6 +106,18 @@ interface MaterialsTableProps {
   canBuildHere?: (typeID: number) => boolean;
   /** Turns one material's sub-build on or off. Omitted alongside `canBuildHere`. */
   onToggleBuildHere?: (typeID: number) => void;
+  /**
+   * Switches several bought materials to built at once — the To buy
+   * heading's link when two or more rows would be cheaper to build.
+   */
+  onBuildAll?: (typeIDs: readonly number[]) => void;
+  /**
+   * What the owned units this job consumes would net if sold, after fees;
+   * shown on the folded owned section's heading. Omitted when unknown.
+   */
+  ownedSellNet?: number | null;
+  /** What one material's owned units would net if sold; shown in a fully owned row's Total cell. */
+  sellValueFor?: (typeID: number) => number | undefined;
   /**
    * Opens the "Build it" modal for a material being built here — the runs and
    * ingredient list the Building row's Recipe link opens. Omitted
@@ -198,6 +211,9 @@ export function MaterialsTable({
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
+  onBuildAll,
+  ownedSellNet,
+  sellValueFor,
   onShowRecipe,
   onOpenAcquisitionPicker,
   skillGates,
@@ -218,6 +234,29 @@ export function MaterialsTable({
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
   // Same for the ledger's Have number.
   const [editingHave, setEditingHave] = useState<number | null>(null);
+  // The digit typed on a value that opened its field (`EditableValue`), so
+  // tabbing down a column and typing keeps the first keystroke.
+  const [editSeed, setEditSeed] = useState<string | undefined>(undefined);
+  function editHave(typeID: number | null, seed?: string) {
+    setEditSeed(seed);
+    setEditingHave(typeID);
+  }
+  function editPrice(typeID: number | null, seed?: string) {
+    setEditSeed(seed);
+    setEditingPrice(typeID);
+  }
+  // The value whose field Enter or Escape just closed: it takes focus back as
+  // it remounts (§6c, `useInPlaceEdit`'s contract), keyed "have-34" / "price-34".
+  const [refocus, setRefocus] = useState<string | null>(null);
+  const clearRefocus = useCallback(() => setRefocus(null), []);
+  const settleHave = (typeID: number) => () => {
+    editHave(null);
+    setRefocus(`have-${typeID}`);
+  };
+  const settlePrice = (typeID: number) => () => {
+    editPrice(null);
+    setRefocus(`price-${typeID}`);
+  };
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { held } = session;
@@ -482,7 +521,9 @@ export function MaterialsTable({
     material: MaterialTableRow,
     withHint = true,
     fill = false,
-    autoFocus = false
+    autoFocus = false,
+    seed?: string,
+    onSettle?: () => void
   ) {
     // Blueprint Acquisition (issue #838): ownership comes entirely from the
     // Character's real BPO/BPC, never from a typed quantity — an editable
@@ -505,12 +546,45 @@ export function MaterialsTable({
           inputMode="numeric"
           widthClassName={fill ? 'w-full' : 'w-20'}
           autoFocus={autoFocus}
+          seed={seed}
+          onSettle={onSettle}
           placeholder="0"
           mine={owned !== undefined && owned > 0}
           parse={unmaskCount}
           onCommit={(ownedQuantity) => commitOwned(material.typeID, ownedQuantity)}
         />
         {withHint && renderOwnedHint(material)}
+      </span>
+    );
+  }
+
+  /**
+   * The table's Have cell: the count edited in place (§6c faint pencil), the
+   * field only while it is being edited, and the row's owned-stock offer
+   * under it. A Blueprint Acquisition row keeps `renderHave`'s own readout.
+   */
+  function renderHaveCell(material: MaterialTableRow) {
+    if (material.acquisitionTier) return renderHave(material);
+    if (editingHave === material.typeID) {
+      return (
+        <span onBlur={whenFocusLeaves(() => editHave(null))}>
+          {renderHave(material, true, false, true, editSeed, settleHave(material.typeID))}
+        </span>
+      );
+    }
+    const owned = sourcing?.[material.typeID]?.ownedQuantity ?? 0;
+    return (
+      <span className="flex flex-col items-start gap-0.5 sm:items-end">
+        <EditableValue
+          focusOnMount={refocus === `have-${material.typeID}`}
+          onFocused={clearRefocus}
+          label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
+          onEdit={(seed) => editHave(material.typeID, seed)}
+          className={owned > 0 ? 'text-accent' : 'text-text-dim'}
+        >
+          {formatCount(owned)}
+        </EditableValue>
+        {renderOwnedHint(material)}
       </span>
     );
   }
@@ -567,16 +641,37 @@ export function MaterialsTable({
             {t('industry.errands.at')}
           </span>
         )}
-        <SourcingInput
-          value={state.unitPrice ?? undefined}
-          label={t('industry.priceFor', { material: name })}
-          inputMode="decimal"
-          widthClassName="w-24"
-          mine={overridden}
-          autoFocus={autoFocus}
-          parse={parsePrice}
-          onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
-        />
+        {!inline && editingPrice !== material.typeID && state.unitPrice !== null ? (
+          // Stays a value to edit even once the row is fully owned: Tab out of
+          // its Have lands here, and a value that vanished under focus would
+          // drop the player at the top of the page. Dim then — nothing is bought.
+          <EditableValue
+            focusOnMount={refocus === `price-${material.typeID}`}
+            onFocused={clearRefocus}
+            label={t('industry.priceFor', { material: name })}
+            onEdit={(seed) => editPrice(material.typeID, seed)}
+            className={
+              overridden ? 'text-accent' : state.fullyOwned ? 'text-text-dim' : 'text-text'
+            }
+          >
+            {maskNumber(state.unitPrice)}
+          </EditableValue>
+        ) : (
+          <span onBlur={inline ? undefined : whenFocusLeaves(() => editPrice(null))}>
+            <SourcingInput
+              value={state.unitPrice ?? undefined}
+              label={t('industry.priceFor', { material: name })}
+              inputMode="decimal"
+              widthClassName="w-24"
+              mine={overridden}
+              autoFocus={autoFocus || editingPrice === material.typeID}
+              seed={editingPrice === material.typeID ? editSeed : undefined}
+              onSettle={editingPrice === material.typeID ? settlePrice(material.typeID) : undefined}
+              parse={parsePrice}
+              onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
+            />
+          </span>
+        )}
         {inline && <span className="text-text-dim">{t('industry.errands.isk')}</span>}
         {(tag || overridden) && (
           <span className="inline-flex items-center gap-1">
@@ -634,6 +729,16 @@ export function MaterialsTable({
       const runs = buildRecipe(material)?.runs ?? 0;
       return <span>{t('industry.subBuildRuns', { runs: formatCount(runs) })}</span>;
     }
+    const sellValue =
+      material.remainingQuantity === 0 ? sellValueFor?.(material.typeID) : undefined;
+    if (sellValue !== undefined) {
+      // A fully owned row costs nothing; what it would fetch is the number worth reading.
+      return (
+        <span className="whitespace-nowrap text-text-dim">
+          {t('industry.errands.rowSellsFor', { amount: formatIskCompact(sellValue) })}
+        </span>
+      );
+    }
     const state = materialRowState(material, sourcing, pricesReady);
     return (
       <span>
@@ -659,7 +764,7 @@ export function MaterialsTable({
     pricesReady,
     anyDepth,
     renderName,
-    renderHave,
+    renderHave: renderHaveCell,
     renderPrice,
     renderTotal,
   });
@@ -678,11 +783,7 @@ export function MaterialsTable({
     dispatch({ type: 'focusLeft' });
   }
 
-  function renderHeading(
-    errand: MaterialErrand,
-    rows: readonly MaterialTableRow[],
-    extra?: ReactNode
-  ) {
+  function renderHeading(errand: MaterialErrand, rows: readonly MaterialTableRow[]) {
     const Glyph = ERRAND_GLYPH[errand];
     const headingId = `${idPrefix}-${errand}`;
     const subtotal =
@@ -691,6 +792,16 @@ export function MaterialsTable({
         : null;
     const saved =
       errand === 'building' ? rows.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0) : 0;
+    // Bought rows that would be cheaper built: one link for all of them, so the
+    // suggestion is a line of the heading rather than a banner competing with
+    // the verdict. One row keeps only its own Build instead.
+    const cheaperBuilt =
+      errand === 'toBuy' && onBuildAll
+        ? rows.filter(
+            (row) => !isBuilt(row) && buildSavings(row) !== null && buildChoice(row).toggleable
+          )
+        : [];
+    const cheaperSaves = cheaperBuilt.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0);
     const title = (
       <span className="inline-flex items-center gap-1.5">
         {Glyph && <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
@@ -700,7 +811,7 @@ export function MaterialsTable({
     return (
       <div
         className={cx(
-          'flex items-center justify-between gap-3 border-b border-line px-2 py-1.5',
+          'flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-line px-2 py-1.5',
           // On a phone the heading is a rule over its cards, not a filled bar
           // — one more box around boxes there.
           !isPhone && 'bg-panel-2'
@@ -732,7 +843,23 @@ export function MaterialsTable({
             title
           )}
         </h3>
-        {extra}
+        {cheaperBuilt.length >= 2 && onBuildAll && (
+          <button
+            type="button"
+            className={textActionClassName('mr-auto')}
+            onClick={() => onBuildAll(cheaperBuilt.map((row) => row.typeID))}
+          >
+            {t('industry.errands.buildCheaper', {
+              count: cheaperBuilt.length,
+              amount: formatIskCompact(cheaperSaves),
+            })}
+          </button>
+        )}
+        {errand === 'have' && ownedSellNet != null && ownedSellNet > 0 && (
+          <span className="ml-auto text-[0.6875rem] text-text-dim tabular-nums">
+            {t('industry.errands.haveSellsFor', { amount: formatIskCompact(ownedSellNet) })}
+          </span>
+        )}
         {saved > 0 && (
           <span className="text-[0.6875rem] font-semibold text-success tabular-nums">
             {t('industry.errands.saves', { amount: formatIskCompact(saved) })}
@@ -788,8 +915,7 @@ export function MaterialsTable({
   const sortPicker = (
     <NativeSelect
       size="sm"
-      className="ml-auto w-32 shrink-0 [&>select]:min-h-11 [&>select]:normal-case"
-      aria-label={t('industry.errands.sortLabel')}
+      className="w-32 shrink-0 [&>select]:min-h-11 [&>select]:normal-case"
       value={phoneSort}
       onChange={(event) => setPhoneSort(event.target.value as PhoneSort)}
     >
@@ -803,6 +929,14 @@ export function MaterialsTable({
 
   return (
     <div ref={containerRef} className="flex flex-col gap-3">
+      {/* Once for the whole list, on its own line: inside the first heading a
+          44px field made that heading the heaviest thing in the section. */}
+      {isPhone && visible.length > 0 && (
+        <label className="flex items-center justify-end gap-2 text-xs text-text-dim">
+          {t('industry.errands.sortLabel')}
+          {sortPicker}
+        </label>
+      )}
       {visible.map((errand) => {
         const rows = groups[errand];
         const open = errand !== 'have' || haveOpen;
@@ -813,38 +947,10 @@ export function MaterialsTable({
             onFocus={() => holdSection(errand)}
             onBlur={releaseSection}
           >
-            {renderHeading(
-              errand,
-              rows,
-              // The phone's sort picker rides in the first heading rather
-              // than taking a row of its own above the list.
-              isPhone && errand === visible[0] ? sortPicker : undefined
-            )}
+            {renderHeading(errand, rows)}
             {open &&
               (isPhone ? (
                 <>
-                  {/* The ledger's column header, printed once per section
-                      rather than as a label on every row. A Blueprint section
-                      has no numbers to head. */}
-                  {errand !== 'blueprint' && (
-                    <div
-                      className="grid grid-cols-3 gap-x-1.5 border-b border-line px-3 pt-2 pb-1 text-[0.5625rem] font-semibold tracking-widest text-text-dim uppercase"
-                      aria-hidden="true"
-                    >
-                      <span className="text-right">{t('industry.errands.need')}</span>
-                      <span className="inline-flex items-center justify-end gap-1">
-                        {t('industry.errands.haveColumn')}
-                        <Icon.Rename size={10} />
-                      </span>
-                      <span className="text-right">
-                        {t(
-                          errand === 'building'
-                            ? 'industry.errands.buildColumn'
-                            : 'industry.errands.buyColumn'
-                        )}
-                      </span>
-                    </div>
-                  )}
                   <ul>
                     {sortForPhone(rows).map((material) => (
                       <MaterialsPhoneRow
@@ -857,17 +963,27 @@ export function MaterialsTable({
                         savings={isBuilt(material) ? buildSavings(material) : null}
                         editingHave={editingHave === material.typeID}
                         editingPrice={editingPrice === material.typeID}
-                        onEditHave={() => setEditingHave(material.typeID)}
-                        onStopEditingHave={() => setEditingHave(null)}
-                        onEditPrice={() => setEditingPrice(material.typeID)}
-                        onStopEditingPrice={() => setEditingPrice(null)}
+                        onEditHave={(seed) => editHave(material.typeID, seed)}
+                        onStopEditingHave={() => editHave(null)}
+                        onEditPrice={(seed) => editPrice(material.typeID, seed)}
+                        refocusHave={refocus === `have-${material.typeID}`}
+                        refocusPrice={refocus === `price-${material.typeID}`}
+                        onRefocused={clearRefocus}
+                        onStopEditingPrice={() => editPrice(null)}
                         name={renderName(material, false, true)}
                         total={renderTotal(material)}
                         ownedHint={renderOwnedHint(material)}
                         action={renderAction(material, false)}
                         haveField={
                           editingHave === material.typeID
-                            ? renderHave(material, false, true, true)
+                            ? renderHave(
+                                material,
+                                false,
+                                true,
+                                true,
+                                editSeed,
+                                settleHave(material.typeID)
+                              )
                             : null
                         }
                         priceField={(autoFocus) => renderPrice(material, true, autoFocus)}

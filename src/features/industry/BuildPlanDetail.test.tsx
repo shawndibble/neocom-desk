@@ -28,6 +28,15 @@ import {
 } from './reactionFacilityDefaults';
 
 /** The toast's status region: the sr-only LiveStatus regions are empty here. */
+/** The cost index row's second line: the system the index was read for. */
+const costIndexSystem = (name: string) =>
+  screen.findByText(
+    (_, el) =>
+      el?.tagName === 'SPAN' &&
+      el.textContent === name &&
+      el.closest('div')?.textContent?.includes('Cost index') === true
+  );
+
 function toastStatus() {
   const live = screen.getAllByRole('status').filter((el) => el.textContent);
   expect(live).toHaveLength(1);
@@ -49,7 +58,8 @@ const loadMarketSnapshot = vi.hoisted(() =>
 );
 // The "vs 90d" figures read market history; nothing here is about them.
 vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
-vi.mock('./marketData', () => ({ loadMarketSnapshot }));
+// No neighbour indices: the ledger's cheaper-system line stays out of these tests.
+vi.mock('./marketData', () => ({ loadMarketSnapshot, loadSystemCostIndices: async () => null }));
 // The blueprint-offer and invention loaders price through Fuzzwork directly,
 // and there is no msw server here: unmocked, the Break Even button's profit
 // (and `pricesReady`) rode on a live request for the Rifter Blueprint's region
@@ -814,6 +824,24 @@ describe('BuildPlanDetail sub-builds', () => {
   });
 });
 
+describe('BuildPlanDetail hero runs field', () => {
+  it('edits runs beside the product name, not in the setup form', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await screen.findByText('Tritanium');
+
+    const runs = screen.getByRole('textbox', { name: 'Runs' });
+    await user.clear(runs);
+    await user.type(runs, '25');
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenLastCalledWith({ runs: 25 });
+    await user.click(screen.getByRole('button', { name: 'Edit setup' }));
+    expect(screen.getAllByRole('textbox', { name: 'Runs' })).toHaveLength(1);
+  });
+});
+
 describe('BuildPlanDetail Auto Build (issue #695)', () => {
   const strategySelect = () => screen.getByRole('combobox', { name: 'Build Strategy' });
   const tritaniumBuildButton = () =>
@@ -852,6 +880,19 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
     // Pyerite's own consumption (Mexallon) only appears once its job is
     // actually pulled onto the table by buildHere containing it.
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
+  });
+
+  it('says what a strategy change built and offers Undo back to the previous choices', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await screen.findByText('Tritanium');
+
+    await applyBuildStrategy(user, 'Build');
+
+    expect(toastStatus()).toHaveTextContent('Build strategy applied: 2 parts built here.');
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
   });
 
   it('re-running Auto Build overwrites a hand-picked build/buy choice — expected, not a bug', async () => {
@@ -1100,8 +1141,9 @@ describe('BuildPlanDetail build system', () => {
     const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);
     await user.click(await screen.findByRole('button', { name: 'Show details' }));
+    await user.click(await screen.findByRole('button', { name: /^total job cost/i }));
 
-    expect(await screen.findByText('Cost index (Badivefi)')).toBeInTheDocument();
+    expect(await costIndexSystem('Badivefi')).toBeInTheDocument();
   });
 
   it('keeps the typed text and says so when ESI knows no such system', async () => {
@@ -1162,8 +1204,9 @@ describe('BuildPlanDetail build system', () => {
     const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888 }} />);
     await user.click(await screen.findByRole('button', { name: 'Show details' }));
+    await user.click(await screen.findByRole('button', { name: /^total job cost/i }));
 
-    expect(await screen.findByText('Cost index (Jita)')).toBeInTheDocument();
+    expect(await costIndexSystem('Jita')).toBeInTheDocument();
     expect(loadMarketSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
@@ -1288,18 +1331,18 @@ describe('BuildPlanDetail Include Reactions (issue #698)', () => {
     expect(onUpdate).toHaveBeenLastCalledWith({ includeReactions: false });
   });
 
-  it("lights up Auto Build's Reactions chip once Include Reactions is on", async () => {
+  it('says Auto Build includes reactions once Include Reactions is on', async () => {
     render(<Harness plan={{ runs: 10, includeReactions: true }} />);
     await screen.findByText('Tritanium');
 
-    expect(screen.getByText('Reactions')).not.toHaveClass('text-text-dim');
+    expect(screen.getByText('incl. reactions')).toBeInTheDocument();
   });
 
-  it("leaves Auto Build's Reactions chip disabled while Include Reactions is off", async () => {
+  it('says Auto Build leaves reactions out while Include Reactions is off', async () => {
     render(<Harness plan={{ runs: 10 }} />);
     await screen.findByText('Tritanium');
 
-    expect(screen.getByText('Reactions')).toHaveClass('text-text-dim');
+    expect(screen.getByText('no reactions')).toBeInTheDocument();
   });
 });
 
@@ -1436,7 +1479,12 @@ describe('BuildPlanDetail material price basis', () => {
   }
 
   const basisSelect = () => screen.getByRole('combobox', { name: 'Material prices' });
-  const tritaniumPrice = () => screen.getByLabelText('Price for Tritanium') as HTMLInputElement;
+  // The price is edited in place, so at rest it is the value's text.
+  const tritaniumPrice = () => ({
+    value: (screen.getByRole('button', { name: /^Price for Tritanium:/ }).textContent ?? '')
+      .replace('Price for Tritanium:', '')
+      .trim(),
+  });
 
   it('opens on sell orders and offers both sides of the book', async () => {
     const user = userEvent.setup();
@@ -1500,11 +1548,16 @@ describe('BuildPlanDetail material price basis', () => {
 });
 
 describe('BuildPlanDetail Corp Assets (issue #798)', () => {
+  // Corp Assets lives in the Owned materials popover.
   const corpAssetsToggle = () => screen.getByRole('button', { name: 'Corp Assets' });
+  async function openOwned() {
+    fireEvent.click(await screen.findByRole('button', { name: /^Owned materials/ }));
+  }
 
   it("renders as a toggle button, not a checkbox — matches the app's other toggles", async () => {
     render(<Harness plan={{ runs: 10 }} corpOwnedStock={{ available: true }} />);
     await screen.findByText('Tritanium');
+    await openOwned();
 
     expect(corpAssetsToggle()).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('checkbox', { name: 'Corp Assets' })).not.toBeInTheDocument();
@@ -1513,6 +1566,7 @@ describe('BuildPlanDetail Corp Assets (issue #798)', () => {
   it('is disabled when the active character lacks the corp Director role', async () => {
     render(<Harness plan={{ runs: 10 }} corpOwnedStock={{ available: false }} />);
     await screen.findByText('Tritanium');
+    await openOwned();
 
     expect(corpAssetsToggle()).toBeDisabled();
   });
@@ -1524,6 +1578,7 @@ describe('BuildPlanDetail Corp Assets (issue #798)', () => {
       <Harness plan={{ runs: 10 }} corpOwnedStock={{ available: true }} onUpdate={onUpdate} />
     );
     await screen.findByText('Tritanium');
+    await openOwned();
 
     await user.click(corpAssetsToggle());
 
@@ -1624,6 +1679,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
       />
     );
 
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
@@ -1655,6 +1711,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
       />
     );
 
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
@@ -1670,6 +1727,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
       />
     );
 
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use none' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([
@@ -1682,6 +1740,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     const onSourcing = vi.fn();
     render(<Harness plan={{ runs: 1 }} onSourcing={onSourcing} />);
 
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).not.toHaveBeenCalled();
@@ -1726,13 +1785,33 @@ describe('BuildPlanDetail Break Even button', () => {
     expect(valueOf(runsInput())).toBe('250');
   });
 
+  it('follows the hero: offered when selling the owned stock beats building, though the build pays', async () => {
+    const user = userEvent.setup();
+    // Profitable with owned Tritanium counted free, a loss once it is
+    // charged at what it would sell for (a buy order at 1M a unit).
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5, 587: 100_000_000 },
+      hubBuyPrices: { 34: 1_000_000, 587: 100_000_000 },
+      adjustedPrices: { 34: 4.5, 587: 100_000_000 },
+      systemCostIndex: 0.05,
+    });
+    breakEvenRuns.mockReturnValue(null);
+    render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 1000 } } }} />);
+
+    await user.click(await breakEvenButton());
+
+    // The search probes profit on the sell-value basis: still a loss at 10 runs.
+    const profitAt = breakEvenRuns.mock.calls[0][0] as (runs: number) => number | null;
+    expect(profitAt(10)).toBeLessThan(0);
+  });
+
   it('is absent when the plan already makes a profit', async () => {
     const user = userEvent.setup();
     priceRifter(100_000_000); // clears the fixture's 150M blueprint cost over 10 runs
     render(<Harness plan={{ runs: 10 }} />);
     await openSetup(user);
 
-    await screen.findByLabelText('Price for Tritanium');
+    await screen.findByRole('button', { name: /^Price for Tritanium:/ });
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Break Even' })).not.toBeInTheDocument()
     );
