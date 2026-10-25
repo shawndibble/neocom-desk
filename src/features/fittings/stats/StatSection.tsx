@@ -5,7 +5,7 @@ import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/u
 import { cx } from '@/lib/cx';
 import type { Fitting } from '@/engine/fittings/types';
 import { STAT_EYEBROW_TYPE } from '../statKit';
-import { useSectionPreviewed } from '../statPreviewChanges';
+import { useSectionPreviewed } from '../statPreviewContext';
 import type { Section } from './sectionIds';
 import { FittingYourCharactersPanel } from '../FittingYourCharactersPanel';
 import { useCharacterGaps, type GapCharacter } from '../useCharacterGaps';

@@ -1,7 +1,7 @@
 import { Fragment, useMemo, type ReactNode } from 'react';
 import { StatChange } from '@/components/ui';
 import type { FittingStatsDelta, StatChangeKey } from '@/engine/fittings/variationDelta';
-import { StatPreviewContext, useChangedKeys, type Changes } from './statPreviewChanges';
+import { StatPreviewContext, useChangedKeys, type Changes } from './statPreviewContext';
 
 /**
  * The whole-fit change a ticked or hovered Improve row would make, for the

@@ -378,9 +378,16 @@ export function ImprovePanel({
               className="border-line rounded-xs border p-2 text-sm"
               // A mouse hover or a keyboard focus previews it; touch has no hover, so only its tick does (§6c).
               onPointerEnter={(event) => event.pointerType === 'mouse' && setHover(option)}
-              onPointerLeave={() => setHover(null)}
+              // Leaving with the pointer keeps a keyboard-focused row previewed; moving focus between the row's own parts keeps it too.
+              onPointerLeave={(event) =>
+                !event.currentTarget.contains(
+                  document.activeElement?.matches(':focus-visible') ? document.activeElement : null
+                ) && setHover(null)
+              }
               onFocus={(event) => event.target.matches(':focus-visible') && setHover(option)}
-              onBlur={() => setHover(null)}
+              onBlur={(event) =>
+                !event.currentTarget.contains(event.relatedTarget as Node | null) && setHover(null)
+              }
             >
               <label
                 htmlFor={id}
