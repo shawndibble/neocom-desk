@@ -1,13 +1,7 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  eyebrowClassName,
-  Eyebrow,
-  FieldError,
-  Radio,
-  SegmentedControl,
-  TextInput,
-} from '@/components/ui';
+import { Button, Eyebrow, FieldError, Radio, SegmentedControl, TextInput } from '@/components/ui';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import { cx } from '@/lib/cx';
 import {
@@ -108,7 +102,7 @@ export function HaulerPicker({
   return (
     <section
       aria-label={t('assets.movePlan.haulerLabel')}
-      className="rounded-xs border border-line bg-panel-2"
+      className="rounded-xs border border-line bg-panel"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
         <Eyebrow as="h3">{t('assets.movePlan.haulerLabel')}</Eyebrow>
@@ -134,7 +128,8 @@ export function HaulerPicker({
               <label
                 className={cx(
                   ROW_COLUMNS,
-                  'min-h-9 cursor-pointer px-3 py-1.5 hover:bg-panel',
+                  'min-h-9 cursor-pointer px-3 py-1.5',
+                  rowInteractiveClassName,
                   selected === id && 'bg-accent/10'
                 )}
               >
@@ -183,7 +178,8 @@ export function HaulerPicker({
         <div className="border-t border-line">
           <label
             className={cx(
-              'flex min-h-9 cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-panel',
+              'flex min-h-9 cursor-pointer items-center gap-3 px-3 py-1.5',
+              rowInteractiveClassName,
               selected === CUSTOM && 'bg-accent/10'
             )}
           >
@@ -224,16 +220,17 @@ export function HaulerPicker({
         </div>
       </div>
       {onToggleExpanded && (hidden > 0 || expanded) && ordered.length > INLINE_ROWS && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           aria-expanded={expanded}
           onClick={onToggleExpanded}
-          className={cx(eyebrowClassName, 'w-full border-t border-line px-3 py-2 hover:text-text')}
+          className="w-full rounded-none border-t border-line"
         >
           {expanded
             ? t('assets.movePlan.showFewerHaulers')
             : t('assets.movePlan.showMoreHaulers', { count: hidden })}
-        </button>
+        </Button>
       )}
     </section>
   );
