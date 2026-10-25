@@ -1,4 +1,12 @@
-import { useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { UNSAFE_LocationContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -98,6 +106,23 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
   // Where focus was before it entered the toast, so Escape can hand it back.
   const rootRef = useRef<HTMLDivElement>(null);
   const cameFrom = useRef<HTMLElement | null>(null);
+
+  // A new message replacing the old one in place replays the rise, so the two
+  // read as different toasts rather than a text swap. Restarted rather than
+  // re-keyed: a remount would drop focus from Undo or close. String messages
+  // only, like the live region — a JSX message is a new object every render.
+  // Layout effect, so the new text never paints once at rest before rising.
+  const risenFor = useRef(message);
+  useLayoutEffect(() => {
+    if (typeof message !== 'string' || message === risenFor.current) return;
+    risenFor.current = message;
+    for (const animation of rootRef.current?.getAnimations?.() ?? []) {
+      if ('animationName' in animation && animation.animationName === 'toast-in') {
+        animation.cancel();
+        animation.play();
+      }
+    }
+  }, [message]);
 
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'Escape' || !onClose) return;

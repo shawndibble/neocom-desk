@@ -29,6 +29,33 @@ describe('Toast', () => {
     modalBody.remove();
   });
 
+  it('replays its rise when a new message replaces the old one in place, so the two read as different toasts', () => {
+    const rise = { animationName: 'toast-in', cancel: vi.fn(), play: vi.fn() };
+    const other = { animationName: 'something-else', cancel: vi.fn(), play: vi.fn() };
+    const spy = vi.fn(() => [rise, other]);
+    Object.defineProperty(HTMLElement.prototype, 'getAnimations', {
+      value: spy,
+      configurable: true,
+    });
+    try {
+      const props = { undo: { label: 'Undo', onUndo: () => {} }, onClose: () => {} };
+      const { rerender } = render(<Toast message="Tritanium moved to To buy" {...props} />);
+      // The mount itself plays from CSS; nothing to restart yet.
+      expect(rise.play).not.toHaveBeenCalled();
+
+      rerender(<Toast message="Pyerite moved to To buy" {...props} />);
+      expect(rise.cancel).toHaveBeenCalledTimes(1);
+      expect(rise.play).toHaveBeenCalledTimes(1);
+      expect(other.play).not.toHaveBeenCalled();
+
+      // A re-render with the same message is not a new toast.
+      rerender(<Toast message="Pyerite moved to To buy" {...props} />);
+      expect(rise.play).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (HTMLElement.prototype as { getAnimations?: unknown }).getAnimations;
+    }
+  });
+
   it('shows the message and, given undo, a working undo link', () => {
     let undone = false;
     render(
