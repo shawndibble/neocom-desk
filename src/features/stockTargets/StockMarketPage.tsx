@@ -539,6 +539,7 @@ export function StockMarketPage({
       {undoToast ? (
         <Toast
           message={undoToast.message}
+          instance={undoToast}
           undo={{ label: t('stockTargets.table.undo'), onUndo: undoToast.onUndo }}
           onClose={() => setUndoToast(null)}
         />

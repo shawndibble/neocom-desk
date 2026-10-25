@@ -229,6 +229,7 @@ export function OverviewEditProvider({
       {toast && (
         <Toast
           message={toast.message}
+          instance={toast}
           undo={{
             label: t('overview.customize.undo.action'),
             onUndo: () => {

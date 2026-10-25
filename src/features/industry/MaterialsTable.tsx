@@ -1014,6 +1014,7 @@ export function MaterialsTable({
       {toast && (
         <Toast
           message={toastText(toast.message)}
+          instance={toast}
           undo={toast.undo ? { label: t('industry.errands.undo'), onUndo: undo } : undefined}
           onClose={() => dispatch({ type: 'toastExpired' })}
         />

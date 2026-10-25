@@ -72,6 +72,7 @@ export function useOwnedStockBulk({ write, ownedFor, scopedQuantityFor }: OwnedS
     toast: bulkToast && (
       <Toast
         message={bulkToast.message}
+        instance={bulkToast}
         undo={bulkToast.undo && { label: t('industry.errands.undo'), onUndo: bulkToast.undo }}
         onClose={() => setBulkToast(null)}
       />
