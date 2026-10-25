@@ -1410,6 +1410,7 @@
       },
       "defenseLabel": "Defense Choice",
       "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
+      "defenseHint": "Defense Choice only changes Tankier and Best overall.",
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
       "sideGain": "up to +{{percent}}%",

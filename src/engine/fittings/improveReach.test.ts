@@ -175,6 +175,50 @@ describe('Improve Reach', () => {
   });
 });
 
+describe('candidate budgets', () => {
+  it('a large same-group list does not starve Rework’s other groups', () => {
+    // 40 extra types in group 38 would use a shared 20-target budget before the Reach groups.
+    const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [100 + i, 38]));
+    const rack = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [100 + i, 'low']));
+    const groupOf = (id: number) => (many as Record<number, number>)[id] ?? GROUP[id];
+    const f = fit([['low', 0, 11]]);
+    const list = improveCandidates(
+      f.modules,
+      index,
+      { ...rackOf, ...rack },
+      {
+        ...base,
+        goal: 'reach',
+        reach: 'rework',
+        pool: {
+          groupOf,
+          typeIdsInGroup: (g) =>
+            g === 60
+              ? Array.from({ length: 40 }, (_, i) => 100 + i)
+              : Object.keys(GROUP)
+                  .map(Number)
+                  .filter((id) => GROUP[id] === g),
+          published: () => true,
+        },
+      }
+    );
+    const reachTargets = list.filter((c) => c.fromTypeId === 11 && GROUP[c.toTypeId] === 211);
+    expect(reachTargets.map((c) => c.toTypeId)).toEqual([9, 10]);
+    expect(list.filter((c) => c.fromTypeId === 11 && c.toTypeId >= 100)).toHaveLength(20);
+  });
+
+  it('asks the pool whether a type is flyable before spending the cap', () => {
+    const f = fit([['low', 0, 11]]);
+    const list = improveCandidates(f.modules, index, rackOf, {
+      ...base,
+      goal: 'reach',
+      reach: 'rework',
+      pool: { ...base.pool!, flyable: (_slot, id) => id !== 9 },
+    });
+    expect(list.filter((c) => c.fromTypeId === 11).map((c) => c.toTypeId)).toEqual([10]);
+  });
+});
+
 describe('empty slots', () => {
   it('fills the first empty slot of each rack from the goal’s groups, always', () => {
     const f = fit([

@@ -18,6 +18,7 @@ import {
   SegmentedControl,
   Spinner,
 } from '@/components/ui';
+import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
@@ -49,12 +50,17 @@ const CHANGES_SHOWN = 4;
 
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
-const optionKey = (option: ImproveOption) =>
-  `${option.candidate.fromTypeId ?? 'empty'}-${option.candidate.toTypeId}-${option.candidate.at[0].slot}${option.candidate.at[0].slotIndex}`;
+const moveKey = (candidate: ImproveOption['candidate']): string =>
+  `${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
+  (candidate.pairedWith ? `+${moveKey(candidate.pairedWith)}` : '');
 
-/** The slot a suggestion changes: at most one ticked row per slot. */
-const slotKey = (option: ImproveOption) =>
-  `${option.candidate.at[0].slot}${option.candidate.at[0].slotIndex}`;
+const optionKey = (option: ImproveOption) => moveKey(option.candidate);
+
+/** Every slot a suggestion changes, its paired downgrade's included: two ticked rows never share one. */
+function slotsOf(candidate: ImproveOption['candidate']): string[] {
+  const own = candidate.at.map((at) => `${at.slot}${at.slotIndex}`);
+  return candidate.pairedWith ? [...own, ...slotsOf(candidate.pairedWith)] : own;
+}
 
 /** What the drawer asks of a search beyond the goal; the hook that owns the state passes it whole. */
 export interface ImproveSettings {
@@ -143,9 +149,14 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, s
 
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
-    const key = slotKey(option);
-    if (next.get(key) === option) next.delete(key);
-    else next.set(key, option);
+    const key = optionKey(option);
+    if (next.has(key)) next.delete(key);
+    else {
+      const taken = new Set(slotsOf(option.candidate));
+      for (const [other, ticked] of next)
+        if (slotsOf(ticked.candidate).some((slot) => taken.has(slot))) next.delete(other);
+      next.set(key, option);
+    }
     setTicked(next);
   }
 
@@ -163,7 +174,7 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, s
                 <Checkbox
                   id={id}
                   className="mt-0.5"
-                  checked={ticked.get(slotKey(option)) === option}
+                  checked={ticked.has(optionKey(option))}
                   onChange={() => toggle(option)}
                 />
                 <span className="min-w-0">
@@ -273,6 +284,9 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, s
           onChange={settings.onDefenseChange}
           fill
         />
+        {!TANK_GOALS.has(goal) && (
+          <p className="text-text-dim text-xs">{t('fittings.improve.defenseHint')}</p>
+        )}
         <div>
           <button
             type="button"

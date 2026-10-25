@@ -8,12 +8,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  COMBAT_GOALS,
   findImprovements,
   goalAvailability,
   IMPROVE_MODES,
   IMPROVE_REACHES,
   improveCandidates,
-  MAX_CANDIDATES,
   type DefenseChoice,
   type ImproveCandidate,
   type ImproveGoal,
@@ -33,7 +33,6 @@ import { getHubPrices } from '@/market/prices';
 import { loadFittingPrice } from './fittingPrice';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
-import { COMBAT_GOALS } from '@/engine/fittings/improve';
 
 /** The last Improve Goal, remembered on this device like other Fittings preferences. */
 export const useImproveGoal = createLocalSetting<ImproveGoal>({
@@ -111,53 +110,48 @@ export interface ImproveSearch {
   restart: () => void;
 }
 
-/** The module pool the catalogue gives Rework and the fills: group, group members, market-listed. */
-function modulePool(catalogue: FittingCatalogue): ModulePool {
+/** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
+function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluator): ModulePool {
   const listed = new Set(catalogue.marketTypes.map((entry) => entry.typeId));
+  const flyable = new Map<string, boolean>();
   return {
     groupOf: (typeId) => catalogue.types[String(typeId)]?.groupID,
     typeIdsInGroup: (groupId) => catalogue.typeIdsByGroup.get(groupId) ?? [],
     published: (typeId) => listed.has(typeId),
+    // A module the pilot lacks skills for goes under Train instead.
+    flyable: (slot, typeId) => {
+      const key = `${slot}:${typeId}`;
+      let ok = flyable.get(key);
+      if (ok === undefined) {
+        const check = variants.engine
+          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
+          .get(typeId);
+        ok = check ? check.fitsHull && check.canFly : true;
+        flyable.set(key, ok);
+      }
+      return ok;
+    },
   };
 }
 
-/** Candidates the hull takes and the pilot can fly: one the pilot lacks skills for goes under Train instead. */
-function flyableCandidates(
+/** The candidates for one side of the search, the hull takes and the pilot can fly. */
+function searchCandidates(
   variants: VariantEvaluator,
   catalogue: FittingCatalogue,
   goal: ImproveGoal,
-  defense: DefenseChoice,
   config: ImproveConfig,
   slotCounts: FittingStats['slotCounts']
 ): ImproveCandidate[] {
   const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
-  const all = improveCandidates(variants.fitting.modules, index, catalogue.rackOf, {
+  return improveCandidates(variants.fitting.modules, index, catalogue.rackOf, {
     goal,
     reach: config.reach,
-    defense,
+    defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
     slotCounts,
-    pool: modulePool(catalogue),
-    limit: Infinity,
+    pool: modulePool(catalogue, variants),
   });
-  const bySlot = new Map<ImproveCandidate['at'][number]['slot'], number[]>();
-  for (const candidate of all) {
-    const slot = candidate.at[0].slot;
-    bySlot.set(slot, [...(bySlot.get(slot) ?? []), candidate.toTypeId]);
-  }
-  const checks = new Map(
-    [...bySlot].map(([slot, typeIds]) => [
-      slot,
-      variants.engine.checkCandidates(variants.fitting.shipTypeId, slot, typeIds, variants.profile),
-    ])
-  );
-  return all
-    .filter((candidate) => {
-      const check = checks.get(candidate.at[0].slot)?.get(candidate.toTypeId);
-      return check ? check.fitsHull && check.canFly : true;
-    })
-    .slice(0, MAX_CANDIDATES);
 }
 
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
@@ -224,12 +218,11 @@ export function useImprove(
             : [defense];
         const sets = sides.map((side) => ({
           side,
-          candidates: flyableCandidates(
+          candidates: searchCandidates(
             variants,
             catalogue,
             searched,
-            side,
-            { reach, mode, spendCap, defense, includeRigs, includeOfficer },
+            { reach, mode, spendCap, defense: side, includeRigs, includeOfficer },
             own.slotCounts
           ),
         }));
@@ -249,6 +242,9 @@ export function useImprove(
             : Promise.resolve(null),
         ]);
         if (cancelled) return;
+        // A cap that cannot be checked is not silently waived.
+        if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
+          throw new Error('Prices unavailable for the spend cap');
         const results: ImproveResult[] = [];
         let done = 0;
         for (const set of sets) {
@@ -277,9 +273,11 @@ export function useImprove(
           if (cancelled || result === null) return;
           results.push(result);
           done += set.candidates.length;
+          // "Show best so far" ends the whole search: the other side was not searched, so it is not compared.
+          if (stopRef.current) break;
         }
         const sideResults =
-          sets.length === 2
+          sets.length === 2 && results.length === 2
             ? ({
                 [sets[0].side]: results[0],
                 [sets[1].side]: results[1],

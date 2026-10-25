@@ -24,9 +24,16 @@ import {
   type Job,
 } from './improveGroups';
 import { applyModuleUpgrade } from './moduleUpgrades';
-import { PAIR_LIMIT, STAT_TOLERANCE } from './makeItFit';
+import {
+  overageOf,
+  PAIR_LIMIT,
+  RESOURCES,
+  STAT_TOLERANCE,
+  usedOf,
+  type Resource,
+} from './makeItFit';
 import { gainMetrics, type GainMetric } from './skillGains';
-import { fitsResourceBudget, resourceOverage } from './skillGaps';
+import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
 import type { Fitting, FittingModule, FittingSlotKind, FittingStats } from './types';
 
@@ -217,6 +224,8 @@ export interface ModulePool {
   typeIdsInGroup: (groupId: number) => readonly number[];
   /** Whether the item is a market-listed one, not an unpublished or NPC type. */
   published: (typeId: number) => boolean;
+  /** Whether the hull takes the module in that rack and the pilot can fly it; absent: assumed. Asked before the per-module cap so unfittable types do not use it. */
+  flyable?: (slot: FittingSlotKind, typeId: number) => boolean;
 }
 
 export interface CandidateOptions {
@@ -312,12 +321,13 @@ export function improveCandidates(
 
   const allowed = (
     typeId: number,
-    slot: string,
+    slot: FittingSlotKind,
     removedGroup: number | undefined,
     removed: number
   ) => {
     if (rackOf[String(typeId)] !== slot) return false;
     if (o.pool && !o.pool.published(typeId)) return false;
+    if (o.pool?.flyable && !o.pool.flyable(slot, typeId)) return false;
     if (!o.includeOfficer && EXCLUDED_META_GROUPS.has(index.types[typeId]?.metaGroupId ?? 0))
       return false;
     const group = groupOf(typeId);
@@ -336,8 +346,11 @@ export function improveCandidates(
     const job = jobOf(from);
     const guardsJob = job !== null && !scored.includes(job);
     const seen = new Set<number>([fromTypeId]);
+    // Each tier has its own budget, and only an offered target spends it.
+    const taken = [0, 0, 0];
     const offer = (tier: number, typeId: number, group: number | undefined) => {
-      if (seen.has(typeId) || !allowed(typeId, slot, from, at.length)) return;
+      if (taken[tier] >= TARGETS_PER_MODULE || seen.has(typeId)) return;
+      if (!allowed(typeId, slot, from, at.length)) return;
       if (
         freesTank &&
         group !== undefined &&
@@ -348,26 +361,25 @@ export function improveCandidates(
       // Never the last module doing a job nobody scores.
       if (guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1) return;
       seen.add(typeId);
+      taken[tier]++;
       tiers[tier].push({ fromTypeId, toTypeId: typeId, at });
     };
-    let offered = 0;
-    const budget = () => offered++ < TARGETS_PER_MODULE;
     for (const member of getVariations(index, fromTypeId).members) {
-      if (member.typeId !== fromTypeId && budget()) offer(0, member.typeId, groupOf(member.typeId));
-    }
-    if (o.pool && from !== undefined && o.reach !== 'upgrade') {
-      for (const typeId of o.pool.typeIdsInGroup(from)) if (budget()) offer(1, typeId, from);
-    }
-    if (o.pool && o.reach === 'rework') {
-      for (const group of reworkGroups(o.goal, sides))
-        for (const typeId of o.pool.typeIdsInGroup(group)) if (budget()) offer(2, typeId, group);
+      offer(0, member.typeId, groupOf(member.typeId));
     }
     // The other side's tank modules are freed: they take the chosen side's modules whatever the Reach.
     const otherSide = from === undefined ? null : sideOf(from);
     if (o.pool && freesTank && otherSide !== null && otherSide !== o.defense) {
       for (const group of reworkGroups(o.goal, sides))
         if (TANK_GROUPS.has(group))
-          for (const typeId of o.pool.typeIdsInGroup(group)) if (budget()) offer(2, typeId, group);
+          for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
+    }
+    if (o.pool && from !== undefined && o.reach !== 'upgrade') {
+      for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
+    }
+    if (o.pool && o.reach === 'rework') {
+      for (const group of reworkGroups(o.goal, sides))
+        for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
     }
   }
 
@@ -380,10 +392,13 @@ export function improveCandidates(
       let free = 0;
       while (free < o.slotCounts[slot] && taken.has(free)) free++;
       if (free >= o.slotCounts[slot]) continue;
-      let added = 0;
-      for (const group of reworkGroups(o.goal, sides)) {
+      // Each group gets an equal share, so the first groups listed cannot use the whole rack's budget.
+      const groups = reworkGroups(o.goal, sides);
+      const share = Math.ceil(FILLS_PER_RACK / Math.max(1, groups.length));
+      for (const group of groups) {
+        let added = 0;
         for (const typeId of pool.typeIdsInGroup(group)) {
-          if (added >= FILLS_PER_RACK || !allowed(typeId, slot, undefined, 0)) continue;
+          if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
           added++;
           tiers[3].push({ fromTypeId: null, toTypeId: typeId, at: [{ slot, slotIndex: free }] });
         }
@@ -456,18 +471,6 @@ export interface FindImprovementsParams {
   /** "Show best so far": stop and rank what is done. */
   shouldStop?: () => boolean;
 }
-
-type Resource = 'cpu' | 'powergrid' | 'calibration';
-const RESOURCES: readonly Resource[] = ['cpu', 'powergrid', 'calibration'];
-
-const usedOf = (s: FittingStats, r: Resource) =>
-  r === 'cpu' ? s.cpuUsed : r === 'powergrid' ? s.powergridUsed : s.calibrationUsed;
-const overageOf = (s: FittingStats, r: Resource) =>
-  r === 'cpu'
-    ? resourceOverage(s.cpuUsed, s.cpuTotal)
-    : r === 'powergrid'
-      ? resourceOverage(s.powergridUsed, s.powergridTotal)
-      : resourceOverage(s.calibrationUsed, s.calibrationTotal);
 
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
 const PAIR_SEEDS = 5;
