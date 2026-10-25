@@ -290,11 +290,18 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  * alive, so every metric counts whole.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
+  const metrics = rawMetrics(before, after);
+  const weight = overallWeight(before, after);
+  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
+  return { overall, ...metrics };
+}
+
+function rawMetrics(before: FittingStats, after: FittingStats): Record<GainMetric, number> {
   const roleGains = Object.fromEntries([
     ...ROLE_METRICS.map((key): [RoleMetric, number] => [key, 0]),
     ...roleResults(before, after).map(({ change, gain }) => [change.key, gain]),
   ]) as Record<RoleMetric, number>;
-  const metrics: Record<GainMetric, number> = {
+  return {
     dps: relative(before.offense.dps, after.offense.dps),
     ehp: relative(before.ehp, after.ehp),
     activeTank: relative(activeTank(before), activeTank(after)),
@@ -304,12 +311,30 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     lockRange: relative(before.targeting.maxTargetRange, after.targeting.maxTargetRange),
     ...roleGains,
   };
+}
+
+/** The weight `overall` gives each metric for this swap; see `gainMetrics`. */
+function overallWeight(before: FittingStats, after: FittingStats) {
   const flipped = before.capacitor.stable !== after.capacitor.stable;
   const weighted = isArmed(before);
-  const weight = (metric: GainMetric) =>
+  return (metric: GainMetric) =>
     !weighted || (metric === 'capacitor' && flipped) ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
-  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
-  return { overall, ...metrics };
+}
+
+/**
+ * The metrics that moved `overall` up, the largest weighted term first —
+ * what earned the score, for a row to lead with. Never a metric that held
+ * still or got worse.
+ */
+export function overallTerms(
+  before: FittingStats,
+  after: FittingStats
+): { metric: GainMetric; term: number }[] {
+  const metrics = rawMetrics(before, after);
+  const weight = overallWeight(before, after);
+  return GAIN_METRICS.map((metric) => ({ metric, term: metrics[metric] * weight(metric) }))
+    .filter(({ term }) => term > 0)
+    .sort((a, b) => b.term - a.term);
 }
 
 export interface SkillGain extends SkillGainCandidate {

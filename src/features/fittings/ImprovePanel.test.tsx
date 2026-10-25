@@ -6,6 +6,7 @@ import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveGoal, ImproveOption, ImproveResult } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
@@ -95,6 +96,7 @@ const renderPanel = (
     onLoadBestCharge?: () => void;
     fitting?: Fitting;
     onPreview?: (delta: FittingStatsDelta | null) => void;
+    target?: TargetProfile;
   } = {}
 ) =>
   render(
@@ -111,6 +113,7 @@ const renderPanel = (
       onLoadBestCharge={extra.onLoadBestCharge}
       fitting={extra.fitting}
       onPreview={extra.onPreview}
+      target={extra.target}
     />
   );
 
@@ -218,6 +221,67 @@ describe('ImprovePanel', () => {
     const row = screen.getByRole('checkbox').closest('li')!;
     expect(row.querySelector('[data-verdict="better"]')).toHaveTextContent('→ 128');
     expect(row).toHaveTextContent('90.7');
+  });
+
+  const missile = (dps: number) =>
+    ({
+      kind: 'missile',
+      dps,
+      range: 40000,
+      explosionRadius: 140,
+      explosionVelocity: 85,
+      damageReductionFactor: 0.682,
+      em: 0,
+      thermal: 0,
+      kinetic: 1,
+      explosive: 0,
+    }) as FittingStats['applied']['weapons'][number];
+  const applied = (dps: number) => ({ weapons: [missile(dps)], droneControlRange: 20000 });
+  const frigate: TargetProfile = { signatureRadius: 40, velocity: 400 };
+
+  it('labels a damage lead Applied DPS against a Target Profile, apart from Sustained DPS', () => {
+    const own = {
+      ...before,
+      applied: applied(100),
+      offense: { ...before.offense, sustainedDps: 90.7 },
+    };
+    const gain = option(11, {
+      applied: applied(150),
+      offense: { ...before.offense, sustainedDps: 128 },
+    });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      target: frigate,
+    });
+    const row = screen.getByRole('checkbox').closest('li')!;
+    const [lead, detail] = row.querySelectorAll('span.block.text-xs');
+    expect(lead).toHaveTextContent('Applied DPS');
+    expect(lead).not.toHaveTextContent('Sustained DPS');
+    expect(detail).toHaveTextContent('Sustained DPS 90.7 → 128');
+  });
+
+  it("never shows the same stat in a row's lead line and its detail line", () => {
+    const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
+    const gain = option(11, { offense: { ...before.offense, sustainedDps: 128 } });
+    renderPanel(search(done({ noDownside: [gain] }, own), own));
+    const row = screen.getByRole('checkbox').closest('li')!;
+    const [lead, detail] = row.querySelectorAll('span.block.text-xs');
+    expect(lead).toHaveTextContent('Sustained DPS');
+    expect(detail).not.toHaveTextContent('Sustained DPS');
+  });
+
+  it('leads Best overall with what changed, not DPS and EHP that stood still', () => {
+    const gain = option(11, { capacitor: { stable: true, stablePercentage: 70 } });
+    renderPanel(search(done({ noDownside: [gain] })), vi.fn(), vi.fn(), settings(), {
+      goal: 'overall',
+    });
+    const [lead] = screen
+      .getByRole('checkbox')
+      .closest('li')!
+      .querySelectorAll('span.block.text-xs');
+    expect(lead).toHaveTextContent('Capacitor');
+    expect(lead).toHaveTextContent('stable at 70%');
+    expect(lead).not.toHaveTextContent('DPS');
+    expect(lead).not.toHaveTextContent('EHP');
   });
 
   it('heads the results with the goal figure now → best found, hidden with no result', () => {
