@@ -1340,6 +1340,66 @@
       "saves": "Saves",
       "costs": "Costs"
     },
+    "improve": {
+      "menuItem": "Improve…",
+      "title": "Improve",
+      "goalLabel": "Improve Goal",
+      "goal": {
+        "overall": "Best overall",
+        "damage": "More damage",
+        "tank": "Tankier",
+        "speed": "Faster",
+        "reach": "Longer reach",
+        "cheaper": "Cheaper"
+      },
+      "unavailable": {
+        "noWeapons": "Nothing on this fit deals damage",
+        "noGunsOrLaunchers": "No guns or launchers on this fit"
+      },
+      "guardrail": {
+        "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
+        "cheaper": "Keeps damage, tank and speed each within 5%, the capacitor stable and the fit within CPU, powergrid and calibration."
+      },
+      "checking": "Checking {{checked}} of {{total}} swaps…",
+      "progressLabel": "Improve search progress",
+      "cancel": "Cancel",
+      "bestSoFar": "Show best so far",
+      "cancelled": "Search cancelled. Nothing was changed.",
+      "searchAgain": "Search again",
+      "failed": "Could not work out improvements for this Fitting.",
+      "swap_one": "{{from}} → {{to}}",
+      "swap_other": "{{count}}× {{from}} → {{to}}",
+      "givesUp": "Gives up: {{stats}}",
+      "noPrice": "No price",
+      "section": {
+        "noDownside": "No downside",
+        "tradeOffs": "Trade-offs"
+      },
+      "nothing": {
+        "overall": "No variation of a fitted module improves this fit overall.",
+        "damage": "No variation of a fitted module adds damage.",
+        "tank": "No variation of a fitted module adds tank.",
+        "speed": "No variation of a fitted module makes this fit faster.",
+        "reach": "No variation of a fitted module adds reach.",
+        "cheaper": "No variation of a fitted module saves ISK within the guardrails."
+      },
+      "closest": "Closest swaps",
+      "broke": {
+        "budget": "Goes over CPU, powergrid or calibration",
+        "capStable": "Makes the capacitor unstable",
+        "keepsStats": "Loses more than 5% of damage, tank or speed"
+      },
+      "widen": "Only variations of the modules already fitted are tried.",
+      "partial": "Best of the first {{checked}} swaps checked.",
+      "checked_one": "Checked {{count}} swap in {{seconds}} s",
+      "checked_other": "Checked {{count}} swaps in {{seconds}} s",
+      "apply": "Apply",
+      "applyCount_one": "Apply {{count}} change",
+      "applyCount_other": "Apply {{count}} changes",
+      "applied_one": "Applied {{count}} change. Not saved yet.",
+      "applied_other": "Applied {{count}} changes. Not saved yet.",
+      "undo": "Undo"
+    },
     "variations": {
       "title": "Variations",
       "swapTitle": "Swap for a variation",
