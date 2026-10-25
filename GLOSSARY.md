@@ -449,7 +449,8 @@ here — they go one per file in `docs/context/decisions/`.
   shows the Fitting at every skill level V. Distinct from a **Share Link**,
   the short, expiring kind.
 - **Foreground Poller**: Client-side interval that checks each enabled
-  Notification Event's underlying ESI data while the app is open and visible.
+  Notification Event's underlying ESI data while the app is open, including
+  while it is hidden, for as long as the browser keeps the page running.
   The fast path for an open app, not the sole guarantee of delivery —
   Scheduled Push covers timestamped events for a closed or backgrounded app.
   It suppresses its own browser notification for an occurrence the
@@ -721,7 +722,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **EVE Markup**: The formatting a mail body can carry, in the game's own tag language: bold, italic, underline, size, colour, links. What Compose sends and the reader shows, so a mail reads in the app as it does in the game. Counts toward the 10,000-character body limit, tags included. A table has no markup of its own: it is sent as pipe-separated rows and drawn as a real table by the reader.
 - **Show-info Link**: A link in a mail body that opens an in-game information window. In the reader it opens the app's own modal for a character, corporation, alliance, item, skill or ship; a system opens **Route Safety**; kinds the app has no view for are shown as styled text.
 - **Net Worth Snapshot**: One Character's wallet, asset value (at the chosen Trade Hub, PLEX excluded because the PLEX Vault is not in ESI), buy-order escrow and sell-order stock on one UTC day: numbers only, kept forever and synced as Editable Data. A day the app was not opened has no row and is never interpolated.
-- **Tab Leader**: The one open tab that runs a piece of origin-wide background work, such as the **Foreground Poller** or the background sync sweep, so several open tabs do it once, not once each. The sweep's leader is always a visible tab: with every tab hidden nobody leads. The poller's leader keeps leading while hidden, until a tab is shown (issue #5120).
+- **Tab Leader**: The one open tab that runs a piece of origin-wide background work, such as the **Foreground Poller** or the background sync sweep, so several open tabs do it once, not once each. The sweep's leader is always a visible tab: with every tab hidden nobody leads. The poller's leader keeps leading while hidden, until a tab is shown.
 - **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
 - **Tax Payment**: ISK a miner sent the corporation, credited against what they owe in a **Corp Tax Book**, oldest debt first. Usually a donation into the corporation's wallet, found automatically; an officer can record one by hand, or mark one "not tax" when it turned out to be for something else. Distinct from a **Made Payment**, which is the pilot's own record of ISK sent.
 - **Throughput** (planetary): A second budget, independent of the **Pin Budget**: whether the colony's links can carry the material flow and whether a buffer cycle fits in the Launchpad and Storage Facility. A layout can clear the Pin Budget and still stall.

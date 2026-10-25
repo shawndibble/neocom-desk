@@ -171,13 +171,16 @@ describe('createTabLeader', () => {
 });
 
 describe('createTabLeader keepWhileHidden (the poller, issue #5120)', () => {
-  it('a hidden leader keeps leading while no other tab is shown', async () => {
+  it('a hidden leader keeps leading, with no change, while no visible tab waits', async () => {
     const locks = createFakeLockManager();
     const a = makeTab(locks, 'visible', true);
     await settle();
+    const onChange = vi.fn();
+    a.leader.subscribe(onChange);
     a.hide();
     await settle();
     expect(a.leader.isLeader()).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('a tab opened hidden leads when nobody else does', async () => {
@@ -185,6 +188,16 @@ describe('createTabLeader keepWhileHidden (the poller, issue #5120)', () => {
     const a = makeTab(locks, 'hidden', true);
     await settle();
     expect(a.leader.isLeader()).toBe(true);
+  });
+
+  it('a hidden tab never queues behind the leader', async () => {
+    const locks = createFakeLockManager();
+    makeTab(locks, 'visible', true);
+    await settle();
+    const b = makeTab(locks, 'hidden', true);
+    await settle();
+    expect(b.leader.isLeader()).toBe(false);
+    expect((await locks.query()).pending).toEqual([]);
   });
 
   it('a tab being shown takes leadership over from a hidden leader', async () => {
@@ -205,34 +218,53 @@ describe('createTabLeader keepWhileHidden (the poller, issue #5120)', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
-  it('a displaced leader takes over again once the new one goes away', async () => {
+  it('a leader going hidden hands over to a visible tab it displaced', async () => {
     const locks = createFakeLockManager();
     const a = makeTab(locks, 'visible', true);
     await settle();
-    a.hide();
     const b = makeTab(locks, 'visible', true);
     await settle();
     expect(b.leader.isLeader()).toBe(true);
 
-    b.pagehide();
+    b.hide();
+    await settle();
+
+    expect(a.leader.isLeader()).toBe(true);
+    expect(b.leader.isLeader()).toBe(false);
+  });
+
+  it('a tab whose lock is stolen before its callback ran still stands', async () => {
+    const locks = createFakeLockManager();
+    const a = makeTab(locks, 'visible', true);
+    const b = makeTab(locks, 'visible', true);
+    await settle();
+    expect(b.leader.isLeader()).toBe(true);
+
+    b.hide();
     await settle();
 
     expect(a.leader.isLeader()).toBe(true);
   });
 
-  it('two shown tabs never trade the lock back and forth on their own', async () => {
+  it('shown tabs settle on one leader and stop trading the lock', async () => {
     const locks = createFakeLockManager();
     const a = makeTab(locks, 'visible', true);
     await settle();
     const b = makeTab(locks, 'visible', true);
+    await settle();
+    a.hide();
+    a.show();
+    a.show();
     await settle();
     const onChange = vi.fn();
     a.leader.subscribe(onChange);
     b.leader.subscribe(onChange);
 
     await settle();
+    await settle();
 
-    expect([a.leader.isLeader(), b.leader.isLeader()].filter(Boolean)).toHaveLength(1);
+    expect(a.leader.isLeader()).toBe(true);
+    expect(b.leader.isLeader()).toBe(false);
     expect(onChange).not.toHaveBeenCalled();
   });
 });

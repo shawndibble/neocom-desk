@@ -17,9 +17,10 @@
  *
  * The poller's leader keeps its lock while hidden (`keepWhileHidden`, issue
  * #5120), so a player who switches away for a few minutes still gets device
- * pop-ups. A hidden tab may lead if nobody else does; a tab being shown steals
- * the lock, so a visible tab always wins over a hidden — perhaps frozen — one,
- * and a displaced leader queues up again to take over once that tab goes.
+ * pop-ups. Only visible tabs queue for the lock. A tab being shown steals it,
+ * so a visible tab wins over a hidden — perhaps frozen — one; a leader going
+ * hidden hands it to a waiting visible tab and otherwise keeps it; a hidden tab
+ * takes it only when nobody holds it.
  *
  * Without Web Locks every tab is leader, permanently, and no change is ever
  * announced — so callers behave exactly as they did before election existed.
@@ -35,7 +36,10 @@ interface LocksLike {
     options: { signal?: AbortSignal; ifAvailable?: boolean; steal?: boolean },
     callback: (lock: unknown) => unknown
   ): Promise<unknown>;
+  query?(): Promise<{ pending?: { name?: string }[] }>;
 }
+
+type RequestKind = 'queue' | 'steal' | 'try';
 
 interface DocLike extends EventTarget {
   readonly visibilityState: DocumentVisibilityState;
@@ -66,12 +70,10 @@ export function createTabLeader(env: {
   const listeners = new Set<() => void>();
   let leader = false;
   let stopped = false;
-  /** Present while a request is queued or the lock is held. */
-  let pending: AbortController | null = null;
+  /** This tab's live request: queued, in flight, or holding the lock. */
+  let current: { controller: AbortController; kind: RequestKind } | null = null;
   /** Present while the lock is held: resolving it releases the lock. */
   let release: (() => void) | null = null;
-  /** The request whose lock is held — told apart from a later queued one. */
-  let holder: AbortController | null = null;
 
   function setLeader(next: boolean) {
     if (leader === next) return;
@@ -79,61 +81,96 @@ export function createTabLeader(env: {
     listeners.forEach((listener) => listener());
   }
 
-  /** `steal` only on being shown: a tab displaced by one just queues again. */
-  function acquire(steal = false) {
-    const visible = doc.visibilityState === 'visible';
-    if (stopped || holder || (!visible && !keepWhileHidden)) return;
-    if (pending) {
-      if (!(steal && keepWhileHidden && visible)) return;
-      // Queued behind a hidden leader: take it now instead.
-      const queued = pending;
-      pending = null;
-      queued.abort();
-    }
+  const isVisible = () => doc.visibilityState === 'visible';
+
+  /**
+   * `queue` waits its turn; `steal` takes the lock at once (a tab being shown,
+   * `keepWhileHidden` only); `try` takes it only if nobody holds it — the only
+   * way a hidden tab stands, so the queue holds visible tabs alone.
+   */
+  function request(kind: RequestKind) {
     const controller = new AbortController();
-    pending = controller;
-    // A steal is granted at once, and Web Locks refuse a signal alongside it.
+    const mine = { controller, kind };
+    current = mine;
+    // Web Locks refuse a signal alongside `steal` or `ifAvailable`.
     const options =
-      steal && keepWhileHidden && visible ? { steal: true } : { signal: controller.signal };
+      kind === 'steal'
+        ? { steal: true }
+        : kind === 'try'
+          ? { ifAvailable: true }
+          : { signal: controller.signal };
     locks!
-      .request(lockName, options, () => {
-        // Granted after this tab gave up on it: let the next tab have it.
-        if (pending !== controller) return;
-        if (!keepWhileHidden && doc.visibilityState !== 'visible') return;
+      .request(lockName, options, (lock) => {
+        // Taken, or granted after this tab gave up on it: let the next tab have it.
+        if (current !== mine || !lock) return;
+        if (!keepWhileHidden && !isVisible()) return;
         return new Promise<void>((resolve) => {
-          holder = controller;
           release = resolve;
           setLeader(true);
         });
       })
       .catch(() => {
-        // AbortError: dropped while queued, or stolen by a tab being shown.
-        if (holder !== controller) return;
-        holder = null;
+        // AbortError: dropped while queued, or stolen by a tab being shown —
+        // possibly before its callback ran. Either way, stand again.
+        if (current !== mine) return;
+        current = null;
         release = null;
-        pending = null;
         setLeader(false);
-        acquire();
+        stand();
       })
       .finally(() => {
-        if (pending === controller && holder !== controller) pending = null;
+        // An `ifAvailable` that found the lock taken.
+        if (current === mine && !release) current = null;
       });
   }
 
+  /** Join the election without displacing anyone. */
+  function stand() {
+    if (stopped || current) return;
+    if (isVisible()) request('queue');
+    else if (keepWhileHidden) request('try');
+  }
+
   function relinquish() {
-    const controller = pending;
-    pending = null;
-    holder = null;
-    controller?.abort();
+    const mine = current;
+    current = null;
+    mine?.controller.abort();
     const held = release;
     release = null;
     setLeader(false);
     held?.();
   }
 
+  function onShown() {
+    if (!keepWhileHidden) return stand();
+    if (release || current?.kind === 'steal') return;
+    relinquish();
+    request('steal');
+  }
+
+  async function onHidden() {
+    if (!keepWhileHidden) return relinquish();
+    if (!release) {
+      // A hidden tab never waits in the queue.
+      if (current?.kind === 'queue') relinquish();
+      return stand();
+    }
+    // Keep leading unless a visible tab is waiting: hand it over then.
+    if (!(await visibleTabWaiting()) || isVisible() || !release) return;
+    relinquish();
+    stand();
+  }
+
+  async function visibleTabWaiting(): Promise<boolean> {
+    // Only visible tabs queue, so any waiter is one. Without `query`, assume one.
+    if (!locks!.query) return true;
+    const { pending = [] } = await locks!.query().catch(() => ({ pending: undefined }));
+    return pending.some((entry) => entry.name === lockName);
+  }
+
   function onVisibilityChange() {
-    if (doc.visibilityState === 'visible') acquire(true);
-    else if (!keepWhileHidden) relinquish();
+    if (isVisible()) onShown();
+    else void onHidden();
   }
 
   function onPageShow(event: Event) {
@@ -143,7 +180,8 @@ export function createTabLeader(env: {
   doc.addEventListener('visibilitychange', onVisibilityChange);
   win.addEventListener('pagehide', relinquish);
   win.addEventListener('pageshow', onPageShow);
-  acquire(true);
+  if (isVisible()) onShown();
+  else stand();
 
   return {
     isLeader: () => leader,

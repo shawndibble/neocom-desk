@@ -9,8 +9,9 @@
  * dropping a still-queued request with an `AbortError`, `ifAvailable`
  * calling back with `null` when the lock is taken, and `steal` taking the lock
  * at once — the previous holder's `request` rejects with an `AbortError` while
- * its callback runs on, no longer holding anything. Shared mode and `query`
- * are not modelled.
+ * its callback runs on, no longer holding anything (and, as in a browser,
+ * `steal` alongside `signal` or `ifAvailable` is refused), and `query` listing
+ * the waiting requests. Shared mode and `query`'s held list are not modelled.
  */
 type Callback = (lock: { name: string; mode: 'exclusive' } | null) => unknown;
 
@@ -29,6 +30,7 @@ export interface FakeLockManager {
     options: { signal?: AbortSignal; ifAvailable?: boolean; steal?: boolean },
     callback: Callback
   ): Promise<unknown>;
+  query(): Promise<{ pending: { name: string }[] }>;
   /** Names currently held — for assertions. */
   held(): string[];
 }
@@ -91,6 +93,10 @@ export function createFakeLockManager(): FakeLockManager {
         return;
       }
       const waiter: Waiter = { callback, resolve, reject, signal };
+      if (options.steal && (signal || options.ifAvailable)) {
+        reject(new DOMException('steal cannot be combined.', 'NotSupportedError'));
+        return;
+      }
       if (options.steal) {
         const holder = holders.get(name);
         holders.delete(name);
@@ -118,6 +124,9 @@ export function createFakeLockManager(): FakeLockManager {
 
   return {
     request: request as FakeLockManager['request'],
+    query: async () => ({
+      pending: [...queues].flatMap(([name, queue]) => queue.map(() => ({ name }))),
+    }),
     held: () => [...heldNames],
   };
 }

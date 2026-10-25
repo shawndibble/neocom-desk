@@ -8,11 +8,18 @@ _Recorded 2026-10-25 · issue #5120._
   poller skipped every tick while `document.hidden` and the leader gave its lock
   up on hiding, so switching apps stopped all checks. This amends the
   2026-09-28 multi-tab decision for the poller only; the sweep is unchanged.
-- **A tab being shown steals the poller lock (Web Locks `steal`); a displaced
-  leader queues up again.** A visible tab always wins over a hidden one, which
-  the browser may have frozen while still holding the lock. Only the transition
-  to visible (and a visible boot) steals, so two shown tabs never trade the lock
-  back and forth. A hidden tab leads only when nobody else does.
+- **Only visible tabs queue for the poller lock; a tab being shown steals it
+  (Web Locks `steal`).** A visible tab wins over a hidden one, which the
+  browser may have frozen while still holding the lock. A leader going hidden
+  hands the lock to a waiting visible tab (`locks.query()`) and otherwise keeps
+  it; a hidden tab takes the lock only when nobody holds it (`ifAvailable`).
+  Only the transition to visible (and a visible boot) steals, so two shown tabs
+  never trade the lock back and forth. A hidden leader that closes leaves no
+  leader until a tab is shown — acceptable for a best-effort path.
+- **The rest of the poller election keeps its visible-only behaviour.** The Net
+  Worth Snapshot Recorder now checks visibility itself, so "only a visible
+  leader writes" (20261007-184320) still holds; the community request badge
+  already did.
 - **Best effort, not a substitute for push.** Android Chrome throttles and then
   freezes a background page within minutes, so this covers a short switch-away,
   not hours. A closed app is push's job (issues #5121, #5122).
