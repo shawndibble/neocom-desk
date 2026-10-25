@@ -10,6 +10,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import {
   ALERTS_PERMISSIONS,
   planAlertsWalk,
@@ -28,6 +30,7 @@ interface Props {
 
 export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }: Props) {
   const { t } = useTranslation();
+  // On by default: the player ticked (or left) the events and is reading the list; unchecking leaves it out of this walk (ADR 0030).
   const [include, setInclude] = useState({ location: true, mail: true });
   const key = (name: string) => `settings.notifications.alertsWhenClosed.confirm.${name}`;
   const asked = ALERTS_PERMISSIONS.filter((permission) =>
@@ -47,7 +50,7 @@ export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }
           const included = !optional || include[permission];
           return (
             <li key={permission} className="space-y-1 px-3 py-2 text-xs">
-              <label className="flex min-h-11 items-start gap-2 text-text md:min-h-0">
+              <label className={cx('flex items-start gap-2 text-text', tappableRowClassName)}>
                 {optional ? (
                   <Checkbox
                     className="mt-0.5"
@@ -83,7 +86,7 @@ export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }
       <p className="text-[0.6875rem] text-text-dim">{t(key('tokenNote'))}</p>
       <div className="flex flex-wrap justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
-          {t(key('cancel'))}
+          {t(key('back'))}
         </Button>
         <Button
           size="sm"

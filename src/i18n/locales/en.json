@@ -1402,11 +1402,7 @@
       "moreOptions_one": "{{count}} more option",
       "moreOptions_other": "{{count}} more options",
       "sortLabel": "Sort by",
-      "sort": {
-        "gain": "Biggest gain",
-        "value": "Best value",
-        "cheapest": "Cheapest"
-      },
+      "sort": { "gain": "Biggest gain", "value": "Best value", "cheapest": "Cheapest" },
       "reachLine": "Reach {{before}} → {{after}} km",
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
@@ -1450,31 +1446,20 @@
         "rework": "Only the module groups that can move this goal are tried."
       },
       "reachLabel": "Improve Reach",
-      "reach": {
-        "upgrade": "Upgrade",
-        "rebalance": "Rebalance",
-        "rework": "Rework"
-      },
+      "reach": { "upgrade": "Upgrade", "rebalance": "Rebalance", "rework": "Rework" },
       "reachHint": {
         "upgrade": "Turns a fitted module into a variation of itself.",
         "rebalance": "Also tries a different module doing the same job.",
         "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
       },
       "modeLabel": "Improve mode",
-      "mode": {
-        "buy": "Planning to buy",
-        "refit": "Refitting a ship I own"
-      },
+      "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
       "cap": {
         "buy": "Total budget (ISK)",
         "refit": "Extra spend cap (ISK)"
       },
       "defenseLabel": "Defense Choice",
-      "defense": {
-        "keep": "Keep as is",
-        "shield": "Shield",
-        "armor": "Armor"
-      },
+      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
       "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
@@ -1506,11 +1491,7 @@
         "ehp": "EHP {{before}} → {{after}}",
         "checking": "Checking the ticked changes together…",
         "failed": "Couldn't check the ticked changes together. They may not fit together.",
-        "resource": {
-          "cpu": "CPU",
-          "powergrid": "powergrid",
-          "calibration": "calibration"
-        },
+        "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
         "problem": {
           "over": "Together these over-run the {{resource}}.",
           "capStable": "Together these leave the capacitor unstable.",
@@ -13169,7 +13150,7 @@
             "leftOut": "Left out: new mail only alerts while the app is open. Untick New mail's Device box to stop being asked."
           },
           "tokenNote": "We keep an encrypted token on our server for each Character, holding only these permissions. It never reaches this device, and Turn off deletes it.",
-          "cancel": "Back",
+          "back": "Back",
           "continue": "Continue to EVE"
         }
       },
