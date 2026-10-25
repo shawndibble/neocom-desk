@@ -85,11 +85,23 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   return { rows, pricedOres, unpricedOres, toneIndex };
 }
 
+/** One scan interval's pace split by ore. */
+export interface PaceInterval {
+  from: number;
+  to: number;
+  /** m³/s over the interval: the sum of `rates`. */
+  total: number;
+  /** m³/s per active ore; 0 when nobody mined it. */
+  rates: Record<string, number>;
+}
+
 export interface PaceByOreSeries {
+  /** One entry per interval, for tables. */
+  intervals: PaceInterval[];
   /**
-   * Step rows for a `stepAfter` stack: one per interval at its start, then the last interval's
-   * values again at its end so the final block closes. Each ore key is its m³/s over the interval
-   * (0 when nobody mined it) and `total` is their sum, which is the interval's `rate`.
+   * Plot rows for a stacked area: two per interval, at its start and 1 ms before its end, so
+   * the nearest-row hover reads the interval under the cursor. Each carries `from`/`to`, `total`
+   * and one key per active ore (m³/s).
    */
   rows: SurveySeriesRow[];
   /** Ores mined in at least one interval, in `oreNames` order. */
@@ -111,19 +123,22 @@ export function paceByOreSeries(summary: SurveySummary): PaceByOreSeries {
   for (const i of summary.intervals) for (const ore of Object.keys(i.minedByOre)) mined.add(ore);
   const activeOres = summary.oreNames.filter((o) => mined.has(o));
 
-  const rows: SurveySeriesRow[] = summary.intervals.map((i) => {
+  const intervals: PaceInterval[] = summary.intervals.map((i) => {
     const seconds = (i.to - i.from) / 1000;
-    const row: SurveySeriesRow = { at: i.from, total: 0 };
+    const rates: Record<string, number> = {};
     let total = 0;
     for (const ore of activeOres) {
-      const rate = (i.minedByOre[ore] ?? 0) / seconds;
-      row[ore] = rate;
-      total += rate;
+      rates[ore] = (i.minedByOre[ore] ?? 0) / seconds;
+      total += rates[ore];
     }
-    row.total = total;
-    return row;
+    return { from: i.from, to: i.to, total, rates };
   });
-  const last = summary.intervals[summary.intervals.length - 1];
-  if (last !== undefined) rows.push({ ...rows[rows.length - 1], at: last.to });
-  return { rows, activeOres, toneIndex };
+  const rows = intervals.flatMap((i) => {
+    const row = { from: i.from, to: i.to, total: i.total, ...i.rates };
+    return [
+      { ...row, at: i.from },
+      { ...row, at: i.to - 1 },
+    ];
+  });
+  return { intervals, rows, activeOres, toneIndex };
 }

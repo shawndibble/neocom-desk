@@ -334,7 +334,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
 
 /**
  * The pace panel's "By ore" view: the stepped bars of m³/s per scan interval,
- * each stacked by ore in the legend's order and colours, so a slice's height is
+ * each stacked by ore in the legend's colours, the first (most valuable) ore at the bottom, so a slice's height is
  * that ore's rate and the stack is the total pace. A surface-coloured 2px line on
  * each slice's top edge leaves the gap between slices. The caller wraps it in its
  * figure and table; only the plot is here.
@@ -343,29 +343,22 @@ export function PaceByOreChart({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
   const { rows, activeOres, toneIndex } = useMemo(() => paceByOreSeries(summary), [summary]);
   const { xAxis } = timeAxis(summary);
-  // Each interval is two rows, at its start and 1 ms before its end: the tooltip reads the
-  // nearest row, so hovering anywhere in a block reads that block, not the next one's start.
-  const plotRows = useMemo(
-    () => summary.intervals.flatMap((i, k) => [rows[k], { ...rows[k], at: i.to - 1 }]),
-    [rows, summary.intervals]
-  );
 
   function Tip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as SurveySeriesRow | undefined;
     if (!active || !row) return null;
-    const interval = summary.intervals.find((i) => row.at >= i.from && row.at <= i.to);
-    if (interval === undefined) return null;
     const slices = activeOres
       .map((ore) => ({ ore, rate: row[ore] ?? 0 }))
       .filter((s) => s.rate > 0)
       .sort((a, b) => b.rate - a.rate);
+    if (row.from === undefined || row.to === undefined) return null;
     return (
       <ChartTooltipShell>
         <div className="min-w-48 space-y-1 text-xs">
           <div className="font-semibold text-text">
             {t('survey.paceRange', {
-              from: formatEveClock(interval.from),
-              to: formatEveClock(interval.to),
+              from: formatEveClock(row.from),
+              to: formatEveClock(row.to),
             })}
           </div>
           <div className="flex justify-between gap-4 text-text">
@@ -390,7 +383,7 @@ export function PaceByOreChart({ summary }: { summary: SurveySummary }) {
 
   return (
     <ResponsiveContainer>
-      <ComposedChart key={activeOres.join('|')} data={plotRows} margin={{ ...MARGIN, top: 20 }}>
+      <ComposedChart key={activeOres.join('|')} data={rows} margin={{ ...MARGIN, top: 20 }}>
         <CartesianGrid stroke="var(--color-line)" vertical={false} />
         {xAxis(false)}
         {yAxis({
@@ -402,7 +395,7 @@ export function PaceByOreChart({ summary }: { summary: SurveySummary }) {
             fontSize: '0.625rem',
           },
         })}
-        {/* Registered in oreNames order, so the most valuable ore is the bottom slice, as in the legend. */}
+        {/* Unlike the volume and ISK charts, the first (most valuable) ore is the BOTTOM slice: it is mined first, so it anchors the baseline. */}
         {activeOres.map((ore) => (
           <Area
             key={ore}
@@ -417,9 +410,6 @@ export function PaceByOreChart({ summary }: { summary: SurveySummary }) {
             isAnimationActive={false}
           />
         ))}
-        {summary.pace !== null && (
-          <ReferenceLine y={summary.pace} stroke="var(--color-text)" strokeDasharray="5 4" />
-        )}
         <Tooltip content={Tip} isAnimationActive={false} />
       </ComposedChart>
     </ResponsiveContainer>

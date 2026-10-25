@@ -28,7 +28,11 @@ import { DataTable, SegmentedControl, type DataTableColumn } from '@/components/
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
-import type { SurveyChartView } from '@/engine/survey/chartViews';
+import {
+  paceByOreSeries,
+  type PaceInterval,
+  type SurveyChartView,
+} from '@/engine/survey/chartViews';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import {
   FULL_HEIGHT,
@@ -186,21 +190,20 @@ export function SurveyCharts({
     ],
     [t]
   );
-  const rateByOreColumns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
-    () => [
-      ...rateColumns.slice(0, 2),
-      { ...rateColumns[2], header: t('survey.chartTotal') },
-      ...summary.oreNames
-        .filter((ore) => summary.intervals.some((i) => ore in i.minedByOre))
-        .map((ore) => ({
-          id: `ore:${ore}`,
-          header: ore,
-          render: (i: SurveySummary['intervals'][number]) =>
-            `${formatCount((i.minedByOre[ore] ?? 0) / ((i.to - i.from) / 1000))} m³/s`,
-        })),
-    ],
-    [rateColumns, summary.oreNames, summary.intervals, t]
-  );
+  const paceByOre = useMemo(() => paceByOreSeries(summary), [summary]);
+  const rateByOreColumns = useMemo<DataTableColumn<PaceInterval>[]>(() => {
+    const unit = (rate: number) => t('survey.paceUnit', { rate: formatCount(rate) });
+    return [
+      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
+      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
+      { id: 'total', header: t('survey.chartTotal'), render: (i) => unit(i.total) },
+      ...paceByOre.activeOres.map((ore) => ({
+        id: `ore:${ore}`,
+        header: ore,
+        render: (i: PaceInterval) => unit(i.rates[ore] ?? 0),
+      })),
+    ];
+  }, [paceByOre.activeOres, t]);
 
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as VolumeRow | undefined;
@@ -425,13 +428,23 @@ export function SurveyCharts({
           </div>
           <figcaption className="sr-only">{rateLabel}</figcaption>
           <div className="sr-only">
-            <DataTable
-              columns={paceView === 'ore' ? rateByOreColumns : rateColumns}
-              responsive="table"
-              rows={summary.intervals}
-              rowKey={(i) => i.from}
-              label={rateLabel}
-            />
+            {paceView === 'ore' ? (
+              <DataTable
+                columns={rateByOreColumns}
+                responsive="table"
+                rows={paceByOre.intervals}
+                rowKey={(i) => i.from}
+                label={rateLabel}
+              />
+            ) : (
+              <DataTable
+                columns={rateColumns}
+                responsive="table"
+                rows={summary.intervals}
+                rowKey={(i) => i.from}
+                label={rateLabel}
+              />
+            )}
           </div>
         </figure>
       )}

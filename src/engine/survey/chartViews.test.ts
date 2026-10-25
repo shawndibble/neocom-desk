@@ -135,30 +135,39 @@ describe('iskSeries', () => {
 describe('paceByOreSeries', () => {
   it('is empty before a second scan', () => {
     const s = summarizeSurvey([scan(0, ['A', 100])])!;
-    expect(paceByOreSeries(s)).toEqual({ rows: [], activeOres: [], toneIndex: { A: 0 } });
+    expect(paceByOreSeries(s)).toEqual({
+      intervals: [],
+      rows: [],
+      activeOres: [],
+      toneIndex: { A: 0 },
+    });
   });
 
-  it('gives each interval a step per ore in m3/s that sums to the total pace', () => {
+  it('gives each interval a rate per ore in m3/s that sums to the total pace', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 1000], ['B', 500]),
       scan(5, ['A', 700], ['B', 400]), // 300 s: A 1, B 1/3
       scan(15, ['A', 700], ['B', 100]), // 600 s: B 0.5
     ])!;
-    const { rows, activeOres, toneIndex } = paceByOreSeries(s);
+    const { intervals, activeOres, toneIndex } = paceByOreSeries(s);
     expect(activeOres).toEqual(['A', 'B']);
     expect(toneIndex).toEqual({ A: 0, B: 1 });
-    expect(rows).toHaveLength(3);
-    expect(rows[0].at).toBe(T0);
-    expect(rows[0].A).toBeCloseTo(1);
-    expect(rows[0].B).toBeCloseTo(1 / 3);
-    expect(rows[0].total).toBeCloseTo(4 / 3);
+    expect(intervals).toHaveLength(2);
+    expect(intervals[0].rates.A).toBeCloseTo(1);
+    expect(intervals[0].rates.B).toBeCloseTo(1 / 3);
+    expect(intervals[0].total).toBeCloseTo(4 / 3);
     // an ore not being mined adds zero height
-    expect(rows[1].A).toBe(0);
-    expect(rows[1].B).toBeCloseTo(0.5);
-    expect(rows[1].total).toBeCloseTo(0.5);
-    // closing row repeats the last step at the last scan
-    expect(rows[2].at).toBe(T0 + 15 * MIN);
-    expect(rows[2].B).toBeCloseTo(0.5);
+    expect(intervals[1].rates.A).toBe(0);
+    expect(intervals[1].rates.B).toBeCloseTo(0.5);
+    expect(intervals[1].total).toBeCloseTo(0.5);
+  });
+
+  it('steps each interval into a start row and a row 1 ms before its end', () => {
+    const s = summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', 700]), scan(15, ['A', 100])])!;
+    const { rows } = paceByOreSeries(s);
+    expect(rows.map((r) => r.at)).toEqual([T0, T0 + 5 * MIN - 1, T0 + 5 * MIN, T0 + 15 * MIN - 1]);
+    expect(rows[1]).toMatchObject({ from: T0, to: T0 + 5 * MIN, A: 1, total: 1 });
+    expect(rows[2]).toMatchObject({ from: T0 + 5 * MIN, to: T0 + 15 * MIN, A: 1, total: 1 });
   });
 
   it('keeps the colour index of the full ore list and drops ores never mined', () => {
