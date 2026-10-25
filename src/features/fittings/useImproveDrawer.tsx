@@ -165,6 +165,8 @@ export function useImproveDrawer({
       search={search}
       catalogue={catalogue}
       onApply={apply}
+      fitting={fitting}
+      target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
       onFixFirst={(resource) => {
@@ -230,7 +232,7 @@ export function useImproveDrawer({
           {body}
         </Modal>
       ) : (
-        <SlideOver open={isOpen} onClose={close} title={t('fittings.improve.title')}>
+        <SlideOver open={isOpen} onClose={close} side="left" title={t('fittings.improve.title')}>
           {body}
         </SlideOver>
       )}
