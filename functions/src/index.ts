@@ -15,6 +15,11 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { firestore } from './firestore.js';
+import {
+  installBookWriteTracking,
+  stampBook,
+  withBookVersions,
+} from './corpTaxBookVersionTracking.js';
 import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js';
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
 import { openPricesR2Key } from './r2DailySnapshots.js';
@@ -249,6 +254,11 @@ import {
 } from './mutamarket.js';
 
 initializeApp();
+// Every write under `corps/{id}` restamps that book's version marker (issue #5047). Each
+// entry point that can reach a book runs inside `bookVersioned`, which does the stamping.
+installBookWriteTracking();
+const bookVersioned = <T>(handler: () => T | Promise<T>): Promise<T> =>
+  withBookVersions((id, touched) => stampBook(firestore(), id, touched), handler, logError);
 
 // Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
 // loudly instead of silently accepting any EVE app's tokens per request.
@@ -397,7 +407,7 @@ alertsAction('deleteAlertGrant', async (request) => {
 // The device and Alerts Grant router (see callableRouter.ts). Clients call this. The secret is only used by the grant actions.
 export const alertsCall = onCall<unknown>(
   { maxInstances: 10, secrets: [ALERTS_TOKEN_KEY] },
-  alertsActions.route
+  (request) => bookVersioned(() => alertsActions.route(request))
 );
 
 /**
@@ -466,7 +476,9 @@ const communityActions = createActionGroup();
 const communityAction = (name: CallableAction<'community'>, handler: CallableHandler): void => {
   communityActions.register(name, handler);
 };
-export const communityCall = onCall<unknown>({ maxInstances: 10 }, communityActions.route);
+export const communityCall = onCall<unknown>({ maxInstances: 10 }, (request) =>
+  bookVersioned(() => communityActions.route(request))
+);
 
 communityAction('createCommunityCallable', (request) =>
   createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
@@ -826,10 +838,11 @@ corpTaxBookAction('forceCorpTaxBookRemovalCallable', (request) =>
 /** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
 export const finalizeCorpTaxBookRemovals = onSchedule(
   { schedule: 'every 1 hours', secrets: FEEDER_VIEW_SECRETS, maxInstances: 1 },
-  async () => {
-    const summary = await finalizeDueRemovals(corpSyncDeps());
-    logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
-  }
+  () =>
+    bookVersioned(async () => {
+      const summary = await finalizeDueRemovals(corpSyncDeps());
+      logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
+    })
 );
 
 // Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
@@ -872,10 +885,11 @@ export const syncCorpTaxBooks = onSchedule(
     timeoutSeconds: 540,
     maxInstances: 1,
   },
-  async () => {
-    const summary = await runScheduledCorpSyncs(corpSyncDeps(), esiSyncReader());
-    logInfo('syncCorpTaxBooks finished', { ...summary });
-  }
+  () =>
+    bookVersioned(async () => {
+      const summary = await runScheduledCorpSyncs(corpSyncDeps(), esiSyncReader());
+      logInfo('syncCorpTaxBooks finished', { ...summary });
+    })
 );
 
 corpTaxBookAction('verifyCorpOfficerCallable', (request) =>
@@ -1086,7 +1100,7 @@ corpTaxBookAction('stopCorpTaxBookRemindersCallable', (request) => {
 // small transactions). Clients call this.
 export const corpTaxBookCall = onCall<unknown>(
   { maxInstances: 10, secrets: FEEDER_VIEW_SECRETS, timeoutSeconds: 120 },
-  corpTaxBookActions.route
+  (request) => bookVersioned(() => corpTaxBookActions.route(request))
 );
 
 /**
@@ -1130,7 +1144,8 @@ export const dailyHousekeeping = onSchedule(
         },
         {
           name: 'purgeStaleAccounts',
-          run: () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps }),
+          // Removing a purged account's sync grant writes its book's status (issue #5047).
+          run: () => bookVersioned(() => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps })),
         },
         {
           name: 'sweepCommunityRequests',

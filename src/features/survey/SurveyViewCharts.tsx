@@ -25,16 +25,17 @@ import {
 } from 'recharts';
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
-import { formatEveClock } from '@/engine/survey/chatMessage';
+import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import {
   depletionSeries,
   iskSeries,
+  paceAxisMax,
   type PaceByOreSeries,
   type SurveySeriesRow,
 } from '@/engine/survey/chartViews';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { FULL_HEIGHT, MARGIN, makeScanDot, timeAxis, yAxis } from './surveyChartParts';
+import { FULL_HEIGHT, MARGIN, formatPace, makeScanDot, timeAxis, yAxis } from './surveyChartParts';
 import { oreTone } from './surveyTones';
 import { formatCount } from '@/lib/formatCount';
 
@@ -332,12 +333,38 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
+/** What Recharts hands a pace line's dot. */
+interface PaceDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: SurveySeriesRow;
+}
+
+/** Dots only on an interval's middle row: a lone interval between idle ones is still visible. */
+function makePaceDot(tone: string) {
+  return function PaceDot({ cx, cy, payload }: PaceDotProps): ReactElement<SVGElement> {
+    if (payload?.mid === undefined || typeof cx !== 'number' || typeof cy !== 'number') {
+      return <g key={`none-${payload?.at ?? 'x'}`} />;
+    }
+    return (
+      <circle
+        key={payload.at}
+        cx={cx}
+        cy={cy}
+        r={3}
+        fill={tone}
+        stroke="var(--color-panel)"
+        strokeWidth={2}
+      />
+    );
+  };
+}
+
 /**
- * The pace panel's "By ore" view: the stepped bars of m³/s per scan interval,
- * each stacked by ore in the legend's colours, the first (most valuable) ore at the bottom, so a slice's height is
- * that ore's rate and the stack is the total pace. A surface-coloured 2px line on
- * each slice's top edge leaves the gap between slices. The caller wraps it in its
- * figure and table; only the plot is here.
+ * The Depletion view's pace chart: one line per ore in the legend's colours, each interval a flat
+ * step at the percent of that ore's starting total mined during it. An ore not mined in an
+ * interval has no value there, so its line breaks instead of resting on the baseline. The caller
+ * wraps it in its figure and table; only the plot is here.
  */
 export function PaceByOreChart({
   summary,
@@ -347,17 +374,16 @@ export function PaceByOreChart({
   pace: PaceByOreSeries;
 }) {
   const { t } = useTranslation();
-  const { rows, activeOres, toneIndex } = pace;
+  const { rows, activeOres, toneIndex, maxPercent } = pace;
   const { xAxis } = timeAxis(summary);
 
   function Tip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as SurveySeriesRow | undefined;
-    if (!active || !row) return null;
+    if (!active || !row || row.from === undefined || row.to === undefined) return null;
     const slices = activeOres
-      .map((ore) => ({ ore, rate: row[ore] ?? 0 }))
-      .filter((s) => s.rate > 0)
-      .sort((a, b) => b.rate - a.rate);
-    if (row.from === undefined || row.to === undefined) return null;
+      .map((ore) => ({ ore, percent: row[ore] }))
+      .filter((s): s is { ore: string; percent: number } => s.percent !== undefined)
+      .sort((a, b) => b.percent - a.percent);
     return (
       <ChartTooltipShell>
         <div className="min-w-48 space-y-1 text-xs">
@@ -367,17 +393,16 @@ export function PaceByOreChart({
               to: formatEveClock(row.to),
             })}
           </div>
-          <div className="flex justify-between gap-4 text-text">
-            <span>{t('survey.chartTotal')}</span>
-            <span>{t('survey.paceUnit', { rate: formatCount(row.total ?? 0) })}</span>
+          <div className="text-text-dim">
+            {t('survey.paceLength', { length: formatDuration(row.to - row.from) })}
           </div>
           <div className="space-y-0.5 border-t border-line pt-1">
-            {slices.map(({ ore, rate }) => (
+            {slices.map(({ ore, percent }) => (
               <div key={ore} className="flex items-center gap-2">
                 <Swatch tone={oreTone(toneIndex[ore])} />
                 <span className="min-w-0 flex-1 truncate">{ore}</span>
                 <span className="text-text">
-                  {t('survey.paceUnit', { rate: formatCount(rate) })}
+                  {t('survey.pacePercentOf', { percent: formatPace(percent), ore })}
                 </span>
               </div>
             ))}
@@ -393,27 +418,28 @@ export function PaceByOreChart({
         <CartesianGrid stroke="var(--color-line)" vertical={false} />
         {xAxis(false)}
         {yAxis({
+          domain: [0, paceAxisMax(maxPercent)],
           label: {
-            value: t('survey.chartRateAxis'),
+            value: t('survey.paceAxis'),
             position: 'insideTopLeft',
             offset: 8,
             fill: 'var(--color-text-dim)',
             fontSize: '0.625rem',
           },
         })}
-        {/* Unlike the volume and ISK charts, the first (most valuable) ore is the BOTTOM slice: it is mined first, so it anchors the baseline. */}
         {activeOres.map((ore) => (
-          <Area
+          <Line
             key={ore}
-            type="stepAfter"
+            type="linear"
             dataKey={ore}
             name={ore}
-            stackId="pace"
-            stroke="var(--color-panel)"
-            strokeWidth={2}
-            fill={oreTone(toneIndex[ore])}
-            fillOpacity={1}
+            stroke={oreTone(toneIndex[ore])}
+            strokeWidth={1.5}
+            connectNulls={false}
+            dot={makePaceDot(oreTone(toneIndex[ore]))}
+            activeDot={false}
             isAnimationActive={false}
+            legendType="none"
           />
         ))}
         <Tooltip content={Tip} isAnimationActive={false} />

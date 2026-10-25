@@ -14,7 +14,7 @@ import { communityOfferToSearchRow, type BpcSearchRow } from '@/engine/contracts
 import {
   loadCommunityMembers,
   loadMemberLibraries,
-  loadMyCommunities,
+  loadMyCommunitiesCached,
 } from '@/features/communities/communityStore';
 import { loadSolarSystemsByName } from '@/sde/solarSystems';
 import { uidForCharacter } from '@/sync/uid';
@@ -22,7 +22,7 @@ import { uidForCharacter } from '@/sync/uid';
 const NONE: readonly BpcSearchRow[] = [];
 
 async function loadCommunityOfferRows(characterId: number): Promise<readonly BpcSearchRow[]> {
-  const communities = await loadMyCommunities(characterId);
+  const communities = await loadMyCommunitiesCached(characterId);
   const sources: CommunityOfferSource[] = await Promise.all(
     communities.map(async (community) => {
       try {

@@ -12,6 +12,8 @@ const fire = vi.hoisted(() => ({
   wheres: [] as unknown[][],
   /** Runs before each retry's read, as another device's write would. */
   beforeRetry: null as null | (() => void),
+  /** The next getDocs fails as a query whose index is not deployed does. */
+  missingIndex: false,
 }));
 
 vi.mock('firebase/firestore/lite', () => ({
@@ -24,6 +26,10 @@ vi.mock('firebase/firestore/lite', () => ({
   query: (q: unknown) => q,
   doc: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   getDocs: async () => {
+    if (fire.missingIndex) {
+      fire.missingIndex = false;
+      throw Object.assign(new Error('needs an index'), { code: 'failed-precondition' });
+    }
     fire.reads.push(`read as ${session.current}`);
     return {
       docs: fire.docs.map((d) => ({ id: d.id, data: () => d.data, ref: {} })),
@@ -77,7 +83,13 @@ vi.mock('@/db', () => ({
   db: { characters: { get: async () => ({ characterId: 1, ownerHash: 'owner-1' }) } },
 }));
 
-import { loadMyRequests, loadPledges, loadRequests, updateMyPledge } from './requestStore';
+import {
+  loadMyRequests,
+  loadPledges,
+  loadRequests,
+  loadRequestsSince,
+  updateMyPledge,
+} from './requestStore';
 
 const entry = (over: Partial<PledgeEntry> = {}): PledgeEntry => ({
   quantity: 100,
@@ -214,6 +226,32 @@ describe('reading malformed documents', () => {
       0: { quantity: 10, delivered: 0, contractIds: [] },
       3: { quantity: 20, delivered: 5, contractIds: [1, 2] },
     });
+  });
+});
+
+describe('loadRequestsSince', () => {
+  const doc = (id: string, createdAt: number) => ({
+    id,
+    data: {
+      ownerUid: 'char:2',
+      createdAt,
+      lines: [{ typeId: 34, name: 'Tritanium', quantity: 5 }],
+    },
+  });
+
+  it('asks only for Requests posted after the given time', async () => {
+    fire.wheres.length = 0;
+    fire.docs = [doc('new', 20)];
+    const found = await loadRequestsSince(1, 'c1', 10);
+    expect(fire.wheres).toEqual([['createdAt', '>', 10]]);
+    expect(found.map((r) => r.id)).toEqual(['new']);
+  });
+
+  it('reads the whole board and filters it while the index is missing', async () => {
+    fire.docs = [doc('old', 5), doc('new', 20)];
+    fire.missingIndex = true;
+    const found = await loadRequestsSince(1, 'c1', 10);
+    expect(found.map((r) => r.id)).toEqual(['new']);
   });
 });
 

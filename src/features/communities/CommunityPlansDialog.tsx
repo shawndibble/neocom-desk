@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
-import { loadCommunityMembers, loadMyCommunities } from './communityStore';
+import { loadCommunityMembers, withMyCommunities } from './communityStore';
 import { loadCommunityPlans } from './sharedPlans';
 import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
 
@@ -32,33 +32,34 @@ export function CommunityPlansDialog({
     let cancelled = false;
     (async () => {
       try {
-        const communities = await loadMyCommunities(characterId);
-        const rows = (
-          await Promise.all(
-            communities.map(async (community) => {
-              const [plans, members] = await Promise.all([
-                loadCommunityPlans(characterId, community.id),
-                loadCommunityMembers(characterId, community.id),
-              ]);
-              const names = new Map(members.map((member) => [member.uid, member.characterName]));
-              return plans.map((plan): SharedPlanRow => {
-                const sharerName =
-                  names.get(plan.ownerUid) ?? t('communities.plansDialog.formerMember');
-                return {
-                  key: `${plan.communityId}:${plan.id}`,
-                  name: plan.name,
-                  sharerName,
-                  detail: t('communities.plansDialog.detail', {
-                    name: sharerName,
-                    community: community.name,
-                    count: plan.entries.length,
-                  }),
-                  entries: plan.entries,
-                };
-              });
-            })
-          )
-        ).flat();
+        const rows = await withMyCommunities(characterId, async (communities) =>
+          (
+            await Promise.all(
+              communities.map(async (community) => {
+                const [plans, members] = await Promise.all([
+                  loadCommunityPlans(characterId, community.id),
+                  loadCommunityMembers(characterId, community.id),
+                ]);
+                const names = new Map(members.map((member) => [member.uid, member.characterName]));
+                return plans.map((plan): SharedPlanRow => {
+                  const sharerName =
+                    names.get(plan.ownerUid) ?? t('communities.plansDialog.formerMember');
+                  return {
+                    key: `${plan.communityId}:${plan.id}`,
+                    name: plan.name,
+                    sharerName,
+                    detail: t('communities.plansDialog.detail', {
+                      name: sharerName,
+                      community: community.name,
+                      count: plan.entries.length,
+                    }),
+                    entries: plan.entries,
+                  };
+                });
+              })
+            )
+          ).flat()
+        );
         if (!cancelled) setState({ status: 'ready', rows });
       } catch {
         if (!cancelled) setState({ status: 'failed' });

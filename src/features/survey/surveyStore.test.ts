@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addSurveyScan,
   finishSurvey,
+  forgetSurveyCache,
   loadSurvey,
+  loadSurveyCached,
+  SURVEY_DETAILS_TTL_MS,
   MAX_LOCATION_NAME,
   MAX_SCAN_BY,
   MAX_SCAN_TEXT,
@@ -37,7 +40,15 @@ const { addDoc, updateDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.h
 vi.mock('firebase/firestore/lite', () => ({
   addDoc,
   updateDoc,
-  getDocs,
+  // Real docs always carry an id, which the merge keys on; most fixtures here leave it off.
+  getDocs: async (ref: unknown) => {
+    const snapshot = (await getDocs(ref)) as { docs: { id?: string }[] };
+    return { docs: snapshot.docs.map((d, i) => ({ id: `doc${i}`, ...d })) };
+  },
+  query: (ref: { path: string }, ...constraints: unknown[]) => ({ path: ref.path, constraints }),
+  where: (field: string, op: string, value: unknown) => ({ where: [field, op, value] }),
+  orderBy: (field: string, dir = 'asc') => ({ orderBy: [field, dir] }),
+  limit: (n: number) => ({ limit: n }),
   doc: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   collection: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   serverTimestamp: () => 'SERVER_TIME',
@@ -59,6 +70,7 @@ beforeEach(() => {
   getDocs.mockReset();
   loadShare.mockReset();
   saveShare.mockReset();
+  forgetSurveyCache();
 });
 
 describe('startSurvey', () => {
@@ -147,8 +159,16 @@ describe('loadSurvey', () => {
       info: null,
       ignored: new Set(),
       scans: [
-        { at: 1000, rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }] },
-        { at: 2000, rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }] },
+        {
+          id: 'doc1',
+          at: 1000,
+          rocks: [{ ore: 'Veldspar', units: 10, volume: 5, isk: 1, distanceM: 20_000 }],
+        },
+        {
+          id: 'doc0',
+          at: 2000,
+          rocks: [{ ore: 'Veldspar', units: 10, volume: 4, isk: 1, distanceM: 20_000 }],
+        },
       ],
     });
   });
@@ -499,7 +519,7 @@ describe('finishing a survey', () => {
       ],
     });
     const result = await loadSurvey('abc123XYZ');
-    expect(result.ok && result.scans[1]).toEqual({ at: 2000, rocks: [], by: 'Shawn' });
+    expect(result.ok && result.scans[1]).toEqual({ id: 'doc1', at: 2000, rocks: [], by: 'Shawn' });
   });
 
   it('still skips an empty scan that is not marked cleared', async () => {
@@ -528,5 +548,206 @@ describe('setSurveyOwner', () => {
   it('refuses an empty name', async () => {
     await expect(setSurveyOwner({ id: 'abc123XYZ', owner: '  ' })).rejects.toThrow();
     expect(updateDoc).not.toHaveBeenCalled();
+  });
+});
+
+describe('polling a survey', () => {
+  const NOW = Date.UTC(2026, 9, 10, 12);
+  const LIVE = NOW + 3 * 86_400_000;
+  type Ref = { path: string; constraints?: unknown[] };
+  type Stamp = InstanceType<typeof FakeTimestamp>;
+  type Row = { id: string; data: () => Record<string, unknown> };
+  const scanDoc = (id: string, at: number) => ({
+    id,
+    data: () => ({ text: ROW(10, 5), createdAt: FakeTimestamp.fromMillis(at) }),
+  });
+  const ignoreDoc = (id: string, scanId: string, ignored: boolean, at: number) => ({
+    id,
+    data: () => ({ scanId, ignored, createdAt: FakeTimestamp.fromMillis(at) }),
+  });
+  /** Serves each subcollection's docs, honouring the `>=` cursor and `limit` the store sends. */
+  function serve(store: Record<string, Row[]>) {
+    getDocs.mockImplementation(async (ref: Ref) => {
+      const name = ref.path.split('/').pop()!;
+      let rows = store[name] ?? [];
+      for (const c of ref.constraints ?? []) {
+        const w = (c as { where?: [string, string, Stamp] }).where;
+        if (w) rows = rows.filter((r) => (r.data().createdAt as Stamp).millis >= w[2].millis);
+        if ((c as { orderBy?: unknown }).orderBy) {
+          rows = [...rows].sort(
+            (a, b) => (b.data().createdAt as Stamp).millis - (a.data().createdAt as Stamp).millis
+          );
+        }
+        const n = (c as { limit?: number }).limit;
+        if (n !== undefined) rows = rows.slice(0, n);
+      }
+      return { docs: rows };
+    });
+  }
+  const calls = () => getDocs.mock.calls.map(([ref]) => ref as Ref);
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    loadShare.mockResolvedValue({
+      ok: true,
+      share: { type: 'survey', payload: { v: 1, owner: 'Ann' }, expiresAt: LIVE },
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('asks only for scans since the newest one seen, and merges what is new', async () => {
+    const store = { surveyScans: [scanDoc('s1', 1000)] };
+    serve(store);
+    await loadSurvey('abc123XYZ');
+    store.surveyScans.push(scanDoc('s2', 2000));
+    getDocs.mockClear();
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.scans.map((s) => s.id)).toEqual(['s1', 's2']);
+    const scansRef = calls().find((ref) => ref.path.endsWith('surveyScans'))!;
+    expect(scansRef.constraints).toEqual([
+      { where: ['createdAt', '>=', FakeTimestamp.fromMillis(1000)] },
+    ]);
+  });
+
+  it('costs two queries when nothing is new, re-reading no share doc, tax or info', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    await loadSurvey('abc123XYZ');
+    getDocs.mockClear();
+    vi.setSystemTime(NOW + 30_000);
+    const result = await loadSurvey('abc123XYZ');
+    expect(result).toMatchObject({ ok: true, owner: 'Ann', expiresAt: LIVE });
+    expect(loadShare).toHaveBeenCalledTimes(1);
+    expect(
+      calls()
+        .map((ref) => ref.path.split('/').pop())
+        .sort()
+    ).toEqual(['surveyIgnores', 'surveyScans']);
+  });
+
+  it('takes an ignore or restore that arrives in a later poll', async () => {
+    const store = {
+      surveyScans: [scanDoc('s1', 1000), scanDoc('s2', 1500)],
+      surveyIgnores: [ignoreDoc('i1', 's1', true, 2000)],
+    };
+    serve(store);
+    const first = await loadSurvey('abc123XYZ');
+    expect(first.ok && [...first.ignored]).toEqual(['s1']);
+    store.surveyIgnores.push(ignoreDoc('i2', 's1', false, 3000), ignoreDoc('i3', 's2', true, 3000));
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && [...result.ignored]).toEqual(['s2']);
+  });
+
+  it('reads the newest tax and info alone', async () => {
+    serve({
+      surveyTax: [
+        { id: 't1', data: () => ({ name: 'Old', pct: 5, createdAt: FakeTimestamp.fromMillis(1) }) },
+        { id: 't2', data: () => ({ name: 'New', pct: 9, createdAt: FakeTimestamp.fromMillis(2) }) },
+      ],
+    });
+    const result = await loadSurvey('abc123XYZ');
+    expect(result).toMatchObject({ tax: { name: 'New', pct: 9 } });
+    const taxRef = calls().find((ref) => ref.path.endsWith('surveyTax'))!;
+    expect(taxRef.constraints).toEqual([{ orderBy: ['createdAt', 'desc'] }, { limit: 1 }]);
+    const infoRef = calls().find((ref) => ref.path.endsWith('surveyInfo'))!;
+    expect(infoRef.constraints).toEqual([{ orderBy: ['createdAt', 'desc'] }, { limit: 1 }]);
+  });
+
+  it('re-reads the share doc, tax and info once they are due', async () => {
+    const store = { surveyTax: [] as Row[] };
+    serve(store);
+    await loadSurvey('abc123XYZ');
+    store.surveyTax.push({
+      id: 't1',
+      data: () => ({ name: 'Moon Corp', pct: 8, createdAt: FakeTimestamp.fromMillis(5) }),
+    });
+    vi.setSystemTime(NOW + SURVEY_DETAILS_TTL_MS - 1);
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({ tax: null });
+    vi.setSystemTime(NOW + SURVEY_DETAILS_TTL_MS);
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({ tax: { name: 'Moon Corp', pct: 8 } });
+    expect(loadShare).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-reads the details on the next load after this app changes them', async () => {
+    serve({});
+    await loadSurvey('abc123XYZ');
+    await setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'Moon Corp', pct: 8 });
+    await loadSurvey('abc123XYZ');
+    await setSurveyOwner({ id: 'abc123XYZ', owner: 'Bob' });
+    await loadSurvey('abc123XYZ');
+    expect(loadShare).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps an edit due when a load that began before it lands after', async () => {
+    serve({});
+    await loadSurvey('abc123XYZ');
+    vi.setSystemTime(NOW + SURVEY_DETAILS_TTL_MS);
+    let answer!: (v: unknown) => void;
+    loadShare.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const stale = loadSurvey('abc123XYZ');
+    await setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'Moon Corp', pct: 8 });
+    answer({ ok: true, share: { type: 'survey', payload: { v: 1 }, expiresAt: LIVE } });
+    await stale;
+    loadShare.mockClear();
+    await loadSurvey('abc123XYZ');
+    expect(loadShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('has a cached load wait for one already under way instead of reading again', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    const [page, label] = [loadSurvey('abc123XYZ'), loadSurveyCached('abc123XYZ')];
+    expect(await label).toEqual(await page);
+    expect(loadShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not-found once the survey has expired, or its share is gone', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    await loadSurvey('abc123XYZ');
+    vi.setSystemTime(LIVE);
+    loadShare.mockResolvedValue({ ok: false, reason: 'not-found' });
+    expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
+    // The cache went with it: the next load asks the share doc again.
+    vi.setSystemTime(NOW);
+    expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
+    expect(loadShare).toHaveBeenCalledTimes(3);
+  });
+
+  it('checks the share doc again after a failed poll', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    await loadSurvey('abc123XYZ');
+    getDocs.mockRejectedValueOnce(new Error('permission-denied'));
+    expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'failed' });
+    loadShare.mockResolvedValue({ ok: false, reason: 'not-found' });
+    expect(await loadSurvey('abc123XYZ')).toEqual({ ok: false, reason: 'not-found' });
+  });
+
+  it('falls back to full reads while the createdAt index is not deployed', async () => {
+    const store = { surveyScans: [scanDoc('s1', 1000)] };
+    serve(store);
+    const base = getDocs.getMockImplementation()!;
+    getDocs.mockImplementation(async (ref: Ref) => {
+      if (ref.constraints !== undefined)
+        throw Object.assign(new Error('index'), { code: 'failed-precondition' });
+      return base(ref);
+    });
+    await loadSurvey('abc123XYZ');
+    store.surveyScans.push(scanDoc('s2', 2000));
+    const result = await loadSurvey('abc123XYZ');
+    expect(result.ok && result.scans.map((s) => s.id)).toEqual(['s1', 's2']);
+    // Remembered: the next poll goes straight to the full read.
+    getDocs.mockClear();
+    await loadSurvey('abc123XYZ');
+    expect(calls().every((ref) => ref.constraints === undefined)).toBe(true);
+  });
+
+  it('answers a cached load with no read at all, and loads one it has not seen', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    expect(await loadSurveyCached('abc123XYZ')).toMatchObject({ ok: true });
+    getDocs.mockClear();
+    loadShare.mockClear();
+    const result = await loadSurveyCached('abc123XYZ');
+    expect(result.ok && result.scans).toHaveLength(1);
+    expect(getDocs).not.toHaveBeenCalled();
+    expect(loadShare).not.toHaveBeenCalled();
   });
 });

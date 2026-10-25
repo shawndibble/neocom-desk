@@ -36,6 +36,7 @@ import {
   type StandingRequest,
 } from '@/engine/communities/buyback';
 import { getSyncFirestore } from '@/sync/firebaseApp';
+import { isMissingIndex } from '@/sync/missingIndex';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
@@ -95,6 +96,42 @@ export async function loadRequests(
     await ensureSignedIn(characterId);
     return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'));
   });
+  return snap.docs
+    .map((entry) => readRequest(entry.id, entry.data()))
+    .filter((request): request is CommunityRequest => request !== null)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * The Requests posted after `since` (epoch ms), newest first: what the nav badge
+ * counts. A single-field range on `createdAt` (an automatic index), so a tick with
+ * nothing new is one read rather than the whole board. Until an index exists it
+ * reads the board and filters it, as before.
+ */
+export async function loadRequestsSince(
+  characterId: number,
+  communityId: string,
+  since: number
+): Promise<CommunityRequest[]> {
+  const override = communityBackendOverride();
+  if (override?.loadItemRequests) {
+    return override.loadItemRequests(communityId).filter((request) => request.createdAt > since);
+  }
+  let snap;
+  try {
+    snap = await underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      return getDocs(
+        query(
+          collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'),
+          where('createdAt', '>', since)
+        )
+      );
+    });
+  } catch (err) {
+    if (!isMissingIndex(err)) throw err;
+    return (await loadRequests(characterId, communityId)).filter((r) => r.createdAt > since);
+  }
   return snap.docs
     .map((entry) => readRequest(entry.id, entry.data()))
     .filter((request): request is CommunityRequest => request !== null)
