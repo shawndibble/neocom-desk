@@ -29,6 +29,42 @@ describe('Toast', () => {
     modalBody.remove();
   });
 
+  it('replays its rise when a new message replaces the old one in place, so the two read as different toasts', () => {
+    const rise = { animationName: 'toast-in', cancel: vi.fn(), play: vi.fn() };
+    const other = { animationName: 'something-else', cancel: vi.fn(), play: vi.fn() };
+    const spy = vi.fn(() => [rise, other]);
+    Object.defineProperty(HTMLElement.prototype, 'getAnimations', {
+      value: spy,
+      configurable: true,
+    });
+    try {
+      const props = { undo: { label: 'Undo', onUndo: () => {} }, onClose: () => {} };
+      const { rerender } = render(<Toast message="Tritanium moved to To buy" {...props} />);
+      // The mount itself plays from CSS; nothing to restart yet.
+      expect(rise.play).not.toHaveBeenCalled();
+
+      rerender(<Toast message="Pyerite moved to To buy" {...props} />);
+      expect(rise.cancel).toHaveBeenCalledTimes(1);
+      expect(rise.play).toHaveBeenCalledTimes(1);
+      expect(other.play).not.toHaveBeenCalled();
+
+      // A re-render with the same message is not a new toast.
+      rerender(<Toast message="Pyerite moved to To buy" {...props} />);
+      expect(rise.play).toHaveBeenCalledTimes(1);
+
+      // Same text, but the caller says it is a new event (a second job dismissed).
+      const first = {};
+      rerender(<Toast message="Job dismissed" instance={first} {...props} />);
+      expect(rise.play).toHaveBeenCalledTimes(2);
+      rerender(<Toast message="Job dismissed" instance={first} {...props} />);
+      expect(rise.play).toHaveBeenCalledTimes(2);
+      rerender(<Toast message="Job dismissed" instance={{}} {...props} />);
+      expect(rise.play).toHaveBeenCalledTimes(3);
+    } finally {
+      delete (HTMLElement.prototype as { getAnimations?: unknown }).getAnimations;
+    }
+  });
+
   it('shows the message and, given undo, a working undo link', () => {
     let undone = false;
     render(
@@ -58,6 +94,25 @@ describe('Toast', () => {
     });
   });
 
+  it('announces a new instance again even when its text is the same', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<Toast message="Job dismissed" instance={{}} />);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Job dismissed');
+      rerender(<Toast message="Job dismissed" instance={{}} />);
+      expect(screen.getByRole('status')).toBeEmptyDOMElement();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Job dismissed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   describe('persistence and dismissal', () => {
     afterEach(() => vi.useRealTimers());
 
@@ -81,6 +136,24 @@ describe('Toast', () => {
       const onClose = vi.fn();
       render(<Toast message="Copied" onClose={onClose} />);
       expect(screen.queryByRole('button', { name: /close/i })).toBeNull();
+      act(() => {
+        vi.advanceTimersByTime(7_999);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('restarts the clock for a new instance with the same text', () => {
+      vi.useFakeTimers();
+      const onClose = vi.fn();
+      const { rerender } = render(<Toast message="Copied" instance={{}} onClose={onClose} />);
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      rerender(<Toast message="Copied" instance={{}} onClose={onClose} />);
       act(() => {
         vi.advanceTimersByTime(7_999);
       });

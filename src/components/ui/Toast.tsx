@@ -1,4 +1,12 @@
-import { useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { UNSAFE_LocationContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +19,13 @@ import { TOAST_MS } from './useTimedToast';
 
 interface ToastBaseProps {
   message: ReactNode;
+  /**
+   * The event this toast reports, when the same text can come back for a new
+   * one (a second job dismissed): pass the caller's toast state object. A new
+   * value is a new toast even with unchanged text. Without it, a new string
+   * message is what marks a new toast.
+   */
+  instance?: unknown;
 }
 
 /** Plain toasts expire on their own; with `onClose` the toast runs that timer itself. */
@@ -59,7 +74,14 @@ export type ToastProps = PlainToastProps | ActionToastProps;
  * layer, so a toast on `document.body` would render behind its backdrop. That
  * container has no transformed ancestor, so `fixed` still pins to the viewport.
  */
-export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }: ToastProps) {
+export function Toast({
+  message,
+  instance,
+  undo,
+  action,
+  onClose,
+  durationMs = TOAST_MS,
+}: ToastProps) {
   const { t } = useTranslation();
   const portalContainer = usePortalContainer();
   const persistent = Boolean(undo || action);
@@ -70,15 +92,27 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
     onCloseRef.current = onClose;
   });
 
+  // Counts the toasts this one instance has shown: a new one replaying in place
+  // restarts the clock, the rise and the announcement. String messages only
+  // without `instance`, like the live region — a JSX message is a new object
+  // every render. Adjusted during render so all three see the same count.
+  const signal = instance !== undefined ? instance : typeof message === 'string' ? message : null;
+  const [seenSignal, setSeenSignal] = useState(signal);
+  const [occurrence, setOccurrence] = useState(0);
+  if (signal !== null && signal !== seenSignal) {
+    setSeenSignal(signal);
+    setOccurrence((n) => n + 1);
+  }
+
   // Hover or focus anywhere inside holds the clock; it resumes with what was left.
   const [held, setHeld] = useState(false);
   const remainingRef = useRef(durationMs);
-  const lastMessage = useRef(message);
+  const clockFor = useRef(occurrence);
   const expires = Boolean(onClose) && !persistent;
   useEffect(() => {
     if (!expires || held) return;
-    if (lastMessage.current !== message) {
-      lastMessage.current = message;
+    if (clockFor.current !== occurrence) {
+      clockFor.current = occurrence;
       remainingRef.current = durationMs;
     }
     const startedAt = Date.now();
@@ -87,7 +121,7 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
       clearTimeout(timer);
       remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
     };
-  }, [expires, held, message, durationMs]);
+  }, [expires, held, occurrence, durationMs]);
 
   // A route change clears an action toast: its Undo belongs to the page it was raised on.
   const mountedPathname = useRef(pathname);
@@ -98,6 +132,22 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
   // Where focus was before it entered the toast, so Escape can hand it back.
   const rootRef = useRef<HTMLDivElement>(null);
   const cameFrom = useRef<HTMLElement | null>(null);
+
+  // A new toast replacing the old one in place replays the rise, so the two
+  // read as different toasts rather than a text swap. Restarted rather than
+  // re-keyed: a remount would drop focus from Undo or close. Layout effect, so
+  // the new text never paints once at rest before rising.
+  const risenFor = useRef(occurrence);
+  useLayoutEffect(() => {
+    if (occurrence === risenFor.current) return;
+    risenFor.current = occurrence;
+    for (const animation of rootRef.current?.getAnimations?.() ?? []) {
+      if ('animationName' in animation && animation.animationName === 'toast-in') {
+        animation.cancel();
+        animation.play();
+      }
+    }
+  }, [occurrence]);
 
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'Escape' || !onClose) return;
@@ -111,7 +161,7 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
   return createPortal(
     <div
       ref={rootRef}
-      className="toast-in bg-panel-2 border-line-bright text-text fixed bottom-32 left-1/2 z-40 flex w-[95vw] -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ring-1 ring-black/50 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]"
+      className="toast-in bg-panel-2 border-line-bright text-text fixed bottom-32 left-1/2 z-40 flex w-[95vw] -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]"
       // Mouse only: a tap emulates mouseenter and nothing ever sends the leave.
       onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
       onPointerLeave={(e) => e.pointerType === 'mouse' && setHeld(false)}
@@ -132,9 +182,7 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
       <span aria-hidden="true" className="min-w-0 break-words">
         {message}
       </span>
-      <LiveStatus announceKey={typeof message === 'string' ? message : undefined}>
-        {message}
-      </LiveStatus>
+      <LiveStatus announceKey={occurrence}>{message}</LiveStatus>
       {undo && (
         <button type="button" className={`${inlineLinkClassName} shrink-0`} onClick={undo.onUndo}>
           {undo.label}

@@ -1329,12 +1329,12 @@
   /*
    * A `Toast` arriving (`components/ui/Toast.tsx`): a short rise and fade so
    * the eye catches it over a busy page. `transform`, not `translate`, so it
-   * leaves the toast's `-translate-x-1/2` centring alone. Plays once on mount;
-   * a toast that replaces another in place does not replay it. Reduced motion
-   * gets none (DESIGN.md §6: no transitions).
+   * leaves the toast's `-translate-x-1/2` centring alone. Plays on mount, and
+   * `Toast` restarts it when a new message replaces the old one in place. Reduced motion
+   * gets none (DESIGN.md §6c: no transitions).
    */
   .toast-in {
-    animation: toast-in 150ms ease-out both;
+    animation: toast-in 200ms ease-out both;
   }
 
   @keyframes toast-in {
