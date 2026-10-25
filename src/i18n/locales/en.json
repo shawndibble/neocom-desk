@@ -13134,6 +13134,7 @@
       "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed, up to 72 hours ahead. Needs notification permission; on iPhone and iPad, the installed app.",
+      "serverPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
       "extractorExpiringLeadTimeOption_one": "{{count}} hour",
       "extractorExpiringLeadTimeOption_other": "{{count}} hours",

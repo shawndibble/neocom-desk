@@ -20,7 +20,8 @@ export function NetWorthSnapshotRecorder() {
     let cancelled = false;
     const seat = joinTabElection('poller', () => {});
     function run() {
-      if (cancelled || !seat.isLeader()) return;
+      // The poller's leader may be hidden (issue #5120); snapshots stay a visible tab's job.
+      if (cancelled || document.visibilityState !== 'visible' || !seat.isLeader()) return;
       void ignoreIdbTeardown(
         runUnlessRunningElsewhere('neocom:netWorth', () => recordAllNetWorthSnapshots())
       );
