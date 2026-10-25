@@ -66,6 +66,13 @@ describe('fittingStatsText', () => {
     ]);
   });
 
+  it('keeps a half megabit of drone bandwidth rather than rounding it away', () => {
+    const astero = { ...stats, droneBandwidthUsed: 10, droneBandwidthTotal: 12.5 } as FittingStats;
+    expect(fittingStatsText(astero, i18n.t.bind(i18n))).toContain(
+      'Drones 124.6 DPS · 10 / 12.5 Mbit/s'
+    );
+  });
+
   it('says every figure is overheated when it is', () => {
     const text = fittingStatsText(
       { ...stats, allOverheated: true, overheated: null },
