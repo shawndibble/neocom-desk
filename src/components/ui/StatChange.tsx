@@ -31,16 +31,6 @@ const VALUE = '\u0000';
 const TONE = { better: 'text-success', worse: 'text-danger', neutral: 'text-text' } as const;
 type Verdict = keyof typeof TONE;
 
-/**
- * One fit stat changing: the stat's name, then `before → after`. The before
- * value is dim; the arrow and the after value are `success` when the change is
- * better, `danger` when worse and plain when the stat is neutral (it only
- * moves with the hull). Colour is never the only cue: both numbers are printed,
- * and the screen-reader name adds "better" or "worse". Rounds at the stats
- * panel's `STAT_DIGITS`. Money is not a stat: ISK keeps `IskDelta`.
- *
- * @summary A fit stat's before → after, green when better, red when worse.
- */
 /** A change's printed parts: the stat's name around the value (`lead` … `trail`), the two values, the verdict and the spoken name. */
 function useStatChangeParts(change: StatChangeValue) {
   const { t } = useTranslation();
@@ -102,11 +92,14 @@ export function StatChange({ change, className, bare = false }: StatChangeProps)
   );
 }
 
-function StatChangeRow({ change }: { change: StatChangeValue }) {
+function StatChangeRow({ change, last }: { change: StatChangeValue; last: boolean }) {
   const { lead, trail, before, after, verdict, spokenName } = useStatChangeParts(change);
   return (
-    <span role="listitem" className="contents">
-      <span className="sr-only">{spokenName}</span>
+    // A real box sharing the list's columns (`subgrid`), not `contents`, which
+    // older WebKit strips of its role.
+    <span role="listitem" className="col-span-2 grid grid-cols-subgrid">
+      {/* A pause between rows, so a neutral change does not run into the next. */}
+      <span className="sr-only">{last ? spokenName : `${spokenName};`}</span>
       <span aria-hidden="true" className="min-w-0">
         {lead.trim()}
       </span>
@@ -135,8 +128,8 @@ export function StatChangeList({
 }) {
   return (
     <span role="list" className={cx('grid grid-cols-[auto_minmax(0,1fr)] gap-x-3', className)}>
-      {changes.map((change) => (
-        <StatChangeRow key={change.key} change={change} />
+      {changes.map((change, i) => (
+        <StatChangeRow key={change.key} change={change} last={i === changes.length - 1} />
       ))}
     </span>
   );

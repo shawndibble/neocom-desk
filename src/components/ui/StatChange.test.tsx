@@ -58,6 +58,8 @@ describe('StatChangeList', () => {
     const [name, value] = Array.from(rows[0]!.children).filter((c) => !c.matches('.sr-only'));
     expect(name).toHaveTextContent(/^Max velocity$/);
     expect(value).toHaveTextContent('2,894 → 2,928 m/s');
-    expect(screen.getByText('Max velocity 2,894 to 2,928 m/s, better')).toBeInTheDocument();
+    // Every row but the last ends in a pause, so a neutral one does not run into the next.
+    expect(screen.getByText('Max velocity 2,894 to 2,928 m/s, better;')).toBeInTheDocument();
+    expect(screen.getByText('CPU used 177 to 186 tf, worse')).toBeInTheDocument();
   });
 });

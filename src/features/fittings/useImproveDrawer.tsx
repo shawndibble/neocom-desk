@@ -79,12 +79,17 @@ export function useImproveDrawer({
   openMakeItFit,
 }: UseImproveDrawerArgs): {
   open: () => void;
+  close: () => void;
   drawer: ReactNode;
+  /** Open beside the editor (desktop), so the page makes room for it rather than sitting under it. */
+  docked: boolean;
   /** The stat changes to preview in the stats column; null when Improve is shut or nothing is ticked or hovered. */
   preview: FittingStatsDelta | null;
 } {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  // The container's footer, where the panel puts its selection and Apply bar.
+  const [footerTarget, setFooterTarget] = useState<HTMLDivElement | null>(null);
   const legacyGoal = useImproveGoal((state) => state.value);
   const goalsByRole = useImproveGoalByRole((state) => state.value);
   const setGoalsByRole = useImproveGoalByRole((state) => state.setValue);
@@ -208,6 +213,7 @@ export function useImproveDrawer({
       fitting={fitting}
       target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
       onPreview={setPreview}
+      footerTarget={footerTarget}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
       onLoadBestCrystal={crystalSteps.length > 0 ? loadBestCrystal : undefined}
@@ -269,10 +275,19 @@ export function useImproveDrawer({
     />
   );
 
+  // Only once a search is done: the bar has nothing to hold before, and an empty footer is a stray line.
+  const footer = search.state.status === 'done' && <div ref={setFooterTarget} />;
+
   const drawer = fitting && (
     <>
       {isPhone ? (
-        <Modal open={isOpen} onClose={close} placement="sheet" title={t('fittings.improve.title')}>
+        <Modal
+          open={isOpen}
+          onClose={close}
+          placement="sheet"
+          title={t('fittings.improve.title')}
+          footer={footer}
+        >
           {body}
         </Modal>
       ) : (
@@ -280,9 +295,11 @@ export function useImproveDrawer({
           open={isOpen}
           onClose={close}
           side="left"
-          // Clears the app's 12rem nav, over the Add column, so the stats stay visible.
-          className="md:left-48"
+          // Docked beside the app's 12rem nav as the editor's left column: the page
+          // makes room (`docked`), so the stats stay visible while rows are ticked.
+          className="slide-in-left md:left-48"
           title={t('fittings.improve.title')}
+          footer={footer}
         >
           {body}
         </SlideOver>
@@ -305,5 +322,5 @@ export function useImproveDrawer({
       )}
     </>
   );
-  return { open, drawer, preview: isOpen ? preview : null };
+  return { open, close, drawer, docked: isOpen && !isPhone, preview: isOpen ? preview : null };
 }

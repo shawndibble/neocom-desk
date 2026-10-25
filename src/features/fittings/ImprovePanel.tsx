@@ -7,6 +7,7 @@
  * are applied together as one unsaved edit.
  */
 import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -106,6 +107,8 @@ const reachKm = (s: FittingStats) =>
 interface Lead {
   node: ReactNode;
   keys: string[];
+  /** When the figure is a plain stat change, so a row of several lines them up as a list. */
+  change?: { key: StatChangeKey; before: number; after: number };
 }
 
 /** How many figures Best overall's lead line shows: the two that moved the score most. */
@@ -179,6 +182,8 @@ interface Props {
    * pointer or keyboard focus, would change; null when nothing is previewed.
    */
   onPreview?: (delta: FittingStatsDelta | null) => void;
+  /** The drawer's footer, where the selection and Apply bar goes; absent: it sticks to the list's bottom. */
+  footerTarget?: HTMLElement | null;
 }
 
 /** The guardrail a rejected swap broke; a budget or cap says by how much. */
@@ -226,6 +231,7 @@ export function ImprovePanel({
   fitting,
   target,
   onPreview,
+  footerTarget,
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
@@ -322,22 +328,24 @@ export function ImprovePanel({
     );
   }
 
-  /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
+  /** Each stat the swap makes worse, with its before → after, so the loss has a size: one per row. */
   function lostLine(option: ImproveOption): ReactNode {
-    return option.lost.flatMap(({ kind, change }, i): ReactNode[] => {
-      const node =
-        kind === 'stat' ? (
-          <StatChange key={change.key} change={change} />
-        ) : (
-          <span key={change.key}>
-            {t(`fittings.whatToTrain.role.${change.key}`, {
-              before: change.before,
-              after: change.after,
-            })}
-          </span>
-        );
-      return i === 0 ? [node] : [', ', node];
-    });
+    const stats = option.lost.flatMap((lost) => (lost.kind === 'stat' ? [lost.change] : []));
+    return (
+      <>
+        {stats.length > 0 && <StatChangeList changes={stats} />}
+        {option.lost.map((lost) =>
+          lost.kind === 'stat' ? null : (
+            <span key={lost.change.key} className="block">
+              {t(`fittings.whatToTrain.role.${lost.change.key}`, {
+                before: lost.change.before,
+                after: lost.change.after,
+              })}
+            </span>
+          )
+        )}
+      </>
+    );
   }
 
   function isk(option: ImproveOption) {
@@ -438,6 +446,7 @@ export function ImprovePanel({
     const stat = (key: StatChangeKey, before: number, after: number): Lead => ({
       node: <StatChange key={key} change={{ key, before, after }} />,
       keys: [key],
+      change: { key, before, after },
     });
     const text = (key: string, line: string | null): Lead | null =>
       line === null ? null : { node: <span key={key}>{line}</span>, keys: [] };
@@ -523,12 +532,22 @@ export function ImprovePanel({
         return leads.length === 0
           ? null
           : {
-              // A line each, like the change rows below them.
-              node: leads.map((lead, i) => (
-                <span key={i} className="block">
-                  {lead.node}
-                </span>
-              )),
+              // A line each, like the change rows below them: the plain stat
+              // changes as one list, any worded figure on its own line after.
+              node: (
+                <>
+                  <StatChangeList
+                    changes={leads.flatMap((lead) => (lead.change ? [lead.change] : []))}
+                  />
+                  {leads
+                    .filter((lead) => !lead.change)
+                    .map((lead) => (
+                      <span key={lead.keys.join() || String(lead.node)} className="block">
+                        {lead.node}
+                      </span>
+                    ))}
+                </>
+              ),
               keys: leads.flatMap((lead) => lead.keys),
             };
       }
@@ -628,7 +647,8 @@ export function ImprovePanel({
             </span>
             {option.lost.length > 0 && (
               <span className="text-warning block text-xs">
-                {t('fittings.improve.givesUp')} {lostLine(option)}
+                <span className="block">{t('fittings.improve.givesUp')}</span>
+                {lostLine(option)}
               </span>
             )}
             <span className="block text-xs">{isk(option)}</span>
@@ -1247,10 +1267,7 @@ export function ImprovePanel({
                 {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
-            {/* Pinned over the scroll body's own bottom padding (0.75rem, plus the
-                safe area in a phone sheet), not above it: a sticky bottom-0 stops at
-                the padding, leaving a strip where rows scroll past under the bar. */}
-            <div className="bg-panel border-line sticky bottom-[calc(-0.75rem_-_env(safe-area-inset-bottom))] space-y-2 border-t pt-2 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
+            <ImproveFooter target={footerTarget}>
               {chosen.length > 0 && checkable && (
                 <div className="space-y-1 text-sm" data-testid="improve-selection">
                   {summary ? (
@@ -1273,7 +1290,8 @@ export function ImprovePanel({
                         )}
                         {summary.unpriced > 0 &&
                           ` + ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
-                        {' · '}
+                      </p>
+                      <p>
                         {t('fittings.improve.selection.dps', {
                           before: m3sFormat(summary.dps.before),
                           after: m3sFormat(summary.dps.after),
@@ -1329,9 +1347,23 @@ export function ImprovePanel({
                     : t('fittings.improve.applyCount', { count: chosen.length })}
                 </Button>
               </div>
-            </div>
+            </ImproveFooter>
           </div>
         ))}
     </div>
+  );
+}
+
+/**
+ * The selection and Apply bar. In the drawer it goes to the container's own
+ * footer (`target`), below the scrolling list, so no row ever scrolls under it;
+ * on its own (tests, a page with no footer) it sticks to the bottom of the list.
+ */
+function ImproveFooter({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
+  const bar = <div className="space-y-2">{children}</div>;
+  return target ? (
+    createPortal(bar, target)
+  ) : (
+    <div className="bg-panel border-line sticky bottom-0 border-t pt-2">{bar}</div>
   );
 }
