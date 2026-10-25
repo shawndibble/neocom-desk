@@ -26,6 +26,7 @@ import {
 } from '@/esi/cache';
 import { isAuthFailure, isOfflineFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { grantHoldsEndpointScope } from '@/esi/grantScope';
 import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import {
   mergeMailHeaderPage,
@@ -233,6 +234,10 @@ export function prefetchMailBodies(
  * inside the 10-minute cache window.
  */
 export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
+  // Opening a mail is not a request to write, and `organize_mail` is off by
+  // default (Write to EVE): without the scope skip quietly, rather than fail
+  // and raise the grant notice on every open. The Mail view offers the grant.
+  if (!(await grantHoldsEndpointScope(characterId, 'putCharacterMail'))) return;
   try {
     await putCharacterMail(characterId, mailId, { read: true });
   } catch (err) {

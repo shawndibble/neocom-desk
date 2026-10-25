@@ -4252,7 +4252,8 @@
         "industry": "Industry & planets",
         "social": "Social & calendar",
         "location": "Location & ships",
-        "structures": "Structures"
+        "structures": "Structures",
+        "write": "Write to EVE"
       },
       "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
       "separateNote": "Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
@@ -8050,6 +8051,9 @@
   },
   "mail": {
     "title": "Mail",
+    "sendGrantTitle": "Permission to send mail",
+    "sendGrantHint": "Grant it to send mail from this character.",
+    "sendGrantAction": "Grant send mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
       "realHost": "Opens {{host}}"
@@ -8107,6 +8111,9 @@
     "searchPlaceholder": "Search subject or sender…",
     "hideRead": "Hide read",
     "capNotice": "Showing the most recent {{count}} matching mails — narrow with a folder or a search to see more.",
+    "markReadGrantTitle": "Mail you open stays unread in EVE",
+    "markReadGrantHint": "Grant the mark-as-read permission to mark mail read in EVE when you open it here.",
+    "markReadGrantAction": "Grant mark as read",
     "reauthTitle": "Log in again to see your mail",
     "reauthHint": "Log in again to fetch this character's mail.",
     "reauthAction": "Log in again with EVE Online",
@@ -8234,6 +8241,9 @@
     "csvResponse": "Response",
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
+    "rsvpGrantTitle": "Permission to respond to events",
+    "rsvpGrantHint": "Grant it to RSVP from this character.",
+    "rsvpGrantAction": "Grant RSVP",
     "rsvpAccept": "Accept",
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
@@ -12632,6 +12642,8 @@
   },
   "permissions": {
     "grantMissing": "Grant missing Permissions",
+    "writeSection": "Write to EVE",
+    "writeSectionHint": "These change things in EVE or open windows in your game client. Off by default; Neocom Desk asks the first time you use one.",
     "wallet": {
       "label": "Wallet",
       "caption": "Your wallet balance, transactions and journal."
@@ -12662,11 +12674,11 @@
     },
     "mail": {
       "label": "Mail",
-      "caption": "Reading, organizing and sending your EVE mail."
+      "caption": "Reading your EVE mail."
     },
     "calendar": {
       "label": "Calendar",
-      "caption": "Your calendar events, and responding to them."
+      "caption": "Your calendar events."
     },
     "notifications": {
       "label": "EVE notifications",
@@ -12676,21 +12688,37 @@
       "label": "Character details",
       "caption": "Implants, clones, location, contacts, standings and loyalty."
     },
-    "openWindow": {
-      "label": "Open in EVE",
-      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract, or open a new mail to a Community member from a Request."
+    "fittings": {
+      "label": "Fittings",
+      "caption": "Your in-game Fittings."
+    },
+    "currentShip": {
+      "label": "Current ship",
+      "caption": "The ship you are flying, so the D-Scan danger read can start from it."
+    },
+    "mailSend": {
+      "label": "Send mail",
+      "caption": "Send, reply to and forward EVE mail from Neocom Desk."
+    },
+    "mailOrganize": {
+      "label": "Mark mail read",
+      "caption": "Mark a mail read in EVE when you open it here."
+    },
+    "calendarRespond": {
+      "label": "Calendar RSVP",
+      "caption": "Accept, decline or tentatively accept a calendar event."
+    },
+    "fittingsWrite": {
+      "label": "Save Fittings to EVE",
+      "caption": "Save a Fitting to your EVE client, or replace one you saved before."
     },
     "autopilot": {
       "label": "Autopilot waypoints",
       "caption": "Set waypoints in your EVE client from Route Safety, order books and the station right-click menus."
     },
-    "fittings": {
-      "label": "Fittings",
-      "caption": "Your in-game Fittings, and saving Fittings to EVE."
-    },
-    "currentShip": {
-      "label": "Current ship",
-      "caption": "The ship you are flying, so the D-Scan danger read can start from it."
+    "openWindow": {
+      "label": "Open in EVE",
+      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract, or open a new mail to a Community member from a Request."
     },
     "corp": {
       "label": "Corporation",
@@ -13489,7 +13517,7 @@
     "resetViewPrefsHint": "Resets every page's remembered sorts, filters and expanded sections. Characters, groups and plans stay.",
     "resetViewPrefsConfirm": "View preferences reset.",
     "permissions": {
-      "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
+      "hint": "What this character lets Neocom Desk read from, and write to, EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
       "character": {
         "label": "Character",

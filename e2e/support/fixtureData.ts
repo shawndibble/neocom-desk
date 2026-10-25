@@ -27,9 +27,20 @@ export const ALLIANCE_NAME = 'Test Alliance';
  * in here drags in no Dexie/fetch code.
  */
 import { SCOPES as BASE_SCOPES, scopesForGroup } from '../../src/esi/scopes';
+import { WRITE_GROUPS } from '../../src/esi/registry';
 
-/** The Base Grant plus the opt-in mercenaryDens Permission, so den specs see their data. */
-export const SCOPES: readonly string[] = [...BASE_SCOPES, ...scopesForGroup('mercenaryDens')];
+/**
+ * The Base Grant plus the opt-in mercenaryDens Permission, so den specs see
+ * their data, and every Write to EVE Permission, so the write buttons (Open in
+ * EVE, Set waypoints, Save to EVE) render enabled.
+ */
+export const SCOPES: readonly string[] = [
+  ...new Set([
+    ...BASE_SCOPES,
+    ...scopesForGroup('mercenaryDens'),
+    ...WRITE_GROUPS.flatMap((group) => scopesForGroup(group)),
+  ]),
+];
 
 /**
  * Skill typeIDs from public/data/skills.json. Caldari Cruiser's prereq

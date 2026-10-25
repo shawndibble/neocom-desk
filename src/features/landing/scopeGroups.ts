@@ -1,4 +1,4 @@
-import { type ScopeGroup } from '@/esi/registry';
+import { WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 
 /**
  * One line of the landing page's "what it asks EVE for" list: either a Core
@@ -58,8 +58,6 @@ export const LANDING_SCOPE_GROUPS: readonly { id: string; rows: readonly ScopeRo
     rows: [
       { kind: 'group', group: 'currentShip' },
       { kind: 'group', group: 'fittings' },
-      { kind: 'group', group: 'autopilot' },
-      { kind: 'group', group: 'openWindow' },
       { kind: 'group', group: 'jumpFatigue' },
       { kind: 'group', group: 'killmails' },
     ],
@@ -71,6 +69,11 @@ export const LANDING_SCOPE_GROUPS: readonly { id: string; rows: readonly ScopeRo
       { kind: 'group', group: 'structureMarkets' },
       { kind: 'group', group: 'corp' },
     ],
+  },
+  // Derived from the registry's `section`, so a new write Permission lands here by itself.
+  {
+    id: 'write',
+    rows: WRITE_GROUPS.map((group) => ({ kind: 'group', group })),
   },
 ];
 

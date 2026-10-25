@@ -34,9 +34,13 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
  * Every named Scope Group (user-facing: **Permission**) a scope outside the
  * **Core Grant** can belong to. Thirteen are default-on — granted at sign-in
  * along with the Core Grant, together forming the **Base Grant** — and the rest
- * (`corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`,
- * `mercenaryDens`) are opt-in: a Character is asked for them only
- * when they ask for the feature, never at sign-in with everyone else.
+ * are opt-in: a Character is asked for them only when they ask for the
+ * feature, never at sign-in with everyone else. Six of those are the **Write to
+ * EVE** section (`mailSend`, `mailOrganize`, `calendarRespond`, `fittingsWrite`,
+ * `autopilot`, `openWindow`, marked `section: 'write'`): one Permission per
+ * write feature, asked for the first time a Character tries it. The other six
+ * are `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`
+ * and `mercenaryDens`.
  *
  * `corp` exists because the corp section needs ten scopes that ~95% of users
  * can never use — CCP role-gates the endpoints server-side, so a line member
@@ -64,9 +68,13 @@ export const SCOPE_GROUPS = [
   'notifications',
   'characterDetails',
   'fittings',
+  'currentShip',
+  'mailSend',
+  'mailOrganize',
+  'calendarRespond',
+  'fittingsWrite',
   'autopilot',
   'openWindow',
-  'currentShip',
   'corp',
   'structureMarkets',
   'jumpFatigue',
@@ -84,6 +92,12 @@ export interface PermissionMeta {
   readonly captionKey: string;
   /** Whether this Permission is part of the Base Grant (on by default). */
   readonly defaultOn: boolean;
+  /**
+   * `'write'` marks a Permission that changes something in EVE (or opens a
+   * window in the client): the surfaces list those under a "Write to EVE"
+   * heading, derived from this field, never hand-listed.
+   */
+  readonly section?: 'write';
 }
 
 /**
@@ -152,20 +166,46 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
     captionKey: 'permissions.fittings.caption',
     defaultOn: true,
   },
-  autopilot: {
-    labelKey: 'permissions.autopilot.label',
-    captionKey: 'permissions.autopilot.caption',
-    defaultOn: true,
-  },
-  openWindow: {
-    labelKey: 'permissions.openWindow.label',
-    captionKey: 'permissions.openWindow.caption',
-    defaultOn: true,
-  },
   currentShip: {
     labelKey: 'permissions.currentShip.label',
     captionKey: 'permissions.currentShip.caption',
     defaultOn: true,
+  },
+  mailSend: {
+    labelKey: 'permissions.mailSend.label',
+    captionKey: 'permissions.mailSend.caption',
+    defaultOn: false,
+    section: 'write',
+  },
+  mailOrganize: {
+    labelKey: 'permissions.mailOrganize.label',
+    captionKey: 'permissions.mailOrganize.caption',
+    defaultOn: false,
+    section: 'write',
+  },
+  calendarRespond: {
+    labelKey: 'permissions.calendarRespond.label',
+    captionKey: 'permissions.calendarRespond.caption',
+    defaultOn: false,
+    section: 'write',
+  },
+  fittingsWrite: {
+    labelKey: 'permissions.fittingsWrite.label',
+    captionKey: 'permissions.fittingsWrite.caption',
+    defaultOn: false,
+    section: 'write',
+  },
+  autopilot: {
+    labelKey: 'permissions.autopilot.label',
+    captionKey: 'permissions.autopilot.caption',
+    defaultOn: false,
+    section: 'write',
+  },
+  openWindow: {
+    labelKey: 'permissions.openWindow.label',
+    captionKey: 'permissions.openWindow.caption',
+    defaultOn: false,
+    section: 'write',
   },
   corp: {
     labelKey: 'permissions.corp.label',
@@ -210,9 +250,9 @@ export interface EsiEndpointSpec {
    * structure lookup and search) — so leaving it off is the rare case,
    * reserved for those.
    *
-   * Every other endpoint declares one of the 21 `SCOPE_GROUPS`: the fifteen
+   * Every other endpoint declares one of the 25 `SCOPE_GROUPS`: the thirteen
    * default-on ones together with the Core Grant make up the **Base Grant**
-   * (`SCOPES` in `scopes.ts`), and the other six stay opt-in.
+   * (`SCOPES` in `scopes.ts`), and the other twelve stay opt-in.
    *
    * Declared per endpoint rather than per scope, which is why
    * `scopes.test.ts` asserts a scope repeated across endpoints always
@@ -305,15 +345,15 @@ export const ESI_REGISTRY = {
   putCharacterMail: {
     route: '/characters/{character_id}/mail/{mail_id}/',
     scope: 'esi-mail.organize_mail.v1',
-    group: 'mail',
+    group: 'mailOrganize',
   },
 
-  // Base grant, deliberately (mail-reply-and-forward decision): every
-  // Character can send mail, unlike the gated `corp` scopes below.
+  // Write to EVE, off by default: a Permission of its own (`mailSend`), asked
+  // for the first time a Character tries to send.
   postCharacterMail: {
     route: '/characters/{character_id}/mail/',
     scope: 'esi-mail.send_mail.v1',
-    group: 'mail',
+    group: 'mailSend',
   },
   getCharacterNotifications: {
     route: '/characters/{character_id}/notifications',
@@ -333,7 +373,7 @@ export const ESI_REGISTRY = {
   putCharacterCalendarResponse: {
     route: '/characters/{character_id}/calendar/{event_id}/',
     scope: 'esi-calendar.respond_calendar_events.v1',
-    group: 'calendar',
+    group: 'calendarRespond',
   },
   getCharacterContracts: {
     route: '/characters/{character_id}/contracts',
@@ -409,7 +449,7 @@ export const ESI_REGISTRY = {
   postCharacterFitting: {
     route: '/characters/{character_id}/fittings/',
     scope: 'esi-fittings.write_fittings.v1',
-    group: 'fittings',
+    group: 'fittingsWrite',
   },
   // A {fitting_id} segment keeps this route distinct from the two above
   // (registry.test.ts requires unique routes). Save to EVE (#1540) calls
@@ -418,7 +458,7 @@ export const ESI_REGISTRY = {
   deleteCharacterFitting: {
     route: '/characters/{character_id}/fittings/{fitting_id}/',
     scope: 'esi-fittings.write_fittings.v1',
-    group: 'fittings',
+    group: 'fittingsWrite',
   },
 
   getCharacterPublicInfo: {
@@ -555,10 +595,10 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
   /**
-   * Base grant (issue #2479, scope decision `20261003-175151`): Route
-   * Safety's Set waypoints in game — the fifth write exception, used only when
-   * the pilot presses it. A Permission of its own, so a Character that signed
-   * in before it reads as lacking only this, not Character details.
+   * Write to EVE, off by default: Route Safety's Set waypoints in game, used
+   * only when the pilot presses it (issue #2479). A Permission of its own, so
+   * a Character that signed in before it reads as lacking only this, not
+   * Character details.
    */
   postAutopilotWaypoint: {
     route: '/ui/autopilot/waypoint',
@@ -566,10 +606,10 @@ export const ESI_REGISTRY = {
     group: 'autopilot',
   },
   /**
-   * Base grant: Open in EVE — the sixth write exception, used only when the
-   * pilot presses it. Each opens a window in the Character's EVE client and
-   * changes nothing in the game. A Permission of its own, so a Character that
-   * signed in before it reads as lacking only this.
+   * Write to EVE, off by default: Open in EVE, used only when the pilot
+   * presses it. Each opens a window in the Character's EVE client and changes
+   * nothing in the game. A Permission of its own, so a Character that signed
+   * in before it reads as lacking only this.
    */
   postOpenWindowInformation: {
     route: '/ui/openwindow/information',
@@ -992,3 +1032,8 @@ export function requiredScopesForEndpoints(ids: readonly EsiEndpointId[]): reado
     isScopeRequired
   );
 }
+
+/** The Permissions of the "Write to EVE" section, in catalogue order. */
+export const WRITE_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
+  (group) => PERMISSIONS[group].section === 'write'
+);

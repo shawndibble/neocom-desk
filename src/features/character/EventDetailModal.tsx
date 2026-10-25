@@ -34,16 +34,20 @@ import { RESPONSE_BADGE_TONE, RESPONSE_ICON, RESPONSE_KEY } from './calendarResp
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
-import { GrantBanner } from '@/app/GrantNote';
+import { GrantBanner, GrantNote } from '@/app/GrantNote';
+
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { CachedResult } from '@/esi/cache';
+import type { EsiEndpointId } from '@/esi/registry';
 import type {
   CalendarEventDetail,
   CalendarEventSummary,
   CalendarRsvpResponse,
 } from '@/esi/endpoints';
+
+const RSVP_ENDPOINTS = ['putCharacterCalendarResponse'] as const satisfies readonly EsiEndpointId[];
 
 const RSVP_OPTIONS: { response: CalendarRsvpResponse; labelKey: string }[] = [
   { response: 'accepted', labelKey: 'calendar.rsvpAccept' },
@@ -243,6 +247,13 @@ export function EventDetailModal({
                 );
               })}
             </div>
+            <GrantNote
+              characterId={characterId}
+              endpoints={RSVP_ENDPOINTS}
+              title={t('calendar.rsvpGrantTitle')}
+              hint={t('calendar.rsvpGrantHint')}
+              actionLabel={t('calendar.rsvpGrantAction')}
+            />
             {rsvpFailed !== null && (
               <p role="alert" className="mt-2 text-[0.6875rem] text-danger">
                 {t(RSVP_FAILURE_KEY[rsvpFailed])}

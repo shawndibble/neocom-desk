@@ -127,7 +127,7 @@ describe('AuthFailureNotice', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
 
-    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: ['mail'] });
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: ['mailSend'] });
   });
 
   it('asks for no Permission when the failure names no endpoint', async () => {

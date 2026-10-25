@@ -12,11 +12,22 @@ import {
   PERMISSIONS,
   PUBLIC,
   SCOPE_GROUPS,
+  WRITE_GROUPS,
   isScopeRequired,
   type EsiEndpointSpec,
 } from './registry';
 
 const specs: readonly EsiEndpointSpec[] = Object.values(ESI_REGISTRY);
+
+// Hand-written: the spelling backstop for the Write to EVE section.
+const WRITE_SCOPES = [
+  'esi-mail.send_mail.v1',
+  'esi-mail.organize_mail.v1',
+  'esi-calendar.respond_calendar_events.v1',
+  'esi-fittings.write_fittings.v1',
+  'esi-ui.write_waypoint.v1',
+  'esi-ui.open_window.v1',
+];
 
 const DEFAULT_ON_GROUPS = SCOPE_GROUPS.filter((group) => PERMISSIONS[group].defaultOn);
 const OPT_IN_GROUPS = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
@@ -47,8 +58,8 @@ describe('CORE_GRANT', () => {
 describe('SCOPES (Base Grant)', () => {
   // Hand-written, not derived: SCOPES is computed from registry.ts, so a
   // derived expectation would assert nothing. This is the spelling backstop.
-  // Most scopes here are reads — `organize_mail`, `send_mail` and
-  // `respond_calendar_events` are the deliberate write exceptions.
+  // Every scope here is a read: the six write scopes are the opt-in
+  // "Write to EVE" section, asked for when a Character first tries the feature.
   it('lists exactly the v1 Base Grant scopes', () => {
     expect([...SCOPES].sort()).toEqual(
       [
@@ -58,10 +69,7 @@ describe('SCOPES (Base Grant)', () => {
         'esi-wallet.read_character_wallet.v1',
         'esi-assets.read_assets.v1',
         'esi-mail.read_mail.v1',
-        'esi-mail.organize_mail.v1',
-        'esi-mail.send_mail.v1',
         'esi-calendar.read_calendar_events.v1',
-        'esi-calendar.respond_calendar_events.v1',
         'esi-contracts.read_character_contracts.v1',
         'esi-markets.read_character_orders.v1',
         'esi-characters.read_blueprints.v1',
@@ -78,11 +86,12 @@ describe('SCOPES (Base Grant)', () => {
         'esi-search.search_structures.v1',
         'esi-industry.read_character_mining.v1',
         'esi-fittings.read_fittings.v1',
-        'esi-fittings.write_fittings.v1',
-        'esi-ui.write_waypoint.v1',
-        'esi-ui.open_window.v1',
       ].sort()
     );
+  });
+
+  it('excludes all six write scopes', () => {
+    for (const scope of WRITE_SCOPES) expect(SCOPES).not.toContain(scope);
   });
 
   it('has no duplicates', () => {
@@ -278,7 +287,7 @@ describe('PERMISSIONS', () => {
   // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
   // are filtered by `defaultOn` itself, so a derived expectation here would
   // pass no matter which way a group's flag flipped.
-  it('marks corp, structureMarkets, jumpFatigue, corpProjects, killmails and mercenaryDens opt-in and every other group default-on', () => {
+  it('marks corp, structureMarkets, jumpFatigue, corpProjects, killmails, mercenaryDens and the six Write to EVE groups opt-in and every other group default-on', () => {
     const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
     expect([...optIn].sort()).toEqual(
       [
@@ -288,8 +297,35 @@ describe('PERMISSIONS', () => {
         'corpProjects',
         'killmails',
         'mercenaryDens',
+        'mailSend',
+        'mailOrganize',
+        'calendarRespond',
+        'fittingsWrite',
+        'autopilot',
+        'openWindow',
       ].sort()
     );
+  });
+
+  it('WRITE_GROUPS is exactly the six write features, all off by default', () => {
+    expect([...WRITE_GROUPS].sort()).toEqual(
+      [
+        'mailSend',
+        'mailOrganize',
+        'calendarRespond',
+        'fittingsWrite',
+        'autopilot',
+        'openWindow',
+      ].sort()
+    );
+    for (const group of WRITE_GROUPS) expect(PERMISSIONS[group].defaultOn, group).toBe(false);
+  });
+
+  it('puts each write scope in its own single-scope group', () => {
+    const owners = WRITE_SCOPES.map((scope) => permissionForScope(scope));
+    expect(new Set(owners).size).toBe(6);
+    expect([...owners].sort()).toEqual([...WRITE_GROUPS].sort());
+    for (const group of WRITE_GROUPS) expect(scopesForGroup(group), group).toHaveLength(1);
   });
 });
 
