@@ -35,8 +35,9 @@ export function cheaperNearbySystems(
   for (const [systemId, jumps] of jumpDistancesFrom(graph, originSystemId)) {
     if (systemId === originSystemId || jumps > maxJumps) continue;
     const index = indices.get(systemId);
+    if (index === undefined || index >= currentIndex) continue;
     if (isEligible && !isEligible(systemId)) continue;
-    if (index !== undefined && index < currentIndex) found.push({ systemId, jumps, index });
+    found.push({ systemId, jumps, index });
   }
   found.sort((a, b) => a.index - b.index || a.jumps - b.jumps || a.systemId - b.systemId);
   return found.slice(0, limit);

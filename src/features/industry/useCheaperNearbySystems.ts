@@ -13,7 +13,11 @@ export interface NearbyCostIndex {
   security: number;
   jumps: number;
   index: number;
-  /** An NPC station there runs industry jobs, so the plan can move to one. */
+  /**
+   * True when the list confirmed an NPC station running industry jobs there.
+   * False for a reaction plan and when the list could not be read, so a move
+   * keeps the plan's facility.
+   */
   npcStation: boolean;
 }
 

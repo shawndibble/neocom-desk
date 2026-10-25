@@ -1,7 +1,9 @@
 /**
  * Which solar systems have an NPC station that runs industry jobs, from ESI's
  * public facility list. The list is static between expansions, so one read
- * serves the session. `null` is the offline signal: callers then skip the
+ * serves the session. `public/data/market/stations.json` cannot stand in: it
+ * lists every NPC station but carries no services, so it cannot say which
+ * ones run industry jobs. `null` is the offline signal: callers then skip the
  * filter rather than treat every system as having no station.
  */
 import { getIndustryFacilities } from '@/esi/endpoints';
