@@ -1,6 +1,6 @@
-import { collection, deleteDoc, doc, getDocs, query, setDoc, where } from 'firebase/firestore/lite';
+import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore/lite';
 import { db } from '@/db';
-import { INTERNAL_PREFIX } from './localBookkeeping';
+import { INTERNAL_PREFIX, writePullCursor } from './localBookkeeping';
 import {
   mergeSettings,
   type RemoteSyncedSetting,
@@ -8,7 +8,7 @@ import {
   type SyncedSettingValue,
 } from './merge';
 import { SYNCED_SETTINGS } from './syncedCollections';
-import type { SyncContext } from './collectionSync';
+import { pullOwnedDocs, type SyncContext } from './collectionSync';
 
 // Local bookkeeping (Dexie settings table). 'sync.__' keys are internal and
 // never synced; 'sync.' keys are the user settings that DO sync.
@@ -54,24 +54,40 @@ export async function writeSettingsTombstones(tombstones: SyncedSettingTombstone
 
 export async function syncSettings(ctx: SyncContext): Promise<void> {
   const { firestore, uid, ownerHash, now } = ctx;
-  // The second `ownerHash` read, and under the same index constraint as
-  // `fetchOwnedDocs` — see its docstring. Deliberately unwindowed: settings
-  // tombstones never expire and `mergeSettings`' absence semantics differ.
   const settingsCol = collection(firestore, 'characters', uid, SYNCED_SETTINGS.remoteName);
-  const snapshot = await getDocs(query(settingsCol, where('ownerHash', '==', ownerHash)));
+  // Incremental like every editable collection (issue #5045): a pass with no
+  // settings changes costs one read, not one per synced key. An unstamped
+  // value (useSyncedSetting's seed) must lose to any remote copy, which only
+  // a full read can show — so its presence forces one. That is a one-off: the
+  // pass stamps what it pushes.
+  const unstamped = await hasUnstampedSetting();
+  const pull = await pullOwnedDocs<RemoteSyncedSetting & { ownerHash: string }>(
+    settingsCol,
+    ctx,
+    SYNCED_SETTINGS.remoteName,
+    unstamped
+  );
   // Only honour well-formed synced keys: a hostile or stale doc naming a
   // non-synced Dexie key ('activeCharacterId') or an internal 'sync.__' key
   // must never reach Dexie.
-  const remoteSettings = snapshot.docs
-    .map((d) => d.data() as RemoteSyncedSetting)
-    .filter((s) => typeof s.key === 'string' && isSyncedSettingKey(s.key));
+  const remoteSettings = pull.remote.filter(
+    (s) => typeof s.key === 'string' && isSyncedSettingKey(s.key)
+  );
   const meta = await readSettingsMeta();
   const settingsTombstones = await readSettingsTombstones();
   const localSettings: SyncedSettingValue[] = (await db.settings.toArray())
     .filter((record) => isSyncedSettingKey(record.key))
     .map((record) => ({ key: record.key, value: record.value, updatedAt: meta[record.key] ?? 0 }));
 
-  const settings = mergeSettings(localSettings, settingsTombstones, remoteSettings, now);
+  const settings = mergeSettings(
+    localSettings,
+    settingsTombstones,
+    remoteSettings,
+    now,
+    pull.since
+  );
+  /** Whether the apply below dropped a pull or delete a mid-pass local write overtook. */
+  let skipped = false;
   /** LWW stamps this pass wants to record, applied under the transaction below. */
   const stamps = new Map<string, number>();
 
@@ -116,6 +132,8 @@ export async function syncSettings(ctx: SyncContext): Promise<void> {
       const untouched = (key: string) => current[key] === meta[key];
       const pull = settings.pull.filter((s) => untouched(s.key));
       const deleteLocal = settings.deleteLocal.filter(untouched);
+      skipped =
+        pull.length < settings.pull.length || deleteLocal.length < settings.deleteLocal.length;
       let dirty = false;
       for (const [key, updatedAt] of stamps) {
         if (!untouched(key)) continue;
@@ -147,4 +165,17 @@ export async function syncSettings(ctx: SyncContext): Promise<void> {
     const cleared = new Set(settings.clearLocalTombstones);
     await writeSettingsTombstones(settingsTombstones.filter((t) => !cleared.has(t.key)));
   }
+
+  // Last, once every write above landed (a throw leaves the cursor alone), and
+  // not at all if the apply dropped a remote doc: advancing past it would hide
+  // it from every later window, so the next pass re-reads the same one.
+  if (!skipped) await writePullCursor(pull.cursorKey, pull.next);
+}
+
+/** A synced value with no LWW stamp yet: written by a bare put, never through setSyncedSetting. */
+async function hasUnstampedSetting(): Promise<boolean> {
+  const meta = await readSettingsMeta();
+  const keys = await db.settings.toCollection().primaryKeys();
+  // Same test mergeSettings applies (`meta[key] ?? 0`), so the two never disagree.
+  return keys.some((key) => isSyncedSettingKey(String(key)) && !((meta[String(key)] ?? 0) > 0));
 }
