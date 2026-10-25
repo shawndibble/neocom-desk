@@ -19,6 +19,8 @@ import { readTrading, tradingNotes, tradingProfit, tradingSource } from './tradi
 import type { KindView, ListRow, TableModel } from './types';
 import { buildProfit, buildsSource, vsPrevious } from './worldModels';
 
+// Keys a `${prefix}.word` template names pin `word` in every lazy locale section into the
+// startup shell (localeSplit's third shape), so a key whose last segment is common stays literal.
 const W = 'overview.widgets.profit';
 const C = 'overview.widgets.chart.profit';
 /** The chart strings every bar chart shares. */
@@ -56,7 +58,7 @@ const bothProfit: Builder = (feeds, ctx) => {
     now,
     range
   );
-  const label = (source: ProfitOrigin) => t(`${W}.source.${source}`);
+  const label = (source: ProfitOrigin) => t(`overview.widgets.profit.source.${source}`);
   const { builds: buildsTotal, trading: tradingTotal } = combined.totals;
 
   const notes = [
@@ -84,7 +86,7 @@ const bothProfit: Builder = (feeds, ctx) => {
 
   const { daily, buckets } = combined.buckets;
   const { builds: buildValues, trading: tradeValues, total: totals } = combined.series;
-  const summary = t(`${C}.summaryBoth`, {
+  const summary = t('overview.widgets.chart.profit.summaryBoth', {
     total: formatIskCompactSigned(combined.total),
     builds: formatIskCompactSigned(buildsTotal),
     trading: formatIskCompactSigned(tradingTotal),
@@ -106,7 +108,7 @@ const bothProfit: Builder = (feeds, ctx) => {
   const view: KindView = {
     ...blank(to, statusOf(buildsFeed, { isEmpty: empty })),
     ...(trades ? { fetchedAt: trades.fetchedAt } : {}),
-    emptyMessage: t(`${W}.emptyBoth`),
+    emptyMessage: t('overview.widgets.profit.emptyBoth'),
     // A Character in scope with no wallet read: the builds still show, with the grant Trading needs under them.
     ...(trades && read === null ? { grantEndpoints: WALLET_TRADE_ENDPOINTS } : {}),
     number: {
@@ -144,7 +146,7 @@ const bothProfit: Builder = (feeds, ctx) => {
           low: formatIskCompactSigned(Math.min(...known)),
           high: formatIskCompactSigned(Math.max(...known)),
           xStart: t(daily ? `${CS}.daysAgo` : `${CS}.weeksAgo`, { count: buckets }),
-          xEnd: t(daily ? `${CS}.today` : `${CS}.thisWeek`),
+          xEnd: t(daily ? `${CS}.today` : 'overview.widgets.chart.thisWeek'),
           tips: rollingTitles(t, daily ? 'day' : 'week', buckets).map((title, i) => ({
             title,
             rows: [

@@ -173,7 +173,7 @@ export const tradingProfit: Builder = (feeds, ctx) => {
     ...base,
     ...blank(HISTORY_PATH, statusOf(feed, { isEmpty: empty })),
     fetchedAt: data.fetchedAt,
-    emptyMessage: t(`${W}.empty`),
+    emptyMessage: t('overview.widgets.profit.trading.empty'),
     number: {
       value: total.matched > 0 ? formatIskCompactSigned(total.margin) : UNKNOWN,
       ...(total.matched > 0 ? { iskAmount: total.margin } : {}),
