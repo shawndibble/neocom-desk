@@ -18,6 +18,7 @@ const option = (typeId: number, name: string, capacityM3: number): HaulerOption 
   trips: 1,
   pickups: [],
   unfitCount: 0,
+  overLimitCount: 0,
   tooBigCount: 0,
 });
 

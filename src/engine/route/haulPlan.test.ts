@@ -263,3 +263,72 @@ describe('planHaul', () => {
     });
   });
 });
+
+describe('planHaul with a max ISK per haul', () => {
+  const stack = (quantity: number, unitIsk?: number, typeId = 34): HaulStack => ({
+    typeId,
+    name: `Type ${typeId}`,
+    quantity,
+    unitM3: 1,
+    ...(unitIsk === undefined ? {} : { unitIsk }),
+  });
+  const withStacks = (stacks: HaulStack[]): HaulPickupInput => ({
+    ...pickup(
+      P1,
+      P1,
+      stacks.reduce((n, s) => n + s.quantity * s.unitM3, 0)
+    ),
+    stacks,
+  });
+  const go = (stacks: HaulStack[], maxIskPerHaul?: number | null, capacityM3 = 100) =>
+    planHaul({
+      graph: LINE,
+      characters: [character([withStacks(stacks)])],
+      capacityM3,
+      destination,
+      maxIskPerHaul,
+    });
+  const deliveries = (plan: ReturnType<typeof go>) =>
+    plan.sections.flatMap((s) => s.legs).filter((l) => l.kind === 'delivery');
+
+  it('with no limit, one trip carries it all', () => {
+    const plan = go([stack(10, 100)]);
+    expect(plan.sections[0].trips).toBe(1);
+    expect(deliveries(plan)[0].isk).toBe(1_000);
+  });
+
+  it('makes more trips under a limit and no trip is worth more than it', () => {
+    const plan = go([stack(10, 100)], 350);
+    expect(plan.sections[0].trips).toBe(4);
+    expect(deliveries(plan).map((l) => l.isk)).toEqual([300, 300, 300, 100]);
+    expect(plan.leftOut).toEqual([]);
+    expect(plan.totals.m3).toBe(10);
+  });
+
+  it('counts every unit exactly once across trips', () => {
+    const plan = go([stack(7, 100, 34), stack(5, 250, 35)], 600);
+    const units = plan.sections
+      .flatMap((s) => s.legs)
+      .flatMap((l) => (l.kind === 'pickup' ? (l.stacks ?? []) : []))
+      .reduce((n, s) => n + s.quantity, 0);
+    expect(units).toBe(12);
+    for (const d of deliveries(plan)) expect(d.isk).toBeLessThanOrEqual(600);
+  });
+
+  it('reports a unit that cannot ride at all instead of looping', () => {
+    const plan = go([stack(2, 900)], 500);
+    expect(plan.leftOut).toHaveLength(1);
+    expect(plan.leftOut[0].reason).toBe('overLimit');
+  });
+
+  it('ignores the limit for a pickup with no stacks', () => {
+    const plan = planHaul({
+      graph: LINE,
+      characters: [character([pickup(P1, P1, 10)])],
+      capacityM3: 100,
+      destination,
+      maxIskPerHaul: 1,
+    });
+    expect(plan.sections[0].trips).toBe(1);
+  });
+});

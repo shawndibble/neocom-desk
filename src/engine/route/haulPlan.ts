@@ -32,6 +32,8 @@ export interface HaulStack {
   quantity: number;
   /** m³ of one unit as hauled. */
   unitM3: number;
+  /** ISK one unit is worth; absent when unpriced (counts as 0 against a limit). */
+  unitIsk?: number;
 }
 
 export interface HaulPickupInput extends HaulPlace {
@@ -63,6 +65,12 @@ export interface HaulInput {
   destination: HaulPlace;
   /** Pickup visits per Character; defaults to `MAX_STOPS`. */
   maxStops?: number;
+  /**
+   * Most one trip's load may be worth, in ISK; null or absent for no limit.
+   * Applies to pickups that carry `stacks` with `unitIsk`; a pickup without
+   * stacks has no values to count.
+   */
+  maxIskPerHaul?: number | null;
 }
 
 export interface HaulLeg {
@@ -79,6 +87,8 @@ export interface HaulLeg {
   /** `null` when no gate route joins the ends, or an end has no system. */
   jumps: number | null;
   m3: number;
+  /** ISK the leg's load is worth by its stacks' `unitIsk`; absent on a flight and on a haul saved before values. */
+  isk?: number;
   /** The pickup location a `pickup` leg loads at. */
   locationId: number | null;
   /** The items a `pickup` leg loads; absent on a delivery and on a haul saved before items. */
@@ -101,8 +111,8 @@ export interface HaulLeftOut {
   /** The pickup's name. */
   place: string;
   m3: number;
-  /** `cap`: past the stop cap. `unplaced`: no system to route to. `noCapacity`: no hold to carry it in. */
-  reason: 'cap' | 'unplaced' | 'noCapacity';
+  /** `cap`: past the stop cap. `unplaced`: no system to route to. `noCapacity`: no hold to carry it in. `overLimit`: a unit that cannot ride in one trip. */
+  reason: 'cap' | 'unplaced' | 'noCapacity' | 'overLimit';
 }
 
 export interface HaulPlan {
@@ -129,6 +139,12 @@ const EPS = 1e-9;
 export function planHaul(input: HaulInput): HaulPlan {
   const { graph, options = {}, characters, capacityM3, destination } = input;
   const maxStops = input.maxStops ?? MAX_STOPS;
+  const maxIsk =
+    typeof input.maxIskPerHaul === 'number' &&
+    Number.isFinite(input.maxIskPerHaul) &&
+    input.maxIskPerHaul > 0
+      ? input.maxIskPerHaul
+      : null;
   const sweeps = new Map<number, ReadonlyMap<number, number>>();
   const jumpsBetween = (from: number | null, to: number | null): number | null => {
     if (from === null || to === null) return null;
@@ -172,7 +188,8 @@ export function planHaul(input: HaulInput): HaulPlan {
       m3: number,
       locationId: number | null,
       stacks?: HaulStack[],
-      ships?: string[]
+      ships?: string[],
+      isk?: number
     ) =>
       legs.push({
         id: nextId++,
@@ -183,6 +200,7 @@ export function planHaul(input: HaulInput): HaulPlan {
         to,
         jumps: from === null ? null : jumpsBetween(from.systemId, to.systemId),
         m3,
+        ...(isk !== undefined ? { isk } : {}),
         locationId,
         ...(stacks ? { stacks } : {}),
         ...(ships ? { ships } : {}),
@@ -192,6 +210,8 @@ export function planHaul(input: HaulInput): HaulPlan {
     while (!capped && left.some((l) => l.m3 > EPS)) {
       trips += 1;
       let hold = 0;
+      let holdIsk = 0;
+      let valued = false;
       let here: HaulPlace | null = start;
       let loaded = false;
       while (hold < capacityM3 - EPS) {
@@ -202,21 +222,62 @@ export function planHaul(input: HaulInput): HaulPlan {
           break;
         }
         const next = nearest(open, here, jumpsBetween);
-        const take = Math.min(next.m3, capacityM3 - hold);
-        const last = next.m3 - take <= EPS;
-        const stacks = next.stacks ? takeStacks(next.stacks, take, last) : undefined;
-        leg(trips, 'pickup', here, next.pickup, take, next.pickup.locationId, stacks);
-        next.m3 -= take;
+        // Under a limit the stacks decide what rides: a take is whole units that
+        // fit the room in both m³ and ISK, and what is left stays for the next trip.
+        const limited = maxIsk !== null && next.stacks !== null;
+        let take = Math.min(next.m3, capacityM3 - hold);
+        let stacks: HaulStack[] | undefined;
+        if (limited) {
+          stacks = takeStacks(next.stacks!, take, false, maxIsk - holdIsk);
+          take = stacks.reduce((sum, s) => sum + s.quantity * s.unitM3, 0);
+          next.m3 = next.stacks!.reduce((sum, s) => sum + s.quantity * s.unitM3, 0);
+          if (stacks.length === 0) {
+            if (hold > 0) break; // this trip is full
+            // Not even one unit rides an empty hold: report it, never loop on it.
+            leftOut.push(leftOutOf(c, next.pickup, next.m3, 'overLimit'));
+            next.m3 = 0;
+            continue;
+          }
+        } else {
+          const last = next.m3 - take <= EPS;
+          stacks = next.stacks ? takeStacks(next.stacks, take, last, null) : undefined;
+          next.m3 -= take;
+        }
+        const isk = stacks?.reduce((sum, s) => sum + s.quantity * (s.unitIsk ?? 0), 0);
+        if (isk !== undefined && stacks?.some((s) => s.unitIsk !== undefined)) valued = true;
+        leg(
+          trips,
+          'pickup',
+          here,
+          next.pickup,
+          take,
+          next.pickup.locationId,
+          stacks,
+          undefined,
+          valued ? isk : undefined
+        );
+        holdIsk += isk ?? 0;
         hold += take;
         visits += 1;
         loaded = true;
         here = next.pickup;
+        if (maxIsk !== null && holdIsk >= maxIsk - EPS) break;
       }
       if (!loaded) {
         trips -= 1;
         break;
       }
-      leg(trips, 'delivery', here, destination, hold, null);
+      leg(
+        trips,
+        'delivery',
+        here,
+        destination,
+        hold,
+        null,
+        undefined,
+        undefined,
+        valued ? holdIsk : undefined
+      );
       start = destination;
     }
 
@@ -264,19 +325,28 @@ export function planHaul(input: HaulInput): HaulPlan {
  * Whole units only, so a non-last leg may sit up to a unit under its m³ (or
  * take none of a unit bigger than its room). The `last` take of a pickup gets
  * whatever is left so no unit is lost, which can sit over that leg's m³ by the
- * units earlier legs could not fit.
+ * units earlier legs could not fit. With `iskRoom` (an ISK limit) a take also
+ * stops at that much value, and `last` must be false so no unit rides over it.
  */
-function takeStacks(stacks: HaulStack[], m3: number, last: boolean): HaulStack[] {
+function takeStacks(
+  stacks: HaulStack[],
+  m3: number,
+  last: boolean,
+  iskRoom: number | null
+): HaulStack[] {
   const taken: HaulStack[] = [];
   let room = m3;
   for (const s of stacks) {
     if (s.quantity <= 0) continue;
     const fit = s.unitM3 > 0 ? Math.floor((room + EPS) / s.unitM3) : s.quantity;
-    const n = last ? s.quantity : Math.min(s.quantity, fit);
+    let n = last ? s.quantity : Math.min(s.quantity, fit);
+    const unitIsk = s.unitIsk ?? 0;
+    if (iskRoom !== null && unitIsk > 0) n = Math.min(n, Math.floor((iskRoom + EPS) / unitIsk));
     if (n <= 0) continue;
     taken.push({ ...s, quantity: n });
     s.quantity -= n;
     room -= n * s.unitM3;
+    if (iskRoom !== null) iskRoom -= n * unitIsk;
   }
   return taken;
 }
