@@ -23,9 +23,20 @@ vi.mock('@/features/character/contracts', () => ({ loadContracts: mocks.contract
 vi.mock('@/features/character/contractItems', () => ({
   loadContractItemsDetailed: mocks.detailed,
 }));
+// The board (`mocks.requests`) and every Pledge on it (`mocks.pledges`), read the way the
+// sweep reads them: only this Character's Pledges, then only the Requests they are on.
 vi.mock('./requestStore', () => ({
-  loadRequests: mocks.requests,
-  loadCommunityPledges: mocks.pledges,
+  loadRequestsById: async (_c: number, _community: string, ids: readonly string[]) =>
+    ((await mocks.requests()) as CommunityRequest[]).filter((r) => ids.includes(r.id)),
+  loadMyPledges: async () => {
+    const all = (await mocks.pledges()) as Map<string, RequestPledge[]>;
+    const mine = new Map<string, RequestPledge>();
+    for (const [id, list] of all) {
+      const own = list.find((p) => p.uid === `char:${ME}`);
+      if (own) mine.set(id, own);
+    }
+    return mine;
+  },
   updateMyPledge: mocks.update,
 }));
 

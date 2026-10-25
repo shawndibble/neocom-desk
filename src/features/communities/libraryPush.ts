@@ -33,7 +33,7 @@ import { lookupSolarSystem } from '@/sde/solarSystems';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { loadPlacedBlueprints } from './blueprintPlacement';
-import { listCommunityIds } from './communityStore';
+import { invalidateCommunityRoster, listCommunityIds } from './communityStore';
 import { loadBlueprintShare } from './shareSelection';
 
 /**
@@ -156,6 +156,8 @@ async function publish(characterId: number, communityId: string): Promise<Publis
     libraryHash: hash,
     chunkCount: chunks.length,
   });
+  // The roster read before this push carries the old stamp: this device shows the new library.
+  invalidateCommunityRoster(characterId, communityId);
   return { outcome: plan, skipped };
 }
 
@@ -211,5 +213,6 @@ export async function removeSharedLibraries(characterId: number): Promise<void> 
     });
     await Promise.all(chunks.docs.map((chunk) => deleteDoc(chunk.ref)));
     await updateDoc(member, { pushedAt: serverTimestamp(), libraryHash: '', chunkCount: 0 });
+    invalidateCommunityRoster(characterId, communityId);
   }
 }

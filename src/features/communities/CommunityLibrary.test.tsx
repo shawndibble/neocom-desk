@@ -47,7 +47,7 @@ vi.mock('@/features/route/currentSystem', () => ({
 }));
 const live = vi.hoisted(() => ({ offline: false, unreadable: false }));
 vi.mock('./communityStore', () => ({
-  loadMemberLibrariesDetailed: async () => {
+  loadMemberLibrariesFor: async () => {
     if (live.offline) throw new TypeError('Failed to fetch');
     return {
       libraries: [

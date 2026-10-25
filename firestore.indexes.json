@@ -255,6 +255,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "pledges",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "communityId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "ownerHash",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
