@@ -32,6 +32,7 @@ describe('LANDING_SCOPE_GROUPS', () => {
       'corpProjects',
       'jumpFatigue',
       'killmails',
+      'mercenaryDens',
       'structureMarkets',
     ]);
   });

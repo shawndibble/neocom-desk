@@ -33,8 +33,9 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
 /**
  * Every named Scope Group (user-facing: **Permission**) a scope outside the
  * **Core Grant** can belong to. Thirteen are default-on — granted at sign-in
- * along with the Core Grant, together forming the **Base Grant** — and two
- * (`corp`, `structureMarkets`) are opt-in: a Character is asked for them only
+ * along with the Core Grant, together forming the **Base Grant** — and the rest
+ * (`corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`,
+ * `mercenaryDens`) are opt-in: a Character is asked for them only
  * when they ask for the feature, never at sign-in with everyone else.
  *
  * `corp` exists because the corp section needs ten scopes that ~95% of users
@@ -71,6 +72,7 @@ export const SCOPE_GROUPS = [
   'jumpFatigue',
   'corpProjects',
   'killmails',
+  'mercenaryDens',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -190,6 +192,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
     captionKey: 'permissions.killmails.caption',
     defaultOn: false,
   },
+  mercenaryDens: {
+    labelKey: 'permissions.mercenaryDens.label',
+    captionKey: 'permissions.mercenaryDens.caption',
+    defaultOn: false,
+  },
 };
 
 export interface EsiEndpointSpec {
@@ -203,9 +210,9 @@ export interface EsiEndpointSpec {
    * structure lookup and search) — so leaving it off is the rare case,
    * reserved for those.
    *
-   * Every other endpoint declares one of the 15 `SCOPE_GROUPS`: the thirteen
+   * Every other endpoint declares one of the 21 `SCOPE_GROUPS`: the fifteen
    * default-on ones together with the Core Grant make up the **Base Grant**
-   * (`SCOPES` in `scopes.ts`), and `corp`/`structureMarkets` stay opt-in.
+   * (`SCOPES` in `scopes.ts`), and the other six stay opt-in.
    *
    * Declared per endpoint rather than per scope, which is why
    * `scopes.test.ts` asserts a scope repeated across endpoints always
@@ -466,27 +473,29 @@ export const ESI_REGISTRY = {
   },
   /**
    * Mercenary Dens (issue #4791). Character routes only: ESI has no corp den
-   * list and no role. In the default-on `planets` Permission, not an opt-in group.
+   * list and no role. Their own opt-in `mercenaryDens` Permission (issue #5153),
+   * not the default-on `planets` one: a niche feature should not cost everyone a
+   * consent-screen line.
    */
   getCharacterMercenaryDens: {
     route: '/characters/{character_id}/structures/mercenary-dens',
     scope: 'esi-structures.read_character.v1',
-    group: 'planets',
+    group: 'mercenaryDens',
   },
   getCharacterMercenaryDen: {
     route: '/characters/{character_id}/structures/mercenary-dens/{mercenary_den_id}',
     scope: 'esi-structures.read_character.v1',
-    group: 'planets',
+    group: 'mercenaryDens',
   },
   getCharacterMercenaryOperations: {
     route: '/characters/{character_id}/mercenary-tactical-operations',
     scope: 'esi-activities.read_character.v1',
-    group: 'planets',
+    group: 'mercenaryDens',
   },
   getCharacterMercenaryOperation: {
     route: '/characters/{character_id}/mercenary-tactical-operations/{operation_id}',
     scope: 'esi-activities.read_character.v1',
-    group: 'planets',
+    group: 'mercenaryDens',
   },
   getCharacterPlanet: {
     route: '/characters/{character_id}/planets/{planet_id}',
