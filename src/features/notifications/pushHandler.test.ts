@@ -612,3 +612,86 @@ describe('server-pushed events (issue #5121)', () => {
     });
   });
 });
+
+describe('server-pushed nearby alerts (issue #5122)', () => {
+  const NOW = Date.parse('2026-10-25T12:00:00Z');
+  const HOUR = 3_600_000;
+  const skyhook = {
+    eventId: 'skyhookRaidableNearby' as const,
+    characterId: 777,
+    systemId: 30000142,
+    planetId: 40009077,
+    startMs: NOW + HOUR,
+    endMs: NOW + 2 * HOUR,
+    jumps: 2,
+  };
+  const incursion = {
+    eventId: 'incursionNearby' as const,
+    characterId: 777,
+    constellationId: 20000020,
+    stagingSystemId: 30000144,
+    state: 'established' as const,
+    jumps: 1,
+  };
+
+  /** What `functions/src/nearbyPush.ts`'s `buildNearbyPush` sends. */
+  const push = (fire: typeof skyhook | typeof incursion, extra: Record<string, string> = {}) =>
+    JSON.stringify({
+      data: {
+        characterId: '777',
+        eventId: fire.eventId,
+        occurrenceKey: 'server-key',
+        fireAt: String(NOW),
+        title: 'Generic title',
+        body: 'Generic body',
+        fire: JSON.stringify(fire),
+        ...extra,
+      },
+    });
+
+  const names = new Map([
+    [30000142, 'Jita'],
+    [40009077, 'Jita IV'],
+    [20000020, 'Kimotoro'],
+    [30000144, 'Perimeter'],
+  ]);
+
+  it('renders a raid window with the app’s own wording and resolved names', async () => {
+    const e = env({ resolveIds: vi.fn(async () => names) });
+    await handlePush(e, push(skyhook), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Raidable skyhook 2 jumps away',
+      expect.objectContaining({
+        body: 'Jita IV can be raided in 1h 0m, 2 jumps from your current system.',
+      })
+    );
+  });
+
+  it('renders an Incursion with its state, and with ids when no name resolves', async () => {
+    const e = env({ resolveIds: vi.fn(async () => new Map()) });
+    await handlePush(e, push(incursion), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Incursion 1 jump away',
+      expect.objectContaining({
+        body: 'Constellation 20000020, staging in #30000144: Established, 1 jump from your current system.',
+      })
+    );
+  });
+
+  it('writes the feed row under the key the Foreground Poller derives', async () => {
+    const e = env();
+    await handlePush(e, push(skyhook), NOW);
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: occurrenceKey(skyhook, NOW), notifiedHereAt: NOW })
+    );
+  });
+
+  it('falls back to the sender’s copy for a malformed fire', async () => {
+    const e = env();
+    await handlePush(e, push({ ...skyhook, planetId: 'x' } as never), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Generic title',
+      expect.objectContaining({ body: 'Generic body' })
+    );
+  });
+});

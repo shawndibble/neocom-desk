@@ -14,6 +14,7 @@ import { verifyEveAccessToken, type VerifyOptions } from './verifyEveToken.js';
 import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
 import { parseServerEvents, parseServerInputs, type ServerEventInputs } from './serverEvents.js';
+import type { NearbyRouteRules } from './nearbyAlerts.js';
 
 export type { ProjectionRowInput };
 
@@ -57,6 +58,12 @@ export interface RegisterDeviceInput {
    * stored window untouched; `null` clears it.
    */
   quietHours?: QuietHours | null;
+  /**
+   * This device's Travel Settings, as the nearby-alerts poller counts jumps
+   * under them (issue #5122). Absent (an older client, or a value that does not
+   * parse) leaves the stored rules untouched.
+   */
+  routeRules?: NearbyRouteRules;
 }
 
 export interface DeviceRegistrationDoc {
@@ -137,6 +144,38 @@ function parseEveTypes(raw: unknown, path: string): string[] | undefined {
   return [...new Set(raw as string[])].sort();
 }
 
+/** Avoided Systems, including pod-kill / EDENCOM / Triglavian ones; New Eden has ~8,500 gated systems. */
+export const MAX_AVOIDED_SYSTEMS = 10_000;
+const ROUTE_PREFERENCES = ['shortest', 'prefer-highsec', 'avoid-highsec'] as const;
+
+/**
+ * Lenient, unlike most of the registration: the rules only feed nearby alerts,
+ * so a value that does not parse is dropped (the stored rules stay) instead of
+ * refusing the whole upload with its Projection and types.
+ */
+function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
+  if (!isRecord(raw) || Array.isArray(raw)) return undefined;
+  const { preference, securityPenalty, avoid } = raw;
+  if (!(ROUTE_PREFERENCES as readonly unknown[]).includes(preference)) return undefined;
+  if (
+    typeof securityPenalty !== 'number' ||
+    !Number.isInteger(securityPenalty) ||
+    securityPenalty < 0 ||
+    securityPenalty > 100
+  ) {
+    return undefined;
+  }
+  if (!Array.isArray(avoid) || avoid.length > MAX_AVOIDED_SYSTEMS) return undefined;
+  if (!avoid.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) {
+    return undefined;
+  }
+  return {
+    preference: preference as NearbyRouteRules['preference'],
+    securityPenalty,
+    avoid: [...new Set(avoid as number[])].sort((a, b) => a - b),
+  };
+}
+
 /**
  * A deviceId becomes a `deviceRegistrations` doc id and the prefix of every
  * projection row id (issue #2240), so it must be a safe Firestore id: no `/`,
@@ -149,7 +188,7 @@ const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   if (!isRecord(data)) throw new Error('Request body must be an object');
 
-  const { deviceId, fcmToken, characters, quietHours } = data;
+  const { deviceId, fcmToken, characters, quietHours, routeRules } = data;
   if (typeof deviceId !== 'string' || deviceId.length === 0) {
     throw new Error('deviceId (non-empty string) is required');
   }
@@ -191,11 +230,13 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
     };
   });
 
+  const parsedRouteRules = parseRouteRules(routeRules);
   return {
     deviceId,
     fcmToken,
     characters: parsedCharacters,
     ...(quietHours !== undefined ? { quietHours: parseQuietHours(quietHours) } : {}),
+    ...(parsedRouteRules !== undefined ? { routeRules: parsedRouteRules } : {}),
   };
 }
 

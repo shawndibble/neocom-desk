@@ -113,6 +113,10 @@ export function firestorePollerStore(
       await guardedUpdate(characterId, guard, { status: 'revoked' });
     },
 
+    async dropLocationScope(characterId, guard, scopes) {
+      await guardedUpdate(characterId, guard, { scopes });
+    },
+
     async devicesFor(characterId) {
       const snap = await db
         .collection(DEVICE_REGISTRATIONS_COLLECTION)

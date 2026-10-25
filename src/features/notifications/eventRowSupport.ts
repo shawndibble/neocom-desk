@@ -6,7 +6,7 @@ import type { ScopeGroup } from '@/esi/registry';
 import { eventApplicability } from './eventApplicability';
 import { eventEntry } from './eventEntries';
 import type { NotificationEventId } from './events';
-import { isServerPushedEvent } from './serverEvents';
+import { isNearbyServerEvent, isServerPushedEvent } from './serverEvents';
 import type { NotificationPreferencesValue } from './preferences';
 import type { CharacterAvailability, CharacterRef } from './CharacterChipGrid';
 
@@ -20,8 +20,12 @@ export const EMPTY_SCOPES: ReadonlySet<string> = new Set();
  * claim the other types reach you with the app closed); `server` for one the
  * backend pushes on its own (issue #5121, `serverEvents.ts`).
  */
-export function pushBadgeKind(eventId: NotificationEventId): 'scheduled' | 'server' | null {
+export function pushBadgeKind(
+  eventId: NotificationEventId
+): 'scheduled' | 'server' | 'nearby' | null {
   if (eventEntry(eventId).projection?.everyOccurrence === true) return 'scheduled';
+  // A nearby alert reaches a closed app only under a location-capable Alerts Grant (ADR 0028).
+  if (isNearbyServerEvent(eventId)) return 'nearby';
   return isServerPushedEvent(eventId) ? 'server' : null;
 }
 

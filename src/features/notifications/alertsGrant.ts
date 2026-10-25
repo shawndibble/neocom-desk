@@ -9,11 +9,13 @@
  * "Needs re-authorizing" is therefore set by whatever learns the grant died
  * (`markAlertsNeedReauth`), and cleared by a fresh successful grant.
  */
+import { useLiveQuery } from 'dexie-react-hooks';
 import { completeAlertsLogin } from '@/auth/session';
 import { db } from '@/db';
 import { reportFailure } from '@/observability/reportFailure';
 
 const GRANTS_KEY = 'alertsGrants';
+const NEARBY_KEY = 'alertsNearby';
 const QUEUE_KEY = 'neocom.alerts.queue';
 /** Same bound as a Pending Login: a queue outlives no login that could still complete. */
 const QUEUE_TTL_MS = 15 * 60_000;
@@ -64,6 +66,59 @@ async function writeGrants(
   });
 }
 
+/**
+ * Nearby alerts on the grant (ADR 0028), as the server last reported it:
+ * whether it takes the location scope at all, and which Characters' grants
+ * carry it. `supported` stays false until a `registerDevice` answer says so,
+ * so this device never asks EVE for a grant an older deployed function would
+ * refuse.
+ */
+export interface AlertsNearby {
+  supported: boolean;
+  characterIds: number[];
+}
+
+export async function readAlertsNearby(): Promise<AlertsNearby> {
+  const value = (await db.settings.get(NEARBY_KEY))?.value as Partial<AlertsNearby> | undefined;
+  return {
+    supported: value?.supported === true,
+    characterIds: Array.isArray(value?.characterIds)
+      ? value.characterIds.filter((id): id is number => typeof id === 'number')
+      : [],
+  };
+}
+
+const NO_NEARBY: AlertsNearby = { supported: false, characterIds: [] };
+
+/** {@link readAlertsNearby}, live. Reads as unsupported until loaded. */
+export function useAlertsNearby(): AlertsNearby {
+  return useLiveQuery(readAlertsNearby, []) ?? NO_NEARBY;
+}
+
+async function writeNearby(change: (ids: Set<number>) => void, supported?: true): Promise<void> {
+  await db.transaction('rw', db.settings, async () => {
+    const current = await readAlertsNearby();
+    const ids = new Set(current.characterIds);
+    change(ids);
+    const value: AlertsNearby = {
+      supported: supported ?? current.supported,
+      characterIds: [...ids].sort((a, b) => a - b),
+    };
+    await db.settings.put({ key: NEARBY_KEY, value });
+  });
+}
+
+/** A `registerDevice` answer's `nearbyGrants`; absent (an older server, a failed read) changes nothing. */
+export async function recordAlertsNearby(
+  nearbyGrants: readonly number[] | undefined
+): Promise<void> {
+  if (nearbyGrants === undefined) return;
+  await writeNearby((ids) => {
+    ids.clear();
+    for (const id of nearbyGrants) ids.add(id);
+  }, true);
+}
+
 /** The server told us, or a poll learned, that this Character's grant is dead. */
 export async function markAlertsNeedReauth(characterId: number): Promise<void> {
   await writeGrants((grants) => {
@@ -78,6 +133,9 @@ export async function markAlertsNeedReauth(characterId: number): Promise<void> {
 export async function forgetAlertsGrants(characterIds: readonly number[]): Promise<void> {
   await writeGrants((grants) => {
     for (const id of characterIds) delete grants[id];
+  });
+  await writeNearby((ids) => {
+    for (const id of characterIds) ids.delete(id);
   });
 }
 
@@ -100,9 +158,10 @@ export async function completeAlertsGrant(params: {
       authorizedName: result.name,
     };
   }
+  let saved: { nearby?: boolean } | void;
   try {
     const { saveAlertGrantRemote } = await import('@/sync/alertsGrantApi');
-    await saveAlertGrantRemote({
+    saved = await saveAlertGrantRemote({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     });
@@ -113,6 +172,15 @@ export async function completeAlertsGrant(params: {
   await writeGrants((grants) => {
     grants[result.characterId] = { status: 'active', enabledAt: Date.now() };
   });
+  // Only a server that knows the location scope says `nearby`, so this also
+  // proves the server takes it.
+  if (typeof saved?.nearby === 'boolean') {
+    const nearby = saved.nearby;
+    await writeNearby((ids) => {
+      if (nearby) ids.add(result.characterId);
+      else ids.delete(result.characterId);
+    }, true);
+  }
   return { status: 'on', characterId: result.characterId, name: result.name };
 }
 

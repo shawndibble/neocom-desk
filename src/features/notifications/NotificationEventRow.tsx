@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import { AggregateRow } from './AggregateRow';
 import { PermissionNote } from './PermissionNote';
-import { ScheduledPushBadge } from './ScheduledPushBadge';
+import { NearbyPushBadge, ScheduledPushBadge } from './ScheduledPushBadge';
 import { EventThresholdsList } from './EventThresholdsList';
 import { eventEntry } from './eventEntries';
 import { eventLabelKey, isCorpEventId, type NotificationEventId } from './events';
@@ -74,7 +74,13 @@ export function NotificationEventRow({
   return (
     <AggregateRow
       label={t(eventLabelKey(eventId))}
-      labelAccessory={badge === null ? undefined : <ScheduledPushBadge kind={badge} />}
+      labelAccessory={
+        badge === null ? undefined : badge === 'nearby' ? (
+          <NearbyPushBadge />
+        ) : (
+          <ScheduledPushBadge kind={badge} />
+        )
+      }
       characters={context.characters}
       availability={availability}
       readValue={(id, channel) =>

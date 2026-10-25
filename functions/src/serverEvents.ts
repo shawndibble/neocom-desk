@@ -65,7 +65,16 @@ export interface ServerEventInputs {
   priceAlerts?: PriceAlertInput[];
   /** 0 or absent: every loss. */
   shipLostMinimumIsk?: number;
+  /** The Character's N for `incursionNearby` (issue #5122): jumps from its location that count as near. */
+  incursionNearbyJumps?: number;
+  /** The Character's N for `skyhookRaidableNearby` (issue #5122). */
+  skyhookRaidableNearbyJumps?: number;
 }
+
+/** The app's options top out at 20; anything sane fits. */
+const MAX_NEARBY_JUMPS = 100;
+const nearbyJumps = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_NEARBY_JUMPS;
 
 const positiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
@@ -90,7 +99,13 @@ function parsePriceAlert(raw: unknown, path: string): PriceAlertInput {
 export function parseServerInputs(raw: unknown, path: string): ServerEventInputs | undefined {
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) throw new Error(`${path}, if present, must be an object`);
-  const { priceStationId, priceAlerts, shipLostMinimumIsk } = raw;
+  const {
+    priceStationId,
+    priceAlerts,
+    shipLostMinimumIsk,
+    incursionNearbyJumps,
+    skyhookRaidableNearbyJumps,
+  } = raw;
   const inputs: ServerEventInputs = {};
   // Lenient, unlike the rest of the registration: the alerts are the user's own
   // Quickbar data (no cap, free-text names), and one odd item must not fail
@@ -116,6 +131,11 @@ export function parseServerInputs(raw: unknown, path: string): ServerEventInputs
       throw new Error(`${path}.shipLostMinimumIsk must be a non-negative number`);
     }
     inputs.shipLostMinimumIsk = shipLostMinimumIsk;
+  }
+  // Lenient like the price alerts: a bad N only loses that nearby alert.
+  if (nearbyJumps(incursionNearbyJumps)) inputs.incursionNearbyJumps = incursionNearbyJumps;
+  if (nearbyJumps(skyhookRaidableNearbyJumps)) {
+    inputs.skyhookRaidableNearbyJumps = skyhookRaidableNearbyJumps;
   }
   return inputs;
 }

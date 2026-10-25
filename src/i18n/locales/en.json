@@ -4184,7 +4184,7 @@
       },
       "token": {
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
+        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications and, for nearby alerts, its location. Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
       },
       "offline": {
         "name": "Your data stays when the signal goes",
@@ -11022,6 +11022,7 @@
     "alertsOffer": {
       "title": "Get alerts when Neocom is closed?",
       "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings.",
+      "bodyNearby": "Turn on alerts for {{name}}. EVE asks you to authorize notifications and location only, for EVE notifications and nearby Incursions and raidable skyhooks. You can change this per character in Settings.",
       "enable": "Turn on",
       "dismiss": "Not now"
     },
@@ -11156,7 +11157,13 @@
         "title_one": "Incursion {{count}} jump away",
         "title_other": "Incursion {{count}} jumps away",
         "body_one": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jump from your current system.",
-        "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system."
+        "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system.",
+        "constellationUnnamed": "Constellation {{id}}",
+        "state": {
+          "mobilizing": "Mobilizing",
+          "established": "Established",
+          "withdrawing": "Withdrawing"
+        }
       },
       "skyhookRaidableNearby": {
         "windowOpen": "now, for another {{duration}}",
@@ -12863,10 +12870,10 @@
         "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
-        "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences both kinds; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
-        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a notifications-only grant per Character.",
+        "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, and nearby Incursions and raidable skyhooks, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences every closed-app push; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
+        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a grant per Character for notifications and, for nearby alerts, location only.",
         "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
-        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, notifications only, and our server checks EVE's notifications about every 15 minutes and pushes the types you chose, with their text, via Google's push service. It doesn't keep them, and turning it off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
+        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, for notifications and location only, and our server checks EVE's notifications and the Character's solar system about every 15 minutes and pushes the types you chose, with their text, and any Incursion or raidable skyhook within your jump limit, via Google's push service. It doesn't keep them, and turning it off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
         "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
         "rowMenus": "Tables with several actions per row show a ⋮ (More actions) button at the end. Right-click the row, or touch and hold on a phone, for the same menu. Overview widgets and fitting tiles have menus too. No ⋮: the row has one action, so just click it.",
         "phone": "Yes. A phone browser or home-screen install gets a narrower layout with bottom navigation. It's designed desktop-first, beside the game, so dense tables and editors are easier on a big screen. The age badge is hidden on a phone. On iPhone and iPad, notifications need the installed app.",
@@ -12918,7 +12925,7 @@
           "walletHistory": "A year of wallet journal and transactions, longer than the 30 days EVE returns. Not in backups.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
-          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character. A Corp Tax Book's Automatic sync is the other: an officer who turns it on leaves a separate, encrypted token with a few corporation reads on our server, deleted when they or the CEO turn it off or they lose the role.",
+          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted token on our server, limited to notifications and location, for each character you turn it on for, deleted when you turn it off or remove the character. A Corp Tax Book's Automatic sync is the other: an officer who turns it on leaves a separate, encrypted token with a few corporation reads on our server, deleted when they or the CEO turn it off or they lose the role.",
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
@@ -13041,11 +13048,16 @@
         "more": "+{{count}} more",
         "hint": "EVE notifications, like a structure under attack, while the app is closed. Authorizes one Character for notifications only; Turn off deletes our encrypted token.",
         "stores": "Stores an encrypted, notifications-only token on our server.",
+        "hintNearby": "EVE notifications, like a structure under attack, and nearby Incursions and raidable skyhooks, while the app is closed. Authorizes one Character for notifications and location only; Turn off deletes our encrypted token.",
+        "storesNearby": "Stores an encrypted token on our server that reads only notifications and location.",
         "state": {
           "off": "Off",
           "on": "On",
-          "needs-reauth": "Needs re-authorizing"
+          "needs-reauth": "Needs re-authorizing",
+          "onWithoutNearby": "On, without nearby alerts"
         },
+        "addNearby": "Add nearby",
+        "addNearbyFor": "Re-authorize {{name}} to add nearby Incursions and raidable skyhooks",
         "turnOn": "Turn on",
         "turnOnFor": "Turn on alerts when closed for {{name}}",
         "turnOff": "Turn off",
@@ -13141,6 +13153,7 @@
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed, up to 72 hours ahead. Needs notification permission; on iPhone and iPad, the installed app.",
       "serverPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
+      "nearbyPushBadge": "Arrives even with the app closed, within about 15 minutes, for Characters whose Alerts when closed includes nearby alerts. Needs notification permission; on iPhone and iPad, the installed app.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
       "extractorExpiringLeadTimeOption_one": "{{count}} hour",
       "extractorExpiringLeadTimeOption_other": "{{count}} hours",

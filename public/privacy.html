@@ -88,15 +88,23 @@
       <p>
         There is one opt-in exception. If you turn on <strong>Alerts when closed</strong> for a
         character in Settings &rarr; Notifications, you authorize that character a second time on
-        EVE's login page, for one permission only: reading its notifications. An encrypted copy of
-        that separate notifications-only token is stored on the app operator's server (Google
-        Firebase), so the server can check for new notifications while the app is closed. It cannot
-        read assets, wallet, mail, skills or anything else, and it is never written to your device
-        or to logs. About every 15 minutes the server uses it to read that character's notifications
-        from EVE and pushes the types you enabled to your device through Google's push service; each
-        push carries the notification's type, time and (size-capped) text. The server keeps only
-        bookkeeping for this — which notifications it has already handled and which notification
-        types it has seen for the character — not the notifications themselves. Turn the setting
+        EVE's login page, for two permissions only: reading its notifications and, for nearby
+        alerts, its current location (a character authorized before nearby alerts existed has the
+        notifications permission alone until you re-authorize it). An encrypted copy of that
+        separate token is stored on the app operator's server (Google Firebase), so the server can
+        check for new notifications while the app is closed. It cannot read assets, wallet, mail,
+        skills or anything else, and it is never written to your device or to logs. About every 15
+        minutes the server uses it to read that character's notifications from EVE and pushes the
+        types you enabled to your device through Google's push service; each push carries the
+        notification's type, time and (size-capped) text. With the location permission it also reads
+        which solar system the character is in, and pushes an Incursion or raidable skyhook within
+        the number of jumps you chose; for this, each device's registration also stores the nearby
+        alerts it enabled, their jump limits and the route settings it counts jumps by. The server
+        keeps only bookkeeping for this — which notifications it has already handled, which
+        notification types it has seen for the character, and which nearby Incursions and raid
+        windows it last saw in range and the system it counted them from, replaced on every check
+        and dropped when the character is not checked or the setting is turned off — not the
+        notifications themselves, and no history of where the character has been. Turn the setting
         off, remove the character, log out or use <strong>Delete all data</strong> and the token is
         deleted and revoked with EVE. Each character is separate: nothing is stored for a character
         you did not turn it on for.
