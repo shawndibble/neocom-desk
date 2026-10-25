@@ -7720,6 +7720,7 @@
       "failed": "Could not read assets.",
       "planFailed": "Could not work out the plan. Try again.",
       "noItems": "No loose stock or ships to move.",
+      "corpNoItems": "No loose stock in the corporation's office hangars to move. Deliveries, impounded stock and anything inside containers are left out.",
       "whatToMove": "What to move",
       "selectAllAt": "Select everything at {{place}} for {{character}}",
       "selectAllFor": "Select everything for {{character}}",

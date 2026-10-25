@@ -931,7 +931,9 @@ function MovePlanTabBody({
                 (loaded.sources.length === 0 && loaded.skipped.length > 0 ? (
                   <p className="text-text-dim">{t('assets.skippedAllHint')}</p>
                 ) : (
-                  <p className="text-text-dim">{t('assets.movePlan.noItems')}</p>
+                  <p className="text-text-dim">
+                    {t(isCorp ? 'assets.movePlan.corpNoItems' : 'assets.movePlan.noItems')}
+                  </p>
                 ))}
               <PickerList
                 grouped={grouped}

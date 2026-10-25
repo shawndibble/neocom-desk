@@ -161,6 +161,22 @@ describe('MovePlanTab for a corporation', () => {
     expect(screen.getByText(/Your active Character|your active Character/)).toBeTruthy();
   });
 
+  it('says why the picker is empty when the corporation has no office hangar stock', async () => {
+    render(
+      <MemoryRouter>
+        <MovePlanTab
+          onClose={() => {}}
+          characterIds={[]}
+          activeCharacterId={1}
+          corp={{ pilotId: 1, name: 'Corporation hangars', inputs: [corpInputs[2]!], version: '1' }}
+        />
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByText(/No loose stock in the corporation's office hangars/)
+    ).toBeTruthy();
+  });
+
   it('plans the picked stock to a destination', async () => {
     const user = userEvent.setup();
     openCorp();
