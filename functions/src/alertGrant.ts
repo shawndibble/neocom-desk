@@ -33,6 +33,8 @@ export interface AlertGrantDoc {
 
 export interface AlertGrantStore {
   get(characterId: number): Promise<AlertGrantDoc | null>;
+  /** One round trip for many Characters; a Character with no grant maps to null. */
+  getMany(characterIds: number[]): Promise<Map<number, AlertGrantDoc | null>>;
   set(characterId: number, doc: AlertGrantDoc): Promise<void>;
   delete(characterId: number): Promise<void>;
 }

@@ -27,6 +27,9 @@ class FakeFirestore {
   readonly collections = new Map<string, Map<string, Data>>();
   /** Batch commits left to fail before they start succeeding again. */
   failCommits = 0;
+  /** Batched set/delete ops committed, to prove what a call actually wrote. */
+  batchWrites = 0;
+  batchDeletes = 0;
 
   private store(name: string): Map<string, Data> {
     let s = this.collections.get(name);
@@ -104,11 +107,17 @@ class FakeFirestore {
     const ops: (() => Promise<void>)[] = [];
     const batch = {
       set: (ref: { set: (d: Data) => Promise<void> }, data: Data) => {
-        ops.push(() => ref.set(data));
+        ops.push(async () => {
+          this.batchWrites += 1;
+          await ref.set(data);
+        });
         return batch;
       },
       delete: (ref: { delete: () => Promise<void> }) => {
-        ops.push(() => ref.delete());
+        ops.push(async () => {
+          this.batchDeletes += 1;
+          await ref.delete();
+        });
         return batch;
       },
       commit: async () => {
@@ -176,6 +185,44 @@ function unfiredRowsOf(db: FakeFirestore, deviceId: string): string[] {
 }
 
 describe('writeDeviceRegistration', () => {
+  it('re-registering an identical set writes and deletes no rows', async () => {
+    const db = new FakeFirestore();
+    const rows = [row('industryJobComplete'), row('skillTrainingComplete')];
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+    db.batchWrites = 0;
+    db.batchDeletes = 0;
+
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+
+    expect(db.batchWrites).toBe(0);
+    expect(db.batchDeletes).toBe(0);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+  });
+
+  it('writes only changed and added rows and deletes only removed ones', async () => {
+    const db = new FakeFirestore();
+    const same = row('industryJobComplete');
+    const changed = row('skillTrainingComplete');
+    const removed = row('eveNotification');
+    await upload(db, 'A', [{ characterId: CHAR, rows: [same, changed, removed] }]);
+    db.batchWrites = 0;
+    db.batchDeletes = 0;
+    const added = row('marketOrderExpired');
+
+    await upload(db, 'A', [
+      { characterId: CHAR, rows: [same, { ...changed, fireAt: changed.fireAt + 1 }, added] },
+    ]);
+
+    expect(db.batchWrites).toBe(2);
+    expect(db.batchDeletes).toBe(1);
+    expect(unfiredRowsOf(db, 'A').sort()).toEqual(
+      [same, changed, added].map((r) => projectionDocId('A', r.occurrenceKey)).sort()
+    );
+    expect(db.get('projections', projectionDocId('A', changed.occurrenceKey))?.fireAt).toBe(
+      changed.fireAt + 1
+    );
+  });
+
   it('stores each device’s own eveTypes, so two devices keep independent lists', async () => {
     const db = new FakeFirestore();
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: ['X', 'Y'] });
