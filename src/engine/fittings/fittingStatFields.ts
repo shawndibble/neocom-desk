@@ -303,6 +303,8 @@ export function changeVerdict(change: {
 }): ChangeVerdict {
   const direction = statDirection(change.key);
   if (direction === 'neutral' || change.before === change.after) return 'neutral';
-  const rose = change.after > change.before;
+  // Unstable capacitor is stored as a negated depletion time: longer (more negative) is better.
+  const unstable = change.key === 'capacitor' && change.before < 0 && change.after < 0;
+  const rose = unstable ? change.after < change.before : change.after > change.before;
   return rose === (direction === 'higher') ? 'better' : 'worse';
 }

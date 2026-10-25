@@ -46,6 +46,7 @@ describe('changeVerdict', () => {
     expect(changeVerdict({ key: 'capacitor', before: -90, after: 60 })).toBe('better');
     expect(changeVerdict({ key: 'capacitor', before: 60, after: -90 })).toBe('worse');
     expect(changeVerdict({ key: 'capacitor', before: 60, after: 70 })).toBe('better');
-    expect(changeVerdict({ key: 'capacitor', before: -90, after: -120 })).toBe('worse');
+    expect(changeVerdict({ key: 'capacitor', before: -90, after: -120 })).toBe('better');
+    expect(changeVerdict({ key: 'capacitor', before: -120, after: -90 })).toBe('worse');
   });
 });
