@@ -26,9 +26,9 @@ export function timeAxis(summary: SurveySummary): {
   ticks: number[];
   xAxis: (hide: boolean) => ReactElement;
 } {
-  // A little past the finish, so its marker and label sit inside the plot.
+  // A hair past the finish so its marker is not clipped; the label sits left of the line.
   const end = summary.etaAt ?? summary.lastAt;
-  const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.07];
+  const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.01];
   const ticks = timeTicks(domain[0], domain[1]);
   const xAxis = (hide: boolean) => (
     <XAxis
