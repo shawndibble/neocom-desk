@@ -169,7 +169,26 @@ jobs:
           echo "::error::validate jobs did not all pass (results: ${{ join(needs.*.result, ', ') }})"
           exit 1
 
+  # Decides whether the `test-shard` jobs run at all: a docs-only PR has
+  # nothing for vitest to check (scripts/lib/testRelevance.mjs). Its own tiny
+  # job rather than a step in `build`, so the shards do not wait on the bundle.
+  tests-needed:
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.tests-needed.outputs.run_tests }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The PR's merge commit plus its first parent, so scripts/needs-tests.mjs
+          # can diff what the merge changes.
+          fetch-depth: 2
+      - id: tests-needed
+        run: node scripts/needs-tests.mjs
+
   test-shard:
+    needs: [tests-needed]
+    # Docs-only PRs skip the four shards; the `test` job below still reports.
+    if: needs.tests-needed.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     # Sharded for the same reason `e2e-shard` is, and with the same shape.
     # Vitest's own summary says where the time goes: of 1250s of worker time,
@@ -211,13 +230,16 @@ jobs:
   # the required context, so this turns the shard results back into it.
   test:
     if: ${{ !cancelled() }}
-    needs: [test-shard]
+    needs: [tests-needed, test-shard]
     runs-on: ubuntu-latest
     steps:
+      # A matrix `needs` result is `success` only when every shard succeeded.
+      # The one accepted `skipped` is `tests-needed` having decided nothing in
+      # the PR can affect vitest; a skip for any other reason still fails here.
       - name: Fail unless every shard passed
-        if: needs.test-shard.result != 'success'
+        if: needs.test-shard.result != 'success' && !(needs.test-shard.result == 'skipped' && needs.tests-needed.result == 'success' && needs.tests-needed.outputs.run_tests == 'false')
         run: |
-          echo "::error::test shards did not all pass (result: ${{ needs.test-shard.result }})"
+          echo "::error::test shards did not all pass (shards: ${{ needs.test-shard.result }}, tests-needed: ${{ needs.tests-needed.result }})"
           exit 1
 
   e2e-shard:

@@ -28,7 +28,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   Playwright's container image, whose tag in `ci.yml` (and `cache-warm.yml`) must match
   `@playwright/test`; that's the gate, not a local
   pre-PR run. Both sharded jobs report through a single aggregate check
-  (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. The `e2e` shards are skipped (and `e2e` still reports green) when every file a PR changes is on `scripts/lib/e2eRelevance.mjs`'s safe list (docs, `functions/`, workflows other than `ci.yml`, unit tests, and the like); any other or unlisted path runs them. In ticket-loop work (`/next-ticket`, `/implement`),
+  (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. The `e2e` shards are skipped (and `e2e` still reports green) when every file a PR changes is on `scripts/lib/e2eRelevance.mjs`'s safe list (docs, `functions/`, workflows other than `ci.yml`, unit tests, and the like); any other or unlisted path runs them. The four `test-shard` jobs skip the same way (and `test` still reports green) when every changed file is prose on `scripts/lib/testRelevance.mjs`'s narrower safe list (`docs/`, root and `.claude/` Markdown, `.out-of-scope/`). In ticket-loop work (`/next-ticket`, `/implement`),
   see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
   exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
