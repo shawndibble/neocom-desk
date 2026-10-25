@@ -347,11 +347,12 @@ export function ResultsSummary({
         )}
       </div>
 
-      {/* A separate group — facts about the plan, not lines of the sum — so a
-          gap and a rule set it apart from the profit it would otherwise sit on.
-          `pl-5.5` is the ledger's caret slot plus its gap, so every label in
-          the panel starts at one edge. */}
-      <dl className="mt-5! grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-t border-line pt-4 pl-5.5 text-xs">
+      {/* Facts about the plan, not lines of the sum: a footer band flush to the
+          panel's edges (the `-mx-3 -mb-3` undo the panel's `p-3`), styled like
+          the verdict hero's setup strip, so Profit ends the ledger and this
+          reads as the card's foot. `mt-0!` sits it straight under Profit, so
+          one rule divides them, not a gap and a rule. No caret indent. */}
+      <dl className="-mx-3 mt-0! -mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 rounded-b-xs border-t border-line bg-bg/40 px-3 py-3 text-xs">
         {revenue !== null && (
           <>
             <dt className="text-text-dim">

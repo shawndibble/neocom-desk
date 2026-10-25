@@ -229,16 +229,16 @@ export function sectionRows<T>(
 
 /**
  * What one LP Store redemption costs in ISK: its ISK cost plus its LP cost at
- * the **LP Value** it's priced at (`lpRate`: the pilot's own, else the
- * store's market value). With no rate (`null`) the ISK side alone — the
- * caller says so, since that undercounts the LP rather than freeing it.
+ * the **LP Value** it's priced at (`blueprintLpRate`: the pilot's own, else
+ * 0 — LP already earned). With no rate (`null`) the ISK side alone.
  */
 export function lpPickPrice(iskCost: number, lpCost: number, iskPerLp: number | null): number {
-  return iskCost + lpCost * usableRate(iskPerLp);
+  return iskCost + lpCost * (validRate(iskPerLp) ?? 0);
 }
 
-function usableRate(iskPerLp: number | null): number {
-  return iskPerLp !== null && Number.isFinite(iskPerLp) && iskPerLp > 0 ? iskPerLp : 0;
+/** The rate, a deliberate 0 (LP free) included; null when it can't price anything. */
+function validRate(iskPerLp: number | null): number | null {
+  return iskPerLp !== null && Number.isFinite(iskPerLp) && iskPerLp >= 0 ? iskPerLp : null;
 }
 
 /**
@@ -265,9 +265,9 @@ export interface LpOfferRow {
   price: number;
   /** False when nothing priced the LP: `price` is the ISK cost only. */
   lpPriced: boolean;
-  /** ISK per LP the LP was priced at; null when unpriced. */
+  /** ISK per LP the LP was priced at (0 when counted free); null when unpriced. */
   lpRate: number | null;
-  /** Whose rate: the pilot's own LP Value or this store's market value. */
+  /** Whose rate: the pilot's own LP Value, or `'free'` (LP already earned). */
   lpRateSource: LpRate['source'];
   me: 0;
   te: 0;
@@ -277,14 +277,14 @@ export interface LpOfferRow {
 
 export function lpOfferRows(
   matches: readonly LpOfferMatch[],
-  /** The rate each store's LP is priced at (`lpRate`). */
-  rateFor: (corporationId: number) => LpRate,
+  /** The rate every offer's LP is priced at (`blueprintLpRate`). */
+  lpRate: LpRate,
   /** Turn-in cost per offer (`loadLpTurnInPricer`); absent while it loads, which prices none. */
   turnInCostFor: (offer: LpOfferMatch['offer']) => number | null = () => 0
 ): LpOfferRow[] {
   return byCheapest(
     matches.map((m): LpOfferRow => {
-      const { rate, source } = rateFor(m.corporationId);
+      const { rate, source } = lpRate;
       const turnInCost = m.offer.required_items.length === 0 ? 0 : turnInCostFor(m.offer);
       return {
         kind: 'lp',
@@ -296,13 +296,15 @@ export function lpOfferRows(
         quantity: m.offer.quantity,
         requiredItemCount: m.offer.required_items.length,
         turnInCost,
-        price: lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, rate) + (turnInCost ?? 0),
-        lpPriced: usableRate(rate) > 0 && m.offer.lp_cost > 0,
+        // Whole ISK: an ISK/LP rate carries a long fraction, and the picked
+        // price is written into the plan's price box as is.
+        price: Math.round(lpPickPrice(m.offer.isk_cost, m.offer.lp_cost, rate) + (turnInCost ?? 0)),
+        lpPriced: validRate(rate) !== null && m.offer.lp_cost > 0,
         lpRate: rate,
         lpRateSource: source,
         me: 0,
         te: 0,
-        pickable: m.offer.lp_cost === 0 || usableRate(rate) > 0,
+        pickable: m.offer.lp_cost === 0 || validRate(rate) !== null,
       };
     })
   );

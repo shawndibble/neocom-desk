@@ -9,9 +9,18 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
  * The pilot's LP Value as one labelled field: the same store (`useLpValue`)
  * everywhere it is edited — Settings → Market, the LP Store's settings modal
  * and the Blueprint Acquisition modal — so the three can never disagree.
- * Blank or 0 means "use each store's market rate".
+ * Blank or 0 means "use each store's market rate", except for a blueprint,
+ * where it counts the LP as already earned (`blueprintLpRate`); the
+ * Blueprint Acquisition modal says so through `note`.
  */
-export function LpValueField({ id }: { id: string }) {
+export function LpValueField({
+  id,
+  note,
+}: {
+  id: string;
+  /** Replaces the default hint where blank means something else (a blueprint's LP is free). */
+  note?: string;
+}) {
   const { t } = useTranslation();
   const lpValue = useLpValue((state) => state.value);
   const setLpValue = useLpValue((state) => state.setValue);
@@ -41,7 +50,7 @@ export function LpValueField({ id }: { id: string }) {
   }
 
   return (
-    <Field label={t('settings.lpValueLabel')} htmlFor={id} note={t('settings.lpValueHint')}>
+    <Field label={t('settings.lpValueLabel')} htmlFor={id} note={note ?? t('settings.lpValueHint')}>
       <div className="flex flex-wrap items-start gap-2">
         <IskInput
           key={resetKey}

@@ -470,20 +470,20 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
     const lp = section('LP Store');
     expect(await within(lp).findByText(/Sisters of EVE/)).toBeInTheDocument();
     expect(within(lp).getByText(/12,000,000 ISK \+ 950,000 LP/)).toBeInTheDocument();
-    // 12M ISK + 950k LP at the store's market 1,000 ISK/LP.
+    // The LP is already earned: only the 12M ISK is charged.
     expect(
-      await within(lp).findByText(/962,000,000 ISK with LP at the store’s market 1,000 ISK.LP/)
+      await within(lp).findByText(/12,000,000 ISK, LP counted as already earned/)
     ).toBeInTheDocument();
   });
 
-  it('says the LP is unpriced when the store has no market rate and the pilot set none', async () => {
-    mockedFindLpOfferMatches.mockResolvedValue(
-      lpResult([lpMatch({ corporationId: 1000127, corpName: 'Unpriced Corp' })])
-    );
+  it("charges the LP at the pilot's own LP Value when they set one", async () => {
+    useLpValue.setState({ value: 1_000, hydrated: true });
+    mockedFindLpOfferMatches.mockResolvedValue(lpResult([lpMatch()]));
     renderModal();
     const lp = section('LP Store');
+    // 12M ISK + 950k LP at 1,000 ISK/LP.
     expect(
-      await within(lp).findByText(/ISK only — no market rate for this store’s LP/)
+      await within(lp).findByText(/962,000,000 ISK with LP at your 1,000 ISK.LP/)
     ).toBeInTheDocument();
   });
 

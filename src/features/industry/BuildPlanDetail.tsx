@@ -1,7 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,6 +22,7 @@ import {
   Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { Collapse } from '@/components/ui/Collapse';
 import {
   FACILITY_PRESETS,
   RIG_KIND_OPTIONS,
@@ -381,6 +382,7 @@ export function BuildPlanDetail({
   // Breakdown is owned here so the hero's break-even ⓘ and the ledger
   // header's ⓘ open the same modal.
   const [setupOpen, setSetupOpen] = useState(false);
+  const setupFormId = useId();
   // How the hero counts owned materials, and how they would be sold. Page
   // state, not plan state: a way of reading the plan, like a sort.
   const [profitBasis, setProfitBasis] = useState<ProfitBasis>('sellValue');
@@ -1196,8 +1198,9 @@ export function BuildPlanDetail({
       )}
       <button
         type="button"
-        className={textActionClassName('shrink-0')}
+        className={textActionClassName('ml-auto shrink-0')}
         aria-expanded={setupOpen}
+        aria-controls={setupFormId}
         onClick={() => setSetupOpen((open) => !open)}
       >
         {setupOpen ? t('industry.setupDone') : t('industry.setupEdit')}
@@ -1219,6 +1222,436 @@ export function BuildPlanDetail({
     />
   );
 
+  // Slides open under the setup strip, attached to the card it edits, rather
+  // than a second card that pushes the page down.
+  const renderSetupForm = (className: string) => (
+    <Collapse open={setupOpen} id={setupFormId} className={className}>
+      <div className="space-y-4">
+        {bpcCoverage && (
+          <div>
+            <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
+              {t('industry.groupBlueprint')}
+            </h3>
+            <div className="mt-2">
+              <BpcCoverageWarning
+                coverage={bpcCoverage}
+                blueprintName={nameForType(catalog, plan.blueprintTypeID)}
+                onSetRuns={(runs) => update({ runs })}
+              />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <h3
+            className={cx(
+              eyebrowClassName,
+              'flex items-center justify-between gap-2 border-b border-line pb-1'
+            )}
+          >
+            {t('industry.groupLocationMarket')}
+            <GroupTargetLink
+              plan={plan}
+              snapshot={groupSnapshot}
+              onApply={() => groupSnapshot && update(retargetPatch(groupSnapshot))}
+            />
+          </h3>
+          <div className="mt-2 flex flex-col gap-3">
+            <BuildLocationPicker
+              activity={activity}
+              summary={t('industry.buildLocationSummary', {
+                facility: facilityPreset.name,
+                system: buildSystem?.name ?? hub.systemName,
+                security: t(`industry.${plan.security}`),
+              })}
+              selectedLabel={buildLocationName}
+              onPick={(option) => movePlan(buildLocationPatch(option))}
+            >
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.facility')}
+                <Select
+                  value={plan.facility}
+                  onValueChange={(value) => {
+                    const facility = value as FacilityKind;
+                    const structure = FACILITY_PRESETS[facility].structure;
+                    movePlan({
+                      facility,
+                      ...clearedBuildLocation,
+                      ...(structure ? {} : { rigFit: EMPTY_RIG_FIT, facilityTaxPct: undefined }),
+                    });
+                  }}
+                >
+                  <SelectTrigger aria-label={t('industry.facility')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Only facilities that can actually run this plan's
+                          activity — an Athanor can't manufacture, a Raitaru
+                          can't react (issue #460). */}
+                    {Object.values(FACILITY_PRESETS)
+                      .filter((f) => f.activity === activity)
+                      .map((f) => (
+                        <SelectItem key={f.kind} value={f.kind}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </label>
+
+              <BuildSystemInput
+                systemName={buildSystem?.name}
+                hubSystemName={hub.systemName}
+                securityLabel={t(`industry.${plan.security}`)}
+                onChange={(system) =>
+                  movePlan({
+                    buildSystemId: system?.id,
+                    buildSystemName: system?.name,
+                    ...clearedBuildLocation,
+                    // The band follows the system, so naming one settles the
+                    // rig multiplier too. An unreachable ESI leaves the plan
+                    // with the band it had rather than a guessed one.
+                    ...(system === null
+                      ? { security: hub.security }
+                      : system.security !== null
+                        ? { security: system.security }
+                        : {}),
+                  })
+                }
+              />
+            </BuildLocationPicker>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {/* Only a player structure has rig slots or an owner-set tax, so an
+                    NPC station shows neither rather than showing them dead. Both
+                    are already cleared on the plan when the facility changes. */}
+              {facilityPreset.structure && (
+                <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
+                  <span>{t('industry.rigFitLabel')}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {resolveRigFit(plan).map((kind, slot) => (
+                      // A slot's position is its identity, not the kind
+                      // fitted in it, so the index is a stable key.
+                      <label key={slot} className="flex flex-col gap-1">
+                        <span className="sr-only">
+                          {t('industry.rigSlotLabel', { slot: slot + 1 })}
+                        </span>
+                        <Select
+                          value={kind}
+                          onValueChange={(value) =>
+                            update({
+                              rigFit: setRigSlot(resolveRigFit(plan), slot, value as RigKind),
+                            })
+                          }
+                        >
+                          <SelectTrigger
+                            aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RIG_KIND_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {t(rigKindLabelKey(option))}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    ))}
+                    <RigMatchHelper
+                      facility={plan.facility}
+                      security={plan.security}
+                      onApply={(fit) => update({ rigFit: fit })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {facilityPreset.structure && (
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="flex items-center gap-1">
+                    <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
+                    <InfoTooltip
+                      label={t('industry.facilityTaxTooltipLabel')}
+                      content={t('industry.facilityTaxTooltip')}
+                    />
+                  </span>
+                  {/* Commits on blur/Enter, like Runs: a per-keystroke write
+                        round-trips IndexedDB and re-resolves the whole plan, so
+                        a controlled field lagged and could drop characters. */}
+                  <SourcingInput
+                    id="build-plan-facility-tax"
+                    value={plan.facilityTaxPct ?? 0}
+                    label={t('industry.facilityTax')}
+                    inputMode="decimal"
+                    widthClassName="w-full"
+                    parse={(raw) => parseTaxPct(plan.facilityTaxPct ?? 0, raw)}
+                    onCommit={(facilityTaxPct) => update({ facilityTaxPct })}
+                  />
+                </div>
+              )}
+
+              {/* Only where ESI has no index for the Build location (J-Space) or
+                    the pilot has already typed one: elsewhere ESI's figure is right
+                    and a field would only invite overriding it. */}
+              {(costIndexMissing || plan.costIndexOverridePct !== undefined) && (
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="flex items-center gap-1">
+                    <label htmlFor="build-plan-cost-index">{t('industry.costIndexOverride')}</label>
+                    <InfoTooltip
+                      label={t('industry.costIndexOverrideTooltipLabel')}
+                      content={t('industry.costIndexOverrideTooltip')}
+                    />
+                  </span>
+                  <SourcingInput
+                    id="build-plan-cost-index"
+                    value={plan.costIndexOverridePct}
+                    label={t('industry.costIndexOverride')}
+                    inputMode="decimal"
+                    widthClassName="w-full"
+                    placeholder="0"
+                    mine={costIndexSource(snapshot, plan.costIndexOverridePct) === 'override'}
+                    describedBy={
+                      costIndexMissing && plan.costIndexOverridePct === undefined
+                        ? 'build-plan-cost-index-note'
+                        : undefined
+                    }
+                    parse={(raw) => {
+                      const parsed = parseCostIndexPct(raw);
+                      // Blank clears, unreadable keeps what was there.
+                      return parsed === undefined
+                        ? plan.costIndexOverridePct
+                        : (parsed ?? undefined);
+                    }}
+                    onCommit={(costIndexOverridePct) => update({ costIndexOverridePct })}
+                  />
+                  {costIndexMissing && plan.costIndexOverridePct === undefined && (
+                    <p id="build-plan-cost-index-note" className="text-warning">
+                      {t('industry.costIndexMissingNote')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.tradeHub')}
+                <Select
+                  value={plan.hubId}
+                  onValueChange={(value) => update({ hubId: value as BuildPlanRecord['hubId'] })}
+                >
+                  <SelectTrigger aria-label={t('industry.tradeHub')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRADE_HUBS.map((h) => (
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+
+              {/* Sits under Trade hub because it names a side of that hub's
+                    order book, not a separate place. Materials only — the
+                    product stays on lowest sell, which is what buying it
+                    outright costs (GLOSSARY.md, Acquisition Verdict). */}
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="flex items-center gap-1">
+                  <label htmlFor="build-plan-material-price-basis">
+                    {t('industry.materialPriceBasis')}
+                  </label>
+                  <InfoTooltip
+                    label={t('industry.materialPriceBasisTooltipLabel')}
+                    content={t('industry.materialPriceBasisTooltip')}
+                  />
+                </span>
+                <Select
+                  value={materialPriceBasisOf(plan.materialPriceBasis)}
+                  onValueChange={(value) =>
+                    update({ materialPriceBasis: value as MaterialPriceBasis })
+                  }
+                >
+                  <SelectTrigger
+                    id="build-plan-material-price-basis"
+                    aria-label={t('industry.materialPriceBasis')}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sell">{t('industry.materialPriceBasisSell')}</SelectItem>
+                    <SelectItem value="buy">{t('industry.materialPriceBasisBuy')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* A reaction-activity plan never shows this: it reuses its own
+                  top-level facility/rig/security for a nested reaction
+                  sub-build instead (issue #698). */}
+            {activity === 'manufacturing' && (
+              <div className="flex flex-col gap-3 border-t border-line pt-3">
+                <span className="flex items-center gap-2 text-xs">
+                  <label className={touchCheckboxLabelClassName}>
+                    <Checkbox
+                      id="build-plan-include-reactions"
+                      checked={includeReactions}
+                      onChange={(e) => toggleIncludeReactions(e.target.checked)}
+                    />
+                  </label>
+                  <label
+                    htmlFor="build-plan-include-reactions"
+                    className={`inline-flex items-center ${tappableRowClassName}`}
+                  >
+                    {t('industry.includeReactions')}
+                  </label>
+                  <InfoTooltip
+                    label={t('industry.includeReactionsTooltipLabel')}
+                    content={t('industry.includeReactionsTooltip')}
+                  />
+                </span>
+
+                {includeReactions && (
+                  <>
+                    <BuildLocationPicker
+                      activity="reaction"
+                      idPrefix="build-plan-reaction-location"
+                      labelKey="industry.reactionLocation"
+                      summary={t('industry.buildLocationSummary', {
+                        facility: FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name,
+                        system: reactionBuildSystem?.name ?? t('industry.reactionLocationNotSet'),
+                        security: t(`industry.${plan.reactionSecurity ?? 'highsec'}`),
+                      })}
+                      selectedLabel={reactionBuildLocationName}
+                      onPick={(option) => update(reactionBuildLocationPatch(option))}
+                    >
+                      <label className="flex flex-col gap-1 text-xs">
+                        {t('industry.facility')}
+                        <Select
+                          value={plan.reactionFacility ?? 'athanor'}
+                          onValueChange={(value) =>
+                            update({
+                              reactionFacility: value as FacilityKind,
+                              ...clearedReactionBuildLocation,
+                            })
+                          }
+                        >
+                          <SelectTrigger aria-label={t('industry.facility')}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Reaction-capable structures only — an
+                                  engineering complex cannot host a reaction. */}
+                            {REACTION_FACILITY_PRESETS.map((f) => (
+                              <SelectItem key={f.kind} value={f.kind}>
+                                {f.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+
+                      <BuildSystemInput
+                        idPrefix="build-plan-reaction-system"
+                        systemName={reactionBuildSystem?.name}
+                        hubSystemName={t('industry.reactionLocationNotSet')}
+                        securityLabel={t(`industry.${plan.reactionSecurity ?? 'highsec'}`)}
+                        onChange={(system) =>
+                          update({
+                            reactionBuildSystemId: system?.id,
+                            reactionBuildSystemName: system?.name,
+                            ...clearedReactionBuildLocation,
+                            ...(system === null
+                              ? { reactionSecurity: 'highsec' }
+                              : system.security !== null
+                                ? { reactionSecurity: system.security }
+                                : {}),
+                          })
+                        }
+                      />
+                    </BuildLocationPicker>
+                    {reactionsInHighsec && (
+                      <p className="text-xs text-warning">
+                        {t('industry.reactionBlocked.setupRule')}
+                      </p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
+                        <span>{t('industry.rigFitLabel')}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {resolveRigFit({ rigFit: plan.reactionRigFit }).map((kind, slot) => (
+                            <label key={slot} className="flex flex-col gap-1">
+                              <span className="sr-only">
+                                {t('industry.rigSlotLabel', { slot: slot + 1 })}
+                              </span>
+                              <Select
+                                value={kind}
+                                onValueChange={(value) =>
+                                  update({
+                                    reactionRigFit: setRigSlot(
+                                      resolveRigFit({ rigFit: plan.reactionRigFit }),
+                                      slot,
+                                      value as RigKind
+                                    ),
+                                  })
+                                }
+                              >
+                                <SelectTrigger
+                                  aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {RIG_KIND_OPTIONS.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                      {t(rigKindLabelKey(option))}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </label>
+                          ))}
+                          <RigMatchHelper
+                            facility={plan.reactionFacility ?? 'athanor'}
+                            security={plan.reactionSecurity ?? 'highsec'}
+                            onApply={(fit) => update({ reactionRigFit: fit })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1 text-xs">
+                        <span className="flex items-center gap-1">
+                          <label htmlFor="build-plan-reaction-facility-tax">
+                            {t('industry.facilityTax')}
+                          </label>
+                          <InfoTooltip
+                            label={t('industry.facilityTaxTooltipLabel')}
+                            content={t('industry.facilityTaxTooltip')}
+                          />
+                        </span>
+                        <SourcingInput
+                          id="build-plan-reaction-facility-tax"
+                          value={plan.reactionFacilityTaxPct ?? 0}
+                          label={t('industry.facilityTax')}
+                          inputMode="decimal"
+                          widthClassName="w-full"
+                          parse={(raw) => parseTaxPct(plan.reactionFacilityTaxPct ?? 0, raw)}
+                          onCommit={(reactionFacilityTaxPct) => update({ reactionFacilityTaxPct })}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Collapse>
+  );
+
   return (
     <div className="space-y-4">
       {result && !error && heroFigures ? (
@@ -1229,6 +1662,7 @@ export function BuildPlanDetail({
           onBasisChange={setProfitBasis}
           runsControl={runsControl}
           footer={setupStrip}
+          expansion={renderSetupForm('border-t border-line p-4')}
           pricesReady={pricesReady}
           pricesUnreachable={pricesUnreachable}
           pricesLoading={pricesLoading}
@@ -1263,6 +1697,8 @@ export function BuildPlanDetail({
             {runsControl}
             {setupStrip}
           </div>
+          {/* Inside the panel's own padding: a rule and a gap, no second inset. */}
+          {renderSetupForm('mt-3 border-t border-line pt-3')}
         </Panel>
       )}
       {result && !error && result.revenue !== null && (
@@ -1270,443 +1706,6 @@ export function BuildPlanDetail({
           characterId={plan.characterId}
           hint={t('industry.assumesBaseStandingsHint')}
         />
-      )}
-
-      {setupOpen && (
-        <Panel title={t('industry.setup')}>
-          <div className="space-y-4">
-            {bpcCoverage && (
-              <div>
-                <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
-                  {t('industry.groupBlueprint')}
-                </h3>
-                <div className="mt-2">
-                  <BpcCoverageWarning
-                    coverage={bpcCoverage}
-                    blueprintName={nameForType(catalog, plan.blueprintTypeID)}
-                    onSetRuns={(runs) => update({ runs })}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <h3
-                className={cx(
-                  eyebrowClassName,
-                  'flex items-center justify-between gap-2 border-b border-line pb-1'
-                )}
-              >
-                {t('industry.groupLocationMarket')}
-                <GroupTargetLink
-                  plan={plan}
-                  snapshot={groupSnapshot}
-                  onApply={() => groupSnapshot && update(retargetPatch(groupSnapshot))}
-                />
-              </h3>
-              <div className="mt-2 flex flex-col gap-3">
-                <BuildLocationPicker
-                  activity={activity}
-                  summary={t('industry.buildLocationSummary', {
-                    facility: facilityPreset.name,
-                    system: buildSystem?.name ?? hub.systemName,
-                    security: t(`industry.${plan.security}`),
-                  })}
-                  selectedLabel={buildLocationName}
-                  onPick={(option) => movePlan(buildLocationPatch(option))}
-                >
-                  <label className="flex flex-col gap-1 text-xs">
-                    {t('industry.facility')}
-                    <Select
-                      value={plan.facility}
-                      onValueChange={(value) => {
-                        const facility = value as FacilityKind;
-                        const structure = FACILITY_PRESETS[facility].structure;
-                        movePlan({
-                          facility,
-                          ...clearedBuildLocation,
-                          ...(structure
-                            ? {}
-                            : { rigFit: EMPTY_RIG_FIT, facilityTaxPct: undefined }),
-                        });
-                      }}
-                    >
-                      <SelectTrigger aria-label={t('industry.facility')}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {/* Only facilities that can actually run this plan's
-                          activity — an Athanor can't manufacture, a Raitaru
-                          can't react (issue #460). */}
-                        {Object.values(FACILITY_PRESETS)
-                          .filter((f) => f.activity === activity)
-                          .map((f) => (
-                            <SelectItem key={f.kind} value={f.kind}>
-                              {f.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-
-                  <BuildSystemInput
-                    systemName={buildSystem?.name}
-                    hubSystemName={hub.systemName}
-                    securityLabel={t(`industry.${plan.security}`)}
-                    onChange={(system) =>
-                      movePlan({
-                        buildSystemId: system?.id,
-                        buildSystemName: system?.name,
-                        ...clearedBuildLocation,
-                        // The band follows the system, so naming one settles the
-                        // rig multiplier too. An unreachable ESI leaves the plan
-                        // with the band it had rather than a guessed one.
-                        ...(system === null
-                          ? { security: hub.security }
-                          : system.security !== null
-                            ? { security: system.security }
-                            : {}),
-                      })
-                    }
-                  />
-                </BuildLocationPicker>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {/* Only a player structure has rig slots or an owner-set tax, so an
-                    NPC station shows neither rather than showing them dead. Both
-                    are already cleared on the plan when the facility changes. */}
-                  {facilityPreset.structure && (
-                    <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
-                      <span>{t('industry.rigFitLabel')}</span>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {resolveRigFit(plan).map((kind, slot) => (
-                          // A slot's position is its identity, not the kind
-                          // fitted in it, so the index is a stable key.
-                          <label key={slot} className="flex flex-col gap-1">
-                            <span className="sr-only">
-                              {t('industry.rigSlotLabel', { slot: slot + 1 })}
-                            </span>
-                            <Select
-                              value={kind}
-                              onValueChange={(value) =>
-                                update({
-                                  rigFit: setRigSlot(resolveRigFit(plan), slot, value as RigKind),
-                                })
-                              }
-                            >
-                              <SelectTrigger
-                                aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {RIG_KIND_OPTIONS.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {t(rigKindLabelKey(option))}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </label>
-                        ))}
-                        <RigMatchHelper
-                          facility={plan.facility}
-                          security={plan.security}
-                          onApply={(fit) => update({ rigFit: fit })}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {facilityPreset.structure && (
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className="flex items-center gap-1">
-                        <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
-                        <InfoTooltip
-                          label={t('industry.facilityTaxTooltipLabel')}
-                          content={t('industry.facilityTaxTooltip')}
-                        />
-                      </span>
-                      {/* Commits on blur/Enter, like Runs: a per-keystroke write
-                        round-trips IndexedDB and re-resolves the whole plan, so
-                        a controlled field lagged and could drop characters. */}
-                      <SourcingInput
-                        id="build-plan-facility-tax"
-                        value={plan.facilityTaxPct ?? 0}
-                        label={t('industry.facilityTax')}
-                        inputMode="decimal"
-                        widthClassName="w-full"
-                        parse={(raw) => parseTaxPct(plan.facilityTaxPct ?? 0, raw)}
-                        onCommit={(facilityTaxPct) => update({ facilityTaxPct })}
-                      />
-                    </div>
-                  )}
-
-                  {/* Only where ESI has no index for the Build location (J-Space) or
-                    the pilot has already typed one: elsewhere ESI's figure is right
-                    and a field would only invite overriding it. */}
-                  {(costIndexMissing || plan.costIndexOverridePct !== undefined) && (
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className="flex items-center gap-1">
-                        <label htmlFor="build-plan-cost-index">
-                          {t('industry.costIndexOverride')}
-                        </label>
-                        <InfoTooltip
-                          label={t('industry.costIndexOverrideTooltipLabel')}
-                          content={t('industry.costIndexOverrideTooltip')}
-                        />
-                      </span>
-                      <SourcingInput
-                        id="build-plan-cost-index"
-                        value={plan.costIndexOverridePct}
-                        label={t('industry.costIndexOverride')}
-                        inputMode="decimal"
-                        widthClassName="w-full"
-                        placeholder="0"
-                        mine={costIndexSource(snapshot, plan.costIndexOverridePct) === 'override'}
-                        describedBy={
-                          costIndexMissing && plan.costIndexOverridePct === undefined
-                            ? 'build-plan-cost-index-note'
-                            : undefined
-                        }
-                        parse={(raw) => {
-                          const parsed = parseCostIndexPct(raw);
-                          // Blank clears, unreadable keeps what was there.
-                          return parsed === undefined
-                            ? plan.costIndexOverridePct
-                            : (parsed ?? undefined);
-                        }}
-                        onCommit={(costIndexOverridePct) => update({ costIndexOverridePct })}
-                      />
-                      {costIndexMissing && plan.costIndexOverridePct === undefined && (
-                        <p id="build-plan-cost-index-note" className="text-warning">
-                          {t('industry.costIndexMissingNote')}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <label className="flex flex-col gap-1 text-xs">
-                    {t('industry.tradeHub')}
-                    <Select
-                      value={plan.hubId}
-                      onValueChange={(value) =>
-                        update({ hubId: value as BuildPlanRecord['hubId'] })
-                      }
-                    >
-                      <SelectTrigger aria-label={t('industry.tradeHub')}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TRADE_HUBS.map((h) => (
-                          <SelectItem key={h.id} value={h.id}>
-                            {h.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-
-                  {/* Sits under Trade hub because it names a side of that hub's
-                    order book, not a separate place. Materials only — the
-                    product stays on lowest sell, which is what buying it
-                    outright costs (GLOSSARY.md, Acquisition Verdict). */}
-                  <div className="flex flex-col gap-1 text-xs">
-                    <span className="flex items-center gap-1">
-                      <label htmlFor="build-plan-material-price-basis">
-                        {t('industry.materialPriceBasis')}
-                      </label>
-                      <InfoTooltip
-                        label={t('industry.materialPriceBasisTooltipLabel')}
-                        content={t('industry.materialPriceBasisTooltip')}
-                      />
-                    </span>
-                    <Select
-                      value={materialPriceBasisOf(plan.materialPriceBasis)}
-                      onValueChange={(value) =>
-                        update({ materialPriceBasis: value as MaterialPriceBasis })
-                      }
-                    >
-                      <SelectTrigger
-                        id="build-plan-material-price-basis"
-                        aria-label={t('industry.materialPriceBasis')}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sell">{t('industry.materialPriceBasisSell')}</SelectItem>
-                        <SelectItem value="buy">{t('industry.materialPriceBasisBuy')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* A reaction-activity plan never shows this: it reuses its own
-                  top-level facility/rig/security for a nested reaction
-                  sub-build instead (issue #698). */}
-                {activity === 'manufacturing' && (
-                  <div className="flex flex-col gap-3 border-t border-line pt-3">
-                    <span className="flex items-center gap-2 text-xs">
-                      <label className={touchCheckboxLabelClassName}>
-                        <Checkbox
-                          id="build-plan-include-reactions"
-                          checked={includeReactions}
-                          onChange={(e) => toggleIncludeReactions(e.target.checked)}
-                        />
-                      </label>
-                      <label
-                        htmlFor="build-plan-include-reactions"
-                        className={`inline-flex items-center ${tappableRowClassName}`}
-                      >
-                        {t('industry.includeReactions')}
-                      </label>
-                      <InfoTooltip
-                        label={t('industry.includeReactionsTooltipLabel')}
-                        content={t('industry.includeReactionsTooltip')}
-                      />
-                    </span>
-
-                    {includeReactions && (
-                      <>
-                        <BuildLocationPicker
-                          activity="reaction"
-                          idPrefix="build-plan-reaction-location"
-                          labelKey="industry.reactionLocation"
-                          summary={t('industry.buildLocationSummary', {
-                            facility: FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name,
-                            system:
-                              reactionBuildSystem?.name ?? t('industry.reactionLocationNotSet'),
-                            security: t(`industry.${plan.reactionSecurity ?? 'highsec'}`),
-                          })}
-                          selectedLabel={reactionBuildLocationName}
-                          onPick={(option) => update(reactionBuildLocationPatch(option))}
-                        >
-                          <label className="flex flex-col gap-1 text-xs">
-                            {t('industry.facility')}
-                            <Select
-                              value={plan.reactionFacility ?? 'athanor'}
-                              onValueChange={(value) =>
-                                update({
-                                  reactionFacility: value as FacilityKind,
-                                  ...clearedReactionBuildLocation,
-                                })
-                              }
-                            >
-                              <SelectTrigger aria-label={t('industry.facility')}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {/* Reaction-capable structures only — an
-                                  engineering complex cannot host a reaction. */}
-                                {REACTION_FACILITY_PRESETS.map((f) => (
-                                  <SelectItem key={f.kind} value={f.kind}>
-                                    {f.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </label>
-
-                          <BuildSystemInput
-                            idPrefix="build-plan-reaction-system"
-                            systemName={reactionBuildSystem?.name}
-                            hubSystemName={t('industry.reactionLocationNotSet')}
-                            securityLabel={t(`industry.${plan.reactionSecurity ?? 'highsec'}`)}
-                            onChange={(system) =>
-                              update({
-                                reactionBuildSystemId: system?.id,
-                                reactionBuildSystemName: system?.name,
-                                ...clearedReactionBuildLocation,
-                                ...(system === null
-                                  ? { reactionSecurity: 'highsec' }
-                                  : system.security !== null
-                                    ? { reactionSecurity: system.security }
-                                    : {}),
-                              })
-                            }
-                          />
-                        </BuildLocationPicker>
-                        {reactionsInHighsec && (
-                          <p className="text-xs text-warning">
-                            {t('industry.reactionBlocked.setupRule')}
-                          </p>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                          <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
-                            <span>{t('industry.rigFitLabel')}</span>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {resolveRigFit({ rigFit: plan.reactionRigFit }).map((kind, slot) => (
-                                <label key={slot} className="flex flex-col gap-1">
-                                  <span className="sr-only">
-                                    {t('industry.rigSlotLabel', { slot: slot + 1 })}
-                                  </span>
-                                  <Select
-                                    value={kind}
-                                    onValueChange={(value) =>
-                                      update({
-                                        reactionRigFit: setRigSlot(
-                                          resolveRigFit({ rigFit: plan.reactionRigFit }),
-                                          slot,
-                                          value as RigKind
-                                        ),
-                                      })
-                                    }
-                                  >
-                                    <SelectTrigger
-                                      aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}
-                                    >
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {RIG_KIND_OPTIONS.map((option) => (
-                                        <SelectItem key={option} value={option}>
-                                          {t(rigKindLabelKey(option))}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </label>
-                              ))}
-                              <RigMatchHelper
-                                facility={plan.reactionFacility ?? 'athanor'}
-                                security={plan.reactionSecurity ?? 'highsec'}
-                                onApply={(fit) => update({ reactionRigFit: fit })}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-1 text-xs">
-                            <span className="flex items-center gap-1">
-                              <label htmlFor="build-plan-reaction-facility-tax">
-                                {t('industry.facilityTax')}
-                              </label>
-                              <InfoTooltip
-                                label={t('industry.facilityTaxTooltipLabel')}
-                                content={t('industry.facilityTaxTooltip')}
-                              />
-                            </span>
-                            <SourcingInput
-                              id="build-plan-reaction-facility-tax"
-                              value={plan.reactionFacilityTaxPct ?? 0}
-                              label={t('industry.facilityTax')}
-                              inputMode="decimal"
-                              widthClassName="w-full"
-                              parse={(raw) => parseTaxPct(plan.reactionFacilityTaxPct ?? 0, raw)}
-                              onCommit={(reactionFacilityTaxPct) =>
-                                update({ reactionFacilityTaxPct })
-                              }
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </Panel>
       )}
 
       {/*

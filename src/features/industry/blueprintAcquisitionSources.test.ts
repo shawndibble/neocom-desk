@@ -352,8 +352,8 @@ describe('lpPickPrice', () => {
   });
 });
 
-const yours = (rate: number) => () => ({ rate, source: 'yours' as const });
-const unpriced = () => ({ rate: null, source: null });
+const yours = (rate: number) => ({ rate, source: 'yours' as const });
+const unpriced = { rate: null, source: null };
 
 describe('lpOfferRows', () => {
   it('prices every offer at ISK + LP x rate, cheapest first, as ME0/TE0', () => {
@@ -384,20 +384,23 @@ describe('lpOfferRows', () => {
     });
   });
 
-  it('prices each store’s LP at its own market rate, and says which rate it used', () => {
-    const rates = new Map([
-      [1, 1_000],
-      [2, 2_000],
-    ]);
-    const rows = lpOfferRows(
-      [lpMatch({ corporationId: 1 }), lpMatch({ corporationId: 2 })],
-      (corp) => ({ rate: rates.get(corp)!, source: 'market' })
+  it('charges only the ISK and turn-ins when the LP is free, and stays pickable', () => {
+    const [row] = lpOfferRows(
+      [lpMatch({ offer: WITH_TURN_IN })],
+      { rate: 0, source: 'free' },
+      () => 300_000
     );
-    // 12M ISK + 950k LP at each store's own rate.
-    expect(rows.map((row) => [row.corporationId, row.price, row.lpRateSource])).toEqual([
-      [1, 962_000_000, 'market'],
-      [2, 1_912_000_000, 'market'],
-    ]);
+    expect(row).toMatchObject({
+      price: 12_300_000,
+      lpPriced: true,
+      lpRateSource: 'free',
+      pickable: true,
+    });
+  });
+
+  it('rounds a computed price to whole ISK', () => {
+    const [row] = lpOfferRows([lpMatch()], yours(2_883.563_888_9), () => 88_800_000.4);
+    expect(Number.isInteger(row.price)).toBe(true);
   });
 
   it('adds the turn-ins still to buy, so the row costs what automatic pricing charges', () => {
