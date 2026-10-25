@@ -1333,6 +1333,27 @@
     }
   }
 
+  /*
+   * Slides a control in from the left as it mounts, e.g. the Permissions "Grant selected"
+   * button appearing beside Select none. Reduced motion gets none (DESIGN.md §6c).
+   */
+  .grant-selected-in {
+    animation: grant-selected-in 200ms ease-out both;
+  }
+
+  @keyframes grant-selected-in {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grant-selected-in {
+      animation: none;
+    }
+  }
+
   @keyframes row-pulse-fade {
     0% {
       background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
