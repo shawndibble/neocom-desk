@@ -14,6 +14,12 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { callRouted } from '@/sync/routedCallable';
 import { createReadCache, dropCached } from './readCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
+import {
+  clearNotFound,
+  isKnownMissing,
+  rememberMissing,
+  NOT_FOUND_TTL_MS,
+} from '@/sync/notFoundCache';
 import { uidForCharacter } from '@/sync/uid';
 import {
   communityBackendOverride,
@@ -175,8 +181,14 @@ async function readMyCommunities(characterId: number): Promise<CommunitySummary[
   const index = await getDocs(collection(db, 'characters', uid, 'communities'));
   const loaded = await Promise.all(
     index.docs.map(async (entry): Promise<CommunitySummary | null> => {
+      const path = `communities/${entry.id}`;
+      // A deleted Community stays gone: one miss prunes it from this device's list.
+      if (await isKnownMissing(path)) return null;
       const snap = await getDoc(doc(db, 'communities', entry.id));
-      if (!snap.exists()) return null;
+      if (!snap.exists()) {
+        await rememberMissing(path, NOT_FOUND_TTL_MS.community);
+        return null;
+      }
       const data = snap.data();
       return {
         id: snap.id,
@@ -428,11 +440,17 @@ export async function previewInvite(inviteCode: string): Promise<InvitePreview> 
   );
 }
 
-export function joinCommunity(characterId: number, inviteCode: string, characterName: string) {
-  return callCommunity<
+export async function joinCommunity(
+  characterId: number,
+  inviteCode: string,
+  characterName: string
+) {
+  const joined = await callCommunity<
     { inviteCode: string; characterName: string },
     { communityId: string; alreadyMember: boolean; pending?: boolean }
   >(characterId, 'joinCommunityCallable', { inviteCode, characterName });
+  await clearNotFound(`communities/${joined.communityId}`);
+  return joined;
 }
 
 export async function setRequireApproval(
@@ -553,11 +571,13 @@ export async function loadMailInviteStatus(
   return { remaining: Math.max(0, MAX_MAIL_INVITES_PER_DAY - used), sent };
 }
 
-export function createCommunity(characterId: number, name: string, characterName: string) {
-  return callCommunity<
+export async function createCommunity(characterId: number, name: string, characterName: string) {
+  const created = await callCommunity<
     { name: string; characterName: string },
     { communityId: string; inviteCode: string }
   >(characterId, 'createCommunityCallable', { name, characterName });
+  await clearNotFound(`communities/${created.communityId}`);
+  return created;
 }
 
 export async function leaveCommunity(characterId: number, communityId: string): Promise<void> {

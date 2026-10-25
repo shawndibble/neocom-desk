@@ -31,6 +31,7 @@ import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/type
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
+import { getDocUnlessKnownMissing, NOT_FOUND_TTL_MS } from '@/sync/notFoundCache';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
 import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
 import { bookVersionsOf, cachedPart } from '@/features/corp/taxBook/bookCache';
@@ -407,8 +408,14 @@ async function readBilledBy(characterId: number): Promise<number[] | null> {
   try {
     return await underFirebaseSession(async () => {
       const uid = await ensureSignedIn(characterId);
-      const snap = await getDoc(doc(getSyncFirestore(characterId), 'corpTaxBookBilledBy', uid));
-      return readBilledByPointer(snap.data());
+      const ref = doc(getSyncFirestore(characterId), 'corpTaxBookBilledBy', uid);
+      return readBilledByPointer(
+        await getDocUnlessKnownMissing(
+          `corpTaxBookBilledBy/${uid}`,
+          NOT_FOUND_TTL_MS.billedByPointer,
+          () => getDoc(ref)
+        )
+      );
     });
   } catch {
     // Offline or signed out: the current and remembered corporations still load.
@@ -469,7 +476,11 @@ async function readOneBook(
   const fs = getSyncFirestore(characterIds[0]);
   const root = `corps/${corporationId}`;
   await ensureSignedIn(characterIds[0]);
-  const bookDoc = (await getDoc(doc(fs, 'corps', String(corporationId)))).data();
+  const bookDoc = await getDocUnlessKnownMissing(
+    `corps/${corporationId}`,
+    NOT_FOUND_TTL_MS.corpBook,
+    () => getDoc(doc(fs, 'corps', String(corporationId)))
+  );
   const settings = readBookSettings(corporationId, bookDoc);
   if (!settings) return null;
   const versions = bookVersionsOf(bookDoc);

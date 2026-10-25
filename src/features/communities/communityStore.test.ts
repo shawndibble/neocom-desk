@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
 
 const fs = vi.hoisted(() => ({
   getDocs: vi.fn(),
@@ -37,7 +38,8 @@ import {
 
 const NOW = 1_000_000;
 
-beforeEach(() => {
+beforeEach(async () => {
+  await db.settings.clear();
   vi.clearAllMocks();
   invalidateMyCommunities();
   fs.getDocs.mockResolvedValue({ docs: [{ id: 'c1' }] });
@@ -51,6 +53,26 @@ beforeEach(() => {
 
 /** Index query + one read per Community: what one fresh load costs. */
 const reads = () => fs.getDocs.mock.calls.length + fs.getDoc.mock.calls.length;
+
+describe('a deleted Community', () => {
+  beforeEach(async () => {
+    fs.getDoc.mockResolvedValue({ id: 'c1', exists: () => false, data: () => undefined });
+  });
+
+  it('is read once, then pruned from every later load', async () => {
+    expect(await loadMyCommunities(1)).toEqual([]);
+    expect(await loadMyCommunities(1)).toEqual([]);
+    expect(fs.getDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it('is read again after joining clears the miss', async () => {
+    await loadMyCommunities(1);
+    routed.callRouted.mockResolvedValueOnce({ communityId: 'c1', alreadyMember: false });
+    await joinCommunity(1, 'code', 'Pilot');
+    await loadMyCommunities(1);
+    expect(fs.getDoc).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('loadMyCommunitiesCached', () => {
   it('reuses one read for the TTL, then reads again', async () => {
