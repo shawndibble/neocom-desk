@@ -38,6 +38,12 @@ export interface SurveyInterval {
   rate: number;
   /** ISK mined: per ore, the m³ mined times that ore's ISK per m³ at the earlier scan. */
   minedIsk: number;
+  /**
+   * `mined` split by ore, m³; ores with nothing mined are left out, and the values sum to `mined`.
+   * Never negative: rocks only shrink, so a rock bigger than any earlier one of its ore counts as
+   * `added`, not as negative mining.
+   */
+  minedByOre: Record<string, number>;
 }
 
 export interface SurveyOre {
@@ -222,6 +228,7 @@ export function summarizeSurvey(
       added,
       rate: mined / seconds,
       minedIsk,
+      minedByOre: Object.fromEntries(Object.entries(minedByOre).filter(([, v]) => v > 0)),
     });
   }
 

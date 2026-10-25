@@ -84,3 +84,61 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   }
   return { rows, pricedOres, unpricedOres, toneIndex };
 }
+
+/** One scan interval's pace split by ore. */
+export interface PaceInterval {
+  from: number;
+  to: number;
+  /** m³/s over the interval: the sum of `rates`. */
+  total: number;
+  /** m³/s per active ore; 0 when nobody mined it. */
+  rates: Record<string, number>;
+}
+
+export interface PaceByOreSeries {
+  /** One entry per interval, for tables. */
+  intervals: PaceInterval[];
+  /**
+   * Plot rows for a stacked area: two per interval, at its start and 1 ms before its end, so
+   * the nearest-row hover reads the interval under the cursor. Each carries `from`/`to`, `total`
+   * and one key per active ore (m³/s).
+   */
+  rows: SurveySeriesRow[];
+  /** Ores mined in at least one interval, in `oreNames` order. */
+  activeOres: string[];
+  /** Each ore's index in `summary.oreNames`, for its colour. */
+  toneIndex: Record<string, number>;
+}
+
+/**
+ * The pace panel's "By ore" view: each interval's rate split by ore. Intervals are as long as the
+ * gap between scans, so every value is m³ over the interval's own seconds, however uneven.
+ */
+export function paceByOreSeries(summary: SurveySummary): PaceByOreSeries {
+  const toneIndex: Record<string, number> = {};
+  summary.oreNames.forEach((ore, i) => {
+    toneIndex[ore] = i;
+  });
+  const mined = new Set<string>();
+  for (const i of summary.intervals) for (const ore of Object.keys(i.minedByOre)) mined.add(ore);
+  const activeOres = summary.oreNames.filter((o) => mined.has(o));
+
+  const intervals: PaceInterval[] = summary.intervals.map((i) => {
+    const seconds = (i.to - i.from) / 1000;
+    const rates: Record<string, number> = {};
+    let total = 0;
+    for (const ore of activeOres) {
+      rates[ore] = (i.minedByOre[ore] ?? 0) / seconds;
+      total += rates[ore];
+    }
+    return { from: i.from, to: i.to, total, rates };
+  });
+  const rows = intervals.flatMap((i) => {
+    const row = { from: i.from, to: i.to, total: i.total, ...i.rates };
+    return [
+      { ...row, at: i.from },
+      { ...row, at: i.to - 1 },
+    ];
+  });
+  return { intervals, rows, activeOres, toneIndex };
+}
