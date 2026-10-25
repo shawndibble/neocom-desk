@@ -5,6 +5,7 @@
  */
 import { chargeScore, quickPicks, type ChargeChoice } from './chargeChoice';
 import type { ModuleAt } from './fittingEdit';
+import { isFiring } from './stats';
 import type { Fitting } from './types';
 
 /** One weapon group as the Charge Picker lists it (`WeaponChargeGroup`'s share). */
@@ -39,10 +40,7 @@ function emptyModulesOf(fitting: Fitting, group: ChargeGroup): ModuleAt[] {
   if (!group.isWeapon || group.choices.length === 0) return [];
   return fitting.modules
     .filter(
-      (m) =>
-        m.typeId === group.moduleTypeId &&
-        m.chargeTypeId === undefined &&
-        (m.state === 'active' || m.state === 'overload')
+      (m) => m.typeId === group.moduleTypeId && m.chargeTypeId === undefined && isFiring(m.state)
     )
     .map(({ slot, slotIndex }) => ({ slot, slotIndex }));
 }

@@ -33,6 +33,7 @@ import {
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
+  isFiring,
   needsChargeToFire,
   type OffenseItem,
 } from '@/engine/fittings/stats';
@@ -305,7 +306,13 @@ async function chargesDealDamage(
   const key = [...groupIds].sort((a, b) => a - b).join(',');
   const known = chargeDamageByGroups.get(key);
   if (known !== undefined) return known;
-  const types = await loadTypes();
+  let types;
+  try {
+    types = await loadTypes();
+  } catch {
+    // Unknown: count the module, as before, rather than hide a real warning.
+    return true;
+  }
   const groups = new Set(groupIds);
   let damages = false;
   for (const [id, info] of Object.entries(types)) {
@@ -321,7 +328,10 @@ async function chargesDealDamage(
         },
       ],
     });
-    if (chargeDamageSplit(items[0]?.charge?.attributes) !== null) {
+    const charge = items[0]?.charge?.attributes;
+    // The engine gave no charge back: can't call it harmless, and don't cache the guess.
+    if (!charge) return true;
+    if (chargeDamageSplit(charge) !== null) {
       damages = true;
       break;
     }
@@ -344,7 +354,7 @@ async function modulesWithHarmlessCharges(
   for (const [index, module] of fitting.modules.entries()) {
     const result = calculation.items[index];
     if (!result || module.chargeTypeId !== undefined || checked.has(module.typeId)) continue;
-    if (module.state !== 'active' && module.state !== 'overload') continue;
+    if (!isFiring(module.state)) continue;
     if (!needsChargeToFire(result.attributes)) continue;
     checked.add(module.typeId);
     const { chargeGroupIds } = extractModuleResult(result);

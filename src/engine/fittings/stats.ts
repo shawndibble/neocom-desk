@@ -426,7 +426,7 @@ export interface OffenseItem {
   chargeDamages?: boolean;
 }
 
-function isFiring(state: FittingItemState): boolean {
+export function isFiring(state: FittingItemState): boolean {
   return state === 'active' || state === 'overload';
 }
 
