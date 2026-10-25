@@ -14,7 +14,17 @@ _Recorded 2026-10-24 · issue #5047._
   writes in a dozen files reach a book; one forgotten bump would serve officers
   a stale book with nothing to show for it. Every Admin SDK write route builds
   through `WriteBatch`, and a test pins each route so an SDK change fails
-  loudly. This rules out hand-placed bumps.
+  loudly. `BulkWriter` and `recursiveDelete` are also recorded where they are
+  called, since both can build the write later, outside the caller's context.
+  This rules out hand-placed bumps.
+- **A book is stamped two seconds after its writes, not at the end of the job.**
+  The scheduled sync runs every book in one scope for up to nine minutes; held
+  to the end, a book's stamp would lag its writes by that much, and a job
+  killed by its timeout would never stamp at all. A final stamp still covers
+  whatever the last two seconds wrote.
+- **All the wrapped functions deploy together.** An unwrapped, older function
+  writing a stamped book moves no stamp, and officers see its writes only once
+  their copy ages out (an hour).
 - **Officer access records, the audit log and the SRP collections move no
   stamp.** The officer page re-checks access on every open, which rewrites the
   officer record; stamping it would invalidate every cache on every open.

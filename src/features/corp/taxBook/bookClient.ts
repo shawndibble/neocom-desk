@@ -240,20 +240,24 @@ async function openBook(characterId: number, corporationId: number) {
   const data = snap.data();
   const versions = bookVersionsOf(data);
   const key = `${characterId}:${corporationId}`;
-  const part = <T>(collectionName: string, read: () => Promise<T>) =>
-    cachedPart(key, collectionName, versions, read);
+  // `meta/paid` is read fresh every time, never from the copy: it is
+  // officer-only, so the rules still decide each open. Every part waits on it,
+  // so no copy is handed out to a Character the rules now refuse.
+  const paid = getDoc(doc(db, 'corps', String(corporationId), 'meta', 'paid'));
+  const paidStatementIds = async () =>
+    new Set(((await paid).data()?.ids as string[] | undefined) ?? []);
+  const part = async <T>(collectionName: string, readPart: () => Promise<T>, slot?: string) => {
+    const [, value] = await Promise.all([
+      paid,
+      cachedPart(key, collectionName, versions, readPart, slot ? { slot } : {}),
+    ]);
+    return value;
+  };
   const read = async <T>(name: string): Promise<T[]> =>
     (await getDocs(collection(db, 'corps', String(corporationId), name))).docs.map(
       (d) => d.data() as T
     );
   const list = <T>(name: string): Promise<T[]> => part(name, () => read<T>(name));
-  // Read fresh every time, never from the copy: it is officer-only, so the
-  // rules still decide each read even when every other part comes from cache.
-  const paidStatementIds = async () =>
-    new Set(
-      ((await getDoc(doc(db, 'corps', String(corporationId), 'meta', 'paid'))).data()?.ids as
-        string[] | undefined) ?? []
-    );
   return { data, part, read, list, paidStatementIds };
 }
 
@@ -484,21 +488,27 @@ export async function readBookData(
     list<ObservedRow>('observed'),
     list<BookDeclaration>('declarations'),
     list<Adjustment>('adjustments'),
-    part('meta', async () =>
-      (await Promise.all([meta('groupingAnswers'), meta('scheduledSync')])).map((d) => d.data())
+    part(
+      'meta',
+      async () =>
+        (await Promise.all([meta('groupingAnswers'), meta('scheduledSync')])).map((d) => d.data()),
+      'meta:answersAndSchedule'
     ),
     // One stamp covers a feeder's record and its payouts: both live under `feeders`.
-    part('feeders', async () =>
-      Promise.all(
-        (await read<FeederDoc>('feeders')).map(async (f) =>
-          bookFeederFrom(
-            f,
-            (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
-              (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+    part(
+      'feeders',
+      async () =>
+        Promise.all(
+          (await read<FeederDoc>('feeders')).map(async (f) =>
+            bookFeederFrom(
+              f,
+              (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
+                (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+              )
             )
           )
-        )
-      )
+        ),
+      'feeders:rows'
     ),
     list<RecordedWriteOff>('writeOffs'),
   ]);

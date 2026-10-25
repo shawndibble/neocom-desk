@@ -32,6 +32,7 @@ describe('bookPathOf', () => {
   it('names the book and the subcollection directly under it', () => {
     expect(bookPathOf('corps/7')).toEqual({ corporationId: '7', collection: null });
     expect(bookPathOf('corps/7/miners/m1')).toEqual({ corporationId: '7', collection: 'miners' });
+    expect(bookPathOf('corps/7/miners')).toEqual({ corporationId: '7', collection: 'miners' });
     expect(bookPathOf('corps/7/feeders/9/payouts/p1')).toEqual({
       corporationId: '7',
       collection: 'feeders',
@@ -83,6 +84,28 @@ describe('withBookVersions', () => {
     ).toEqual({ '7': ['adjustments', 'writeOffs'] });
   });
 
+  it('records a BulkWriter write when it is called, even once buffered past the pending limit', async () => {
+    // Past 500 pending operations a BulkWriter builds the write later, from
+    // another operation's completion, outside this scope's context.
+    const writer = db.bulkWriter();
+    expect(
+      await touchedBy(() => {
+        for (let i = 0; i < 600; i++)
+          ignore(writer.set(db.collection('corps').doc('3').collection('miners').doc(`m${i}`), {}));
+        ignore(writer.set(book.collection('extractions').doc('late'), { a: 1 }));
+      })
+    ).toEqual({ '3': ['miners'], '7': ['extractions'] });
+  });
+
+  it('records a recursiveDelete where it is called, before it streams anything', async () => {
+    expect(
+      await touchedBy(() => {
+        ignore(db.recursiveDelete(book.collection('declarations')));
+        ignore(db.recursiveDelete(book.collection('feeders').doc('9')));
+      })
+    ).toEqual({ '7': ['declarations', 'feeders'] });
+  });
+
   it('ignores the officer, audit and SRP subcollections, and paths outside a book', async () => {
     expect(
       await touchedBy(() => {
@@ -130,6 +153,30 @@ describe('withBookVersions', () => {
       )
     ).rejects.toThrow('boom');
     expect(stamp).toHaveBeenCalledWith('7', new Set(['miners']));
+  });
+
+  it('stamps a book soon after its writes while a long job is still running', async () => {
+    const stamps: [string, string[]][] = [];
+    const stamp: BookStamper = async (id, names) => {
+      stamps.push([id, [...names].sort()]);
+    };
+    const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    await withBookVersions(
+      stamp,
+      async () => {
+        db.batch().set(db.collection('corps').doc('1').collection('miners').doc('m'), {});
+        await pause(40);
+        // The first book is stamped while the job moves on to the next one.
+        expect(stamps).toEqual([['1', ['miners']]]);
+        db.batch().set(db.collection('corps').doc('2').collection('statements').doc('s'), {});
+      },
+      vi.fn(),
+      10
+    );
+    expect(stamps).toEqual([
+      ['1', ['miners']],
+      ['2', ['statements']],
+    ]);
   });
 
   it('logs a failed stamp without failing the work', async () => {

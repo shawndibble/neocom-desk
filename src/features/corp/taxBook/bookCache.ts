@@ -57,29 +57,30 @@ export function clearBookCache(): void {
 }
 
 /**
- * One part of a book (named by the subcollection whose stamp guards it):
- * the copy when its stamp still matches and it is young enough, otherwise
- * `read()`, kept for next time. Callers get their own structured clone, so
- * nothing they do to it reaches the copy.
+ * One part of a book, guarded by the stamp of `collection`: the copy when that
+ * stamp still matches and the copy is young enough, otherwise `read()`, kept
+ * for next time. `slot` names the copy when one stamp guards more than one
+ * shape (a feeder's rows with their payouts, beside its raw records). Callers
+ * get their own structured clone, so nothing they do to it reaches the copy.
  */
 export async function cachedPart<T>(
   key: string,
   collection: string,
   versions: BookVersions | null,
   read: () => Promise<T>,
-  now: number = Date.now()
+  { now = Date.now(), slot = collection }: { now?: number; slot?: string } = {}
 ): Promise<T> {
   const version = versions?.collections[collection];
   const book = copies.get(key);
-  const held = book?.get(collection);
+  const held = book?.get(slot);
   if (version !== undefined && held?.version === version && now - held.at <= BOOK_CACHE_MAX_AGE_MS)
     return structuredClone(held.data as T);
   const data = await read();
   if (version === undefined) {
-    book?.delete(collection);
+    book?.delete(slot);
   } else {
     if (!copies.has(key)) copies.set(key, new Map());
-    copies.get(key)!.set(collection, { version, at: now, data: structuredClone(data) });
+    copies.get(key)!.set(slot, { version, at: now, data: structuredClone(data) });
   }
   return data;
 }

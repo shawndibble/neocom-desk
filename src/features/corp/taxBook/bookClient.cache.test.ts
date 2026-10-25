@@ -3,12 +3,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
-const store = vi.hoisted(() => ({ docs: new Map<string, Data>(), reads: [] as string[] }));
+const store = vi.hoisted(() => ({
+  docs: new Map<string, Data>(),
+  reads: [] as string[],
+  denied: new Set<string>(),
+}));
 vi.mock('firebase/firestore/lite', () => ({
   doc: (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }),
   collection: (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }),
   getDoc: async (ref: { path: string }) => {
     store.reads.push(ref.path);
+    if (store.denied.has(ref.path))
+      throw Object.assign(new Error('denied'), { code: 'permission-denied' });
     const data = store.docs.get(ref.path);
     return { exists: () => data !== undefined, data: () => data, get: () => undefined };
   },
@@ -63,6 +69,7 @@ beforeEach(() => {
   clearBookCache();
   store.docs.clear();
   store.reads.length = 0;
+  store.denied.clear();
   store.docs.set(BOOK, stamped());
   store.docs.set(`${BOOK}/miners/m1`, { id: 'm1', characterIds: [1] });
   store.docs.set(`${BOOK}/statements/s1`, { id: 's1' });
@@ -129,6 +136,13 @@ describe('readBookData over the version marker', () => {
     expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`]);
     expect(state?.statements).toEqual([{ id: 's1' }]);
     expect(state?.paidStatementIds).toEqual(new Set(['s0']));
+  });
+
+  it('serves no copy to a Character the rules now refuse', async () => {
+    await readBookData(7, CORP);
+    store.denied.add(`${BOOK}/meta/paid`);
+
+    await expect(readBookData(7, CORP)).rejects.toMatchObject({ code: 'permission-denied' });
   });
 
   it('is null, reading nothing else, when the corporation has no book', async () => {

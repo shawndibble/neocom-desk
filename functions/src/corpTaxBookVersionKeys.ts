@@ -55,8 +55,8 @@ export const VERSIONED_COLLECTIONS = [
 export type VersionedCollection = (typeof VERSIONED_COLLECTIONS)[number];
 
 /**
- * Where a document path lands in a book: its corporation id, and the
- * subcollection directly under `corps/{id}` (`null` for the book document
+ * Where a document or collection path lands in a book: its corporation id, and
+ * the subcollection directly under `corps/{id}` (`null` for the book document
  * itself, `undefined` for anything that is not a book path).
  */
 export function bookPathOf(
@@ -64,5 +64,5 @@ export function bookPathOf(
 ): { corporationId: string; collection: string | null } | undefined {
   const parts = path.split('/');
   if (parts[0] !== 'corps' || parts.length < 2 || parts[1] === '') return undefined;
-  return { corporationId: parts[1], collection: parts.length >= 4 ? parts[2] : null };
+  return { corporationId: parts[1], collection: parts.length >= 3 ? parts[2] : null };
 }
