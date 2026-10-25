@@ -12,6 +12,7 @@
 // `ScheduledAction`, the only edits it can ask for. It also does not group the
 // officer's own Characters (that needs the officer's device).
 
+import { isDeepStrictEqual } from 'node:util';
 import type { Firestore } from 'firebase-admin/firestore';
 import { parseEditAction, parseSyncInput, type OfficerAccess } from './corpTaxBook.js';
 import {
@@ -31,8 +32,16 @@ import {
   bookRef,
   editBookAs,
   syncBookAs,
+  writeBilledByPointers,
   type BookDeps,
 } from './corpTaxBookStore.js';
+import {
+  advanceObservedThrough,
+  isSettledRow,
+  readObservedThrough,
+  type LedgerRead,
+  type ObservedThrough,
+} from './corpTaxBookObservedThrough.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
   detectGaps,
@@ -119,6 +128,10 @@ export interface AdminBookState {
   paidStatementIds: Set<string>;
   /** Officer write-offs (#4637): a Statement one forgives in full settles. */
   writeOffs?: (AllocWriteOff & { minerId: string })[];
+  /** Per refinery, the last read merged in full: which rows are final (corpTaxBookObservedThrough.ts). */
+  observedThrough: ObservedThrough;
+  /** The book doc's `createdAt`: tells this book from one deleted and turned on again. */
+  createdAt: unknown;
 }
 
 /** The sync's reads of the book, with the admin SDK (the client reads the same collections under the rules). */
@@ -152,6 +165,8 @@ export async function readBookStateAdmin(
     dismissals,
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    observedThrough: readObservedThrough(data.observedThrough),
+    createdAt: data.createdAt,
     writeOffs: writeOffDocs.flatMap((d) => {
       const w = writeOffForAllocation(d);
       return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
@@ -221,6 +236,7 @@ export async function runBookSync(
     truncated: observers.truncated,
   };
   const systemIds: Record<number, number> = {};
+  const ledgerReads: LedgerRead[] = [];
   for (const structureId of observers.data) {
     const ledger = await esi.ledger(corporationId, structureId, accessToken);
     if (ledger.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
@@ -230,6 +246,7 @@ export async function runBookSync(
     const rows = observedRowsFromLedger(structureId, ledger.data, ledger.fetchedAt, corporationId);
     feed.rows.push(...rows);
     feed.truncated ||= ledger.truncated;
+    ledgerReads.push({ structureId, fetchedAt: ledger.fetchedAt, truncated: ledger.truncated });
     feed.oldestEsiDate[structureId] = rows.map((r) => r.date).sort()[0];
 
     // Remembered, else what stored rows already carry (an officer's visit set it), else ask ESI:
@@ -319,7 +336,13 @@ export async function runBookSync(
     extractions.length > 0 ? extractions : before.extractions,
     systemIds
   );
-  const batches = chunks(placed, OBSERVED_PER_CALL);
+  // Rows a full earlier read already merged at their final quantity would write nothing:
+  // leave them out of the merge and its per-row reads. They still refresh the billed-by
+  // pointers, which record that this sync saw the Character.
+  const settled: ObservedRow[] = [];
+  const toMerge: ObservedRow[] = [];
+  for (const r of placed) (isSettledRow(r, before.observedThrough) ? settled : toMerge).push(r);
+  const batches = chunks(toMerge, OBSERVED_PER_CALL);
   const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
 
   if (!(await args.stillHeld())) return { kind: 'skipped', reason: 'esi-unavailable' };
@@ -339,6 +362,20 @@ export async function runBookSync(
   for (const rest of extraCalls) {
     await syncBookAs(deps, access, call({ extractions: rest }), { scheduled: true });
   }
+  if (settled.length > 0) await writeBilledByPointers(deps, corporationId, settled);
+  // Only now, with every row of this run merged: a failed merge above leaves the
+  // watermark where it was, so the next run merges those rows again.
+  const observedThrough = advanceObservedThrough(before.observedThrough, ledgerReads);
+  if (!isDeepStrictEqual(observedThrough, before.observedThrough)) {
+    await db.runTransaction(async (tx) => {
+      const ref = bookRef(db, corporationId);
+      const held = await tx.get(ref);
+      // A book deleted and turned on again during the run starts with no rows: it must not
+      // inherit the old book's watermark, or its closed days would never be merged.
+      if (!held.exists || held.get('createdAt') !== before.createdAt) return;
+      tx.update(ref, { observedThrough });
+    });
+  }
 
   const edit = (action: ScheduledAction) =>
     editBookAs(
@@ -353,8 +390,11 @@ export async function runBookSync(
   const { assigned, error: reassignError } = await reassignUnmatched(edit, before, known);
 
   // --- Settle ---------------------------------------------------------------
+  // Read again, right before settling, whenever this run brought in money: a settle is never
+  // undone (D22), so it plans from the book as it is now, officers' edits during the run included,
+  // rather than from the copy read before the (slow) ESI reads.
   const after =
-    receipt.donationsAdded > 0 || assigned > 0
+    receipt.donationsAdded > 0 || assigned.size > 0
       ? await readBookStateAdmin(db, corporationId)
       : before;
   const toSettle = after
@@ -385,7 +425,7 @@ export async function runBookSync(
     extractions: extractions.length,
     donationsAdded: receipt.donationsAdded,
     settled: toSettle.length,
-    reassigned: assigned,
+    reassigned: assigned.size,
     missing,
     truncated: feed.truncated,
     ...(reassignError ? { reassignError } : {}),
@@ -397,11 +437,11 @@ async function reassignUnmatched(
   edit: (action: ScheduledAction) => Promise<unknown>,
   before: AdminBookState,
   known: ReadonlySet<number>
-): Promise<{ assigned: number; error?: string }> {
+): Promise<{ assigned: Map<string, string>; error?: string }> {
   const unmatched = before.payments.filter(
     (p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0)
   );
-  let assigned = 0;
+  const assigned = new Map<string, string>();
   try {
     for (const p of unmatched) {
       const match = matchDonation(
@@ -410,7 +450,7 @@ async function reassignUnmatched(
       );
       if (match.kind === 'unmatched') continue;
       await edit({ action: 'assignPayment', paymentId: p.id, minerId: match.minerId });
-      assigned += 1;
+      assigned.set(p.id, match.minerId);
     }
     return { assigned };
   } catch (e) {
