@@ -1,6 +1,7 @@
 name: Public data - LP store offers and cost indices
 
-# Publishes the LP store offers (lp-store-offers/snapshot.json) and merges the day's
+# Publishes the LP store offers (lp-store-offers/snapshot.json), each hub region's daily
+# volume (lp-store-volume/<regionId>.json) and merges the day's
 # industry cost indices (cost-indices/<systemId>.json) into R2 once a day, 00:30 UTC;
 # the app reads them from https://data.neocomdesk.com. The cron is pinned to UTC
 # because the cost index half stamps a UTC date. Pattern and secrets: public-data-job.yml.

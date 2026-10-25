@@ -16,7 +16,14 @@ import {
 import { ESI_COMPATIBILITY_DATE, ESI_USER_AGENT } from './esiNotifications.js';
 import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
 import { r2ConfigFromEnv } from './publicDataActiveWars.js';
-import { publishLpStoreOffersToR2 } from './r2DailySnapshots.js';
+import {
+  LP_VOLUME_WINDOW_DAYS,
+  VolumeFold,
+  foldHistoryDayUrl,
+  historyWindow,
+  type FoldHistoryDay,
+} from './marketHistoryVolume.js';
+import { publishLpStoreOffersToR2, publishLpStoreVolumeToR2 } from './r2DailySnapshots.js';
 import { createR2Get, createR2Put, type R2Get, type R2Put } from './r2Client.js';
 
 const ESI_PUBLIC_HEADERS = {
@@ -37,7 +44,13 @@ export interface PublicLpStoreDeps {
   sleepImpl?: (ms: number) => Promise<unknown>;
   corporations?: Readonly<Record<number, readonly number[]>>;
   requestGapMs?: number;
+  /** Test seam: downloads and folds one day of EVE Ref market history. */
+  foldDayImpl?: FoldHistoryDay;
 }
+
+/** Fewer days than this and a per-day average would swing on which days happened to be published. */
+const LP_VOLUME_MIN_DAYS = 20;
+const LP_VOLUME_FETCH_ATTEMPTS = 3;
 
 /** Crawls every LP store and publishes the snapshot; throws when it published nothing. */
 export async function publishLpStoreOffers(deps: PublicLpStoreDeps): Promise<void> {
@@ -62,6 +75,43 @@ export async function publishLpStoreOffers(deps: PublicLpStoreDeps): Promise<voi
     );
   }
   await publishLpStoreOffersToR2(rows, (deps.now ?? Date.now)(), deps.put);
+}
+
+/**
+ * Publishes each Trade Hub region's units-per-day (issue #5127) from EVE Ref's daily
+ * market-history files; throws, publishing nothing, when too few days were readable.
+ */
+export async function publishLpStoreVolume(deps: PublicLpStoreDeps): Promise<void> {
+  const foldDay = deps.foldDayImpl ?? foldHistoryDayUrl(ESI_USER_AGENT);
+  const fold = new VolumeFold();
+  let folded = 0;
+  const failed: string[] = [];
+  for (const date of historyWindow(new Date((deps.now ?? Date.now)()), LP_VOLUME_WINDOW_DAYS)) {
+    for (let attempt = 1; attempt <= LP_VOLUME_FETCH_ATTEMPTS; attempt += 1) {
+      try {
+        if ((await foldDay(date, fold)) === 'folded') folded += 1;
+        break;
+      } catch (err) {
+        if (attempt === LP_VOLUME_FETCH_ATTEMPTS) failed.push(`${date}: ${String(err)}`);
+        else await (deps.sleepImpl ?? sleep)(2_000 * attempt);
+      }
+    }
+  }
+  console.info('LP store volume', { days: folded, failed: failed.length });
+  // A failed day half-folded would skew the average, so any failure publishes nothing.
+  if (failed.length > 0 || folded < LP_VOLUME_MIN_DAYS) {
+    throw new Error(
+      `LP store volume: ${folded} days read, ${failed.length} failed (${failed[0] ?? 'none'}); nothing published`
+    );
+  }
+  const lastSyncedAt = (deps.now ?? Date.now)();
+  for (const regionId of fold.regionIds()) {
+    await publishLpStoreVolumeToR2(
+      regionId,
+      { lastSyncedAt, days: folded, perDay: fold.perDay(regionId, folded) },
+      deps.put
+    );
+  }
 }
 
 /** Merges today's industry cost indices into each system's R2 history object. */
@@ -92,6 +142,7 @@ export async function publishLpStoreAndCostIndices(deps: PublicLpStoreDeps): Pro
   const failed: string[] = [];
   for (const [name, run] of [
     ['LP store offers', publishLpStoreOffers],
+    ['LP store volume', publishLpStoreVolume],
     ['cost indices', publishCostIndices],
   ] as const) {
     try {

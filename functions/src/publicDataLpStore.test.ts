@@ -1,10 +1,12 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
+import { VolumeFold } from './marketHistoryVolume.js';
 import { LP_STORE_OFFERS_R2_KEY } from './r2DailySnapshots.js';
 import {
   publishCostIndices,
   publishLpStoreAndCostIndices,
   publishLpStoreOffers,
+  publishLpStoreVolume,
 } from './publicDataLpStore.js';
 
 const NOW = Date.UTC(2026, 9, 25, 0, 30);
@@ -41,6 +43,15 @@ function esi(opts: { failCorps?: number[]; industry?: unknown; industryStatus?: 
       : Response.json([offer]);
   }) as typeof fetch;
 }
+
+const foldDay = (opts: { missing?: string[]; fail?: string[] } = {}) =>
+  vi.fn<(date: string, fold: VolumeFold) => Promise<'folded' | 'missing'>>(async (date, fold) => {
+    if (opts.fail?.includes(date)) throw new Error('HTTP 500');
+    if (opts.missing?.includes(date)) return 'missing';
+    fold.add(10000002, 34, 60);
+    fold.add(10000002, 35, 0);
+    return 'folded';
+  });
 
 describe('publishLpStoreOffers', () => {
   it('publishes the snapshot under the existing key', async () => {
@@ -134,8 +145,54 @@ describe('publishLpStoreAndCostIndices', () => {
         corporations: CORPS,
         requestGapMs: 0,
         now: () => NOW,
+        foldDayImpl: foldDay(),
       })
     ).rejects.toThrow('Sync failed: LP store offers');
-    expect(put.mock.calls.map((c) => c[0])).toEqual(['cost-indices/30000001.json']);
+    const keys = put.mock.calls.map((c) => c[0]);
+    expect(keys).toContain('cost-indices/30000001.json');
+    expect(keys).toContain('lp-store-volume/10000002.json');
+    expect(keys).not.toContain(LP_STORE_OFFERS_R2_KEY);
+  });
+});
+
+describe('publishLpStoreVolume', () => {
+  const base = { get: async () => null, now: () => NOW, sleepImpl };
+
+  it('publishes one object per hub region: units per day over the days read', async () => {
+    const put = vi.fn<Put>(async () => {});
+    const fold = foldDay({ missing: ['2026-10-24', '2026-10-23'] });
+    await publishLpStoreVolume({ ...base, put, foldDayImpl: fold });
+    expect(fold).toHaveBeenCalledTimes(30);
+    expect(put.mock.calls.map((c) => c[0]).sort()).toEqual(
+      [10000002, 10000043, 10000032, 10000030, 10000042]
+        .map((r) => `lp-store-volume/${r}.json`)
+        .sort()
+    );
+    const forge = put.mock.calls.find((c) => c[0] === 'lp-store-volume/10000002.json')!;
+    expect(JSON.parse(gunzipSync(forge[1] as Buffer).toString())).toEqual({
+      lastSyncedAt: NOW,
+      days: 28,
+      // 28 days x 60 units / 28 days; type 35 never traded, so it is absent.
+      perDay: { 34: 60 },
+    });
+    const domain = put.mock.calls.find((c) => c[0] === 'lp-store-volume/10000043.json')!;
+    expect(JSON.parse(gunzipSync(domain[1] as Buffer).toString()).perDay).toEqual({});
+  });
+
+  it('publishes nothing when a day keeps failing', async () => {
+    const put = vi.fn<Put>(async () => {});
+    await expect(
+      publishLpStoreVolume({ ...base, put, foldDayImpl: foldDay({ fail: ['2026-10-20'] }) })
+    ).rejects.toThrow(/nothing published/);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('publishes nothing when too few days are published', async () => {
+    const put = vi.fn<Put>(async () => {});
+    const missing = Array.from({ length: 15 }, (_, i) => `2026-10-${String(10 + i)}`);
+    await expect(
+      publishLpStoreVolume({ ...base, put, foldDayImpl: foldDay({ missing }) })
+    ).rejects.toThrow(/nothing published/);
+    expect(put).not.toHaveBeenCalled();
   });
 });

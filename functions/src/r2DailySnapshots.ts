@@ -22,6 +22,7 @@ import type {
 
 export const LP_STORE_OFFERS_R2_KEY = 'lp-store-offers/snapshot.json';
 export const OPEN_PRICES_R2_PREFIX = 'open-prices/';
+export const LP_STORE_VOLUME_R2_PREFIX = 'lp-store-volume/';
 
 /** Rewritten once a day; five minutes keeps a fresh publish visible soon after. */
 const LP_HEADERS = {
@@ -49,6 +50,19 @@ export async function publishLpStoreOffersToR2(
   put: R2Put
 ): Promise<void> {
   await put(LP_STORE_OFFERS_R2_KEY, gzipSync(JSON.stringify({ lastSyncedAt, rows })), LP_HEADERS);
+}
+
+export function lpStoreVolumeR2Key(regionId: number): string {
+  return `${LP_STORE_VOLUME_R2_PREFIX}${regionId}.json`;
+}
+
+/** One hub region's daily volume object: `{ lastSyncedAt, days, perDay }`, read back by the LP Store page. */
+export async function publishLpStoreVolumeToR2(
+  regionId: number,
+  volume: { lastSyncedAt: number; days: number; perDay: Record<number, number> },
+  put: R2Put
+): Promise<void> {
+  await put(lpStoreVolumeR2Key(regionId), gzipSync(JSON.stringify(volume)), LP_HEADERS);
 }
 
 export interface MergeFn {

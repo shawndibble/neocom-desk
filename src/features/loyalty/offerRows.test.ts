@@ -567,4 +567,48 @@ describe('computeLoyaltyOfferRows', () => {
       expect(collectNameableTypeIds([])).toEqual([]);
     });
   });
+
+  describe('sellsPerDay (issue #5127)', () => {
+    const base = {
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800, [ASTERO_ID]: 50_000_000, [TRITANIUM_ID]: 5 },
+      adjustedPrices: null,
+      systemCostIndex: null,
+      skills: {},
+      materialSourcing: undefined,
+      liquidationBasis: 'order' as const,
+      playerLp: null,
+    };
+
+    it("reads a plain item's volume off its own type, and a blueprint's off the product it builds", () => {
+      const rows = computeLoyaltyOfferRows({
+        ...base,
+        offers: [probes, astero],
+        sellsPerDayByType: { [PROBE_ID]: 420.5, [ASTERO_ID]: 3, [ASTERO_BP_ID]: 999 },
+      });
+      const byOffer = (id: number) => rows.find((r) => r.offer.offer_id === id)!;
+      expect(byOffer(2).sellsPerDay).toBe(420.5);
+      expect(byOffer(1).sellsPerDay).toBe(3);
+    });
+
+    it('is zero when the volume loaded and the type never traded', () => {
+      const [row] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [probes],
+        sellsPerDayByType: { [ASTERO_ID]: 3 },
+      });
+      expect(row.sellsPerDay).toBe(0);
+    });
+
+    it('is null, not zero, when no volume data is available', () => {
+      for (const sellsPerDayByType of [undefined, null]) {
+        const rows = computeLoyaltyOfferRows({
+          ...base,
+          offers: [probes, astero],
+          sellsPerDayByType,
+        });
+        expect(rows.map((r) => r.sellsPerDay)).toEqual([null, null]);
+      }
+    });
+  });
 });

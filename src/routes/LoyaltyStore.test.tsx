@@ -175,6 +175,7 @@ const ITEM_ROW: LoyaltyOfferRow = {
   productName: null,
   build: null,
   profit: PROFIT,
+  sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
 };
@@ -187,6 +188,7 @@ const BLUEPRINT_ROW: LoyaltyOfferRow = {
   productName: 'Republic Fleet Firetail',
   build: null,
   profit: PROFIT,
+  sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
 };
@@ -199,6 +201,7 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   productName: null,
   build: null,
   profit: PROFIT,
+  sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
 };
@@ -564,6 +567,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     productName: null,
     build: null,
     profit: { ...PROFIT, profit: 30_095_516 },
+    sellsPerDay: null,
     requiredItems: [
       { typeId: 40_000, name: 'Serpentis Palladium Tag', quantity: 8, unitPrice: 100_000 },
       { typeId: 40_001, name: 'Shadow Serpentis Gold Tag', quantity: 1, unitPrice: 5_000_000 },
@@ -579,6 +583,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     productName: null,
     build: null,
     profit: { ...PROFIT, profit: null, iskPerLp: null },
+    sellsPerDay: null,
     requiredItems: [{ typeId: 40_002, name: 'Unpriced Faction Tag', quantity: 3, unitPrice: null }],
     requiredItemsCost: null,
   };
@@ -591,6 +596,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     productName: null,
     build: null,
     profit: { ...PROFIT, profit: null, iskPerLp: null },
+    sellsPerDay: null,
     requiredItems: [],
     requiredItemsCost: 0,
   };

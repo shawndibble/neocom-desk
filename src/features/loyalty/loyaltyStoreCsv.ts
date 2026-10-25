@@ -14,6 +14,7 @@ export function loyaltyOfferCsvColumns(t: CsvTranslate): CsvColumn<LoyaltyOfferR
     { header: t('loyaltyStore.colItem'), value: (row) => row.itemName },
     { header: t('loyaltyStore.csvLpCost'), value: (row) => row.offer.lp_cost },
     { header: t('loyaltyStore.csvIskCost'), value: (row) => row.offer.isk_cost },
+    { header: t('loyaltyStore.colSellsPerDay'), value: (row) => row.sellsPerDay },
     { header: t('loyaltyStore.colProfit'), value: (row) => row.profit.profit },
     { header: t('loyaltyStore.colIskPerLp'), value: (row) => row.profit.iskPerLp },
   ];
