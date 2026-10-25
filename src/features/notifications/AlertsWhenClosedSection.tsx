@@ -20,7 +20,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
-import i18n from '@/i18n';
 import { Button, Modal, NeedsConnection } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -53,7 +52,7 @@ interface CharacterRef {
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
 
 export function AlertsWhenClosedSection({ characters }: { characters: readonly CharacterRef[] }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const grants: Record<number, AlertsGrantRecord> = useLiveQuery(readAlertsGrants, []) ?? {};

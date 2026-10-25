@@ -509,6 +509,28 @@ describe('pollEveNotifications: new-mail alerts (issue #5143)', () => {
     );
   });
 
+  it('logs a quiet device as handled, so a retry after another device’s failure cannot push late', async () => {
+    const quiet: PollDevice = {
+      ...wantsMail,
+      quietHours: { start: '00:00', end: '23:59', timeZone: 'UTC', allowAttacks: true },
+    };
+    const tablet: PollDevice = { ...wantsMail, deviceId: 'tablet', fcmToken: 'fcm-tablet' };
+    const s = setup({
+      grants: { 1: grant(MAIL_GRANT) },
+      devices: [quiet, tablet],
+      now: () => Date.parse('2026-10-14T13:00:00Z'),
+      send: async () => {
+        throw new Error('unavailable');
+      },
+    });
+    await pollEveNotifications(withMail(s, () => ok([header(101)])).deps);
+    expect(s.store.patchMail).toHaveBeenCalledWith(1, 'blob', {
+      mailHighWaterId: 100,
+      mailEtag: '"m1"',
+      mailPushed: ['phone|1:newMail:101'],
+    });
+  });
+
   it('a burst pushes only the newest mails', async () => {
     const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
     const headers = Array.from({ length: 9 }, (_, i) => header(101 + i));

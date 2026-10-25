@@ -420,7 +420,11 @@ async function pollMail(
   const nowMs = (deps.now ?? Date.now)();
   for (const device of wanting) {
     // Quiet time: skipped, not queued. The mark still advances below.
-    if (suppressPush(nowMs, device.quietHours, undefined)) continue;
+    // Logged as handled, so a retry after another device's failure cannot push it later.
+    if (suppressPush(nowMs, device.quietHours, undefined)) {
+      for (const fire of fires) pushedNow.push(mailPushedEntry(device.deviceId, fire));
+      continue;
+    }
     for (const fire of fires) {
       const entry = mailPushedEntry(device.deviceId, fire);
       if (alreadyPushed.has(entry)) continue;

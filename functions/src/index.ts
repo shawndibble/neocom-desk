@@ -369,6 +369,7 @@ alertsAction('registerDevice', async (request) => {
   let nearbyGrants: number[] | undefined = [];
   // Likewise the Characters whose active grant can read mail headers (ADR 0029),
   // present only from a server that takes the mail scope.
+  // Sent only when `nearbyGrants` is: both mark a server that takes the new scopes.
   const mailGrants: number[] = [];
   try {
     const grants = await store.getMany(registration.characterIds);

@@ -74,6 +74,7 @@ async function writeGrants(
  */
 export type AlertsExtra = 'nearby' | 'mail';
 const EXTRA_KEYS: Record<AlertsExtra, string> = { nearby: NEARBY_KEY, mail: MAIL_KEY };
+const ALERTS_EXTRAS = Object.keys(EXTRA_KEYS) as AlertsExtra[];
 
 /**
  * One extra on the grant, as the server last reported it: whether it takes the
@@ -165,7 +166,7 @@ export async function forgetAlertsGrants(characterIds: readonly number[]): Promi
   await writeGrants((grants) => {
     for (const id of characterIds) delete grants[id];
   });
-  for (const extra of ['nearby', 'mail'] as const) {
+  for (const extra of ALERTS_EXTRAS) {
     await writeExtra(extra, (ids) => {
       for (const id of characterIds) ids.delete(id);
     });
@@ -207,7 +208,7 @@ export async function completeAlertsGrant(params: {
   });
   // Only a server that knows a scope says so in its answer, so this also proves
   // the server takes it.
-  for (const extra of ['nearby', 'mail'] as const) {
+  for (const extra of ALERTS_EXTRAS) {
     const covered = saved?.[extra];
     if (typeof covered !== 'boolean') continue;
     await writeExtra(
