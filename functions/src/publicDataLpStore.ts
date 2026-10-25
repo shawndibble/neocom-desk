@@ -86,10 +86,12 @@ export async function publishLpStoreVolume(deps: PublicLpStoreDeps): Promise<voi
   const fold = new VolumeFold();
   let folded = 0;
   const failed: string[] = [];
+  const missing: string[] = [];
   for (const date of historyWindow(new Date((deps.now ?? Date.now)()), LP_VOLUME_WINDOW_DAYS)) {
     for (let attempt = 1; attempt <= LP_VOLUME_FETCH_ATTEMPTS; attempt += 1) {
       try {
         if ((await foldDay(date, fold)) === 'folded') folded += 1;
+        else missing.push(date);
         break;
       } catch (err) {
         if (attempt === LP_VOLUME_FETCH_ATTEMPTS) failed.push(`${date}: ${String(err)}`);
@@ -97,7 +99,7 @@ export async function publishLpStoreVolume(deps: PublicLpStoreDeps): Promise<voi
       }
     }
   }
-  console.info('LP store volume', { days: folded, failed: failed.length });
+  console.info('LP store volume', { days: folded, missing, failed: failed.length });
   // A failed day half-folded would skew the average, so any failure publishes nothing.
   if (failed.length > 0 || folded < LP_VOLUME_MIN_DAYS) {
     throw new Error(

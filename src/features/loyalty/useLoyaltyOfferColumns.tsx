@@ -55,14 +55,11 @@ export function useLoyaltyOfferColumns({
         // Unavailable sorts last, apart from a real zero.
         sortValue: (row) => row.sellsPerDay ?? undefined,
         cellClassName: () => 'tabular-nums',
-        render: (row) =>
-          row.sellsPerDay === null
-            ? '—'
-            : row.sellsPerDay === 0
-              ? t('loyaltyStore.sellsNone')
-              : row.sellsPerDay < 10
-                ? fixed1(row.sellsPerDay)
-                : formatCount(row.sellsPerDay),
+        render: (row) => {
+          if (row.sellsPerDay === null) return '—';
+          if (row.sellsPerDay === 0) return t('loyaltyStore.sellsNone');
+          return row.sellsPerDay < 10 ? fixed1(row.sellsPerDay) : formatCount(row.sellsPerDay);
+        },
       },
       profit: {
         id: 'profit',

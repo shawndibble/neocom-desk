@@ -23,8 +23,7 @@ export function parseLpStoreVolume(raw: unknown): LpStoreVolume | null {
   const volume: Record<number, number> = {};
   for (const [typeId, value] of Object.entries(perDay)) {
     const id = Number(typeId);
-    if (!Number.isInteger(id) || typeof value !== 'number' || !(value > 0)) return null;
-    volume[id] = value;
+    if (Number.isInteger(id) && typeof value === 'number' && value > 0) volume[id] = value;
   }
   return volume;
 }
@@ -40,11 +39,15 @@ async function fetchVolume(regionId: number): Promise<LpStoreVolume | null> {
 }
 
 export async function loadLpStoreVolume(regionId: number): Promise<LpStoreVolume | null> {
-  const cached = await loadWithCache(
-    GLOBAL_CACHE_CHARACTER_ID,
-    `lpStoreVolumeR2:${regionId}`,
-    () => fetchVolume(regionId),
-    { staleAfterMs: STALE_AFTER_MS, allowStaleServe: true }
-  );
-  return cached?.data ?? null;
+  try {
+    const cached = await loadWithCache(
+      GLOBAL_CACHE_CHARACTER_ID,
+      `lpStoreVolumeR2:${regionId}`,
+      () => fetchVolume(regionId),
+      { staleAfterMs: STALE_AFTER_MS, allowStaleServe: true }
+    );
+    return cached?.data ?? null;
+  } catch {
+    return null;
+  }
 }

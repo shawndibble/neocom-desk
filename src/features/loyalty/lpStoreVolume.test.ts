@@ -15,15 +15,21 @@ describe('parseLpStoreVolume', () => {
     expect(parseLpStoreVolume({ lastSyncedAt: 100, days: 30, perDay: {} })).toEqual({});
   });
 
+  it('skips a bad entry without losing the rest', () => {
+    expect(
+      parseLpStoreVolume({
+        lastSyncedAt: 1,
+        perDay: { 34: 'many', 35: 0, tritanium: 5, 36: 2 },
+      })
+    ).toEqual({ 36: 2 });
+  });
+
   it.each([
     ['not an object', 'nope'],
     ['no stamp', { perDay: {} }],
     ['a zero stamp', { lastSyncedAt: 0, perDay: {} }],
     ['no volume map', { lastSyncedAt: 1 }],
     ['a list for the map', { lastSyncedAt: 1, perDay: [] }],
-    ['a non-numeric volume', { lastSyncedAt: 1, perDay: { 34: 'many' } }],
-    ['a zero volume', { lastSyncedAt: 1, perDay: { 34: 0 } }],
-    ['a non-numeric type id', { lastSyncedAt: 1, perDay: { tritanium: 5 } }],
   ])('rejects %s', (_label, raw) => {
     expect(parseLpStoreVolume(raw)).toBeNull();
   });

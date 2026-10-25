@@ -15,13 +15,14 @@ import { MARKET_OPEN_PRICES_REGION_IDS, addDays } from './marketOpenPrices.js';
 
 const EVEREF_HISTORY_BASE = 'https://data.everef.net/market-history';
 export const LP_VOLUME_WINDOW_DAYS = 30;
+const DOWNLOAD_TIMEOUT_MS = 60_000;
 const REQUIRED_COLUMNS = ['region_id', 'type_id', 'volume'] as const;
 
 export function historyDayUrl(date: string): string {
   return `${EVEREF_HISTORY_BASE}/${date.slice(0, 4)}/market-history-${date}.csv.bz2`;
 }
 
-/** The `days` UTC dates ending the day before `now`'s, newest first. */
+/** The `days` UTC dates ending the day before `now`'s, newest first. EVE Ref lists a day about 11:00 UTC the next day, so the first is usually still missing at the 00:30 run. */
 export function historyWindow(now: Date, days: number = LP_VOLUME_WINDOW_DAYS): string[] {
   const yesterday = addDays(now.toISOString().slice(0, 10), -1);
   return Array.from({ length: days }, (_, i) => addDays(yesterday, -i));
@@ -29,11 +30,9 @@ export function historyWindow(now: Date, days: number = LP_VOLUME_WINDOW_DAYS): 
 
 /** Total traded volume per tracked region and type across the days folded in. */
 export class VolumeFold {
-  private readonly tracked: ReadonlySet<number>;
   private readonly totals = new Map<number, Map<number, number>>();
 
   constructor(regionIds: readonly number[] = MARKET_OPEN_PRICES_REGION_IDS) {
-    this.tracked = new Set(regionIds);
     for (const id of regionIds) this.totals.set(id, new Map());
   }
 
@@ -55,7 +54,7 @@ export class VolumeFold {
   }
 
   regionIds(): number[] {
-    return [...this.tracked];
+    return [...this.totals.keys()];
   }
 }
 
@@ -107,9 +106,14 @@ export type FoldHistoryDay = (date: string, fold: VolumeFold) => Promise<'folded
 /** Downloads and folds one day; `missing` for a 404 (not published yet), a throw for anything else. */
 export function foldHistoryDayUrl(userAgent: string): FoldHistoryDay {
   return async (date, fold) => {
-    const response = await fetch(historyDayUrl(date), { headers: { 'User-Agent': userAgent } });
+    // The signal also covers the body read, so a stalled download errors the pipeline.
+    const response = await fetch(historyDayUrl(date), {
+      headers: { 'User-Agent': userAgent },
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    });
     if (response.status === 404) return 'missing';
     if (!response.ok || !response.body) {
+      await response.body?.cancel();
       throw new Error(`EVE Ref market-history fetch failed: HTTP ${response.status}`);
     }
     await foldHistoryBz2(

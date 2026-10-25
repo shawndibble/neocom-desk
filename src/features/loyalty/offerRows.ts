@@ -12,6 +12,7 @@
  * actual facility/skills.
  */
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import type { LpStoreVolume } from '@/features/loyalty/lpStoreVolume';
 import {
   nameForType,
   toIndustryBlueprint,
@@ -135,13 +136,16 @@ export interface LoyaltyOfferComputeInputs {
   /** Null when the LP balance has never been read (unknown, not zero). */
   playerLp: number | null;
   /** Units per day by type at the hub region (`lpStoreVolume.ts`); absent or null when unavailable. */
-  sellsPerDayByType?: Readonly<Record<number, number>> | null;
+  sellsPerDayByType?: LpStoreVolume | null;
 }
 
 /** Null when the volume data is unavailable; 0 when it loaded and this type never traded. */
-function sellsPerDayOf(inputs: LoyaltyOfferComputeInputs, typeId: number | null): number | null {
-  if (!inputs.sellsPerDayByType || typeId === null) return null;
-  return inputs.sellsPerDayByType[typeId] ?? 0;
+function sellsPerDayOf(
+  volume: LpStoreVolume | null | undefined,
+  typeId: number | null
+): number | null {
+  if (!volume || typeId === null) return null;
+  return volume[typeId] ?? 0;
 }
 
 /**
@@ -259,7 +263,7 @@ function computeBlueprintRow(
     productName: entry.productName,
     build,
     profit,
-    sellsPerDay: sellsPerDayOf(inputs, entry.productTypeID),
+    sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, entry.productTypeID),
     requiredItems,
     requiredItemsCost: itemsCost,
   };
@@ -293,7 +297,7 @@ function computeItemRow(
     productName: null,
     build: null,
     profit,
-    sellsPerDay: sellsPerDayOf(inputs, offer.type_id),
+    sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, offer.type_id),
     requiredItems,
     requiredItemsCost: itemsCost,
   };
