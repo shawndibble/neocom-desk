@@ -30,6 +30,7 @@ import {
   useImproveMode,
   useImproveOre,
   useImproveReach,
+  useImproveSort,
   useImproveBudget,
   useImproveRefitCap,
   migrateSpendCap,
@@ -93,6 +94,8 @@ export function useImproveDrawer({
   const setGoal = (next: ImproveGoal) => setGoalsByRole({ ...goalsByRole, [role]: next });
   const reach = useImproveReach((state) => state.value);
   const setReach = useImproveReach((state) => state.setValue);
+  const sort = useImproveSort((state) => state.value);
+  const setSort = useImproveSort((state) => state.setValue);
   const mode = useImproveMode((state) => state.value);
   const setMode = useImproveMode((state) => state.setValue);
   const oreFamily = useImproveOre((state) => state.value);
@@ -226,6 +229,8 @@ export function useImproveDrawer({
       settings={{
         reach,
         onReachChange: (next) => void setReach(next),
+        sort,
+        onSortChange: (next) => void setSort(next),
         mode,
         onModeChange: (next) => void setMode(next),
         spendCap,

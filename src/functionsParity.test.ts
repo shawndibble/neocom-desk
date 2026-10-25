@@ -51,6 +51,11 @@ import {
   type ServerEventFire as FunctionsServerEventFire,
   type ServerEventInputs as FunctionsServerEventInputs,
 } from '../functions/src/serverEvents';
+import {
+  NEARBY_EVENT_IDS,
+  occurrenceKeyOf as nearbyOccurrenceKey,
+  type NearbyFire as FunctionsNearbyFire,
+} from '../functions/src/nearbyAlerts';
 import { occurrenceFiredAt, occurrenceKey } from '@/engine/occurrenceKey';
 import {
   diffPriceAlertTriggered,
@@ -150,13 +155,15 @@ describe('standing buyback Requests', () => {
 
 describe('server-pushed events (issue #5121)', () => {
   it('the server handles exactly the events the client registers for', () => {
-    expect([...COMMUNITY_EVENT_IDS, ...POLLED_EVENT_IDS].sort()).toEqual(
+    expect([...COMMUNITY_EVENT_IDS, ...POLLED_EVENT_IDS, ...NEARBY_EVENT_IDS].sort()).toEqual(
       [...SERVER_PUSHED_EVENT_IDS].sort()
     );
   });
 
   it('the server builds the fires the service worker parses', () => {
-    expectTypeOf<FunctionsServerEventFire>().toEqualTypeOf<ClientServerEventFire>();
+    expectTypeOf<
+      FunctionsServerEventFire | FunctionsNearbyFire
+    >().toEqualTypeOf<ClientServerEventFire>();
     expectTypeOf<FunctionsServerEventInputs>().toEqualTypeOf<ClientServerEventInputs>();
   });
 
@@ -258,4 +265,32 @@ describe('server-pushed events (issue #5121)', () => {
       }
     }
   });
+});
+
+describe('server-pushed nearby alerts (issue #5122)', () => {
+  const fires: FunctionsNearbyFire[] = [
+    {
+      eventId: 'incursionNearby',
+      characterId: 7,
+      constellationId: 20000020,
+      stagingSystemId: 30000144,
+      state: 'established',
+      jumps: 1,
+    },
+    {
+      eventId: 'skyhookRaidableNearby',
+      characterId: 7,
+      systemId: 30000142,
+      planetId: 40009077,
+      startMs: 1_700_000_000_000,
+      endMs: 1_700_000_360_000,
+      jumps: 3,
+    },
+  ];
+  it.each(fires.map((fire) => [fire.eventId, fire] as const))(
+    '%s: the push is keyed like the Foreground Poller’s row',
+    (_, fire) => {
+      expect(nearbyOccurrenceKey(fire)).toBe(occurrenceKey(fire, 50_000));
+    }
+  );
 });

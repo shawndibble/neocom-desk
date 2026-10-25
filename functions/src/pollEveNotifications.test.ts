@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AlertGrantDoc } from './alertGrant.js';
 import type { NotificationsResult } from './esiNotifications.js';
+import type { LocationResult } from './esiNearby.js';
 import type { PushMessage } from './eveNotificationPush.js';
 import {
   pollEveNotifications,
@@ -53,6 +54,7 @@ function setup(opts: {
     }),
     patch: vi.fn(async () => {}),
     markRevoked: vi.fn(async () => {}),
+    dropLocationScope: vi.fn(async () => {}),
     devicesFor: vi.fn(async () => opts.devices ?? [phone]),
     deleteDevice: vi.fn(async () => {}),
   } satisfies PollerStore;
@@ -307,5 +309,84 @@ describe('quiet time (issue #4566)', () => {
     });
     await pollEveNotifications(deps);
     expect(sent.map((s) => s.token)).toEqual(['fcm-tablet']);
+  });
+});
+
+describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
+  const LOCATION_GRANT = {
+    scopes: ['esi-characters.read_notifications.v1', 'esi-location.read_location.v1'],
+  };
+
+  function withNearby(
+    s: ReturnType<typeof setup>,
+    location: (id: number) => LocationResult = () => ({
+      kind: 'ok',
+      solarSystemId: 30000142,
+      budgetLow: false,
+    })
+  ) {
+    const fetchLocation = vi.fn<(id: number, token: string) => Promise<LocationResult>>(
+      async (id) => location(id)
+    );
+    const runPhase = vi.fn(async () => ({ pushesSent: 2, budgetStopped: false }));
+    return {
+      deps: { ...s.deps, nearby: { fetchLocation, runPhase } },
+      fetchLocation,
+      runPhase,
+    };
+  }
+
+  it('reads the location only for a grant that carries the location scope', async () => {
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT), 2: grant() } });
+    const { deps, fetchLocation, runPhase } = withNearby(s);
+    const summary = await pollEveNotifications(deps);
+    expect(fetchLocation).toHaveBeenCalledTimes(1);
+    expect(fetchLocation).toHaveBeenCalledWith(1, 'access-1');
+    expect(runPhase).toHaveBeenCalledWith(new Map([[1, 30000142]]));
+    expect(summary).toMatchObject({ located: 1, pushesSent: 2 });
+  });
+
+  it('still reads the location when the notifications feed answered 304', async () => {
+    const s = setup({
+      grants: { 1: grant(LOCATION_GRANT) },
+      esi: () => ({ kind: 'not-modified', budgetLow: false }),
+    });
+    const { deps, fetchLocation } = withNearby(s);
+    await pollEveNotifications(deps);
+    expect(fetchLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('never reads the location of a grant ESI just rejected', async () => {
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) }, esi: () => ({ kind: 'forbidden' }) });
+    const { deps, fetchLocation } = withNearby(s);
+    await pollEveNotifications(deps);
+    expect(fetchLocation).not.toHaveBeenCalled();
+  });
+
+  it('a refused location drops that scope from the grant but never revokes it', async () => {
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const { deps, runPhase } = withNearby(s, () => ({ kind: 'forbidden' }));
+    await pollEveNotifications(deps);
+    expect(runPhase).toHaveBeenCalledWith(new Map());
+    expect(s.store.markRevoked).not.toHaveBeenCalled();
+    expect(s.store.dropLocationScope).toHaveBeenCalledWith(1, 'blob', [
+      'esi-characters.read_notifications.v1',
+    ]);
+  });
+
+  it('a failed location read just leaves the Character out', async () => {
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const { deps, runPhase } = withNearby(s, () => ({ kind: 'error', status: 502 }));
+    await pollEveNotifications(deps);
+    expect(runPhase).toHaveBeenCalledWith(new Map());
+    expect(s.store.dropLocationScope).not.toHaveBeenCalled();
+  });
+
+  it('skips the nearby phase once the shared error budget is spent', async () => {
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const { deps, runPhase } = withNearby(s, () => ({ kind: 'backoff', retryAfterMs: null }));
+    const summary = await pollEveNotifications(deps);
+    expect(runPhase).not.toHaveBeenCalled();
+    expect(summary.budgetStopped).toBe(true);
   });
 });

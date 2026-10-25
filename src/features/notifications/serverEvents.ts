@@ -28,12 +28,25 @@ export const SERVER_PUSHED_EVENT_IDS = [
   'communityRequestPledged',
   'priceAlertTriggered',
   'shipLost',
+  // Need an Alerts Grant that carries the location (issue #5122, ADR 0028).
+  'incursionNearby',
+  'skyhookRaidableNearby',
 ] as const satisfies readonly NotificationEventId[];
 
 export type ServerPushedEventId = (typeof SERVER_PUSHED_EVENT_IDS)[number];
 
 export function isServerPushedEvent(eventId: string): eventId is ServerPushedEventId {
   return (SERVER_PUSHED_EVENT_IDS as readonly string[]).includes(eventId);
+}
+
+/** The server-pushed events that need the Character's location (ADR 0028): pushed only under a location-capable Alerts Grant. */
+export const NEARBY_SERVER_EVENT_IDS = [
+  'incursionNearby',
+  'skyhookRaidableNearby',
+] as const satisfies readonly ServerPushedEventId[];
+
+export function isNearbyServerEvent(eventId: string): boolean {
+  return (NEARBY_SERVER_EVENT_IDS as readonly string[]).includes(eventId);
 }
 
 /** Mirrors `functions/src/serverEvents.ts`'s `ServerEventInputs`. */
@@ -47,6 +60,10 @@ export interface ServerEventInputs {
     direction: 'above' | 'below';
   }[];
   shipLostMinimumIsk?: number;
+  /** This Character's N for `incursionNearby`; sent with it. */
+  incursionNearbyJumps?: number;
+  /** This Character's N for `skyhookRaidableNearby`; sent with it. */
+  skyhookRaidableNearbyJumps?: number;
 }
 
 /** One Character's part of the registration. */

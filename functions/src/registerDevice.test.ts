@@ -450,3 +450,67 @@ describe('buildDeviceRegistration', () => {
     expect(serialized).not.toContain('token-2');
   });
 });
+
+describe('nearby alert inputs and Travel Settings (issue #5122)', () => {
+  const base = {
+    deviceId: 'device-1',
+    fcmToken: 'fcm-token',
+    characters: [{ characterId: 1, accessToken: 'a', projectionRows: [] }],
+  };
+  const withInputs = (serverInputs: Record<string, unknown>) => ({
+    ...base,
+    characters: [{ ...base.characters[0], serverInputs }],
+  });
+
+  it('leaves routeRules absent for an older client', () => {
+    expect('routeRules' in parseRegisterDeviceInput(base)).toBe(false);
+  });
+
+  it('parses each nearby N from serverInputs', () => {
+    const input = parseRegisterDeviceInput(
+      withInputs({ incursionNearbyJumps: 10, skyhookRaidableNearbyJumps: 3 })
+    );
+    expect(input.characters[0].serverInputs).toEqual({
+      incursionNearbyJumps: 10,
+      skyhookRaidableNearbyJumps: 3,
+    });
+  });
+
+  it.each([
+    ['a fraction', 2.5],
+    ['a negative', -1],
+    ['a huge value', 1000],
+    ['a string', '5'],
+  ])('drops a nearby N that is %s, keeping the upload', (_, value) => {
+    const input = parseRegisterDeviceInput(withInputs({ incursionNearbyJumps: value }));
+    expect(input.characters[0].serverInputs).toEqual({});
+  });
+
+  it('parses routeRules, sorting and de-duplicating the Avoided Systems', () => {
+    const input = parseRegisterDeviceInput({
+      ...base,
+      routeRules: { preference: 'shortest', securityPenalty: 40, avoid: [3, 1, 3] },
+    });
+    expect(input.routeRules).toEqual({
+      preference: 'shortest',
+      securityPenalty: 40,
+      avoid: [1, 3],
+    });
+  });
+
+  it.each([
+    ['an unknown preference', { preference: 'fastest', securityPenalty: 50, avoid: [] }],
+    ['a penalty out of range', { preference: 'shortest', securityPenalty: 101, avoid: [] }],
+    ['a non-id in avoid', { preference: 'shortest', securityPenalty: 50, avoid: ['x'] }],
+    [
+      'too many avoided systems',
+      {
+        preference: 'shortest',
+        securityPenalty: 50,
+        avoid: Array.from({ length: 10_001 }, (_, i) => i + 1),
+      },
+    ],
+  ])('drops routeRules with %s, keeping the upload', (_, routeRules) => {
+    expect(parseRegisterDeviceInput({ ...base, routeRules }).routeRules).toBeUndefined();
+  });
+});

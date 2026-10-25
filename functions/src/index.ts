@@ -32,6 +32,7 @@ import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './v
 import {
   AlertGrantError,
   deleteAlertGrant as deleteAlertGrantFor,
+  grantCoversNearby,
   parseSaveAlertGrantInput,
   refreshAtSso,
   revokeAtSso,
@@ -40,6 +41,10 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
+import { firestoreNearbyStore, forgetNearbyCharacter } from './nearbyStore.js';
+import { fetchCharacterLocation, fetchIncursions, fetchRaidableSkyhooks } from './esiNearby.js';
+import type { PushMessage } from './eveNotificationPush.js';
+import { runNearbyPhase } from './pollNearby.js';
 import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
@@ -348,6 +353,7 @@ alertsAction('registerDevice', async (request) => {
     eveTypesByCharacter,
     serverEventsByCharacter,
     serverInputsByCharacter,
+    routeRules: input.routeRules,
     quietHours: input.quietHours,
   });
 
@@ -355,20 +361,34 @@ alertsAction('registerDevice', async (request) => {
   // so the client can offer a toggle for them. Only `seenTypes` is read out.
   const { store } = alertGrantDeps();
   const seenTypes: Record<string, string[]> = {};
+  // The Characters whose active grant can read the location (ADR 0028). Its
+  // presence also tells the client this server accepts the location scope, so
+  // it never asks EVE for a grant an older deployed function would refuse.
+  let nearbyGrants: number[] | undefined = [];
   try {
     const grants = await store.getMany(registration.characterIds);
     for (const characterId of registration.characterIds) {
-      seenTypes[String(characterId)] = grants.get(characterId)?.seenTypes ?? [];
+      const grant = grants.get(characterId);
+      seenTypes[String(characterId)] = grant?.seenTypes ?? [];
+      if (grant?.status === 'active' && grantCoversNearby(grant)) nearbyGrants?.push(characterId);
     }
   } catch (err) {
     // The registration already landed; a failed read only delays new toggles.
+    // No `nearbyGrants` then, so the client keeps what it last learned.
+    nearbyGrants = undefined;
     logError('Device registration: seenTypes read failed', {
       characterIds: registration.characterIds,
       error: String(err),
     });
   }
 
-  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
+  return {
+    deviceId: input.deviceId,
+    registered: registration.characterIds,
+    rejected,
+    seenTypes,
+    ...(nearbyGrants ? { nearbyGrants } : {}),
+  };
 });
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
@@ -385,6 +405,7 @@ function alertGrantDeps(): AlertGrantDeps {
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     now: () => Date.now(),
     log: (message, data) => logWarn(message, data),
+    forgetNearby: (characterId) => forgetNearbyCharacter(firestore(), characterId),
   };
 }
 
@@ -515,8 +536,10 @@ export const pushCommunityPledge = onDocumentCreated(
 /**
  * pollEveNotifications (issue #3756, ADR 0020): every 15 minutes, reads each
  * active Alerts Grant's `/notifications/` feed and pushes the types a
- * registered device enabled. The only function that holds an EVE token, and
- * only the notifications-only one. Deploy is manual:
+ * registered device enabled. For a grant that also carries the location scope
+ * (issue #5122, ADR 0028) it reads the Character's Current System with the same
+ * token and pushes nearby Incursions and raidable skyhooks. The only function
+ * that holds an EVE token, and only the Alerts Grant's narrow one. Deploy is manual:
  * `firebase deploy --only functions:pollEveNotifications`.
  */
 export const pollEveNotifications = onSchedule(
@@ -528,6 +551,14 @@ export const pollEveNotifications = onSchedule(
   },
   async () => {
     const messaging = getMessaging();
+    const send = async (token: string, message: PushMessage) => {
+      await messaging.send({
+        token,
+        data: message.data,
+        ...(message.collapseKey ? { webpush: { headers: { Topic: message.collapseKey } } } : {}),
+      });
+    };
+    const log = (message: string, data?: Record<string, unknown>) => logWarn(message, data);
     const summary = await pollEveNotificationsRun({
       store: firestorePollerStore(firestore(), {
         key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
@@ -535,14 +566,25 @@ export const pollEveNotifications = onSchedule(
       }),
       fetchNotifications: (characterId, accessToken, etag) =>
         fetchEsiNotifications(characterId, accessToken, etag),
-      send: async (token, message) => {
-        await messaging.send({
-          token,
-          data: message.data,
-          ...(message.collapseKey ? { webpush: { headers: { Topic: message.collapseKey } } } : {}),
-        });
+      send,
+      log,
+      // Nearby alerts (issue #5122, ADR 0028): the same run, the same refreshed token.
+      nearby: {
+        fetchLocation: (characterId, accessToken) =>
+          fetchCharacterLocation(characterId, accessToken),
+        runPhase: (locations) =>
+          runNearbyPhase({
+            deps: {
+              store: firestoreNearbyStore(firestore()),
+              fetchIncursions: () => fetchIncursions(),
+              fetchRaidableSkyhooks: () => fetchRaidableSkyhooks(),
+            },
+            locations,
+            send,
+            log,
+            nowMs: Date.now(),
+          }),
       },
-      log: (message, data) => logWarn(message, data),
     });
     logInfo('pollEveNotifications finished', { ...summary });
   }

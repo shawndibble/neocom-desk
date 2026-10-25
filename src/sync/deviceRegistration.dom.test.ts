@@ -131,6 +131,35 @@ describe('registerDeviceForWebPush', () => {
     });
   });
 
+  it('sends the Travel Settings it is given, and a change to them is never skipped', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => `token-${id}`);
+    const rules = (penalty: number) => ({
+      preference: 'shortest' as const,
+      securityPenalty: penalty,
+      avoid: [30000142],
+    });
+
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      skipIfUnchanged: true,
+      routeRules: rules(50),
+    });
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      skipIfUnchanged: true,
+      routeRules: rules(50),
+    });
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      skipIfUnchanged: true,
+      routeRules: rules(60),
+    });
+
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(call.mock.calls[0][0].data.routeRules).toEqual(rules(50));
+  });
+
   it('includes each Character’s Projection rows from the passed-in map, keyed by characterId', async () => {
     vi.mocked(getToken).mockResolvedValue('fcm-token');
     vi.spyOn(db.characters, 'toArray').mockResolvedValue([

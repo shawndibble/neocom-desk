@@ -68,6 +68,10 @@ import {
   shipLostText,
   type Translate,
 } from './serverEventCopy';
+import {
+  incursionNearbyWording,
+  skyhookRaidableNearbyWording,
+} from './pollDomains/copy/nearbyWording';
 
 /**
  * The service worker's own i18next instance, not `@/i18n`: that module loads
@@ -244,14 +248,7 @@ async function presentServerFire(
       return { ...priceAlertText(t, fire), feedKey, subjectId: fire.typeId };
     case 'shipLost': {
       const ids = [fire.shipTypeId, fire.systemId].filter((id): id is number => id !== undefined);
-      const names =
-        ids.length === 0 || !env.resolveIds
-          ? new Map<number, string>()
-          : await withinBudget(
-              env.resolveIds(ids).catch(() => new Map<number, string>()),
-              new Map<number, string>(),
-              RESOLUTION_BUDGET_MS
-            );
+      const names = await publicNames(env, ids);
       return {
         ...shipLostText(t, fire, {
           ship: fire.shipTypeId === undefined ? undefined : names.get(fire.shipTypeId),
@@ -260,7 +257,43 @@ async function presentServerFire(
         feedKey,
       };
     }
+    // Nearby alerts (issue #5122): the poller's own wording, with public names.
+    case 'incursionNearby': {
+      const names = await publicNames(env, [fire.constellationId, fire.stagingSystemId]);
+      return {
+        ...incursionNearbyWording(t, fire, {
+          constellation: names.get(fire.constellationId),
+          system: names.get(fire.stagingSystemId),
+        }),
+        feedKey,
+      };
+    }
+    case 'skyhookRaidableNearby': {
+      const names = await publicNames(env, [fire.systemId, fire.planetId]);
+      return {
+        ...skyhookRaidableNearbyWording(
+          t,
+          fire,
+          { system: names.get(fire.systemId), planet: names.get(fire.planetId) },
+          now
+        ),
+        feedKey,
+      };
+    }
   }
+}
+
+/** Public names for ids within the resolution budget; never rejects, empty when it cannot. */
+async function publicNames(
+  env: PushEnv,
+  ids: readonly number[]
+): Promise<ReadonlyMap<number, string>> {
+  if (ids.length === 0 || !env.resolveIds) return new Map();
+  return withinBudget(
+    env.resolveIds(ids).catch(() => new Map<number, string>()),
+    new Map<number, string>(),
+    RESOLUTION_BUDGET_MS
+  );
 }
 
 /** The sender's own generic copy, keyed by the payload's key — the floor every failure lands on. */

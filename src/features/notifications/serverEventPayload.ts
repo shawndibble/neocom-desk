@@ -15,6 +15,9 @@ import type {
   CommunityRequestPledgedFire,
 } from '@/engine/communities/communityAlert';
 import type { PriceAlertTriggeredFire, ShipLostFire } from '@/engine/notificationDiffs';
+import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
+import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
+import type { SkyhookRaidableNearbyFire } from '@/engine/skyhooks/skyhookAlert';
 import { is, shapeGuard } from './snapshotShape';
 import type { ServerPushedEventId } from './serverEvents';
 
@@ -23,7 +26,9 @@ export type ServerEventFire =
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
   | PriceAlertTriggeredFire
-  | ShipLostFire;
+  | ShipLostFire
+  | IncursionNearbyFire
+  | SkyhookRaidableNearbyFire;
 
 const community = {
   characterId: is.number,
@@ -67,6 +72,23 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
     shipTypeId: is.optional(is.number),
     systemId: is.optional(is.number),
     value: is.optional(is.number),
+  }),
+  incursionNearby: shapeGuard<IncursionNearbyFire>({
+    eventId: is.oneOf(['incursionNearby'] as const),
+    characterId: is.number,
+    constellationId: is.number,
+    stagingSystemId: is.number,
+    state: is.oneOf(INCURSION_STATES),
+    jumps: is.number,
+  }),
+  skyhookRaidableNearby: shapeGuard<SkyhookRaidableNearbyFire>({
+    eventId: is.oneOf(['skyhookRaidableNearby'] as const),
+    characterId: is.number,
+    systemId: is.number,
+    planetId: is.number,
+    startMs: is.number,
+    endMs: is.number,
+    jumps: is.number,
   }),
 };
 

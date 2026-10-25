@@ -61,6 +61,8 @@ describe('uploadProjectionRows', () => {
         eveTypesByCharacter: TYPES,
         serverEventsByCharacter: new Map(),
         quietHours: null,
+        // No Character wants a nearby push, so the Travel Settings are not read.
+        routeRules: null,
       }
     );
   });
@@ -148,5 +150,30 @@ describe('unregisterProjectionRegistration', () => {
     vi.mocked(unregisterDeviceForWebPush).mockRejectedValue(new Error('offline'));
     await expect(unregisterProjectionRegistration()).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
+  });
+});
+
+describe('uploadProjectionRows: nearby alerts (issue #5122)', () => {
+  it('remembers which Characters the server says carry nearby alerts', async () => {
+    vi.mocked(registerDeviceForWebPush).mockResolvedValue({
+      deviceId: 'd',
+      registered: [1],
+      rejected: [],
+      nearbyGrants: [1],
+    });
+    await uploadProjectionRows(new Map([[1, [ROW]]]), TYPES);
+    const { readAlertsNearby } = await import('./alertsGrant');
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [1] });
+  });
+
+  it('sends the Travel Settings only when a Character wants a nearby push', async () => {
+    const reg = (serverEvents: string[]) =>
+      new Map([[1, { serverEvents: serverEvents as never[], serverInputs: {} }]]);
+    await uploadProjectionRows(new Map(), TYPES, reg(['shipLost']));
+    expect(vi.mocked(registerDeviceForWebPush).mock.calls[0][3]?.routeRules).toBeNull();
+    await uploadProjectionRows(new Map(), TYPES, reg(['incursionNearby']));
+    expect(vi.mocked(registerDeviceForWebPush).mock.calls[1][3]?.routeRules).toMatchObject({
+      preference: expect.any(String),
+    });
   });
 });

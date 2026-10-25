@@ -58,7 +58,17 @@ class FakeFirestore {
     return {
       id,
       get: async () => this.snapshotOf(name, id),
-      set: async (data: Data) => void store.set(id, { ...data }),
+      set: async (data: Data, options?: { mergeFields?: string[] }) => {
+        if (!options?.mergeFields) return void store.set(id, { ...data });
+        // Real Firestore: listed fields are written, a listed field absent from
+        // `data` is deleted, every other field is kept.
+        const next: Data = { ...(store.get(id) ?? {}) };
+        for (const field of options.mergeFields) {
+          if (field in data) next[field] = data[field];
+          else delete next[field];
+        }
+        store.set(id, next);
+      },
       update: async (data: Data) => {
         const existing = store.get(id);
         if (!existing) throw new Error(`update of missing doc ${name}/${id}`);
@@ -279,6 +289,27 @@ describe('writeDeviceRegistration', () => {
     expect(second?.serverInputsByCharacter).toEqual({ [String(CHAR)]: { shipLostMinimumIsk: 5 } });
     expect(second?.serverEventBaselines).toEqual({ [String(CHAR)]: { shipLossIds: [1] } });
     expect(second?.polledServerEvents).toEqual(['shipLost']);
+  });
+
+  it("keeps routeRules when an upload omits them, and never touches the poller's nearbyState (issue #5122)", async () => {
+    const db = new FakeFirestore();
+    const rules = { preference: 'shortest' as const, securityPenalty: 50, avoid: [30000142] };
+    await writeDeviceRegistration(asFirestore(db), {
+      deviceId: 'A',
+      fcmToken: 'token-A',
+      characterIds: [CHAR],
+      projections: [],
+      eveTypesByCharacter: {},
+      routeRules: rules,
+    });
+    // The poller's own state rides on the doc; an upload never wipes it.
+    const nearbyState = { characters: {}, pushed: { k: 1 } };
+    await asFirestore(db).collection('deviceRegistrations').doc('A').update({ nearbyState });
+    // An older client sends no rules.
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    const doc = db.get('deviceRegistrations', 'A');
+    expect(doc?.nearbyState).toEqual(nearbyState);
+    expect(doc?.routeRules).toEqual(rules);
   });
 
   it("keeps device A's unfired rows when device B uploads for the same Character", async () => {

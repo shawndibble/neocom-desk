@@ -25,6 +25,7 @@ import { getDeviceId } from './deviceId';
 import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { QuietHoursPayload } from '@/features/notifications/quietTime';
 import type { ServerEventRegistration } from '@/features/notifications/serverEvents';
+import type { RouteRules } from '@/features/route/routeRules';
 
 interface RegisterDeviceResponse {
   deviceId: string;
@@ -32,6 +33,12 @@ interface RegisterDeviceResponse {
   rejected: number[];
   /** Per Character (id as a string): the ESI types the server has seen. Absent from an older deployed function. */
   seenTypes?: Record<string, string[]>;
+  /**
+   * The Characters whose Alerts Grant can read the location (ADR 0028).
+   * Absent from an older deployed function, which would also refuse a grant
+   * carrying the location scope.
+   */
+  nearbyGrants?: number[];
 }
 
 /** No Projection to upload for a Character this call doesn't mention. */
@@ -114,7 +121,8 @@ function registrationFingerprint(
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>,
   eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
   serverEventsByCharacter: ReadonlyMap<number, ServerEventRegistration>,
-  quietHours: QuietHoursPayload | null
+  quietHours: QuietHoursPayload | null,
+  routeRules: RouteRules | null
 ): string {
   const characters = [...characterIds]
     .sort((a, b) => a - b)
@@ -135,7 +143,7 @@ function registrationFingerprint(
       [...(eveTypesByCharacter.get(characterId) ?? NO_EVE_TYPES)].sort(),
       serverEventsByCharacter.get(characterId) ?? NO_SERVER_EVENTS,
     ]);
-  return digest(JSON.stringify([getDeviceId(), fcmToken, characters, quietHours]));
+  return digest(JSON.stringify([getDeviceId(), fcmToken, characters, quietHours, routeRules]));
 }
 
 /**
@@ -176,6 +184,12 @@ export interface RegisterDeviceOptions {
    * (its parser reads only the keys it knows), so the upload is safe either way.
    */
   serverEventsByCharacter?: ReadonlyMap<number, ServerEventRegistration>;
+  /**
+   * This device's Travel Settings, which the server counts nearby jumps under
+   * (issue #5122). `null` (the default) sends none, keeping the stored rules.
+   * Part of the fingerprint; an older deployed function ignores the field.
+   */
+  routeRules?: RouteRules | null;
 }
 
 /**
@@ -201,6 +215,7 @@ export async function registerDeviceForWebPush(
     eveTypesByCharacter = new Map(),
     serverEventsByCharacter = new Map(),
     quietHours = null,
+    routeRules = null,
   }: RegisterDeviceOptions = {}
 ): Promise<RegisterDeviceResponse | null> {
   // Checked before `getToken`: a late rebuild on an emptied roster (after
@@ -225,7 +240,8 @@ export async function registerDeviceForWebPush(
     projectionsByCharacter,
     eveTypesByCharacter,
     serverEventsByCharacter,
-    quietHours
+    quietHours,
+    routeRules
   );
   const now = Date.now();
   if (skipIfUnchanged) {
@@ -263,6 +279,7 @@ export async function registerDeviceForWebPush(
       serverInputs: ServerEventRegistration['serverInputs'];
     }[];
     quietHours: QuietHoursPayload | null;
+    routeRules?: RouteRules;
   };
 
   // Forgotten before the call, whatever its outcome: this upload replaces
@@ -280,6 +297,7 @@ export async function registerDeviceForWebPush(
         deviceId: getDeviceId(),
         fcmToken,
         quietHours,
+        ...(routeRules ? { routeRules } : {}),
         characters: withAccessTokens.map((character) => ({
           ...character,
           projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,

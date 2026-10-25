@@ -6,7 +6,7 @@
  * No downside and Trade-offs, never ranked against each other. Ticked rows
  * are applied together as one unsaved edit.
  */
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -23,7 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  Caret,
   StatChange,
+  TypeIcon,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
@@ -34,6 +36,7 @@ import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
   bestScore,
+  damageOf,
   DEFENSE_CHOICES,
   goalAvailability,
   effectiveHold,
@@ -60,6 +63,7 @@ import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
+import { groupByModule, IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -73,6 +77,15 @@ const CHANGES_SHOWN = 4;
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
 const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
+
+/** The furthest a turret's optimal or a missile's range reaches, in km. */
+const reachKm = (s: FittingStats) =>
+  Math.max(
+    0,
+    ...s.applied.weapons.map((w) =>
+      w.kind === 'turret' ? w.optimal : w.kind === 'missile' ? w.range : 0
+    )
+  ) / 1000;
 
 const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
@@ -94,6 +107,9 @@ function slotsOf(candidate: ImproveOption['candidate']): string[] {
 export interface ImproveSettings {
   reach: ImproveReach;
   onReachChange: (reach: ImproveReach) => void;
+  /** How each section's rows are ordered. */
+  sort: ImproveSort;
+  onSortChange: (sort: ImproveSort) => void;
   mode: ImproveMode;
   onModeChange: (mode: ImproveMode) => void;
   /** Total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
@@ -157,6 +173,7 @@ function brokeText(
 }
 
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
+const NO_OPEN: ReadonlySet<string> = new Set();
 
 export function ImprovePanel({
   goal,
@@ -176,6 +193,12 @@ export function ImprovePanel({
   const { t } = useTranslation();
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { sort, onSortChange: setSort } = settings;
+  // Modules whose other options, and rows whose other stats, are showing; like ticks, they belong to one result.
+  const [open, setOpen] = useState<{ result: ImproveResult | null; keys: ReadonlySet<string> }>({
+    result: null,
+    keys: new Set(),
+  });
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
   // Ticks belong to the result they were made in: a new search (a goal
   // change, an edit to the fit) starts with none.
@@ -187,6 +210,14 @@ export function ImprovePanel({
   }>({ result: null, byModule: new Map(), replaced: new Map() });
   const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
+  const expanded = open.result === result ? open.keys : NO_OPEN;
+  const flip = (key: string) =>
+    setOpen({
+      result,
+      keys: new Set(
+        expanded.has(key) ? [...expanded].filter((k) => k !== key) : [...expanded, key]
+      ),
+    });
   const ticked = ticks.result === result ? ticks.byModule : NO_TICKS;
   const replaced = ticks.result === result ? ticks.replaced : new Map<string, string>();
   // The row under the pointer or keyboard focus; like ticks, it belongs to the result it was made in.
@@ -218,16 +249,33 @@ export function ImprovePanel({
         })
       : moveLabel(option.candidate);
 
-  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): ReactNode {
+  /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
+  function changeLine(
+    option: ImproveOption | RejectedOption,
+    own: FittingStats,
+    all = false,
+    onOpen?: () => void
+  ): ReactNode {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
     const changes = [...diffFittingStats(own, option.after).changes].sort(
       (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
     );
     const shown: ReactNode[] = changes
-      .slice(0, CHANGES_SHOWN)
+      .slice(0, all ? undefined : CHANGES_SHOWN)
       .map((change) => <StatChange key={change.key} change={change} />);
     const rest = changes.length - shown.length;
-    if (rest > 0) shown.push(t('fittings.makeItFit.otherStats', { count: rest }));
+    if (rest > 0) {
+      const label = t('fittings.makeItFit.otherStats', { count: rest });
+      shown.push(
+        onOpen ? (
+          <button key="rest" type="button" className={textActionClassName()} onClick={onOpen}>
+            {label}
+          </button>
+        ) : (
+          label
+        )
+      );
+    }
     if (shown.length === 0) return t('fittings.variations.noChanges');
     return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
   }
@@ -343,6 +391,40 @@ export function ImprovePanel({
     return null;
   }
 
+  /** The goal's own figure, before → after, first on every row. */
+  function leadLine(option: ImproveOption, own: FittingStats): ReactNode {
+    const stat = (key: 'sustainedDps' | 'ehp' | 'maxVelocity', before: number, after: number) => (
+      <StatChange key={key} change={{ key, before, after }} />
+    );
+    const dps = () => stat('sustainedDps', damageOf(own, target), damageOf(option.after, target));
+    const tank = () => stat('ehp', own.ehp, option.after.ehp);
+    switch (goal) {
+      case 'damage':
+        return dps();
+      case 'tank':
+        return tank();
+      case 'overall':
+        return (
+          <>
+            {dps()}
+            {', '}
+            {tank()}
+          </>
+        );
+      case 'speed':
+        return stat('maxVelocity', own.navigation.maxVelocity, option.after.navigation.maxVelocity);
+      case 'reach':
+        return t('fittings.improve.reachLine', {
+          before: m3sFormat(reachKm(own)),
+          after: m3sFormat(reachKm(option.after)),
+        });
+      case 'mining':
+        return oreLine(option, own);
+      default:
+        return moveLine(option, own);
+    }
+  }
+
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
     const nextReplaced = new Map(replaced);
@@ -366,67 +448,107 @@ export function ImprovePanel({
     setTicked(next, nextReplaced);
   }
 
-  function rows(options: ImproveOption[], own: FittingStats) {
+  function optionRow(option: ImproveOption, own: FittingStats, section: string) {
+    const id = `improve-${section}-${optionKey(option)}`;
+    const statsKey = `stats:${id}`;
+    const lead = leadLine(option, own);
+    return (
+      <li
+        key={optionKey(option)}
+        className="border-line rounded-xs border p-2 text-sm"
+        // A mouse hover or a keyboard focus previews it; touch has no hover, so only its tick does (§6c).
+        onPointerEnter={(event) => event.pointerType === 'mouse' && setHover(option)}
+        // Leaving with the pointer keeps a keyboard-focused row previewed; moving focus between the row's own parts keeps it too.
+        onPointerLeave={(event) =>
+          !event.currentTarget.contains(
+            document.activeElement?.matches(':focus-visible') ? document.activeElement : null
+          ) && setHover(null)
+        }
+        onFocus={(event) => event.target.matches(':focus-visible') && setHover(option)}
+        onBlur={(event) =>
+          !event.currentTarget.contains(event.relatedTarget as Node | null) && setHover(null)
+        }
+      >
+        <label
+          htmlFor={id}
+          className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}
+        >
+          <Checkbox
+            id={id}
+            className="mt-0.5"
+            checked={ticked.has(optionKey(option))}
+            onChange={() => toggle(option)}
+          />
+          <TypeIcon typeId={option.candidate.toTypeId} size={32} width={24} height={24} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-start justify-between gap-2">
+              <span className="font-medium">{swapLabel(option)}</span>
+              {goal !== 'cheaper' && (
+                <span className="text-success shrink-0 text-xs font-medium">
+                  {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
+                </span>
+              )}
+            </span>
+            {lead && <span className="block text-xs">{lead}</span>}
+            <span className="text-text-dim block text-xs">
+              {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey))}
+            </span>
+            {option.lost.length > 0 && (
+              <span className="text-warning block text-xs">
+                {t('fittings.improve.givesUp')} {lostLine(option)}
+              </span>
+            )}
+            <span className="block text-xs">{isk(option)}</span>
+            {replaced.has(optionKey(option)) && ticked.has(optionKey(option)) && (
+              <span className="text-text-dim block text-xs">
+                {t('fittings.improve.replacesPick', { swap: replaced.get(optionKey(option)) })}
+              </span>
+            )}
+            {option.destroysRigs && (
+              <span className="text-warning block text-xs">
+                {t('fittings.improve.destroysRig')}
+              </span>
+            )}
+          </span>
+        </label>
+      </li>
+    );
+  }
+
+  function rows(options: ImproveOption[], own: FittingStats, section: string) {
     return (
       <ul className="space-y-1">
-        {options.map((option) => {
-          const id = `improve-${optionKey(option)}`;
-          const line = moveLine(option, own);
+        {groupByModule(options, sort).map((group, index) => {
+          const all = [group.best, ...group.others];
+          // A ticked alternative takes the row's place; the rest stay behind it.
+          const shown = all.find((option) => ticked.has(optionKey(option))) ?? group.best;
+          const rest = all.filter((option) => option !== shown);
+          const groupKey = `${section}:${group.key}`;
+          const isOpen = expanded.has(groupKey);
+          const listId = `${moreId}-${section}-${index}`;
           return (
-            <li
-              key={optionKey(option)}
-              className="border-line rounded-xs border p-2 text-sm"
-              // A mouse hover or a keyboard focus previews it; touch has no hover, so only its tick does (§6c).
-              onPointerEnter={(event) => event.pointerType === 'mouse' && setHover(option)}
-              // Leaving with the pointer keeps a keyboard-focused row previewed; moving focus between the row's own parts keeps it too.
-              onPointerLeave={(event) =>
-                !event.currentTarget.contains(
-                  document.activeElement?.matches(':focus-visible') ? document.activeElement : null
-                ) && setHover(null)
-              }
-              onFocus={(event) => event.target.matches(':focus-visible') && setHover(option)}
-              onBlur={(event) =>
-                !event.currentTarget.contains(event.relatedTarget as Node | null) && setHover(null)
-              }
-            >
-              <label
-                htmlFor={id}
-                className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}
-              >
-                <Checkbox
-                  id={id}
-                  className="mt-0.5"
-                  checked={ticked.has(optionKey(option))}
-                  onChange={() => toggle(option)}
-                />
-                <span className="min-w-0">
-                  <span className="block font-medium">{swapLabel(option)}</span>
-                  {goal === 'mining' && (
-                    <span className="block text-xs">{oreLine(option, own)}</span>
-                  )}
-                  {line && <span className="block text-xs">{line}</span>}
-                  <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
-                  {option.lost.length > 0 && (
-                    <span className="text-warning block text-xs">
-                      {t('fittings.improve.givesUp')} {lostLine(option)}
-                    </span>
-                  )}
-                  <span className="block text-xs">{isk(option)}</span>
-                  {replaced.has(optionKey(option)) && ticked.has(optionKey(option)) && (
-                    <span className="text-text-dim block text-xs">
-                      {t('fittings.improve.replacesPick', {
-                        swap: replaced.get(optionKey(option)),
-                      })}
-                    </span>
-                  )}
-                  {option.destroysRigs && (
-                    <span className="text-warning block text-xs">
-                      {t('fittings.improve.destroysRig')}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </li>
+            <Fragment key={group.key}>
+              {optionRow(shown, own, section)}
+              {rest.length > 0 && (
+                <li className="pl-2">
+                  <button
+                    type="button"
+                    className={textActionClassName()}
+                    aria-expanded={isOpen}
+                    aria-controls={listId}
+                    onClick={() => flip(groupKey)}
+                  >
+                    {t('fittings.improve.moreOptions', { count: rest.length })}
+                    <Caret expanded={isOpen} />
+                  </button>
+                  <Collapse open={isOpen} id={listId} className="pt-1">
+                    <ul className="space-y-1">
+                      {rest.map((option) => optionRow(option, own, section))}
+                    </ul>
+                  </Collapse>
+                </li>
+              )}
+            </Fragment>
           );
         })}
       </ul>
@@ -846,14 +968,24 @@ export function ImprovePanel({
                 {t('fittings.improve.partial', { checked: state.result.checked })}
               </p>
             )}
+            <SegmentedControl
+              label={t('fittings.improve.sortLabel')}
+              options={IMPROVE_SORTS.map((value) => ({
+                value,
+                label: t(`fittings.improve.sort.${value}`),
+              }))}
+              value={sort}
+              onChange={setSort}
+              fill
+            />
             {state.result.noDownside.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.noDownside')}>
-                {rows(state.result.noDownside, state.before)}
+                {rows(state.result.noDownside, state.before, 'nd')}
               </MakeItFitSection>
             )}
             {state.result.tradeOffs.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.tradeOffs')}>
-                {rows(state.result.tradeOffs, state.before)}
+                {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
             <div className="bg-surface border-line sticky bottom-0 space-y-2 border-t pt-2">

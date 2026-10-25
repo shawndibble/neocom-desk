@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { db } from '@/db';
 
 const remote = vi.hoisted(() => ({
-  save: vi.fn<(tokens: { accessToken: string; refreshToken: string }) => Promise<void>>(),
+  save: vi.fn<
+    (tokens: { accessToken: string; refreshToken: string }) => Promise<{ nearby?: boolean } | void>
+  >(),
   del: vi.fn<(characterId: number) => Promise<void>>(),
 }));
 vi.mock('@/sync/alertsGrantApi', () => ({
@@ -26,6 +28,8 @@ import {
   takeNextQueuedAlerts,
   clearAlertsQueue,
   deleteAlertGrantsBestEffort,
+  readAlertsNearby,
+  recordAlertsNearby,
 } from './alertsGrant';
 
 const result = (characterId: number, expectedCharacterId = characterId) => ({
@@ -139,5 +143,40 @@ describe('Turn on for all', () => {
     queueAlertsForAll([1, 2]);
     clearAlertsQueue();
     expect(takeNextQueuedAlerts()).toBeNull();
+  });
+});
+
+describe('nearby alerts on the grant (ADR 0028)', () => {
+  it('knows nothing until a registration says the server takes the location scope', async () => {
+    expect(await readAlertsNearby()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsNearby(undefined);
+    expect(await readAlertsNearby()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsNearby([2, 1]);
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [1, 2] });
+  });
+
+  it('records what the server said the saved grant covers', async () => {
+    auth.complete.mockResolvedValue(result(111));
+    remote.save.mockResolvedValue({ nearby: true });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [111] });
+
+    remote.save.mockResolvedValue({ nearby: false });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsNearby()).characterIds).toEqual([]);
+  });
+
+  it('an older server answers without `nearby`: nothing changes', async () => {
+    await recordAlertsNearby([111]);
+    auth.complete.mockResolvedValue(result(111));
+    remote.save.mockResolvedValue(undefined);
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsNearby()).characterIds).toEqual([111]);
+  });
+
+  it('turning alerts off forgets the Character', async () => {
+    await recordAlertsNearby([111, 222]);
+    await turnOffAlerts(111);
+    expect((await readAlertsNearby()).characterIds).toEqual([222]);
   });
 });

@@ -99,13 +99,16 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
 
 /**
  * Turn on Alerts when closed for one Character (ADR 0020): a separate SSO
- * round trip for the notifications scope alone, returning to the page it was
- * pressed on. The callback never stores its token on this device; see
- * `features/notifications/alertsGrant.ts`.
+ * round trip for the grant's narrow scopes, returning to the page it was
+ * pressed on. The location scope for nearby alerts (ADR 0028) is asked for
+ * only once the deployed server has said it takes it. The callback never
+ * stores its token on this device; see `features/notifications/alertsGrant.ts`.
  */
 export async function beginAlertsLogin(characterId: number): Promise<void> {
+  const { readAlertsNearby } = await import('@/features/notifications/alertsGrant');
+  const { supported } = await readAlertsNearby().catch(() => ({ supported: false }));
   rememberThisPage();
-  assignLocation(await startAlertsLogin(characterId));
+  assignLocation(await startAlertsLogin(characterId, undefined, { nearby: supported }));
 }
 
 /**
