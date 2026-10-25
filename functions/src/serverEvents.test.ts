@@ -68,29 +68,24 @@ describe('parseServerInputs', () => {
     });
   });
 
-  it('rejects a malformed alert, an alert without a station, and too many alerts', () => {
-    expect(() =>
-      parseServerInputs(
-        { priceStationId: 1, priceAlerts: [{ typeId: 34, name: 'T', targetPrice: 5 }] },
-        'x'
-      )
-    ).toThrow(/direction/);
-    expect(() =>
-      parseServerInputs(
-        { priceAlerts: [{ typeId: 34, name: 'T', targetPrice: 5, direction: 'above' }] },
-        'x'
-      )
-    ).toThrow(/priceStationId/);
+  it('drops a malformed alert and alerts without a station, and cuts the list to the cap, never failing the registration', () => {
     const alert = { typeId: 34, name: 'T', targetPrice: 5, direction: 'below' };
-    expect(() =>
+    expect(
+      parseServerInputs(
+        { priceStationId: 1, priceAlerts: [{ typeId: 34, name: 'T', targetPrice: 5 }, alert] },
+        'x'
+      )
+    ).toEqual({ priceStationId: 1, priceAlerts: [alert] });
+    expect(parseServerInputs({ priceAlerts: [alert] }, 'x')).toEqual({});
+    expect(
       parseServerInputs(
         {
           priceStationId: 1,
           priceAlerts: Array.from({ length: MAX_PRICE_ALERTS + 1 }, () => alert),
         },
         'x'
-      )
-    ).toThrow(/more than/);
+      )?.priceAlerts
+    ).toHaveLength(MAX_PRICE_ALERTS);
     expect(() => parseServerInputs({ shipLostMinimumIsk: -1 }, 'x')).toThrow(/shipLostMinimumIsk/);
   });
 });

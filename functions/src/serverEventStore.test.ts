@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
+  deleteDeviceIfToken,
   deliverServerEvent,
   listPolledDevices,
   onCommunityChildCreated,
@@ -18,6 +19,17 @@ type FakeCollection = Record<string, unknown>;
 
 class Fake {
   readonly docs = new Map<string, Data>();
+
+  async runTransaction(fn: (tx: unknown) => Promise<void>): Promise<void> {
+    const pending: Promise<void>[] = [];
+    await fn({
+      get: (ref: { get: () => Promise<unknown> }) => ref.get(),
+      delete: (ref: { delete: () => Promise<void> }) => {
+        pending.push(ref.delete());
+      },
+    });
+    await Promise.all(pending);
+  }
 
   doc(path: string): FakeDocRef {
     const docs = this.docs;
@@ -142,6 +154,15 @@ describe('deliverServerEvent', () => {
     const { send, dead } = sender();
     dead.add('a');
     await deliverServerEvent(asDb(db), send, joinFire, NOW);
+    expect(db.docs.has('deviceRegistrations/A')).toBe(false);
+  });
+
+  it('keeps a registration that re-registered a fresh token meanwhile', async () => {
+    const db = new Fake();
+    db.docs.set('deviceRegistrations/A', { fcmToken: 'fresh' });
+    await deleteDeviceIfToken(asDb(db), 'A', 'stale');
+    expect(db.docs.has('deviceRegistrations/A')).toBe(true);
+    await deleteDeviceIfToken(asDb(db), 'A', 'fresh');
     expect(db.docs.has('deviceRegistrations/A')).toBe(false);
   });
 });

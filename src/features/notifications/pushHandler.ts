@@ -95,7 +95,7 @@ export interface PushEnv {
   timeZone?: () => Promise<string | undefined>;
   /** Public names (types, systems) for ids, within the resolution budget; never rejects. */
   resolveIds?: (ids: readonly number[]) => Promise<ReadonlyMap<number, string>>;
-  /** Whether this device already showed a pop-up for the Occurrence Key (`feed.feedSuppressesToast`). */
+  /** Whether this device already showed a pop-up for the Occurrence Key (its feed row's `notifiedHereAt`). */
   alreadyNotified?: (occurrenceKey: string) => Promise<boolean>;
 }
 

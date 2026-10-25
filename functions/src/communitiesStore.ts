@@ -42,7 +42,9 @@ import { FLEET_PAYOUTS_COLLECTION } from './communityFleetPayouts.js';
 import { ADMITTED_FROM_REQUEST } from './communityPush.js';
 
 const LIBRARY_COLLECTION = 'library';
-const REQUESTS_COLLECTION = 'requests';
+/** The waiting list of a Community that approves new Members (not the item Requests). */
+export const JOIN_REQUESTS_COLLECTION = 'requests';
+const REQUESTS_COLLECTION = JOIN_REQUESTS_COLLECTION;
 const FITTINGS_COLLECTION = 'fittings';
 const SKILL_PLANS_COLLECTION = 'skillPlans';
 
@@ -216,6 +218,9 @@ export async function joinCommunity(
     );
     // The admin mailing this Character an invite is the approval already, once.
     const mailed = await tx.get(mailInvite);
+    // Already on the waiting list: the join request told the admin, so the
+    // Member-joined push stays quiet, as the Foreground Poller does (#5121).
+    const waiting = await tx.get(requestRef(db, ref.id, caller.uid));
     const preApproved = isPreApproved(
       mailed.exists
         ? {
@@ -247,10 +252,14 @@ export async function joinCommunity(
     }
     if (decision !== 'ok') fail(decision);
 
-    admit(tx, db, ref, caller.uid, {
-      ownerHash: caller.ownerHash,
-      characterName: input.characterName,
-    });
+    admit(
+      tx,
+      db,
+      ref,
+      caller.uid,
+      { ownerHash: caller.ownerHash, characterName: input.characterName },
+      waiting.exists ? ADMITTED_FROM_REQUEST : undefined
+    );
     tx.delete(requestRef(db, ref.id, caller.uid));
     if (preApproved) tx.update(mailInvite, { consumedAt: Date.now() });
     return { communityId: ref.id, alreadyMember: false };

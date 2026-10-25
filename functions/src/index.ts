@@ -51,6 +51,7 @@ import {
 import { pollServerEvents } from './serverEventPoll.js';
 import { fetchFuzzworkPrices, fetchZkillLosses } from './serverEventSources.js';
 import {
+  deleteDeviceIfToken,
   listPolledDevices,
   onCommunityChildCreated,
   onPledgeCreated,
@@ -437,8 +438,9 @@ export const alertsCall = onCall<unknown>(
  * #5121, ADR 0027): public Fuzzwork and zKillboard reads, still no EVE token, rather than a scheduled job of its own.
  */
 export const dispatchProjections = onSchedule(
-  // The server-pushed events' zKillboard reads are paced (serverEventPoll.ts),
-  // so the tick can outlast the default minute; the projections finish first.
+  // The server-pushed events' zKillboard reads are paced and stop after 5
+  // minutes (serverEventPoll.ts), so the tick can outlast the default minute;
+  // the projection dispatch runs alongside and is unaffected by them.
   { schedule: 'every 15 minutes', timeoutSeconds: 540, maxInstances: 1 },
   async () => {
     const db = firestore();
@@ -456,9 +458,7 @@ export const dispatchProjections = onSchedule(
           await messaging.send({ token, data });
         },
         saveBaselines: (deviceId, baselines) => saveServerBaselines(db, deviceId, baselines),
-        deleteDevice: async (deviceId) => {
-          await db.collection('deviceRegistrations').doc(deviceId).delete();
-        },
+        deleteDevice: (deviceId, fcmToken) => deleteDeviceIfToken(db, deviceId, fcmToken),
         log: (message, data) => logWarn(message, data),
         now: () => Date.now(),
       }),

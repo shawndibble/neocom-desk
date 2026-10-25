@@ -66,8 +66,14 @@ export async function fetchZkillLosses(
     });
     if (res.status === 429 || res.status === 420) return { kind: 'backoff' };
     if (!res.ok) return { kind: 'error' };
-    const losses = parseZkillLosses(await res.json());
-    return losses === null ? { kind: 'error' } : { kind: 'ok', losses };
+    const body: unknown = await res.json();
+    const losses = parseZkillLosses(body);
+    if (losses === null) return { kind: 'error' };
+    // Entries but none readable (hash-only): a failure, as the app's
+    // `fetchPilotKillmailHistory` treats it. Stored as an empty reading, the
+    // next readable answer would announce the whole page as new losses.
+    if (losses.length === 0 && Array.isArray(body) && body.length > 0) return { kind: 'error' };
+    return { kind: 'ok', losses };
   } catch {
     return { kind: 'error' };
   }

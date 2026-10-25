@@ -92,18 +92,20 @@ export function parseServerInputs(raw: unknown, path: string): ServerEventInputs
   if (!isRecord(raw)) throw new Error(`${path}, if present, must be an object`);
   const { priceStationId, priceAlerts, shipLostMinimumIsk } = raw;
   const inputs: ServerEventInputs = {};
-  if (priceAlerts !== undefined) {
-    if (!Array.isArray(priceAlerts)) throw new Error(`${path}.priceAlerts must be an array`);
-    if (priceAlerts.length > MAX_PRICE_ALERTS) {
-      throw new Error(`${path}.priceAlerts has more than ${MAX_PRICE_ALERTS} entries`);
-    }
-    if (!positiveInteger(priceStationId)) {
-      throw new Error(`${path}.priceStationId must be a positive integer with priceAlerts`);
-    }
+  // Lenient, unlike the rest of the registration: the alerts are the user's own
+  // Quickbar data (no cap, free-text names), and one odd item must not fail
+  // every Character's registration and Projection. A bad alert is dropped, the
+  // list is cut to the cap, and alerts without a station are not stored.
+  if (Array.isArray(priceAlerts) && positiveInteger(priceStationId)) {
+    const alerts = priceAlerts.flatMap((alert, i) => {
+      try {
+        return [parsePriceAlert(alert, `${path}.priceAlerts[${i}]`)];
+      } catch {
+        return [];
+      }
+    });
     inputs.priceStationId = priceStationId;
-    inputs.priceAlerts = priceAlerts.map((alert, i) =>
-      parsePriceAlert(alert, `${path}.priceAlerts[${i}]`)
-    );
+    inputs.priceAlerts = alerts.slice(0, MAX_PRICE_ALERTS);
   }
   if (shipLostMinimumIsk !== undefined) {
     if (

@@ -32,6 +32,7 @@ import {
   type ItemRequestDoc,
 } from './communityPush.js';
 import { COMMUNITIES_COLLECTION, COMMUNITY_MEMBERS_COLLECTION } from './communities.js';
+import { JOIN_REQUESTS_COLLECTION } from './communitiesStore.js';
 import { REQUESTS_COLLECTION as ITEM_REQUESTS_COLLECTION } from './communityRequests.js';
 
 type Log = (message: string, meta?: Record<string, unknown>) => void;
@@ -76,12 +77,30 @@ export async function deliverServerEvent(
       } catch (err) {
         const code = err instanceof Error && 'code' in err ? String(err.code) : '';
         const message = err instanceof Error ? err.message : String(err);
-        if (shouldDeleteDeviceToken(code, message)) await doc.ref.delete();
-        else log('Server event push failed', { deviceId: doc.id, error: code || message });
+        if (shouldDeleteDeviceToken(code, message)) {
+          await deleteDeviceIfToken(db, doc.id, device.fcmToken as string);
+        } else log('Server event push failed', { deviceId: doc.id, error: code || message });
       }
     })
   );
   return sent;
+}
+
+/**
+ * Deletes a device's registration after FCM called its token dead, but only if
+ * the doc still holds that token: a re-registration with a fresh token in the
+ * meantime must survive.
+ */
+export async function deleteDeviceIfToken(
+  db: Firestore,
+  deviceId: string,
+  fcmToken: string
+): Promise<void> {
+  const ref = db.collection(DEVICE_REGISTRATIONS_COLLECTION).doc(deviceId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (snap.exists && snap.get('fcmToken') === fcmToken) tx.delete(ref);
+  });
 }
 
 /** The polled tick's devices: those with a price alert or ship-lost event on for some Character. */
@@ -151,8 +170,8 @@ export async function onCommunityChildCreated(
   nowMs: number,
   log: Log
 ): Promise<void> {
-  // `requests` is the waiting list (communitiesStore.ts's layout), not `itemRequests`.
-  const isRequest = params.collection === 'requests';
+  // The waiting list, not the item Requests (`itemRequests`).
+  const isRequest = params.collection === JOIN_REQUESTS_COLLECTION;
   const isMember = params.collection === COMMUNITY_MEMBERS_COLLECTION;
   if (!isRequest && !isMember) return;
   const community = (await communityRef(db, params.communityId).get()).data() as

@@ -53,6 +53,15 @@ describe('fetchZkillLosses', () => {
     expect(
       await fetchZkillLosses(7, (async () => response(200, { no: 1 })) as typeof fetch)
     ).toEqual({ kind: 'error' });
+    // Hash-only entries: not an empty list, or the next good read would be a burst.
+    const hashOnly = [{ killmail_id: 1, zkb: { hash: 'h' } }];
+    expect(
+      await fetchZkillLosses(7, (async () => response(200, hashOnly)) as typeof fetch)
+    ).toEqual({ kind: 'error' });
+    expect(await fetchZkillLosses(7, (async () => response(200, [])) as typeof fetch)).toEqual({
+      kind: 'ok',
+      losses: [],
+    });
   });
 });
 

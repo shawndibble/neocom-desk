@@ -49,6 +49,7 @@ import {
   serverEventFiredAt,
   serverEventOccurrenceKey,
   type ServerEventFire as FunctionsServerEventFire,
+  type ServerEventInputs as FunctionsServerEventInputs,
 } from '../functions/src/serverEvents';
 import { occurrenceFiredAt, occurrenceKey } from '@/engine/occurrenceKey';
 import {
@@ -56,7 +57,10 @@ import {
   diffShipLost,
   type PriceAlertEntrySnapshot,
 } from '@/engine/notificationDiffs';
-import { SERVER_PUSHED_EVENT_IDS } from '@/features/notifications/serverEvents';
+import {
+  SERVER_PUSHED_EVENT_IDS,
+  type ServerEventInputs as ClientServerEventInputs,
+} from '@/features/notifications/serverEvents';
 import type { ServerEventFire as ClientServerEventFire } from '@/features/notifications/serverEventPayload';
 
 describe('trade hubs', () => {
@@ -153,6 +157,7 @@ describe('server-pushed events (issue #5121)', () => {
 
   it('the server builds the fires the service worker parses', () => {
     expectTypeOf<FunctionsServerEventFire>().toEqualTypeOf<ClientServerEventFire>();
+    expectTypeOf<FunctionsServerEventInputs>().toEqualTypeOf<ClientServerEventInputs>();
   });
 
   const fires: FunctionsServerEventFire[] = [

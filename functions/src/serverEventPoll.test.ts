@@ -130,6 +130,24 @@ describe('pollServerEvents', () => {
     expect(summary.lossReadsStopped).toBe(true);
   });
 
+  it('stops reading zKillboard once the run’s time budget is spent', async () => {
+    const devices = [7, 8, 9].map((characterId) => ({
+      deviceId: `D${characterId}`,
+      fcmToken: `t${characterId}`,
+      characters: [{ characterId, events: ['shipLost'], inputs: {}, baseline: {} }],
+    }));
+    const { deps } = harness(devices);
+    let clock = NOW;
+    deps.now = () => clock;
+    deps.fetchLosses = vi.fn(async () => {
+      clock += 400_000;
+      return { kind: 'ok' as const, losses: [] };
+    });
+    const summary = await pollServerEvents(deps);
+    expect(deps.fetchLosses).toHaveBeenCalledTimes(1);
+    expect(summary.lossReadsStopped).toBe(true);
+  });
+
   it('holds a push inside quiet time, but lets a loss through when attacks are allowed', async () => {
     const quietHours = { start: '00:00', end: '23:59', timeZone: 'UTC', allowAttacks: true };
     const { deps, sent, saved } = harness([
@@ -150,7 +168,7 @@ describe('pollServerEvents', () => {
       });
     };
     await pollServerEvents(dead.deps);
-    expect(dead.deps.deleteDevice).toHaveBeenCalledWith('A');
+    expect(dead.deps.deleteDevice).toHaveBeenCalledWith('A', 'token-A');
     expect(dead.saved.has('A')).toBe(false);
 
     const flaky = harness([device({}, baseline)]);

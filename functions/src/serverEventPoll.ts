@@ -26,12 +26,15 @@ import {
 } from './serverEvents.js';
 
 /**
- * zKillboard reads per run, spaced by `LOSS_READ_SPACING_MS`: the tick has a
- * 9-minute budget and zKillboard asks API users to go gently. A Character past
- * the cap waits for a later run (the order rotates, below).
+ * zKillboard reads per run, spaced by `LOSS_READ_SPACING_MS` and bounded by
+ * `LOSS_READ_BUDGET_MS` of wall time: the tick has a 9-minute timeout, pushes
+ * and readings are written only after the reads, so a run must stop reading
+ * well before it, and zKillboard asks API users to go gently. A Character past
+ * either bound waits for a later run (the order rotates, below).
  */
 export const MAX_LOSS_READS_PER_RUN = 300;
 export const LOSS_READ_SPACING_MS = 1_000;
+export const LOSS_READ_BUDGET_MS = 300_000;
 
 export interface PolledCharacter {
   characterId: number;
@@ -66,7 +69,11 @@ export interface ServerPollDeps {
   send(token: string, data: Record<string, string>): Promise<void>;
   /** Replaces the device's readings; a device deleted meanwhile is not an error. */
   saveBaselines(deviceId: string, baselines: Record<string, ServerEventBaseline>): Promise<void>;
-  deleteDevice(deviceId: string): Promise<void>;
+  /**
+   * Deletes the registration only if it still holds `fcmToken`: the device may
+   * have re-registered a fresh token while this run was reading.
+   */
+  deleteDevice(deviceId: string, fcmToken: string): Promise<void>;
   /** Receives only ids and counts, never a token. */
   log(message: string, data?: Record<string, unknown>): void;
   now(): number;
@@ -104,8 +111,12 @@ async function readLosses(
 ): Promise<Map<number, ShipLossEntry[]>> {
   const losses = new Map<number, ShipLossEntry[]>();
   const pause = deps.pause ?? wait;
-  for (const characterId of rotated(characterIds, deps.now())) {
-    if (summary.lossReads >= MAX_LOSS_READS_PER_RUN) {
+  const startedAt = deps.now();
+  for (const characterId of rotated(characterIds, startedAt)) {
+    if (
+      summary.lossReads >= MAX_LOSS_READS_PER_RUN ||
+      deps.now() - startedAt >= LOSS_READ_BUDGET_MS
+    ) {
       summary.lossReadsStopped = true;
       break;
     }
@@ -251,7 +262,7 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
     }
 
     if (dead) {
-      await deps.deleteDevice(device.deviceId);
+      await deps.deleteDevice(device.deviceId, device.fcmToken);
       continue;
     }
     const unchanged = device.characters.every(

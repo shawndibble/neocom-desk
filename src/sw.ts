@@ -32,7 +32,7 @@ import {
   urlFromNotificationData,
 } from '@/features/notifications/notificationClick';
 import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
-import { feedSuppressesToast, recordFeedEntry } from '@/features/notifications/feed';
+import { recordFeedEntry } from '@/features/notifications/feed';
 import { resolvePublicNames, resolvePushNames } from '@/features/notifications/pushNames';
 import { db } from '@/db';
 import { readTimeZone } from '@/lib/timeFormat';
@@ -243,7 +243,9 @@ function pushEnv(): PushEnv {
     characterName: async (characterId) => (await db.characters.get(characterId))?.name,
     resolveNames: (fire) => resolvePushNames(fire),
     resolveIds: (ids) => resolvePublicNames(ids),
-    alreadyNotified: (key) => feedSuppressesToast(key, Date.now()),
+    // Only a pop-up this device actually showed, not a dismissed or old row.
+    alreadyNotified: async (key) =>
+      (await db.notificationFeed.get(key))?.notifiedHereAt !== undefined,
     timeZone: readTimeZone,
   };
 }
