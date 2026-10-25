@@ -27,6 +27,11 @@ import { createR2Get, createR2Put, type R2Get, type R2Put } from './r2Client.js'
 export const MARKET_OPEN_PRICES_STATE_R2_KEY = 'open-prices-state/last-run.json';
 const STATE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 
+interface OpenPricesState {
+  date?: unknown;
+  regions?: Record<string, unknown>;
+}
+
 export interface PublicMarketOpenPricesDeps {
   get: R2Get;
   put: R2Put;
@@ -42,10 +47,7 @@ export interface PublicMarketOpenPricesDeps {
  */
 export async function publishMarketOpenPrices(deps: PublicMarketOpenPricesDeps): Promise<boolean> {
   const date = previousUtcDate(new Date((deps.now ?? Date.now)()));
-  const state = (await deps.get(MARKET_OPEN_PRICES_STATE_R2_KEY)) as {
-    date?: unknown;
-    regions?: Record<string, unknown>;
-  } | null;
+  const state = (await deps.get(MARKET_OPEN_PRICES_STATE_R2_KEY)) as OpenPricesState | null;
   if (state?.date === date) {
     console.info('Market open prices already published', { date });
     return false;
