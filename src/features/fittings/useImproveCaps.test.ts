@@ -27,8 +27,18 @@ describe('Improve budget and refit cap', () => {
     expect(await db.settings.get('fittingsImproveSpendCap')).toBeUndefined();
   });
 
-  it('moves it to Refitting when no mode is stored', async () => {
+  it('moves it to Planning when no mode is stored, the default mode', async () => {
     await db.settings.put({ key: 'fittingsImproveSpendCap', value: 8_000_000 });
+    await migrateSpendCap();
+    expect(useImproveBudget.getState().value).toBe(8_000_000);
+    expect(useImproveRefitCap.getState().value).toBeNull();
+  });
+
+  it('moves it to Refitting when that mode was active', async () => {
+    await db.settings.bulkPut([
+      { key: 'fittingsImproveSpendCap', value: 8_000_000 },
+      { key: 'fittingsImproveMode', value: 'refit' },
+    ]);
     await migrateSpendCap();
     expect(useImproveRefitCap.getState().value).toBe(8_000_000);
     expect(useImproveBudget.getState().value).toBeNull();

@@ -165,8 +165,7 @@ export const useImproveRefitCap = createLocalSetting<number | null>({
 const LEGACY_SPEND_CAP_KEY = 'fittingsImproveSpendCap';
 
 /**
- * One shared cap used to serve both modes. Moves it to the mode that was active (Refitting when
- * that is not stored), once, then drops the old row.
+ * One shared cap used to serve both modes. Moves it to the mode that was active (Planning when none is stored: it is the default), once, then drops the old row.
  */
 export async function migrateSpendCap(): Promise<void> {
   const legacy = await db.settings.get(LEGACY_SPEND_CAP_KEY);
@@ -174,7 +173,7 @@ export async function migrateSpendCap(): Promise<void> {
   const cap = parseCap(legacy.value);
   if (cap !== null) {
     const stored = (await db.settings.get('fittingsImproveMode'))?.value;
-    const store = stored === 'buy' ? useImproveBudget : useImproveRefitCap;
+    const store = stored === undefined || stored === 'buy' ? useImproveBudget : useImproveRefitCap;
     await store.getState().hydrate();
     if (store.getState().value === null) await store.getState().setValue(cap);
   }
