@@ -2,6 +2,21 @@
 
 Source: `src/mockups/ImproveOwnedStock.stories.tsx` (`mockups-improveownedstock--*`). Sample data. Every story has a `-phone` twin (390). Run `npm run storybook`, or `npm run ui:shot -- mockups-improveownedstock--<story>`.
 
+## Chosen (2026-10-25)
+
+- **Q1:** inside Search settings. The Search settings header becomes two lines, the label with its caret and then the summary under it. The summary names the place ("minus owned at Jita IV-4"), so the counted place shows without opening the settings.
+- **Q2:** Appraisal's sentence with the place picker: "Count what I own at [Jita IV-4]". It edits the one shared pick.
+- **Q3:** the note replaces the cost line.
+
+Stories `chosen`, `chosen-open` (and their `-phone` twins).
+
+| Settings closed | Settings open |
+|---|---|
+| ![](chosen-1440.png) | ![](chosen-open-1440.png) |
+| ![](chosen-390.png) | ![](chosen-open-390.png) |
+
+## The questions as reviewed
+
 The base is today's drawer after a Planning search on a Drake, with two rows ticked: the launcher swap (all 6 owned) and the Ballistic Control swap (1 of 2 owned). The base picks are Q1 B, Q2 A and Q3 A, so the base picture serves all three. The selection summary reads "still to buy … of a 500M budget" in every story.
 
 ## Q1: where does "Count what I own" go?

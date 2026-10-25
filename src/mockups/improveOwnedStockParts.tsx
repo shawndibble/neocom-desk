@@ -287,11 +287,11 @@ function ResultRow({
   );
 }
 
-const settingsLine = (counting: boolean, budget: string) =>
+const settingsLine = (counting: boolean, place: string, budget: string) =>
   [
     'Upgrade',
     'Planning to buy',
-    counting ? 'minus owned' : null,
+    counting ? `minus owned at ${place === 'all' ? 'any location' : placeOf(place).short}` : null,
     budget ? `budget ${budget}` : 'no budget',
   ]
     .filter(Boolean)
@@ -370,17 +370,18 @@ export function OwnedStockBody({
         <Caret expanded={false} />
       </button>
       <div>
+        {/* Two lines: the label with its caret, then the summary under it. */}
         <button
           type="button"
-          className={textActionClassName('w-full justify-between gap-2')}
+          className={textActionClassName('flex-wrap gap-x-1 text-left')}
           aria-expanded={open}
           aria-controls={settingsId}
           onClick={() => setOpen((o) => !o)}
         >
           <span>Search settings</span>
-          <span className="text-text-dim flex items-center gap-1 normal-case tracking-normal">
-            {settingsLine(on, budget)}
-            <Caret expanded={open} />
+          <Caret expanded={open} />
+          <span className="text-text-dim basis-full text-xs normal-case tracking-normal">
+            {settingsLine(on, place, budget)}
           </span>
         </button>
         <Collapse open={open} id={settingsId} className="pt-2">
