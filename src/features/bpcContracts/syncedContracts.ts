@@ -31,12 +31,12 @@ const CACHE_KEY = 'publicContractOffers';
 /**
  * How often the backend republishes the snapshot, and therefore the soonest a
  * refetch can return anything new. `STALE_AFTER.default`'s ten minutes is the
- * app-wide promise for a *Character's* own mutable data; against a twice-hourly
- * publish it just re-reads a byte-identical snapshot up to three times per
+ * app-wide promise for a *Character's* own mutable data; against an hourly
+ * publish it just re-reads a byte-identical snapshot up to six times per
  * cycle. The UI shows the snapshot's `lastSyncedAt` rather than when this
  * browser last read it.
  */
-const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * 60_000;
+const SNAPSHOT_PUBLISH_INTERVAL_MS = 60 * 60_000;
 
 export interface PublicBpcContractsSnapshot {
   rows: BpcContractRow[];
@@ -92,7 +92,7 @@ async function fetchSnapshot(): Promise<PublicBpcContractsSnapshot | null> {
  * the offline banner, a manual refresh re-fetches) even though the live side
  * is R2, not ESI — `loadWithCache` only needs a `fetchLive`. A lapsed copy is
  * served while the next publish is read behind it, so a visit after the
- * 30-minute window opens on the last snapshot instead of waiting on the read.
+ * hourly window opens on the last snapshot instead of waiting on the read.
  */
 export function loadPublicBpcContracts(): Promise<CachedResult<PublicBpcContractsSnapshot> | null> {
   return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY, fetchSnapshot, {

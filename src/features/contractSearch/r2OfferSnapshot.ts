@@ -26,7 +26,7 @@ export const R2_SNAPSHOT_ORIGIN = 'https://data.neocomdesk.com';
 const INDEX_URL = `${R2_SNAPSHOT_ORIGIN}/contract-offers/index.json`;
 const INDEX_CACHE_KEY = 'contractOffersR2Index';
 /** How often the backend republishes; the index is re-read once its window lapses. */
-const INDEX_STALE_AFTER_MS = 30 * 60_000;
+const INDEX_STALE_AFTER_MS = 60 * 60_000;
 const READ_TIMEOUT_MS = 20_000;
 /** What the writer names an object (`functions/src/contractOfferObjects.ts`); anything else is not fetched. */
 const OBJECT_NAME = /^contract-offers\/types\/[\w.-]+\.json$/;

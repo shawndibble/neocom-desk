@@ -207,7 +207,7 @@ export async function publishContractOffersToR2(args: {
       hashes,
       bundles: indexWritten ? bundleNames : (previous?.bundles ?? []),
       // A failed or budget-cut refresh pass drops to `null` so the next run resumes from the
-      // recorded hashes instead of re-uploading everything every 30 minutes.
+      // recorded hashes instead of re-uploading everything every hour.
       fullUploadAt:
         failed === 0 && remaining === 0 && completesFullPass
           ? now
