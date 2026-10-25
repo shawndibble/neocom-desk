@@ -613,6 +613,80 @@ describe('server-pushed events (issue #5121)', () => {
   });
 });
 
+describe('server-pushed new mail (issue #5143)', () => {
+  const fire = {
+    eventId: 'newMail',
+    characterId: 7,
+    mailId: 120,
+    sentMs: 900,
+    fromId: 900,
+    subject: 'Fleet tonight',
+  } as const;
+  /** What `functions/src/mailPush.ts`'s `buildMailPush` sends. */
+  const push = (f: object = fire) =>
+    JSON.stringify({
+      data: {
+        characterId: '7',
+        eventId: 'newMail',
+        occurrenceKey: '7:newMail:120',
+        title: 'New mail',
+        body: 'You have new mail.',
+        fireAt: '900',
+        fire: JSON.stringify(f),
+      },
+    });
+  const named = {
+    characterName: vi.fn(async () => 'Aurelia'),
+    resolveIds: vi.fn(async () => new Map([[900, 'Vexor Fan']])),
+  };
+
+  it('words the pop-up with the sender and subject, keyed like the Foreground Poller', async () => {
+    const e = env(named);
+    await handlePush(e, push(), 5000);
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('New mail');
+    expect(options.body).toBe('Aurelia has new mail from Vexor Fan: Fleet tonight');
+    expect(named.resolveIds).toHaveBeenCalledWith([900]);
+  });
+
+  it('never writes the sender or subject into the feed row, which syncs to Firestore', async () => {
+    const e = env(named);
+    await handlePush(e, push(), 5000);
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: occurrenceKey({ eventId: 'newMail', characterId: 7, mailId: 120 }, 5000),
+        body: 'Aurelia has new mail.',
+        firedAt: 900,
+      })
+    );
+    const entry = vi.mocked(e.recordFeedEntry).mock.calls[0][0];
+    expect(JSON.stringify(entry)).not.toMatch(/Fleet tonight|Vexor Fan/);
+  });
+
+  it('leaves out a sender it cannot name (a mailing list) and a missing subject', async () => {
+    const e = env({ ...named, resolveIds: vi.fn(async () => new Map()) });
+    await handlePush(e, push(), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe(
+      'Aurelia has new mail: Fleet tonight'
+    );
+    const bare = env(named);
+    await handlePush(bare, push({ eventId: 'newMail', characterId: 7, mailId: 120 }), 5000);
+    expect(vi.mocked(bare.showNotification).mock.calls[0][1].body).toBe('Aurelia has new mail.');
+  });
+
+  it('shows the generic floor, naming nothing, for a fire that is not the push’s own', async () => {
+    const e = env(named);
+    await handlePush(e, push({ ...fire, characterId: 8 }), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('You have new mail.');
+  });
+
+  it('replaces an earlier pop-up for the same mail silently', async () => {
+    const e = env({ ...named, alreadyNotified: vi.fn(async () => true) });
+    await handlePush(e, push(), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1]).toMatchObject({ silent: true });
+  });
+});
+
 describe('server-pushed nearby alerts (issue #5122)', () => {
   const NOW = Date.parse('2026-10-25T12:00:00Z');
   const HOUR = 3_600_000;

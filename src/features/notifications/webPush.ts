@@ -16,7 +16,7 @@ import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
-import { recordAlertsNearby } from './alertsGrant';
+import { recordAlertsGrantScopes } from './alertsGrant';
 import { routeRulesForServer } from './nearbyRouteRules';
 import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
@@ -68,7 +68,7 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
       });
       settlePushRegistration(result);
       await recordSeenEveTypes(result?.seenTypes);
-      await recordAlertsNearby(result?.nearbyGrants);
+      await recordAlertsGrantScopes(result);
     } catch (err) {
       // Registration failing must not undo a permission grant the browser
       // already gave — the user is still enrolled for the feed/foreground

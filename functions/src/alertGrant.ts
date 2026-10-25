@@ -1,6 +1,7 @@
 // Alerts Grant custody (issue #3753, ADR 0020, ADR 0028): save/delete logic for
 // the one server-held EVE token — a refresh token scoped to notifications and,
-// when the user granted it for nearby alerts, the Character's location. Pure of
+// when the user granted them, the Character's location (nearby alerts, ADR 0028)
+// and mail (new-mail alerts, ADR 0029). Pure of
 // Firebase: the Firestore store, key, verifier and SSO revoke are injected, so
 // it tests without an emulator (alertGrantStore.ts / index.ts wire the real
 // ones). A token is never logged, never put in an error, never returned.
@@ -17,11 +18,25 @@ export const ALERTS_SCOPE = 'esi-characters.read_notifications.v1';
  * existed holds the notifications scope alone and keeps working for that.
  */
 export const ALERTS_LOCATION_SCOPE = 'esi-location.read_location.v1';
-const ALLOWED_SCOPES: ReadonlySet<string> = new Set([ALERTS_SCOPE, ALERTS_LOCATION_SCOPE]);
+/**
+ * The second optional extra (ADR 0029): the Character's mail, so the poller can
+ * push new mail to a closed app. Only the headers are ever read.
+ */
+export const ALERTS_MAIL_SCOPE = 'esi-mail.read_mail.v1';
+const ALLOWED_SCOPES: ReadonlySet<string> = new Set([
+  ALERTS_SCOPE,
+  ALERTS_LOCATION_SCOPE,
+  ALERTS_MAIL_SCOPE,
+]);
 
 /** Whether a grant's token can read the Character's location (absent `scopes`: saved before ADR 0028). */
 export function grantCoversNearby(grant: Pick<AlertGrantDoc, 'scopes'>): boolean {
   return grant.scopes?.includes(ALERTS_LOCATION_SCOPE) === true;
+}
+
+/** Whether a grant's token can read the Character's mail headers (absent `scopes`: saved before ADR 0028). */
+export function grantCoversMail(grant: Pick<AlertGrantDoc, 'scopes'>): boolean {
+  return grant.scopes?.includes(ALERTS_MAIL_SCOPE) === true;
 }
 
 const SSO_TIMEOUT_MS = 10_000;
@@ -47,6 +62,15 @@ export interface AlertGrantDoc {
    * saved before the location scope existed, which means notifications only.
    */
   scopes?: string[];
+  /**
+   * New-mail alerts (ADR 0029); the poller owns all three, and they exist only
+   * while the grant carries the mail scope. Ids and an ETag, never content.
+   * `null`/absent mark: the next mail read seeds silently instead of pushing.
+   */
+  mailHighWaterId?: number | null;
+  mailEtag?: string | null;
+  /** `deviceId|Occurrence Key` of mails already pushed to a device while the mark could not advance (a partial send). */
+  mailPushed?: string[];
 }
 
 export interface AlertGrantStore {
@@ -107,7 +131,7 @@ export function parseSaveAlertGrantInput(data: unknown): SaveAlertGrantInput {
 export async function saveAlertGrant(
   deps: AlertGrantDeps,
   input: SaveAlertGrantInput
-): Promise<{ characterId: number; enabledAt: number; nearby: boolean }> {
+): Promise<{ characterId: number; enabledAt: number; nearby: boolean; mail: boolean }> {
   const supplied = await verifyAlertsToken(deps, input.accessToken);
 
   // The access token alone proves nothing about the refresh token beside it:
@@ -132,6 +156,12 @@ export async function saveAlertGrant(
   const key = deps.key();
   const existing = await deps.store.get(characterId);
   const previousActive = existing?.status === 'active' ? existing : null;
+  const scopes = [...claims.scopes].sort();
+  // Mail state survives only a re-grant that keeps the mail scope: one that
+  // drops it forgets the mark, and one that adds it starts unmarked, so the
+  // first read seeds silently and enabling mail never replays the inbox.
+  const withMail = scopes.includes(ALERTS_MAIL_SCOPE);
+  const keptMail = withMail && previousActive !== null && grantCoversMail(previousActive);
   const doc: AlertGrantDoc = {
     encryptedRefreshToken: encryptRefreshToken(refreshed.refreshToken, characterId, key),
     clientId,
@@ -140,7 +170,14 @@ export async function saveAlertGrant(
     etag: previousActive?.etag ?? null,
     seenTypes: previousActive?.seenTypes ?? [],
     status: 'active',
-    scopes: [...claims.scopes].sort(),
+    scopes,
+    ...(withMail
+      ? {
+          mailHighWaterId: keptMail ? (previousActive.mailHighWaterId ?? null) : null,
+          mailEtag: keptMail ? (previousActive.mailEtag ?? null) : null,
+          mailPushed: keptMail ? (previousActive.mailPushed ?? []) : [],
+        }
+      : {}),
   };
   await deps.store.set(characterId, doc);
 
@@ -149,7 +186,12 @@ export async function saveAlertGrant(
   if (existing) {
     await revokeStored(deps, characterId, existing, refreshed.refreshToken);
   }
-  return { characterId, enabledAt: doc.enabledAt, nearby: grantCoversNearby(doc) };
+  return {
+    characterId,
+    enabledAt: doc.enabledAt,
+    nearby: grantCoversNearby(doc),
+    mail: grantCoversMail(doc),
+  };
 }
 
 async function verifyAlertsToken(
@@ -163,7 +205,7 @@ async function verifyAlertsToken(
       }),
     toError: () => new AlertGrantError('unauthenticated', 'EVE access token rejected'),
   });
-  // Notifications, optionally with location; nothing else, and no repeats.
+  // Notifications, optionally with location and mail; nothing else, and no repeats.
   const scopes = new Set(claims.scopes);
   if (
     scopes.size !== claims.scopes.length ||
@@ -172,7 +214,7 @@ async function verifyAlertsToken(
   ) {
     throw new AlertGrantError(
       'permission-denied',
-      `Token must carry ${ALERTS_SCOPE}, optionally with ${ALERTS_LOCATION_SCOPE}, and nothing else`
+      `Token must carry ${ALERTS_SCOPE}, optionally with ${ALERTS_LOCATION_SCOPE} and ${ALERTS_MAIL_SCOPE}, and nothing else`
     );
   }
   return claims;

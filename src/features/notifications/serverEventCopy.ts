@@ -13,10 +13,29 @@ import type {
   CommunityRequestPledgedFire,
 } from '@/engine/communities/communityAlert';
 import type { NotificationCopy } from '@/engine/notificationWording';
-import type { PriceAlertTriggeredFire, ShipLostFire } from '@/engine/notificationDiffs';
+import type {
+  MailNotificationFire,
+  PriceAlertTriggeredFire,
+  ShipLostFire,
+} from '@/engine/notificationDiffs';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 
 export type Translate = (key: string, vars?: Record<string, unknown>) => string;
+
+/**
+ * The fire a server push of `newMail` carries (issue #5143): the poller's own
+ * fire plus what the push may name. Only the closed-app pop-up is worded from
+ * them; the open app's diff does not carry them, so its copy stays the plain one.
+ */
+export interface NewMailPushFire extends MailNotificationFire {
+  /** The header's `from`: a character, or a mailing list the name lookup cannot resolve. */
+  fromId?: number;
+  subject?: string;
+}
+
+export interface NewMailNames {
+  readonly sender?: string;
+}
 
 export interface ShipLostNames {
   readonly ship?: string;
@@ -77,6 +96,35 @@ export function priceAlertText(t: Translate, fire: PriceAlertTriggeredFire): Not
       price: formatIsk(fire.price, 2),
       target: formatIsk(fire.targetPrice, 2),
     }),
+  };
+}
+
+/**
+ * "{{character}} has new mail." — and, when the fire names them, from whom and
+ * about what (a sender the lookup could not name is left out, not guessed).
+ * The plain form (no sender, no subject) is what the Foreground Poller shows and
+ * what a pushed feed row keeps, so no mail content is ever written to the
+ * synced Notification Feed.
+ */
+export function newMailText(
+  t: Translate,
+  fire: Pick<NewMailPushFire, 'subject'>,
+  character: string,
+  names: NewMailNames = {}
+): NotificationCopy {
+  const subject = fire.subject?.trim() || undefined;
+  const { sender } = names;
+  const variant =
+    sender !== undefined && subject !== undefined
+      ? 'bodyFromSubject'
+      : sender !== undefined
+        ? 'bodyFrom'
+        : subject !== undefined
+          ? 'bodySubject'
+          : 'body';
+  return {
+    title: fired(t, 'newMail', 'title'),
+    body: fired(t, 'newMail', variant, { character, sender, subject }),
   };
 }
 

@@ -32,6 +32,7 @@ import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './v
 import {
   AlertGrantError,
   deleteAlertGrant as deleteAlertGrantFor,
+  grantCoversMail,
   grantCoversNearby,
   parseSaveAlertGrantInput,
   refreshAtSso,
@@ -45,6 +46,7 @@ import { firestoreNearbyStore, forgetNearbyCharacter } from './nearbyStore.js';
 import { fetchCharacterLocation, fetchIncursions, fetchRaidableSkyhooks } from './esiNearby.js';
 import type { PushMessage } from './eveNotificationPush.js';
 import { runNearbyPhase } from './pollNearby.js';
+import { fetchMailHeaders } from './esiMail.js';
 import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
@@ -365,12 +367,16 @@ alertsAction('registerDevice', async (request) => {
   // presence also tells the client this server accepts the location scope, so
   // it never asks EVE for a grant an older deployed function would refuse.
   let nearbyGrants: number[] | undefined = [];
+  // Likewise the Characters whose active grant can read mail headers (ADR 0029),
+  // present only from a server that takes the mail scope.
+  const mailGrants: number[] = [];
   try {
     const grants = await store.getMany(registration.characterIds);
     for (const characterId of registration.characterIds) {
       const grant = grants.get(characterId);
       seenTypes[String(characterId)] = grant?.seenTypes ?? [];
       if (grant?.status === 'active' && grantCoversNearby(grant)) nearbyGrants?.push(characterId);
+      if (grant?.status === 'active' && grantCoversMail(grant)) mailGrants.push(characterId);
     }
   } catch (err) {
     // The registration already landed; a failed read only delays new toggles.
@@ -387,7 +393,7 @@ alertsAction('registerDevice', async (request) => {
     registered: registration.characterIds,
     rejected,
     seenTypes,
-    ...(nearbyGrants ? { nearbyGrants } : {}),
+    ...(nearbyGrants ? { nearbyGrants, mailGrants } : {}),
   };
 });
 
@@ -538,7 +544,8 @@ export const pushCommunityPledge = onDocumentCreated(
  * active Alerts Grant's `/notifications/` feed and pushes the types a
  * registered device enabled. For a grant that also carries the location scope
  * (issue #5122, ADR 0028) it reads the Character's Current System with the same
- * token and pushes nearby Incursions and raidable skyhooks. The only function
+ * token and pushes nearby Incursions and raidable skyhooks; for one that carries
+ * the mail scope (issue #5143, ADR 0029) it reads the mail headers and pushes new mail. The only function
  * that holds an EVE token, and only the Alerts Grant's narrow one. Deploy is manual:
  * `firebase deploy --only functions:pollEveNotifications`.
  */
@@ -568,6 +575,11 @@ export const pollEveNotifications = onSchedule(
         fetchEsiNotifications(characterId, accessToken, etag),
       send,
       log,
+      // New mail (issue #5143, ADR 0029): the same run, the same refreshed token.
+      mail: {
+        fetchHeaders: (characterId, accessToken, etag) =>
+          fetchMailHeaders(characterId, accessToken, etag),
+      },
       // Nearby alerts (issue #5122, ADR 0028): the same run, the same refreshed token.
       nearby: {
         fetchLocation: (characterId, accessToken) =>

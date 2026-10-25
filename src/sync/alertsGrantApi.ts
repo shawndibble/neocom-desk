@@ -10,16 +10,22 @@
 import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
 
-/** `nearby` (ADR 0028): whether the saved grant carries the location scope; absent from an older deployed function. */
+/**
+ * `nearby` (ADR 0028) and `mail` (ADR 0029): whether the saved grant carries the
+ * location / mail scope; each absent from a deployed function older than it.
+ */
 export async function saveAlertGrantRemote(tokens: {
   accessToken: string;
   refreshToken: string;
-}): Promise<{ nearby?: boolean }> {
-  const { nearby } = await callRouted<
+}): Promise<{ nearby?: boolean; mail?: boolean }> {
+  const { nearby, mail } = await callRouted<
     typeof tokens,
-    { characterId: number; enabledAt: number; nearby?: boolean }
+    { characterId: number; enabledAt: number; nearby?: boolean; mail?: boolean }
   >('saveAlertGrant', tokens, undefined);
-  return typeof nearby === 'boolean' ? { nearby } : {};
+  return {
+    ...(typeof nearby === 'boolean' ? { nearby } : {}),
+    ...(typeof mail === 'boolean' ? { mail } : {}),
+  };
 }
 
 export async function deleteAlertGrantRemote(characterId: number): Promise<void> {

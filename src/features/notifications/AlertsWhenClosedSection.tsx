@@ -7,11 +7,12 @@
  * may wait for someone to open the screen. Off by default. Turning one on
  * sends the user to EVE to authorize that Character for notifications only,
  * plus the location for nearby alerts once the server takes it (ADR 0028);
- * the token goes to our server and never to this device.
+ * the token goes to our server and never to this device. Mail (ADR 0029) is
+ * never part of Turn on: it is added per Character with an explicit "Add mail".
  *
  * Every state is a word, never a colour alone (§6c). A row has one action, or
- * two for a grant from before nearby alerts ("Add nearby" re-authorizes it
- * with the location), so there is no ⋮ menu. "Turn on for all" walks the
+ * up to three for a grant from before an extra ("Add nearby" and "Add mail"
+ * re-authorize it with that scope, keeping the others), so there is no ⋮ menu. "Turn on for all" walks the
  * Characters one at a time, because EVE's own page picks the Character and
  * each needs its own round trip.
  */
@@ -19,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
+import i18n from '@/i18n';
 import { Button, Modal, NeedsConnection } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -37,6 +39,7 @@ import {
   readAlertsGrants,
   takeNextQueuedAlerts,
   turnOffAlerts,
+  useAlertsMail,
   useAlertsNearby,
   type AlertsGrantRecord,
 } from './alertsGrant';
@@ -55,9 +58,28 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
   const navigate = useNavigate();
   const grants: Record<number, AlertsGrantRecord> = useLiveQuery(readAlertsGrants, []) ?? {};
   const nearby = useAlertsNearby();
+  const mail = useAlertsMail();
   /** An on grant from before the server took the location scope: it can be re-authorized to add it. */
   const lacksNearby = (characterId: number) =>
     nearby.supported && !nearby.characterIds.includes(characterId);
+  /** An on grant without the mail scope (every grant until the player adds it): offered "Add mail". */
+  const lacksMail = (characterId: number) =>
+    mail.supported && !mail.characterIds.includes(characterId);
+  /** What this Character's grant reads, in words (or what re-authorizing it will ask for). */
+  const covers = (characterId: number) => {
+    const items = [
+      t('settings.notifications.alertsWhenClosed.covers.notifications'),
+      ...(nearby.characterIds.includes(characterId)
+        ? [t('settings.notifications.alertsWhenClosed.covers.location')]
+        : []),
+      ...(mail.characterIds.includes(characterId)
+        ? [t('settings.notifications.alertsWhenClosed.covers.mail')]
+        : []),
+    ];
+    return t('settings.notifications.alertsWhenClosed.covers.line', {
+      list: new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(items),
+    });
+  };
   const nameOf = (characterId: number) =>
     characters.find((character) => character.characterId === characterId)?.name ??
     String(characterId);
@@ -86,8 +108,8 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     }
   });
   const [busyId, setBusyId] = useState<number | null>(null);
-  // Which of a row's two buttons is working, so only that one spins.
-  const [addingNearby, setAddingNearby] = useState(false);
+  // Which of a row's buttons is working, so only that one spins.
+  const [adding, setAdding] = useState<'nearby' | 'mail' | null>(null);
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   // Closed to start, so the list never pushes the Topics below the fold; open on
   // arrival from EVE, where it holds the outcome of the round trip.
@@ -114,10 +136,12 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     (character) => alertsRowState(grants[character.characterId]) !== 'on'
   );
 
-  const turnOn = (characterId: number) => {
+  const turnOn = (characterId: number, add?: 'mail') => {
     setBusyId(characterId);
     clearAlertsQueue();
-    void beginAlertsLogin(characterId).catch(() => setBusyId(null));
+    void (
+      add === undefined ? beginAlertsLogin(characterId) : beginAlertsLogin(characterId, { add })
+    ).catch(() => setBusyId(null));
   };
   const turnOnAll = () => {
     const ids = toAuthorize.map((character) => character.characterId);
@@ -129,7 +153,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     }
   };
   const turnOff = async (characterId: number) => {
-    setAddingNearby(false);
+    setAdding(null);
     setBusyId(characterId);
     const ok = await turnOffAlerts(characterId);
     setBusyId(null);
@@ -219,6 +243,11 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                 : 'settings.notifications.alertsWhenClosed.hint'
             )}
           </p>
+          {mail.supported && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('settings.notifications.alertsWhenClosed.hintMail')}
+            </p>
+          )}
           <QuietTimeRows />
           {toAuthorize.length > 1 && (
             <NeedsConnection>
@@ -251,11 +280,13 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-text">{character.name}</span>
                     <span className="block text-[0.6875rem] text-text-dim">
-                      {t(
-                        nearby.supported
-                          ? 'settings.notifications.alertsWhenClosed.storesNearby'
-                          : 'settings.notifications.alertsWhenClosed.stores'
-                      )}
+                      {state === 'off'
+                        ? t(
+                            nearby.supported
+                              ? 'settings.notifications.alertsWhenClosed.storesNearby'
+                              : 'settings.notifications.alertsWhenClosed.stores'
+                          )
+                        : covers(character.characterId)}
                     </span>
                   </span>
                   <span
@@ -275,13 +306,13 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                       <Button
                         size="sm"
                         variant="ghost"
-                        loading={busy && addingNearby}
+                        loading={busy && adding === 'nearby'}
                         disabled={busyId !== null}
                         aria-label={t('settings.notifications.alertsWhenClosed.addNearbyFor', {
                           name: character.name,
                         })}
                         onClick={() => {
-                          setAddingNearby(true);
+                          setAdding('nearby');
                           turnOn(character.characterId);
                         }}
                       >
@@ -289,10 +320,29 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                       </Button>
                     </NeedsConnection>
                   )}
+                  {state === 'on' && lacksMail(character.characterId) && (
+                    <NeedsConnection>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        loading={busy && adding === 'mail'}
+                        disabled={busyId !== null}
+                        aria-label={t('settings.notifications.alertsWhenClosed.addMailFor', {
+                          name: character.name,
+                        })}
+                        onClick={() => {
+                          setAdding('mail');
+                          turnOn(character.characterId, 'mail');
+                        }}
+                      >
+                        {t('settings.notifications.alertsWhenClosed.addMail')}
+                      </Button>
+                    </NeedsConnection>
+                  )}
                   {state === 'on' ? (
                     <Button
                       size="sm"
-                      loading={busy && !addingNearby}
+                      loading={busy && adding === null}
                       disabled={busyId !== null}
                       aria-label={t('settings.notifications.alertsWhenClosed.turnOffFor', {
                         name: character.name,

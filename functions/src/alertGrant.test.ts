@@ -2,8 +2,10 @@ import { randomBytes } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ALERTS_LOCATION_SCOPE,
+  ALERTS_MAIL_SCOPE,
   ALERTS_SCOPE,
   AlertGrantError,
+  grantCoversMail,
   grantCoversNearby,
   deleteAlertGrant,
   parseSaveAlertGrantInput,
@@ -73,7 +75,7 @@ describe('saveAlertGrant', () => {
   it('stores an encrypted token, never the plaintext, and returns no token', async () => {
     const { deps, docs } = makeDeps();
     const res = await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
-    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: false });
+    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: false, mail: false });
     const doc = docs.get(42)!;
     expect(JSON.stringify(doc)).not.toContain(REFRESH);
     expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe(`${REFRESH}-rotated`);
@@ -93,9 +95,49 @@ describe('saveAlertGrant', () => {
     const scopes = [ALERTS_LOCATION_SCOPE, ALERTS_SCOPE];
     const { deps, docs } = makeDeps({ verify: async () => claims({ scopes }) });
     const res = await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
-    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: true });
+    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: true, mail: false });
     expect(docs.get(42)?.scopes).toEqual([ALERTS_SCOPE, ALERTS_LOCATION_SCOPE].sort());
     expect(grantCoversNearby(docs.get(42)!)).toBe(true);
+  });
+
+  it('accepts the mail scope beside the others and says the grant covers mail', async () => {
+    const scopes = [ALERTS_MAIL_SCOPE, ALERTS_SCOPE, ALERTS_LOCATION_SCOPE];
+    const { deps, docs } = makeDeps({ verify: async () => claims({ scopes }) });
+    const res = await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: true, mail: true });
+    expect(grantCoversMail(docs.get(42)!)).toBe(true);
+    // A new mail grant starts unmarked: the first read seeds, nothing replays.
+    expect(docs.get(42)).toMatchObject({ mailHighWaterId: null, mailEtag: null, mailPushed: [] });
+  });
+
+  it('adding mail to a live grant starts an unmarked mail state and keeps the grant’s own state', async () => {
+    const { deps, docs } = makeDeps();
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    docs.set(42, { ...docs.get(42)!, highWaterId: 77, enabledAt: 500 });
+    deps.verify = async () => claims({ scopes: [ALERTS_SCOPE, ALERTS_MAIL_SCOPE] });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(docs.get(42)).toMatchObject({ highWaterId: 77, enabledAt: 500, mailHighWaterId: null });
+  });
+
+  it('a re-grant that keeps mail keeps its mark; one that drops mail forgets it', async () => {
+    const { deps, docs } = makeDeps({
+      verify: async () => claims({ scopes: [ALERTS_SCOPE, ALERTS_MAIL_SCOPE] }),
+    });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    docs.set(42, {
+      ...docs.get(42)!,
+      mailHighWaterId: 900,
+      mailEtag: '"m"',
+      mailPushed: ['phone|42:newMail:900'],
+    });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(docs.get(42)).toMatchObject({ mailHighWaterId: 900, mailEtag: '"m"' });
+    expect(docs.get(42)?.mailPushed).toEqual(['phone|42:newMail:900']);
+
+    deps.verify = async () => claims({ scopes: [ALERTS_SCOPE] });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(docs.get(42)).not.toHaveProperty('mailHighWaterId');
+    expect(grantCoversMail(docs.get(42)!)).toBe(false);
   });
 
   it('rejects a token that fails verification, storing nothing', async () => {
@@ -120,6 +162,8 @@ describe('saveAlertGrant', () => {
       [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE, 'esi-skills.read_skills.v1'],
     ],
     ['a repeated scope', [ALERTS_SCOPE, ALERTS_SCOPE]],
+    ['mail alone', [ALERTS_MAIL_SCOPE]],
+    ['mail with another scope', [ALERTS_SCOPE, ALERTS_MAIL_SCOPE, 'esi-mail.send_mail.v1']],
   ])('rejects %s', async (_n, scopes) => {
     const { deps, docs } = makeDeps({ verify: async () => claims({ scopes }) });
     await expect(
@@ -286,6 +330,14 @@ describe('grantCoversNearby', () => {
     expect(grantCoversNearby({ scopes: undefined })).toBe(false);
     expect(grantCoversNearby({ scopes: [ALERTS_SCOPE] })).toBe(false);
     expect(grantCoversNearby({ scopes: [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE] })).toBe(true);
+  });
+});
+
+describe('grantCoversMail', () => {
+  it('is false for a grant saved before the mail scope existed', () => {
+    expect(grantCoversMail({ scopes: undefined })).toBe(false);
+    expect(grantCoversMail({ scopes: [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE] })).toBe(false);
+    expect(grantCoversMail({ scopes: [ALERTS_SCOPE, ALERTS_MAIL_SCOPE] })).toBe(true);
   });
 });
 

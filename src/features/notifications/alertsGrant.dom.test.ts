@@ -3,7 +3,10 @@ import { db } from '@/db';
 
 const remote = vi.hoisted(() => ({
   save: vi.fn<
-    (tokens: { accessToken: string; refreshToken: string }) => Promise<{ nearby?: boolean } | void>
+    (tokens: {
+      accessToken: string;
+      refreshToken: string;
+    }) => Promise<{ nearby?: boolean; mail?: boolean } | void>
   >(),
   del: vi.fn<(characterId: number) => Promise<void>>(),
 }));
@@ -28,7 +31,9 @@ import {
   takeNextQueuedAlerts,
   clearAlertsQueue,
   deleteAlertGrantsBestEffort,
+  readAlertsMail,
   readAlertsNearby,
+  recordAlertsGrantScopes,
   recordAlertsNearby,
 } from './alertsGrant';
 
@@ -143,6 +148,40 @@ describe('Turn on for all', () => {
     queueAlertsForAll([1, 2]);
     clearAlertsQueue();
     expect(takeNextQueuedAlerts()).toBeNull();
+  });
+});
+
+describe('mail alerts on the grant (ADR 0029)', () => {
+  it('knows nothing until a registration says the server takes the mail scope, apart from nearby', async () => {
+    expect(await readAlertsMail()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsGrantScopes({ nearbyGrants: [1] });
+    expect(await readAlertsMail()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsGrantScopes({ nearbyGrants: [1], mailGrants: [3, 2] });
+    expect(await readAlertsMail()).toEqual({ supported: true, characterIds: [2, 3] });
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [1] });
+    await recordAlertsGrantScopes(null);
+    expect((await readAlertsMail()).characterIds).toEqual([2, 3]);
+  });
+
+  it('records what the server said the saved grant covers, and an older server changes nothing', async () => {
+    auth.complete.mockResolvedValue(result(111));
+    remote.save.mockResolvedValue({ nearby: false, mail: true });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect(await readAlertsMail()).toEqual({ supported: true, characterIds: [111] });
+
+    remote.save.mockResolvedValue({ nearby: false });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsMail()).characterIds).toEqual([111]);
+
+    remote.save.mockResolvedValue({ nearby: false, mail: false });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsMail()).characterIds).toEqual([]);
+  });
+
+  it('turning alerts off forgets the Character', async () => {
+    await recordAlertsGrantScopes({ mailGrants: [111, 222] });
+    await turnOffAlerts(111);
+    expect((await readAlertsMail()).characterIds).toEqual([222]);
   });
 });
 

@@ -6,7 +6,7 @@ import type { ScopeGroup } from '@/esi/registry';
 import { eventApplicability } from './eventApplicability';
 import { eventEntry } from './eventEntries';
 import type { NotificationEventId } from './events';
-import { isNearbyServerEvent, isServerPushedEvent } from './serverEvents';
+import { isMailServerEvent, isNearbyServerEvent, isServerPushedEvent } from './serverEvents';
 import type { NotificationPreferencesValue } from './preferences';
 import type { CharacterAvailability, CharacterRef } from './CharacterChipGrid';
 
@@ -22,10 +22,12 @@ export const EMPTY_SCOPES: ReadonlySet<string> = new Set();
  */
 export function pushBadgeKind(
   eventId: NotificationEventId
-): 'scheduled' | 'server' | 'nearby' | null {
+): 'scheduled' | 'server' | 'nearby' | 'mail' | null {
   if (eventEntry(eventId).projection?.everyOccurrence === true) return 'scheduled';
   // A nearby alert reaches a closed app only under a location-capable Alerts Grant (ADR 0028).
   if (isNearbyServerEvent(eventId)) return 'nearby';
+  // New mail reaches a closed app only under a mail-capable Alerts Grant (ADR 0029).
+  if (isMailServerEvent(eventId)) return 'mail';
   return isServerPushedEvent(eventId) ? 'server' : null;
 }
 

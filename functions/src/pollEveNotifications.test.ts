@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AlertGrantDoc } from './alertGrant.js';
 import type { NotificationsResult } from './esiNotifications.js';
 import type { LocationResult } from './esiNearby.js';
+import type { MailHeadersResult } from './esiMail.js';
 import type { PushMessage } from './eveNotificationPush.js';
 import {
   pollEveNotifications,
@@ -55,6 +56,8 @@ function setup(opts: {
     patch: vi.fn(async () => {}),
     markRevoked: vi.fn(async () => {}),
     dropLocationScope: vi.fn(async () => {}),
+    patchMail: vi.fn(async () => {}),
+    dropMailScope: vi.fn(async () => {}),
     devicesFor: vi.fn(async () => opts.devices ?? [phone]),
     deleteDevice: vi.fn(async () => {}),
   } satisfies PollerStore;
@@ -388,5 +391,203 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
     const summary = await pollEveNotifications(deps);
     expect(runPhase).not.toHaveBeenCalled();
     expect(summary.budgetStopped).toBe(true);
+  });
+});
+
+describe('pollEveNotifications: new-mail alerts (issue #5143)', () => {
+  const MAIL_GRANT = {
+    scopes: ['esi-characters.read_notifications.v1', 'esi-mail.read_mail.v1'],
+    mailHighWaterId: 100,
+    mailEtag: '"m1"',
+    mailPushed: [],
+  };
+  const wantsMail: PollDevice = { ...phone, serverEvents: ['newMail'] };
+  const header = (mailId: number, fromId = 900) => ({
+    mailId,
+    fromId,
+    subject: `subject ${mailId}`,
+    sentMs: Date.parse(AFTER),
+  });
+  const ok = (headers: ReturnType<typeof header>[], etag = '"m2"'): MailHeadersResult => ({
+    kind: 'ok',
+    headers,
+    etag,
+    budgetLow: false,
+  });
+
+  function withMail(s: ReturnType<typeof setup>, result: () => MailHeadersResult) {
+    const fetchHeaders = vi.fn(async () => result());
+    return { deps: { ...s.deps, mail: { fetchHeaders } }, fetchHeaders };
+  }
+  const mailPushes = (s: ReturnType<typeof setup>) =>
+    s.sent.filter(({ m }) => m.data.eventId === 'newMail');
+
+  it('reads mail only for a grant with the mail scope and a device that wants newMail', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT), 2: grant() }, devices: [wantsMail] });
+    const { deps, fetchHeaders } = withMail(s, () => ok([]));
+    await pollEveNotifications(deps);
+    expect(fetchHeaders).toHaveBeenCalledTimes(1);
+    expect(fetchHeaders).toHaveBeenCalledWith(1, 'access-1', '"m1"');
+
+    const none = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [phone] });
+    const quiet = withMail(none, () => ok([]));
+    await pollEveNotifications(quiet.deps);
+    expect(quiet.fetchHeaders).not.toHaveBeenCalled();
+  });
+
+  it('forgets the mark when no device wants newMail any more, so re-enabling seeds afresh', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [phone] });
+    await pollEveNotifications(withMail(s, () => ok([])).deps);
+    expect(s.store.patchMail).toHaveBeenCalledWith(1, 'blob', {
+      mailHighWaterId: null,
+      mailEtag: null,
+      mailPushed: [],
+    });
+  });
+
+  it('seeds silently on the first read: no push, the mark is the highest id, no ETag sent', async () => {
+    const s = setup({
+      grants: { 1: grant({ ...MAIL_GRANT, mailHighWaterId: null, mailEtag: null }) },
+      devices: [wantsMail],
+    });
+    const { deps, fetchHeaders } = withMail(s, () => ok([header(90), header(95)]));
+    await pollEveNotifications(deps);
+    expect(fetchHeaders).toHaveBeenCalledWith(1, 'access-1', null);
+    expect(mailPushes(s)).toHaveLength(0);
+    expect(s.store.patchMail).toHaveBeenCalledWith(1, 'blob', {
+      mailHighWaterId: 95,
+      mailEtag: '"m2"',
+      mailPushed: [],
+    });
+  });
+
+  it('pushes each new mail not sent by the Character, with the fire, and advances the mark', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
+    const { deps } = withMail(s, () => ok([header(103), header(101), header(102, 1), header(100)]));
+    const summary = await pollEveNotifications(deps);
+    const pushes = mailPushes(s);
+    expect(pushes.map(({ token }) => token)).toEqual(['fcm-phone', 'fcm-phone']);
+    expect(pushes.map(({ m }) => m.data.occurrenceKey)).toEqual(['1:newMail:101', '1:newMail:103']);
+    expect(JSON.parse(pushes[0].m.data.fire)).toMatchObject({
+      mailId: 101,
+      subject: 'subject 101',
+    });
+    expect(summary.pushesSent).toBe(2);
+    expect(s.store.patchMail).toHaveBeenCalledWith(1, 'blob', {
+      mailHighWaterId: 103,
+      mailEtag: '"m2"',
+      mailPushed: [],
+    });
+  });
+
+  it('a 304 pushes and writes nothing', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
+    await pollEveNotifications(
+      withMail(s, () => ({ kind: 'not-modified', budgetLow: false })).deps
+    );
+    expect(mailPushes(s)).toHaveLength(0);
+    expect(s.store.patchMail).not.toHaveBeenCalled();
+  });
+
+  it('quiet time skips the push but still advances the mark', async () => {
+    const quietNow = Date.parse('2026-10-14T13:00:00Z');
+    const quietPhone: PollDevice = {
+      ...wantsMail,
+      quietHours: { start: '00:00', end: '23:59', timeZone: 'UTC', allowAttacks: true },
+    };
+    const s = setup({
+      grants: { 1: grant(MAIL_GRANT) },
+      devices: [quietPhone],
+      now: () => quietNow,
+    });
+    await pollEveNotifications(withMail(s, () => ok([header(101)])).deps);
+    expect(mailPushes(s)).toHaveLength(0);
+    expect(s.store.patchMail).toHaveBeenCalledWith(
+      1,
+      'blob',
+      expect.objectContaining({ mailHighWaterId: 101 })
+    );
+  });
+
+  it('a burst pushes only the newest mails', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
+    const headers = Array.from({ length: 9 }, (_, i) => header(101 + i));
+    await pollEveNotifications(withMail(s, () => ok(headers)).deps);
+    expect(mailPushes(s).map(({ m }) => m.data.occurrenceKey)).toEqual(
+      [105, 106, 107, 108, 109].map((id) => `1:newMail:${id}`)
+    );
+    expect(s.store.patchMail).toHaveBeenCalledWith(
+      1,
+      'blob',
+      expect.objectContaining({ mailHighWaterId: 109 })
+    );
+  });
+
+  it('a transient send failure keeps the mark, and a retry skips what already went out', async () => {
+    const tablet: PollDevice = { ...wantsMail, deviceId: 'tablet', fcmToken: 'fcm-tablet' };
+    const s = setup({
+      grants: { 1: grant(MAIL_GRANT) },
+      devices: [wantsMail, tablet],
+      send: async (token) => {
+        if (token === 'fcm-tablet') throw new Error('unavailable');
+      },
+    });
+    await pollEveNotifications(withMail(s, () => ok([header(101)])).deps);
+    expect(s.store.patchMail).toHaveBeenCalledWith(1, 'blob', {
+      mailHighWaterId: 100,
+      mailEtag: '"m1"',
+      mailPushed: ['phone|1:newMail:101'],
+    });
+
+    const retry = setup({
+      grants: { 1: grant({ ...MAIL_GRANT, mailPushed: ['phone|1:newMail:101'] }) },
+      devices: [wantsMail, tablet],
+    });
+    await pollEveNotifications(withMail(retry, () => ok([header(101)])).deps);
+    expect(mailPushes(retry).map(({ token }) => token)).toEqual(['fcm-tablet']);
+    expect(retry.store.patchMail).toHaveBeenCalledWith(1, 'blob', {
+      mailHighWaterId: 101,
+      mailEtag: '"m2"',
+      mailPushed: [],
+    });
+  });
+
+  it('a refused mail scope drops that scope but never revokes the grant, and nearby still runs', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
+    const { deps } = withMail(s, () => ({ kind: 'forbidden' }));
+    await pollEveNotifications(deps);
+    expect(s.store.markRevoked).not.toHaveBeenCalled();
+    expect(s.store.dropMailScope).toHaveBeenCalledWith(1, 'blob', [
+      'esi-characters.read_notifications.v1',
+    ]);
+  });
+
+  it('stops the run on a 420/429 and leaves the mark alone', async () => {
+    const s = setup({
+      grants: { 1: grant(MAIL_GRANT), 2: grant(MAIL_GRANT) },
+      devices: [wantsMail],
+    });
+    const { deps, fetchHeaders } = withMail(s, () => ({ kind: 'backoff', retryAfterMs: null }));
+    const summary = await pollEveNotifications({ ...deps, concurrency: 1 });
+    expect(summary.budgetStopped).toBe(true);
+    expect(fetchHeaders).toHaveBeenCalledTimes(1);
+    expect(s.store.patchMail).not.toHaveBeenCalled();
+  });
+
+  it('a Firestore failure in the mail step costs the Character nothing else', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
+    s.store.patchMail.mockRejectedValueOnce(new Error('boom'));
+    const summary = await pollEveNotifications(withMail(s, () => ok([header(101)])).deps);
+    expect(summary.skipped).toBe(0);
+    expect(s.deps.log).toHaveBeenCalledWith(
+      'Mail alerts failed for a Character',
+      expect.anything()
+    );
+  });
+
+  it('reads the devices once per Character however many reads want them', async () => {
+    const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
+    await pollEveNotifications(withMail(s, () => ok([header(101)])).deps);
+    expect(s.store.devicesFor).toHaveBeenCalledTimes(1);
   });
 });

@@ -220,6 +220,54 @@ describe('Quiet time (issue #4566)', () => {
   });
 });
 
+describe('AlertsWhenClosedSection: mail alerts (ADR 0029)', () => {
+  it('says nothing about mail until the server takes the mail scope', async () => {
+    await turnOn(1);
+    await renderSection();
+    expect(await screen.findByTestId('alerts-state-1')).toHaveTextContent(/^On$/);
+    expect(screen.queryByRole('button', { name: /add mail/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/mail headers/)).not.toBeInTheDocument();
+  });
+
+  it('offers Add mail to a grant without it, says what it will read, and asks for mail only on that press', async () => {
+    await turnOn(1);
+    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [] } });
+    await renderSection();
+    expect(await screen.findByText(/never the message/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Our server holds an encrypted token that reads only notifications.')
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Re-authorize Alpha to add new-mail alerts (reads mail headers only)',
+      })
+    );
+    expect(login.begin).toHaveBeenCalledWith(1, { add: 'mail' });
+  });
+
+  it('a plain Turn on never asks for mail, even once the server takes it', async () => {
+    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [] } });
+    await renderSection();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Turn on alerts when closed for Alpha' })
+    );
+    expect(login.begin).toHaveBeenCalledWith(1);
+  });
+
+  it('shows what a grant with mail reads, and no longer offers Add mail', async () => {
+    await turnOn(1);
+    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [1] } });
+    await db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: [1] } });
+    await renderSection();
+    expect(
+      await screen.findByText(
+        'Our server holds an encrypted token that reads only notifications, location, and mail headers.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add mail/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('AlertsWhenClosedSection: nearby alerts (ADR 0028)', () => {
   it('says nothing about nearby alerts until the server takes the location scope', async () => {
     await turnOn(1);

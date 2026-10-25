@@ -28,6 +28,8 @@ export const SERVER_PUSHED_EVENT_IDS = [
   'communityRequestPledged',
   'priceAlertTriggered',
   'shipLost',
+  // Needs an Alerts Grant that carries the mail scope (issue #5143, ADR 0029).
+  'newMail',
   // Need an Alerts Grant that carries the location (issue #5122, ADR 0028).
   'incursionNearby',
   'skyhookRaidableNearby',
@@ -47,6 +49,13 @@ export const NEARBY_SERVER_EVENT_IDS = [
 
 export function isNearbyServerEvent(eventId: string): boolean {
   return (NEARBY_SERVER_EVENT_IDS as readonly string[]).includes(eventId);
+}
+
+/** The server-pushed events that need the Character's mail (ADR 0029): pushed only under a mail-capable Alerts Grant. */
+export const MAIL_SERVER_EVENT_IDS = ['newMail'] as const satisfies readonly ServerPushedEventId[];
+
+export function isMailServerEvent(eventId: string): boolean {
+  return (MAIL_SERVER_EVENT_IDS as readonly string[]).includes(eventId);
 }
 
 /** Mirrors `functions/src/serverEvents.ts`'s `ServerEventInputs`. */

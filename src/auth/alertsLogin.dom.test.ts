@@ -10,7 +10,7 @@ import {
   scopesForRetry,
   LoginError,
 } from './session';
-import { ALERTS_LOCATION_SCOPE, ALERTS_SCOPE } from './alertsScope';
+import { ALERTS_LOCATION_SCOPE, ALERTS_MAIL_SCOPE, ALERTS_SCOPE } from './alertsScope';
 import { db } from '@/db';
 
 const cfg = { clientId: 'client-abc', redirectUri: 'https://app.example/neocom-desk/callback' };
@@ -69,6 +69,19 @@ describe('startAlertsLogin', () => {
     expect(new URL(url).searchParams.get('scope')?.split(' ').sort()).toEqual(
       [ALERTS_LOCATION_SCOPE, ALERTS_SCOPE].sort()
     );
+  });
+
+  it('adds the mail scope only when asked, keeping the others asked for (ADR 0029)', async () => {
+    const scopes = async (options: { nearby?: boolean; mail?: boolean }) =>
+      new URL(await startAlertsLogin(111, cfg, options)).searchParams
+        .get('scope')
+        ?.split(' ')
+        .sort();
+    expect(await scopes({ mail: true })).toEqual([ALERTS_MAIL_SCOPE, ALERTS_SCOPE].sort());
+    expect(await scopes({ nearby: true, mail: true })).toEqual(
+      [ALERTS_LOCATION_SCOPE, ALERTS_MAIL_SCOPE, ALERTS_SCOPE].sort()
+    );
+    expect(await scopes({})).toEqual([ALERTS_SCOPE]);
   });
 
   it('records which Character the row was for, under that round trip', async () => {

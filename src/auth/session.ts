@@ -12,7 +12,7 @@ import {
   purgeCorpScopedCache,
 } from '@/esi/cachePurge';
 import { revokedScopes } from '@/esi/scopes';
-import { ALERTS_LOCATION_SCOPE, ALERTS_SCOPE } from './alertsScope';
+import { ALERTS_LOCATION_SCOPE, ALERTS_MAIL_SCOPE, ALERTS_SCOPE } from './alertsScope';
 import { CORP_SYNC_SCOPES, FEEDER_SYNC_SCOPES } from './corpSyncScopes';
 
 export interface SsoConfig {
@@ -149,16 +149,23 @@ export function startLogin(scopes: string[], config?: SsoConfig): Promise<string
 
 /**
  * An Alerts Grant round trip for one Character's Settings row: the
- * notifications scope, plus the location for nearby alerts (ADR 0028), marked
- * so the callback never persists it as a login. Leaves `INTENT_KEY` alone — a failed callback must not restart this
+ * notifications scope, plus the location for nearby alerts (ADR 0028) and the
+ * mail for new-mail alerts (ADR 0029) when asked, marked so the callback never
+ * persists it as a login. A re-authorization replaces the grant's token with
+ * exactly what is requested, so the caller names every extra the Character
+ * should keep. Leaves `INTENT_KEY` alone — a failed callback must not restart this
  * as a plain login, which would store the narrow token as the device session.
  */
 export function startAlertsLogin(
   characterId: number,
   config?: SsoConfig,
-  { nearby = false }: { nearby?: boolean } = {}
+  { nearby = false, mail = false }: { nearby?: boolean; mail?: boolean } = {}
 ): Promise<string> {
-  const scopes = nearby ? [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE] : [ALERTS_SCOPE];
+  const scopes = [
+    ALERTS_SCOPE,
+    ...(nearby ? [ALERTS_LOCATION_SCOPE] : []),
+    ...(mail ? [ALERTS_MAIL_SCOPE] : []),
+  ];
   return beginLogin(scopes, config, { kind: 'alerts', characterId });
 }
 

@@ -52,12 +52,19 @@ import {
   type ServerEventInputs as FunctionsServerEventInputs,
 } from '../functions/src/serverEvents';
 import {
+  buildMailPush,
+  mailOccurrenceKey,
+  selectNewMail,
+  type NewMailFire as FunctionsNewMailFire,
+} from '../functions/src/mailPush';
+import {
   NEARBY_EVENT_IDS,
   occurrenceKeyOf as nearbyOccurrenceKey,
   type NearbyFire as FunctionsNearbyFire,
 } from '../functions/src/nearbyAlerts';
 import { occurrenceFiredAt, occurrenceKey } from '@/engine/occurrenceKey';
 import {
+  diffNewMail,
   diffPriceAlertTriggered,
   diffShipLost,
   type PriceAlertEntrySnapshot,
@@ -66,7 +73,10 @@ import {
   SERVER_PUSHED_EVENT_IDS,
   type ServerEventInputs as ClientServerEventInputs,
 } from '@/features/notifications/serverEvents';
-import type { ServerEventFire as ClientServerEventFire } from '@/features/notifications/serverEventPayload';
+import {
+  parseServerEventFire,
+  type ServerEventFire as ClientServerEventFire,
+} from '@/features/notifications/serverEventPayload';
 
 describe('trade hubs', () => {
   it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {
@@ -155,14 +165,14 @@ describe('standing buyback Requests', () => {
 
 describe('server-pushed events (issue #5121)', () => {
   it('the server handles exactly the events the client registers for', () => {
-    expect([...COMMUNITY_EVENT_IDS, ...POLLED_EVENT_IDS, ...NEARBY_EVENT_IDS].sort()).toEqual(
-      [...SERVER_PUSHED_EVENT_IDS].sort()
-    );
+    expect(
+      [...COMMUNITY_EVENT_IDS, ...POLLED_EVENT_IDS, ...NEARBY_EVENT_IDS, 'newMail'].sort()
+    ).toEqual([...SERVER_PUSHED_EVENT_IDS].sort());
   });
 
   it('the server builds the fires the service worker parses', () => {
     expectTypeOf<
-      FunctionsServerEventFire | FunctionsNearbyFire
+      FunctionsServerEventFire | FunctionsNearbyFire | FunctionsNewMailFire
     >().toEqualTypeOf<ClientServerEventFire>();
     expectTypeOf<FunctionsServerEventInputs>().toEqualTypeOf<ClientServerEventInputs>();
   });
@@ -293,4 +303,51 @@ describe('server-pushed nearby alerts (issue #5122)', () => {
       expect(nearbyOccurrenceKey(fire)).toBe(occurrenceKey(fire, 50_000));
     }
   );
+});
+
+describe('server-pushed new mail (issue #5143)', () => {
+  const header = (mailId: number, fromId: number | undefined, sentMs: number) => ({
+    mailId,
+    ...(fromId === undefined ? {} : { fromId }),
+    sentMs,
+    subject: `Subject ${mailId}`,
+  });
+  const headers = [
+    header(120, 900, 1_000),
+    header(110, 7, 2_000),
+    header(105, 901, 3_000),
+    header(90, 902, 4_000),
+    header(130, undefined, 5_000),
+  ];
+
+  it('fires for the same mail ids as diffNewMail: above the mark, never the Character’s own', () => {
+    const snapshot = (entries: typeof headers) => ({
+      entries: entries.map(({ mailId, sentMs, fromId }) => ({
+        mailId,
+        sentMs,
+        ...(fromId === undefined ? {} : { fromId }),
+      })),
+      nowMs: 0,
+    });
+    for (const mark of [0, 90, 105, 119, 130]) {
+      const server = selectNewMail(7, mark, headers).fires;
+      const client = diffNewMail(7, snapshot([header(mark, 1, 0)]), snapshot(headers));
+      expect(server.map((f) => f.mailId).sort()).toEqual(client.map((f) => f.mailId).sort());
+    }
+  });
+
+  it('seeds silently like a missing baseline, at the highest id', () => {
+    const snapshot = { entries: headers.map(({ mailId }) => ({ mailId })), nowMs: 0 };
+    expect(diffNewMail(7, undefined, snapshot)).toEqual([]);
+    expect(selectNewMail(7, null, headers)).toMatchObject({ fires: [], highWaterId: 130 });
+  });
+
+  it('the push is keyed and dated like the Foreground Poller’s row, and carries a fire the worker parses', () => {
+    const [fire] = selectNewMail(7, 100, [header(120, 900, 1_000)]).fires;
+    expect(mailOccurrenceKey(fire)).toBe(occurrenceKey(fire, 50_000));
+    const { data } = buildMailPush(fire, 50_000);
+    expect(data.occurrenceKey).toBe(occurrenceKey(fire, 50_000));
+    expect(Number(data.fireAt)).toBe(occurrenceFiredAt(fire, 50_000));
+    expect(parseServerEventFire('newMail', 7, data.fire)).toEqual(fire);
+  });
 });

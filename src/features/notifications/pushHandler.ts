@@ -64,6 +64,7 @@ import {
   communityJoinRequestText,
   communityMemberJoinedText,
   communityRequestPledgedText,
+  newMailText,
   priceAlertText,
   shipLostText,
   type Translate,
@@ -226,6 +227,12 @@ interface Presented {
   feedKey: string | null;
   /** The row the fire was about, for the click target (a price alert's item). */
   subjectId?: number;
+  /**
+   * The body the feed row keeps when it must differ from the pop-up's. The
+   * Notification Feed syncs to Firestore, so a new mail's sender and subject
+   * appear on the pop-up only (issue #5143, ADR 0029).
+   */
+  feedBody?: string;
 }
 
 const t: Translate = (key, vars) => i18n.t(key, vars);
@@ -256,6 +263,21 @@ async function presentServerFire(
         }),
         feedKey,
       };
+    }
+    // New mail (issue #5143): the pop-up names the sender and subject; the feed row never does.
+    case 'newMail': {
+      const character =
+        (await withinBudget(
+          Promise.resolve(env.characterName?.(fire.characterId)),
+          undefined,
+          NAME_READ_BUDGET_MS
+        )) ?? t('notifications.fired.pushFallback.character');
+      const names = await publicNames(env, fire.fromId === undefined ? [] : [fire.fromId]);
+      const plain = newMailText(t, {}, character);
+      const popup = newMailText(t, fire, character, {
+        sender: fire.fromId === undefined ? undefined : names.get(fire.fromId),
+      });
+      return { ...popup, feedBody: plain.body, feedKey };
     }
     // Nearby alerts (issue #5122): the poller's own wording, with public names.
     case 'incursionNearby': {
@@ -387,7 +409,7 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
 
   // Bounded like the name lookups: a stuck store read must not hold the
   // notification back, because WebKit revokes the subscription on a silent push.
-  const { title, body, feedKey, subjectId } = await withinBudget(
+  const { title, body, feedBody, feedKey, subjectId } = await withinBudget(
     present(env, payload, now),
     genericPresented(payload),
     PRESENT_BUDGET_MS
@@ -419,7 +441,7 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
           characterId: payload.characterId,
           eventId: payload.eventId,
           title,
-          body,
+          body: feedBody ?? body,
           // Never in the future, should the server's clock run ahead of this device's.
           firedAt: payload.fireAt === undefined ? now : Math.min(payload.fireAt, now),
           // So this device's Foreground Poller does not toast it a second time.
