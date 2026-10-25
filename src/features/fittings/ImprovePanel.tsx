@@ -441,6 +441,15 @@ export function ImprovePanel({
     }
   }
 
+  /** The goal's figure now → after the single best swap; null when there is no result or the goal has no figure. */
+  function bestFoundLine(result: ImproveResult, own: FittingStats): ReactNode {
+    const best = [...result.noDownside, ...result.tradeOffs].reduce<ImproveOption | null>(
+      (top, option) => (top === null || option.score > top.score ? option : top),
+      null
+    );
+    return best === null ? null : leadLine(best, own);
+  }
+
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
     const nextReplaced = new Map(replaced);
@@ -571,6 +580,7 @@ export function ImprovePanel({
     );
   }
 
+  const bestFound = state.status === 'done' ? bestFoundLine(state.result, state.before) : null;
   const chosen = useMemo(() => [...ticked.values()], [ticked]);
 
   // The rows were each scored alone: one recalculation of the ticked set checks them together.
@@ -1055,6 +1065,12 @@ export function ImprovePanel({
           </div>
         ) : (
           <div className="space-y-4">
+            {bestFound && (
+              <p className="text-sm" data-testid="improve-best-found">
+                <span className="text-text-dim">{t('fittings.improve.bestFound')} </span>
+                <span className="font-medium">{bestFound}</span>
+              </p>
+            )}
             {state.result.stopped && (
               <p className="text-text-dim text-xs">
                 {t('fittings.improve.partial', { checked: state.result.checked })}
