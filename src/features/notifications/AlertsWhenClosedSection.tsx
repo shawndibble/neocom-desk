@@ -273,14 +273,16 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
               {t('settings.notifications.alertsWhenClosed.hint')}
             </p>
             <QuietTimeRows />
-            <p className="text-xs text-text">
-              {summaryNeeds.characters === 0
-                ? enabled.length > 0 && t('settings.notifications.alertsWhenClosed.needsNone')
-                : t('settings.notifications.alertsWhenClosed.needsLine', {
-                    count: summaryNeeds.characters,
-                    list: list(summaryNeeds.permissions.map(permissionLabel)),
-                  })}
-            </p>
+            {(summaryNeeds.characters > 0 || enabled.length > 0) && (
+              <p className="text-xs text-text">
+                {summaryNeeds.characters === 0
+                  ? t('settings.notifications.alertsWhenClosed.needsNone')
+                  : t('settings.notifications.alertsWhenClosed.needsLine', {
+                      count: summaryNeeds.characters,
+                      list: list(summaryNeeds.permissions.map(permissionLabel)),
+                    })}
+              </p>
+            )}
             {summaryNeeds.characters > 0 && (
               <NeedsConnection>
                 <Button

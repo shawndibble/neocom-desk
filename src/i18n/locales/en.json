@@ -13232,6 +13232,7 @@
         "server-rejected": "The server turned down this device's background alert setup, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work.",
         "unknown": "Background alert setup failed, so device pop-ups may not arrive while Neocom is closed. Alerts inside the app still work."
       },
+      "pushFailedAt": "Last tried at {{time}}.",
       "pushRetryButton": "Retry",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",

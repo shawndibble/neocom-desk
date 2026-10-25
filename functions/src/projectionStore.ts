@@ -248,7 +248,7 @@ export async function writeDeviceRegistration(
   // A listed field left out is deleted, as a plain `set` would; an unlisted one
   // is kept. `mergeFields` does not do the deleting itself: a listed field
   // missing from the data throws ("Input data is missing for field …"), so
-  // each one is written as an explicit delete — the marker always, here.
+  // each one is written as an explicit delete (the marker included).
   for (const field of REGISTRATION_FIELDS) {
     if (!(field in registration)) registration[field] = FieldValue.delete();
   }
