@@ -404,6 +404,8 @@ function FittingsPage() {
     targetProfiles,
     isPhone,
     edit,
+    characterId: activeCharacterId,
+    openMakeItFit: makeItFit.open,
   });
   const overlay = useOverlayFitting({
     characterId: activeCharacterId,

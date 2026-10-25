@@ -6,7 +6,7 @@
  * No downside and Trade-offs, never ranked against each other. Ticked rows
  * are applied together as one unsaved edit.
  */
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,6 +36,7 @@ import {
   type ImproveResult,
   type RejectedOption,
 } from '@/engine/fittings/improve';
+import type { Resource } from '@/engine/fittings/makeItFit';
 import type { FittingStats } from '@/engine/fittings/types';
 import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -86,9 +87,22 @@ interface Props {
   catalogue: FittingCatalogue | null;
   onApply: (options: ImproveOption[]) => void;
   settings: ImproveSettings;
+  /** Opens Make it fit on that budget, from "Fix this first". */
+  onFixFirst: (resource: Resource) => void;
+  /** Train and Implants, which cost the fit nothing and sit above the swaps; none for an over-budget fit. */
+  freeSections?: ReactNode;
 }
 
-export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, settings }: Props) {
+export function ImprovePanel({
+  goal,
+  onGoalChange,
+  search,
+  catalogue,
+  onApply,
+  settings,
+  onFixFirst,
+  freeSections,
+}: Props) {
   const { t } = useTranslation();
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -205,6 +219,26 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, s
   }
 
   const chosen = [...ticked.values()];
+
+  // A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`).
+  if (state.status === 'overBudget')
+    return (
+      <MakeItFitSection heading={t('fittings.improve.section.fixFirst')}>
+        <p className="text-sm">{t('fittings.improve.fixFirst')}</p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          {state.resources.map((resource) => (
+            <button
+              key={resource}
+              type="button"
+              className={textActionClassName()}
+              onClick={() => onFixFirst(resource)}
+            >
+              {t(`fittings.makeItFit.fix.${resource}`)}
+            </button>
+          ))}
+        </div>
+      </MakeItFitSection>
+    );
 
   return (
     <div className="space-y-4">
@@ -354,6 +388,8 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, s
       {state.status === 'failed' && (
         <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
       )}
+
+      {freeSections}
 
       {state.status === 'done' && state.sides && (
         <p className="text-sm" data-testid="improve-sides">

@@ -22,7 +22,9 @@ import {
   type ImproveResult,
   type ModulePool,
 } from '@/engine/fittings/improve';
+import { overBudgetResources } from '@/engine/fittings/improveFree';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { FittingStats } from '@/engine/fittings/types';
 import { buildVariationIndex } from '@/engine/market/variations';
@@ -88,6 +90,8 @@ export type ImproveState =
   | { status: 'idle' }
   | { status: 'searching'; checked: number; total: number; slow: boolean }
   | { status: 'cancelled' }
+  /** The fit is over a budget: Improve hands over to Make it fit and searches nothing. */
+  | { status: 'overBudget'; resources: Resource[] }
   | { status: 'failed' }
   | {
       status: 'done';
@@ -209,6 +213,12 @@ export function useImprove(
         const { before: own } = await variants.compare(variants.fitting, controller.signal);
         if (cancelled) return;
         setBefore(own);
+        // A fit that doesn't fit has nothing to improve yet (`20261019-144736`).
+        const over = overBudgetResources(own);
+        if (over.length > 0) {
+          setState({ status: 'overBudget', resources: over });
+          return;
+        }
         // A remembered goal this fit cannot score (Longer reach on a drone boat) searches Best overall.
         const searched = goalAvailability(goal, own).available ? goal : 'overall';
         // A tank goal under Shield or Armor runs both sides, the chosen one first, to compare them.
