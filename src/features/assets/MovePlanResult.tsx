@@ -420,7 +420,7 @@ export function PlanResult({
         <Button variant="ghost" onClick={onBack}>
           {t('assets.movePlan.back')}
         </Button>
-        {onShowRoute && active && destinationSystem !== null && (
+        {onShowRoute && (active || totals.shipsToFly > 0) && destinationSystem !== null && (
           <Button loading={routing} onClick={onShowRoute}>
             {t('assets.movePlan.showRoute')}
           </Button>

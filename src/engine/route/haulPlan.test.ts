@@ -168,6 +168,60 @@ describe('planHaul', () => {
     expect(plan.sections[0].legs[0].jumps).toBeNull();
   });
 
+  describe('flown ships', () => {
+    const ship = (locationId: number, systemId: number | null, ships: string[]) => ({
+      ...pickup(locationId, systemId, 0),
+      ships,
+    });
+
+    it('routes a ships-only move: take the ship at its pickup, fly it to the destination', () => {
+      const plan = run([character([ship(10, P1, ['Rifter'])])], 0);
+      const legs = plan.sections[0]?.legs ?? [];
+      expect(legs.map((l) => [l.kind, l.to.name, l.jumps, l.ships])).toEqual([
+        ['pickup', 'Pickup 10', 1, ['Rifter']],
+        ['delivery', 'Dest Station', 3, ['Rifter']],
+      ]);
+      expect(plan.sections[0]?.trips).toBe(1);
+      expect(plan.flown).toEqual([]);
+      expect(plan.leftOut).toEqual([]);
+    });
+
+    it('flies each ship as a trip of its own, nearest pickup first from where the last one landed', () => {
+      const plan = run(
+        [character([ship(20, P3, ['Merlin']), ship(10, P1, ['Rifter', 'Punisher'])])],
+        0
+      );
+      const legs = plan.sections[0]?.legs ?? [];
+      expect(legs.map((l) => [l.trip, l.kind, l.ships?.[0]])).toEqual([
+        [1, 'pickup', 'Rifter'],
+        [1, 'delivery', 'Rifter'],
+        [2, 'pickup', 'Merlin'],
+        [2, 'delivery', 'Merlin'],
+        [3, 'pickup', 'Punisher'],
+        [3, 'delivery', 'Punisher'],
+      ]);
+      expect(plan.sections[0]?.trips).toBe(3);
+    });
+
+    it('flies after the cargo trips, from the destination', () => {
+      const plan = run([character([pickup(10, P1, 50), ship(20, P2, ['Rifter'])])]);
+      const legs = plan.sections[0]?.legs ?? [];
+      expect(legs.map((l) => [l.kind, l.ships ?? null])).toEqual([
+        ['pickup', null],
+        ['delivery', null],
+        ['pickup', ['Rifter']],
+        ['delivery', ['Rifter']],
+      ]);
+      expect(legs[2]?.from?.name).toBe('Dest Station');
+    });
+
+    it('keeps a ship at a place with no solar system as a note', () => {
+      const plan = run([character([ship(10, null, ['Rifter'])])], 0);
+      expect(plan.sections).toEqual([]);
+      expect(plan.flown).toEqual([{ characterId: 1, name: 'Pilot', ships: ['Rifter'] }]);
+    });
+  });
+
   it('carries the flown-ship notes through', () => {
     const plan = run([character([pickup(10, P1, 10)], { flown: ['Rifter'] })]);
     expect(plan.flown).toEqual([{ characterId: 1, name: 'Pilot', ships: ['Rifter'] }]);

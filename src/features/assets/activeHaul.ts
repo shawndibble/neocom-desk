@@ -55,6 +55,8 @@ function isLeg(leg: Record<string, unknown>): boolean {
   const to = leg.to as Record<string, unknown> | null;
   return (
     (leg.stacks === undefined || (Array.isArray(leg.stacks) && leg.stacks.every(isStack))) &&
+    (leg.ships === undefined ||
+      (Array.isArray(leg.ships) && leg.ships.every((s) => typeof s === 'string'))) &&
     typeof leg.id === 'number' &&
     typeof leg.m3 === 'number' &&
     (leg.kind === 'pickup' || leg.kind === 'delivery') &&
@@ -156,13 +158,14 @@ export interface BuildHaulArgs {
 
 /**
  * Works the Haul route out for a plan under the saved Jump Basis, from each
- * Character's Current System. `null` when the plan has no hauler to plan with
- * or the stargate snapshot cannot be read.
+ * Character's Current System. A plan with no hauler (ships only, or nothing
+ * any hull could carry) still routes its flights. `null` when the plan has
+ * nothing to route or the stargate snapshot cannot be read.
  */
 export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul | null> {
   const { plan, destination, places, systems, stationIds, name } = args;
   const active = plan.active;
-  if (!active) return null;
+  if (!active && plan.totals.shipsToFly === 0) return null;
   const basis = await loadJumpBasis();
   const characters: HaulCharacterInput[] = await Promise.all(
     plan.perCharacter.map(async (c) => {
@@ -173,7 +176,7 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
           ? null
           : { systemId, stationId: null, name: entry?.name ?? String(systemId) };
       const hauled = (locationId: number) =>
-        active.pickups.find((h) => h.characterId === c.characterId && h.locationId === locationId);
+        active?.pickups.find((h) => h.characterId === c.characterId && h.locationId === locationId);
       const pickups: HaulPickupInput[] = c.pickups.map((p) => ({
         locationId: p.locationId,
         systemId: systems.get(p.locationId) ?? null,
@@ -181,16 +184,18 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
         name: places.get(p.locationId) ?? String(p.locationId),
         m3: carriableM3(plan, c.characterId, p.locationId, p.totalM3),
         stacks: carriableStacks(plan, c.characterId, p.locationId, p.lines, name),
+        ships: [
+          ...p.ships.map((s) => name(s.typeId)),
+          ...(hauled(p.locationId)?.tooBigShips.flatMap((s) =>
+            Array<string>(s.quantity).fill(name(s.typeId))
+          ) ?? []),
+        ],
       }));
-      const flown = c.pickups.flatMap((p) => [
-        ...p.ships.map((s) => name(s.typeId)),
-        ...(hauled(p.locationId)?.tooBigShips.map((s) => name(s.typeId)) ?? []),
-      ]);
-      return { characterId: c.characterId, name: c.name, start, pickups, flown };
+      return { characterId: c.characterId, name: c.name, start, pickups, flown: [] };
     })
   );
   const result = await planLocalHaul(
-    { characters, capacityM3: active.hull.capacityM3, destination },
+    { characters, capacityM3: active?.hull.capacityM3 ?? 0, destination },
     basis.rules,
     basis.network
   );
@@ -198,7 +203,7 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
   return {
     id: newId(),
     createdAt: Date.now(),
-    capacityM3: active.hull.capacityM3,
+    capacityM3: active?.hull.capacityM3 ?? 0,
     destination,
     plan: result.plan,
   };
