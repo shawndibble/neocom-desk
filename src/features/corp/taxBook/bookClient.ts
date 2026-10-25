@@ -47,6 +47,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
 import { callRouted } from '@/sync/routedCallable';
+import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
 /** `verifyCorpOfficerCallable`'s answer. */
@@ -604,12 +605,17 @@ export async function turnOnBook(
   startRatePct: number
 ): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'turnOnCorpTaxBookCallable', {
-    corporationId,
-    accessToken,
-    startDate,
-    startRatePct,
-  });
+  try {
+    await call(characterId, 'turnOnCorpTaxBookCallable', {
+      corporationId,
+      accessToken,
+      startDate,
+      startRatePct,
+    });
+  } finally {
+    // Also on a throw: the server may have written the book before the call failed.
+    await clearNotFound(`corps/${corporationId}`);
+  }
 }
 
 /**
