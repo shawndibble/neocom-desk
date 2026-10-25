@@ -654,6 +654,9 @@ here — they go one per file in `docs/context/decisions/`.
   Distinct from the **Acquisition Verdict** — a product can be cheaper to
   build than buy while still losing ISK if resold, since selling fees only
   apply to the sale, not the build-vs-buy comparison.
+  Priced at the hub's lowest sell (a listed sell order); "Profit if sold now"
+  in Costs & revenue states the same sale into the highest buy order instead,
+  sales tax only.
 - **Scheduled Push**: Delivery of a Notification Event from a timestamp the app already knew in advance, pushed by the backend rather than discovered by a poller. Where diff-based detection answers "what changed since last time", a Scheduled Push answers "what becomes true at 14:32 on Thursday".
 - **Scope Group**: A named set of OAuth scopes granted or declined as one unit, called a **Permission** wherever the user sees it. Every scope outside the **Core Grant** belongs to exactly one group.
 - **Seeded Build Plan**: A **Build Plan** opened from a BPC Sourcing **Offer**, a blueprint line in a BPC contract's contents, or a **Contract Search** item row, at that copy's own ME, TE and runs instead of the usual defaults. Named for the copy it quotes ("Rifter 10/20 ×5"); a Character can hold a plain plan and several seeded plans for one blueprint.

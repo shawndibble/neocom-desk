@@ -41,6 +41,7 @@ import {
 import { craftScope } from '@/engine/industry/craftScope';
 import { planOwnedStockSale, type LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import { profitOnBasis, type ProfitBasis } from '@/engine/industry/profitBasis';
+import { productSellNow } from '@/engine/industry/productSellNow';
 import { securityBand } from '@/engine/securityStatus';
 import type { FacilityKind, MaterialPriceBasis, RigKind } from '@/engine/industry/types';
 import { rigKindLabelKey } from './rigFitLabels';
@@ -1146,6 +1147,19 @@ export function BuildPlanDetail({
         corpStanding: standing?.corpStanding,
       })
     : null;
+  // The product sold into buy orders instead, on the hero's basis so it reads
+  // against the Profit row above it (issue #5007).
+  const sellNow =
+    result && snapshot && entry.productTypeID !== null && productQuantity !== null
+      ? productSellNow({
+          productTypeID: entry.productTypeID,
+          productQuantity,
+          hubBuyPrices: snapshot.hubBuyPrices,
+          skills: modifiers.skills,
+          totalCost: result.totalCost,
+          forgone: heroBasis === 'sellValue' && ownedForSale ? ownedForSale.net : 0,
+        })
+      : undefined;
   const cheapest = cheaperSystems[0];
   const currentIndex = snapshot?.systemCostIndex ?? null;
   const cheaperNearbyLine =
@@ -1679,6 +1693,7 @@ export function BuildPlanDetail({
               heroBasis === 'sellValue' && ownedForSale
                 ? { forgone: ownedForSale.net, breakEvenPrice: heroFigures.breakEvenPrice }
                 : null,
+            sellNow,
           }}
           breakdownOpen={breakdownOpen}
           onBreakdownOpenChange={setBreakdownOpen}
@@ -2019,6 +2034,7 @@ export function BuildPlanDetail({
               onSaleBasisChange={setSaleBasis}
               profitBasis={heroBasis}
               profit={heroFigures?.profit ?? null}
+              sellNow={sellNow}
               cheaperNearby={cheaperNearbyLine}
               hubName={hub.systemName}
               planSeconds={planSeconds}
