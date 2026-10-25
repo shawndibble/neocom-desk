@@ -36,7 +36,7 @@ import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
-import { gainMetrics, roleChanges, type GainMetric, type RoleChange } from './skillGains';
+import { gainMetrics, roleChanges, type RoleChange } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
 import { diffFittingStats, type StatChange } from './variationDelta';
@@ -147,14 +147,12 @@ export interface ImproveOption {
   iskDelta: number | null;
   /** Refitting changes a rig: the old one is destroyed when removed. */
   destroysRigs: boolean;
-  /** The scored stats it worsens; empty with `lost` empty is No downside. */
-  downsides: GainMetric[];
   /** Every stat it makes worse, before and after, so "Gives up" names the size; empty is No downside. */
   lost: LostStat[];
 }
 
 /** A stat a swap makes worse: a stats-panel change, or a weapon-reach and mining one. */
-export type LostStat = StatChange | RoleChange;
+export type LostStat = { kind: 'stat'; change: StatChange } | { kind: 'role'; change: RoleChange };
 
 /** A fit this full of CPU, powergrid or calibration has no room left, so using more is a cost. */
 const TIGHT_BUDGET = 0.9;
@@ -181,12 +179,15 @@ export function lostStats(before: FittingStats, after: FittingStats): LostStat[]
   const shown = diffFittingStats(before, after).changes.filter((change) => {
     if (changeVerdict(change) !== 'worse') return false;
     const total = BUDGET_USED[change.key as keyof typeof BUDGET_USED];
-    return total === undefined || change.after > after[total] * TIGHT_BUDGET;
+    return total === undefined || (after[total] > 0 && change.after > after[total] * TIGHT_BUDGET);
   });
   const roles = roleChanges(before, after).filter(
     (change) => LOST_ROLE_KEYS.has(change.key) && changeVerdict(change) === 'worse'
   );
-  return [...shown, ...roles];
+  return [
+    ...shown.map((change): LostStat => ({ kind: 'stat', change })),
+    ...roles.map((change): LostStat => ({ kind: 'role', change })),
+  ];
 }
 
 export interface RejectedOption extends ImproveOption {
@@ -214,20 +215,6 @@ const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
 
 /** A change smaller than this (a fraction) is rounding, not a gain or a loss. */
 const EPSILON = 1e-4;
-
-/** The stats a swap can give up, as What to train scores them. */
-const DOWNSIDE_METRICS: readonly GainMetric[] = [
-  'dps',
-  'ehp',
-  'activeTank',
-  'speed',
-  'align',
-  'capacitor',
-  'lockRange',
-  'optimal',
-  'falloff',
-  'tracking',
-];
 
 export type GoalAvailability =
   | { available: true }
@@ -684,8 +671,7 @@ export interface FindImprovementsParams {
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
 const PAIR_SEEDS = 5;
 
-const isNoDownside = (option: ImproveOption) =>
-  option.downsides.length === 0 && option.lost.length === 0;
+const isNoDownside = (option: ImproveOption) => option.lost.length === 0;
 
 /** Null when cancelled. */
 export async function findImprovements({
@@ -717,7 +703,6 @@ export async function findImprovements({
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
-    const metrics = gainMetrics(before, after);
     const option: ImproveOption = {
       candidate,
       fitting: swapped,
@@ -726,11 +711,6 @@ export async function findImprovements({
       iskDelta,
       destroysRigs,
       lost: lostStats(before, after),
-      downsides: [
-        ...DOWNSIDE_METRICS.filter((metric) => metrics[metric] < -EPSILON),
-        // A goal that does not score mining must still name a weaker miner.
-        ...(goal !== 'mining' && metrics.miningYield < -EPSILON ? (['miningYield'] as const) : []),
-      ],
     };
     const overSpend =
       spendCap !== null &&

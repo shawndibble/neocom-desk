@@ -1396,7 +1396,6 @@
       "swap_one": "{{from}} → {{to}}",
       "swap_other": "{{count}}× {{from}} → {{to}}",
       "givesUp": "Gives up:",
-      "lostRole": "{{stat}} {{before}} → {{after}}",
       "noPrice": "No price",
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {

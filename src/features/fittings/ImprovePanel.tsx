@@ -59,11 +59,7 @@ import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
-import {
-  diffFittingStats,
-  STAT_DIGITS,
-  type StatChange as StatChangeValue,
-} from '@/engine/fittings/variationDelta';
+import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MakeItFitSection } from './MakeItFitSection';
@@ -224,16 +220,15 @@ export function ImprovePanel({
 
   /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
   function lostLine(option: ImproveOption): ReactNode {
-    return option.lost.flatMap((stat, i): ReactNode[] => {
+    return option.lost.flatMap(({ kind, change }, i): ReactNode[] => {
       const node =
-        stat.key in STAT_DIGITS ? (
-          <StatChange key={stat.key} change={stat as StatChangeValue} />
+        kind === 'stat' ? (
+          <StatChange key={change.key} change={change} />
         ) : (
-          <span key={stat.key}>
-            {t('fittings.improve.lostRole', {
-              stat: t(`fittings.whatToTrain.sort.${stat.key}`),
-              before: stat.before,
-              after: stat.after,
+          <span key={change.key}>
+            {t(`fittings.whatToTrain.role.${change.key}`, {
+              before: change.before,
+              after: change.after,
             })}
           </span>
         );

@@ -28,7 +28,6 @@ function option(
     score: 0.1,
     iskDelta: 1000,
     destroysRigs: false,
-    downsides: [],
     lost: [],
     ...extra,
   } as ImproveOption;
@@ -172,8 +171,7 @@ describe('ImprovePanel', () => {
       21,
       { ehp: 1200 },
       {
-        downsides: ['speed'],
-        lost: [{ key: 'maxVelocity', before: 300, after: 250 }],
+        lost: [{ kind: 'stat', change: { key: 'maxVelocity', before: 300, after: 250 } }],
       }
     );
     const onApply = vi.fn();

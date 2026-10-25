@@ -117,7 +117,7 @@ describe('findImprovements goals', () => {
     const result = await search('overall', table, [candidate(1, 2), candidate(1, 3)]);
     expect(toIds([...result.noDownside, ...result.tradeOffs])).toContain(2);
     expect(result.tradeOffs[0].candidate.toTypeId).toBe(2);
-    expect(result.tradeOffs[0].downsides).toContain('speed');
+    expect(result.tradeOffs[0].lost.map((l) => l.change.key)).toContain('maxVelocity');
   });
 
   it('a swap that raises signature radius lands in Trade-offs with its size', async () => {
@@ -126,15 +126,15 @@ describe('findImprovements goals', () => {
     expect(result.noDownside).toEqual([]);
     const lost = result.tradeOffs[0].lost;
     expect(lost).toHaveLength(1);
-    expect(lost[0]).toMatchObject({ key: 'signatureRadius' });
-    expect(lost[0].after - lost[0].before).toBe(10);
+    expect(lost[0].change).toMatchObject({ key: 'signatureRadius' });
+    expect(lost[0].change.after - lost[0].change.before).toBe(10);
   });
 
   it('a longer capacitor recharge is a downside', async () => {
     const table = { 1: {}, 2: { ehp: 100, recharge: 28000 } };
     const result = await search('tank', table, [candidate(1, 2)]);
     expect(result.noDownside).toEqual([]);
-    expect(result.tradeOffs[0].lost.map((l) => l.key)).toEqual(['capacitorRechargeTime']);
+    expect(result.tradeOffs[0].lost.map((l) => l.change.key)).toEqual(['capacitorRechargeTime']);
   });
 
   it('a swap that gains nothing on the goal is listed under no goal but Cheaper', async () => {
