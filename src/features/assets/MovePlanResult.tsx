@@ -1,8 +1,8 @@
 import { formatCount } from '@/lib/formatCount';
-import { useId, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Modal } from '@/components/ui';
+import { Button, Checkbox, Eyebrow, Modal } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   CUSTOM_HAULER_TYPE_ID,
@@ -127,7 +127,6 @@ export function PlanResult({
   };
   const { plan, destinationSystem, destinationStation } = state;
   const systemName = useSystemName(destinationSystem);
-  const flyingHeadingId = useId();
   if (plan.perCharacter.length === 0) {
     return (
       <div className="flex flex-col gap-3">
@@ -276,16 +275,11 @@ export function PlanResult({
       )}
       {flown.length > 0 && (
         <section
-          aria-labelledby={flyingHeadingId}
+          aria-label={t('assets.movePlan.flyingHeading')}
           className="rounded-xs border border-line bg-panel-2"
         >
           <div className="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">
-            <h3
-              id={flyingHeadingId}
-              className="m-0 text-xs font-semibold tracking-wide text-text-dim uppercase"
-            >
-              {t('assets.movePlan.flyingHeading')}
-            </h3>
+            <Eyebrow as="h3">{t('assets.movePlan.flyingHeading')}</Eyebrow>
             <span className="text-xs text-text-dim tabular-nums">
               {t('assets.movePlan.shipFlightCount', { count: flown.length })}
             </span>

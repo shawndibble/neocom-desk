@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FieldError, TextInput } from '@/components/ui';
+import { eyebrowClassName, FieldError, TextInput } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 
 const COMMIT_DELAY_MS = 500;
@@ -44,13 +45,14 @@ export function MaxIskInput({ value, onChange }: MaxIskInputProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <label title={t('assets.movePlan.maxIskHint')} className="flex flex-wrap items-center gap-2">
-        <span className="text-xs tracking-wide text-text-dim uppercase">
-          {t('assets.movePlan.maxIskLabel')}
+      <label className="flex flex-wrap items-center gap-2">
+        <span className={eyebrowClassName}>
+          <HintText content={t('assets.movePlan.maxIskHint')}>
+            {t('assets.movePlan.maxIskLabel')}
+          </HintText>
         </span>
         <TextInput
           size="sm"
-          aria-label={t('assets.movePlan.maxIskAria')}
           inputMode="decimal"
           className="w-40 font-mono tabular-nums"
           placeholder={t('assets.movePlan.maxIskPlaceholder')}

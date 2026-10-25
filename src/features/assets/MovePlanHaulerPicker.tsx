@@ -1,6 +1,13 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FieldError, Radio, SegmentedControl, TextInput } from '@/components/ui';
+import {
+  eyebrowClassName,
+  Eyebrow,
+  FieldError,
+  Radio,
+  SegmentedControl,
+  TextInput,
+} from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { cx } from '@/lib/cx';
 import {
@@ -104,9 +111,7 @@ export function HaulerPicker({
       className="rounded-xs border border-line bg-panel-2"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <span className="text-xs font-semibold tracking-wide text-text-dim uppercase">
-          {t('assets.movePlan.haulerLabel')}
-        </span>
+        <Eyebrow as="h3">{t('assets.movePlan.haulerLabel')}</Eyebrow>
         {anyOwned && onOwnedFirstChange && (
           <SegmentedControl
             size="sm"
@@ -120,16 +125,12 @@ export function HaulerPicker({
           />
         )}
       </div>
-      <ul
-        role="radiogroup"
-        aria-label={t('assets.movePlan.haulerLabel')}
-        className="m-0 list-none p-0"
-      >
+      <div role="radiogroup" aria-label={t('assets.movePlan.haulerLabel')}>
         {visible.map((o) => {
           const id = String(o.hull.typeId);
           const trips = tripsOf(o);
           return (
-            <li key={id} className="border-b border-line last:border-b-0">
+            <div key={id} className="border-b border-line last:border-b-0">
               <label
                 className={cx(
                   ROW_COLUMNS,
@@ -176,10 +177,10 @@ export function HaulerPicker({
                   <OwnedMark t={t} hull={o.hull} />
                 </span>
               </label>
-            </li>
+            </div>
           );
         })}
-        <li className="border-t border-line">
+        <div className="border-t border-line">
           <label
             className={cx(
               'flex min-h-9 cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-panel',
@@ -220,14 +221,14 @@ export function HaulerPicker({
               )}
             </div>
           )}
-        </li>
-      </ul>
+        </div>
+      </div>
       {onToggleExpanded && (hidden > 0 || expanded) && ordered.length > INLINE_ROWS && (
         <button
           type="button"
           aria-expanded={expanded}
           onClick={onToggleExpanded}
-          className="w-full border-t border-line px-3 py-2 text-xs font-semibold tracking-wide text-text-dim uppercase hover:text-text"
+          className={cx(eyebrowClassName, 'w-full border-t border-line px-3 py-2 hover:text-text')}
         >
           {expanded
             ? t('assets.movePlan.showFewerHaulers')

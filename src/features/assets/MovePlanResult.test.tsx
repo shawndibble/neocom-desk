@@ -668,7 +668,7 @@ describe('PlanResult', () => {
 
     it('shows the input beside the hauler picker', () => {
       show(limited({}), null);
-      expect(screen.getByRole('textbox', { name: /max isk per haul/i })).toBeTruthy();
+      expect(screen.getByRole('textbox', { name: /cap per haul/i })).toBeTruthy();
     });
 
     it('names the unpriced stacks only once a limit is set', () => {

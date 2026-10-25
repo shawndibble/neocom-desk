@@ -763,7 +763,12 @@ function MovePlanTabBody({
     .filter(Boolean)
     .join(' + ');
 
-  const planView = !!result && !failed && !(showingHaul && savedHaul) && !!loaded;
+  const planView =
+    !!result &&
+    result.plan.perCharacter.length > 0 &&
+    !failed &&
+    !(showingHaul && savedHaul) &&
+    !!loaded;
 
   return (
     <section
