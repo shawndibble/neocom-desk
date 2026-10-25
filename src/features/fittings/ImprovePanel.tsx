@@ -23,6 +23,7 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
+import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { commandOf } from '@/engine/fittings/improveCommand';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
@@ -115,6 +116,10 @@ interface Props {
   settings: ImproveSettings;
   /** Opens Make it fit on that budget, from "Fix this first". */
   onFixFirst: (resource: Resource) => void;
+  /** Weapons holding no charge, which damage goals can't score; null or absent: none. */
+  unloaded?: UnloadedWeapons | null;
+  /** Loads the best charge into each empty weapon group; absent when none can be loaded. */
+  onLoadBestCharge?: () => void;
   /** Train and Implants, which cost the fit nothing and sit above the swaps; none for an over-budget fit. */
   freeSections?: ReactNode;
 }
@@ -127,6 +132,8 @@ export function ImprovePanel({
   onApply,
   settings,
   onFixFirst,
+  unloaded,
+  onLoadBestCharge,
   freeSections,
 }: Props) {
   const { t } = useTranslation();
@@ -503,6 +510,19 @@ export function ImprovePanel({
           </Collapse>
         </div>
       </div>
+
+      {unloaded && (
+        <div className="space-y-2">
+          <p role="status" className="text-warning text-sm">
+            {t(`fittings.improve.unloaded.${unloaded.kind}`, { count: unloaded.count })}
+          </p>
+          {onLoadBestCharge && (
+            <Button size="sm" onClick={onLoadBestCharge}>
+              {t('fittings.improve.loadBestCharge')}
+            </Button>
+          )}
+        </div>
+      )}
 
       {state.status === 'searching' && (
         <div className="space-y-2">

@@ -213,7 +213,9 @@ export const remoteRepairOf = (s: FittingStats) => {
   return shield + armor + hull;
 };
 const canAlign = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility) > 0;
+/** Fitted guns and launchers, loaded or not: an empty one is the unloaded-weapons notice's to explain. */
 const hasShipWeapons = (s: FittingStats) =>
+  s.offense.chargelessWeaponCount > 0 ||
   s.applied.weapons.some((w) => w.kind === 'turret' || w.kind === 'missile');
 
 /** Whether the fit can score `goal`, and why not: the drawer shows a disabled chip with the reason. */

@@ -405,6 +405,9 @@ function FittingsPage() {
     isPhone,
     edit,
     characterId: activeCharacterId,
+    charges,
+    context,
+    moduleResults,
     openMakeItFit: makeItFit.open,
   });
   const overlay = useOverlayFitting({

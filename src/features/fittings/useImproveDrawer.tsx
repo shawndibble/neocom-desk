@@ -7,7 +7,11 @@ import {
   type ImproveOption,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
-import type { Fitting } from '@/engine/fittings/types';
+import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
+import type { Fitting, FittingModuleResult } from '@/engine/fittings/types';
+import type { FittingContext } from './fittingContext';
+import { useChargeChoices } from './useChargeChoices';
+import type { ChargeLoading } from './useChargeLoading';
 import { ImproveImplants } from './ImproveImplants';
 import { ImprovePanel } from './ImprovePanel';
 import { ImproveTrain } from './ImproveTrain';
@@ -26,7 +30,7 @@ import {
 import type { FittingWorkspace } from './useFittingWorkspace';
 
 const moduleKey = (f: Fitting) =>
-  f.modules.map((m) => `${m.slot}${m.slotIndex}:${m.typeId}`).join();
+  f.modules.map((m) => `${m.slot}${m.slotIndex}:${m.typeId}:${m.chargeTypeId ?? ''}`).join();
 const sameModules = (a: Fitting, b: Fitting) => a === b || moduleKey(a) === moduleKey(b);
 
 interface UseImproveDrawerArgs {
@@ -39,6 +43,11 @@ interface UseImproveDrawerArgs {
   edit: FittingWorkspace['edit'];
   /** The active Character, for Train; null shows no Train section. */
   characterId: number | null;
+  /** Loads charges, for "Load best charge". */
+  charges: ChargeLoading;
+  /** The Fitting's calculation, for the Charge Picker's figures; null while it loads. */
+  context: FittingContext | null;
+  moduleResults: FittingModuleResult[] | null;
   /** Opens Make it fit on a budget, for "Fix this first". */
   openMakeItFit: (resource: FitResource) => void;
 }
@@ -56,6 +65,9 @@ export function useImproveDrawer({
   isPhone,
   edit,
   characterId,
+  charges,
+  context,
+  moduleResults,
   openMakeItFit,
 }: UseImproveDrawerArgs): { open: () => void; drawer: ReactNode } {
   const { t } = useTranslation();
@@ -98,6 +110,30 @@ export function useImproveDrawer({
     { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold }
   );
 
+  // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
+  const { groups: chargeGroups } = useChargeChoices({
+    fitting: isOpen ? fitting : null,
+    context,
+    moduleResults,
+  });
+  const unloaded = fitting && chargeGroups ? unloadedWeapons(fitting, chargeGroups) : null;
+  const chargeSteps = fitting && chargeGroups ? loadBestCharges(fitting, chargeGroups) : [];
+
+  function loadBestCharge() {
+    if (!fitting) return;
+    const applied = charges.loadSteps(chargeSteps);
+    if (applied === null) return;
+    setUndo({
+      before: fitting,
+      applied,
+      message: t('fittings.improve.chargesLoaded', {
+        // Cargo can run out before every empty weapon is loaded.
+        count: applied.modules.filter((m, i) => m.chargeTypeId !== fitting.modules[i]?.chargeTypeId)
+          .length,
+      }),
+    });
+  }
+
   function apply(options: ImproveOption[]) {
     if (!fitting) return;
     // One edit for every ticked row, so Back undoes them together.
@@ -120,6 +156,8 @@ export function useImproveDrawer({
       search={search}
       catalogue={catalogue}
       onApply={apply}
+      unloaded={unloaded}
+      onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
       onFixFirst={(resource) => {
         setIsOpen(false);
         openMakeItFit(resource);

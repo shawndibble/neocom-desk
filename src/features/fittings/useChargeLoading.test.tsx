@@ -83,6 +83,29 @@ describe('useChargeLoading', () => {
     expect(result.current.message).toBe('Loaded Scourge Heavy Missile into 2 modules.');
   });
 
+  it('loadSteps loads every step in one edit and returns the Fitting it made', () => {
+    const { result, edit, after } = setup();
+    let made: Fitting | null = null;
+    act(() => {
+      made = result.current.loadSteps([
+        { chargeTypeId: HEAVY, fromCargo: false, at: [{ slot: 'high', slotIndex: 0 }] },
+        { chargeTypeId: HEAVY, fromCargo: true, at: [{ slot: 'high', slotIndex: 1 }] },
+      ]);
+    });
+    expect(edit).toHaveBeenCalledTimes(1);
+    expect(made).toBe(after());
+    expect(after().modules.map((m) => m.chargeTypeId)).toEqual([HEAVY, HEAVY, undefined]);
+  });
+
+  it('loadSteps returns null when nothing changed', () => {
+    const { result } = setup();
+    let made: Fitting | null = fitting;
+    act(() => {
+      made = result.current.loadSteps([]);
+    });
+    expect(made).toBeNull();
+  });
+
   it('says how many modules it loaded, and how many already held the charge', () => {
     const holding: Fitting = {
       ...fitting,
