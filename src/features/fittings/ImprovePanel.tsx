@@ -697,11 +697,21 @@ export function ImprovePanel({
   };
   // Role-relevant goals lead as chips; the rest, and any the fit cannot score, sit under "More goals".
   const roleGoals: readonly ImproveGoal[] = role === 'combat' ? COMBAT_GOALS : roleUnlocks(role);
+  // The picked goal stays a chip so the pick is visible, unless the fit cannot score it: that one sits with its reason.
   const isRelevant = (id: ImproveGoal) =>
-    id === goal ||
-    (availabilityOf(id).available && (roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id)));
+    availabilityOf(id).available &&
+    (id === goal || roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id));
   const relevantGoals = IMPROVE_GOALS.filter(isRelevant);
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
+  const settingsSummary = [
+    t(`fittings.improve.reach.${settings.reach}`),
+    t(`fittings.improve.mode.${settings.mode}`),
+    settings.spendCap === null
+      ? t('fittings.improve.summaryNoCap')
+      : t(`fittings.improve.summaryCap.${settings.mode}`, {
+          cap: formatIskCompact(settings.spendCap),
+        }),
+  ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
     if (goal === id) return;
     setTicked(new Map());
@@ -815,7 +825,10 @@ export function ImprovePanel({
           onClick={() => setSettingsOpen((open) => !open)}
         >
           <span>{t('fittings.improve.settingsLabel')}</span>
-          <Caret expanded={settingsOpen} />
+          <span className="text-text-dim flex items-center gap-1 normal-case tracking-normal">
+            {settingsSummary}
+            <Caret expanded={settingsOpen} />
+          </span>
         </button>
         <Collapse open={settingsOpen} id={settingsId} className="pt-2">
           <div className="space-y-3">
