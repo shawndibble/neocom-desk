@@ -225,3 +225,40 @@ describe('eve type upload (issue #3755)', () => {
     expect(uploadProjection.mock.calls[0][1].get(CHAR.characterId)).toEqual([]);
   });
 });
+
+describe('server-pushed events upload (issue #5121)', () => {
+  it('uploads each Character’s browser-enabled server events, sorted, with their inputs', async () => {
+    const serverInputsFor = vi.fn(async (_characterId: number, events: readonly string[]) =>
+      events.includes('shipLost') ? { shipLostMinimumIsk: 5 } : {}
+    );
+    const { deps: d, uploadProjection } = deps({
+      // communityMemberJoined and communityRequestPledged default browser-off.
+      eventPrefsFor: async () => ({ priceAlertTriggered: { browser: false, feed: true } }),
+      serverInputsFor,
+    });
+    await rebuildProjection(d);
+    expect(uploadProjection.mock.calls[0][2]?.get(CHAR.characterId)).toEqual({
+      serverEvents: ['communityJoinRequest', 'shipLost'],
+      serverInputs: { shipLostMinimumIsk: 5 },
+    });
+    expect(serverInputsFor).toHaveBeenCalledWith(CHAR.characterId, [
+      'communityJoinRequest',
+      'shipLost',
+    ]);
+  });
+
+  it('uploads an empty list when the device cannot show a pop-up', async () => {
+    for (const override of [
+      { masterEnabled: async () => false },
+      { browserChannelEnabled: async () => false },
+      { permission: () => 'denied' as const },
+    ]) {
+      const { deps: d, uploadProjection } = deps(override);
+      await rebuildProjection(d);
+      expect(uploadProjection.mock.calls[0][2]?.get(CHAR.characterId)).toEqual({
+        serverEvents: [],
+        serverInputs: {},
+      });
+    }
+  });
+});

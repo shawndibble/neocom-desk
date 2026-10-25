@@ -10,6 +10,7 @@ import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -47,6 +48,14 @@ import {
   purgeFiredProjections,
   writeDeviceRegistration,
 } from './projectionStore.js';
+import { pollServerEvents } from './serverEventPoll.js';
+import { fetchFuzzworkPrices, fetchZkillLosses } from './serverEventSources.js';
+import {
+  listPolledDevices,
+  onCommunityChildCreated,
+  onPledgeCreated,
+  saveServerBaselines,
+} from './serverEventStore.js';
 import {
   parseBookCall,
   parseClaimPaymentInput,
@@ -317,8 +326,14 @@ alertsAction('registerDevice', async (request) => {
     );
   }
 
-  const { registration, rejected, projections, eveTypesByCharacter } =
-    await buildDeviceRegistration(input, verifyOptions, logError);
+  const {
+    registration,
+    rejected,
+    projections,
+    eveTypesByCharacter,
+    serverEventsByCharacter,
+    serverInputsByCharacter,
+  } = await buildDeviceRegistration(input, verifyOptions, logError);
 
   if (registration.characterIds.length === 0) {
     throw new HttpsError('unauthenticated', 'No character access token could be verified');
@@ -330,6 +345,8 @@ alertsAction('registerDevice', async (request) => {
     characterIds: registration.characterIds,
     projections,
     eveTypesByCharacter,
+    serverEventsByCharacter,
+    serverInputsByCharacter,
     quietHours: input.quietHours,
   });
 
@@ -415,10 +432,85 @@ export const alertsCall = onCall<unknown>(
  * (ADR 0010). This function only decides *when* to fire what it was handed,
  * and pushes each row only to the device that uploaded it (issue #2240) —
  * see projectionStore.ts.
+ *
+ * The same tick polls the server-pushed price alerts and ship losses (issue
+ * #5121, ADR 0027): public Fuzzwork and zKillboard reads, still no EVE token, rather than a scheduled job of its own.
  */
-export const dispatchProjections = onSchedule('every 15 minutes', async () => {
-  await dispatchDueProjections(firestore(), getMessaging(), Date.now(), logError);
-});
+export const dispatchProjections = onSchedule(
+  // The server-pushed events' zKillboard reads are paced (serverEventPoll.ts),
+  // so the tick can outlast the default minute; the projections finish first.
+  { schedule: 'every 15 minutes', timeoutSeconds: 540, maxInstances: 1 },
+  async () => {
+    const db = firestore();
+    const messaging = getMessaging();
+    // Independent halves: one failing must not stop the other.
+    const [projected, polled] = await Promise.allSettled([
+      dispatchDueProjections(db, messaging, Date.now(), logError),
+      // Price alerts and ship losses for a closed app (issue #5121): public data,
+      // no EVE token, pushed to the devices that enabled them.
+      pollServerEvents({
+        listDevices: () => listPolledDevices(db),
+        fetchLosses: (characterId) => fetchZkillLosses(characterId),
+        fetchPrices: (stationId, typeIds) => fetchFuzzworkPrices(stationId, typeIds),
+        send: async (token, data) => {
+          await messaging.send({ token, data });
+        },
+        saveBaselines: (deviceId, baselines) => saveServerBaselines(db, deviceId, baselines),
+        deleteDevice: async (deviceId) => {
+          await db.collection('deviceRegistrations').doc(deviceId).delete();
+        },
+        log: (message, data) => logWarn(message, data),
+        now: () => Date.now(),
+      }),
+    ]);
+    if (projected.status === 'rejected')
+      logError('Scheduled Push dispatch failed', { error: String(projected.reason) });
+    if (polled.status === 'rejected')
+      logError('Server event poll failed', { error: String(polled.reason) });
+    else logInfo('Server event poll finished', { ...polled.value });
+  }
+);
+
+/**
+ * Community alerts for a closed app (issue #5121): a join request or a new
+ * Member, pushed to the admin's devices the moment the backend writes it. One
+ * trigger for every doc made directly under a Community; anything but the
+ * waiting list and the roster returns at once (communityPush.ts decides).
+ */
+export const pushCommunityAlert = onDocumentCreated(
+  'communities/{communityId}/{collection}/{docId}',
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const { communityId, collection, docId } = event.params;
+    await onCommunityChildCreated(
+      firestore(),
+      getMessaging(),
+      { communityId, collection, docId },
+      data,
+      Date.now(),
+      logWarn
+    );
+  }
+);
+
+/** A Pledge on a Request (issue #5121): pushed to the requester's devices when it is written. */
+export const pushCommunityPledge = onDocumentCreated(
+  'communities/{communityId}/itemRequests/{requestId}/pledges/{pledgerUid}',
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const { communityId, requestId, pledgerUid } = event.params;
+    await onPledgeCreated(
+      firestore(),
+      getMessaging(),
+      { communityId, requestId, pledgerUid },
+      data,
+      Date.now(),
+      logWarn
+    );
+  }
+);
 
 /**
  * pollEveNotifications (issue #3756, ADR 0020): every 15 minutes, reads each

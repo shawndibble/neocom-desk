@@ -28,6 +28,7 @@ import {
 } from './dispatchProjections.js';
 import type { CharacterProjection } from './registerDevice.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
+import { polledEventsOf, trimBaseline, type ServerEventInputs } from './serverEvents.js';
 
 export const PROJECTIONS_COLLECTION = 'projections';
 export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
@@ -70,6 +71,25 @@ export interface DeviceRegistrationWrite {
    * keeps what the registration already stores; `null` clears it.
    */
   quietHours?: QuietHours | null;
+  /**
+   * Verified Characters' server-pushed event ids and inputs from this device
+   * (issue #5121). A Character absent from either map (an older client) keeps
+   * what this device stored for it, the `eveTypesByCharacter` rule.
+   */
+  serverEventsByCharacter?: Record<number, string[]>;
+  serverInputsByCharacter?: Record<number, ServerEventInputs>;
+}
+
+/** The registration doc's map fields, keyed by characterId as a string. */
+export const SERVER_EVENTS_FIELD = 'serverEventsByCharacter';
+export const SERVER_INPUTS_FIELD = 'serverInputsByCharacter';
+/** The polled events' last readings per Character, written by the dispatch tick (`serverEventPoll.ts`). */
+export const SERVER_BASELINES_FIELD = 'serverEventBaselines';
+/** Which polled events any Character on the device enabled, for the tick's one query. */
+export const POLLED_EVENTS_FIELD = 'polledServerEvents';
+
+function mapField<T>(raw: unknown): Record<string, T> {
+  return typeof raw === 'object' && raw !== null ? (raw as Record<string, T>) : {};
 }
 
 type Doc = QueryDocumentSnapshot;
@@ -126,6 +146,22 @@ export async function writeDeviceRegistration(
   // below rebuilds the doc, so an omitted field is a deleted one).
   const quietHours =
     write.quietHours === undefined ? readQuietHours(previous?.quietHours) : write.quietHours;
+  const previousServerEvents = mapField<string[]>(previous?.[SERVER_EVENTS_FIELD]);
+  const previousServerInputs = mapField<ServerEventInputs>(previous?.[SERVER_INPUTS_FIELD]);
+  const previousBaselines = mapField<unknown>(previous?.[SERVER_BASELINES_FIELD]);
+  const serverEventsByCharacter = Object.fromEntries(
+    write.characterIds.map((id) => [
+      String(id),
+      write.serverEventsByCharacter?.[id] ?? previousServerEvents[String(id)] ?? [],
+    ])
+  );
+  const keep = <T>(byId: Record<string, T>, fresh?: Record<number, T>): Record<string, T> =>
+    Object.fromEntries(
+      write.characterIds.flatMap((id) => {
+        const value = fresh?.[id] ?? byId[String(id)];
+        return value === undefined ? [] : [[String(id), value]];
+      })
+    );
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
   // Once per Character per device: on the device's first per-device upload,
   // and again for any Character it adds later, which may still carry another
@@ -168,6 +204,18 @@ export async function writeDeviceRegistration(
       ])
     ),
     ...(quietHours ? { quietHours } : {}),
+    [SERVER_EVENTS_FIELD]: serverEventsByCharacter,
+    [SERVER_INPUTS_FIELD]: keep(previousServerInputs, write.serverInputsByCharacter),
+    // The tick's readings for Characters still held, for events still enabled: a
+    // re-registration must not reset them, or the next tick would seed silently
+    // and miss a crossing.
+    [SERVER_BASELINES_FIELD]: Object.fromEntries(
+      Object.entries(keep(previousBaselines)).map(([id, baseline]) => [
+        id,
+        trimBaseline(baseline, serverEventsByCharacter[id] ?? []),
+      ])
+    ),
+    [POLLED_EVENTS_FIELD]: polledEventsOf(serverEventsByCharacter),
     updatedAt: FieldValue.serverTimestamp(),
   });
 

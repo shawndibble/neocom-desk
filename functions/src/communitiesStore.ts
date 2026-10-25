@@ -5,7 +5,7 @@
 //
 // Layout (see firestore.rules):
 //   communities/{id}                              name, adminUid, inviteCode, memberCount, createdAt
-//   communities/{id}/members/{uid}                ownerHash, characterName, joinedAt (+ client-written pushedAt/libraryHash/chunkCount)
+//   communities/{id}/members/{uid}                ownerHash, characterName, joinedAt, admittedFrom? (+ client-written pushedAt/libraryHash/chunkCount)
 //   communities/{id}/members/{uid}/library/{n}    chunk of Shared Blueprints, written by the Member
 //   communities/{id}/fittings/{uid~key}           one shared Fitting (issue #3605), written by the Member
 //   characters/{uid}/communities/{id}             the Character's membership index
@@ -39,6 +39,7 @@ import {
 } from './communityRequests.js';
 
 import { FLEET_PAYOUTS_COLLECTION } from './communityFleetPayouts.js';
+import { ADMITTED_FROM_REQUEST } from './communityPush.js';
 
 const LIBRARY_COLLECTION = 'library';
 const REQUESTS_COLLECTION = 'requests';
@@ -287,13 +288,16 @@ function admit(
   db: Firestore,
   community: FirebaseFirestore.DocumentReference,
   uid: string,
-  who: { ownerHash: string; characterName: string }
+  who: { ownerHash: string; characterName: string },
+  admittedFrom?: typeof ADMITTED_FROM_REQUEST
 ): void {
   const now = Date.now();
   tx.set(memberRef(db, community.id, uid), {
     ownerHash: who.ownerHash,
     characterName: who.characterName,
     joinedAt: now,
+    // The Member-joined push skips a Member the admin let in themselves (issue #5121).
+    ...(admittedFrom ? { admittedFrom } : {}),
   });
   tx.set(indexCollection(db, uid).doc(community.id), {
     ownerHash: who.ownerHash,
@@ -361,10 +365,17 @@ export async function decideJoinRequest(
       return;
     }
     if (decision !== 'ok') fail(decision);
-    admit(tx, db, community.ref, requestUid, {
-      ownerHash: String(stillWaiting.get('ownerHash')),
-      characterName: String(stillWaiting.get('characterName') ?? ''),
-    });
+    admit(
+      tx,
+      db,
+      community.ref,
+      requestUid,
+      {
+        ownerHash: String(stillWaiting.get('ownerHash')),
+        characterName: String(stillWaiting.get('characterName') ?? ''),
+      },
+      ADMITTED_FROM_REQUEST
+    );
     tx.delete(request);
   });
 }

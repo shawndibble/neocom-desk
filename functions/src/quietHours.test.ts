@@ -109,6 +109,16 @@ describe('suppressPush', () => {
     );
     expect(suppressPush(night, { ...quiet, allowAttacks: true }, 'SkillFinished')).toBe(true);
   });
+
+  it('a ship loss counts as a loss: it passes when attacks are let through (issue #5121)', () => {
+    expect(suppressPush(night, quiet, undefined, 'shipLost')).toBe(true);
+    expect(suppressPush(night, { ...quiet, allowAttacks: true }, undefined, 'shipLost')).toBe(
+      false
+    );
+    expect(
+      suppressPush(night, { ...quiet, allowAttacks: true }, undefined, 'priceAlertTriggered')
+    ).toBe(true);
+  });
 });
 
 describe('isAttackType', () => {

@@ -112,6 +112,46 @@ describe('parseRegisterDeviceInput', () => {
     ).toThrow(/eveTypes/);
   });
 
+  describe('server-pushed events (issue #5121)', () => {
+    const character = { characterId: 1, accessToken: 'a', projectionRows: [] };
+
+    it('parses serverEvents sorted and de-duplicated, and serverInputs', () => {
+      const input = parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [
+          {
+            ...character,
+            serverEvents: ['shipLost', 'priceAlertTriggered', 'shipLost'],
+            serverInputs: { shipLostMinimumIsk: 5 },
+          },
+        ],
+      });
+      expect(input.characters[0].serverEvents).toEqual(['priceAlertTriggered', 'shipLost']);
+      expect(input.characters[0].serverInputs).toEqual({ shipLostMinimumIsk: 5 });
+    });
+
+    it('leaves both absent for an older client', () => {
+      const input = parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [character],
+      });
+      expect(input.characters[0].serverEvents).toBeUndefined();
+      expect(input.characters[0].serverInputs).toBeUndefined();
+    });
+
+    it('rejects a malformed list', () => {
+      expect(() =>
+        parseRegisterDeviceInput({
+          deviceId: 'device-1',
+          fcmToken: 'fcm-token',
+          characters: [{ ...character, serverEvents: 'shipLost' }],
+        })
+      ).toThrow(/serverEvents/);
+    });
+  });
+
   it('accepts the client fallback deviceId shape (base36 time + random)', () => {
     expect(
       parseRegisterDeviceInput({
@@ -332,6 +372,38 @@ describe('buildDeviceRegistration', () => {
     const result = await buildDeviceRegistration(input, opts);
 
     expect(result.eveTypesByCharacter).toEqual({ 1: ['StructureDestroyed'] });
+  });
+
+  it('keys each verified character’s server events and inputs, omitting rejected and absent ones', async () => {
+    verifyMock.mockImplementation(async (token) => {
+      if (token === 'token-2') throw new Error('expired');
+      return {
+        characterId: token === 'token-1' ? 1 : 3,
+        ownerHash: 'hash',
+        name: 'P',
+        scopes: [],
+        clientId: 'c',
+      };
+    });
+
+    const result = await buildDeviceRegistration(
+      {
+        ...input,
+        characters: [
+          {
+            ...input.characters[0],
+            serverEvents: ['shipLost'],
+            serverInputs: { shipLostMinimumIsk: 1 },
+          },
+          { ...input.characters[1], serverEvents: ['shipLost'] },
+          { characterId: 3, accessToken: 'token-3', projectionRows: [] },
+        ],
+      },
+      opts
+    );
+
+    expect(result.serverEventsByCharacter).toEqual({ 1: ['shipLost'] });
+    expect(result.serverInputsByCharacter).toEqual({ 1: { shipLostMinimumIsk: 1 } });
   });
 
   it('drops a character whose access token fails verification, keeping the rest', async () => {

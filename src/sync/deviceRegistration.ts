@@ -24,6 +24,7 @@ import { callRouted } from './routedCallable';
 import { getDeviceId } from './deviceId';
 import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { QuietHoursPayload } from '@/features/notifications/quietTime';
+import type { ServerEventRegistration } from '@/features/notifications/serverEvents';
 
 interface RegisterDeviceResponse {
   deviceId: string;
@@ -36,6 +37,7 @@ interface RegisterDeviceResponse {
 /** No Projection to upload for a Character this call doesn't mention. */
 const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
 const NO_EVE_TYPES: readonly string[] = [];
+const NO_SERVER_EVENTS: ServerEventRegistration = { serverEvents: [], serverInputs: {} };
 
 /**
  * How long an unchanged registration is trusted before the poll re-sends it
@@ -111,6 +113,7 @@ function registrationFingerprint(
   characterIds: readonly number[],
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>,
   eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+  serverEventsByCharacter: ReadonlyMap<number, ServerEventRegistration>,
   quietHours: QuietHoursPayload | null
 ): string {
   const characters = [...characterIds]
@@ -130,6 +133,7 @@ function registrationFingerprint(
           row.eveType ?? null,
         ]),
       [...(eveTypesByCharacter.get(characterId) ?? NO_EVE_TYPES)].sort(),
+      serverEventsByCharacter.get(characterId) ?? NO_SERVER_EVENTS,
     ]);
   return digest(JSON.stringify([getDeviceId(), fcmToken, characters, quietHours]));
 }
@@ -164,6 +168,14 @@ export interface RegisterDeviceOptions {
    * deployed function ignores the field.
    */
   quietHours?: QuietHoursPayload | null;
+  /**
+   * Each Character's server-pushed events and their inputs (issue #5121): sent
+   * as `serverEvents` / `serverInputs` beside `eveTypes`, replacing this
+   * device's previous ones. A Character with no entry uploads empty ones. Part
+   * of the fingerprint. A function deployed before #5121 ignores both fields
+   * (its parser reads only the keys it knows), so the upload is safe either way.
+   */
+  serverEventsByCharacter?: ReadonlyMap<number, ServerEventRegistration>;
 }
 
 /**
@@ -187,6 +199,7 @@ export async function registerDeviceForWebPush(
   {
     skipIfUnchanged = false,
     eveTypesByCharacter = new Map(),
+    serverEventsByCharacter = new Map(),
     quietHours = null,
   }: RegisterDeviceOptions = {}
 ): Promise<RegisterDeviceResponse | null> {
@@ -211,6 +224,7 @@ export async function registerDeviceForWebPush(
     characters.map((character) => character.characterId),
     projectionsByCharacter,
     eveTypesByCharacter,
+    serverEventsByCharacter,
     quietHours
   );
   const now = Date.now();
@@ -245,6 +259,8 @@ export async function registerDeviceForWebPush(
       accessToken: string;
       projectionRows: readonly ProjectionRow[];
       eveTypes: readonly string[];
+      serverEvents: readonly string[];
+      serverInputs: ServerEventRegistration['serverInputs'];
     }[];
     quietHours: QuietHoursPayload | null;
   };
@@ -268,6 +284,7 @@ export async function registerDeviceForWebPush(
           ...character,
           projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
           eveTypes: eveTypesByCharacter.get(character.characterId) ?? NO_EVE_TYPES,
+          ...(serverEventsByCharacter.get(character.characterId) ?? NO_SERVER_EVENTS),
         })),
       },
       // Each Character is proven by its own access token in the payload: no session.
