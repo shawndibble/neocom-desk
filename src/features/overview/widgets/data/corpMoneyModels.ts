@@ -166,6 +166,7 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   const ready = notReady(feeds.corpWallet, t);
   if ('view' in ready) return ready.view;
   const { data } = ready;
+  // Copy under the retired kind's name on purpose (now the corp wallet's Flow): renaming would churn copy and tests.
   const K = `${W}.corpCashFlow`;
   const base = blank(TO, statusOf(feeds.corpWallet));
 
@@ -267,7 +268,10 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
 
 // --- Income by source -------------------------------------------------------------
 
-/** The common corp income types have their own words; any other is the raw type, de-snaked. */
+/**
+ * The common corp income types have their own words; any other is the raw type, de-snaked.
+ * Under `corpIncome` on purpose: the retired kind's name, kept to avoid churning copy.
+ */
 function sourceLabel(t: Translate, refType: string): string {
   return t(`${W}.corpIncome.refType.${refType}`, { defaultValue: humanizeRefType(refType) });
 }
@@ -276,6 +280,7 @@ export const corpIncome: Builder = (feeds, { t, now, range }) => {
   const ready = notReady(feeds.corpWallet, t);
   if ('view' in ready) return ready.view;
   const { data } = ready;
+  // Copy under the retired kind's name on purpose (now the corp wallet's Sources): renaming would churn copy and tests.
   const K = `${W}.corpIncome`;
 
   if (data.journal === null) {

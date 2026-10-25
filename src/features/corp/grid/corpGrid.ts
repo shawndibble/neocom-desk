@@ -38,7 +38,7 @@ import { seqId } from '@/features/overview/widgets/roles';
  * roles would, once edited and saved, drop the Director main's widgets on
  * every device.
  */
-export const CORP_DEFAULT_KINDS: readonly WidgetSeed[] = [
+export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
   'corpDeadlines',
   'structures',
   'moonChunks',
@@ -54,7 +54,7 @@ export const CORP_DEFAULT_KINDS: readonly WidgetSeed[] = [
 
 export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
   const widgets: Widget[] = [];
-  for (const seed of CORP_DEFAULT_KINDS) {
+  for (const seed of CORP_DEFAULT_SEEDS) {
     if (!isAddable(seedKind(seed)) || widgets.length >= MAX_WIDGETS) continue;
     const widget = seedWidget(seed, makeId());
     if (widget) widgets.push(widget);

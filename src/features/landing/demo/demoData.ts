@@ -25,6 +25,7 @@ import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import { blank, statusOf } from '@/features/overview/widgets/data/builderKit';
 import { buildView } from '@/features/overview/widgets/data/models';
+import { settingsContext } from '@/features/overview/widgets/data/viewSettings';
 import { wobble } from '@/features/overview/samplePilot';
 import { ordersStateChart, ordersTable } from '@/features/overview/widgets/data/ordersModels';
 import type { Feeds, FeedState, KindView, Translate } from '@/features/overview/widgets/data/types';
@@ -341,7 +342,8 @@ export function buildDemoViews(t: TFunction, now: number): ReadonlyMap<string, K
             activeCharacterId: null,
             scopeAll: false,
             notTrainingAlert: false,
-            range: widget.range ?? 30,
+            // The widget's own settings, resolved as the real board resolves them (Range, Show, ...).
+            ...settingsContext(widget.kind, widget),
           })
     );
   }

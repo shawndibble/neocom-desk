@@ -44,7 +44,7 @@ export function seqId(prefix: string): MakeId {
   return () => `${prefix}${++n}`;
 }
 
-function fromKinds(seeds: readonly WidgetSeed[], makeId: MakeId): OverviewLayout {
+function fromSeeds(seeds: readonly WidgetSeed[], makeId: MakeId): OverviewLayout {
   const widgets: Widget[] = [];
   const seen = new Set<string>();
   for (const seed of seeds) {
@@ -66,12 +66,12 @@ export function buildLayoutFromRoles(
 ): OverviewLayout {
   const kinds: WidgetSeed[] = [...BASE_KINDS];
   for (const role of roles) kinds.push(...(ROLES[role] ?? []));
-  return fromKinds(kinds, makeId);
+  return fromSeeds(kinds, makeId);
 }
 
 /** "Just the basics". */
 export function basicsLayout(makeId: MakeId = seqId('r')): OverviewLayout {
-  return fromKinds(BASE_KINDS, makeId);
+  return fromSeeds(BASE_KINDS, makeId);
 }
 
 /**
@@ -95,5 +95,5 @@ const DEFAULT_BOARD: readonly WidgetKindId[] = [
 ];
 
 export function defaultLayout(makeId: MakeId = seqId('d')): OverviewLayout {
-  return fromKinds(DEFAULT_BOARD, makeId);
+  return fromSeeds(DEFAULT_BOARD, makeId);
 }

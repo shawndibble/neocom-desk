@@ -230,7 +230,7 @@ Header & alerts
 
 Widgets (catalogue)
 - [ ] E23 Existing 13 cards exist as Widget Kinds (orders, miningTax, contracts, planetary, industry, comingUp, spExtraction→sp, mail, priceAlerts→priceWatch, incursions, stock, structures, moonChunks) plus training and wallet.
-- [ ] E24 New kinds from recent work where the data already exists in the app (netWorth, profit, miningYield, survey, routeSafety, hauling, lp, clones, walletFlow, location, kills, jumpTimers).
+- [ ] E24 New kinds from recent work where the data already exists in the app (netWorth, profit, miningYield, survey, routeSafety, hauling, lp, clones, walletFlow (since folded into wallet's Flow Show), location, kills, jumpTimers).
 - [ ] E25 Honest charts per §8; hidden text summaries.
 
 Persistence

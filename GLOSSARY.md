@@ -758,10 +758,7 @@ here — they go one per file in `docs/context/decisions/`.
   needs and, for a corp kind, the Corp Capabilities that open it. Corp-only ids
   are prefixed `corp`; Structures and Moon extractions are on both boards. A
   kind not built yet is "coming soon": listed in the **Gallery**, not addable.
-- **Widget Show**: A per-**Widget** setting on a kind that answers more than
-  one question from one feed: what the widget draws. The Wallet shows Balance
-  or Flow; the Corp wallet shows Divisions, Flow or Sources; Structures shows
-  All structures or Problems only. On the wallet kinds a Show other than the
-  first names the widget (Wallet flow, Cash flow, Income by source).
+- **Widget Show**: A per-**Widget** setting that picks what a kind draws from
+  its one feed, e.g. the Wallet on Balance or on Flow.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.

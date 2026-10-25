@@ -172,7 +172,10 @@ function directionCell(text: string, value: number, tone: 'good' | 'bad'): Table
   return value > 0 ? { text, tone } : text;
 }
 
-/** Per ref type: net, what came in, what went out, and its share of all the ISK that moved. */
+/**
+ * Per ref type: net, what came in, what went out, and its share of all the ISK that moved.
+ * The copy is under `walletFlow`, the retired kind's name, on purpose (now the Wallet's Flow).
+ */
 export function flowTable(t: Translate, rows: readonly RefTypeBreakdownRow[]): TableModel {
   const moved = rows.reduce((sum, row) => sum + row.income + row.expense, 0);
   return {

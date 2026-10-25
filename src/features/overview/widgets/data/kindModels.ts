@@ -68,7 +68,11 @@ export function humanizeRefType(refType: string): string {
 
 // --- Wallet, Show Flow ------------------------------------------------------------
 
-/** The wallet kind's Flow (once its own Wallet flow kind): net, net bars and a table by ref type. */
+/**
+ * The wallet kind's Flow: net, net bars and a table by ref type. It and its copy
+ * (`chart.walletFlow`, `walletFlow`) keep the retired Wallet flow kind's name on
+ * purpose, so renaming churns no copy or tests.
+ */
 export const walletFlow: Builder = (feeds, { t, now, range }) => {
   const feed = feeds.journal;
   const data = feed?.data ?? null;

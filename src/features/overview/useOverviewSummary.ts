@@ -46,6 +46,7 @@ export function useOverviewSummary(widgets: readonly Widget[]) {
   const breakdown = fetchBreakdown(
     shown.map((widget) => ({
       kind: widget.kind,
+      show: widget.show,
       view: views.get(viewKey(requestOf(widget))) ?? EMPTY_READ,
     }))
   );

@@ -90,7 +90,7 @@ export interface WidgetKindDef {
   /** Shows that read no time window, so Range does not apply to them. */
   rangelessShows: readonly WidgetShow[];
   /** A Show other than the default names the widget (Wallet flow, Cash flow); else it keeps the kind's title. */
-  showsNameWidget: boolean;
+  hasNamedShows: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -556,7 +556,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   hasProfitSource: s.profitSource === true,
   shows: s.shows ?? [],
   rangelessShows: s.rangelessShows ?? [],
-  showsNameWidget: s.namedShows === true,
+  hasNamedShows: s.namedShows === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',
@@ -568,9 +568,17 @@ export function getKind(id: WidgetKindId): WidgetKindDef | undefined {
   return BY_ID.get(id);
 }
 
+const isShowOf = (kind: WidgetKindDef, value: unknown): value is WidgetShow =>
+  kind.shows.some((show) => show === value);
+
 /** The Show a widget draws: its stored one when the kind offers it, else the default; none for a kind without. */
 export function showOf(kind: WidgetKindDef, stored: unknown): WidgetShow | undefined {
-  return kind.shows.includes(stored as WidgetShow) ? (stored as WidgetShow) : kind.shows[0];
+  return isShowOf(kind, stored) ? stored : kind.shows[0];
+}
+
+/** What a widget stores for `value`: a Show the kind offers other than its default, else nothing. */
+export function storedShow(kind: WidgetKindDef, value: unknown): WidgetShow | undefined {
+  return isShowOf(kind, value) && value !== kind.shows[0] ? value : undefined;
 }
 
 /** Whether the widget's Range changes what it draws: the kind reads a window and so does its Show. */
@@ -585,7 +593,7 @@ export function widgetKeys(
   stored: unknown
 ): { titleKey: string; emptyMessageKey: string } {
   const show = showOf(kind, stored);
-  if (show === undefined || show === kind.shows[0] || !kind.showsNameWidget) {
+  if (show === undefined || show === kind.shows[0] || !kind.hasNamedShows) {
     return { titleKey: kind.titleKey, emptyMessageKey: kind.emptyMessageKey };
   }
   // Spelled out, not a prefix variable plus ".title": a template ending in a bare segment pins every

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import { getKind } from '@/features/overview/widgets/kinds';
 import { seedKind } from '@/features/overview/widgets/layout';
-import { CORP_DEFAULT_KINDS, corpDefaultLayout, corpWidgetBoard } from './corpGrid';
+import { CORP_DEFAULT_SEEDS, corpDefaultLayout, corpWidgetBoard } from './corpGrid';
 
-const DEFAULT_KINDS = CORP_DEFAULT_KINDS.map(seedKind);
+const DEFAULT_KINDS = CORP_DEFAULT_SEEDS.map(seedKind);
 
 const ALL: CorpCapabilities = {
   canReadWallet: true,
@@ -37,7 +37,7 @@ const drawnFor = (caps: CorpCapabilities) => {
 describe('the Corp Board default layout', () => {
   it('opens with the clocks first, then money, then people, like the board it replaces', () => {
     expect(corpDefaultLayout().widgets.map((w) => w.kind)).toEqual(DEFAULT_KINDS);
-    expect(CORP_DEFAULT_KINDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
+    expect(CORP_DEFAULT_SEEDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
   });
 
   it('holds every default kind whatever the Character reads, so a saved edit keeps the rest', () => {

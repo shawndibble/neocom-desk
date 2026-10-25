@@ -15,6 +15,7 @@ import { isRowsPerPage, DEFAULT_ROWS_PER_PAGE, type RowsPerPage } from './tableS
 import {
   getKind,
   isAddable,
+  storedShow,
   type WidgetKindId,
   type WidgetShow,
   type WidgetSize,
@@ -148,7 +149,8 @@ export function newWidget(kind: WidgetKindId, id: string, show?: WidgetShow): Wi
   };
   if (def.hasRange) widget.range = DEFAULT_RANGE;
   if (def.hasProfitSource) widget.profitSource = DEFAULT_PROFIT_SOURCE;
-  if (show && show !== def.shows[0] && def.shows.includes(show)) widget.show = show;
+  const stored = storedShow(def, show);
+  if (stored) widget.show = stored;
   return widget;
 }
 
@@ -346,14 +348,16 @@ export function setRaidsWhere(
 /** Stored only when it differs from the default. The view and range stay: every Show offers the kind's views. */
 export function setShow(layout: OverviewLayout, id: string, show: WidgetShow): OverviewLayout {
   return update(layout, id, (w) => {
-    const shows = getKind(w.kind)?.shows ?? [];
-    if (!shows.includes(show) || show === (w.show ?? shows[0])) return null;
-    if (show === shows[0]) {
+    const def = getKind(w.kind);
+    if (!def?.shows.includes(show)) return null;
+    const next = storedShow(def, show);
+    if (next === storedShow(def, w.show)) return null;
+    if (!next) {
       const { show: _dropped, ...rest } = w;
       void _dropped;
       return rest;
     }
-    return { ...w, show };
+    return { ...w, show: next };
   });
 }
 

@@ -35,6 +35,8 @@ export function stalestFetch(views: readonly Pick<KindView, 'fetchedAt' | 'fromC
 
 export interface FetchRow {
   kind: string;
+  /** The first such widget's Show, so the row reads as its header does (Wallet flow). */
+  show?: string;
   fetchedAt: Date | null;
 }
 
@@ -43,12 +45,15 @@ export interface FetchRow {
  * first so the row that sets the header's age leads; kinds never read sit last.
  */
 export function fetchBreakdown(
-  entries: readonly { kind: string; view: Pick<KindView, 'fetchedAt'> }[]
+  entries: readonly { kind: string; show?: string; view: Pick<KindView, 'fetchedAt'> }[]
 ): FetchRow[] {
   const byKind = new Map<string, FetchRow>();
-  for (const { kind, view } of entries) {
+  for (const { kind, show, view } of entries) {
     if (!byKind.has(kind)) {
-      byKind.set(kind, { kind, fetchedAt: view.fetchedAt });
+      byKind.set(
+        kind,
+        show ? { kind, show, fetchedAt: view.fetchedAt } : { kind, fetchedAt: view.fetchedAt }
+      );
     }
   }
   const time = (row: FetchRow) => row.fetchedAt?.getTime() ?? Infinity;

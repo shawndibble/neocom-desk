@@ -5,6 +5,7 @@
  */
 import { formatAge } from '@/lib/age';
 import type { WidgetStateInput } from '../state';
+import type { WidgetShow } from '../kinds';
 import type { EsiEndpointId } from '@/esi/registry';
 import type { SettingsContext } from './viewSettings';
 import type {
@@ -92,8 +93,11 @@ export type Builder = (feeds: Feeds, ctx: BuildContext) => KindView;
  * A kind with a Show setting: one builder per Show, all over the kind's feeds. `fallback`
  * draws a Show it has no builder for, which `viewSettings` never hands it but a test may.
  */
-export function byShow(builders: Readonly<Record<string, Builder>>, fallback: Builder): Builder {
-  return (feeds, ctx) => (builders[ctx.show ?? ''] ?? fallback)(feeds, ctx);
+export function byShow(
+  builders: Readonly<Partial<Record<WidgetShow, Builder>>>,
+  fallback: Builder
+): Builder {
+  return (feeds, ctx) => ((ctx.show && builders[ctx.show]) || fallback)(feeds, ctx);
 }
 
 /**
