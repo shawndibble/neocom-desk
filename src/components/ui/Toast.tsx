@@ -111,7 +111,7 @@ export function Toast({ message, undo, action, onClose, durationMs = TOAST_MS }:
   return createPortal(
     <div
       ref={rootRef}
-      className="toast-in bg-panel-2 border-line-bright text-text fixed bottom-32 left-1/2 z-40 flex w-[95vw] -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ring-1 ring-black/50 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]"
+      className="toast-in bg-panel-2 border-line-bright text-text fixed bottom-32 left-1/2 z-40 flex w-[95vw] -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]"
       // Mouse only: a tap emulates mouseenter and nothing ever sends the leave.
       onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
       onPointerLeave={(e) => e.pointerType === 'mouse' && setHeld(false)}
