@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { HardpointKindOf } from '@/engine/fittings/hardpoints';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
@@ -18,7 +18,7 @@ export function useFittingRuleBreaks(
   kindOf: HardpointKindOf
 ) {
   const { t } = useTranslation();
-  return useMemo(() => {
+  const computed = useMemo(() => {
     const rules = stats?.ruleBreaks ?? [];
     if (!fitting || rules.length === 0) return EMPTY;
     const groupOf = (typeId: number) => catalogue?.types[String(typeId)]?.groupID;
@@ -40,4 +40,11 @@ export function useFittingRuleBreaks(
       flagged: ruleBreakModuleKeys(fitting, rules, groupOf, kindOf),
     };
   }, [t, fitting, stats, catalogue, kindOf]);
+  // Stats are null while an edit recalculates: keep the last answer for the same hull so the block and flags don't flicker.
+  const [kept, setKept] = useState({ shipTypeId: -1, result: EMPTY });
+  if (stats && fitting && (kept.result !== computed || kept.shipTypeId !== fitting.shipTypeId)) {
+    setKept({ shipTypeId: fitting.shipTypeId, result: computed });
+  }
+  if (!stats && fitting && kept.shipTypeId === fitting.shipTypeId) return kept.result;
+  return computed;
 }

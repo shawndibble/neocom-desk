@@ -2169,7 +2169,7 @@
         "active": "active"
       },
       "maxGroup": "Only {{allowed}} {{name}} can be {{limit}} ({{used}} are).",
-      "maxGroupUnknown": "Only {{allowed}} module of this kind can be {{limit}} ({{used}} are).",
+      "maxGroupUnknown": "Only {{allowed}} of this kind of module can be {{limit}} ({{used}} are).",
       "maxType": "Only {{allowed}} {{name}} can be fitted ({{used}} are).",
       "hardpoints": "{{fitted}}, {{room}}.",
       "hardpoint": {

@@ -46,7 +46,7 @@ describe('ruleBreakLine', () => {
       allowed: 1,
     };
     expect(ruleBreakLine(t, fitting, rule, NAMES)).toBe(
-      'Only 1 module of this kind can be active (2 are).'
+      'Only 1 of this kind of module can be active (2 are).'
     );
   });
 

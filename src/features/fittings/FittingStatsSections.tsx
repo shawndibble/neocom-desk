@@ -284,7 +284,6 @@ export function FittingStatsSections({
 
         {ruleBreaks.length > 0 && (
           <div
-            role="alert"
             data-testid="rule-breaks"
             className="space-y-1 border-b border-line px-3 py-2 text-xs"
           >
