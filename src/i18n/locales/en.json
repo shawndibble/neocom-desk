@@ -1397,6 +1397,12 @@
       "swap_other": "{{count}}× {{from}} → {{to}}",
       "givesUp": "Gives up:",
       "noPrice": "No price",
+      "gain": "+{{percent}}%",
+      "moreOptions_one": "{{count}} more option",
+      "moreOptions_other": "{{count}} more options",
+      "sortLabel": "Sort by",
+      "sort": { "gain": "Biggest gain", "value": "Best value", "cheapest": "Cheapest" },
+      "reachLine": "Reach {{before}} → {{after}} km",
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
         "fixFirst": "Fix this first",

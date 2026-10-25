@@ -42,6 +42,7 @@ import {
   loadCrystals,
 } from '@/engine/fittings/improveMining';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
+import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
@@ -114,6 +115,16 @@ export const useImproveReach = createLocalSetting<ImproveReach>({
     typeof raw === 'string' && (IMPROVE_REACHES as readonly string[]).includes(raw)
       ? (raw as ImproveReach)
       : 'upgrade',
+});
+
+/** How Improve orders each section's rows, remembered on this device. */
+export const useImproveSort = createLocalSetting<ImproveSort>({
+  key: 'fittingsImproveSort',
+  defaultValue: 'gain',
+  parse: (raw) =>
+    typeof raw === 'string' && (IMPROVE_SORTS as readonly string[]).includes(raw)
+      ? (raw as ImproveSort)
+      : 'gain',
 });
 
 /** Planning to buy or Refitting a ship the pilot owns, remembered on this device. */
