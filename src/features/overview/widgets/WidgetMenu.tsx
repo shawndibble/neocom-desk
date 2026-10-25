@@ -47,6 +47,9 @@ import {
   type RaidsWhere,
   STRUCTURES_SHOWS,
   type StructuresShow,
+  LEGACY_PROFIT_SOURCE,
+  PROFIT_SOURCES,
+  type ProfitSource,
   rangesOf,
   type CalendarEventsChoice,
   type Widget,
@@ -196,7 +199,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
 
   const fallbackTitle = t(kind.titleKey);
   const title = widget.title ?? fallbackTitle;
-  const canSum = kindSumsAcrossCharacters(widget.kind);
+  const canSum = kindSumsAcrossCharacters(widget.kind, widget);
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
@@ -333,6 +336,22 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               </DropdownMenuRadioGroup>
             </>
           )}
+          {kind.hasProfitSource && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('overview.menu.profitSource')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={widget.profitSource ?? LEGACY_PROFIT_SOURCE}
+                onValueChange={(next) => edit.setProfitSource(widget.id, next as ProfitSource)}
+              >
+                {PROFIT_SOURCES.map((source) => (
+                  <DropdownMenuRadioItem key={source} value={source}>
+                    {t(`overview.menu.profitSourceChoice.${source}`)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </>
+          )}
           {kind.hasTrendSources && (
             <>
               <DropdownMenuSeparator />
@@ -357,6 +376,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
             kind.hasCalendarEvents ||
             kind.hasRaidsWhere ||
             kind.hasStructuresShow ||
+            kind.hasProfitSource ||
             kind.hasTrendSources ||
             kind.hasPlexPlan) && <DropdownMenuSeparator />}
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>

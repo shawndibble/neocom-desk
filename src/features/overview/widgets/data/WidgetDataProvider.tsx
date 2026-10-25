@@ -17,18 +17,21 @@ import { createFeedStore } from './feedStore';
 import { FeedStoreContext } from './feedStoreContext';
 import { FeedSourceMount } from './feedSources';
 import { useOverviewRefresh } from './refreshContext';
-import { ensureBuilders, feedsFor } from './models';
+import { ensureBuilders, feedsFor, type FeedReader } from './models';
 import type { FeedId } from './types';
 
 const NO_FEEDS: readonly FeedId[] = [];
 
 export function WidgetDataProvider({
   kinds,
+  widgets,
   always = NO_FEEDS,
   children,
 }: {
   /** The distinct Widget Kinds in the layout; only their reads are mounted. */
   kinds: readonly string[];
+  /** The drawn widgets, when given: a kind whose reads follow a setting (Profit's Source) mounts only that widget's. */
+  widgets?: readonly FeedReader[];
   /** Reads the page itself needs whatever the layout holds (the header's SP chips). */
   always?: readonly FeedId[];
   children: ReactNode;
@@ -36,8 +39,8 @@ export function WidgetDataProvider({
   const [store] = useState(createFeedStore);
   // Sorted so the same set of kinds never remounts a source by reordering.
   const feeds = useMemo(
-    () => [...new Set([...feedsFor(kinds), ...always])].sort(),
-    [kinds, always]
+    () => [...new Set([...feedsFor(widgets ?? kinds), ...always])].sort(),
+    [kinds, widgets, always]
   );
   // A kind's lazy builder loads with the kind, not with its first read; views rebuild when it lands.
   // A failed load shows failed (the stand-in) and retries on the next Refresh or Retry.

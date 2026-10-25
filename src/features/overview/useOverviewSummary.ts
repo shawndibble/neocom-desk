@@ -12,10 +12,17 @@ import {
 import type { Widget } from './widgets/layout';
 import { chipTone, nextDeadline } from './widgets/nextDeadline';
 import { useWidgetBoard } from './widgets/board';
-import { distinctKinds, visibleWidgets } from './widgets/visibility';
+import { visibleWidgets } from './widgets/visibility';
 
 /** A kind whose view has not been built yet: no read to date. */
 const EMPTY_READ = { fetchedAt: null, fromCache: false };
+
+/** Profit's reads follow its Source, so its request carries it; every other kind's key ignores the field. */
+const requestOf = (widget: Widget) => ({
+  kind: widget.kind,
+  scopeAll: false,
+  profitSource: widget.profitSource,
+});
 
 /** What the header shows of the drawn widgets: the soonest clock and the stalest read. */
 export type OverviewSummary = ReturnType<typeof useOverviewSummary>;
@@ -29,17 +36,17 @@ export function useOverviewSummary(widgets: readonly Widget[]) {
     () => visibleWidgets(widgets, isPhone, canDraw),
     [widgets, isPhone, canDraw]
   );
-  const requests = useMemo(
-    () => distinctKinds(shown).map((kind) => ({ kind, scopeAll: false })),
-    [shown]
-  );
+  const requests = useMemo(() => {
+    const byKey = new Map(shown.map((widget) => [viewKey(requestOf(widget)), requestOf(widget)]));
+    return [...byKey.values()];
+  }, [shown]);
   const views = useKindViews(requests);
   const all = [...views.values()];
   const next = nextDeadline(collectDeadlines(all), now);
   const breakdown = fetchBreakdown(
     shown.map((widget) => ({
       kind: widget.kind,
-      view: views.get(viewKey({ kind: widget.kind, scopeAll: false })) ?? EMPTY_READ,
+      view: views.get(viewKey(requestOf(widget))) ?? EMPTY_READ,
     }))
   );
   const remaining = next ? next.at - now : 0;

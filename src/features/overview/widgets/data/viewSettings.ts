@@ -9,8 +9,8 @@
  */
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { getKind, type WidgetKindDef } from '../kinds';
-import { DEFAULT_RAIDS_RADIUS, DEFAULT_RANGE } from '../layout';
-import type { CalendarEventsChoice, WidgetRange } from '../layout';
+import { DEFAULT_RAIDS_RADIUS, DEFAULT_RANGE, LEGACY_PROFIT_SOURCE } from '../layout';
+import type { CalendarEventsChoice, ProfitSource, WidgetRange } from '../layout';
 import type { BuildContext } from './types';
 
 /** A widget's own settings, as stored; every field is absent when left at its default. */
@@ -26,6 +26,8 @@ export interface ViewSettings {
   raidsRadius?: number;
   /** Structures: 'problems' lists only the structures that need attention; left out, All. */
   structuresShow?: 'problems';
+  /** Profit: which earnings it adds up; left out, Builds (a widget saved before the setting). */
+  profitSource?: ProfitSource;
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
@@ -48,6 +50,7 @@ export type SettingsContext = Pick<
   | 'raidsWhere'
   | 'raidsRadius'
   | 'structuresShow'
+  | 'profitSource'
   | 'trendItems'
   | 'trendHubs'
 >;
@@ -90,6 +93,11 @@ export const VIEW_SETTINGS = {
     enabledFor: (k) => k.hasStructuresShow,
     fields: ['structuresShow'],
     resolve: (s) => ({ structuresShow: s.structuresShow === 'problems' ? 'problems' : 'all' }),
+  },
+  profitSource: {
+    enabledFor: (k) => k.hasProfitSource,
+    fields: ['profitSource'],
+    resolve: (s) => ({ profitSource: s.profitSource ?? LEGACY_PROFIT_SOURCE }),
   },
   trend: {
     enabledFor: (k) => k.hasTrendSources,

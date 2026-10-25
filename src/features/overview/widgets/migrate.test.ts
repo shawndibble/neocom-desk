@@ -135,4 +135,36 @@ describe('migrateRetiredKind', () => {
     const saved = { id: 'y', kind: 'structures', view: 'chart' };
     expect(migrateRetiredKind(saved)).toBe(saved);
   });
+
+  const saved = (over: Record<string, unknown>) => ({
+    id: 'a',
+    kind: 'profit',
+    size: 'L',
+    view: 'table',
+    scope: 'all',
+    range: 90,
+    title: 'Mine',
+    showOnPhone: false,
+    ...over,
+  });
+
+  it('turns a Trading profit widget into Profit on Trading, keeping everything else', () => {
+    expect(migrateRetiredKind(saved({ kind: 'tradingProfit' }))).toEqual(
+      saved({ kind: 'profit', profitSource: 'trading' })
+    );
+  });
+
+  it('puts a Profit widget saved before the setting on Builds, so it shows what it did', () => {
+    expect(migrateRetiredKind(saved({}))).toEqual(saved({ profitSource: 'builds' }));
+    expect(migrateRetiredKind(saved({ profitSource: 'nonsense' }))).toEqual(
+      saved({ profitSource: 'builds' })
+    );
+  });
+
+  it('leaves a Profit widget with a Source, and every other kind, as found', () => {
+    const both = saved({ profitSource: 'both' });
+    expect(migrateRetiredKind(both)).toBe(both);
+    const wallet = saved({ kind: 'wallet' });
+    expect(migrateRetiredKind(wallet)).toBe(wallet);
+  });
 });

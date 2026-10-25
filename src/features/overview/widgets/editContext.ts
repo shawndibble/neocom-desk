@@ -12,6 +12,7 @@
 import { createContext, useContext } from 'react';
 import type {
   CalendarEventsChoice,
+  ProfitSource,
   RaidsWhere,
   OverviewLayout,
   StructuresShow,
@@ -46,6 +47,7 @@ export interface OverviewEditActions {
   setRaidsWhere: (id: string, where: RaidsWhere) => void;
   setRaidsRadius: (id: string, radius: number) => void;
   setStructuresShow: (id: string, show: StructuresShow) => void;
+  setProfitSource: (id: string, source: ProfitSource) => void;
   setTrendItems: (id: string, items: number[]) => void;
   setTrendHubs: (id: string, hubs: string[]) => void;
   rename: (id: string, title: string) => void;
@@ -89,6 +91,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setPlexPer30Days: none,
   setCalendarEvents: none,
   setRaidsWhere: none,
+  setProfitSource: none,
   setRaidsRadius: none,
   setStructuresShow: none,
   setTrendItems: none,

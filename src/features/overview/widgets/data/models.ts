@@ -16,6 +16,9 @@ import { comingUp, sp, training } from './characterBuilders';
 import { KIND_DEFS } from './kindModels';
 import { WORLD_DEFS } from './worldModels';
 import type { BuildContext, FeedId, Feeds, KindView } from './types';
+import { settingsContext, type ViewSettings } from './viewSettings';
+import type { EsiEndpointId } from '@/esi/registry';
+import { getKind } from '../kinds';
 
 // --- The kind registry --------------------------------------------------------
 //
@@ -49,19 +52,42 @@ export const kindDef = (kind: string): KindDef | undefined => KINDS[kind];
 
 export const allKindIds = (): string[] => Object.keys(KINDS);
 
-/** Kind -> the feeds it reads. Undefined for a kind with no declaration (coming soon, or from a newer build). */
-export const feedsOf = (kind: string): readonly FeedId[] | undefined => KINDS[kind]?.feeds;
+/** A kind's feeds and scope for one widget's settings; the kind's own without settings. */
+function resolved(kind: string, settings?: ViewSettings) {
+  const def = KINDS[kind];
+  if (!def) return undefined;
+  return def.bySettings && settings ? def.bySettings(settingsContext(kind, settings)) : def;
+}
 
-/** The distinct feeds needed by `kinds`; only these are ever fetched. */
-export function feedsFor(kinds: readonly string[]): FeedId[] {
+/**
+ * Kind -> the feeds it reads, or with a widget's settings the feeds that widget reads.
+ * Undefined for a kind with no declaration (coming soon, or from a newer build).
+ */
+export const feedsOf = (kind: string, settings?: ViewSettings): readonly FeedId[] | undefined =>
+  resolved(kind, settings)?.feeds;
+
+/** What wants a feed: a kind, or one widget of it with its settings (`ViewSettings`). */
+export type FeedReader = string | ({ kind: string } & ViewSettings);
+
+/** The distinct feeds needed by `readers`; only these are ever fetched. */
+export function feedsFor(readers: readonly FeedReader[]): FeedId[] {
   const out = new Set<FeedId>();
-  for (const kind of kinds) for (const feed of feedsOf(kind) ?? []) out.add(feed);
+  for (const reader of readers) {
+    const feeds = typeof reader === 'string' ? feedsOf(reader) : feedsOf(reader.kind, reader);
+    for (const feed of feeds ?? []) out.add(feed);
+  }
   return [...out];
 }
 
+/** The ESI endpoints a widget of `kind` needs under `settings`, for its "needs permission" state. */
+export function endpointsOf(kind: string, settings?: ViewSettings): readonly EsiEndpointId[] {
+  const reads = resolved(kind, settings);
+  return reads && 'endpoints' in reads ? reads.endpoints : (getKind(kind)?.endpoints ?? []);
+}
+
 /** Whether the kind's read covers every Character; a widget scoped to the header Character still narrows to it in the builder. */
-export function kindSumsAcrossCharacters(kind: string): boolean {
-  return KINDS[kind]?.scope === 'account';
+export function kindSumsAcrossCharacters(kind: string, settings?: ViewSettings): boolean {
+  return resolved(kind, settings)?.scope === 'account';
 }
 
 // --- Lazy builders -----------------------------------------------------------

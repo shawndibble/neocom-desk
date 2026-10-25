@@ -42,7 +42,6 @@ const ALL_IDS = [
   'hauling',
   'kills',
   'omega',
-  'tradingProfit',
   'eveTime',
   'comingUp',
   'contracts',
@@ -268,7 +267,6 @@ describe('widget kind catalogue', () => {
       'miningYield',
       'omega',
       'profit',
-      'tradingProfit',
       'wallet',
       'walletFlow',
     ]);

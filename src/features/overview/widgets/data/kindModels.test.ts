@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { summarizeSurvey } from '@/engine/survey/series';
 import { formatDuration } from '@/lib/duration';
 import { resolveWidget } from '../state';
-import { buildView, feedsFor, feedsOf } from './models';
+import { buildView, endpointsOf, feedsFor, feedsOf, kindSumsAcrossCharacters } from './models';
+import { scopePresentation } from '../scope';
 import { humanizeRefType } from './kindModels';
 import type {
   BelowMarketWidgetData,
@@ -1336,7 +1337,7 @@ describe('omega coverage', () => {
   });
 });
 
-describe('trading profit', () => {
+describe('profit on Trading', () => {
   const fill = (id: number, over: Record<string, unknown>) => ({
     transaction_id: id,
     date: iso(NOW - 2 * DAY),
@@ -1385,10 +1386,20 @@ describe('trading profit', () => {
     fetchedAt: new Date(NOW),
   });
   const build = (over: Partial<BuildContext> = {}) =>
-    buildView('tradingProfit', { tradingProfit: ok(data()) }, ctx(over));
+    buildView('profit', { tradingProfit: ok(data()) }, ctx({ profitSource: 'trading', ...over }));
 
-  it('reads its own feed', () => {
-    expect(feedsOf('tradingProfit')).toEqual(['tradingProfit']);
+  it('reads only the trading feed', () => {
+    expect(feedsOf('profit', { profitSource: 'trading' })).toEqual(['tradingProfit']);
+  });
+
+  it('says its own empty line', () => {
+    const none = buildView(
+      'profit',
+      { tradingProfit: ok({ ...data(), characters: [{ ...data().characters[1]! }] }) },
+      ctx({ profitSource: 'trading', scopeAll: true })
+    );
+    expect(stateOf(none)).toBe('empty');
+    expect(none.emptyMessage).toBe('overview.widgets.profit.trading.empty');
   });
 
   it("pools every Character's buys under All characters, and leaves the header Character's sale unmatched", () => {
@@ -1405,5 +1416,191 @@ describe('trading profit', () => {
   it('lists margin per item in the table', () => {
     const view = build({ scopeAll: true });
     expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Tritanium']);
+  });
+
+  it('asks for the wallet grant when the header Character has no wallet read', () => {
+    expect(stateOf(build({ activeCharacterId: 93 }))).toBe('needsPermission');
+  });
+});
+
+describe('profit sources', () => {
+  it('reads only the feeds its Source needs; absent is Builds', () => {
+    expect(feedsOf('profit', { profitSource: 'builds' })).toEqual(['profit']);
+    expect(feedsOf('profit', {})).toEqual(['profit']);
+    expect(feedsOf('profit', { profitSource: 'both' })).toEqual(['profit', 'tradingProfit']);
+    expect(feedsFor([{ kind: 'profit', profitSource: 'trading' }, 'lp']).sort()).toEqual([
+      'lp',
+      'tradingProfit',
+    ]);
+  });
+
+  it('asks for the wallet endpoints on Trading and Both, and none on Builds', () => {
+    const wallet = ['getCharacterWalletJournal', 'getCharacterWalletTransactions'];
+    expect(endpointsOf('profit', { profitSource: 'builds' })).toEqual([]);
+    expect(endpointsOf('profit', {})).toEqual([]);
+    expect(endpointsOf('profit', { profitSource: 'trading' })).toEqual(wallet);
+    expect(endpointsOf('profit', { profitSource: 'both' })).toEqual(wallet);
+    // A kind without settings-driven reads keeps its catalogue endpoints.
+    expect(endpointsOf('lp', {})).toEqual(['getCharacterLoyaltyPoints']);
+  });
+
+  it('sums across Characters on Trading only: Builds and Both read the header Character', () => {
+    expect(kindSumsAcrossCharacters('profit', { profitSource: 'trading' })).toBe(true);
+    expect(kindSumsAcrossCharacters('profit', { profitSource: 'both' })).toBe(false);
+    expect(kindSumsAcrossCharacters('profit', { profitSource: 'builds' })).toBe(false);
+    expect(kindSumsAcrossCharacters('profit')).toBe(false);
+  });
+});
+
+describe('profit on Both', () => {
+  const run = (id: string, ago: number, profit: number, productTypeID = 1) => ({
+    runId: id,
+    productTypeID,
+    quantity: 1,
+    loggedAt: NOW - ago,
+    profit,
+    status: 'closed' as const,
+  });
+  const fill = (id: number, ago: number, over: Record<string, unknown> = {}) => ({
+    transaction_id: id,
+    date: iso(NOW - ago),
+    location_id: 1,
+    type_id: 34,
+    unit_price: 100,
+    quantity: 1,
+    client_id: 1,
+    is_buy: true,
+    journal_ref_id: id,
+    is_personal: true,
+    ...over,
+  });
+  // Bought at 100, sold at 150, 10 tax: a margin of 40 per sale.
+  const trading = (sales: number[]): TradingProfitWidgetData => ({
+    characters: [
+      {
+        characterId: 91,
+        name: 'Main',
+        transactions: [
+          ...sales.map((ago, i) => fill(100 + i, ago + DAY)),
+          ...sales.map((ago, i) => fill(200 + i, ago, { is_buy: false, unit_price: 150 })),
+        ],
+        journal: sales.map((ago, i) => ({
+          id: 300 + i,
+          date: iso(NOW - ago),
+          ref_type: 'transaction_tax',
+          description: '',
+          amount: -10,
+          context_id: 200 + i,
+          context_id_type: 'market_transaction_id',
+        })),
+      },
+    ],
+    names: new Map([[34, 'Tritanium']]),
+    truncated: false,
+    skippedCount: 0,
+    fetchedAt: new Date(NOW),
+  });
+  const builds = (runs: ReturnType<typeof run>[]) => ok({ runs, names: new Map([[1, 'Raven']]) });
+  const both = (feeds: Feeds, over: Partial<BuildContext> = {}) =>
+    buildView('profit', feeds, ctx({ profitSource: 'both', range: 7, ...over }));
+
+  it('adds builds and trades into one figure', () => {
+    const view = both({
+      profit: builds([run('a', DAY, 300)]),
+      tradingProfit: ok(trading([2 * DAY])),
+    });
+    expect(view.number.iskAmount).toBe(340);
+    expect(view.number.unit).toBe('overview.isk');
+  });
+
+  it('compares with the window before when either source had one', () => {
+    const view = both({
+      profit: builds([run('a', DAY, 300), run('b', 10 * DAY, 100)]),
+      tradingProfit: ok(trading([2 * DAY, 9 * DAY])),
+    });
+    // 340 now against 140 before.
+    expect(view.number.secondary?.text).toContain('"delta":"+200"');
+    // No trades before: they count 0 there, so 340 against 100.
+    const noTradesBefore = both({
+      profit: builds([run('a', DAY, 300), run('b', 10 * DAY, 100)]),
+      tradingProfit: ok(trading([2 * DAY])),
+    });
+    expect(noTradesBefore.number.secondary?.text).toContain('"delta":"+240"');
+    const nothingBefore = both({
+      profit: builds([run('a', DAY, 300)]),
+      tradingProfit: ok(trading([2 * DAY])),
+    });
+    expect(nothingBefore.number.secondary).toBeUndefined();
+  });
+
+  it('tags each table row with its source, sorted by profit', () => {
+    const view = both({
+      profit: builds([run('a', DAY, 30)]),
+      tradingProfit: ok(trading([2 * DAY])),
+    });
+    expect(view.table!.rows.map((r) => [r.cells[0], r.cells[2]])).toEqual([
+      ['Tritanium', 'overview.widgets.profit.source.trading'],
+      ['Raven', 'overview.widgets.profit.source.builds'],
+    ]);
+    // The same toned signed cell Trading draws, whichever source.
+    expect(view.table!.rows.map((r) => r.cells[1])).toEqual([
+      { text: '+40', tone: 'good' },
+      { text: '+30', tone: 'good' },
+    ]);
+  });
+
+  it('draws builds and trades as two lines on the same days', () => {
+    const view = both({
+      profit: builds([run('a', DAY / 2, 300)]),
+      tradingProfit: ok(trading([2.5 * DAY])),
+    });
+    if (view.chart?.kind !== 'lines') throw new Error('lines');
+    expect(view.chart.series.map((s) => s.key)).toEqual(['builds', 'trading']);
+    expect(view.chart.series[0]!.values).toEqual([0, 0, 0, 0, 0, 0, 300]);
+    expect(view.chart.series[1]!.values).toEqual([0, 0, 0, 0, 40, 0, 0]);
+    expect(view.chart.tips).toHaveLength(7);
+    // The legend reads the latest day; the axis names the span.
+    expect(view.chart.series.map((s) => s.end)).toEqual(['+300', '0']);
+    expect(view.chart.xStart).toBe('overview.widgets.chart.daysAgo{"count":7}');
+    expect(view.chart.xEnd).toBe('overview.widgets.chart.today');
+  });
+
+  it('keeps showing the builds, with a grant, when the header Character has no wallet read', () => {
+    const view = both(
+      { profit: builds([run('a', DAY, 300)]), tradingProfit: ok(trading([2 * DAY])) },
+      { activeCharacterId: 93 }
+    );
+    expect(stateOf(view)).toBe('ok');
+    expect(view.number.iskAmount).toBe(300);
+    expect(view.grantEndpoints).toEqual([
+      'getCharacterWalletJournal',
+      'getCharacterWalletTransactions',
+    ]);
+  });
+
+  it('narrows trades to the header Character even when the widget asks for All characters', () => {
+    const scoped = scopePresentation('profit', 'all', { profitSource: 'both' });
+    expect(scoped).toMatchObject({ scopeAll: false, fallbackNote: true });
+  });
+
+  it('waits for the trading read, and says when it failed', () => {
+    const waiting = both({
+      profit: builds([run('a', DAY, 300)]),
+      tradingProfit: { data: null, error: false, loading: true },
+    });
+    expect(stateOf(waiting)).toBe('loading');
+    const failed = both({
+      profit: builds([run('a', DAY, 300)]),
+      tradingProfit: { data: null, error: true, loading: false },
+    });
+    expect(stateOf(failed)).toBe('ok');
+    expect(failed.number.iskAmount).toBe(300);
+    expect(failed.number.notes).toEqual(['overview.widgets.profit.tradingFailed']);
+  });
+
+  it('is empty only when neither source has anything', () => {
+    const view = both({ profit: builds([]), tradingProfit: ok(trading([])) });
+    expect(stateOf(view)).toBe('empty');
+    expect(view.emptyMessage).toBe('overview.widgets.profit.emptyBoth');
   });
 });

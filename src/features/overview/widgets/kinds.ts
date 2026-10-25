@@ -79,11 +79,19 @@ export interface WidgetKindDef {
   hasRaidsWhere: boolean;
   /** Whether the kind has the Show setting (All structures / Problems only). */
   hasStructuresShow: boolean;
+  /** Whether the kind has the Source setting (Builds / Trading / Both): Profit. */
+  hasProfitSource: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
   availability: KindAvailability;
 }
+
+/** The wallet reads that price market sales: Profit's Trading source needs them. */
+export const WALLET_TRADE_ENDPOINTS: readonly EsiEndpointId[] = [
+  'getCharacterWalletJournal',
+  'getCharacterWalletTransactions',
+];
 
 const NCT: readonly WidgetView[] = ['number', 'chart', 'table'];
 const NT: readonly WidgetView[] = ['number', 'table'];
@@ -107,6 +115,7 @@ interface Spec {
   calendarEvents?: true;
   raidsWhere?: true;
   structuresShow?: true;
+  profitSource?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -216,14 +225,6 @@ const SPECS = {
     range: true,
     endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
   },
-  tradingProfit: {
-    category: 'trade',
-    views: NCT,
-    view: 'number',
-    size: 'M',
-    range: true,
-    endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
-  },
   lp: {
     category: 'money',
     views: NCT,
@@ -252,13 +253,15 @@ const SPECS = {
     size: 'M',
     endpoints: ['getCharacterIndustryJobs'],
   },
+  // Every endpoint any Source needs; one widget's come from its `KindDef.bySettings` (Builds needs none).
   profit: {
-    category: 'industry',
+    category: 'money',
     views: NCT,
     view: 'chart',
     size: 'M',
     range: true,
-    endpoints: [],
+    profitSource: true,
+    endpoints: WALLET_TRADE_ENDPOINTS,
   },
   miningYield: {
     category: 'industry',
@@ -554,6 +557,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   hasCalendarEvents: s.calendarEvents === true,
   hasRaidsWhere: s.raidsWhere === true,
   hasStructuresShow: s.structuresShow === true,
+  hasProfitSource: s.profitSource === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

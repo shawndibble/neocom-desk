@@ -12,7 +12,14 @@
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { isAddable, type WidgetKindId } from './kinds';
-import { newWidget, type MakeId, type OverviewLayout, type Widget } from './layout';
+import {
+  isProfitSource,
+  LEGACY_PROFIT_SOURCE,
+  newWidget,
+  type MakeId,
+  type OverviewLayout,
+  type Widget,
+} from './layout';
 
 export const OVERVIEW_HIDDEN_CARDS_KEY = 'sync.overviewHiddenCards';
 export const OVERVIEW_CARD_ORDER_KEY = 'sync.overviewCardOrder';
@@ -92,20 +99,32 @@ export function migrateFromCards(
   return { version: 1, widgets };
 }
 
-/**
- * A saved widget of a retired kind, as the kind that took it over. Offline
- * services folded into Structures' Problems only: the same feed, and the
- * structures with an offline service are among the problems it lists. Size,
- * view, title and the rest stay as saved; `parseLayout` repairs whatever the
- * new kind does not offer.
- */
-export function migrateRetiredKind(raw: Record<string, unknown>): Record<string, unknown> {
-  if (raw.kind === 'corpServices')
-    return { ...raw, kind: 'structures', structuresShow: 'problems' };
-  return raw;
-}
-
 /** Whether the old settings show this pilot used the board before the grid. */
 export function isReturningPilot(hidden: readonly string[], order: readonly string[]): boolean {
   return hidden.length > 0 || order.length > 0;
+}
+
+/**
+ * A saved widget of a retired or reshaped kind, as this build reads it; any
+ * other widget comes back as the very object passed. `parseLayout` runs it on
+ * every read, so a layout another device wrote before the change still loads,
+ * and the new form is only written on the pilot's next edit. Size, view,
+ * scope, range, title and the rest stay as saved; `parseLayout` repairs
+ * whatever the new kind does not offer.
+ *
+ * - Offline services folded into Structures' Problems only: the same feed, and
+ *   the structures with an offline service are among the problems it lists.
+ * - Trading profit became Profit on Trading; a Profit widget saved before the
+ *   Source setting existed is put on Builds, which is all it ever showed
+ *   (decision `20261024-191335`).
+ */
+export function migrateRetiredKind(raw: Record<string, unknown>): Record<string, unknown> {
+  if (raw.kind === 'corpServices') {
+    return { ...raw, kind: 'structures', structuresShow: 'problems' };
+  }
+  if (raw.kind === 'tradingProfit') return { ...raw, kind: 'profit', profitSource: 'trading' };
+  if (raw.kind === 'profit' && !isProfitSource(raw.profitSource)) {
+    return { ...raw, profitSource: LEGACY_PROFIT_SOURCE };
+  }
+  return raw;
 }

@@ -171,6 +171,22 @@ describe('parseLayout', () => {
     });
   });
 
+  it('reads a retired Trading profit widget as Profit on Trading, and an old Profit as Builds', () => {
+    const [trading, builds, both, wallet] = parseLayout(
+      wrap(
+        good({ id: 'a', kind: 'tradingProfit', view: 'number', range: 7 }),
+        good({ id: 'b', kind: 'profit', range: 90 }),
+        good({ id: 'c', kind: 'profit', profitSource: 'both' }),
+        good({ id: 'd', kind: 'wallet', profitSource: 'trading' })
+      )
+    )!.widgets;
+    expect(trading).toMatchObject({ kind: 'profit', profitSource: 'trading', range: 7 });
+    expect(trading.view).toBe('number');
+    expect(builds).toMatchObject({ profitSource: 'builds', range: 90 });
+    expect(both.profitSource).toBe('both');
+    expect(wallet).not.toHaveProperty('profitSource');
+  });
+
   it('keeps a valid rowsPerPage and drops one that is not offered', () => {
     expect(parseLayout(wrap(good({ rowsPerPage: 25 })))!.widgets[0].rowsPerPage).toBe(25);
     expect('rowsPerPage' in parseLayout(wrap(good({ rowsPerPage: 7 })))!.widgets[0]).toBe(false);

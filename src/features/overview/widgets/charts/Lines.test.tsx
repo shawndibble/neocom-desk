@@ -31,6 +31,12 @@ describe('Lines chart', () => {
     expect(container.querySelector('polygon')).toBeNull();
   });
 
+  it('labels the time axis ends when the model gives them', () => {
+    render(<Chart model={{ ...model, xStart: '5 weeks ago', xEnd: 'this week' }} size="M" />);
+    expect(screen.getByText('5 weeks ago')).toBeInTheDocument();
+    expect(screen.getByText('this week')).toBeInTheDocument();
+  });
+
   it('brings a hovered legend entry to full weight and dims the other lines', () => {
     const { container } = render(<Chart model={model} size="M" />);
     const entry = screen.getByText('PLEX').closest('li')!;

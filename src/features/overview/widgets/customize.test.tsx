@@ -260,6 +260,29 @@ describe('Widget menu', () => {
     expect(seen.current.widgets[0].structuresShow).toBe('problems');
   });
 
+  it('offers Source to Profit, and All characters only on Trading', async () => {
+    const profit: OverviewLayout = {
+      version: 1,
+      widgets: [w('p', 'profit', { view: 'chart', profitSource: 'both' })],
+    };
+    const { user, seen } = setup({ initial: profit });
+    await user.click(screen.getByRole('button', { name: 'Settings for Profit' }));
+    expect(screen.getByRole('menuitemradio', { name: 'Both' })).toBeChecked();
+    expect(screen.getByRole('menuitemradio', { name: 'All' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.click(screen.getByRole('menuitemradio', { name: 'Trading' }));
+    expect(seen.current.widgets[0].profitSource).toBe('trading');
+
+    await user.click(screen.getByRole('button', { name: 'Settings for Profit' }));
+    expect(screen.getByRole('menuitemradio', { name: 'All' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.keyboard('{Escape}');
+  });
+
   it('offers Where to Skyhook raids, and the jumps radius only under Near me', async () => {
     const raids: OverviewLayout = { version: 1, widgets: [w('r', 'sovRaids', { view: 'table' })] };
     const { user, seen } = setup({ initial: raids });

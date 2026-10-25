@@ -139,6 +139,10 @@ const ALT: Record<keyof typeof VIEW_SETTINGS, ViewRequest[]> = {
     { kind: '', scopeAll: false, raidsWhere: 'near', raidsRadius: 15 },
   ],
   structuresShow: [{ kind: '', scopeAll: false, structuresShow: 'problems' }],
+  profitSource: [
+    { kind: '', scopeAll: false, profitSource: 'trading' },
+    { kind: '', scopeAll: false, profitSource: 'both' },
+  ],
   trend: [
     { kind: '', scopeAll: false, trendItems: [34] },
     { kind: '', scopeAll: false, trendHubs: ['amarr'] },
@@ -168,6 +172,7 @@ describe('view key', () => {
         !k.hasCalendarEvents &&
         !k.hasRaidsWhere &&
         !k.hasStructuresShow &&
+        !k.hasProfitSource &&
         !k.hasTrendSources
     )!;
     const base = viewKey({ kind: plain.id, scopeAll: false });
@@ -182,6 +187,10 @@ describe('view key', () => {
     );
     expect(viewKey({ kind: 'sovRaids', scopeAll: false })).toBe(
       viewKey({ kind: 'sovRaids', scopeAll: false, raidsRadius: 15 })
+    );
+    // A Profit widget saved before the Source setting is a Builds one.
+    expect(viewKey({ kind: 'profit', scopeAll: false })).toBe(
+      viewKey({ kind: 'profit', scopeAll: false, profitSource: 'builds' })
     );
   });
 

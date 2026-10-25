@@ -32,6 +32,18 @@ export const isRaidsRadius = (value: unknown): value is number =>
 /** Structures: every structure, or only those with a timer, low fuel or an offline service. All is never stored. */
 export type StructuresShow = 'all' | 'problems';
 export const STRUCTURES_SHOWS: readonly StructuresShow[] = ['all', 'problems'];
+/**
+ * Profit: which earnings it adds up. Stored on every Profit widget; absent is
+ * one saved before the setting existed, i.e. Builds (what that widget showed).
+ */
+export type ProfitSource = 'builds' | 'trading' | 'both';
+export const PROFIT_SOURCES: readonly ProfitSource[] = ['builds', 'trading', 'both'];
+/** What a new Profit widget adds up. */
+export const DEFAULT_PROFIT_SOURCE: ProfitSource = 'both';
+/** What a Profit widget with no stored Source adds up: one saved before the setting showed builds. */
+export const LEGACY_PROFIT_SOURCE: ProfitSource = 'builds';
+export const isProfitSource = (value: unknown): value is ProfitSource =>
+  PROFIT_SOURCES.includes(value as ProfitSource);
 
 export type WidgetRange = 7 | 30 | 90 | 365;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
@@ -78,6 +90,8 @@ export interface Widget {
   raidsRadius?: number;
   /** Structures only: 'problems' lists only the structures that need attention. Absent means All. */
   structuresShow?: 'problems';
+  /** Profit only: which earnings it adds up. Absent means Builds (a widget saved before the setting). */
+  profitSource?: ProfitSource;
   /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
   trendItems?: number[];
   /** Market Trend only: the Trade Hubs it prices at. Absent means the pilot's Market hub. */
@@ -126,6 +140,7 @@ export function newWidget(kind: WidgetKindId, id: string): Widget | null {
     showOnPhone: true,
   };
   if (def.hasRange) widget.range = DEFAULT_RANGE;
+  if (def.hasProfitSource) widget.profitSource = DEFAULT_PROFIT_SOURCE;
   return widget;
 }
 
@@ -329,6 +344,21 @@ export function setStructuresShow(
       return rest;
     }
     return { ...w, structuresShow: 'problems' };
+  });
+}
+
+/** Always stored: absent means Builds, not the new-widget default. */
+export function setProfitSource(
+  layout: OverviewLayout,
+  id: string,
+  source: ProfitSource
+): OverviewLayout {
+  if (!isProfitSource(source)) return layout;
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasProfitSource || source === (w.profitSource ?? LEGACY_PROFIT_SOURCE)) {
+      return null;
+    }
+    return { ...w, profitSource: source };
   });
 }
 

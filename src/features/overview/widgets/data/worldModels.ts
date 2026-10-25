@@ -20,9 +20,11 @@ import {
   incursionsSummary,
 } from '../../data/incursionsBoard';
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
+import type { ProfitWidgetData } from './kindLoaders';
 import { blank, count, statusOf, UNKNOWN, type Builder, type KindDef } from './builderKit';
 import { fractionBar, signedCell } from './cellKit';
 import { backwardBucketSums } from './chartSeries';
+import { profitBuckets, type SourceProfit } from './profitCombine';
 import { dayTitle, rollingTitles, signTone } from './chartTips';
 import type {
   NumberModel,
@@ -146,30 +148,27 @@ export const incursions: Builder = (feeds, { t }) => {
 
 // --- Realized profit --------------------------------------------------------------
 
-export const profit: Builder = (feeds, { t, now, range }) => {
-  const feed = feeds.profit;
-  const data = feed?.data ?? null;
-  const to = '/industry';
-  if (!data) return blank(to, statusOf(feed));
-  const inWindow = (from: number, until: number) =>
-    data.runs.filter((run) => run.loggedAt >= from && run.loggedAt <= until);
-  const inRange = inWindow(now - range * DAY_MS, now);
+/** "+12M vs the previous 30 days": a Profit window against the one before it. */
+export function vsPrevious(t: Translate, delta: number, range: number): NumberSecondary {
+  return {
+    text: t('overview.widgets.profit.vsPrevious', {
+      delta: formatIskCompactSigned(delta),
+      count: range,
+    }),
+    direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat',
+    tone: delta > 0 ? 'good' : delta < 0 ? 'bad' : undefined,
+  };
+}
+
+/** The logged runs in the window, the window before it and each product's line, as both Profit sources read them. */
+function readBuilds(data: ProfitWidgetData, now: number, range: number) {
+  const inRange = data.runs.filter(
+    (run) => run.loggedAt >= now - range * DAY_MS && run.loggedAt <= now
+  );
   const previous = data.runs.filter(
     (run) => run.loggedAt >= now - 2 * range * DAY_MS && run.loggedAt < now - range * DAY_MS
   );
   const total = inRange.reduce((sum, run) => sum + run.profit, 0);
-  // A week is the unit the spec asks for; a 7-day range has too few weeks to be a chart, so days.
-  const daily = range <= 7;
-  const bucketMs = daily ? DAY_MS : 7 * DAY_MS;
-  const buckets = daily ? range : Math.ceil(range / 7);
-  const values = backwardBucketSums(
-    data.runs,
-    (run) => run.loggedAt,
-    (run) => run.profit,
-    now,
-    bucketMs,
-    buckets
-  );
   const byProduct = new Map<number, { profit: number; built: number }>();
   for (const run of inRange) {
     const row = byProduct.get(run.productTypeID) ?? { profit: 0, built: 0 };
@@ -179,20 +178,46 @@ export const profit: Builder = (feeds, { t, now, range }) => {
   }
   const products = [...byProduct.entries()].sort((a, b) => b[1].profit - a[1].profit);
   const nameOf = (typeId: number) => data.names.get(typeId) ?? `#${typeId}`;
+  return { inRange, previous, total, products, nameOf };
+}
+
+/** The Builds side of Profit on Both; no earlier runs is no window before. */
+export function buildsSource(data: ProfitWidgetData, now: number, range: number): SourceProfit {
+  const { previous, total, products, nameOf } = readBuilds(data, now, range);
+  return {
+    total,
+    previous: previous.length > 0 ? previous.reduce((sum, run) => sum + run.profit, 0) : null,
+    points: data.runs.map((run) => ({ at: run.loggedAt, profit: run.profit })),
+    rows: products.map(([typeId, row]) => ({
+      key: String(typeId),
+      name: nameOf(typeId),
+      profit: row.profit,
+    })),
+  };
+}
+
+/** Profit on Builds: what the logged industry runs made. */
+export const buildProfit: Builder = (feeds, { t, now, range }) => {
+  const feed = feeds.profit;
+  const data = feed?.data ?? null;
+  const to = '/industry';
+  if (!data) return blank(to, statusOf(feed));
+  const { inRange, previous, total, products, nameOf } = readBuilds(data, now, range);
+  const { daily, bucketMs, buckets } = profitBuckets(range);
+  const values = backwardBucketSums(
+    data.runs,
+    (run) => run.loggedAt,
+    (run) => run.profit,
+    now,
+    bucketMs,
+    buckets
+  );
 
   // The headline is the window's total; against the window before it is the fact it lacks. No earlier runs, no claim.
-  let secondary: NumberSecondary | undefined;
-  if (previous.length > 0) {
-    const delta = total - previous.reduce((sum, run) => sum + run.profit, 0);
-    secondary = {
-      text: t('overview.widgets.profit.vsPrevious', {
-        delta: formatIskCompactSigned(delta),
-        count: range,
-      }),
-      direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat',
-      tone: delta > 0 ? 'good' : delta < 0 ? 'bad' : undefined,
-    };
-  }
+  const secondary =
+    previous.length > 0
+      ? vsPrevious(t, total - previous.reduce((sum, run) => sum + run.profit, 0), range)
+      : undefined;
 
   const table: TableModel = {
     columns: [
@@ -446,6 +471,5 @@ export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
     build: sovRaidsPending,
     loadBuild: () => import('./sovRaidsModel').then((m) => m.sovRaids),
   },
-  profit: { feeds: ['profit'], scope: 'character', build: profit },
   miningYield: { feeds: ['miningYield'], scope: 'account', build: miningYield },
 };
