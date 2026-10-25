@@ -12504,6 +12504,7 @@
       "offline": "Offline, couldn't check"
     },
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
+    "updatePending": "The update is still rolling out. Try again in a few minutes.",
     "analyticsTitle": "Analytics",
     "analyticsLabel": "Send page views",
     "analyticsHint": "Sends only the page name to Google Analytics. Never character, corporation or other IDs.",

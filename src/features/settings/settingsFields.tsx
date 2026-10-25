@@ -28,19 +28,19 @@ export function DefaultsSyncHint() {
   return <SettingsScopeHint scope="synced" />;
 }
 
-/** A success or error line after a button press. Success is a polite status; an error is an alert. */
+/** A line after a button press. Success and info are a polite status; an error is an alert. */
 export function ActionResult({
   kind,
   children,
   className,
 }: {
-  kind: 'success' | 'error';
+  kind: 'success' | 'info' | 'error';
   children: ReactNode;
   className?: string;
 }) {
-  const tone = kind === 'success' ? 'text-success' : 'text-danger';
+  const tone = { success: 'text-success', info: 'text-text-dim', error: 'text-danger' }[kind];
   const classes = `${className ? `${className} ` : ''}text-xs ${tone}`;
-  return kind === 'success' ? (
+  return kind !== 'error' ? (
     <p role="status" aria-live="polite" className={classes}>
       {children}
     </p>
