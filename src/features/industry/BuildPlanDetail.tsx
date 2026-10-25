@@ -91,6 +91,8 @@ import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
+import { mineralShortfall } from '@/engine/industry/oreBuyPlan';
+import { BuyOreDialog } from './buyOre/BuyOreDialog';
 import { parseTaxPct } from './planInputParsers';
 import { buildItemMenuProps } from './buildItemMenuProps';
 import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
@@ -944,6 +946,11 @@ export function BuildPlanDetail({
    * is also how the modal closes when its row stops being built underneath it.
    */
   const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
+
+  /** "Buy ore instead", offered only while the plan still buys a mineral. */
+  const [buyOreOpen, setBuyOreOpen] = useState(false);
+  const shortfall = useMemo(() => mineralShortfall(visibleMaterials), [visibleMaterials]);
+  const hasShortfall = Object.keys(shortfall.needs).length > 0;
 
   /** Which Blueprint Acquisition row's picker/override modal (issue #839) is open, if any. */
   const [acquisitionPickerTypeId, setAcquisitionPickerTypeId] = useState<number | null>(null);
@@ -1867,6 +1874,7 @@ export function BuildPlanDetail({
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
                 onBuildAll={buildHereAll}
+                onBuyOre={hasShortfall ? () => setBuyOreOpen(true) : undefined}
                 ownedSellNet={ownedForSale?.net ?? null}
                 sellValueFor={(typeID) =>
                   ownedForSale?.lines.find((line) => line.typeID === typeID)?.net
@@ -1877,6 +1885,15 @@ export function BuildPlanDetail({
                 characterNameFor={detection.characterNameFor}
                 depthFor={(typeID) => boughtDepth.get(typeID)}
               />
+              {buyOreOpen && (
+                <BuyOreDialog
+                  open
+                  onClose={() => setBuyOreOpen(false)}
+                  hub={hub}
+                  needs={shortfall.needs}
+                  mineralsTotal={shortfall.total}
+                />
+              )}
               <BuildRecipeModal
                 recipe={openRecipe}
                 onClose={() => setRecipeTypeId(null)}
