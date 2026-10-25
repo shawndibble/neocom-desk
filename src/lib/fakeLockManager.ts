@@ -6,9 +6,11 @@
  * Faithful to the parts the app leans on — exclusive locks granted FIFO per
  * name, granted asynchronously, held until the callback's promise settles,
  * `request` resolving to the callback's result, and an aborted `signal`
- * dropping a still-queued request with an `AbortError`, and `ifAvailable`
- * calling back with `null` when the lock is taken. Shared mode, `steal` and
- * `query` are not modelled.
+ * dropping a still-queued request with an `AbortError`, `ifAvailable`
+ * calling back with `null` when the lock is taken, and `steal` taking the lock
+ * at once — the previous holder's `request` rejects with an `AbortError` while
+ * its callback runs on, no longer holding anything. Shared mode and `query`
+ * are not modelled.
  */
 type Callback = (lock: { name: string; mode: 'exclusive' } | null) => unknown;
 
@@ -24,7 +26,7 @@ export interface FakeLockManager {
   request(name: string, callback: Callback): Promise<unknown>;
   request(
     name: string,
-    options: { signal?: AbortSignal; ifAvailable?: boolean },
+    options: { signal?: AbortSignal; ifAvailable?: boolean; steal?: boolean },
     callback: Callback
   ): Promise<unknown>;
   /** Names currently held — for assertions. */
@@ -35,30 +37,41 @@ export function createFakeLockManager(): FakeLockManager {
   const heldNames = new Set<string>();
   const queues = new Map<string, Waiter[]>();
 
-  function pump(name: string) {
-    if (heldNames.has(name)) return;
-    const next = queues.get(name)?.shift();
-    if (!next) return;
-    if (next.onAbort) next.signal?.removeEventListener('abort', next.onAbort);
+  /** The current holder of each held name — a steal rejects it. */
+  const holders = new Map<string, Waiter>();
+
+  function grant(name: string, waiter: Waiter) {
     heldNames.add(name);
+    holders.set(name, waiter);
     // Granted on a later task, as a browser does.
     setTimeout(() => {
       let result: Promise<unknown>;
       try {
-        result = Promise.resolve(next.callback({ name, mode: 'exclusive' }));
+        result = Promise.resolve(waiter.callback({ name, mode: 'exclusive' }));
       } catch (err) {
         result = Promise.reject(err);
       }
-      result.then(next.resolve, next.reject).finally(() => {
+      result.then(waiter.resolve, waiter.reject).finally(() => {
+        // Stolen meanwhile: the lock is someone else's now.
+        if (holders.get(name) !== waiter) return;
+        holders.delete(name);
         heldNames.delete(name);
         pump(name);
       });
     }, 0);
   }
 
+  function pump(name: string) {
+    if (heldNames.has(name)) return;
+    const next = queues.get(name)?.shift();
+    if (!next) return;
+    if (next.onAbort) next.signal?.removeEventListener('abort', next.onAbort);
+    grant(name, next);
+  }
+
   function request(
     name: string,
-    optionsOrCallback: { signal?: AbortSignal; ifAvailable?: boolean } | Callback,
+    optionsOrCallback: { signal?: AbortSignal; ifAvailable?: boolean; steal?: boolean } | Callback,
     maybeCallback?: Callback
   ): Promise<unknown> {
     const options = typeof optionsOrCallback === 'function' ? {} : optionsOrCallback;
@@ -78,6 +91,14 @@ export function createFakeLockManager(): FakeLockManager {
         return;
       }
       const waiter: Waiter = { callback, resolve, reject, signal };
+      if (options.steal) {
+        const holder = holders.get(name);
+        holders.delete(name);
+        heldNames.delete(name);
+        holder?.reject(new DOMException('The lock was stolen.', 'AbortError'));
+        grant(name, waiter);
+        return;
+      }
       if (signal) {
         waiter.onAbort = () => {
           const queue = queues.get(name) ?? [];

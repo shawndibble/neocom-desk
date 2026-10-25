@@ -8,12 +8,18 @@
  * route) but the poller only in `Layout`, so a tab on `/s/*` or `/share/*` or `/login`
  * must never win the poller's lock and then not poll.
  *
- * Leadership is a held Web Lock, and only a *visible* tab holds it: both jobs
- * skip while hidden, so a hidden leader would mean nobody works. A tab requests
- * the lock when it becomes visible and gives it up (or drops its queued
- * request) when hidden, on `pagehide`, when the job unmounts, or when closed —
- * the browser releases a closed tab's locks. With every tab hidden nobody
- * leads, which is exactly the pre-election hidden behaviour.
+ * Leadership is a held Web Lock. For the sweep only a *visible* tab holds it:
+ * the sweep skips while hidden, so a hidden leader would mean nobody works. A
+ * tab requests the lock when it becomes visible and gives it up (or drops its
+ * queued request) when hidden, on `pagehide`, when the job unmounts, or when
+ * closed — the browser releases a closed tab's locks. With every tab hidden
+ * nobody leads, which is exactly the pre-election hidden behaviour.
+ *
+ * The poller's leader keeps its lock while hidden (`keepWhileHidden`, issue
+ * #5120), so a player who switches away for a few minutes still gets device
+ * pop-ups. A hidden tab may lead if nobody else does; a tab being shown steals
+ * the lock, so a visible tab always wins over a hidden — perhaps frozen — one,
+ * and a displaced leader queues up again to take over once that tab goes.
  *
  * Without Web Locks every tab is leader, permanently, and no change is ever
  * announced — so callers behave exactly as they did before election existed.
@@ -26,7 +32,7 @@
 interface LocksLike {
   request(
     name: string,
-    options: { signal?: AbortSignal; ifAvailable?: boolean },
+    options: { signal?: AbortSignal; ifAvailable?: boolean; steal?: boolean },
     callback: (lock: unknown) => unknown
   ): Promise<unknown>;
 }
@@ -49,8 +55,10 @@ export function createTabLeader(env: {
   locks: LocksLike | undefined;
   doc: DocLike;
   win: EventTarget;
+  /** Keep leading while hidden, yielding only to a tab being shown. */
+  keepWhileHidden?: boolean;
 }): TabLeader {
-  const { lockName, locks, doc, win } = env;
+  const { lockName, locks, doc, win, keepWhileHidden = false } = env;
   if (!locks) {
     return { isLeader: () => true, subscribe: () => () => {}, stop: () => {} };
   }
@@ -62,6 +70,8 @@ export function createTabLeader(env: {
   let pending: AbortController | null = null;
   /** Present while the lock is held: resolving it releases the lock. */
   let release: (() => void) | null = null;
+  /** The request whose lock is held — told apart from a later queued one. */
+  let holder: AbortController | null = null;
 
   function setLeader(next: boolean) {
     if (leader === next) return;
@@ -69,30 +79,51 @@ export function createTabLeader(env: {
     listeners.forEach((listener) => listener());
   }
 
-  function acquire() {
-    if (stopped || pending || doc.visibilityState !== 'visible') return;
+  /** `steal` only on being shown: a tab displaced by one just queues again. */
+  function acquire(steal = false) {
+    const visible = doc.visibilityState === 'visible';
+    if (stopped || holder || (!visible && !keepWhileHidden)) return;
+    if (pending) {
+      if (!(steal && keepWhileHidden && visible)) return;
+      // Queued behind a hidden leader: take it now instead.
+      const queued = pending;
+      pending = null;
+      queued.abort();
+    }
     const controller = new AbortController();
     pending = controller;
+    // A steal is granted at once, and Web Locks refuse a signal alongside it.
+    const options =
+      steal && keepWhileHidden && visible ? { steal: true } : { signal: controller.signal };
     locks!
-      .request(lockName, { signal: controller.signal }, () => {
+      .request(lockName, options, () => {
         // Granted after this tab gave up on it: let the next tab have it.
-        if (pending !== controller || doc.visibilityState !== 'visible') return;
+        if (pending !== controller) return;
+        if (!keepWhileHidden && doc.visibilityState !== 'visible') return;
         return new Promise<void>((resolve) => {
+          holder = controller;
           release = resolve;
           setLeader(true);
         });
       })
       .catch(() => {
-        // AbortError from a request dropped while queued — nothing to undo.
+        // AbortError: dropped while queued, or stolen by a tab being shown.
+        if (holder !== controller) return;
+        holder = null;
+        release = null;
+        pending = null;
+        setLeader(false);
+        acquire();
       })
       .finally(() => {
-        if (pending === controller) pending = null;
+        if (pending === controller && holder !== controller) pending = null;
       });
   }
 
   function relinquish() {
     const controller = pending;
     pending = null;
+    holder = null;
     controller?.abort();
     const held = release;
     release = null;
@@ -101,8 +132,8 @@ export function createTabLeader(env: {
   }
 
   function onVisibilityChange() {
-    if (doc.visibilityState === 'visible') acquire();
-    else relinquish();
+    if (doc.visibilityState === 'visible') acquire(true);
+    else if (!keepWhileHidden) relinquish();
   }
 
   function onPageShow(event: Event) {
@@ -112,7 +143,7 @@ export function createTabLeader(env: {
   doc.addEventListener('visibilitychange', onVisibilityChange);
   win.addEventListener('pagehide', relinquish);
   win.addEventListener('pageshow', onPageShow);
-  acquire();
+  acquire(true);
 
   return {
     isLeader: () => leader,
@@ -165,7 +196,11 @@ export function createTabElections(env: TabElectionEnv): TabElections {
       let election = elections.get(job);
       if (!election) {
         election = {
-          leader: createTabLeader({ ...env, lockName: `neocom:leader:${job}` }),
+          leader: createTabLeader({
+            ...env,
+            lockName: `neocom:leader:${job}`,
+            keepWhileHidden: job === 'poller',
+          }),
           seats: 0,
         };
         elections.set(job, election);

@@ -9,12 +9,22 @@ import {
 import { createFakeLockManager, type FakeLockManager } from './fakeLockManager';
 
 /** One simulated tab: its own document and window, sharing the origin's locks. */
-function makeTab(locks: FakeLockManager | undefined, visibility: 'visible' | 'hidden' = 'visible') {
+function makeTab(
+  locks: FakeLockManager | undefined,
+  visibility: 'visible' | 'hidden' = 'visible',
+  keepWhileHidden = false
+) {
   const doc = Object.assign(new EventTarget(), {
     visibilityState: visibility as DocumentVisibilityState,
   });
   const win = new EventTarget();
-  const leader = createTabLeader({ lockName: 'neocom:leader:test', locks, doc, win });
+  const leader = createTabLeader({
+    lockName: 'neocom:leader:test',
+    locks,
+    doc,
+    win,
+    keepWhileHidden,
+  });
   started.push(leader);
   return {
     leader,
@@ -160,6 +170,73 @@ describe('createTabLeader', () => {
   });
 });
 
+describe('createTabLeader keepWhileHidden (the poller, issue #5120)', () => {
+  it('a hidden leader keeps leading while no other tab is shown', async () => {
+    const locks = createFakeLockManager();
+    const a = makeTab(locks, 'visible', true);
+    await settle();
+    a.hide();
+    await settle();
+    expect(a.leader.isLeader()).toBe(true);
+  });
+
+  it('a tab opened hidden leads when nobody else does', async () => {
+    const locks = createFakeLockManager();
+    const a = makeTab(locks, 'hidden', true);
+    await settle();
+    expect(a.leader.isLeader()).toBe(true);
+  });
+
+  it('a tab being shown takes leadership over from a hidden leader', async () => {
+    const locks = createFakeLockManager();
+    const a = makeTab(locks, 'visible', true);
+    await settle();
+    a.hide();
+    const b = makeTab(locks, 'hidden', true);
+    await settle();
+    const onChange = vi.fn();
+    a.leader.subscribe(onChange);
+
+    b.show();
+    await settle();
+
+    expect(b.leader.isLeader()).toBe(true);
+    expect(a.leader.isLeader()).toBe(false);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('a displaced leader takes over again once the new one goes away', async () => {
+    const locks = createFakeLockManager();
+    const a = makeTab(locks, 'visible', true);
+    await settle();
+    a.hide();
+    const b = makeTab(locks, 'visible', true);
+    await settle();
+    expect(b.leader.isLeader()).toBe(true);
+
+    b.pagehide();
+    await settle();
+
+    expect(a.leader.isLeader()).toBe(true);
+  });
+
+  it('two shown tabs never trade the lock back and forth on their own', async () => {
+    const locks = createFakeLockManager();
+    const a = makeTab(locks, 'visible', true);
+    await settle();
+    const b = makeTab(locks, 'visible', true);
+    await settle();
+    const onChange = vi.fn();
+    a.leader.subscribe(onChange);
+    b.leader.subscribe(onChange);
+
+    await settle();
+
+    expect([a.leader.isLeader(), b.leader.isLeader()].filter(Boolean)).toHaveLength(1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
 describe('createTabElections', () => {
   it('holds a job’s lock only while something in the tab stands for it', async () => {
     const locks = createFakeLockManager();
@@ -199,17 +276,33 @@ describe('createTabElections', () => {
     const locks = createFakeLockManager();
     const a = makeElections(locks);
     const b = makeElections(locks);
-    const aPoller = a.join('poller', () => {});
+    const aSweep = a.join('sweep', () => {});
     await settle();
     const onChange = vi.fn();
-    const bPoller = b.join('poller', onChange);
+    const bSweep = b.join('sweep', onChange);
     await settle();
-    expect(bPoller.isLeader()).toBe(false);
+    expect(bSweep.isLeader()).toBe(false);
 
-    aPoller.leave();
+    aSweep.leave();
+    await settle();
+    expect(bSweep.isLeader()).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('the poller goes to the newest shown tab, and back when it unmounts', async () => {
+    const locks = createFakeLockManager();
+    const a = makeElections(locks);
+    const b = makeElections(locks);
+    const aPoller = a.join('poller', () => {});
+    await settle();
+    const bPoller = b.join('poller', () => {});
     await settle();
     expect(bPoller.isLeader()).toBe(true);
-    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(aPoller.isLeader()).toBe(false);
+
+    bPoller.leave();
+    await settle();
+    expect(aPoller.isLeader()).toBe(true);
   });
 });
 

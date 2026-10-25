@@ -59,12 +59,12 @@ describe('ForegroundNotificationPoller', () => {
     expect(runForegroundPoll).toHaveBeenCalledTimes(1);
   });
 
-  it('does not poll after mount while hidden', () => {
+  it('polls after mount even while hidden, when this tab leads (issue #5120)', () => {
     vi.useFakeTimers();
     setHidden(true);
     render(<ForegroundNotificationPoller />);
     vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
-    expect(runForegroundPoll).not.toHaveBeenCalled();
+    expect(runForegroundPoll).toHaveBeenCalledTimes(1);
   });
 
   it('polls again every POLL_INTERVAL_MS while visible', () => {
@@ -78,14 +78,14 @@ describe('ForegroundNotificationPoller', () => {
     expect(runForegroundPoll).toHaveBeenCalledTimes(3);
   });
 
-  it('skips a scheduled tick while hidden', () => {
+  it('keeps polling while hidden, so a player who switched apps still gets pop-ups', () => {
     vi.useFakeTimers();
     render(<ForegroundNotificationPoller />);
     vi.advanceTimersByTime(FIRST_POLL_DELAY_MS);
     expect(runForegroundPoll).toHaveBeenCalledTimes(1);
     setHidden(true);
     vi.advanceTimersByTime(POLL_INTERVAL_MS);
-    expect(runForegroundPoll).toHaveBeenCalledTimes(1);
+    expect(runForegroundPoll).toHaveBeenCalledTimes(2);
   });
 
   it('runs an immediate catch-up poll on regaining visibility', () => {
