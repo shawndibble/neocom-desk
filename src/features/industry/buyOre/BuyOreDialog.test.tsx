@@ -22,12 +22,14 @@ vi.mock('@/features/character/typeNames', () => ({
 vi.mock('@/features/character/characterModifiers', () => ({
   loadCharacterModifiers: async () => ({ skills: {} }),
 }));
-vi.mock('../depthPriceLoader', () => ({ loadDepthPrices: async () => new Map() }));
+const depth = vi.hoisted(() => ({ value: new Map<number, unknown>() }));
+vi.mock('../depthPriceLoader', () => ({ loadDepthPrices: async () => depth.value }));
 
 import { BuyOreDialog } from './BuyOreDialog';
 
 const needs = { 34: 1000 };
 beforeEach(() => {
+  depth.value = new Map();
   prices.clear();
   prices.set(28430, { sellMin: 5, buyMax: 4 });
   prices.set(34, { sellMin: 6, buyMax: 5 });
@@ -47,7 +49,7 @@ describe('BuyOreDialog', () => {
     // 1000 trit at 200 a batch = 5 batches = 500 units at 5 ISK = 2,500 ISK.
     expect(await screen.findByText('Compressed Veldspar')).toBeTruthy();
     expect(screen.getByText(/Refining at 50.0% base rate \(NPC station\)/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Copy buy list' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Copy buy list' })).toBeTruthy();
     expect(screen.getByText(/Cheapest found/)).toBeTruthy();
   });
 
@@ -64,5 +66,20 @@ describe('BuyOreDialog', () => {
     expect(await screen.findByText(/Buying the minerals is cheaper/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Copy buy list' })).toBeNull();
     expect(screen.queryByText('Compressed Veldspar')).toBeNull();
+  });
+
+  it('buys minerals when the hub lists fewer units of the ore than the route needs', async () => {
+    depth.value = new Map([[28430, { need: 500, filled: 100, avg: 5, covered: false }]]);
+    render(
+      <BuyOreDialog
+        open
+        onClose={vi.fn()}
+        hub={DEFAULT_TRADE_HUB}
+        needs={needs}
+        mineralsTotal={6000}
+      />
+    );
+    expect(await screen.findByText(/lists fewer units of this ore/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Copy buy list' })).toBeNull();
   });
 });

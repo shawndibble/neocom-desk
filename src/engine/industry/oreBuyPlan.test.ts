@@ -141,6 +141,17 @@ describe('planOreBuy', () => {
   });
 });
 
+describe('volume ordering', () => {
+  it('skips an ore with no known volume instead of treating it as free to haul', () => {
+    const route = planOreBuy({
+      needs: { [TRIT]: 200 },
+      ores: [{ ...heavyCheap, unitVolume: 0 }, lightPricey],
+      ordering: 'volume',
+    });
+    expect(route.purchases.map((p) => p.typeId)).toEqual([2]);
+  });
+});
+
 describe('compareOreRoute', () => {
   const route = planOreBuy({
     needs: { [TRIT]: 600, [PYER]: 450 },
@@ -148,18 +159,17 @@ describe('compareOreRoute', () => {
     ordering: 'cost',
   });
 
-  it('values leftovers net of sales tax and recommends ore when it beats minerals', () => {
+  it('values leftovers at the buy price and recommends ore when it beats minerals', () => {
     const c = compareOreRoute({
       route,
       mineralsTotal: 10_000,
       mineralBuyPrices: { [TRIT]: 4 },
-      salesTaxPct: 10,
     });
-    // ore 10 batches * 600 = 6000; leftover 150 * 4 * 0.9 = 540.
+    // ore 10 batches * 600 = 6000; leftover 150 * 4 = 600.
     expect(c.oreCost).toBe(6000);
-    expect(c.leftoverValue).toBe(540);
-    expect(c.oreNet).toBe(5460);
-    expect(c.saving).toBe(4540);
+    expect(c.leftoverValue).toBe(600);
+    expect(c.oreNet).toBe(5400);
+    expect(c.saving).toBe(4600);
     expect(c.recommendOre).toBe(true);
   });
 
@@ -168,9 +178,8 @@ describe('compareOreRoute', () => {
       route,
       mineralsTotal: 5_000,
       mineralBuyPrices: { [TRIT]: 4 },
-      salesTaxPct: 10,
     });
-    expect(c.saving).toBe(-460);
+    expect(c.saving).toBe(-400);
     expect(c.recommendOre).toBe(false);
   });
 
@@ -179,7 +188,6 @@ describe('compareOreRoute', () => {
       route,
       mineralsTotal: 10_000,
       mineralBuyPrices: {},
-      salesTaxPct: 10,
     });
     expect(c.leftoverValue).toBe(0);
     expect(c.leftoverUnpriced).toEqual([TRIT]);
@@ -195,7 +203,6 @@ describe('compareOreRoute', () => {
       route: partial,
       mineralsTotal: 1e9,
       mineralBuyPrices: {},
-      salesTaxPct: 0,
     });
     expect(c.recommendOre).toBe(false);
   });

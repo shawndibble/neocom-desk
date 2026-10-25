@@ -1,22 +1,8 @@
 /**
- * "Buy ore instead" (issue #5134): which compressed ore to buy and refine to
- * cover a plan's mineral shortfall, set against buying the minerals.
- *
- * Pure. Every ore yields several minerals, so this is a small integer
- * program. It is solved greedily with a repair pass, not exactly: the result
- * is the cheapest (or lightest) route *found*, never claimed optimal.
- *
- * - Greedy: repeatedly buy the ore with the lowest metric (ISK or m³) per
- *   unit of still-needed mineral, in as many batches as it takes to finish
- *   the first mineral it serves.
- * - Repair: walk the purchases dearest first and trim each to the fewest
- *   whole batches that still cover every shortfall, since later picks can
- *   make an earlier batch redundant.
- *
- * Ore is bought in whole portions, so no part-portion remainder is bought
- * and none refines into nothing. Leftover minerals (output beyond the
- * shortfall) are valued as `20260914-192439` values refine-vs-sell leftovers:
- * at the hub buy price, net of sales tax.
+ * "Buy ore instead": which compressed ore to buy and refine to cover a mineral
+ * shortfall. A small integer program, solved greedily plus a repair pass that
+ * trims redundant batches: cheapest (or lightest) route found, not proven optimal.
+ * Ore is bought in whole portions; leftover minerals are valued at the hub buy price.
  */
 import { reprocessingYield, type ReprocessingMaterial } from './reprocessing';
 
@@ -76,8 +62,13 @@ export function planOreBuy(input: {
   const { ordering, mineralPrices = {} } = input;
   const need: Record<number, number> = {};
   for (const [id, qty] of Object.entries(input.needs)) if (qty > 0) need[Number(id)] = qty;
+  // An ore with no known volume would read as free to haul, so it cannot be ranked by weight.
   const ores = input.ores.filter(
-    (o) => o.portionSize > 0 && o.unitPrice !== null && o.unitPrice >= 0
+    (o) =>
+      o.portionSize > 0 &&
+      o.unitPrice !== null &&
+      o.unitPrice >= 0 &&
+      (ordering === 'cost' || o.unitVolume > 0)
   );
   const metricPerBatch = (o: BuyableOre) =>
     (ordering === 'cost' ? o.unitPrice! : o.unitVolume) * o.portionSize;
@@ -95,7 +86,9 @@ export function planOreBuy(input: {
     if (!uncovered.includes(id)) remaining[id] = need[id]!;
   const batchesOf = new Map<number, number>();
 
-  const weight = (id: number) => ((mineralPrices[id] ?? 0) > 0 ? mineralPrices[id]! : 1);
+  // ISK weights rank ores by cost; hauling is per unit of mineral, so volume weighs all alike.
+  const weight = (id: number) =>
+    ordering === 'cost' && (mineralPrices[id] ?? 0) > 0 ? mineralPrices[id]! : 1;
   for (;;) {
     let best: { ore: BuyableOre; k: number; score: number } | null = null;
     for (const ore of ores) {
@@ -140,10 +133,9 @@ export function planOreBuy(input: {
     });
 
   // Repair: dearest purchase first, binary-search the fewest batches that still cover.
+  const oreById = new Map(ores.map((o) => [o.typeId, o]));
   const byMetric = [...batchesOf.keys()].sort(
-    (a, b) =>
-      metricPerBatch(ores.find((o) => o.typeId === b)!) -
-      metricPerBatch(ores.find((o) => o.typeId === a)!)
+    (a, b) => metricPerBatch(oreById.get(b)!) - metricPerBatch(oreById.get(a)!)
   );
   for (const typeId of byMetric) {
     let lo = 0;
@@ -189,7 +181,7 @@ export function planOreBuy(input: {
 
 export interface OreRouteComparison {
   oreCost: number;
-  /** Leftover minerals at the hub buy price, net of sales tax. */
+  /** Leftover minerals at the hub buy price. */
   leftoverValue: number;
   /** Leftover mineral type ids with no buy price: counted as 0, never as free value. */
   leftoverUnpriced: number[];
@@ -206,17 +198,15 @@ export function compareOreRoute(input: {
   /** What buying the shortfall minerals costs, as the plan prices them. */
   mineralsTotal: number;
   mineralBuyPrices: Readonly<Record<number, number>>;
-  salesTaxPct: number;
   /** Ore cost re-priced from the order book; defaults to the route's flat cost. */
   oreCost?: number;
 }): OreRouteComparison {
-  const { route, mineralsTotal, mineralBuyPrices, salesTaxPct } = input;
-  const net = 1 - salesTaxPct / 100;
+  const { route, mineralsTotal, mineralBuyPrices } = input;
   let leftoverValue = 0;
   const leftoverUnpriced: number[] = [];
   for (const [idStr, qty] of Object.entries(route.leftovers)) {
     const price = mineralBuyPrices[Number(idStr)];
-    if (price && price > 0) leftoverValue += qty * price * net;
+    if (price && price > 0) leftoverValue += qty * price;
     else leftoverUnpriced.push(Number(idStr));
   }
   const oreCost = input.oreCost ?? route.cost;

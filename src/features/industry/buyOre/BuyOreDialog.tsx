@@ -1,15 +1,11 @@
 /**
- * "Buy ore instead" (issue #5134): a plan's mineral shortfall, priced as
- * compressed ore bought at the plan's hub and refined, against buying the
- * minerals. The route is "cheapest found" (`oreBuyPlan.ts`), not optimal.
- *
- * The refining facility is an assumption the dialog states, the same one the
- * Assets "What to do with this ore" dialog uses (synced structure rate; 0 is
- * an NPC station at the 50% base).
+ * "Buy ore instead": a plan's mineral shortfall as compressed ore bought at the
+ * plan's hub and refined, against buying the minerals. The refining facility is
+ * stated, and shares the synced structure rate with the Assets ore dialog.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fixed1, fixed2 } from '@/lib/fixedFormat';
+import { fixed1 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
@@ -35,8 +31,6 @@ import { loadCharacterModifiers } from '@/features/character/characterModifiers'
 import { useOreRefiningStructureRate } from '@/features/assets/oreDecision/refiningFacility';
 import { NO_CHARACTER_MODIFIERS, refiningEfficiency } from '@/engine/industry/characterModifiers';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
-import { salesTaxPct } from '@/engine/industry/fees';
-import { SKILL_IDS } from '@/engine/industry/types';
 import { resolveRefiningRate } from '@/engine/industry/oreDecision';
 import {
   compareOreRoute,
@@ -91,8 +85,13 @@ export function BuyOreDialog({
   const setStructureRate = useOreRefiningStructureRate((state) => state.setValue);
   const [editingYield, setEditingYield] = useState(false);
   const [ordering, setOrdering] = useState<OreOrdering>('cost');
-  const [data, setData] = useState<BuyOreData | null>(null);
-  const [walk, setWalk] = useState<ReadonlyMap<number, DepthPrice>>(new Map());
+  // Keyed on the inputs they were built for, so a changed hub or shortfall never
+  // reads the previous load's prices while the new one is in flight.
+  const [loaded, setLoaded] = useState<{ key: string; data: BuyOreData } | null>(null);
+  const [walked, setWalked] = useState<{
+    key: string;
+    depth: ReadonlyMap<number, DepthPrice> | 'failed';
+  } | null>(null);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const { failed: loadFailed, attempt, fail, clear, retry } = useRetryableLoad();
 
@@ -101,6 +100,8 @@ export function BuyOreDialog({
   }, []);
 
   const needsKey = JSON.stringify(Object.entries(needs).sort());
+  const inputKey = `${hub.id}|${needsKey}`;
+  const data = loaded?.key === inputKey ? loaded.data : null;
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -129,18 +130,25 @@ export function BuyOreDialog({
           unitVolume: types[String(compressedId)]?.volume ?? 0,
         });
       }
-      const ids = [...new Set([...wanted, ...candidates.map((c) => c.typeId)])];
+      // Every mineral an ore refines into, so leftover byproducts are priced too.
+      const ids = [
+        ...new Set([
+          ...wanted,
+          ...candidates.flatMap((c) => [c.typeId, ...c.materials.map((m) => m.typeId)]),
+        ]),
+      ];
       const [prices, names] = await Promise.all([getHubPrices(hub, ids), loadTypeNames(ids)]);
       for (const c of candidates) {
         const price = prices.get(c.typeId)?.sellMin;
         c.unitPrice = price && price > 0 ? price : null;
       }
       const mineralBuyPrices: Record<number, number> = {};
-      for (const id of wanted) {
+      for (const id of ids) {
         const price = prices.get(id)?.buyMax;
         if (price && price > 0) mineralBuyPrices[id] = price;
       }
-      if (!cancelled) setData({ candidates, modifiers, mineralBuyPrices, names });
+      if (!cancelled)
+        setLoaded({ key: inputKey, data: { candidates, modifiers, mineralBuyPrices, names } });
     })().catch(() => {
       if (!cancelled) fail();
     });
@@ -182,41 +190,50 @@ export function BuyOreDialog({
   useEffect(() => {
     if (!route || route.purchases.length === 0) return;
     let cancelled = false;
+    const key = `${inputKey}|${purchaseKey}`;
     const wanted = new Map(route.purchases.map((p) => [p.typeId, p.units]));
     void loadDepthPrices(hub, wanted)
       .then((depth) => {
-        if (!cancelled) setWalk(depth);
+        if (!cancelled) setWalked({ key, depth });
       })
       .catch(() => {
-        if (!cancelled) setWalk(new Map());
+        if (!cancelled) setWalked({ key, depth: 'failed' });
       });
     return () => {
       cancelled = true;
     };
     // `purchaseKey` stands for `route.purchases`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hub, purchaseKey]);
+  }, [hub, purchaseKey, inputKey]);
 
+  const depth =
+    walked?.key === `${inputKey}|${purchaseKey}` && walked.depth !== 'failed' ? walked.depth : null;
+  // A failed walk falls back to the lowest sell, as the plan's own prices do.
+  const walkSettled =
+    !route || route.purchases.length === 0 || walked?.key === `${inputKey}|${purchaseKey}`;
+  const underfilled =
+    !!route && route.purchases.some((p) => depth?.get(p.typeId)?.covered === false);
   const unitCost = useCallback(
     (p: OrePurchase) => {
-      const w = walk.get(p.typeId);
+      const w = depth?.get(p.typeId);
       return w && w.need === p.units ? w.avg : p.units > 0 ? p.cost / p.units : 0;
     },
-    [walk]
+    [depth]
   );
   const oreCost = route ? route.purchases.reduce((s, p) => s + unitCost(p) * p.units, 0) : 0;
-  const taxPct = data ? salesTaxPct(data.modifiers.skills[SKILL_IDS.accounting] ?? 0) : 0;
   const comparison =
-    route && data && mineralsTotal !== null
+    route && data && walkSettled && mineralsTotal !== null
       ? compareOreRoute({
           route,
           mineralsTotal,
           mineralBuyPrices: data.mineralBuyPrices,
-          salesTaxPct: taxPct,
           oreCost,
         })
       : null;
 
+  // Minerals cheaper: no ore list to offer.
+  const recommendOre = !!comparison?.recommendOre && !underfilled;
+  const showRoute = !comparison || recommendOre;
   const name = (id: number) => data?.names.get(id) ?? `#${id}`;
   const facilityLabel =
     structureRate > 0 ? t('industry.buyOre.facilityStructure') : t('industry.buyOre.facilityNpc');
@@ -301,7 +318,7 @@ export function BuyOreDialog({
               )}
               {route.purchases.length === 0 ? (
                 <p className="text-text-dim">{t('industry.buyOre.noRoute')}</p>
-              ) : comparison && !comparison.recommendOre ? null : (
+              ) : !showRoute ? null : (
                 <div className="overflow-hidden rounded-xs border border-line">
                   <p className={TABLE_TITLE_TEXT}>{t('industry.buyOre.routeTitle')}</p>
                   <div className="overflow-x-auto">
@@ -326,14 +343,17 @@ export function BuyOreDialog({
                     <IskAmount value={comparison.mineralsTotal} decimals={0} />
                   </p>
                   <p className="font-semibold">
-                    {comparison.recommendOre
+                    {recommendOre
                       ? t('industry.buyOre.saves', {
                           amount: formatCount(Math.round(comparison.saving)),
                         })
-                      : t('industry.buyOre.buyMineralsCheaper')}
+                      : underfilled
+                        ? t('industry.buyOre.underfilled')
+                        : t('industry.buyOre.buyMineralsCheaper')}
                   </p>
                 </div>
               )}
+              {!walkSettled && <p className="text-text-dim">{t('industry.buyOre.pricingDepth')}</p>}
               {mineralsTotal === null && (
                 <p className="text-warning">{t('industry.buyOre.mineralsUnpriced')}</p>
               )}
@@ -366,7 +386,7 @@ export function BuyOreDialog({
                 <p className="text-xs text-text-dim">{t('industry.buyOre.wholePortions')}</p>
               )}
               <div className="space-y-1.5 text-[0.6875rem] leading-relaxed text-text-dim">
-                <p>{t('industry.buyOre.pricingBasis', { hub: hub.name, tax: fixed2(taxPct) })}</p>
+                <p>{t('industry.buyOre.pricingBasis', { hub: hub.name })}</p>
                 <p className="flex flex-wrap items-center gap-2">
                   <span>
                     {t('industry.buyOre.yieldAssumption', {
@@ -405,9 +425,15 @@ export function BuyOreDialog({
                     />
                   </label>
                 )}
-                <p>{t('industry.buyOre.cheapestFound')}</p>
+                <p>
+                  {t(
+                    ordering === 'cost'
+                      ? 'industry.buyOre.cheapestFound'
+                      : 'industry.buyOre.lightestFound'
+                  )}
+                </p>
               </div>
-              {comparison?.recommendOre && (
+              {recommendOre && (
                 <div className="flex items-center gap-2">
                   <Button variant="accent" onClick={() => void copyList()}>
                     {copied === 'copied'

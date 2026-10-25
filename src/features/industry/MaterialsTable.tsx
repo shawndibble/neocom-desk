@@ -111,10 +111,7 @@ interface MaterialsTableProps {
    * heading's link when two or more rows would be cheaper to build.
    */
   onBuildAll?: (typeIDs: readonly number[]) => void;
-  /**
-   * Opens "Buy ore instead" (issue #5134) from the To buy heading. Passed only
-   * while the plan still has a mineral to buy.
-   */
+  /** Opens "Buy ore instead" from the To buy heading; passed only while a mineral is still bought. */
   onBuyOre?: () => void;
   /**
    * What the owned units this job consumes would net if sold, after fees;

@@ -947,7 +947,7 @@ export function BuildPlanDetail({
    */
   const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
 
-  /** "Buy ore instead" (issue #5134): the plan's bought minerals, offered only while it has some. */
+  /** "Buy ore instead", offered only while the plan still buys a mineral. */
   const [buyOreOpen, setBuyOreOpen] = useState(false);
   const shortfall = useMemo(() => mineralShortfall(visibleMaterials), [visibleMaterials]);
   const hasShortfall = Object.keys(shortfall.needs).length > 0;
