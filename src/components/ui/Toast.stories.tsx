@@ -39,3 +39,27 @@ export const WithAction: Story = {
     onClose: noop,
   },
 };
+
+/** @summary Feedback cue (§6c Undo): over a panel, where it must still stand out from the page. */
+export const OverPanel: Story = {
+  args: {
+    message: 'Auto-Integrity Preservation Seal moved to To buy',
+    undo: { label: 'Undo', onUndo: noop },
+    onClose: noop,
+  },
+  decorators: [
+    (Story) => (
+      <div className="bg-bg h-screen p-4">
+        <div className="bg-panel border-line text-text-dim h-full rounded-xs border p-4 text-sm">
+          {Array.from({ length: 24 }, (_, i) => (
+            <div key={i} className="border-line flex justify-between border-b py-2">
+              <span className="text-accent">Material {i + 1}</span>
+              <span>1,738</span>
+            </div>
+          ))}
+        </div>
+        <Story />
+      </div>
+    ),
+  ],
+};

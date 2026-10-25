@@ -1326,6 +1326,30 @@
     }
   }
 
+  /*
+   * A `Toast` arriving (`components/ui/Toast.tsx`): a short rise and fade so
+   * the eye catches it over a busy page. `transform`, not `translate`, so it
+   * leaves the toast's `-translate-x-1/2` centring alone. Plays once on mount;
+   * a toast that replaces another in place does not replay it. Reduced motion
+   * gets none (DESIGN.md §6: no transitions).
+   */
+  .toast-in {
+    animation: toast-in 150ms ease-out both;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast-in {
+      animation: none;
+    }
+  }
+
   @keyframes row-pulse-fade {
     0% {
       background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
