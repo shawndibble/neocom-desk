@@ -88,6 +88,17 @@ describe('loadActiveWars', () => {
     expect(await loadActiveWars(1)).toEqual([]);
   });
 
+  it('reads the Firestore doc when the R2 list is stale', async () => {
+    syncConfigured.value = true;
+    firestoreDoc.data = { updatedAt: Date.now(), wars: [war] };
+    const stale = { updatedAt: Date.now() - ACTIVE_WARS_STALE_AFTER_MS - 1, wars: [] };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json(stale))
+    );
+    expect(await loadActiveWars(1)).toEqual([war]);
+  });
+
   it('reads the Firestore doc when R2 has no list yet and sync is configured', async () => {
     syncConfigured.value = true;
     firestoreDoc.data = { updatedAt: Date.now(), wars: [war] };

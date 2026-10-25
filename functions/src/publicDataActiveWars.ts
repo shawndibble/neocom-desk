@@ -36,6 +36,7 @@ export interface PublicActiveWarsDeps {
   put: R2Put;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  budget?: number;
 }
 
 /** Runs one sweep; true when it wrote. */
@@ -43,14 +44,19 @@ export async function publishActiveWars(deps: PublicActiveWarsDeps): Promise<boo
   const outcome = await runActiveWarsSweep({
     fetchImpl: deps.fetchImpl ?? fetch,
     now: deps.now ?? Date.now,
+    ...(deps.budget === undefined ? {} : { budget: deps.budget }),
     read: async () => ((await deps.get(ACTIVE_WARS_STATE_R2_KEY)) ?? undefined) as ActiveWarsDoc,
-    write: async (doc) => {
+    write: async (doc, { complete }) => {
+      // No state to start from (the first runs) means a partial list: keep the app on
+      // the Firestore doc until the sweep has read back to the horizon.
       // The list first: a failed state write only repeats some reads next run.
-      await deps.put(
-        ACTIVE_WARS_R2_KEY,
-        JSON.stringify({ updatedAt: doc.updatedAt, wars: doc.wars }),
-        LIST_HEADERS
-      );
+      if (complete) {
+        await deps.put(
+          ACTIVE_WARS_R2_KEY,
+          JSON.stringify({ updatedAt: doc.updatedAt, wars: doc.wars }),
+          LIST_HEADERS
+        );
+      }
       await deps.put(ACTIVE_WARS_STATE_R2_KEY, JSON.stringify(doc), STATE_HEADERS);
     },
   });

@@ -46,7 +46,11 @@ async function readR2(): Promise<unknown> {
     });
     if (!res.ok) return null;
     const body: unknown = await res.json();
-    return parseStoredWars(body) === null ? null : body;
+    // A stale copy (the job stopped) loses to the Firestore doc, which may be fresher.
+    const stored = parseStoredWars(body);
+    return stored !== null && Date.now() - stored.updatedAt <= ACTIVE_WARS_STALE_AFTER_MS
+      ? body
+      : null;
   } catch {
     return null;
   }

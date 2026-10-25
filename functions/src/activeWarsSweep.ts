@@ -1,7 +1,7 @@
 /**
  * The active-wars sweep: reads ESI's war list and the wars it holds open. The
  * planning is `activeWars.ts`; this is the fetching, with `read`, `write` and
- * `fetchImpl` injected so it runs against fakes. Free of Firestore, so both
+ * `fetchImpl` injected so it runs against fakes. Free of Firestore and firebase-admin, so both
  * `syncActiveWars` (activeWarsJob.ts) and the GitHub Actions runner
  * (publicDataActiveWars.ts) use it.
  */
@@ -38,7 +38,9 @@ export interface ActiveWarsDeps {
   fetchImpl: typeof fetch;
   read: () => Promise<ActiveWarsDoc | undefined>;
   write: (
-    doc: Required<Pick<ActiveWarsDoc, 'updatedAt'>> & { wars: StoredWar[] } & SweepState
+    doc: Required<Pick<ActiveWarsDoc, 'updatedAt'>> & { wars: StoredWar[] } & SweepState,
+    /** `complete`: the sweep has read back to the horizon, so `wars` is the whole open list. */
+    progress: { complete: boolean }
   ) => Promise<void>;
   now: () => number;
   budget?: number;
@@ -156,7 +158,9 @@ export async function runActiveWarsSweep(deps: ActiveWarsDeps): Promise<ActiveWa
   const openRead = plan.openIds.filter((id) => done.has(id)).length;
   const openConfirmed = openRead >= plan.openIds.length * OPEN_CONFIRMED_SHARE;
   const updatedAt = openConfirmed ? at : (doc?.updatedAt ?? 0);
-  await deps.write({ updatedAt, wars, ...next });
+  const reach = listed[0] - ACTIVE_WARS_HORIZON_IDS;
+  const complete = !listed.some((id) => id > reach && id < (next.floorId ?? Infinity));
+  await deps.write({ updatedAt, wars, ...next }, { complete });
   const outcome: ActiveWarsOutcome = {
     written: true,
     open: wars.length,

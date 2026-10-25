@@ -74,6 +74,34 @@ describe('publishActiveWars', () => {
   });
 });
 
+describe('publishActiveWars while seeding', () => {
+  it('keeps the state but not the list until the sweep reaches the horizon', async () => {
+    const stored = new Map<string, unknown>();
+    const run = () =>
+      publishActiveWars({
+        get: async (key) => stored.get(key) ?? null,
+        put: async (key, body) => {
+          stored.set(key, JSON.parse(String(body)));
+        },
+        // Ended wars are not held open, so they do not eat the next run's budget.
+        fetchImpl: (async (input: string | URL | Request) => {
+          const detail = /\/wars\/(\d+)\/$/.exec(String(input));
+          return detail
+            ? Response.json({ ...esiWar(Number(detail[1])), finished: '2026-10-21T00:00:00Z' })
+            : Response.json([12, 11, 10]);
+        }) as typeof fetch,
+        now: () => NOW,
+        budget: 1,
+      });
+    await run();
+    expect(stored.has(ACTIVE_WARS_R2_KEY)).toBe(false);
+    expect(stored.has(ACTIVE_WARS_STATE_R2_KEY)).toBe(true);
+    await run();
+    await run();
+    expect(stored.has(ACTIVE_WARS_R2_KEY)).toBe(true);
+  });
+});
+
 describe('r2ConfigFromEnv', () => {
   it('names every missing setting', () => {
     expect(() => r2ConfigFromEnv({ R2_BUCKET: 'b' })).toThrow(
