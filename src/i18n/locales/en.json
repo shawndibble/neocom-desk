@@ -1587,7 +1587,6 @@
         "totalDps": "Total DPS {{value}}",
         "totalVolley": "Total volley {{value}}",
         "appliedDps": "Applied DPS {{value}}",
-        "sustainedDamage": "Sustained DPS with drones {{value}}",
         "droneDps": "Drone DPS {{value}}",
         "droneBandwidthUsed": "Drone bandwidth used {{value}} Mbit/s",
         "droneBandwidthTotal": "Drone bandwidth total {{value}} Mbit/s",
