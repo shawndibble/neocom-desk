@@ -589,6 +589,13 @@ describe('PlanResult', () => {
     expect(screen.queryByRole('link', { name: /Route Safety/ })).toBeNull();
   });
 
+  it('offers Show my route when only ships are picked, with no hauler to plan', async () => {
+    const onShowRoute = vi.fn();
+    renderWith({ ...shipPlan, active: null }, onShowRoute, 30000142);
+    await userEvent.click(screen.getByRole('button', { name: 'Show my route' }));
+    expect(onShowRoute).toHaveBeenCalledTimes(1);
+  });
+
   it('has no Show my route without a hauler', () => {
     renderWith(plan, vi.fn(), 30000142);
     expect(screen.queryByRole('button', { name: 'Show my route' })).toBeNull();

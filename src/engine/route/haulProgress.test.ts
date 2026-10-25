@@ -211,4 +211,22 @@ describe('replanInputs', () => {
     const { characters } = replanInputs({ ...plan, flown }, []);
     expect(characters[0]?.flown).toEqual(['Rifter']);
   });
+
+  it('hands the flights still to fly back as ships at their pickups', () => {
+    const flights: HaulSection = {
+      characterId: 1,
+      name: 'Alice',
+      trips: 2,
+      legs: [
+        leg(0, 'pickup', jita, amarr, { m3: 0, ships: ['Rifter'] }),
+        leg(1, 'delivery', amarr, jita, { m3: 0, ships: ['Rifter'] }),
+        leg(2, 'pickup', jita, amarr, { trip: 2, m3: 0, ships: ['Merlin'] }),
+        leg(3, 'delivery', amarr, jita, { trip: 2, m3: 0, ships: ['Merlin'] }),
+      ],
+    };
+    const { characters } = replanInputs({ ...plan, sections: [flights] }, [0, 1]);
+    expect(characters[0]?.pickups.map((p) => [p.name, p.m3, p.ships])).toEqual([
+      ['Amarr', 0, ['Merlin']],
+    ]);
+  });
 });

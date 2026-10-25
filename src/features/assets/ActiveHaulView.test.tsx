@@ -188,6 +188,30 @@ describe('ActiveHaulView', () => {
     expect(screen.getByText('11 × Item 1')).toBeTruthy();
   });
 
+  it('reads a flight as take the ship, fly it out, with no hold to open', () => {
+    const flight: HaulLeg[] = [
+      { ...legs[0], m3: 0, ships: ['Rifter'] },
+      { ...legs[1], m3: 0, ships: ['Rifter'] },
+    ];
+    renderView(undefined, {
+      haul: {
+        ...haul,
+        capacityM3: 0,
+        plan: {
+          ...haul.plan,
+          sections: [{ ...haul.plan.sections[0], legs: flight }],
+          leftOut: [],
+          flown: [],
+          totals: { legs: 2, jumps: 10, m3: 0 },
+        },
+      },
+    });
+    expect(screen.getByText('2 legs · 10 jumps to Jita 4-4')).toBeTruthy();
+    expect(screen.getByText('Take Rifter at Dodixie IX')).toBeTruthy();
+    expect(screen.getByText('Fly Rifter to Jita 4-4')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /cargo for leg/ })).toBeNull();
+  });
+
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {
     renderView();
     await userEvent.click(screen.getByRole('button', { name: 'Set waypoint, leg 1' }));
