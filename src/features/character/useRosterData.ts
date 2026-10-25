@@ -1,3 +1,4 @@
+import { liveQuery } from 'dexie';
 import { useEffect, useState } from 'react';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
 import { rosterCoreMap, mergeRosterCore, type RosterCore } from '@/features/character/rosterView';
@@ -13,7 +14,7 @@ export function useRosterData(characters: readonly { characterId: number }[] | u
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
   const [refreshingAll, setRefreshingAll] = useState(false);
 
-  /** The one place a fresh roster snapshot becomes `rosterCore` — shared by the cache-only load effect and "Refresh all" so a future added field only needs adding to `rosterView.ts`'s `RosterCore`. */
+  /** "Refresh all"'s finished roster becomes `rosterCore`. Like the live cache snapshot below, it goes through `rosterCoreMap`, so a future added field only needs adding to `rosterView.ts`'s `RosterCore`. */
   function applyRoster(roster: readonly RosterEntry[], now: number) {
     setRosterCore(rosterCoreMap(roster, now));
   }
@@ -23,25 +24,24 @@ export function useRosterData(characters: readonly { characterId: number }[] | u
     setRosterCore((previous) => mergeRosterCore(previous, entry, now));
   }
 
+  // Live over the cache rows the snapshot reads, not read once: a sync still
+  // landing when the page opens (straight after a first login) would otherwise
+  // leave every row "Unknown" until something else changed the characters.
+  // No dependency on `characters`: the snapshot reads them itself (and is empty
+  // with none), so the live query already re-runs when they change.
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (!characters || characters.length === 0) {
-        if (!cancelled) setRosterCore(new Map());
-        return;
-      }
-      const now = Date.now();
-      const roster = await loadRosterSnapshot();
-      if (cancelled) return;
-      setRosterCore(rosterCoreMap(roster, now));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [characters]);
+    const subscription = liveQuery(() => loadRosterSnapshot()).subscribe({
+      next: (roster) => setRosterCore(rosterCoreMap(roster, Date.now())),
+      // A failed local read ends the live query; the last snapshot stays shown,
+      // as it did when the one-shot read failed.
+      error: () => undefined,
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-  // Mirrors the cache-only effect above, cache-only by default: manufacturing
-  // running counts and PI attention across the whole roster.
+  // Cache-only by default: manufacturing running counts and PI attention across
+  // the whole roster. Still read once per `characters` change, unlike the
+  // snapshot above.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
