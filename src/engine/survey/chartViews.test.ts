@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  availableChartViews,
-  depletionSeries,
-  iskSeries,
-  PACE_FADE_FLOOR,
-  paceFade,
-  paceShareSeries,
-} from './chartViews';
+import { availableChartViews, depletionSeries, iskSeries, paceShareSeries } from './chartViews';
 import { summarizeSurvey, type SurveyScan } from './series';
 
 const MIN = 60_000;
@@ -183,17 +176,15 @@ describe('paceShareSeries', () => {
     expect(activeOres).toEqual(['A']);
   });
 
-  it('gives an interval where nothing was mined no shares, no progress and the floor opacity', () => {
+  it('gives an interval where nothing was mined no shares and no progress', () => {
     const s = summarizeSurvey([
       scan(0, ['A', 100]),
       scan(5, ['A', 100], ['B', 50]), // B appears: added, nothing mined
       scan(10, ['A', 50], ['B', 50]),
     ])!;
-    const [idle, busy] = paceShareSeries(s).intervals;
+    const [idle] = paceShareSeries(s).intervals;
     expect(idle.shares).toEqual({});
     expect(idle.progress).toBe(0);
-    expect(idle.opacity).toBe(PACE_FADE_FLOOR);
-    expect(busy.opacity).toBe(1);
   });
 
   it('measures an ore that came into range later against its own start volume', () => {
@@ -226,14 +217,12 @@ describe('paceShareSeries', () => {
     expect(i.percents).toEqual({ B: 100 });
     expect(i.shares).toEqual({ B: 100 });
     expect(i.progress).toBeCloseTo(100);
-    expect(i.opacity).toBe(1);
   });
 
   it('reports no progress when the summary has no starting volume (hand-built summary)', () => {
     const base = summarizeSurvey([scan(0, ['A', 100]), scan(5, ['A', 50])])!;
     const [i] = paceShareSeries({ ...base, startVolume: 0 }).intervals;
     expect(i.progress).toBe(0);
-    expect(i.opacity).toBe(1);
   });
 
   it('clamps progress to 100 (hand-built summary)', () => {
@@ -268,19 +257,5 @@ describe('paceShareSeries', () => {
     const { activeOres, toneIndex } = paceShareSeries(s);
     expect(activeOres).toEqual(['C']);
     expect(toneIndex.C).toBe(2);
-  });
-});
-
-describe('paceFade', () => {
-  it('runs from the floor at nothing to 1 at the busiest interval, linearly', () => {
-    expect(paceFade(0, 10)).toBe(PACE_FADE_FLOOR);
-    expect(paceFade(10, 10)).toBe(1);
-    expect(paceFade(5, 10)).toBeCloseTo((PACE_FADE_FLOOR + 1) / 2);
-  });
-
-  it('is never below the floor or above 1, and is 1 when nothing was ever mined', () => {
-    expect(paceFade(-3, 10)).toBe(PACE_FADE_FLOOR);
-    expect(paceFade(20, 10)).toBe(1);
-    expect(paceFade(0, 0)).toBe(1);
   });
 });

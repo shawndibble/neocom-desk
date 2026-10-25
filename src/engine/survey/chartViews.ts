@@ -98,8 +98,6 @@ export interface PaceInterval {
   shares: Record<string, number>;
   /** m³ mined in the interval as a percent of every ore's starting volume together. */
   progress: number;
-  /** Bar opacity for this interval, from `paceFade`: quiet intervals fade. */
-  opacity: number;
 }
 
 /** One invisible plot row the pace chart's tooltip snaps to. */
@@ -123,19 +121,6 @@ export interface PaceShareSeries {
   activeOres: string[];
   /** Each ore's index in `summary.oreNames`, for its colour. */
   toneIndex: Record<string, number>;
-}
-
-/** The faintest a bar gets, so a quiet interval stays visible. */
-export const PACE_FADE_FLOOR = 0.35;
-
-/**
- * Bar opacity for an interval: linear from `PACE_FADE_FLOOR` at nothing mined to 1 at the busiest
- * interval (`maxProgress`). With nothing mined anywhere there is no quiet-versus-busy to show: 1.
- */
-export function paceFade(progress: number, maxProgress: number): number {
-  if (!(maxProgress > 0)) return 1;
-  const t = Math.min(1, Math.max(0, progress / maxProgress));
-  return PACE_FADE_FLOOR + (1 - PACE_FADE_FLOOR) * t;
 }
 
 /**
@@ -172,11 +157,7 @@ export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
       summary.startVolume > 0 ? clampPercent((i.mined / summary.startVolume) * 100) : 0;
     return { from: i.from, to: i.to, percents, shares, progress };
   });
-  const maxProgress = Math.max(0, ...raw.map((r) => r.progress));
-  const intervals: PaceInterval[] = raw.map((r) => ({
-    ...r,
-    opacity: paceFade(r.progress, maxProgress),
-  }));
+  const intervals: PaceInterval[] = raw;
   const activeOres = summary.oreNames.filter((o) => active.has(o));
   const rows: PaceRow[] = intervals.flatMap((i, interval) => [
     { at: i.from, interval, idle: 0 as const },
