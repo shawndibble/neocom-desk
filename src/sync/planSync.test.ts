@@ -2670,15 +2670,149 @@ describe('triggerSync: incremental pull', () => {
     expect(await readCursor(PLANS_CURSOR_KEY)).toEqual(before);
     expect(await db.skillPlans.get('p3')).toBeUndefined();
   });
+});
 
-  it('leaves the settings collection on a full read', async () => {
-    await triggerSync(1);
+describe('triggerSync: incremental settings pull (#5045)', () => {
+  const SETTINGS_CURSOR_KEY = pullCursorKey(1, 'settings');
+  const settingsWrites = () =>
+    vi
+      .mocked(setDoc)
+      .mock.calls.filter(([ref]) => (ref as unknown as FakeRef).col.path === SETTINGS_PATH);
+
+  it('costs one filtered read and no writes once nothing has changed', async () => {
+    await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 5_000);
+    await deleteSyncedSetting('sync.corpDarkAfterDays');
+    await triggerSync(1); // full read: pushes the value and the tombstone
+    await triggerSync(1); // reads both back, cursor now at the newest of them
+    const cursor = await readCursor(SETTINGS_CURSOR_KEY);
+
+    vi.mocked(setDoc).mockClear();
+    const from = readsSoFar();
     await triggerSync(1);
 
-    // mergeSettings' tombstones never expire and its absence semantics differ;
-    // the allow-list bounds the doc count anyway.
-    expect(filtersFor(SETTINGS_PATH, readsSoFar() - COLLECTION_COUNT)).toEqual([OWNER_FILTER]);
-    expect(await readCursor('sync.__pullCursor.1.settings')).toBeUndefined();
+    expect(filtersFor(SETTINGS_PATH, from)).toEqual([
+      OWNER_FILTER,
+      { field: 'updatedAt', op: '>', value: cursor?.high },
+    ]);
+    // Neither the value nor the never-expiring tombstone goes up again.
+    expect(settingsWrites()).toEqual([]);
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('jita');
+    expect(await readLocalSettingsTombstones()).toHaveLength(1);
+  });
+
+  it('pulls another device’s edit and delete through the window', async () => {
+    const before = Date.now() - 60_000;
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'jita', updatedAt: before, ownerHash: HASH },
+      { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: before, ownerHash: HASH },
+    ]);
+    await triggerSync(1);
+    expect((await db.settings.get('sync.corpDarkAfterDays'))?.value).toBe(7);
+
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: before + 1_000, ownerHash: HASH },
+      { key: 'sync.corpDarkAfterDays', updatedAt: before + 1_000, ownerHash: HASH, deleted: true },
+    ]);
+    const from = readsSoFar();
+    await triggerSync(1);
+
+    expect(filtersFor(SETTINGS_PATH, from)).toHaveLength(2);
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
+    expect(await db.settings.get('sync.corpDarkAfterDays')).toBeUndefined();
+  });
+
+  it('pushes a local edit made after the cursor', async () => {
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'jita', updatedAt: Date.now() - 60_000, ownerHash: HASH },
+    ]);
+    await triggerSync(1);
+
+    await seedLocalSetting('sync.tradeHub', 'dodixie', Date.now());
+    await triggerSync(1);
+
+    expect(remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub')).toMatchObject({
+      value: 'dodixie',
+    });
+  });
+
+  it('forces a full read while an unstamped value is present, so a remote copy still wins', async () => {
+    const remoteAt = Date.now() - 60_000;
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: remoteAt, ownerHash: HASH },
+      { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: remoteAt + 1, ownerHash: HASH },
+    ]);
+    await triggerSync(1);
+    await triggerSync(1); // cursor now above the tradeHub doc
+    // useSyncedSetting's legacy seed: a bare put, no LWW stamp.
+    await db.settings.put({ key: 'sync.tradeHub', value: 'jita' });
+    const meta = (await db.settings.get(SETTINGS_META_KEY))?.value as Record<string, number>;
+    delete meta['sync.tradeHub'];
+    await db.settings.put({ key: SETTINGS_META_KEY, value: meta });
+
+    const from = readsSoFar();
+    await triggerSync(1);
+
+    expect(filtersFor(SETTINGS_PATH, from)).toEqual([OWNER_FILTER]);
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
+    expect(remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub')).toMatchObject({
+      value: 'amarr',
+    });
+  });
+
+  it('relays a value pulled for one Character to another whose cursor is already past it', async () => {
+    // Settings are one local set, but each Character has its own remote copy
+    // and cursor. A device holding only Character 2 learns of this edit only
+    // if this device pushes it into Character 2's collection.
+    const SETTINGS_PATH_2 = 'characters/char:2/settings';
+    await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 2 });
+    const now = Date.now();
+    seedRemote(SETTINGS_PATH_2, [
+      { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: now - 1_000, ownerHash: HASH },
+    ]);
+    await triggerSync(2);
+    await triggerSync(2); // Character 2's cursor now at now - 1000
+
+    // Another device, holding only Character 1, edited a setting earlier.
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: now - 5_000, ownerHash: HASH },
+    ]);
+    await triggerSync(1);
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
+
+    const from = readsSoFar();
+    await triggerSync(2);
+
+    expect(filtersFor(SETTINGS_PATH_2, from)).toEqual([OWNER_FILTER]);
+    expect(remoteStore.get(SETTINGS_PATH_2)?.get('sync.tradeHub')).toMatchObject({
+      value: 'amarr',
+      updatedAt: now - 5_000,
+    });
+
+    // Reconciled: both Characters are back on one windowed read.
+    const after = readsSoFar();
+    await triggerSync(1);
+    await triggerSync(2);
+    expect(filtersFor(SETTINGS_PATH, after)).toHaveLength(2);
+    expect(filtersFor(SETTINGS_PATH_2, after)).toHaveLength(2);
+  });
+
+  it('keeps the cursor when a mid-pass local write overtook a pulled doc', async () => {
+    await triggerSync(1);
+    const before = await readCursor(SETTINGS_CURSOR_KEY);
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: Date.now() + 60_000, ownerHash: HASH },
+    ]);
+    // Something for the pass to push, so a write lands between read and apply.
+    await seedLocalSetting('sync.corpDarkAfterDays', 7);
+    vi.mocked(setDoc).mockImplementationOnce((async () => {
+      await seedLocalSetting('sync.tradeHub', 'dodixie', Date.now() + 120_000);
+    }) as never);
+
+    await triggerSync(1);
+
+    // The pull was dropped; advancing past it would hide it from every later window.
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('dodixie');
+    expect(await readCursor(SETTINGS_CURSOR_KEY)).toEqual(before);
   });
 });
 

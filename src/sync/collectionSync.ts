@@ -143,9 +143,9 @@ async function fetchOwnedDocs<R extends { ownerHash: string }>(
 // an edit. What a partial remote set costs is the two `mergeRecords`
 // decisions that used to read remote *absence* — see its `since` docstring.
 //
-// The synced *settings* collection deliberately stays a full read: its
-// tombstones never expire and `mergeSettings`' absence semantics differ, and
-// it is the cheapest of the 12 (bounded by the synced-key allow-list).
+// The Notification Feed (feedSync.ts) and synced settings (settingsSync.ts,
+// issue #5045) read through the same cursor; `mergeFeed` and `mergeSettings`
+// each document how they read a partial remote set.
 // ---------------------------------------------------------------------------
 
 /** How stale a cursor may get before the pass falls back to an unfiltered read. */
@@ -172,16 +172,23 @@ function isMissingIndex(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === 'failed-precondition';
 }
 
+/**
+ * `forceFull` makes this pass an unfiltered read whatever the cursor says, for
+ * a caller whose local state a window cannot reconcile (settingsSync.ts, an
+ * unstamped value). It is recorded as a full read like any other.
+ */
 export async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }>(
   col: CollectionReference,
   ctx: SyncContext,
-  collectionName: string
+  collectionName: string,
+  forceFull = false
 ): Promise<PullWindow<R>> {
   const cursorKey = pullCursorKey(ctx.characterId, collectionName);
   const cursor = await readPullCursor(cursorKey);
   // No cursor at all = an in-place upgrade, or a fresh device: full read, so
   // pre-existing remote docs can never be missed.
-  const fresh = cursor !== undefined && ctx.now - cursor.fullAt <= FULL_RECONCILE_INTERVAL_MS;
+  const fresh =
+    !forceFull && cursor !== undefined && ctx.now - cursor.fullAt <= FULL_RECONCILE_INTERVAL_MS;
   let since = fresh ? cursor.high : undefined;
   let remote: R[];
   try {
