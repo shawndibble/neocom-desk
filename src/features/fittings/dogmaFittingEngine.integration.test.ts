@@ -31,6 +31,7 @@ import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fitt
 import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
+import { goalAvailability } from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 
@@ -68,6 +69,8 @@ const WARRIOR_II = 2488;
 const RIFTER = 587;
 const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
+const BUZZARD = 11192;
+const CORE_PROBE_LAUNCHER_I = 17938;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
 // Looked up by exact name in `public/data/types.json`, 2026-09-29.
@@ -937,6 +940,33 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       null
     );
     expect(launcher.chargelessWeaponCount).toBe(1);
+  });
+
+  it('counts an empty missile launcher, not an empty probe launcher, as an unloaded weapon', async () => {
+    // `computeFittingStats` reads the SDE's type list to tell which charges deal damage.
+    const types = await readFile(new URL('../../../public/data/types.json', import.meta.url));
+    const realFetch = fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+      String(input).includes('types.json') ? new Response(new Uint8Array(types)) : realFetch(input)
+    );
+    const empty = (shipTypeId: number, typeId: number): Fitting => ({
+      name: 'Integration Test empty charge-taker',
+      shipTypeId,
+      modules: [{ slot: 'high', slotIndex: 0, typeId, state: 'active' }],
+      drones: [],
+      cargo: [],
+    });
+    const profile = buildAllVProfile(SUPPORT_SKILL_IDS);
+
+    const buzzard = await computeFittingStats(empty(BUZZARD, CORE_PROBE_LAUNCHER_I), profile);
+    expect(buzzard.offense.chargelessWeaponCount).toBe(0);
+    expect(goalAvailability('reach', buzzard)).toEqual({
+      available: false,
+      reason: 'noGunsOrLaunchers',
+    });
+
+    const caracal = await computeFittingStats(empty(CARACAL, HEAVY_MISSILE_LAUNCHER_II), profile);
+    expect(caracal.offense.chargelessWeaponCount).toBe(1);
   });
 
   it('mines more with a crystal loaded, and counts launched mining drones', () => {

@@ -35,12 +35,14 @@ const kindOf = (group: ChargeGroup): Exclude<UnloadedKind, 'weapon'> =>
   group.choices.every((c) => c.falloff === 0) ? 'launcher' : 'turret';
 
 function emptyModulesOf(fitting: Fitting, group: ChargeGroup): ModuleAt[] {
-  // Offline guns aren't firing, so the stats panel doesn't count them either.
+  // A gun that is only online isn't firing, so the stats panel doesn't count it either.
   if (!group.isWeapon || group.choices.length === 0) return [];
   return fitting.modules
     .filter(
       (m) =>
-        m.typeId === group.moduleTypeId && m.chargeTypeId === undefined && m.state !== 'offline'
+        m.typeId === group.moduleTypeId &&
+        m.chargeTypeId === undefined &&
+        (m.state === 'active' || m.state === 'overload')
     )
     .map(({ slot, slotIndex }) => ({ slot, slotIndex }));
 }

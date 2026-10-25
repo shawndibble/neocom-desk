@@ -17,6 +17,7 @@ import {
 } from './dogmaEngineLoader';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
+import { loadTypes } from '@/sde/loadSde';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
@@ -32,6 +33,7 @@ import {
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
+  needsChargeToFire,
   type OffenseItem,
 } from '@/engine/fittings/stats';
 import {
@@ -292,6 +294,66 @@ function overloadHeatable(
   };
 }
 
+/** Whether any charge in `groupIds` deals damage, per sorted group-id key; a type's charges never change. */
+const chargeDamageByGroups = new Map<string, boolean>();
+
+async function chargesDealDamage(
+  shipTypeId: number,
+  module: { slot: FittingSlotKind; typeId: number },
+  groupIds: readonly number[]
+): Promise<boolean> {
+  const key = [...groupIds].sort((a, b) => a - b).join(',');
+  const known = chargeDamageByGroups.get(key);
+  if (known !== undefined) return known;
+  const types = await loadTypes();
+  const groups = new Set(groupIds);
+  let damages = false;
+  for (const [id, info] of Object.entries(types)) {
+    if (!groups.has(info.groupID)) continue;
+    const { items } = calculate({
+      ship: { type_id: shipTypeId },
+      items: [
+        {
+          type_id: module.typeId,
+          slot: { type: module.slot, index: 0 },
+          state: 'online',
+          charge: { type_id: Number(id) },
+        },
+      ],
+    });
+    if (chargeDamageSplit(items[0]?.charge?.attributes) !== null) {
+      damages = true;
+      break;
+    }
+  }
+  chargeDamageByGroups.set(key, damages);
+  return damages;
+}
+
+/**
+ * The type ids of fitted, firing modules that take charges, fire only with
+ * one, sit empty, and have no charge that deals damage: an empty probe
+ * launcher is not an unloaded weapon.
+ */
+async function modulesWithHarmlessCharges(
+  fitting: Fitting,
+  calculation: ReturnType<typeof calculate>
+): Promise<Set<number>> {
+  const harmless = new Set<number>();
+  const checked = new Set<number>();
+  for (const [index, module] of fitting.modules.entries()) {
+    const result = calculation.items[index];
+    if (!result || module.chargeTypeId !== undefined || checked.has(module.typeId)) continue;
+    if (module.state !== 'active' && module.state !== 'overload') continue;
+    if (!needsChargeToFire(result.attributes)) continue;
+    checked.add(module.typeId);
+    const { chargeGroupIds } = extractModuleResult(result);
+    if (!(await chargesDealDamage(fitting.shipTypeId, module, chargeGroupIds)))
+      harmless.add(module.typeId);
+  }
+  return harmless;
+}
+
 /**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
@@ -317,6 +379,7 @@ export async function computeFittingStats(
     incoming
   );
   const calculation = calculate(dogmaFit);
+  const harmlessCharges = await modulesWithHarmlessCharges(fitting, calculation);
 
   // Overheated values come from the engine itself (its overload state), not
   // a multiplier applied here: the same fit again with every active module
@@ -335,9 +398,9 @@ export async function computeFittingStats(
   // what the pilot set, not the what-if.
   const allOverheated = overheatAll && heatedCalculation !== null;
   if (allOverheated) {
-    const unheated = statsFrom(fitting, dogmaFit, calculation, calculation, null);
+    const unheated = statsFrom(fitting, dogmaFit, calculation, calculation, null, harmlessCharges);
     return {
-      ...statsFrom(fitting, dogmaFit, calculation, heatedCalculation, null),
+      ...statsFrom(fitting, dogmaFit, calculation, heatedCalculation, null, harmlessCharges),
       allOverheated: true,
       unheated: { ...unheated, allOverheated: false, unheated: null },
     };
@@ -348,7 +411,8 @@ export async function computeFittingStats(
       dogmaFit,
       calculation,
       calculation,
-      withOverheated ? heatedCalculation : null
+      withOverheated ? heatedCalculation : null,
+      harmlessCharges
     ),
     allOverheated: false,
     unheated: null,
@@ -365,7 +429,9 @@ function statsFrom(
   dogmaFit: Fit,
   calculation: ReturnType<typeof calculate>,
   shown: ReturnType<typeof calculate>,
-  beside: ReturnType<typeof calculate> | null
+  beside: ReturnType<typeof calculate> | null,
+  /** Module type ids none of whose charges deal damage (probe launchers). */
+  harmlessCharges: ReadonlySet<number>
 ): Omit<FittingStats, 'allOverheated' | 'unheated'> {
   const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
 
@@ -398,6 +464,7 @@ function statsFrom(
       chargeTypeId: module.chargeTypeId,
       quantity: 1,
       isDrone: false,
+      chargeDamages: !harmlessCharges.has(module.typeId),
     })),
     ...fitting.drones.map((drone) => ({
       typeId: drone.typeId,

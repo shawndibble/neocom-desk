@@ -418,6 +418,12 @@ export interface OffenseItem {
   quantity: number;
   isDrone: boolean;
   isFighter?: boolean;
+  /**
+   * Whether a charge this module can load deals damage. `false` (a probe
+   * launcher) keeps an empty one out of `chargelessWeaponCount`; absent
+   * counts as damaging.
+   */
+  chargeDamages?: boolean;
 }
 
 function isFiring(state: FittingItemState): boolean {
@@ -431,7 +437,7 @@ function isFiring(state: FittingItemState): boolean {
  * take a charge too, but run without one. Combine with
  * `chargeTypeId === undefined` to mean "this weapon is empty".
  */
-function needsChargeToFire(attributes: AttributeMap): boolean {
+export function needsChargeToFire(attributes: AttributeMap): boolean {
   return (
     chargeGroupIds(attributes).length > 0 &&
     readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.rateOfFire) > 0
@@ -521,6 +527,7 @@ export function extractOffense(
       if (
         !item.isDrone &&
         item.chargeTypeId === undefined &&
+        item.chargeDamages !== false &&
         needsChargeToFire(result.attributes)
       ) {
         chargelessWeaponCount += 1;
