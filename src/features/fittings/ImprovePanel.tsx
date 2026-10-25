@@ -58,8 +58,9 @@ import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
+import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
-import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MakeItFitSection } from './MakeItFitSection';
@@ -131,6 +132,11 @@ interface Props {
   fitting?: Fitting | null;
   /** The page's Target Profile, for the summary's DPS. */
   target?: TargetProfile;
+  /**
+   * Tells the stats column what the ticked rows, plus the row under the
+   * pointer or keyboard focus, would change; null when nothing is previewed.
+   */
+  onPreview?: (delta: FittingStatsDelta | null) => void;
 }
 
 /** The guardrail a rejected swap broke; a budget or cap says by how much. */
@@ -165,6 +171,7 @@ export function ImprovePanel({
   freeSections,
   fitting,
   target,
+  onPreview,
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
@@ -182,6 +189,13 @@ export function ImprovePanel({
   const result = state.status === 'done' ? state.result : null;
   const ticked = ticks.result === result ? ticks.byModule : NO_TICKS;
   const replaced = ticks.result === result ? ticks.replaced : new Map<string, string>();
+  // The row under the pointer or keyboard focus; like ticks, it belongs to the result it was made in.
+  const [hovering, setHovering] = useState<{
+    result: ImproveResult | null;
+    option: ImproveOption | null;
+  }>({ result: null, option: null });
+  const hovered = hovering.result === result ? hovering.option : null;
+  const setHover = (option: ImproveOption | null) => setHovering({ result, option });
   const setTicked = (
     byModule: ReadonlyMap<string, ImproveOption>,
     nextReplaced: ReadonlyMap<string, string> = new Map()
@@ -359,7 +373,15 @@ export function ImprovePanel({
           const id = `improve-${optionKey(option)}`;
           const line = moveLine(option, own);
           return (
-            <li key={optionKey(option)} className="border-line rounded-xs border p-2 text-sm">
+            <li
+              key={optionKey(option)}
+              className="border-line rounded-xs border p-2 text-sm"
+              // A mouse hover or a keyboard focus previews it; touch has no hover, so only its tick does (§6c).
+              onPointerEnter={(event) => event.pointerType === 'mouse' && setHover(option)}
+              onPointerLeave={() => setHover(null)}
+              onFocus={(event) => event.target.matches(':focus-visible') && setHover(option)}
+              onBlur={() => setHover(null)}
+            >
               <label
                 htmlFor={id}
                 className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}
@@ -443,6 +465,55 @@ export function ImprovePanel({
           target,
         })
       : null;
+  // The ticked set with the hovered row on top (it displaces a ticked row sharing a slot, as ticking it would).
+  const hoverSet = useMemo(() => {
+    if (!hovered || ticked.has(optionKey(hovered))) return null;
+    const taken = new Set(slotsOf(hovered.candidate));
+    return [
+      ...chosen.filter((pick) => !slotsOf(pick.candidate).some((slot) => taken.has(slot))),
+      hovered,
+    ];
+  }, [hovered, ticked, chosen]);
+  const hoverKey = hoverSet?.map(optionKey).sort().join('|') ?? null;
+  const [hoverResult, setHoverResult] = useState<{
+    key: string;
+    fitting: Fitting;
+    after: FittingStats | null;
+  } | null>(null);
+  // One debounced recalculation per hovered row, so a sweep down the list works out only where the pointer rests.
+  useEffect(() => {
+    if (!fitting || !recalc || !hoverSet || hoverKey === null) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      const folded = hoverSet.reduce(
+        (acc, pick) => applyImproveCandidate(acc, pick.candidate),
+        fitting
+      );
+      recalc(folded)
+        .then((after) => !stale && setHoverResult({ key: hoverKey, fitting, after }))
+        .catch(() => !stale && setHoverResult({ key: hoverKey, fitting, after: null }));
+    }, ADD_PREVIEW_DELAY_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [fitting, recalc, hoverSet, hoverKey]);
+  const hoverAfter =
+    hoverKey !== null && hoverResult?.key === hoverKey && hoverResult.fitting === fitting
+      ? hoverResult.after
+      : null;
+  // Until the hovered row's figures land, the ticked set's stay up.
+  const previewAfter = hoverAfter ?? (chosen.length > 0 ? (checked ?? null) : null);
+  const previewBefore = state.status === 'done' ? state.before : null;
+  const previewDelta = useMemo(
+    () => (previewBefore && previewAfter ? diffFittingStats(previewBefore, previewAfter) : null),
+    [previewBefore, previewAfter]
+  );
+  useEffect(() => {
+    onPreview?.(previewDelta);
+  }, [onPreview, previewDelta]);
+  // Closing Improve (or a new search) takes the panel away: nothing stays previewed.
+  useEffect(() => () => onPreview?.(null), [onPreview]);
   // A pending check holds Apply back; a failed one (each row was valid alone) warns but does not block.
   const canApply =
     chosen.length > 0 &&

@@ -25,6 +25,8 @@ import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { AbyssalRunPlanner, AbyssalWeatherMeta, type WeatherCompare } from './AbyssalRunPlanner';
 import { useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
+import { StatPreviewProvider } from './statPreview';
+import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { StatsHeadingLabel } from './StatsHeadingLabel';
 import { StatsScopePanel, StatsScopeTrigger } from './StatsScopePanels';
 import {
@@ -93,6 +95,8 @@ interface FittingStatsSectionsProps {
    */
   fitting?: Fitting | null;
   moduleResults?: FittingModuleResult[] | null;
+  /** A change to preview in place (`current → after`), from Improve's ticked or hovered rows; absent or null: none. */
+  preview?: FittingStatsDelta | null;
 }
 
 /**
@@ -126,6 +130,7 @@ export function FittingStatsSections({
   showDrones = true,
   fitting = null,
   moduleResults = null,
+  preview = null,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
@@ -217,141 +222,143 @@ export function FittingStatsSections({
   const ship = shipSections({ ...column, price });
 
   return (
-    <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs">
-        <StatsScopeTrigger
-          ref={pilotTriggerRef}
-          label={t('fittings.stats.pilot.label')}
-          open={panel === 'pilot'}
-          onClick={() => openPanel('pilot')}
-        >
-          {pilotValue}
-        </StatsScopeTrigger>
-        <StatsScopeTrigger
-          ref={situationTriggerRef}
-          label={t('fittings.stats.situation.label')}
-          open={panel === 'situation'}
-          onClick={() => openPanel('situation')}
-        >
-          {situationValue}
-        </StatsScopeTrigger>
-      </div>
-      {statsError && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-danger"
-        >
-          <span>
-            {t(
-              statsErrorReason === 'skills'
-                ? 'fittings.stats.errorSkills'
-                : shipDataNeedsConnection
-                  ? 'fittings.stats.errorOffline'
-                  : 'fittings.stats.error'
-            )}
-          </span>
-          {onRetry && (
-            <Button size="sm" onClick={onRetry}>
-              {t('fittings.stats.retry')}
-            </Button>
-          )}
+    <StatPreviewProvider delta={preview}>
+      <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs">
+          <StatsScopeTrigger
+            ref={pilotTriggerRef}
+            label={t('fittings.stats.pilot.label')}
+            open={panel === 'pilot'}
+            onClick={() => openPanel('pilot')}
+          >
+            {pilotValue}
+          </StatsScopeTrigger>
+          <StatsScopeTrigger
+            ref={situationTriggerRef}
+            label={t('fittings.stats.situation.label')}
+            open={panel === 'situation'}
+            onClick={() => openPanel('situation')}
+          >
+            {situationValue}
+          </StatsScopeTrigger>
         </div>
-      )}
+        {statsError && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-danger"
+          >
+            <span>
+              {t(
+                statsErrorReason === 'skills'
+                  ? 'fittings.stats.errorSkills'
+                  : shipDataNeedsConnection
+                    ? 'fittings.stats.errorOffline'
+                    : 'fittings.stats.error'
+              )}
+            </span>
+            {onRetry && (
+              <Button size="sm" onClick={onRetry}>
+                {t('fittings.stats.retry')}
+              </Button>
+            )}
+          </div>
+        )}
 
-      {stats && !skillsKnown && (
-        <p className="border-b border-line px-3 py-2 text-xs text-warning">
-          {t('fittings.stats.skillsUnknown')}
-        </p>
-      )}
+        {stats && !skillsKnown && (
+          <p className="border-b border-line px-3 py-2 text-xs text-warning">
+            {t('fittings.stats.skillsUnknown')}
+          </p>
+        )}
 
-      {group('damageTank', [...damage, ...tank])}
-      {group('ship', ship)}
+        {group('damageTank', [...damage, ...tank])}
+        {group('ship', ship)}
 
-      {/* One panel, its content switched by `panel`: swapping two open
+        {/* One panel, its content switched by `panel`: swapping two open
         panels would remount it, sending focus back to the first trigger and
         leaving its history entry behind. */}
-      <StatsScopePanel
-        open={panel !== null}
-        onClose={closePanel}
-        title={t(
-          shownPanel === 'pilot' ? 'fittings.stats.pilot.label' : 'fittings.stats.situation.label'
-        )}
-        subtitle={
-          shownPanel === 'pilot' ? (
-            <StatsHeadingLabel
-              hasCharacter={pilot !== undefined}
-              characterName={pilot?.characterName ?? null}
-            />
-          ) : (
-            t('fittings.stats.situation.subtitle')
-          )
-        }
-        returnFocusFallback={() =>
-          (shownPanel === 'pilot' ? pilotTriggerRef : situationTriggerRef).current
-        }
-      >
-        {shownPanel === 'pilot' ? (
-          <>
-            {pilot?.notes && (
-              <div className="space-y-2 border-b border-line px-3 py-2">{pilot.notes}</div>
-            )}
-            {/* Its sections wait on the stats: say why the panel is bare meanwhile. */}
-            {!stats && <div className="px-3 py-2 text-xs">{placeholder}</div>}
-            {stats &&
-              section(
-                'assumptions',
-                undefined,
-                <StatFields>
-                  {implants}
-                  <SkillOverridesControl />
-                </StatFields>,
-                undefined,
-                'h3'
-              )}
-            {stats &&
-              whatToTrain &&
-              section('whatToTrain', undefined, whatToTrain, undefined, 'h3')}
-            {stats && fitting && yourCharacters && (
-              <YourCharactersSection
-                fitting={fitting}
-                characters={yourCharacters}
-                render={(meta, body) => section('yourCharacters', meta, body, undefined, 'h3')}
-                expanded={isExpanded('yourCharacters')}
+        <StatsScopePanel
+          open={panel !== null}
+          onClose={closePanel}
+          title={t(
+            shownPanel === 'pilot' ? 'fittings.stats.pilot.label' : 'fittings.stats.situation.label'
+          )}
+          subtitle={
+            shownPanel === 'pilot' ? (
+              <StatsHeadingLabel
+                hasCharacter={pilot !== undefined}
+                characterName={pilot?.characterName ?? null}
               />
-            )}
-          </>
-        ) : (
-          <>
-            {tacticalMode && (
-              <div className="border-b border-line px-3 py-2">
-                <StatFields>{tacticalMode}</StatFields>
-              </div>
-            )}
-            {abyssal &&
-              section(
-                'abyssal',
-                <AbyssalWeatherMeta />,
-                <AbyssalRunPlanner
-                  hullGroupId={abyssal.hullGroupId}
-                  compare={abyssal.compare}
-                  typeName={typeName}
-                />,
+            ) : (
+              t('fittings.stats.situation.subtitle')
+            )
+          }
+          returnFocusFallback={() =>
+            (shownPanel === 'pilot' ? pilotTriggerRef : situationTriggerRef).current
+          }
+        >
+          {shownPanel === 'pilot' ? (
+            <>
+              {pilot?.notes && (
+                <div className="space-y-2 border-b border-line px-3 py-2">{pilot.notes}</div>
+              )}
+              {/* Its sections wait on the stats: say why the panel is bare meanwhile. */}
+              {!stats && <div className="px-3 py-2 text-xs">{placeholder}</div>}
+              {stats &&
+                section(
+                  'assumptions',
+                  undefined,
+                  <StatFields>
+                    {implants}
+                    <SkillOverridesControl />
+                  </StatFields>,
+                  undefined,
+                  'h3'
+                )}
+              {stats &&
+                whatToTrain &&
+                section('whatToTrain', undefined, whatToTrain, undefined, 'h3')}
+              {stats && fitting && yourCharacters && (
+                <YourCharactersSection
+                  fitting={fitting}
+                  characters={yourCharacters}
+                  render={(meta, body) => section('yourCharacters', meta, body, undefined, 'h3')}
+                  expanded={isExpanded('yourCharacters')}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {tacticalMode && (
+                <div className="border-b border-line px-3 py-2">
+                  <StatFields>{tacticalMode}</StatFields>
+                </div>
+              )}
+              {abyssal &&
+                section(
+                  'abyssal',
+                  <AbyssalWeatherMeta />,
+                  <AbyssalRunPlanner
+                    hullGroupId={abyssal.hullGroupId}
+                    compare={abyssal.compare}
+                    typeName={typeName}
+                  />,
+                  undefined,
+                  'h3'
+                )}
+              {section(
+                'projected',
+                projectedShips > 0
+                  ? t('fittings.projected.meta', { count: projectedShips })
+                  : undefined,
+                <ProjectedEffectsPanel />,
                 undefined,
                 'h3'
               )}
-            {section(
-              'projected',
-              projectedShips > 0
-                ? t('fittings.projected.meta', { count: projectedShips })
-                : undefined,
-              <ProjectedEffectsPanel />,
-              undefined,
-              'h3'
-            )}
-            {stats && <StatsToolbar stats={stats} />}
-          </>
-        )}
-      </StatsScopePanel>
-    </div>
+              {stats && <StatsToolbar stats={stats} />}
+            </>
+          )}
+        </StatsScopePanel>
+      </div>
+    </StatPreviewProvider>
   );
 }

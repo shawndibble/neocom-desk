@@ -10,6 +10,8 @@ import {
   formatEhp,
   type DamageType,
 } from './resistFormat';
+import type { StatChangeKey } from '@/engine/fittings/variationDelta';
+import { PreviewedFigure } from '../statPreview';
 import { STAT_EYEBROW, STAT_EYEBROW_TYPE } from '../statKit';
 import { fmt0 } from './fixedFormat';
 
@@ -18,7 +20,10 @@ function ResistCell({
   resonance,
   tone,
   unheated,
+  statKey,
 }: {
+  /** The stat a previewed change to it shows in place of the percentage. */
+  statKey?: StatChangeKey;
   resonance: number;
   tone: DamageType;
   /** The unheated resist as shown, when heat changed it ("Overheat all"). */
@@ -33,20 +38,43 @@ function ResistCell({
           className={`absolute inset-y-0 left-0 opacity-45 ${DMG_FILL_CLASS[tone]}`}
           style={{ width: `${pct}%` }}
         />
-        {unheated === undefined ? (
-          <span className="relative">{fmt0(pct)}%</span>
-        ) : (
-          <HintText
-            content={t('fittings.stats.unheated', { value: unheated })}
-            className="relative text-warning"
-          >
-            {fmt0(pct)}%
-            <span className="sr-only"> ({t('fittings.stats.unheated', { value: unheated })})</span>
-          </HintText>
-        )}
+        <PreviewedFigure keys={statKey && [statKey]}>
+          {unheated === undefined ? (
+            <span className="relative">{fmt0(pct)}%</span>
+          ) : (
+            <HintText
+              content={t('fittings.stats.unheated', { value: unheated })}
+              className="relative text-warning"
+            >
+              {fmt0(pct)}%
+              <span className="sr-only">
+                {' '}
+                ({t('fittings.stats.unheated', { value: unheated })})
+              </span>
+            </HintText>
+          )}
+        </PreviewedFigure>
       </div>
     </td>
   );
+}
+
+const LAYERS = ['shield', 'armor', 'hull'] as const;
+const RESONANCE_STAT = {
+  emResonance: 'EmResonance',
+  thermalResonance: 'ThermalResonance',
+  kineticResonance: 'KineticResonance',
+  explosiveResonance: 'ExplosiveResonance',
+} as const;
+
+/** The stat key for a layer row's HP or resist cell; none for an adapted-hardener row. */
+function layerKey(
+  rowKey: string,
+  field: 'Hp' | keyof typeof RESONANCE_STAT
+): readonly [StatChangeKey] | undefined {
+  const layer = LAYERS.find((candidate) => candidate === rowKey);
+  if (!layer) return undefined;
+  return [`${layer}${field === 'Hp' ? field : RESONANCE_STAT[field]}`];
 }
 
 export interface ResistRow {
@@ -96,7 +124,9 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
             >
               <span className={row.tone ? '' : 'font-semibold'}>{row.label}</span>
               {row.sub && (
-                <span className="block text-[0.6875rem] text-text-dim tabular-nums">{row.sub}</span>
+                <span className="block text-[0.6875rem] text-text-dim tabular-nums">
+                  <PreviewedFigure keys={layerKey(row.key, 'Hp')}>{row.sub}</PreviewedFigure>
+                </span>
               )}
             </th>
             {RESIST_TYPES.map((type) => (
@@ -105,6 +135,7 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
                 tone={type}
                 resonance={row.resonances[RESONANCE_KEY[type]]}
                 unheated={row.unheated?.[type]}
+                statKey={layerKey(row.key, RESONANCE_KEY[type])?.[0]}
               />
             ))}
             <td className="text-right text-xs tabular-nums">

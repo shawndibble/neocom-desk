@@ -8,6 +8,11 @@ interface StatChangeProps {
   change: StatChangeValue;
   /** Layout and type only. The tones are the primitive's. */
   className?: string;
+  /**
+   * Values only, for a row that already names the stat (the stats column).
+   * The screen-reader name still carries it.
+   */
+  bare?: boolean;
 }
 
 const formatters = new Map<number, (value: number) => string>();
@@ -34,7 +39,7 @@ const TONE = { better: 'text-success', worse: 'text-danger', neutral: 'text-text
  *
  * @summary A fit stat's before → after, green when better, red when worse.
  */
-export function StatChange({ change, className }: StatChangeProps) {
+export function StatChange({ change, className, bare = false }: StatChangeProps) {
   const { t } = useTranslation();
   const verdict = changeVerdict(change);
   const isCapacitor = change.key === 'capacitor';
@@ -59,13 +64,13 @@ export function StatChange({ change, className }: StatChangeProps) {
     <span className={className}>
       <span className="sr-only">{`${named(spoken)}${verdictWord}`}</span>
       <span aria-hidden="true">
-        {lead}
+        {!bare && lead}
         <span className="text-text-dim">{before}</span>
         <span className={TONE[verdict]} data-verdict={verdict}>
           {' → '}
           {after}
         </span>
-        {trail}
+        {!bare && trail}
       </span>
     </span>
   );

@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveGoal, ImproveOption, ImproveResult } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
+import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
@@ -87,6 +88,7 @@ const renderPanel = (
     unloaded?: UnloadedWeapons | null;
     onLoadBestCharge?: () => void;
     fitting?: Fitting;
+    onPreview?: (delta: FittingStatsDelta | null) => void;
   } = {}
 ) =>
   render(
@@ -102,6 +104,7 @@ const renderPanel = (
       unloaded={extra.unloaded}
       onLoadBestCharge={extra.onLoadBestCharge}
       fitting={extra.fitting}
+      onPreview={extra.onPreview}
     />
   );
 
@@ -598,6 +601,68 @@ describe('ImprovePanel', () => {
       await userEvent.click(boxes[0]);
       await userEvent.click(boxes[1]);
       expect(screen.getByText(/Replaces your pick:/)).toBeInTheDocument();
+    });
+  });
+
+  describe('stats column preview', () => {
+    const fitting = {
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+      ],
+    } as unknown as Fitting;
+    const withRecalc = (state: ImproveState, after: (fit: Fitting) => FittingStats) => ({
+      ...search(state),
+      recalc: vi.fn().mockImplementation(async (fit: Fitting) => after(fit)),
+    });
+    const lastDelta = (onPreview: ReturnType<typeof vi.fn>) =>
+      onPreview.mock.calls[onPreview.mock.calls.length - 1]?.[0] as FittingStatsDelta | null;
+
+    it('previews the ticked set, and clears it when everything is unticked', async () => {
+      const a = option(11, { ehp: 1100 });
+      const onPreview = vi.fn();
+      const s = withRecalc(done({ noDownside: [a] }), () => ({ ...before, ehp: before.ehp + 500 }));
+      renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting, onPreview });
+      await userEvent.click(screen.getByRole('checkbox'));
+      await waitFor(() => expect(lastDelta(onPreview)?.changes.map((c) => c.key)).toEqual(['ehp']));
+      await userEvent.click(screen.getByRole('checkbox'));
+      await waitFor(() => expect(lastDelta(onPreview)).toBeNull());
+    });
+
+    it('previews a hovered row on top of the ticked set, and restores the ticked set on leave', async () => {
+      const a = option(11, { ehp: 1100 });
+      const b = option(21, { cpuUsed: 5 });
+      const onPreview = vi.fn();
+      // The hovered fold (both rows) also moves CPU; the ticked fold moves EHP alone.
+      const s = withRecalc(done({ noDownside: [a, b] }), (fit) => {
+        void fit;
+        return { ...before, ehp: before.ehp + 500 };
+      });
+      s.recalc = vi
+        .fn()
+        .mockResolvedValueOnce({ ...before, ehp: before.ehp + 500 })
+        .mockResolvedValue({ ...before, ehp: before.ehp + 500, cpuUsed: before.cpuUsed + 5 });
+      renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting, onPreview });
+      const boxes = screen.getAllByRole('checkbox');
+      await userEvent.click(boxes[0]);
+      await waitFor(() => expect(lastDelta(onPreview)?.count).toBe(1));
+      await userEvent.hover(boxes[1]);
+      await waitFor(() =>
+        expect(lastDelta(onPreview)?.changes.map((c) => c.key)).toEqual(['cpuUsed', 'ehp'])
+      );
+      await userEvent.unhover(boxes[1]);
+      await waitFor(() => expect(lastDelta(onPreview)?.changes.map((c) => c.key)).toEqual(['ehp']));
+    });
+
+    it('clears the preview when the panel goes away', async () => {
+      const a = option(11, { ehp: 1100 });
+      const onPreview = vi.fn();
+      const s = withRecalc(done({ noDownside: [a] }), () => ({ ...before, ehp: before.ehp + 500 }));
+      const { unmount } = renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting, onPreview });
+      await userEvent.click(screen.getByRole('checkbox'));
+      await waitFor(() => expect(lastDelta(onPreview)?.count).toBe(1));
+      unmount();
+      expect(lastDelta(onPreview)).toBeNull();
     });
   });
 });
