@@ -127,7 +127,7 @@ export function SolarSystemSearchField({
               role="option"
               aria-selected={index === highlight}
               className={cx(
-                'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2 touch:flex touch:min-h-11 touch:items-center',
+                'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2 touch:flex touch:min-h-9 touch:items-center',
                 index === highlight && `bg-panel-2 ${activeOptionClassName}`
               )}
               onMouseDown={(event) => event.preventDefault()}

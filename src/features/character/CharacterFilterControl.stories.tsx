@@ -77,7 +77,7 @@ export const InPageHeader: Story = {
   ),
 };
 
-/** @summary The same header at 390 wide: the same faces at the 44px touch height, the row on one line. */
+/** @summary The same header at 390 wide: the same faces at the 36px touch height, the row on one line. */
 export const InPageHeaderPhone: Story = {
   ...InPageHeader,
   globals: { viewport: { value: 'phone390', isRotated: false } },

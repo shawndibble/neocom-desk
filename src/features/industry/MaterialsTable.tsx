@@ -834,7 +834,7 @@ export function MaterialsTable({
               aria-expanded={haveOpen}
               onClick={() => setHaveOpen((open) => !open)}
               className={cx(
-                'inline-flex min-h-11 items-center gap-1 rounded-xs uppercase hover:text-text md:min-h-0',
+                'inline-flex min-h-9 items-center gap-1 rounded-xs uppercase hover:text-text md:min-h-0',
                 interactiveClassName,
                 focusRingClassName
               )}
@@ -923,7 +923,7 @@ export function MaterialsTable({
   const sortPicker = (
     <NativeSelect
       size="sm"
-      className="w-32 shrink-0 [&>select]:min-h-11 [&>select]:normal-case"
+      className="w-32 shrink-0 [&>select]:min-h-9 [&>select]:normal-case"
       value={phoneSort}
       onChange={(event) => setPhoneSort(event.target.value as PhoneSort)}
     >
@@ -938,7 +938,7 @@ export function MaterialsTable({
   return (
     <div ref={containerRef} className="flex flex-col gap-3">
       {/* Once for the whole list, on its own line: inside the first heading a
-          44px field made that heading the heaviest thing in the section. */}
+          36px field made that heading the heaviest thing in the section. */}
       {isPhone && visible.length > 0 && (
         <label className="flex items-center justify-end gap-2 text-xs text-text-dim">
           {t('industry.errands.sortLabel')}

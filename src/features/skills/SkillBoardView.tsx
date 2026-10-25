@@ -50,7 +50,7 @@ export function GroupTile({
       aria-disabled={matchCount !== undefined || undefined}
       onClick={onToggle}
       className={cx(
-        'flex min-h-11 w-full scroll-mt-14 items-center gap-3 rounded-xs border border-line bg-panel/85 p-3 text-left aria-disabled:cursor-default',
+        'flex min-h-9 w-full scroll-mt-14 items-center gap-3 rounded-xs border border-line bg-panel/85 p-3 text-left aria-disabled:cursor-default',
         rowInteractiveClassName,
         focusRingInsetClassName,
         expanded && 'border-accent-dim'

@@ -103,7 +103,7 @@ export function NotificationEventList({
           type="button"
           onClick={() => setTopicParam('')}
           className={cx(
-            'flex min-h-11 items-center gap-1.5 text-xs text-text-dim',
+            'flex min-h-9 items-center gap-1.5 text-xs text-text-dim',
             interactiveClassName,
             focusRingInsetClassName
           )}
@@ -128,7 +128,7 @@ export function NotificationEventList({
             type="button"
             onClick={() => setTopicParam(topic.id, { push: true })}
             className={cx(
-              'flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left text-xs hover:bg-panel-2',
+              'flex min-h-9 w-full items-center gap-3 px-3 py-2 text-left text-xs hover:bg-panel-2',
               interactiveClassName,
               focusRingInsetClassName
             )}

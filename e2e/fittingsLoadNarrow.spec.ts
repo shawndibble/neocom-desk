@@ -1,7 +1,7 @@
 /**
  * Fittings section tracer (issue #1532): pasting an EFT fit Loads it and
  * renders the List view, at a phone width where every tappable control still
- * meets the 44px touch-target floor (DESIGN.md, `min-h-11`). The stats
+ * meets the 36px touch-target floor (DESIGN.md, `min-h-9`). The stats
  * sections wait on the dogma engine's own WASM+SDE download — genuinely slow
  * on a cold CI runner — so this spec asserts on the List view and the Load
  * control only, not on any stat figure.
@@ -33,7 +33,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     const loadButton = page.getByRole('button', { name: 'Load', exact: true });
     const box = await loadButton.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.height).toBeGreaterThanOrEqual(36);
 
     await loadButton.click();
 
@@ -49,7 +49,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
 
-  test('switches to the Ring overview, edits a rack through a 44px rack button, and remembers the choice across a reload', async ({
+  test('switches to the Ring overview, edits a rack through a 36px rack button, and remembers the choice across a reload', async ({
     page,
   }) => {
     await signInAndGoto(page, './ships/fittings');
@@ -65,7 +65,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     // Below desktop the Ring, the List and the stats are one row of tabs.
     const ringToggle = page.getByRole('tab', { name: 'Ring', exact: true });
     const toggleBox = await ringToggle.boundingBox();
-    expect(toggleBox!.height).toBeGreaterThanOrEqual(44);
+    expect(toggleBox!.height).toBeGreaterThanOrEqual(36);
     await ringToggle.click();
 
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
@@ -74,7 +74,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await expect(page.getByLabel(/^High slots 1[:,]/)).toBeVisible();
     const rackButton = page.getByRole('button', { name: /^High slots\s*\d+ \/ \d+/ });
     const rackBox = await rackButton.boundingBox();
-    expect(rackBox!.height).toBeGreaterThanOrEqual(44);
+    expect(rackBox!.height).toBeGreaterThanOrEqual(36);
     await rackButton.click();
     const sheet = page.getByRole('dialog', { name: 'High slots' });
     await expect(sheet).toBeVisible();
@@ -106,12 +106,12 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.setViewportSize(PHONE);
 
     const newFromHull = page.getByRole('button', { name: 'New from hull' });
-    expect((await newFromHull.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await newFromHull.boundingBox())!.height).toBeGreaterThanOrEqual(36);
     await newFromHull.click();
     await page.getByRole('searchbox', { name: 'Search hulls' }).fill('Rifter');
     await page.getByRole('button', { name: 'Rifter', exact: true }).click();
     const start = page.getByRole('button', { name: 'Start fitting' });
-    expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(36);
     await start.click();
 
     await expect(page.getByRole('heading', { level: 1, name: 'Rifter' })).toBeVisible();
@@ -152,7 +152,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
       const box = (await control.boundingBox())!;
       expect(box.x).toBeGreaterThanOrEqual(h1Box.x + h1Box.width);
       expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
-      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(36);
     }
 
     const doc = await page.evaluate(() => ({

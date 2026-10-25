@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Slider } from './Slider';
 
 /**
- * @summary Native range slider in the house recipe: accent track, shared focus ring, 44px touch tier. Always named, always with its value printed beside it.
+ * @summary Native range slider in the house recipe: accent track, shared focus ring, 36px touch tier. Always named, always with its value printed beside it.
  */
 const meta = {
   title: 'ui/Slider',

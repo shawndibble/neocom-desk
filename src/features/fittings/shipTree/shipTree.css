@@ -338,12 +338,12 @@
 }
 
 /*
- * The ladder's 44px thumbnail: the map tile's marks at phone size — same
+ * The ladder's 36px thumbnail: the map tile's marks at phone size — same
  * tech corner, tone and winged badge, scaled down.
  */
 .isis-tile.isis-thumb {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   cursor: inherit;
 }

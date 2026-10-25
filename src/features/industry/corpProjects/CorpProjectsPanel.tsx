@@ -232,7 +232,7 @@ export function CorpProjectsPanel({
       header: t('industry.corpProjects.select'),
       phoneHidden: true,
       render: (row) => (
-        // The label is the 44px touch target on a coarse pointer, and keeps the click off the row's disclosure.
+        // The label is the 36px touch target on a coarse pointer, and keeps the click off the row's disclosure.
         <label className={touchCheckboxLabelClassName} onClick={(event) => event.stopPropagation()}>
           <Checkbox
             checked={selectedIds.has(row.id)}

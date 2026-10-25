@@ -63,7 +63,7 @@ for (const section of SECTIONS) {
   });
 }
 
-test('Travel folds Avoided systems and Also avoid at 390px; each opens on tap at the 44px floor', async ({
+test('Travel folds Avoided systems and Also avoid at 390px; each opens on tap at the 36px floor', async ({
   page,
 }) => {
   await page.setViewportSize(PHONE);
@@ -75,7 +75,7 @@ test('Travel folds Avoided systems and Also avoid at 390px; each opens on tap at
   await expect(alsoAvoid).toContainText('of 3 on');
   expect(
     await alsoAvoid.evaluate((el) => el.getBoundingClientRect().height)
-  ).toBeGreaterThanOrEqual(44);
+  ).toBeGreaterThanOrEqual(36);
   await alsoAvoid.click();
   await expect(alsoAvoid).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('checkbox', { name: /EDENCOM/ })).toBeVisible();
@@ -85,7 +85,7 @@ test('Travel folds Avoided systems and Also avoid at 390px; each opens on tap at
     '0 systems'
   );
   expect(await avoided.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(
-    44
+    36
   );
   await avoided.click();
   await expect(page.getByRole('button', { name: 'Hide avoided systems' })).toBeVisible();

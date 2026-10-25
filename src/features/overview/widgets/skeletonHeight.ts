@@ -48,12 +48,12 @@ const CHART_PAD = 10;
 const TABLE_BORDER = 1;
 /** A header row of plain labels. */
 const HEADER_ROW = 25;
-/** A header row of sort buttons, which stand 44px tall on a phone (the touch floor). */
+/** A header row of sort buttons, which stand 36px tall on a phone (the touch floor). */
 const SORTABLE_HEADER_DESK = 29.3;
 const SORTABLE_HEADER_PHONE = 52.5;
 /**
  * A table row: `md:h-7` on a desktop; on a phone a plain row is `h-8` and one that links or
- * opens a detail is `h-11` (the touch floor).
+ * opens a detail is `h-9` (the touch floor).
  */
 const ROW_DESK = 28;
 const ROW_PHONE = 32;

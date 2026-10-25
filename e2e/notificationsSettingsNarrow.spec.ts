@@ -6,7 +6,7 @@
  * A phone lists the Topics and drills into one. Every event row is one button
  * that opens that event's Characters, and the row's own two checkboxes sit on a
  * second line beneath its full name. A phone thumb needs the button at the
- * 44px floor, the checkboxes must stay independently tappable, and the phone
+ * 36px floor, the checkboxes must stay independently tappable, and the phone
  * opens a bottom sheet rather than growing the page.
  *
  * Asserted on the rendered bounding box rather than the class string; see
@@ -46,7 +46,7 @@ const TOPICS = [
   /^EVE notifications/,
 ];
 
-test('an event row meets the 44px touch floor at 390px and opens a sheet with its characters', async ({
+test('an event row meets the 36px touch floor at 390px and opens a sheet with its characters', async ({
   page,
 }) => {
   await gotoNotificationSettings(page);
@@ -56,7 +56,7 @@ test('an event row meets the 44px touch floor at 390px and opens a sheet with it
   const toggle = eventToggle(page, 'Skill queue ending');
   await expect(toggle).toBeVisible();
   const height = await toggle.evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBeGreaterThanOrEqual(44);
+  expect(height).toBeGreaterThanOrEqual(36);
 
   // A click 3px below the row's top edge, clear of the label text, must still open it.
   const box = await toggle.boundingBox();

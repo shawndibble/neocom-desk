@@ -119,7 +119,7 @@ export function SkillPlanCard({
       {current ? (
         <Link
           to={`/skills/plans/${current.id}`}
-          className="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-xs border border-accent-dim bg-panel px-3"
+          className="flex min-h-9 min-w-0 items-center justify-between gap-2 rounded-xs border border-accent-dim bg-panel px-3"
         >
           <span className="truncate text-sm text-accent">{current.name}</span>
           <span className="flex shrink-0 items-center gap-1 text-xs text-text-dim">

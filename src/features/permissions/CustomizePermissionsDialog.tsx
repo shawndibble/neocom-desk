@@ -156,7 +156,7 @@ export function CustomizePermissionsDialog({
             return (
               <label
                 key={group}
-                className="flex min-h-11 cursor-pointer items-start gap-2 rounded-xs border border-line px-3 py-2 md:min-h-0"
+                className="flex min-h-9 cursor-pointer items-start gap-2 rounded-xs border border-line px-3 py-2 md:min-h-0"
               >
                 <CaptionedCheckbox
                   domId={`permission-${group}`}

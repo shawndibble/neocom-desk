@@ -147,7 +147,7 @@ export function CloneVerdictCard({
   const queueLink = (
     <Link
       to={`/skills/plans${CURRENT_QUEUE_HASH}`}
-      className={`${inlineLinkClassName} inline-flex min-h-11 items-center md:min-h-0`}
+      className={`${inlineLinkClassName} inline-flex min-h-9 items-center md:min-h-0`}
     >
       {t('clones.verdict.viewQueue')}
     </Link>

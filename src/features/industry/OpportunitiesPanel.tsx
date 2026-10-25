@@ -387,7 +387,7 @@ export function OpportunitiesPanel({
       id: 'select',
       header: '',
       width: COL_ICON,
-      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
+      // The label is the 36px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
         <label className={touchCheckboxLabelClassName}>
           <Checkbox

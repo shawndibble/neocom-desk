@@ -83,7 +83,7 @@ export function TripLegs({
               aria-label={parts.join(' · ')}
               onClick={() => toggle(index)}
               className={cx(
-                'flex min-h-11 w-full items-center gap-1.5 py-1.5 text-left text-sm md:min-h-0',
+                'flex min-h-9 w-full items-center gap-1.5 py-1.5 text-left text-sm md:min-h-0',
                 rowInteractiveClassName,
                 focusRingInsetClassName
               )}

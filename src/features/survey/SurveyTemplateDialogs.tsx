@@ -105,7 +105,7 @@ export function SaveTemplateDialog({ fields, moon, templates, onClose, onSaved }
         <fieldset className="flex flex-col gap-1">
           <legend className="mb-1 text-xs text-text-dim">{t('survey.templates.include')}</legend>
           {rows.map((row) => (
-            <label key={row.key} className="flex min-h-9 items-center gap-2 touch:min-h-11">
+            <label key={row.key} className="flex min-h-9 items-center gap-2">
               <Checkbox
                 checked={include[row.key]}
                 disabled={!available[row.key]}

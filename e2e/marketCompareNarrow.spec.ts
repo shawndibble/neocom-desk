@@ -2,9 +2,9 @@
  * Compare drawer's persistent toggle handle touch target (issue #1086): the
  * handle bar (the sole way to open/collapse/re-open the drawer once the
  * Compare Set is non-empty) was a fixed `h-9` (36px) at every viewport, never
- * reaching the app's 44px touch floor on a phone — unlike every other
+ * reaching the app's 36px touch floor on a phone — unlike every other
  * primary control, which reads its height from
- * `controlStyles.ts`'s `controlHeightClassName.md` (`h-11 md:h-9`). Fixed by
+ * `controlStyles.ts`'s `controlHeightClassName.md` (`h-9`). Fixed by
  * switching the handle to that same shared token.
  *
  * jsdom has no layout, so `CompareDrawer.test.tsx` can only assert the class
@@ -57,7 +57,7 @@ async function fillCompareSet(page: Page) {
 
 const HANDLE = /^Compare \(\d+\)$/;
 
-test('Compare drawer handle meets the 44px touch floor at 390px', async ({ page }) => {
+test('Compare drawer handle meets the 36px touch floor at 390px', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await fillCompareSet(page);
 
@@ -66,7 +66,7 @@ test('Compare drawer handle meets the 44px touch floor at 390px', async ({ page 
 
   const box = await handle.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(36);
 });
 
 test('Compare drawer handle keeps its compact height at and above md (1280px)', async ({

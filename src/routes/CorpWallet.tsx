@@ -294,7 +294,7 @@ function CorpDivisionsPanel({
                     toggleRef.current?.focus();
                   }}
                   className={cx(
-                    'min-h-11 rounded-xs border border-line px-3 py-2 text-left',
+                    'min-h-9 rounded-xs border border-line px-3 py-2 text-left',
                     interactiveClassName,
                     focusRingInsetClassName,
                     isSelected ? selectedRowClassName : 'hover:bg-panel-2 active:bg-panel'

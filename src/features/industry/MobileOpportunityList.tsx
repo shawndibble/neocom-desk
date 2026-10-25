@@ -253,12 +253,12 @@ export function MobileOpportunityList({
                 if (isCardOwnClick(event)) startPlanFromRow(row.candidate.catalogEntry);
               }}
               className={cx(
-                'grid grid-cols-[2.75rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
+                'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
                 selected ? selectedRowClassName : 'border-l-2 border-l-transparent'
               )}
             >
               <label
-                className={`flex size-11 cursor-pointer items-center justify-center self-start`}
+                className={`flex size-9 cursor-pointer items-center justify-center self-start`}
               >
                 <Checkbox
                   checked={selected}

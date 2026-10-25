@@ -199,14 +199,14 @@ function labelLines(cells: CellBox[], tolerance = 1): string[][] {
   return lines(cells, tolerance).map((line) => line.map((cell) => cell.label));
 }
 
-/** A phone card: the pinned ⋮ is a 44px target centred on the card, with no › beside or under it, clear of line two. */
+/** A phone card: the pinned ⋮ is a 36px target centred on the card, with no › beside or under it, clear of line two. */
 async function expectCardMenu(page: Page, tableLabel: string, orderId: number) {
   const row = page.locator(`table[aria-label="${tableLabel}"] tr[data-row-key="${orderId}"]`);
   const more = await row.getByRole('button', { name: /^More actions/ }).boundingBox();
   const card = await row.boundingBox();
   const meta = await row.locator('td.dt-meta').last().boundingBox();
-  expect(more!.width).toBeGreaterThanOrEqual(44);
-  expect(more!.height).toBeGreaterThanOrEqual(44);
+  expect(more!.width).toBeGreaterThanOrEqual(36);
+  expect(more!.height).toBeGreaterThanOrEqual(36);
   await expect(row.locator('td.dt-disclosure svg')).toBeHidden();
   await expect(row.locator('.dt-lead-caret')).toBeHidden();
   const dy = Math.abs(more!.y + more!.height / 2 - (card!.y + card!.height / 2));
@@ -406,12 +406,12 @@ test.describe('Market Browser — order book stacked cards', () => {
 
 /**
  * The item panel header's icon cluster (Add to Quickbar, Add to Compare, price
- * alert, Info) at phone widths: every button visible, a 44px touch target
+ * alert, Info) at phone widths: every button visible, a 36px touch target
  * (§6c touch tier), none overlapping another, and the page not scrolling
  * sideways.
  */
 for (const width of [390, 360]) {
-  test(`item header buttons are visible, 44px and non-overlapping at ${width}px`, async ({
+  test(`item header buttons are visible, 36px and non-overlapping at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 844 });
@@ -456,8 +456,8 @@ for (const width of [390, 360]) {
       await expect(button).toBeVisible();
       const box = await button.boundingBox();
       expect(box, String(name)).not.toBeNull();
-      expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(44);
-      expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(44);
+      expect(box!.width, `${name} width`).toBeGreaterThanOrEqual(36);
+      expect(box!.height, `${name} height`).toBeGreaterThanOrEqual(36);
       expect(box!.x + box!.width, `${name} inside viewport`).toBeLessThanOrEqual(width);
       boxes.push(box!);
     }

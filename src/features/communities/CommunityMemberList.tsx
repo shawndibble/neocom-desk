@@ -77,7 +77,7 @@ export function CommunityMemberList({
             const row = (
               <li
                 key={member.uid}
-                className={`flex min-h-11 items-center gap-2.5 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
+                className={`flex min-h-9 items-center gap-2.5 py-1.5 text-xs ${stale ? 'opacity-60' : ''}`}
               >
                 {characterId !== null && (
                   <CharacterAvatar characterId={characterId} loading="lazy" />

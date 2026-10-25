@@ -1,7 +1,7 @@
 /**
  * The Market Browser item header's price alert bell (issue #1427): opens the
  * shared alert form in a popover, and one Save pins the item and sets its
- * target. `md` (44px on touch) like the adjacent header buttons.
+ * target. `md` (36px on touch) like the adjacent header buttons.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -105,7 +105,7 @@ export function SurveyOwnerChange({
                   <button
                     type="button"
                     className={cx(
-                      'w-full rounded-xs px-2 py-1 text-left hover:bg-panel-2 touch:min-h-11',
+                      'w-full rounded-xs px-2 py-1 text-left hover:bg-panel-2 touch:min-h-9',
                       focusRingClassName
                     )}
                     onClick={() => setChosen(hit)}

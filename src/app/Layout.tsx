@@ -506,7 +506,7 @@ export const Layout = memo(function Layout() {
                     <CharacterFooterLink
                       activeCharacter={activeCharacter}
                       size="sm"
-                      className="min-h-11 rounded-xs"
+                      className="min-h-9 rounded-xs"
                       onClick={() => setMoreOpen(false)}
                       originPath={originPath}
                     />

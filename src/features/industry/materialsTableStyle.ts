@@ -39,7 +39,7 @@ type LinkTone = 'accent' | 'build' | 'blueprint' | 'quiet';
  */
 export function linkClassName(tone: LinkTone): string {
   return cx(
-    'inline-flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold whitespace-nowrap underline underline-offset-2 md:min-h-0',
+    'inline-flex min-h-9 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold whitespace-nowrap underline underline-offset-2 md:min-h-0',
     interactiveClassName,
     focusRingClassName,
     tone === 'accent' && 'text-accent decoration-accent-dim',

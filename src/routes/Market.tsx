@@ -201,7 +201,7 @@ function MarketGroupTree({
             // whenever a search collapses or re-expands a group.
             data-tree-item-id={item.typeId}
             aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-            className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
+            className={`flex min-h-9 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingInsetClassName} ${
               selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
             }`}
           >
@@ -238,9 +238,9 @@ function MarketGroupTree({
         : !flipped;
     const expandable = children.length > 0 || items.length > 0;
 
-    // `min-h-11 md:min-h-0` gives a thumb the 44px floor on the leaf row and
+    // `min-h-9 md:min-h-0` gives a thumb the 36px floor on the leaf row and
     // on an expandable header — a disabled header is inert, so it stays dense
-    // rather than spending 44px of the phone's scrollport on nothing (55 of
+    // rather than spending 36px of the phone's scrollport on nothing (55 of
     // the catalogue's groups are childless and itemless, five in a row under
     // ECCM alone). Not `controlHeightClassName.md`: its `md:h-9` would grow
     // desktop's 24px rows too, which this fix must not do.
@@ -253,7 +253,7 @@ function MarketGroupTree({
           onClick={() => onToggle(group.id)}
           style={{ paddingLeft: `${depth * 0.75}rem` }}
           className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${interactiveClassName} ${focusRingInsetClassName} ${
-            expandable ? 'min-h-11 md:min-h-0' : ''
+            expandable ? 'min-h-9 md:min-h-0' : ''
           }`}
         >
           {expandable && <Caret expanded={expanded} />}

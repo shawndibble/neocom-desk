@@ -220,7 +220,7 @@ export function CopyAmount({
   );
 }
 
-/** Two equal 44px buttons side by side. */
+/** Two equal 36px buttons side by side. */
 export function ButtonPair({ children }: { children: ReactNode }) {
   return (
     <span className="grid grid-cols-2 gap-2 [&>button]:w-full [&>button]:px-2 [&>button]:whitespace-nowrap">

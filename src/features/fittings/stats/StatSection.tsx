@@ -45,7 +45,7 @@ export function StatSection({
             aria-expanded={expanded}
             onClick={onToggle}
             className={cx(
-              'flex min-h-11 w-full items-center gap-2 pl-3 text-left text-xs font-semibold tracking-widest uppercase md:min-h-9',
+              'flex min-h-9 w-full items-center gap-2 pl-3 text-left text-xs font-semibold tracking-widest uppercase',
               focusRingInsetClassName
             )}
           >

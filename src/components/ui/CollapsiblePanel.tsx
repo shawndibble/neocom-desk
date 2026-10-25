@@ -42,7 +42,7 @@ interface CollapsiblePanelProps {
   /** The caret button, for a caller that must put focus back on it after folding the panel. */
   toggleRef?: Ref<HTMLButtonElement>;
   /**
-   * The caret's size tier. `row` is the 44px touch tier on a phone; `sm` (default) stays 36px
+   * The caret's size tier. `row` is the 36px touch tier on a phone; `sm` (default) stays 36px
    * so a header that also holds `sm` buttons keeps one height per row (DESIGN.md §3).
    */
   caretSize?: 'sm' | 'row';

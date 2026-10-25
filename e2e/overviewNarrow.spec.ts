@@ -142,7 +142,7 @@ test('on a phone M takes the whole row, with no overflow', async ({ page }) => {
   expect(await hasHorizontalOverflow(page)).toBe(false);
 });
 
-test("a widget's title link meets the 44px touch floor at 390px", async ({ page }) => {
+test("a widget's title link meets the 36px touch floor at 390px", async ({ page }) => {
   await seedAndOpen(page, 'S', 4, PHONE);
   // The title is the link to the kind's page (no separate Open link).
   const openLink = page.locator('main section h2 a').first();
@@ -150,7 +150,7 @@ test("a widget's title link meets the 44px touch floor at 390px", async ({ page 
   // Polled: a card remounted as its reads land measures as a null box.
   await expect
     .poll(async () => (await openLink.boundingBox())?.height ?? 0)
-    .toBeGreaterThanOrEqual(44);
+    .toBeGreaterThanOrEqual(36);
 });
 
 function contractFixture(over: Record<string, unknown>) {
@@ -214,7 +214,7 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     };
     expect(Math.abs(boxes.next.height - boxes.customize.height)).toBeLessThan(1);
     expect(Math.abs(boxes.bell.height - boxes.customize.height)).toBeLessThan(1);
-    if (viewport.width < 768) expect(boxes.customize.height).toBeGreaterThanOrEqual(44);
+    if (viewport.width < 768) expect(boxes.customize.height).toBeGreaterThanOrEqual(36);
     // Customize and the bell share a row, the bell last, top right.
     expect(Math.abs(boxes.bell.y - boxes.customize.y)).toBeLessThan(2);
     expect(boxes.bell.x).toBeGreaterThan(boxes.customize.x);
@@ -371,7 +371,7 @@ async function openOrdersWidget(page: Page, viewport: { width: number; height: n
   return sortButtons;
 }
 
-test('Open Orders sort headers meet the 44px touch floor at 390px', async ({ page }) => {
+test('Open Orders sort headers meet the 36px touch floor at 390px', async ({ page }) => {
   const sortButtons = await openOrdersWidget(page, PHONE);
   const count = await sortButtons.count();
   expect(count).toBeGreaterThanOrEqual(2);
@@ -380,7 +380,7 @@ test('Open Orders sort headers meet the 44px touch floor at 390px', async ({ pag
     // Polled: a card remounted as its reads land measures as a null box.
     await expect
       .poll(async () => (await sortButtons.nth(i).boundingBox())?.height ?? 0)
-      .toBeGreaterThanOrEqual(44);
+      .toBeGreaterThanOrEqual(36);
     boxes.push((await sortButtons.nth(i).boundingBox())!);
   }
   expectNoOverlap(boxes);
@@ -407,7 +407,7 @@ test('Open Orders sort headers stay compact with a fine pointer at 1280px', asyn
 });
 
 for (const size of ['S', 'M'] as const) {
-  test(`a ${size} widget's settings menu meets the 44px touch floor at 390px`, async ({ page }) => {
+  test(`a ${size} widget's settings menu meets the 36px touch floor at 390px`, async ({ page }) => {
     await seedAndOpen(page, size, 4, PHONE);
     const triggers = page.locator('main section button[aria-label^="Settings for"]');
     await expect(triggers).toHaveCount(4);
@@ -415,10 +415,10 @@ for (const size of ['S', 'M'] as const) {
       // Polled: a card remounted as its reads land measures as a null box.
       await expect
         .poll(async () => (await triggers.nth(i).boundingBox())?.width ?? 0)
-        .toBeGreaterThanOrEqual(44);
+        .toBeGreaterThanOrEqual(36);
       await expect
         .poll(async () => (await triggers.nth(i).boundingBox())?.height ?? 0)
-        .toBeGreaterThanOrEqual(44);
+        .toBeGreaterThanOrEqual(36);
     }
     const trigger = triggers.first();
     const title = page.locator('main section h2 a').first();
@@ -533,7 +533,7 @@ for (const kind of ['incursions', 'contracts'] as const) {
       expect(await hasHorizontalOverflow(page)).toBe(false);
       // Linked rows (incursions) keep the touch floor.
       const rowBox = await rows.first().boundingBox();
-      if (kind === 'incursions') expect(rowBox!.height).toBeGreaterThanOrEqual(44);
+      if (kind === 'incursions') expect(rowBox!.height).toBeGreaterThanOrEqual(36);
     });
   }
 

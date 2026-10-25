@@ -144,7 +144,7 @@ export function CertifiedPlanDialog({ characterId, onPick, onClose }: CertifiedP
                       <li key={plan.id}>
                         <label
                           className={cx(
-                            'flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2',
+                            'flex min-h-9 cursor-pointer items-center gap-3 px-3 py-2',
                             'text-text',
                             rowInteractiveClassName,
                             isPicked ? selectedRowClassName : 'border-l-2 border-l-transparent'

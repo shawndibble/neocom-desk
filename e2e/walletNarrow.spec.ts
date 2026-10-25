@@ -1,8 +1,8 @@
 /**
  * Wallet Journal "Transactions" link touch target (issue #1919): a bare
  * `text-xs` link in the Panel header `actions` (centred, so it does not
- * inherit the header's `min-h-11`) was ~14px tall. Fixed with
- * `inline-flex min-h-11 min-w-11 ... md:min-h-0 md:min-w-0`, the same
+ * inherit the header's `min-h-9`) was ~14px tall. Fixed with
+ * `inline-flex min-h-9 min-w-9 ... md:min-h-0 md:min-w-0`, the same
  * precedent as #1070 / #1077 / #1126.
  *
  * Also the journal as a plain phone table (was #2521's "Sort by" picker), below.
@@ -15,7 +15,7 @@ import { expectNoPageOverflow } from './support/overflow';
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
-test('Journal "Transactions" link meets the 44px touch floor at 390px, without overflow', async ({
+test('Journal "Transactions" link meets the 36px touch floor at 390px, without overflow', async ({
   page,
 }) => {
   await page.setViewportSize(PHONE);
@@ -28,7 +28,7 @@ test('Journal "Transactions" link meets the 44px touch floor at 390px, without o
     const r = el.getBoundingClientRect();
     return { height: r.height, right: r.right };
   });
-  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(36);
   expect(box.right).toBeLessThanOrEqual(PHONE.width);
 
   const overflow = await page.evaluate(

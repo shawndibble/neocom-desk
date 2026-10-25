@@ -94,8 +94,8 @@ async function expectPickerFits(page: Page, name: RegExp) {
   await expectNoPageOverflow(page);
   const box = (await trigger.boundingBox())!;
   expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
-  // Truncated, not wrapped: one control-height line (`h-11` on a phone).
-  expect(box.height).toBe(44);
+  // Truncated, not wrapped: one control-height line (`h-9` on a phone).
+  expect(box.height).toBe(36);
 }
 
 test.describe('Travel at 390px', () => {

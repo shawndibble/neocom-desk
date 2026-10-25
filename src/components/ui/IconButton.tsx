@@ -57,7 +57,7 @@ interface IconButtonProps extends Omit<
   tone?: IconButtonTone;
   /**
    * `md` (default) is the toolbar size; `sm` is for controls nested inside a
-   * dense row; `row` is `sm` on a pointer but the 44px touch tier below `md`.
+   * dense row; `row` is `sm` on a pointer but the 36px touch tier below `md`.
    */
   size?: IconButtonSize;
   /**
@@ -82,7 +82,7 @@ interface IconButtonProps extends Omit<
  * sized for a mouse. The name is mandatory — `label` is not optional and is
  * used for `aria-label` and the Tooltip alike, so the two can never drift
  * unless a caller deliberately shortens the bubble via `tooltip`.
- * The default size is the 44px touch tier below `md` and the standard 36px
+ * The default size is the 36px touch tier below `md` and the standard 36px
  * control above it (DESIGN.md §3); a pointer never gets the phone-sized box
  * and a thumb never gets the mouse-sized one.
  *

@@ -3,7 +3,7 @@
  *
  * The History table has no row click: the Type/title button in each stacked
  * card's first line is the only visible way to open a contract's detail. A
- * bare text button is one line tall (~16px), well under the 44px touch floor;
+ * bare text button is one line tall (~16px), well under the 36px touch floor;
  * the button now takes the touch tier below `md` and reverts to its one-line
  * height from `md` up. jsdom lays nothing out, so only a real render can pin it.
  */
@@ -13,7 +13,7 @@ import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
-const TOUCH_TARGET_PX = 44;
+const TOUCH_TARGET_PX = 36;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -67,7 +67,7 @@ test.describe('contracts history — detail opener', () => {
   test.describe('at 390px', () => {
     test.use({ viewport: PHONE });
 
-    test('every opener meets the 44px touch floor and opens the detail', async ({ page }) => {
+    test('every opener meets the 36px touch floor and opens the detail', async ({ page }) => {
       await page.goto('./contracts/history');
       const table = page.getByRole('table').first();
       const openers = table.locator('tbody tr:not(.dt-group-header) td:first-child button');

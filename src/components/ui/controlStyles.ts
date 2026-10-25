@@ -81,11 +81,11 @@ export const selectedRowClassName =
 
 /**
  * Heights, per DESIGN.md §3: `h-7` compact / `h-9` default for a pointer, one
- * step up on a touch viewport so a thumb gets a 44px target. Touch means below
+ * step up on a touch viewport so a thumb gets a 36px target. Touch means below
  * `md` *or* a coarse primary pointer (`touch:`, see `index.css`), so a touch
  * tablet keeps the touch tier at every width; `touch:` is declared after `md:`
  * and wins above it, and a fine pointer renders exactly as before. `IconButton`
- * shipped this tier first (`size-11 md:size-9`); it lives here now so the text
+ * shipped this tier first (`size-9`); it lives here now so the text
  * controls beside it match at *both* breakpoints instead of only on desktop.
  *
  * `StatChip` and `DataAgeBadge` deliberately stay at a flat `h-7` — they are
@@ -93,7 +93,7 @@ export const selectedRowClassName =
  */
 export const controlHeightClassName: Record<ControlSize, string> = {
   sm: 'h-9 md:h-7 touch:h-9',
-  md: 'h-11 md:h-9 touch:h-11',
+  md: 'h-9',
 };
 
 /**
@@ -142,16 +142,16 @@ export function selectTriggerClassName(size: ControlSize): string {
  * Not a `ControlSize`: those rows keep their own `px-2 py-1.5 text-xs`
  * density, and a single line of that lands at 28px — exactly `sm`'s pointer
  * value, and exactly the "reusing a pointer size on a phone" mistake DESIGN.md
- * §3 calls out. So this pins the touch tier's 44px on a phone and reverts to
+ * §3 calls out. So this pins the touch tier's 36px on a phone and reverts to
  * that same 28px above `md`, leaving pointer rendering pixel-identical (the
- * `min-h-11` / `md:min-h-7` shape #1055's Balances-strip fix established).
+ * `min-h-9` / `md:min-h-7` shape #1055's Balances-strip fix established).
  * `min-h-*`, not `h-*`, so a row whose text wraps grows instead of clipping.
  */
-export const tappableRowClassName = 'min-h-11 md:min-h-7 touch:min-h-11';
+export const tappableRowClassName = 'min-h-9 md:min-h-7 touch:min-h-9';
 
 /**
  * A native checkbox or radio is 16px, and a pseudo-element on it is not an
- * option (Firefox draws none on native form controls). Its 44px touch target
+ * option (Firefox draws none on native form controls). Its 36px touch target
  * is the label that wraps it instead: this is that label's class. Used where a
  * bare control sits alone in a table cell or a card corner; a control already
  * inside a `tappableRowClassName` label row needs nothing. The label grows the
@@ -160,26 +160,26 @@ export const tappableRowClassName = 'min-h-11 md:min-h-7 touch:min-h-11';
  * text it would otherwise squeeze narrower and slide the box out of line.
  */
 export const touchCheckboxLabelClassName =
-  'inline-flex shrink-0 items-center justify-center touch:size-11';
+  'inline-flex shrink-0 items-center justify-center touch:size-9';
 
 /**
- * A 44px-tall hit area on a coarse pointer for a small drag grip: an invisible
- * `::before` as wide as the grip itself and 44px tall, centred on it. Only the
+ * A 36px-tall hit area on a coarse pointer for a small drag grip: an invisible
+ * `::before` as wide as the grip itself and 36px tall, centred on it. Only the
  * vertical axis grows: along the row a grip's neighbour (the title, the row's
  * ⋮ or remove button) is right beside it, while vertically a touch row is
- * already 44px tall, so the area stays inside the grip's own row and column and
+ * already 36px tall, so the area stays inside the grip's own row and column and
  * can never cover a sibling control. The grip keeps `touch-none` itself.
  */
 export const gripHitAreaClassName =
-  "touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-11 touch:before:-translate-y-1/2 touch:before:content-['']";
+  "touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-9 touch:before:-translate-y-1/2 touch:before:content-['']";
 
 /**
  * The CompareDrawer's resize separator on touch: the separator itself grows to
- * a 44px band (so it takes layout space instead of overlaying the header or the
+ * a 36px band (so it takes layout space instead of overlaying the header or the
  * content above it) and its hairline is redrawn centred in it.
  */
 export const resizeHandleTouchClassName =
-  "touch:h-11 touch:border-b-0 touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:top-1/2 touch:after:h-px touch:after:bg-line touch:after:content-['']";
+  "touch:h-9 touch:border-b-0 touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:top-1/2 touch:after:h-px touch:after:bg-line touch:after:content-['']";
 
 /** An inline text action beside a status message — an Undo, a "jump to it". */
 export const inlineLinkClassName = cx(

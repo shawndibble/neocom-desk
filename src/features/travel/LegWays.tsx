@@ -296,7 +296,7 @@ function PhoneLine({
       aria-label={t('travel.ways.phoneToggle', { number })}
       onClick={onToggle}
       className={cx(
-        'flex min-h-11 w-full items-center gap-1.5 rounded-xs text-left text-sm text-text-dim',
+        'flex min-h-9 w-full items-center gap-1.5 rounded-xs text-left text-sm text-text-dim',
         rowInteractiveClassName,
         focusRingInsetClassName
       )}

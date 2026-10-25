@@ -263,7 +263,7 @@ function IdenticalToggle({
       aria-expanded={expanded}
       onClick={onToggle}
       className={cx(
-        'flex min-h-11 w-full items-center gap-1.5 px-3 py-2 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:min-h-0 touch:min-h-11',
+        'flex min-h-9 w-full items-center gap-1.5 px-3 py-2 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:min-h-0 touch:min-h-9',
         rowInteractiveClassName,
         focusRingInsetClassName
       )}

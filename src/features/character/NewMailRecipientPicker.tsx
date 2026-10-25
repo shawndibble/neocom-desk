@@ -279,7 +279,7 @@ export function NewMailRecipientPicker({
                   role="option"
                   aria-selected={highlight === i}
                   className={cx(
-                    'flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1 text-xs text-text md:min-h-0 touch:min-h-11',
+                    'flex min-h-9 cursor-pointer items-center gap-2 px-3 py-1 text-xs text-text md:min-h-0 touch:min-h-9',
                     highlight === i ? `bg-panel-2 ${activeOptionClassName}` : 'hover:bg-panel-2'
                   )}
                   onMouseEnter={() => setHighlight(i)}

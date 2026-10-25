@@ -2028,7 +2028,7 @@ describe('jumps-away distance (issue #87)', () => {
           facts.children.length - 1
         );
         expect(facts.textContent).toMatch(/^[^·].*·0 jumps$/);
-        expect(jumps.className).toContain('min-h-11');
+        expect(jumps.className).toContain('min-h-9');
       } finally {
         matchMedia.mockRestore();
       }
@@ -2041,7 +2041,7 @@ describe('jumps-away distance (issue #87)', () => {
       const jumps = await screen.findByRole('button', { name: '0 jumps' });
       expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
       expect(jumps.closest('[class~="sm:flex"]')).not.toBeNull();
-      expect(jumps.className).not.toContain('min-h-11');
+      expect(jumps.className).not.toContain('min-h-9');
     });
   });
 });

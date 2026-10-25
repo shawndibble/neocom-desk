@@ -85,7 +85,7 @@ export function SurveyConnectionsPanel({
                   </p>
                 )}
               </div>
-              <Button size="sm" className="touch:min-h-11" onClick={() => stop(c)}>
+              <Button size="sm" onClick={() => stop(c)}>
                 {t('survey.moonTax.stop')}
               </Button>
             </li>

@@ -1232,7 +1232,7 @@ export function PlanEditor({
   /**
    * One action in the tools pane: a full-width row, glyph left, label beside
    * it. `size="md"` is deliberate — these are the pane's primary targets, so
-   * they take the `h-11 md:h-9` touch tier (DESIGN.md §3) rather than `sm`,
+   * they take the `h-9` touch tier (DESIGN.md §3) rather than `sm`,
    * which is for controls nested inside an already-dense row and would hand
    * a phone a 36px target.
    *
@@ -1980,7 +1980,7 @@ export function PlanEditor({
         </p>
         <div className="mt-2 flex gap-2">
           {/* md, not this file's usual sm-in-a-Modal: the ticket calls out the
-              44px touch floor by name for this Modal specifically. */}
+              36px touch floor by name for this Modal specifically. */}
           <Button variant="primary" size="md" onClick={confirmQueueImportAppend}>
             {t('plans.importQueueAppend')}
           </Button>

@@ -287,10 +287,10 @@ describe('Gallery on a phone', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add a widget' })).toBeNull());
   });
 
-  it('gives the actions a 44px target', async () => {
+  it('gives the actions a 36px target', async () => {
     const { dialog } = await openGallery({ isPhone: true });
     expect(within(dialog).getByRole('button', { name: 'Add Open orders' }).className).toContain(
-      'min-h-11'
+      'min-h-9'
     );
   });
 });

@@ -72,7 +72,7 @@ function LaunchSquares({
               if (!blocked) onLaunch(count === inSpace ? count - 1 : count);
             }}
             className={cx(
-              'group flex size-11 items-center justify-center rounded-xs aria-disabled:cursor-not-allowed md:size-6',
+              'group flex size-9 items-center justify-center rounded-xs aria-disabled:cursor-not-allowed md:size-6',
               interactiveClassName,
               focusRingClassName
             )}

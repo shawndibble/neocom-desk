@@ -397,7 +397,7 @@ function NoFilterMatches({
               key={f.id}
               type="button"
               onClick={() => onFaction(f.id)}
-              className={cx(jumpChipClassName, 'min-h-11 px-2 md:min-h-9')}
+              className={cx(jumpChipClassName, 'min-h-9 px-2')}
             >
               {f.name}
               <span className="tabular-nums opacity-80" aria-hidden="true">
@@ -497,7 +497,7 @@ function LadderClass({
     >
       <summary
         className={cx(
-          'flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 py-1.5',
+          'flex min-h-9 cursor-pointer flex-wrap items-center gap-x-2 gap-y-1 py-1.5',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}

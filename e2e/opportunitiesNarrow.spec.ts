@@ -196,10 +196,10 @@ test.describe('Opportunities — ranked phone list', () => {
     // reads as a null box — a CI-only flake, not a short target.
     await expect
       .poll(async () => (await trigger.boundingBox())?.height ?? 0)
-      .toBeGreaterThanOrEqual(44);
+      .toBeGreaterThanOrEqual(36);
   });
 
-  test('the selection checkbox leads the card with a real ~44px target', async ({ page }) => {
+  test('the selection checkbox leads the card with a real ~36px target', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
 
@@ -221,7 +221,7 @@ test.describe('Opportunities — ranked phone list', () => {
         const box = await wrapper.boundingBox();
         return Math.min(box?.width ?? 0, box?.height ?? 0);
       })
-      .toBeGreaterThanOrEqual(44);
+      .toBeGreaterThanOrEqual(36);
   });
 
   test('changing the sort changes which metric leads the card', async ({ page }) => {

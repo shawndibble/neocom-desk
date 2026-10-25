@@ -139,7 +139,7 @@ export function SelectionToolbar({
     <Button
       key={action.id}
       // The bar's one primary, decision-committing action reads this app's
-      // `md` touch tier (44px) — every other action here stays `sm`, the
+      // `md` touch tier (36px) — every other action here stays `sm`, the
       // accepted size for an ordinary secondary bulk action (issue #1175).
       size={action.primary ? 'md' : 'sm'}
       variant={action.primary ? 'primary' : undefined}

@@ -65,10 +65,10 @@ export function CopyablePrice({
         <button
           type="button"
           onClick={() => void copy()}
-          // The 44px touch tier (DESIGN.md §3) on a phone, where the modal's
+          // The 36px touch tier (DESIGN.md §3) on a phone, where the modal's
           // next-step and exit lines are this button alone; no extra height
           // on a pointer, where it sits inside a dense table row.
-          className={`inline-flex min-h-11 cursor-copy items-center rounded-xs text-left font-semibold hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingClassName}`}
+          className={`inline-flex min-h-9 cursor-copy items-center rounded-xs text-left font-semibold hover:text-accent md:min-h-0 ${interactiveClassName} ${focusRingClassName}`}
         >
           {children ?? formatted}
         </button>

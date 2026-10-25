@@ -148,7 +148,7 @@ export function PermissionsPanel() {
           </label>
         ) : (
           // Keeps labels aligned with the rows that have a checkbox.
-          missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-11" />
+          missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-9" />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-text">

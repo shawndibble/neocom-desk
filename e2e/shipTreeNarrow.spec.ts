@@ -31,7 +31,7 @@ test.describe('Ship Tree — narrow', () => {
 
       const factionButton = page.getByRole('button', { name: /Caldari State/ });
       const box = await factionButton.boundingBox();
-      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(36);
 
       await views.getByRole('button', { name: 'Map' }).click();
       await expect(page.getByRole('region', { name: 'Caldari State ship tree' })).toBeVisible();

@@ -42,7 +42,7 @@ import { valueButtonLabel } from './basisLabel';
 interface RangeControlProps {
   value: MiningYieldRange;
   onChange: (range: MiningYieldRange) => void;
-  /** Full width with 44px tap targets — the phone layout. */
+  /** Full width with 36px tap targets — the phone layout. */
   fill?: boolean;
 }
 
@@ -67,7 +67,7 @@ export function RangeControl({ value, onChange, fill = false }: RangeControlProp
 interface ChartMetricControlProps {
   value: ChartMetric;
   onChange: (metric: ChartMetric) => void;
-  /** Full width with 44px tap targets — the phone layout. */
+  /** Full width with 36px tap targets — the phone layout. */
   fill?: boolean;
 }
 
@@ -118,7 +118,7 @@ export function PriceBasisOptions({ value, onChange }: PriceBasisOptionsProps) {
       {choices.map((choice) => (
         <label
           key={choice}
-          className={`flex min-h-11 cursor-pointer items-start gap-2.5 rounded-xs border px-2.5 py-2 md:min-h-0 ${current === choice ? 'border-accent-dim bg-bg' : 'border-transparent hover:bg-panel-2'}`}
+          className={`flex min-h-9 cursor-pointer items-start gap-2.5 rounded-xs border px-2.5 py-2 md:min-h-0 ${current === choice ? 'border-accent-dim bg-bg' : 'border-transparent hover:bg-panel-2'}`}
         >
           <Radio
             name="mining-price-basis"
@@ -158,7 +158,7 @@ export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps)
     // A plain labelled checkbox, the app's one on/off control (Settings uses
     // the same markup) — not a custom switch.
     <div className="space-y-1.5">
-      <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
+      <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
         <Checkbox checked={value} onChange={() => onChange(!value)} />
         {t('miningTax.overview.showRefiningLabel')}
       </label>

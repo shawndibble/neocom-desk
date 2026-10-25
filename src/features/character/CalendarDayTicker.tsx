@@ -64,7 +64,7 @@ export function CalendarDayTicker({
             aria-current={day.isToday ? 'date' : undefined}
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
             className={cx(
-              'flex min-h-11 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',
+              'flex min-h-9 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',
               interactiveClassName,
               focusRingClassName,
               isSelected ? 'border-accent-dim bg-accent/15' : 'border-transparent',

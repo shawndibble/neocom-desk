@@ -447,7 +447,7 @@ export function AddPlanetDetail(props: AddPlanetDetailProps) {
             to={props.productHref(recipe.typeId)}
             onClick={onPlanLinkClick(() => props.onTraceRecipe(recipe.typeId))}
             className={cx(
-              'flex min-h-11 w-full items-center gap-2 rounded-xs border border-line px-2 py-1.5 text-left [@media(hover:hover)]:hover:bg-panel-2',
+              'flex min-h-9 w-full items-center gap-2 rounded-xs border border-line px-2 py-1.5 text-left [@media(hover:hover)]:hover:bg-panel-2',
               interactiveClassName,
               focusRingClassName
             )}

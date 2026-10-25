@@ -127,7 +127,7 @@ export function RebuildSteps({
               key={step.id}
               className={cx(tappableRowClassName, 'flex items-center gap-2 px-3 py-1.5')}
             >
-              <label className={cx(touchCheckboxLabelClassName, 'max-md:size-11')}>
+              <label className={cx(touchCheckboxLabelClassName, 'max-md:size-9')}>
                 <Checkbox
                   checked={ticked}
                   onChange={() => ticks.toggle(step.id)}

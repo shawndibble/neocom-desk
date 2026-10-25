@@ -71,7 +71,7 @@ function Chips({
             aria-pressed={active}
             onClick={() => select(row.characterId)}
             className={cx(
-              'flex min-h-11 items-center gap-2 rounded-xs border px-2 py-1 text-left md:min-h-9 touch:min-h-11',
+              'flex min-h-9 items-center gap-2 rounded-xs border px-2 py-1 text-left',
               toggleChipStateClassName(active),
               focusRingClassName
             )}
@@ -114,7 +114,7 @@ function PickerGroup({
           aria-current={row.characterId === activeId || undefined}
           onClick={() => onPick(row.characterId)}
           className={cx(
-            'flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left md:min-h-9 touch:min-h-11',
+            'flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left',
             rowInteractiveClassName,
             row.characterId === activeId && 'bg-panel-2'
           )}
@@ -163,7 +163,7 @@ function Picker({
         <button
           type="button"
           className={cx(
-            'flex min-h-11 w-full items-center gap-2 rounded-xs border border-line bg-panel-2 px-2 py-1 text-left md:min-h-9 touch:min-h-11',
+            'flex min-h-9 w-full items-center gap-2 rounded-xs border border-line bg-panel-2 px-2 py-1 text-left',
             focusRingClassName
           )}
         >

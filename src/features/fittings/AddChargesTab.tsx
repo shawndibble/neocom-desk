@@ -123,7 +123,7 @@ export function ChargesTab({
                 aria-controls={bodyId}
                 onClick={() => toggleSection(group.moduleTypeId)}
                 className={cx(
-                  'flex min-h-11 w-full items-center gap-2 px-2 text-left md:min-h-9',
+                  'flex min-h-9 w-full items-center gap-2 px-2 text-left',
                   rowInteractiveClassName,
                   focusRingInsetClassName
                 )}
@@ -191,7 +191,7 @@ export function ChargesTab({
                             onClick={() => onLoadCharge?.(choice.typeId)}
                             className={chargeRowClassName(
                               loaded,
-                              'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9'
+                              'flex min-h-9 w-full items-center gap-2 px-2 text-left text-xs'
                             )}
                           >
                             <TypeIcon typeId={choice.typeId} size={32} width={20} height={20} />

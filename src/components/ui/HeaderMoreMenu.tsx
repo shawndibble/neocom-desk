@@ -19,7 +19,7 @@
  * - It needs two or more real actions (§6c restraint); one action keeps its
  *   own button at every width. Refresh never moves in: it stays a standalone
  *   icon beside the data age.
- * - It always draws at the header's touch tier (`IconButton`'s default: 44px
+ * - It always draws at the header's touch tier (`IconButton`'s default: 36px
  *   square below `md`, 36px from `md` up), level with the icons beside it; it
  *   takes no size prop.
  *
