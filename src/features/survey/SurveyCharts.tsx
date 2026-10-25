@@ -1,8 +1,10 @@
 /**
- * The Survey tab's two charts, drawn with Recharts on one shared time axis:
- * the volume left in the field, stacked by ore with a dot and a total-volume
- * label on every scan and a dashed run to zero at the current pace,
- * and under it the mining rate between each pair of scans. Statically imports
+ * The Survey tab's charts, drawn with Recharts on one shared time axis. Ore left
+ * (the default) is the volume left in the field, stacked by ore with a dot and a
+ * total-volume label on every scan and a dashed run to zero at the current pace,
+ * and under it the total mining rate between each pair of scans. Depletion by
+ * ore is its chart with the mining rate stacked by ore under it; ISK left is one
+ * chart. Statically imports
  * `recharts`, so — same rule as `miningTax/MiningYieldCharts.tsx` — this must
  * only be reached through a dynamic `import()` from `SurveyBoard.tsx`.
  *
@@ -26,20 +28,12 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
-import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { SurveyChartView } from '@/engine/survey/chartViews';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import {
-  FULL_HEIGHT,
-  MARGIN,
-  makeScanDot,
-  timeAxis,
-  yAxis,
-  Y_AXIS_WIDTH,
-} from './surveyChartParts';
+import { FULL_HEIGHT, MARGIN, makeScanDot, thinLabels, timeAxis, yAxis } from './surveyChartParts';
 import { DepletionChart, IskChart } from './SurveyViewCharts';
-import { SurveyPacePanel } from './SurveyPacePanel';
+import { ByOrePaceFigure, TotalPaceFigure } from './SurveyPacePanel';
 import { oreTone } from './surveyTones';
 import { createNumberFormat } from '@/lib/numberLocale';
 
@@ -105,15 +99,13 @@ export function SurveyCharts({
   const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
   // Scans can bunch up in time, so labels are thinned to the ones that fit.
-  // Every scan keeps its dot; the tooltip carries the rest.
-  const plotPx = Math.max(0, plotWidth - scalePx(Y_AXIS_WIDTH) - MARGIN.right);
-  const pxAt = (at: number) => ((at - domain[0]) / (domain[1] - domain[0])) * plotPx;
-  // Before the chart reports a width there is nothing to measure, so show all.
-  const thin = (labels: { x: number; weight: number }[], gap: number) =>
-    plotPx === 0 ? new Set(labels.keys()) : spacedLabels(labels, gap);
-  // The projected finish row sits after the scans and draws no label.
-  const deltaShown = thin(
-    rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.total ?? 0 })),
+  // Every scan keeps its dot; the tooltip carries the rest. The projected
+  // finish row sits after the scans and draws no label.
+  const rowsWithTotal = rows.slice(0, summary.points.length);
+  const deltaShown = thinLabels(
+    rowsWithTotal.map((r) => ({ at: r.at, weight: r.total ?? 0 })),
+    domain,
+    plotWidth,
     scalePx(DELTA_LABEL_GAP)
   );
   const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, totalLabel: r.total } : r));
@@ -285,7 +277,7 @@ export function SurveyCharts({
     return (
       <div className="space-y-1">
         <DepletionChart summary={summary} />
-        {summary.intervals.length > 0 && <SurveyPacePanel summary={summary} paceView="ore" />}
+        {summary.intervals.length > 0 && <ByOrePaceFigure summary={summary} />}
       </div>
     );
   }
@@ -310,7 +302,7 @@ export function SurveyCharts({
         </div>
       </figure>
 
-      {summary.intervals.length > 0 && <SurveyPacePanel summary={summary} paceView="total" />}
+      {summary.intervals.length > 0 && <TotalPaceFigure summary={summary} />}
     </div>
   );
 }

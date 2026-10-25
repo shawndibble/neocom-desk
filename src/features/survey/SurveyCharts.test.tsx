@@ -96,27 +96,29 @@ describe('SurveyCharts pace panel', () => {
     ]),
   ])!;
 
-  it('Ore left ends with the Total pace chart and no toggle', () => {
+  it('Ore left ends with the Total pace chart and its table only', () => {
     render(<SurveyCharts summary={summary} />);
     expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: /mining rate by ore/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'By ore' })).toBeNull();
   });
 
-  it('Depletion ends with the by-ore pace chart and table, no toggle', () => {
+  it('Depletion ends with the by-ore pace chart and table', () => {
     render(<SurveyCharts summary={summary} view="depletion" />);
     expect(screen.getByRole('table', { name: /ore left by percent/i })).toBeInTheDocument();
     const table = screen.getByRole('table', { name: /mining rate by ore/i });
     expect(within(table).getAllByRole('row')).toHaveLength(1 + 1);
     expect(within(table).getByRole('columnheader', { name: 'Veldspar' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
     expect(within(table).getByRole('cell', { name: '5 m³/s' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: '1 m³/s' })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: /^mining rate$/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'By ore' })).toBeNull();
   });
 
-  it('draws no pace panel with a single scan', () => {
+  it('draws no pace chart with a single scan, in either view', () => {
     const one = summarizeSurvey([scan(0, [['Veldspar', 1000]])])!;
-    render(<SurveyCharts summary={one} view="depletion" />);
+    const { rerender } = render(<SurveyCharts summary={one} />);
+    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
+    rerender(<SurveyCharts summary={one} view="depletion" />);
     expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
   });
 });

@@ -1,12 +1,13 @@
 /**
- * The pace panel under the Survey's volume and depletion charts: the mining rate
- * between each pair of scans, as one Total area or stacked by ore, on the same
- * time axis as the chart above it. Statically imports `recharts`, so — same rule
- * as `SurveyCharts.tsx` — this must only be reached through a dynamic `import()`
- * from `SurveyBoard.tsx`. Which of the two it draws is the caller's `paceView`.
+ * The pace figures under the Survey's charts, on the same time axis as the chart
+ * above them: `TotalPaceFigure` (Ore left) is the mining rate between each pair
+ * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is that rate stacked
+ * by ore. Each carries its hidden data table. Statically imports `recharts`, so —
+ * same rule as `SurveyCharts.tsx` — this must only be reached through a dynamic
+ * `import()` from `SurveyBoard.tsx`.
  */
 import { scalePx } from '@/lib/fontScale';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Area,
@@ -19,30 +20,50 @@ import {
 } from 'recharts';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
-import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
 import { paceByOreSeries, type PaceInterval } from '@/engine/survey/chartViews';
 import { formatCount } from '@/lib/formatCount';
-import { MARGIN, timeAxis, yAxis, Y_AXIS_WIDTH } from './surveyChartParts';
+import { MARGIN, thinLabels, timeAxis, yAxis } from './surveyChartParts';
 import { PaceByOreChart } from './SurveyViewCharts';
-
-/** `total`: the one-area rate (Ore left view); `ore`: stacked by ore (Depletion view). */
-export type PaceView = 'total' | 'ore';
 
 /** Room a rate label needs, in px: "1,116" at 10px. */
 const RATE_LABEL_GAP = 34;
 
-export function SurveyPacePanel({
-  summary,
-  paceView,
+function PaceFigure({
+  label,
+  chart,
+  table,
 }: {
-  summary: SurveySummary;
-  paceView: PaceView;
+  label: string;
+  chart: ReactNode;
+  table: ReactNode;
 }) {
+  return (
+    <figure aria-label={label} className="m-0">
+      <div className="h-32 w-full">{chart}</div>
+      <figcaption className="sr-only">{label}</figcaption>
+      <div className="sr-only">{table}</div>
+    </figure>
+  );
+}
+
+export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
   const [plotWidth, setPlotWidth] = useState(0);
   const { domain, xAxis } = timeAxis(summary);
-  const paceByOre = useMemo(() => paceByOreSeries(summary), [summary]);
+  const label = t('survey.chartRate');
+  const columns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
+    () => [
+      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
+      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
+      {
+        id: 'rate',
+        header: t('survey.tableRate'),
+        render: (i) => `${formatCount(i.rate)} m³/s`,
+      },
+    ],
+    [t]
+  );
 
   // The rate is one flat block per pair of scans, from the earlier scan to the
   // later: a step area drawn from each interval's start, closed at the last
@@ -55,25 +76,18 @@ export function SurveyPacePanel({
   ];
   const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
   // Labels are thinned to the ones that fit; the tooltip carries the rest.
-  const plotPx = Math.max(0, plotWidth - scalePx(Y_AXIS_WIDTH) - MARGIN.right);
-  const pxAt = (at: number) => ((at - domain[0]) / (domain[1] - domain[0])) * plotPx;
-  const rateShown =
-    plotPx === 0
-      ? new Set(rateLabels.keys())
-      : spacedLabels(
-          rateLabels.map((r) => ({ x: pxAt(r.at), weight: r.rate })),
-          scalePx(RATE_LABEL_GAP)
-        );
-  const shownRateLabels = rateLabels.filter((_, i) => rateShown.has(i));
-  const rateLabel = paceView === 'ore' ? t('survey.chartRateByOre') : t('survey.chartRate');
+  const shown = thinLabels(
+    rateLabels.map((r) => ({ at: r.at, weight: r.rate })),
+    domain,
+    plotWidth,
+    scalePx(RATE_LABEL_GAP)
+  );
+  const shownRateLabels = rateLabels.filter((_, i) => shown.has(i));
 
   return (
     <PaceFigure
-      summary={summary}
-      paceView={paceView}
-      rateLabel={rateLabel}
-      paceByOre={paceByOre}
-      totalChart={
+      label={label}
+      chart={
         <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
           <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
             <CartesianGrid stroke="var(--color-line)" vertical={false} />
@@ -121,75 +135,51 @@ export function SurveyPacePanel({
           </ComposedChart>
         </ResponsiveContainer>
       }
+      table={
+        <DataTable
+          columns={columns}
+          responsive="table"
+          rows={summary.intervals}
+          rowKey={(i) => i.from}
+          label={label}
+        />
+      }
     />
   );
 }
 
-function PaceFigure({
-  summary,
-  paceView,
-  rateLabel,
-  paceByOre,
-  totalChart,
-}: {
-  summary: SurveySummary;
-  paceView: PaceView;
-  rateLabel: string;
-  paceByOre: ReturnType<typeof paceByOreSeries>;
-  totalChart: React.ReactElement;
-}) {
+export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
-  const rateColumns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
-    () => [
-      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
-      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
-      {
-        id: 'rate',
-        header: t('survey.tableRate'),
-        render: (i) => `${formatCount(i.rate)} m³/s`,
-      },
-    ],
-    [t]
-  );
-  const rateByOreColumns = useMemo<DataTableColumn<PaceInterval>[]>(() => {
+  const label = t('survey.chartRateByOre');
+  const pace = useMemo(() => paceByOreSeries(summary), [summary]);
+  const columns = useMemo<DataTableColumn<PaceInterval>[]>(() => {
     const unit = (rate: number) => t('survey.paceUnit', { rate: formatCount(rate) });
     return [
       { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
       { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
       { id: 'total', header: t('survey.chartTotal'), render: (i) => unit(i.total) },
-      ...paceByOre.activeOres.map((ore) => ({
+      ...pace.activeOres.map((ore) => ({
         id: `ore:${ore}`,
         header: ore,
         render: (i: PaceInterval) => unit(i.rates[ore] ?? 0),
       })),
     ];
-  }, [paceByOre.activeOres, t]);
+  }, [pace.activeOres, t]);
 
+  if (summary.intervals.length === 0) return null;
   return (
-    <figure aria-label={rateLabel} className="m-0">
-      <div className="h-32 w-full">
-        {paceView === 'ore' ? <PaceByOreChart summary={summary} /> : totalChart}
-      </div>
-      <figcaption className="sr-only">{rateLabel}</figcaption>
-      <div className="sr-only">
-        {paceView === 'ore' ? (
-          <DataTable
-            columns={rateByOreColumns}
-            responsive="table"
-            rows={paceByOre.intervals}
-            rowKey={(i) => i.from}
-            label={rateLabel}
-          />
-        ) : (
-          <DataTable
-            columns={rateColumns}
-            responsive="table"
-            rows={summary.intervals}
-            rowKey={(i) => i.from}
-            label={rateLabel}
-          />
-        )}
-      </div>
-    </figure>
+    <PaceFigure
+      label={label}
+      chart={<PaceByOreChart summary={summary} pace={pace} />}
+      table={
+        <DataTable
+          columns={columns}
+          responsive="table"
+          rows={pace.intervals}
+          rowKey={(i) => i.from}
+          label={label}
+        />
+      }
+    />
   );
 }
