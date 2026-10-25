@@ -57,7 +57,8 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
 }
 
 const openMoreGoals = () => userEvent.click(screen.getByRole('button', { name: /^More goals/ }));
-const openSettings = () => userEvent.click(screen.getByRole('button', { name: 'Search settings' }));
+const openSettings = () =>
+  userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
 
 const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   reach: 'upgrade',
@@ -302,7 +303,7 @@ describe('ImprovePanel', () => {
     renderPanel(search({ status: 'idle' }));
     expect(screen.getByRole('button', { name: /Best overall/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Carry more/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Search settings' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Search settings/ })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
