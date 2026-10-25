@@ -119,6 +119,8 @@ async function lockCounts(page: Page): Promise<LockCounts> {
 
 const LEADS: Leadership = { poller: true, sweep: true };
 const FOLLOWS: Leadership = { poller: false, sweep: false };
+const SWEEP_ONLY: Leadership = { poller: false, sweep: true };
+const POLLER_ONLY: Leadership = { poller: true, sweep: false };
 const ONE_EACH = { [POLLER_LOCK]: 1, [SWEEP_LOCK]: 1 };
 const NONE = { [POLLER_LOCK]: 0, [SWEEP_LOCK]: 0 };
 
@@ -184,10 +186,11 @@ test.describe('Tab Leader election (real Web Locks)', () => {
   test('exactly one of two visible tabs leads each job', async ({ page, baseURL }) => {
     const tab = await twoTabs(page, baseURL!);
 
-    // The second tab's requests are queued behind the first's.
+    // The sweep's newcomer queues behind the first tab; the poller's newest
+    // shown tab steals it, and the first tab queues instead (issue #5120).
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
-    expect(await leadership(page)).toEqual(LEADS);
-    expect(await leadership(tab)).toEqual(FOLLOWS);
+    expect(await leadership(page)).toEqual(SWEEP_ONLY);
+    expect(await leadership(tab)).toEqual(POLLER_ONLY);
   });
 
   test('a hidden leader hands both jobs to the visible tab', async ({ page, baseURL }) => {
@@ -200,11 +203,11 @@ test.describe('Tab Leader election (real Web Locks)', () => {
     // The hidden tab dropped its requests rather than queueing behind.
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: NONE });
 
-    // Visible again, it waits its turn instead of taking leadership back.
+    // Visible again, it waits its turn for the sweep but takes the poller back.
     await setHidden(page, false);
     await expect.poll(() => lockCounts(tab)).toEqual({ held: ONE_EACH, pending: ONE_EACH });
-    expect(await leadership(tab)).toEqual(LEADS);
-    expect(await leadership(page)).toEqual(FOLLOWS);
+    expect(await leadership(tab)).toEqual(SWEEP_ONLY);
+    expect(await leadership(page)).toEqual(POLLER_ONLY);
   });
 
   test('closing the leader hands both jobs to the other tab', async ({ page, baseURL }) => {
