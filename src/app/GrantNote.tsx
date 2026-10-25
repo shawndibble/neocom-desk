@@ -59,6 +59,8 @@ interface GrantNoteProps extends GrantCopy {
   characterId?: number;
   characterName?: string;
   className?: string;
+  /** The one-line form (`ReauthBanner`'s `compact`). */
+  compact?: boolean;
 }
 
 /**

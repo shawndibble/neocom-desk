@@ -175,7 +175,7 @@ async function seed() {
     accessToken: 'access-token',
     refreshToken: 'refresh',
     expiresAt: Date.now() + 3_600_000,
-    scopes: ['esi-mail.read_mail.v1'],
+    scopes: ['esi-mail.read_mail.v1', 'esi-mail.organize_mail.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/mail');
@@ -982,7 +982,7 @@ describe('Mail', () => {
       accessToken: 'access-token-2',
       refreshToken: 'refresh-2',
       expiresAt: Date.now() + 3_600_000,
-      scopes: ['esi-mail.read_mail.v1'],
+      scopes: ['esi-mail.read_mail.v1', 'esi-mail.organize_mail.v1'],
     });
   }
 
@@ -1096,6 +1096,24 @@ describe('Mail', () => {
 
     await waitFor(() => expect(requestCount).toBe(1));
     expect(capturedBody).toEqual({ read: true });
+  });
+
+  it('offers the mark-as-read Permission and makes no write without organize_mail', async () => {
+    await db.tokens.update(CHAR_ID, { scopes: ['esi-mail.read_mail.v1'] });
+    let requestCount = 0;
+    server.use(
+      http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, () => {
+        requestCount += 1;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByText('Fleet up!'));
+
+    expect(await screen.findByText('Mail you open stays unread in EVE')).toBeInTheDocument();
+    expect(requestCount).toBe(0);
   });
 
   it('retries the write on every reopen within the session, not only on a fresh page load', async () => {

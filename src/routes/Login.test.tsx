@@ -47,7 +47,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-fittings.read_fittings.v1': 'in-game fittings',
 };
 
-/** The Base Grant scopes that are writes, not reads — their disclosure goes in the "Six writes" trust card, not the read sentence, which it would otherwise contradict. */
+/** The write scopes (opt-in, not in the Base Grant) — their disclosure goes in the "Six writes" trust card, not the read sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'flags it as read in EVE',
   'esi-calendar.respond_calendar_events.v1': 'sends your response',
@@ -57,10 +57,9 @@ const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-ui.open_window.v1': 'opens a window in the client',
 };
 
-const BASE_GRANT_PHRASES: Record<string, string> = {
-  ...READ_ONLY_PHRASES,
-  ...WRITE_SCOPE_PHRASES,
-};
+// The Base Grant is reads only; the write scopes are the opt-in "Write to EVE"
+// Permissions, disclosed in the trust card but not asked for at sign-in.
+const BASE_GRANT_PHRASES: Record<string, string> = READ_ONLY_PHRASES;
 
 function renderLogin(url = '/login') {
   return render(
@@ -460,6 +459,7 @@ describe('Login', () => {
   // fails here until someone decides how to disclose its scope.
   it('discloses every scope in the Base Grant, and nothing it no longer asks for', () => {
     expect(new Set(Object.keys(BASE_GRANT_PHRASES))).toEqual(new Set(SCOPES));
+    for (const scope of Object.keys(WRITE_SCOPE_PHRASES)) expect(SCOPES).not.toContain(scope);
   });
 
   it('redirects to /characters when a Character already exists', async () => {

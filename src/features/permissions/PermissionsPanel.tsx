@@ -25,7 +25,7 @@ import { Button, Checkbox, Disclosure, InfoTooltip, NeedsConnection, Panel } fro
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
-import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
+import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -199,8 +199,24 @@ export function PermissionsPanel() {
   }
 
   // Two columns from `xl`: one full-width list put each status a screen away from its name.
+  // The Write to EVE rows sit under their own heading, below the reads.
   function renderRows(list: ScopeGroup[]) {
-    return <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{list.map(renderRow)}</ul>;
+    const writes = list.filter((group) => WRITE_GROUPS.includes(group));
+    const reads = list.filter((group) => !WRITE_GROUPS.includes(group));
+    return (
+      <>
+        {reads.length > 0 && (
+          <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{reads.map(renderRow)}</ul>
+        )}
+        {writes.length > 0 && (
+          <section aria-label={t('permissions.writeSection')} className="space-y-1 pt-2">
+            <h3 className="text-xs font-semibold text-text">{t('permissions.writeSection')}</h3>
+            <p className="text-xs text-text-dim">{t('permissions.writeSectionHint')}</p>
+            <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{writes.map(renderRow)}</ul>
+          </section>
+        )}
+      </>
+    );
   }
 
   return (

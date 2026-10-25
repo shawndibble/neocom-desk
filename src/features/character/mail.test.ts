@@ -278,6 +278,45 @@ describe('prefetchMailBodies', () => {
 });
 
 describe('markMailReadOnEsi', () => {
+  // `organize_mail` is off by default (Write to EVE): most cases run with it held.
+  beforeEach(async () => {
+    await db.tokens.clear();
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-mail.organize_mail.v1'],
+    });
+  });
+
+  it('makes no request and reports nothing when the grant lacks organize_mail', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-mail.read_mail.v1'],
+    });
+    const requested = vi.fn();
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () => {
+        requested();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await markMailReadOnEsi(CHAR_ID, 7);
+      expect(requested).not.toHaveBeenCalled();
+      expect(reported).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it('PUTs {read:true} to the mail endpoint', async () => {
     let capturedBody: unknown;
     server.use(
@@ -310,10 +349,10 @@ describe('markMailReadOnEsi', () => {
     await expect(markMailReadOnEsi(CHAR_ID, 7)).resolves.toBeUndefined();
   });
 
-  it('signals the app-wide reauth banner on a 401/403 — a stale grant (e.g. a token that predates organize_mail) must not fail silently', async () => {
+  it('signals the app-wide reauth banner on a 401 — a dead credential must not fail silently', async () => {
     server.use(
       http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () =>
-        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+        HttpResponse.json({ error: 'unauthorized' }, { status: 401 })
       )
     );
     const reported = vi.fn();
@@ -321,8 +360,8 @@ describe('markMailReadOnEsi', () => {
 
     try {
       await markMailReadOnEsi(CHAR_ID, 7);
-      // Names the endpoint, so the notice can ask for its Permission.
-      expect(reported).toHaveBeenCalledWith(CHAR_ID, 'putCharacterMail');
+      expect(reported).toHaveBeenCalledTimes(1);
+      expect(reported.mock.calls[0][0]).toBe(CHAR_ID);
     } finally {
       unsubscribe();
     }

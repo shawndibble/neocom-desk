@@ -8,7 +8,7 @@ import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { beginEveLogin } from '@/app/loginFlow';
-import { ESI_REGISTRY, PERMISSIONS, SCOPE_GROUPS } from '@/esi/registry';
+import { ESI_REGISTRY, PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS } from '@/esi/registry';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from '@/features/corp/roles';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
@@ -94,7 +94,7 @@ describe('PermissionsPanel — every Permission', () => {
   it('lists each Permission with its label and caption', () => {
     renderPanel();
     expect(screen.getAllByRole('listitem')).toHaveLength(SCOPE_GROUPS.length);
-    expect(within(row('Mail')).getByText(/reading, organizing and sending/i)).toBeInTheDocument();
+    expect(within(row('Mail')).getByText(/reading your eve mail/i)).toBeInTheDocument();
     expect(within(row('Structure markets')).getByText(/player structure/i)).toBeInTheDocument();
   });
 
@@ -114,13 +114,15 @@ describe('PermissionsPanel — every Permission', () => {
     mockedGrantedScopes.mockReturnValue([...SCOPES]);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
-    const items = screen.getAllByRole('listitem');
+    // The Write to EVE section is its own list below the reads; ordering is per list.
+    const writeSection = screen.getByRole('region', { name: 'Write to EVE' });
+    const items = screen.getAllByRole('listitem').filter((li) => !writeSection.contains(li));
     const states = items.map((li) => (within(li).queryByText('Not granted') ? 'missing' : 'other'));
     const firstOther = states.indexOf('other');
     expect(firstOther).toBeGreaterThan(0);
     expect(states.slice(0, firstOther)).not.toContain('other');
     expect(states.slice(firstOther)).not.toContain('missing');
-    expect(items).toHaveLength(SCOPE_GROUPS.length);
+    expect(items).toHaveLength(SCOPE_GROUPS.length - WRITE_GROUPS.length);
   });
 
   it('keeps catalogue order when nothing is missing', () => {
@@ -129,10 +131,36 @@ describe('PermissionsPanel — every Permission', () => {
     const shown = screen
       .getAllByRole('listitem')
       .map((li) => li.querySelector('div > div')?.firstChild?.textContent);
-    const catalogue = SCOPE_GROUPS.map((group) => i18n.t(PERMISSIONS[group].labelKey)).filter(
-      (label) => shown.includes(label)
-    );
+    // Reads in catalogue order, then the Write to EVE section's rows.
+    const ordered = [
+      ...SCOPE_GROUPS.filter((group) => !WRITE_GROUPS.includes(group)),
+      ...WRITE_GROUPS,
+    ];
+    const catalogue = ordered
+      .map((group) => i18n.t(PERMISSIONS[group].labelKey))
+      .filter((label) => shown.includes(label));
     expect(shown).toEqual(catalogue);
+  });
+
+  it('lists the six write features under a Write to EVE heading', () => {
+    mockedGrantedScopes.mockReturnValue([...SCOPES]);
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    renderPanel();
+    expect(screen.getByRole('heading', { name: 'Write to EVE' })).toBeInTheDocument();
+    const section = within(screen.getByRole('region', { name: 'Write to EVE' }));
+    const labels = [
+      'Send mail',
+      'Mark mail read',
+      'Calendar RSVP',
+      'Save Fittings to EVE',
+      'Autopilot waypoints',
+      'Open in EVE',
+    ];
+    expect(section.getAllByRole('listitem')).toHaveLength(labels.length);
+    for (const label of labels) {
+      expect(within(row(label)).getByText('Not granted')).toBeInTheDocument();
+      expect(section.getByText(label, { selector: 'div' })).toBeInTheDocument();
+    }
   });
 
   it('offers Grant on every Permission a Core-only Character is missing', () => {
