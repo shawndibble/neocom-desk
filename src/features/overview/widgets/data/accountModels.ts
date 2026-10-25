@@ -345,13 +345,27 @@ function miningTaxSecondary(t: Translate, data: MiningTaxBoardData): NumberSecon
   return undefined;
 }
 
-const miningTax: Builder = (feeds, { t }) => {
+const miningTax: Builder = (feeds, { t, activeCharacterId }) => {
   const feed = feeds.mining;
   const data = feed?.data ?? null;
   const to = '/mining/tax';
   if (!data) return blank(to, statusOf(feed));
+  // Account-wide, like Mining yield: the figures are the Characters whose ledger could
+  // be read; one that could not is left out, never asked about (`needsReauth` is set
+  // only when none could). Then the grant asks a Character that failed, the active
+  // one if it is among them, never one that may hold the permission already.
+  const missing = data.missingCharacterIds ?? [];
+  const index = Math.max(0, activeCharacterId === null ? 0 : missing.indexOf(activeCharacterId));
+  const grant =
+    data.needsReauth && missing.length > 0
+      ? {
+          grantCharacterId: missing[index],
+          grantCharacterName: data.missingCharacterNames[index],
+        }
+      : {};
   return {
     ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
+    ...grant,
     fetchedAt: data.fetchedAt,
     number: {
       value: formatIskCompact(data.unpaidIsk),
