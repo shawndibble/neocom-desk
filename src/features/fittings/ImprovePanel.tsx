@@ -214,6 +214,16 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
         (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
             <p className="text-sm">{t(`fittings.improve.nothing.${goal}`)}</p>
+            {state.result.stopped && (
+              <div className="space-y-2">
+                <p className="text-text-dim text-xs">
+                  {t('fittings.improve.partial', { checked: state.result.checked })}
+                </p>
+                <Button size="sm" onClick={search.restart}>
+                  {t('fittings.improve.searchAgain')}
+                </Button>
+              </div>
+            )}
             {state.result.rejected.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.closest')}>
                 <ul className="space-y-1">

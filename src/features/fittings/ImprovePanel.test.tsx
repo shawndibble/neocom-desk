@@ -27,7 +27,14 @@ function option(
 }
 
 function search(state: ImproveState, own: FittingStats | null = before): ImproveSearch {
-  return { state, before: own, cancel: vi.fn(), showBestSoFar: vi.fn(), restart: vi.fn() };
+  return {
+    goal: 'damage',
+    state,
+    before: own,
+    cancel: vi.fn(),
+    showBestSoFar: vi.fn(),
+    restart: vi.fn(),
+  };
 }
 
 function done(result: Partial<ImproveResult>): ImproveState {

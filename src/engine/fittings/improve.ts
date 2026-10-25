@@ -247,6 +247,7 @@ export async function findImprovements({
   const kept: ImproveOption[] = [];
   const rejected: RejectedOption[] = [];
   let checked = 0;
+  let failed = 0;
   let stopped = false;
   for (const candidate of candidates) {
     if (isCancelled?.()) return null;
@@ -260,6 +261,7 @@ export async function findImprovements({
       after = await stats(swapped);
     } catch {
       // Left out: one variation's calculation failing must not end the search.
+      failed++;
     }
     if (isCancelled?.()) return null;
     checked++;
@@ -281,6 +283,8 @@ export async function findImprovements({
     if (guardrail) rejected.push({ ...option, guardrail });
     else kept.push(option);
   }
+  // Every calculation failed: the engine is broken, not the fit beyond improving.
+  if (checked > 0 && failed === checked) throw new Error('Every Improve calculation failed');
   const ranked = rankImproveOptions(kept);
   return {
     noDownside: ranked.filter((option) => option.downsides.length === 0),

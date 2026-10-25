@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   findImprovements,
+  goalAvailability,
   improveCandidates,
   type ImproveCandidate,
   type ImproveGoal,
@@ -46,6 +47,8 @@ export type ImproveState =
   | { status: 'done'; result: ImproveResult; before: FittingStats; elapsedMs: number };
 
 export interface ImproveSearch {
+  /** The goal searched: the remembered one, or Best overall when this fit cannot score it. */
+  goal: ImproveGoal;
   state: ImproveState;
   /** The open Fitting's stats before any swap, for each row's goal check; null until known. */
   before: FittingStats | null;
@@ -110,6 +113,8 @@ export function useImprove(
     };
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new search starts from nothing
     setState({ status: 'searching', checked: 0, total: candidates.length, slow: false });
+    // The last fit's baseline must not decide this fit's goal chips.
+    setBefore(null);
     const started = performance.now();
     const slowTimer = setTimeout(() => {
       if (!cancelled)
@@ -129,7 +134,8 @@ export function useImprove(
         const result = await findImprovements({
           fitting: variants.fitting,
           before: own,
-          goal,
+          // A remembered goal this fit cannot score (Longer reach on a drone boat) searches Best overall.
+          goal: goalAvailability(goal, own).available ? goal : 'overall',
           candidates,
           stats: async (fitting) => (await variants.compare(fitting, controller.signal)).after,
           priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
@@ -163,6 +169,7 @@ export function useImprove(
   const restart = useCallback(() => setAttempt((n) => n + 1), []);
 
   return {
+    goal: before && !goalAvailability(goal, before).available ? 'overall' : goal,
     state: enabled ? state : { status: 'idle' },
     before: enabled ? before : null,
     cancel,

@@ -274,6 +274,23 @@ describe('findImprovements whole-fit results', () => {
     expect(toIds(result!.noDownside)).toEqual([3]);
   });
 
+  it('throws when every calculation fails, rather than report nothing improves', async () => {
+    const base = fit([1]);
+    const before = await calc({})(base);
+    await expect(
+      findImprovements({
+        fitting: base,
+        before,
+        goal: 'damage',
+        candidates: [candidate(1, 2)],
+        stats: async () => {
+          throw new Error('worker gone');
+        },
+        priceOf: () => null,
+      })
+    ).rejects.toThrow();
+  });
+
   it('reports progress and returns null when cancelled', async () => {
     const base = fit([1]);
     const stat = calc({});
