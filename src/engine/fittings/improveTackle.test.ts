@@ -91,11 +91,15 @@ describe('ewarOf', () => {
       { kind: 'targetPainter', amount: 30, optimal: 40_000, falloff: 20_000 },
       scram(2),
     ];
-    expect(ewarOf(stats(rows))).toEqual({ strength: 38, range: (2 * 20_000 + 60_000) / 3 });
+    expect(ewarOf(stats(rows))).toEqual({
+      strength: 38,
+      range: (2 * 20_000 + 60_000) / 3,
+      byKind: { ecm: 8, targetPainter: 30 },
+    });
   });
 
   it('is zero for a fit with no electronic warfare', () => {
-    expect(ewarOf(stats([scram(2), web(50)]))).toEqual({ strength: 0, range: 0 });
+    expect(ewarOf(stats([scram(2), web(50)]))).toEqual({ strength: 0, range: 0, byKind: {} });
   });
 });
 
@@ -161,6 +165,15 @@ describe('Stronger EWAR goal', () => {
       4: stats([ecm(3)]),
     });
     expect(result.noDownside.map((o) => o.candidate.toTypeId)).toEqual([3, 2]);
+  });
+
+  it('counts swapping a bonused jammer for a different kind as a loss', async () => {
+    const damp: Row = { kind: 'sensorDampener', amount: 43.5, optimal: 20_000 };
+    const result = await run('ewar', {
+      1: stats([ecm(32.5, 4)]),
+      2: stats([ecm(32.5, 3), damp]),
+    });
+    expect(result.noDownside).toEqual([]);
   });
 
   it('ignores scram and web gains', async () => {

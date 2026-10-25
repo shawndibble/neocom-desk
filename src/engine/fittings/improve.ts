@@ -359,10 +359,11 @@ function scoreOf(
         : commandOf(after).strength * 1e6 + commandOf(after).compression / 1000;
     case 'ewar': {
       const [was, now] = [ewarOf(before), ewarOf(after)];
-      return meanGain([
-        [was.strength, now.strength],
-        [was.range, now.range],
-      ]);
+      // Each kind against its own baseline; a kind the swap drops counts as lost.
+      const kinds = Object.entries(was.byKind).map(
+        ([kind, strength]) => [strength, now.byKind[kind as keyof typeof now.byKind] ?? 0] as const
+      );
+      return meanGain([...kinds, [was.range, now.range]]);
     }
   }
 }

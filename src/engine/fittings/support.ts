@@ -27,6 +27,9 @@ export const SUPPORT_ATTRIBUTE = {
   // Plain SDE, looked up by name in the pinned `sde.dat` 2026-09-25.
   energyNeutralizerAmount: 97,
   optimal: 54,
+  // A scripted point and a burst jammer keep their reach here, not in 54.
+  warpScrambleRange: 103,
+  ecmBurstRange: 142,
   falloff: 2044,
   speedFactor: 20,
   warpScrambleStrength: 105,
@@ -240,8 +243,11 @@ export function extractSupport(
     if (!result || !MODULE_SLOTS.has(item.slot.type)) return;
     if (result.state !== 'active' && result.state !== 'overload') return;
     const read = (id: number) => result.attributes.get(id)?.value ?? 0;
-    const optimal = read(SUPPORT_ATTRIBUTE.optimal);
-    // Only a module that reaches another ship has an optimal range.
+    const optimal =
+      read(SUPPORT_ATTRIBUTE.optimal) ||
+      read(SUPPORT_ATTRIBUTE.warpScrambleRange) ||
+      read(SUPPORT_ATTRIBUTE.ecmBurstRange);
+    // Only a module that reaches another ship has a range.
     if (optimal <= 0) return;
     const what = classifySupport(read);
     if (!what) return;
