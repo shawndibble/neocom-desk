@@ -54,6 +54,7 @@ export { TypeIcon } from './TypeIcon';
 export { characterAvatarBoxClassName } from './characterAvatarBox';
 export type { CharacterAvatarSize } from './characterAvatarBox';
 export { FilterChip } from './FilterChip';
+export { EditableValue } from './EditableValue';
 export { SegmentedControl } from './SegmentedControl';
 export { FilterBar, FilterField } from './FilterBar';
 export { countActive } from './countActive';

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { ownedStockSale, compareUseOrSell, sellableMaterials } from './ownedStockSale';
+import {
+  ownedStockSale,
+  compareUseOrSell,
+  sellableMaterials,
+  ownedStockLines,
+  planOwnedStockSale,
+} from './ownedStockSale';
 import { SKILL_IDS, type MaterialCostLine } from './types';
 
 const NO_SKILLS = {};
@@ -127,5 +133,90 @@ describe('compareUseOrSell', () => {
     );
 
     expect(compareUseOrSell(500, nothing)).toBeNull();
+  });
+});
+
+describe('ownedStockLines', () => {
+  it('counts owned stock a sub-build claimed, not only the top level', () => {
+    const lines = ownedStockLines([
+      line({ typeID: 34, ownedQuantity: 100 }),
+      {
+        ...line({ typeID: 11399, ownedQuantity: 0, remainingQuantity: 100 }),
+        subBuild: { inputs: [line({ typeID: 35, ownedQuantity: 40 })] },
+      },
+    ]);
+
+    expect(lines.map((l) => [l.typeID, l.ownedQuantity])).toEqual([
+      [34, 100],
+      [35, 40],
+    ]);
+  });
+
+  it('merges one type claimed in several branches into one stack', () => {
+    const lines = ownedStockLines([
+      line({ typeID: 34, ownedQuantity: 100 }),
+      {
+        ...line({ typeID: 11399, ownedQuantity: 0 }),
+        subBuild: {
+          inputs: [
+            line({ typeID: 34, ownedQuantity: 25 }),
+            {
+              ...line({ typeID: 11400, ownedQuantity: 0 }),
+              subBuild: { inputs: [line({ typeID: 34, ownedQuantity: 5 })] },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ typeID: 34, ownedQuantity: 130 });
+  });
+
+  it('leaves out Blueprint Acquisition rows at any depth', () => {
+    const lines = ownedStockLines([
+      line({ typeID: 999, acquisitionTier: { me: 10, te: 20 } }),
+      {
+        ...line({ typeID: 11399, ownedQuantity: 0 }),
+        subBuild: { inputs: [line({ typeID: 998, acquisitionTier: { me: 0, te: 0 } })] },
+      },
+    ]);
+
+    expect(lines).toEqual([]);
+  });
+});
+
+describe('planOwnedStockSale', () => {
+  const books = { hubPrices: { 34: 1_000 }, hubBuyPrices: { 34: 800 } };
+
+  it('sells into buy orders at the buy side of the book', () => {
+    const sale = planOwnedStockSale([line()], books, 'instant', NO_SKILLS);
+
+    expect(sale.basis).toBe('instant');
+    expect(sale.gross).toBeCloseTo(80_000, 6);
+  });
+
+  it('lists a sell order at the sell side of the book', () => {
+    const sale = planOwnedStockSale([line()], books, 'order', NO_SKILLS);
+
+    expect(sale.basis).toBe('order');
+    expect(sale.gross).toBeCloseTo(100_000, 6);
+  });
+
+  it('includes stock a sub-build would consume', () => {
+    const sale = planOwnedStockSale(
+      [
+        {
+          ...line({ typeID: 11399, ownedQuantity: 0 }),
+          subBuild: { inputs: [line({ ownedQuantity: 10 })] },
+        },
+      ],
+      books,
+      'order',
+      NO_SKILLS
+    );
+
+    expect(sale.ownedUnits).toBe(10);
+    expect(sale.gross).toBeCloseTo(10_000, 6);
   });
 });

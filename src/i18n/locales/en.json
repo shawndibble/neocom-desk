@@ -2776,6 +2776,7 @@
     "autoBuildConfirmGroup_other": "This will overwrite craft/buy choices on {{count}} plans in this group — continue?",
     "price": "Price",
     "priceFor": "Price for {{material}}",
+    "editPriceFor": "Edit price for {{material}}",
     "depthPriceLine": "{{best}} best · {{avg}} avg for {{need}}",
     "depthPriceShort": "only {{listed}} listed",
     "resetPriceFor": "Reset {{material}} to the market price",
@@ -3592,6 +3593,7 @@
       "undo": "Undo",
       "changeTierFor": "Change tier: {{material}}",
       "haveFor": "Have: {{material}}",
+      "editHaveFor": "Edit Have for {{material}}",
       "savesVsBuying": "saves {{amount}} ISK vs buying",
       "sortLabel": "Sort materials",
       "sort": {
