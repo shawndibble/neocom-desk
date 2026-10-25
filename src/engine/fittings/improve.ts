@@ -639,7 +639,11 @@ export async function findImprovements({
       score,
       iskDelta,
       destroysRigs,
-      downsides: DOWNSIDE_METRICS.filter((metric) => metrics[metric] < -EPSILON),
+      downsides: [
+        ...DOWNSIDE_METRICS.filter((metric) => metrics[metric] < -EPSILON),
+        // A goal that does not score mining must still name a weaker miner.
+        ...(goal !== 'mining' && metrics.miningYield < -EPSILON ? (['miningYield'] as const) : []),
+      ],
     };
     const overSpend =
       spendCap !== null &&
