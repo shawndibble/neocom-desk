@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import type { ImproveGoal } from '@/engine/fittings/improve';
-import { IMPLANT_GOAL } from '@/engine/fittings/improveFree';
+import { FREE_ROWS_SHOWN, IMPLANT_GOAL } from '@/engine/fittings/improveFree';
 import { cloneSeedSet } from '@/engine/fittings/implantBasis';
 import {
   displayValue,
@@ -31,7 +31,6 @@ import { useTargetProfiles } from './targetProfiles';
 import { implantNames, useImplantFinder } from './useImplantFinder';
 
 const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
-const ROWS_SHOWN = 3;
 const MIN_GAIN = 1e-4;
 
 interface Props {
@@ -96,7 +95,7 @@ function Implants({
         return best && best.gain > MIN_GAIN ? [best] : [];
       })
       .sort((a, b) => b.gain - a.gain)
-      .slice(0, ROWS_SHOWN);
+      .slice(0, FREE_ROWS_SHOWN);
   }, [baseline, finder.updating, finder.results, goalDef, context]);
 
   if (finder.status === 'error' || rows.length === 0 || !baseline) return null;

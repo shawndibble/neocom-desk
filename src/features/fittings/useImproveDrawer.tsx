@@ -6,6 +6,7 @@ import {
   type DefenseChoice,
   type ImproveOption,
 } from '@/engine/fittings/improve';
+import { overBudgetResources } from '@/engine/fittings/improveFree';
 import type { Fitting } from '@/engine/fittings/types';
 import { ImproveImplants } from './ImproveImplants';
 import { ImprovePanel } from './ImprovePanel';
@@ -118,7 +119,10 @@ export function useImproveDrawer({
         openMakeItFit(resource);
       }}
       freeSections={
-        fitting && (
+        // Only once the baseline is known to fit: an over-budget fit shows Fix this first alone.
+        fitting &&
+        search.before &&
+        overBudgetResources(search.before).length === 0 && (
           <>
             <ImproveTrain
               goal={search.goal}

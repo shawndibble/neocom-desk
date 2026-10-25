@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toast } from '@/components/ui';
 import type { ImproveGoal } from '@/engine/fittings/improve';
-import { TRAIN_SORT } from '@/engine/fittings/improveFree';
+import { FREE_ROWS_SHOWN, TRAIN_SORT } from '@/engine/fittings/improveFree';
 import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import { rankSkillGains } from '@/engine/fittings/skillGains';
 import { hasSkillOverrides } from '@/engine/fittings/skillOverrides';
@@ -24,9 +24,6 @@ import type { SkillGainEvaluator } from './useFittingEvaluation';
 import { useModuleUpgrades } from './useModuleUpgrades';
 import { useSkillGains } from './useSkillGains';
 import { usePlannedLevels, useTrainingSchedule } from './useTrainingSchedule';
-
-/** Per kind: the section is a few best answers, not What to train's whole list. */
-const ROWS_SHOWN = 3;
 
 interface Props {
   goal: ImproveGoal;
@@ -74,13 +71,13 @@ function Train({
     }));
     return rankSkillGains(rows, sort)
       .filter((row) => row.metrics[sort] > 0)
-      .slice(0, ROWS_SHOWN);
+      .slice(0, FREE_ROWS_SHOWN);
   }, [gains, catalog, sort]);
   const modules = useMemo(
     () =>
       rankModuleUpgrades(upgrades.rows ?? [], sort)
         .filter((row) => row.metrics[sort] > 0)
-        .slice(0, ROWS_SHOWN),
+        .slice(0, FREE_ROWS_SHOWN),
     [upgrades.rows, sort]
   );
 

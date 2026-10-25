@@ -8,6 +8,9 @@ import { overageOf, RESOURCES, type Resource } from './makeItFit';
 import type { GainSort } from './skillGains';
 import type { FittingStats } from './types';
 
+/** How many rows each free section shows: a few best answers, not a whole list. */
+export const FREE_ROWS_SHOWN = 3;
+
 /** The What to train metric each goal ranks skills and module upgrades by; Cheaper has none (training saves no ISK). */
 export const TRAIN_SORT: Partial<Record<ImproveGoal, GainSort>> = {
   overall: 'overall',
