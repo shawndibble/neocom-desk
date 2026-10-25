@@ -350,9 +350,10 @@ function WidgetFrame({
           <GrantBanner
             variant="ghost"
             characterId={grantTarget}
+            characterName={view.grantCharacterName}
             endpoints={endpoints}
             title={t('overview.widgets.needsPermission')}
-            hint={view.grantHint ?? t('overview.widgets.needsPermissionHint', { title })}
+            hint={t('overview.widgets.needsPermissionHint', { title })}
             actionLabel={t('overview.widgets.grantAction')}
           />
         ) : (
@@ -428,11 +429,11 @@ function WidgetFrame({
   }
 
   // A lapsed grant over saved data: the figures stay, with a small note to log in again.
-  if (reauthNote && characterId !== null && endpoints.length > 0) {
+  if (reauthNote && grantTarget !== null && endpoints.length > 0) {
     body = (
       <>
         {body}
-        <ReauthCachedNote className="px-3 pb-3" characterId={characterId} endpoints={endpoints} />
+        <ReauthCachedNote className="px-3 pb-3" characterId={grantTarget} endpoints={endpoints} />
       </>
     );
   }
@@ -445,9 +446,10 @@ function WidgetFrame({
           <GrantBanner
             variant="ghost"
             characterId={grantTarget}
+            characterName={view.grantCharacterName}
             endpoints={view.grantEndpoints}
             title={t('overview.widgets.needsPermission')}
-            hint={view.grantHint ?? t('overview.widgets.needsPermissionHint', { title })}
+            hint={t('overview.widgets.needsPermissionHint', { title })}
             actionLabel={t('overview.widgets.grantAction')}
           />
         </div>

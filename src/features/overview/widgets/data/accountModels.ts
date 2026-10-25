@@ -345,29 +345,26 @@ function miningTaxSecondary(t: Translate, data: MiningTaxBoardData): NumberSecon
   return undefined;
 }
 
-const miningTax: Builder = (feeds, { t }) => {
+const miningTax: Builder = (feeds, { t, activeCharacterId }) => {
   const feed = feeds.mining;
   const data = feed?.data ?? null;
   const to = '/mining/tax';
   if (!data) return blank(to, statusOf(feed));
-  // Account-wide, like Mining yield: the figures are the Characters that granted the
-  // permission, and a Character that did not is simply left out, never asked about.
-  // Only when none can read does the widget ask, and then a Character that lacks it,
-  // not the active one, which may hold it already.
-  const missing = data.missingCharacterIds;
-  const known = missing !== undefined && missing.length > 0;
-  const everyoneMissing = known ? missing.length >= data.characterCount : data.needsReauth;
+  // Account-wide, like Mining yield: the figures are the Characters whose ledger could
+  // be read; one that could not is left out, never asked about (`needsReauth` is set
+  // only when none could). Then the grant asks a Character that failed, the active
+  // one if it is among them, never one that may hold the permission already.
+  const missing = data.missingCharacterIds ?? [];
+  const index = Math.max(0, activeCharacterId === null ? 0 : missing.indexOf(activeCharacterId));
   const grant =
-    known && everyoneMissing
+    data.needsReauth && missing.length > 0
       ? {
-          grantCharacterId: missing[0],
-          grantHint: t('overview.widgets.miningTax.needsFor', {
-            names: data.missingCharacterNames.join(', '),
-          }),
+          grantCharacterId: missing[index],
+          grantCharacterName: data.missingCharacterNames[index],
         }
       : {};
   return {
-    ...blank(to, statusOf(feed, { needsPermission: everyoneMissing })),
+    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
     ...grant,
     fetchedAt: data.fetchedAt,
     number: {

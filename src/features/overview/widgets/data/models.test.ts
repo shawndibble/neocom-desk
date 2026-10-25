@@ -534,48 +534,52 @@ describe('the Number view says one new thing', () => {
       oldestUnpaidDays: 13,
       payeeCount: 1,
       unassignedCount: 0,
-      needsReauth: true,
       fetchedAt: new Date(NOW),
       characterCount: 2,
     };
+    const build = (data: object, patch = {}) =>
+      buildView('miningTax', { mining: ok({ ...base, ...data }) as never }, ctx(patch));
 
-    it('shows the Characters that granted it, and never asks about the one that did not', () => {
-      const view = buildView(
-        'miningTax',
-        {
-          mining: ok({
-            ...base,
-            missingCharacterNames: ['Shadow Ruler'],
-            missingCharacterIds: [2],
-          }) as never,
-        },
-        ctx()
-      );
+    it('shows the Characters that could be read, in a calm tone, and asks about none', () => {
+      const view = build({
+        needsReauth: false,
+        missingCharacterNames: ['Shadow Ruler'],
+        missingCharacterIds: [2],
+      });
       expect(view.status.needsPermission).toBe(false);
       expect(view.number.iskAmount).toBe(10_900_000);
+      expect(view.number.tone).not.toBe('warning');
+      expect(view.summary).not.toContain('reauth');
       expect(view.grantEndpoints).toBeUndefined();
       expect(view.grantCharacterId).toBeUndefined();
     });
 
-    it('needs permission only when no Character can read, and asks one of them', () => {
-      const view = buildView(
-        'miningTax',
-        {
-          mining: ok({
-            ...base,
-            missingCharacterNames: ['Shadow Ruler', 'Krish Mero'],
-            missingCharacterIds: [2, 3],
-          }) as never,
-        },
-        ctx()
-      );
+    it('when none can be read, asks a Character that failed, by name', () => {
+      const view = build({
+        needsReauth: true,
+        missingCharacterNames: ['Shadow Ruler', 'Krish Mero'],
+        missingCharacterIds: [2, 3],
+      });
       expect(view.status.needsPermission).toBe(true);
       expect(view.grantCharacterId).toBe(2);
-      expect(view.grantHint).toContain('Shadow Ruler, Krish Mero');
+      expect(view.grantCharacterName).toBe('Shadow Ruler');
     });
 
-    it('a snapshot cached before the ids were kept reads as before', () => {
-      const view = buildView('miningTax', { mining: ok(base) as never }, ctx());
+    it('prefers the active Character when it is among those that failed', () => {
+      const view = build(
+        {
+          needsReauth: true,
+          missingCharacterNames: ['Shadow Ruler', 'Krish Mero'],
+          missingCharacterIds: [2, 3],
+        },
+        { activeCharacterId: 3 }
+      );
+      expect(view.grantCharacterId).toBe(3);
+      expect(view.grantCharacterName).toBe('Krish Mero');
+    });
+
+    it('a snapshot cached before the ids were kept asks as before', () => {
+      const view = build({ needsReauth: true, missingCharacterNames: [] });
       expect(view.status.needsPermission).toBe(true);
       expect(view.grantCharacterId).toBeUndefined();
     });

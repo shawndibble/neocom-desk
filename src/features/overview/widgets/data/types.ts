@@ -265,8 +265,8 @@ export interface KindView {
    * a grant it already holds.
    */
   grantCharacterId?: number;
-  /** The Grant access hint, when it can say more than the generic one (who is left out). */
-  grantHint?: string;
+  /** That Character's name, for the Grant access title, when `grantCharacterId` is set. */
+  grantCharacterName?: string;
   /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
   emptyLinkLabel?: string;
   /**

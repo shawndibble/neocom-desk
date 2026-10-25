@@ -160,6 +160,10 @@ export interface MiningTaxBoardData {
   unassignedCount: number;
   /** Days since the oldest outstanding Assignment's entry, or null when nothing is owed. */
   oldestUnpaidDays: number | null;
+  /**
+   * No Character's ledger could be read, so the figures say nothing. One that
+   * could not among others that could is only left out (`missingCharacterNames`).
+   */
   needsReauth: boolean;
   fetchedAt: Date | null;
   /** Who is owed what, the most owed first. Absent in a snapshot cached before this field existed. */
@@ -201,7 +205,9 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
     unassignedCount,
     oldestUnpaidDays:
       oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / 86_400_000),
-    needsReauth: snapshot.reauthCharacters.length > 0,
+    needsReauth:
+      snapshot.reauthCharacters.length > 0 &&
+      snapshot.reauthCharacters.length >= snapshot.characters.length,
     fetchedAt: snapshot.fetchedAt,
     payees: payeesOwed(
       snapshot.rows,

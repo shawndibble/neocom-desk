@@ -378,7 +378,7 @@ describe('Widget states', () => {
           payeeCount: 1,
           unassignedCount: 0,
           oldestUnpaidDays: 3,
-          needsReauth: true,
+          needsReauth: false,
           fetchedAt: new Date(),
           characterCount: 2,
           missingCharacterNames: ['Shadow Ruler'],
@@ -413,7 +413,7 @@ describe('Widget states', () => {
       })
     );
     const region = screen.getByRole('region', { name: 'Mining tax' });
-    expect(within(region).getByText(/mining ledger of Shadow Ruler/)).toBeInTheDocument();
+    expect(within(region).getByText(/Shadow Ruler/)).toBeInTheDocument();
     await userEvent.click(within(region).getByRole('button', { name: 'Grant access' }));
     expect(grant.begin).toHaveBeenCalledWith(92, ['getCharacterMining']);
   });
