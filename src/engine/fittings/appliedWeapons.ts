@@ -170,7 +170,7 @@ export function droneSpeed(attributes: AttributeMap): number {
 
 /**
  * Metres an untracked weapon reaches: a smartbomb's blast, a Vorton's optimal
- * (the module's own), or a breacher charge's flight. 0 for anything else.
+ * (the module's own), or a breacher charge's flight, in that order. 0 for anything else.
  */
 function areaRange(attributes: AttributeMap, charge?: AttributeMap): number {
   return (
@@ -199,7 +199,19 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
   if (read(result.attributes, APPLIED_DPS_ATTRIBUTE.tracking) > 0) {
     return { kind: 'turret', dps, ...trackingOf(result.attributes), ...damageSplit(charge) };
   }
-  // A smartbomb, a Vorton or a breacher pod hits whatever is in range.
+  // A Vorton applies like a missile, off its own explosion attributes, out to its optimal.
+  if (isMissile(result.attributes) && read(result.attributes, APPLIED_DPS_ATTRIBUTE.optimal) > 0) {
+    return {
+      kind: 'missile',
+      dps,
+      range: read(result.attributes, APPLIED_DPS_ATTRIBUTE.optimal),
+      explosionRadius: read(result.attributes, APPLIED_DPS_ATTRIBUTE.explosionRadius),
+      explosionVelocity: read(result.attributes, APPLIED_DPS_ATTRIBUTE.explosionVelocity),
+      damageReductionFactor: read(result.attributes, APPLIED_DPS_ATTRIBUTE.damageReductionFactor),
+      ...damageSplit(charge ?? result.attributes),
+    };
+  }
+  // A smartbomb or a breacher pod hits whatever is in range.
   const range = areaRange(result.attributes, charge);
   if (range > 0) {
     const own = damageSplit(charge);

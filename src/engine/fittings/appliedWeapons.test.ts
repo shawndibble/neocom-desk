@@ -215,7 +215,14 @@ describe('area weapons: smartbombs, Vorton projectors, breacher pods', () => {
     [A.smartbombRange]: 7500,
     [A.emDamage]: 100,
   });
-  const vorton = attrs({ [A.dps]: 152.5, [A.optimal]: 49500 });
+  const vorton = attrs({
+    [A.dps]: 152.5,
+    [A.optimal]: 49500,
+    [A.explosionRadius]: 400,
+    [A.explosionVelocity]: 200,
+    [A.damageReductionFactor]: 1,
+    [A.kineticDamage]: 10,
+  });
   const breacherLauncher = attrs({ [A.dps]: 250 });
   const breacherPod = attrs({
     [A.maxVelocity]: 2000,
@@ -223,7 +230,7 @@ describe('area weapons: smartbombs, Vorton projectors, breacher pods', () => {
     [A.thermalDamage]: 30,
   });
 
-  it('reads each as an area weapon with its reach, damage off the module or charge', () => {
+  it('reads a smartbomb and breacher as area weapons, a Vorton as a missile, damage off module or charge', () => {
     const inputs = extractAppliedDpsInputs(
       [high, high, high],
       [
@@ -240,7 +247,15 @@ describe('area weapons: smartbombs, Vorton projectors, breacher pods', () => {
         range: 7500,
         damage: { em: 1, thermal: 0, kinetic: 0, explosive: 0 },
       },
-      { kind: 'area', dps: 152.5, range: 49500 },
+      {
+        kind: 'missile',
+        dps: 152.5,
+        range: 49500,
+        explosionRadius: 400,
+        explosionVelocity: 200,
+        damageReductionFactor: 1,
+        damage: { em: 0, thermal: 0, kinetic: 1, explosive: 0 },
+      },
       {
         kind: 'area',
         dps: 250,

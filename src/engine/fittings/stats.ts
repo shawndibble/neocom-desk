@@ -483,7 +483,7 @@ function offenseRange(item: OffenseItem, result: ModuleCalculationResult): { ran
   if (item.isFighter) return {};
   if (item.isDrone && isMobileDrone(droneSpeed(result.attributes))) return {};
   const range = weaponRange(result.attributes, result.charge?.attributes);
-  // A charge the engine reads no flight for (a Vorton pack) reaches nowhere shown.
+  // A charge the engine reads no flight for reaches nowhere shown.
   return range && range.optimal > 0 ? { range } : {};
 }
 
