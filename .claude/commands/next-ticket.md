@@ -211,7 +211,8 @@ lists `ready-for-agent` issues, drops any not authored by the authenticated
 under their own account must never be picked up and auto-merged by this
 loop — and any with an assignee or an `in-progress` label, resolves each
 remaining issue's `## Blocked by` section (unblocked only if every
-referenced issue is `CLOSED`), picks the lowest-numbered unblocked one (or
+listed blocker is `CLOSED`; prose after the list, such as a parent idea,
+does not count — `scripts/lib/blockedBy.mjs`), picks the lowest-numbered unblocked one (or
 checks the given issue number against the same rules, if `$ARGUMENTS` has
 one), claims it (`--add-assignee @me --add-label in-progress`), and releases
 the lock. It retries lock acquisition internally (12 attempts over ~2

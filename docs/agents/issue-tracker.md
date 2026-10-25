@@ -18,7 +18,8 @@ Tickets from `/to-tickets` record blockers as free text in a `## Blocked by` sec
 
 1. Read the issue body, find the `## Blocked by` section.
 2. "None" / "None — can start immediately" → unblocked.
-3. Otherwise extract every `#<n>` reference and check each with `gh issue view <n> --json state`. The ticket is unblocked only when every referenced issue is `CLOSED`.
+3. Otherwise extract the `#<n>` references from the section's list items (or, when it has no list, from its first paragraph) and check each with `gh issue view <n> --json state`. The ticket is unblocked only when every referenced issue is `CLOSED`.
+   Prose after the list is not a blocker, so a "Parent idea: #n" line there never holds a ticket back; keep blockers in the list (`scripts/lib/blockedBy.mjs`).
 
 ## Author guard
 
