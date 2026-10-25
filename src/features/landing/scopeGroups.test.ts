@@ -28,11 +28,31 @@ describe('LANDING_SCOPE_GROUPS', () => {
 
   it('only tags as opt-in what the registry marks opt-in', () => {
     expect(PLACED_GROUPS.filter((g) => !PERMISSIONS[g].defaultOn).sort()).toEqual([
+      'autopilot',
+      'calendarRespond',
       'corp',
       'corpProjects',
+      'fittingsWrite',
       'jumpFatigue',
       'killmails',
+      'mailOrganize',
+      'mailSend',
+      'mercenaryDens',
+      'openWindow',
       'structureMarkets',
+    ]);
+  });
+
+  it('puts exactly the six write Permissions in the write group', () => {
+    const write = LANDING_SCOPE_GROUPS.find(({ id }) => id === 'write');
+    const groups = write?.rows.flatMap((row) => (row.kind === 'group' ? [row.group] : []));
+    expect(groups?.sort()).toEqual([
+      'autopilot',
+      'calendarRespond',
+      'fittingsWrite',
+      'mailOrganize',
+      'mailSend',
+      'openWindow',
     ]);
   });
 });

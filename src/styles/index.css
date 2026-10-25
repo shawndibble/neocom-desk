@@ -30,7 +30,7 @@
  */
 /*
  * `touch:` — the input is a finger (`(pointer: coarse)`), whatever the width.
- * The 44px touch tier is "below `md` or `touch:`", so a touch tablet or laptop
+ * The 36px touch tier is "below `md` or `touch:`", so a touch tablet or laptop
  * is treated as touch (DESIGN.md §3, §6c). Declared here, after Tailwind's own
  * variants, so `md:h-7 touch:h-9` lets `touch:` win above `md` on a coarse
  * pointer while a fine pointer never matches it.
@@ -401,8 +401,8 @@
   }
 
   /* A labelless text-button cell (Active Jobs' "Log production"): its own
-     row at the card's foot, button at its natural width and a 44px tap
-     height. Not `dt-actions`, whose fixed 44px square is for an icon button
+     row at the card's foot, button at its natural width and a 36px tap
+     height. Not `dt-actions`, whose fixed 36px square is for an icon button
      and squeezes a labelled one into a sliver. */
   .dt-stacked td.dt-action-row {
     padding-left: 0;
@@ -419,7 +419,7 @@
   }
 
   .dt-stacked td.dt-action-row button {
-    min-height: 2.75rem;
+    min-height: 2.25rem;
   }
 
   /*
@@ -514,7 +514,7 @@
      button is the 36px touch tier (`sm`, DESIGN.md §3) here regardless of
      its own (desktop-oriented) size prop, and centred on the title line
      (card padding + half a title line, minus half the button) so the first
-     row reads as one row rather than a title beside a 44px block. */
+     row reads as one row rather than a title beside a 36px block. */
   .dt-stacked:not(.dt-stack-dense) td.dt-actions {
     position: absolute;
     top: 0;
@@ -613,7 +613,7 @@
     column-gap: 0.1875rem;
     row-gap: 0.125rem;
     /* A thumb target even for a card whose two lines are short. */
-    min-height: 44px;
+    min-height: 36px;
     padding: 0.5rem 0.75rem;
   }
 
@@ -657,7 +657,7 @@
     align-self: center;
   }
 
-  /* The ⋮ is a 44px thumb target, taller than the title: it stretches line one
+  /* The ⋮ is a 36px thumb target, taller than the title: it stretches line one
      to its own height, and the title and figure (baseline-aligned like the
      rest of the row) would ride at the top of it while the ⋮ and a leading
      tick box centre. Centre them too, so line one reads as one line. */
@@ -674,7 +674,7 @@
   /* Opt-in (`dt-actions-pinned-only` on the table, Market order book): the
      actions button pinned to the card's right edge and centred across both
      lines, the way a `start` edge control is on the left. In flow on line
-     one its 44px touch target makes that line 44px tall and pushes the meta
+     one its 36px touch target makes that line 36px tall and pushes the meta
      line a button's height below the title; pinned, the card is two text
      lines. Not the default because the other dense tables with actions
      (Hauling, Contract Search, Mining Tax) carry chevrons and `end` edge
@@ -687,7 +687,7 @@
   }
 
   /* The headline figure stays in flow on line one (a long ISK price would
-     not fit a pinned corner's fixed width). The button flush to the card's edge, a 44px gutter of its own (the
+     not fit a pinned corner's fixed width). The button flush to the card's edge, a 36px gutter of its own (the
      row's right padding) the card's text never enters: both lines live
      in the width left of it. Line one's figure keeps a hair of air. Line two
      (a buy's five cells and an 8-figure quantity nearly fill it) can never
@@ -701,7 +701,7 @@
   }
 
   .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
-    padding-right: 2.75rem;
+    padding-right: 2.25rem;
     padding-left: 0.5rem;
     column-gap: 0.1875rem;
   }
@@ -780,12 +780,12 @@
     padding-left: 2.5rem;
   }
 
-  /* A coarse pointer grows the tick box's label to 44px (`touch:size-11`):
-     0.75rem + 2.75rem of box needs more than the 2.5rem above to leave a gap
+  /* A coarse pointer grows the tick box's label to 36px (`touch:size-9`):
+     0.75rem + 2.25rem of box needs more than the 2.5rem above to leave a gap
      before the text. */
   @media (pointer: coarse) {
     .dt-stacked.dt-stack-dense:not(.dt-dense-tight, .dt-dense-lead) tr:has(> td.dt-edge-start) {
-      padding-left: 4rem;
+      padding-left: 3.5rem;
     }
   }
 
@@ -817,7 +817,7 @@
      corner): a card whose tick box,
      title, headline figure and More actions button all sit on line one,
      centred on each other, with the `end` box closing line two. Without it
-     the button's 44px box made line one button-tall (the title riding its
+     the button's 36px box made line one button-tall (the title riding its
      top edge, the ⋮ below it), the tick box sat centred across both lines
      rather than beside the name, and the box's height pushed the meta text
      to its baseline, a gap's width under the title. */
@@ -837,7 +837,7 @@
     height: 1rem;
     margin-left: -1.5rem;
     margin-right: 0.5rem;
-    /* Over the title, so the coarse pointer's 44px label overhang takes the tap. */
+    /* Over the title, so the coarse pointer's 36px label overhang takes the tap. */
     z-index: 1;
   }
 
@@ -851,7 +851,7 @@
     padding-left: 2.25rem;
   }
 
-  /* The button keeps its 44px touch target, but negative margins stop it
+  /* The button keeps its 36px touch target, but negative margins stop it
      counting towards line one's height. */
   .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-actions {
     margin-block: -0.75rem;
@@ -873,28 +873,11 @@
     padding-left: 0.25rem;
   }
 
-  /* A row with the in-flow ⋮ (Mining Tax) has a 44px line one, and the box and
-     the button centre in it. The title and the headline figure stay on the
-     baseline, which pins them to the top of that line, a box-height above
-     the box beside them; centre them with it. */
-  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-primary,
-  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-corner {
-    align-self: center;
-  }
-
-  /* The ⋮'s 44px touch box holds a 16px glyph, so beside the card's padding
-     it left the dots a thumb-width in from the edge the status and the
-     figures end at. Let the box overhang into the padding: the touch target
-     is the same, the dots sit near the card's right edge. */
-  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-actions {
-    margin-right: -0.75rem;
-  }
-
   /* Opt-in (`dt-dense-lead` on the table, Mining Tax): the tick box joins
      line one ahead of the title with a small gap, and the row keeps its
      ordinary left padding, so line two starts at the card's left edge under
      the box rather than indented to the title. The cell is only the box
-     wide; a coarse pointer's 44px label overflows it evenly into the
+     wide; a coarse pointer's 36px label overflows it evenly into the
      padding around, so the touch target grows without the box carrying
      visible empty space. Stacked above the title (z-index) so the overhang
      takes the tap. An unselectable row keeps the empty cell, so every date

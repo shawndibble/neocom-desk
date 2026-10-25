@@ -369,7 +369,7 @@ export function CourierContractDetailModal({
                 type="button"
                 aria-expanded={showPath}
                 onClick={() => setShowPath((shown) => !shown)}
-                className={`-my-2.5 flex min-h-11 items-center gap-1 tabular-nums md:my-0 md:min-h-0 ${inlineLinkClassName}`}
+                className={`-my-1.5 flex min-h-9 items-center gap-1 tabular-nums md:my-0 md:min-h-0 ${inlineLinkClassName}`}
               >
                 <Caret expanded={showPath} />
                 {t('contractSearch.jumpsShort', { count: jumpCount })}
@@ -433,11 +433,11 @@ export function CourierContractDetailModal({
             {reverseLane.kind === 'unresolved' ? (
               <span className="text-text-dim">{t('contractSearch.reverseLaneUnresolved')}</span>
             ) : reverseLane.count > 0 ? (
-              // `-my-2.5` cancels `min-h-11`'s added height so the section doesn't grow — the 44px only exists as invisible hit area bleeding into the border-t/pt-2 gap above and the section's own p-3 below; `md:` reverts both so desktop is unchanged.
+              // `-my-1.5` cancels `min-h-9`'s added height so the section doesn't grow — the 36px only exists as invisible hit area bleeding into the border-t/pt-2 gap above and the section's own p-3 below; `md:` reverts both so desktop is unchanged.
               <button
                 type="button"
                 onClick={onSearchReverseLane}
-                className={`-my-2.5 flex min-h-11 items-center self-start py-1 md:my-0 md:min-h-0 ${inlineLinkClassName}`}
+                className={`-my-1.5 flex min-h-9 items-center self-start py-1 md:my-0 md:min-h-0 ${inlineLinkClassName}`}
               >
                 {t('contractSearch.reverseLaneCount', { count: reverseLane.count })}
               </button>

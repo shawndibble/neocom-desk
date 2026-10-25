@@ -25,7 +25,7 @@ import { Button, Checkbox, Disclosure, InfoTooltip, NeedsConnection, Panel } fro
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
-import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
+import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -54,6 +54,7 @@ const UNLOCKS_TOOLTIP: Partial<Record<ScopeGroup, string>> = {
   corp: 'settings.permissions.unlocks.corp',
   corpProjects: 'settings.permissions.unlocks.corpProjects',
   killmails: 'settings.permissions.unlocks.killmails',
+  mercenaryDens: 'settings.permissions.unlocks.mercenaryDens',
 };
 
 /** `?grant=a,b` from a "Grant missing Permissions" link: the Permissions whose button should flash. */
@@ -148,7 +149,7 @@ export function PermissionsPanel() {
           </label>
         ) : (
           // Keeps labels aligned with the rows that have a checkbox.
-          missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-11" />
+          missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-9" />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-text">
@@ -198,8 +199,27 @@ export function PermissionsPanel() {
   }
 
   // Two columns from `xl`: one full-width list put each status a screen away from its name.
-  function renderRows(list: ScopeGroup[]) {
-    return <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{list.map(renderRow)}</ul>;
+  // The Write to EVE rows sit under their own heading, below the reads; the folded list drops it so the heading shows once.
+  function renderRows(list: ScopeGroup[], headed = true) {
+    const writes = list.filter((group) => WRITE_GROUPS.includes(group));
+    const reads = list.filter((group) => !WRITE_GROUPS.includes(group));
+    return (
+      <>
+        {reads.length > 0 && (
+          <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{reads.map(renderRow)}</ul>
+        )}
+        {writes.length > 0 &&
+          (headed ? (
+            <section aria-label={t('permissions.writeSection')} className="space-y-1 pt-2">
+              <h3 className="text-xs font-semibold text-text">{t('permissions.writeSection')}</h3>
+              <p className="text-xs text-text-dim">{t('permissions.writeSectionHint')}</p>
+              <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{writes.map(renderRow)}</ul>
+            </section>
+          ) : (
+            <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{writes.map(renderRow)}</ul>
+          ))}
+      </>
+    );
   }
 
   return (
@@ -245,7 +265,7 @@ export function PermissionsPanel() {
                 expanded={grantedFold.expanded}
                 onToggle={grantedFold.toggle}
               >
-                {renderRows(foldedRows)}
+                {renderRows(foldedRows, false)}
               </Disclosure>
             )}
           </>

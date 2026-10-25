@@ -42,8 +42,8 @@ export function CorpProjectCards({
             key={row.id}
             className={`border-b border-line last:border-b-0 ${selected ? 'bg-accent/5' : ''}`}
           >
-            <div className="grid grid-cols-[2.75rem_minmax(0,1fr)]">
-              <label className="flex size-11 cursor-pointer items-center justify-center self-start">
+            <div className="grid grid-cols-[2.25rem_minmax(0,1fr)]">
+              <label className="flex size-9 cursor-pointer items-center justify-center self-start">
                 <Checkbox
                   checked={selected}
                   onChange={() => onToggleSelected(row.id)}

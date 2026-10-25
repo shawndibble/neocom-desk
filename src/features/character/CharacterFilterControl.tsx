@@ -38,7 +38,7 @@
  * Settings is a form field and is outside that rule.
  *
  * The trigger is the same at every width and carries no words: faces and a
- * small caret, at the height of the `IconButton`s beside it (44px below `md`
+ * small caret, at the height of the `IconButton`s beside it (36px below `md`
  * or on a touch pointer, 36px from `md`). "This character" is the active
  * Character's portrait; "All characters" is up to three overlapping portraits
  * (two below `md`, chosen in JS with `useIsNarrow`)
@@ -130,7 +130,7 @@ export interface CharacterFilterControlProps<
   hideAll?: boolean;
   /**
    * The sibling touch tier this trigger's height must match,
-   * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
+   * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-9`) —
    * not the full `IconButtonSize` (there is no `'row'` tier here). `'sm'`
    * (default) beside `size="sm"` `IconButton`s, `'md'` beside default-tier
    * ones. Every page picker now sits in a `PageHeader`'s `scope` slot, where
@@ -173,7 +173,7 @@ export interface CharacterFilterControlProps<
 
 /**
  * The face box inside the trigger, the same at both size tiers: 24px where
- * the trigger is 44px (below `md`, or a touch pointer), 20px from `md` (an
+ * the trigger is 36px (below `md`, or a touch pointer), 20px from `md` (an
  * `IconButton` glyph's size). Each face after the first tucks half under the
  * one before it (`FACE_OVERLAP`); the ring in the trigger's own fill
  * separates them. Three faces, a "+N" and the caret stay about 72px wide at

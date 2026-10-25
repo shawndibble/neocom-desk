@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveGoal, ImproveOption, ImproveResult } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
+import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
@@ -28,7 +30,7 @@ function option(
     score: 0.1,
     iskDelta: 1000,
     destroysRigs: false,
-    downsides: [],
+    lost: [],
     ...extra,
   } as ImproveOption;
 }
@@ -55,9 +57,15 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
   };
 }
 
+const openMoreGoals = () => userEvent.click(screen.getByRole('button', { name: /^More goals/ }));
+const openSettings = () =>
+  userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
+
 const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   reach: 'upgrade',
   onReachChange: vi.fn(),
+  sort: 'gain',
+  onSortChange: vi.fn(),
   mode: 'buy',
   onModeChange: vi.fn(),
   spendCap: null,
@@ -87,6 +95,8 @@ const renderPanel = (
     unloaded?: UnloadedWeapons | null;
     onLoadBestCharge?: () => void;
     fitting?: Fitting;
+    onPreview?: (delta: FittingStatsDelta | null) => void;
+    target?: TargetProfile;
   } = {}
 ) =>
   render(
@@ -102,6 +112,8 @@ const renderPanel = (
       unloaded={extra.unloaded}
       onLoadBestCharge={extra.onLoadBestCharge}
       fitting={extra.fitting}
+      onPreview={extra.onPreview}
+      target={extra.target}
     />
   );
 
@@ -167,14 +179,23 @@ describe('ImprovePanel', () => {
 
   it('sections No downside and Trade-offs, and applies the ticked rows together', async () => {
     const gain = option(11, { ehp: 1100 });
-    const trade = option(21, { ehp: 1200 }, { downsides: ['speed'] });
+    const trade = option(
+      21,
+      { ehp: 1200 },
+      {
+        lost: [{ kind: 'stat', change: { key: 'maxVelocity', before: 300, after: 250 } }],
+      }
+    );
     const onApply = vi.fn();
     renderPanel(search(done({ noDownside: [gain], tradeOffs: [trade] })), onApply);
     expect(screen.getByText('No downside')).toBeInTheDocument();
     expect(screen.getByText('Trade-offs')).toBeInTheDocument();
-    expect(screen.getByText('Gives up: Speed')).toBeInTheDocument();
+    expect(screen.getByText(/Gives up:/)).toBeInTheDocument();
+    expect(screen.getByText(/Max velocity 300 to 250 m\/s, worse/)).toBeInTheDocument();
     const apply = screen.getByRole('button', { name: 'Apply' });
     expect(apply).toBeDisabled();
+    // Opaque in the drawer's surface token, so rows scrolling under it don't show through.
+    expect(apply.closest('.sticky')).toHaveClass('bg-panel');
     const boxes = screen.getAllByRole('checkbox');
     await userEvent.click(boxes[0]);
     await userEvent.click(boxes[1]);
@@ -182,15 +203,146 @@ describe('ImprovePanel', () => {
     expect(onApply).toHaveBeenCalledWith([gain, trade]);
   });
 
+  it('shows one row per module with its best option, the rest behind "more options"', async () => {
+    const best = option(11, { ehp: 1100 }, { score: 0.3 });
+    const other = option(12, { ehp: 1050 }, { score: 0.1 });
+    renderPanel(search(done({ noDownside: [other, best] })));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByText('+30%')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '1 more option' }));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(screen.getByText('+10%')).toBeInTheDocument();
+  });
+
+  it('leads a damage row with its DPS before → after', () => {
+    const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
+    const gain = option(11, { offense: { ...before.offense, sustainedDps: 128 } });
+    renderPanel(search(done({ noDownside: [gain] }, own), own));
+    const row = screen.getByRole('checkbox').closest('li')!;
+    expect(row.querySelector('[data-verdict="better"]')).toHaveTextContent('→ 128');
+    expect(row).toHaveTextContent('90.7');
+  });
+
+  const missile = (dps: number) =>
+    ({
+      kind: 'missile',
+      dps,
+      range: 40000,
+      explosionRadius: 140,
+      explosionVelocity: 85,
+      damageReductionFactor: 0.682,
+      em: 0,
+      thermal: 0,
+      kinetic: 1,
+      explosive: 0,
+    }) as FittingStats['applied']['weapons'][number];
+  const applied = (dps: number) => ({ weapons: [missile(dps)], droneControlRange: 20000 });
+  const frigate: TargetProfile = { signatureRadius: 40, velocity: 400 };
+
+  it('labels a damage lead Applied DPS against a Target Profile, apart from Sustained DPS', () => {
+    const own = {
+      ...before,
+      applied: applied(100),
+      offense: { ...before.offense, sustainedDps: 90.7 },
+    };
+    const gain = option(11, {
+      applied: applied(150),
+      offense: { ...before.offense, sustainedDps: 128 },
+    });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      target: frigate,
+    });
+    const row = screen.getByRole('checkbox').closest('li')!;
+    const [lead, detail] = row.querySelectorAll('span.block.text-xs');
+    expect(lead).toHaveTextContent('Applied DPS');
+    expect(lead).not.toHaveTextContent('Sustained DPS');
+    expect(detail).toHaveTextContent('Sustained DPS 90.7 → 128');
+  });
+
+  it("never shows the same stat in a row's lead line and its detail line", () => {
+    const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
+    const gain = option(11, { offense: { ...before.offense, sustainedDps: 128 } });
+    renderPanel(search(done({ noDownside: [gain] }, own), own));
+    const row = screen.getByRole('checkbox').closest('li')!;
+    const [lead, detail] = row.querySelectorAll('span.block.text-xs');
+    expect(lead).toHaveTextContent('Sustained DPS');
+    expect(detail).not.toHaveTextContent('Sustained DPS');
+  });
+
+  it('leads Best overall with what changed, not DPS and EHP that stood still', () => {
+    const gain = option(11, { capacitor: { stable: true, stablePercentage: 70 } });
+    renderPanel(search(done({ noDownside: [gain] })), vi.fn(), vi.fn(), settings(), {
+      goal: 'overall',
+    });
+    const [lead] = screen
+      .getByRole('checkbox')
+      .closest('li')!
+      .querySelectorAll('span.block.text-xs');
+    expect(lead).toHaveTextContent('Capacitor');
+    expect(lead).toHaveTextContent('stable at 70%');
+    expect(lead).not.toHaveTextContent('DPS');
+    expect(lead).not.toHaveTextContent('EHP');
+  });
+
+  it('heads the results with the goal figure now → best found, hidden with no result', () => {
+    const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
+    const small = option(11, { offense: { ...before.offense, sustainedDps: 100 } }, { score: 0.1 });
+    const big = option(12, { offense: { ...before.offense, sustainedDps: 128 } }, { score: 0.4 });
+    renderPanel(search(done({ noDownside: [small], tradeOffs: [big] }, own), own));
+    const header = screen.getByTestId('improve-best-found');
+    expect(header).toHaveTextContent('Now → best found');
+    expect(header).toHaveTextContent('90.7');
+    expect(header).toHaveTextContent('→ 128');
+    cleanup();
+    renderPanel(search(done({}, own), own));
+    expect(screen.queryByTestId('improve-best-found')).not.toBeInTheDocument();
+  });
+
+  it('orders each section by the remembered sort, and reports a change', async () => {
+    const pricey = option(11, { ehp: 1100 }, { score: 0.5, iskDelta: 900_000_000 });
+    const cheap = option(21, { ehp: 1100 }, { score: 0.1, iskDelta: 1_000_000 });
+    const state = search(done({ noDownside: [cheap, pricey] }));
+    const first = () => screen.getAllByRole('checkbox')[0]!.closest('li')!;
+    const onSortChange = vi.fn();
+    const { unmount } = renderPanel(state, vi.fn(), vi.fn(), settings({ onSortChange }));
+    expect(first()).toHaveTextContent('+50%');
+    await userEvent.click(screen.getByRole('button', { name: 'Best value' }));
+    expect(onSortChange).toHaveBeenCalledWith('value');
+    unmount();
+    renderPanel(state, vi.fn(), vi.fn(), settings({ sort: 'value' }));
+    expect(first()).toHaveTextContent('+10%');
+  });
+
+  it('opens "N other stats" inline', async () => {
+    const gain = option(11, {
+      ehp: 1100,
+      cpuUsed: before.cpuUsed + 1,
+      powergridUsed: before.powergridUsed + 1,
+      calibrationUsed: before.calibrationUsed + 1,
+      droneDps: before.droneDps + 1,
+      droneCapacity: before.droneCapacity + 1,
+      capacitorCapacity: before.capacitorCapacity + 1,
+    });
+    renderPanel(search(done({ noDownside: [gain] })));
+    const row = screen.getByRole('checkbox').closest('li')!;
+    const before_ = row.querySelectorAll('[data-verdict]').length;
+    await userEvent.click(screen.getByRole('button', { name: /other stats?/ }));
+    expect(row.querySelectorAll('[data-verdict]').length).toBeGreaterThan(before_);
+    expect(screen.queryByRole('button', { name: /other stats?/ })).not.toBeInTheDocument();
+  });
+
   it('ticks one variation per fitted module', async () => {
     const a = option(11, { ehp: 1100 });
     const b = option(12, { ehp: 1050 });
     const onApply = vi.fn();
     renderPanel(search(done({ noDownside: [a, b] })), onApply);
+    await userEvent.click(screen.getByRole('button', { name: '1 more option' }));
     const boxes = screen.getAllByRole('checkbox');
     await userEvent.click(boxes[0]);
     await userEvent.click(boxes[1]);
-    expect(boxes[0]).not.toBeChecked();
+    expect(
+      screen.getAllByRole('checkbox').filter((box) => (box as HTMLInputElement).checked)
+    ).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Apply 1 change' }));
     expect(onApply).toHaveBeenCalledWith([b]);
   });
@@ -202,18 +354,66 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('Goes over CPU, powergrid or calibration')).toBeInTheDocument();
   });
 
-  it('disables a goal the fit cannot score', () => {
-    const unarmed = { ...before, offense: { ...before.offense, dps: 0, sustainedDps: 0 } };
-    renderPanel(search({ status: 'idle' }, unarmed));
-    expect(screen.getByRole('button', { name: /More damage/ })).toHaveAttribute(
-      'aria-disabled',
-      'true'
+  it('names the overage on a swap over the budget or the cap', () => {
+    const rejected = {
+      ...option(11, { ehp: 1100 }, { iskDelta: 12_300_000 }),
+      guardrail: 'spend' as const,
+    };
+    const state = { ...done({ rejected: [rejected] }), fitTotal: 40_000_000 } as ImproveState;
+    const { unmount } = renderPanel(
+      search(state),
+      vi.fn(),
+      vi.fn(),
+      settings({ mode: 'buy', spendCap: 50_000_000 })
     );
+    expect(screen.getByText('Over your 50M budget by 2.3M')).toBeInTheDocument();
+    unmount();
+    renderPanel(search(state), vi.fn(), vi.fn(), settings({ mode: 'refit', spendCap: 5_000_000 }));
+    expect(screen.getByText('7.3M over your 5M cap')).toBeInTheDocument();
+  });
+
+  it('shows a notice and no results when the budget is below the fit price', () => {
+    renderPanel(search({ status: 'belowPrice', budget: 5_000_000, fitTotal: 40_100_000 }));
+    expect(
+      screen.getByText(/Your budget \(5M\) is below this fit's price \(40\.1M\)/)
+    ).toBeInTheDocument();
+  });
+
+  it('leads with the hull role goals and keeps the settings collapsed', () => {
+    renderPanel(search({ status: 'idle' }));
+    expect(screen.getByRole('button', { name: /Best overall/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Carry more/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Search settings/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.queryByRole('group', { name: 'Improve Reach' })).not.toBeInTheDocument();
+  });
+
+  it('says nothing could be added on a fit with no modules', () => {
+    const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
+    renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });
+    expect(
+      screen.getByText('Nothing could be added to this fit within the guardrails.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No variation of a fitted/)).not.toBeInTheDocument();
+  });
+
+  it('moves a goal the fit cannot score under More goals, disabled, with its reason', async () => {
+    const unarmed = { ...before, offense: { ...before.offense, dps: 0, sustainedDps: 0 } };
+    renderPanel(search({ status: 'idle' }, unarmed), vi.fn(), vi.fn(), settings(), {
+      goal: 'overall',
+    });
+    expect(screen.queryByRole('button', { name: /More damage/ })).not.toBeInTheDocument();
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /More damage/ })).toBeDisabled();
+    expect(screen.getByText('Nothing on this fit deals damage')).toBeInTheDocument();
   });
 
   it('shows Reach, mode, Defense Choice and the spend cap, and reports a pick', async () => {
     const config = settings({ reach: 'rebalance' });
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config, { goal: 'tank' });
+    await openSettings();
     expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Defense Choice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Rework' }));
@@ -224,13 +424,15 @@ describe('ImprovePanel', () => {
     expect(config.onDefenseChange).toHaveBeenCalledWith('armor');
   });
 
-  it('hides Defense Choice on goals it does not change', () => {
+  it('hides Defense Choice on goals it does not change', async () => {
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings(), { goal: 'mining' });
+    await openSettings();
     expect(screen.queryByRole('group', { name: 'Defense Choice' })).not.toBeInTheDocument();
   });
 
-  it('disables Shield and Armor under Upgrade, with the reason', () => {
+  it('disables Shield and Armor under Upgrade, with the reason', async () => {
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings(), { goal: 'tank' });
+    await openSettings();
     expect(screen.getByRole('button', { name: 'Armor' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Shield' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Pick Rebalance or Rework to change tank side')).toBeInTheDocument();
@@ -239,8 +441,9 @@ describe('ImprovePanel', () => {
   it('keeps Rigs and Officer behind a collapsed, unticked group', async () => {
     const config = settings();
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config);
+    await openSettings();
     expect(screen.queryByRole('checkbox', { name: 'Rigs' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Also try…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rigs and officer modules' }));
     const rigs = screen.getByRole('checkbox', { name: 'Rigs' });
     expect(rigs).not.toBeChecked();
     await userEvent.click(rigs);
@@ -301,10 +504,9 @@ describe('ImprovePanel', () => {
 
   it('disables Mine more with its reason on a fit with no miners', async () => {
     renderPanel(search({ status: 'idle' }, before));
-    const chip = screen.getByRole('button', { name: /Mine more/ });
-    expect(chip).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.hover(chip);
-    expect(await screen.findByText('No miners on this fit')).toBeInTheDocument();
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /Mine more/ })).toBeDisabled();
+    expect(screen.getByText('No miners on this fit')).toBeInTheDocument();
   });
 
   it('shows the ore on every Mine more row and in the closest swaps, with the m³/s it gives', () => {
@@ -320,14 +522,27 @@ describe('ImprovePanel', () => {
     const broke = { ...option(21, { mining: mining(11) }), guardrail: 'budget' as const };
     const noGain = search(
       done(
-        { noDownside: [gain, { ...gain, candidate: { ...gain.candidate, toTypeId: 11 } }] },
+        {
+          noDownside: [
+            gain,
+            {
+              ...gain,
+              candidate: {
+                ...gain.candidate,
+                toTypeId: 11,
+                at: [{ slot: 'low' as const, slotIndex: 1 }],
+              },
+            },
+          ],
+        },
         own
       ),
       own
     );
     renderPanel(noGain, vi.fn(), vi.fn(), settings(), { goal: 'mining' });
     const lines = screen.getAllByText(/Mines 10 → 12\.5 m³\/s of Veldspar, Scordite/);
-    expect(lines).toHaveLength(2);
+    // Two rows plus the best-found header.
+    expect(lines).toHaveLength(3);
     expect(lines[0]).toHaveTextContent('(Simple Asteroid crystals)');
     cleanup();
     renderPanel(search(done({ rejected: [broke] }, own), own), vi.fn(), vi.fn(), settings(), {
@@ -352,15 +567,14 @@ describe('ImprovePanel', () => {
       navigation: { ...before.navigation, agility: 0, warpSpeed: 0 },
     };
     renderPanel(search({ status: 'idle' }, bare));
+    await openMoreGoals();
     for (const [name, reason] of [
       [/Carry more/, 'This hull has no cargo or other hold'],
       [/^Align faster/, 'This hull has no align time to improve'],
       [/Align and warp faster/, 'This hull has no align time or warp speed to improve'],
     ] as const) {
-      const chip = screen.getByRole('button', { name });
-      expect(chip).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.hover(chip);
-      expect(await screen.findByText(reason)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByText(reason)).toBeInTheDocument();
     }
   });
 
@@ -375,7 +589,7 @@ describe('ImprovePanel', () => {
       settings({ onHoldChange }),
       { goal: 'haul' }
     );
-    expect(screen.getByText('Cargo hold 1,000 → 1,250 m³')).toBeInTheDocument();
+    expect(screen.getAllByText('Cargo hold 1,000 → 1,250 m³')).toHaveLength(2);
     await userEvent.click(screen.getByRole('combobox', { name: 'Hold' }));
     await userEvent.click(await screen.findByRole('option', { name: /Ice hold/ }));
     expect(onHoldChange).toHaveBeenCalledWith('iceHold');
@@ -387,19 +601,18 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'warp',
     });
-    expect(screen.getByText(/Align 55\.45 → 27\.73 s · Warp 3 → 3\.6 AU\/s/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Align 55\.45 → 27\.73 s · Warp 3 → 3\.6 AU\/s/)).toHaveLength(2);
   });
 
   it('disables Repair more and Transfer more with their reasons on a fit that gives neither', async () => {
     renderPanel(search({ status: 'idle' }));
+    await openMoreGoals();
     for (const [name, reason] of [
       [/Repair more/, 'No remote repairers on this fit'],
       [/Transfer more/, 'No remote capacitor transmitters on this fit'],
     ] as const) {
-      const chip = screen.getByRole('button', { name });
-      expect(chip).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.hover(chip);
-      expect(await screen.findByText(reason)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByText(reason)).toBeInTheDocument();
     }
   });
 
@@ -412,23 +625,22 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'repair',
     });
-    expect(screen.getByText('Repairs 100 → 125.5 HP/s')).toBeInTheDocument();
+    expect(screen.getAllByText('Repairs 100 → 125.5 HP/s')).toHaveLength(2);
     cleanup();
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'transfer',
     });
-    expect(screen.getByText('Transfers 0 → 40 GJ/s')).toBeInTheDocument();
+    expect(screen.getAllByText('Transfers 0 → 40 GJ/s')).toHaveLength(2);
   });
   it('disables Hold tighter and Stronger EWAR with their reasons on a fit with neither', async () => {
     renderPanel(search({ status: 'idle' }));
+    await openMoreGoals();
     for (const [name, reason] of [
       [/Hold tighter/, 'No warp scramblers, disruptors or webs on this fit'],
       [/Stronger EWAR/, 'No electronic warfare modules on this fit'],
     ] as const) {
-      const chip = screen.getByRole('button', { name });
-      expect(chip).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.hover(chip);
-      expect(await screen.findByText(reason)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByText(reason)).toBeInTheDocument();
     }
   });
 
@@ -460,22 +672,21 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'tackle',
     });
-    expect(screen.getByText('Points 2 → 3 · Web 50 → 60% · Reach 9 → 12 km')).toBeInTheDocument();
+    expect(screen.getAllByText('Points 2 → 3 · Web 50 → 60% · Reach 9 → 12 km')).toHaveLength(2);
     cleanup();
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'ewar',
     });
     expect(
-      screen.getByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
-    ).toBeInTheDocument();
+      screen.getAllByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
+    ).toHaveLength(2);
   });
   it('disables Stronger fleet support with its reason on a fit with no fleet modules', async () => {
     renderPanel(search({ status: 'idle' }));
-    const chip = screen.getByRole('button', { name: /Stronger fleet support/ });
-    expect(chip).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.hover(chip);
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /Stronger fleet support/ })).toBeDisabled();
     expect(
-      await screen.findByText('No command bursts, compressors or industrial core on this fit')
+      screen.getByText('No command bursts, compressors or industrial core on this fit')
     ).toBeInTheDocument();
   });
 
@@ -503,10 +714,10 @@ describe('ImprovePanel', () => {
       goal: 'command',
     });
     expect(
-      screen.getByText(
+      screen.getAllByText(
         'Burst strength 10 → 12 · Burst reach 30 → 40 km · Core fuel 200 → 150 per cycle'
       )
-    ).toBeInTheDocument();
+    ).toHaveLength(2);
   });
 
   describe('combined check', () => {
@@ -553,10 +764,73 @@ describe('ImprovePanel', () => {
       const b = option(12, { ehp: 1050 });
       const s = checked(before, done({ noDownside: [a, b] }));
       renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('button', { name: '1 more option' }));
       const boxes = screen.getAllByRole('checkbox');
       await userEvent.click(boxes[0]);
       await userEvent.click(boxes[1]);
       expect(screen.getByText(/Replaces your pick:/)).toBeInTheDocument();
+    });
+  });
+
+  describe('stats column preview', () => {
+    const fitting = {
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+      ],
+    } as unknown as Fitting;
+    const withRecalc = (state: ImproveState, after: (fit: Fitting) => FittingStats) => ({
+      ...search(state),
+      recalc: vi.fn().mockImplementation(async (fit: Fitting) => after(fit)),
+    });
+    const lastDelta = (onPreview: ReturnType<typeof vi.fn>) =>
+      onPreview.mock.calls[onPreview.mock.calls.length - 1]?.[0] as FittingStatsDelta | null;
+
+    it('previews the ticked set, and clears it when everything is unticked', async () => {
+      const a = option(11, { ehp: 1100 });
+      const onPreview = vi.fn();
+      const s = withRecalc(done({ noDownside: [a] }), () => ({ ...before, ehp: before.ehp + 500 }));
+      renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting, onPreview });
+      await userEvent.click(screen.getByRole('checkbox'));
+      await waitFor(() => expect(lastDelta(onPreview)?.changes.map((c) => c.key)).toEqual(['ehp']));
+      await userEvent.click(screen.getByRole('checkbox'));
+      await waitFor(() => expect(lastDelta(onPreview)).toBeNull());
+    });
+
+    it('previews a hovered row on top of the ticked set, and restores the ticked set on leave', async () => {
+      const a = option(11, { ehp: 1100 });
+      const b = option(21, { cpuUsed: 5 });
+      const onPreview = vi.fn();
+      // The hovered fold (both rows) also moves CPU; the ticked fold moves EHP alone.
+      const s = withRecalc(done({ noDownside: [a, b] }), (fit) => {
+        void fit;
+        return { ...before, ehp: before.ehp + 500 };
+      });
+      s.recalc = vi
+        .fn()
+        .mockResolvedValueOnce({ ...before, ehp: before.ehp + 500 })
+        .mockResolvedValue({ ...before, ehp: before.ehp + 500, cpuUsed: before.cpuUsed + 5 });
+      renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting, onPreview });
+      const boxes = screen.getAllByRole('checkbox');
+      await userEvent.click(boxes[0]);
+      await waitFor(() => expect(lastDelta(onPreview)?.count).toBe(1));
+      await userEvent.hover(boxes[1]);
+      await waitFor(() =>
+        expect(lastDelta(onPreview)?.changes.map((c) => c.key)).toEqual(['cpuUsed', 'ehp'])
+      );
+      await userEvent.unhover(boxes[1]);
+      await waitFor(() => expect(lastDelta(onPreview)?.changes.map((c) => c.key)).toEqual(['ehp']));
+    });
+
+    it('clears the preview when the panel goes away', async () => {
+      const a = option(11, { ehp: 1100 });
+      const onPreview = vi.fn();
+      const s = withRecalc(done({ noDownside: [a] }), () => ({ ...before, ehp: before.ehp + 500 }));
+      const { unmount } = renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting, onPreview });
+      await userEvent.click(screen.getByRole('checkbox'));
+      await waitFor(() => expect(lastDelta(onPreview)?.count).toBe(1));
+      unmount();
+      expect(lastDelta(onPreview)).toBeNull();
     });
   });
 });

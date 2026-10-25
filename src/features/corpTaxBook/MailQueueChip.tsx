@@ -43,7 +43,7 @@ export function MailQueueChip(props: ChipProps) {
           aria-haspopup="dialog"
           onClick={() => setSheetOpen(true)}
           className={cx(
-            'relative inline-flex size-11 items-center justify-center rounded-xs border border-line hover:bg-panel-2',
+            'relative inline-flex size-9 items-center justify-center rounded-xs border border-line hover:bg-panel-2',
             focusRingClassName
           )}
         >

@@ -51,6 +51,28 @@ export function getIndustrySystemCostIndices(
   });
 }
 
+// --- GET /industry/facilities (public) ---
+
+/** An NPC station that runs industry jobs. ESI sends no `tax` on any entry. */
+export interface IndustryFacility {
+  facility_id: number;
+  owner_id: number;
+  region_id: number;
+  solar_system_id: number;
+  type_id: number;
+  tax?: number;
+}
+
+/** Every NPC station with industry services (no player structures). */
+export function getIndustryFacilities(
+  options: EndpointOptions = {}
+): Promise<EsiResult<IndustryFacility[]>> {
+  return esiFetch<IndustryFacility[]>('/industry/facilities', {
+    ...options,
+    endpointId: 'getIndustryFacilities',
+  });
+}
+
 // --- GET /characters/{character_id}/industry/jobs (esi-industry.read_character_jobs.v1) ---
 
 /**

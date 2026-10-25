@@ -356,3 +356,57 @@ describe('planMove hauler override', () => {
     expect(result.active?.trips).toBe(2);
   });
 });
+
+describe('planMove with a max ISK per haul', () => {
+  const run = (maxIskPerHaul?: number | null, unitIsk?: Map<number, number>) =>
+    planMove({
+      destinationLocationIds: new Set([DEST]),
+      characters: [
+        {
+          characterId: 1,
+          name: 'Alice',
+          assets: [
+            asset({ itemId: 1, typeId: 35, quantity: 10 }), // 20 m3
+            asset({ itemId: 2, typeId: 36, quantity: 1 }),
+          ],
+        },
+      ],
+      unitM3: new Map([
+        [35, 2],
+        [36, 1],
+      ]),
+      shipTypeIds: new Set([SHIP]),
+      hulls: [hull(1, 5000)],
+      unitIsk,
+      maxIskPerHaul,
+    });
+  const PRICES = new Map([
+    [35, 100],
+    [36, 5_000],
+  ]);
+
+  it('with no limit, trips and counts are as before', () => {
+    const r = run(undefined, PRICES);
+    expect(r.totals.trips).toBe(1);
+    expect(r.active?.overLimitCount).toBe(0);
+    expect(r.active?.pickups[0].hauls[0].iskValue).toBe(6_000);
+  });
+
+  it('splits into more hauls under a limit and reports over-limit units apart from unfit', () => {
+    const r = run(300, PRICES);
+    expect(r.totals.trips).toBe(4); // 10 x 100 ISK in hauls of 3,3,3,1
+    expect(r.active?.unfitCount).toBe(0);
+    expect(r.active?.overLimitCount).toBe(1);
+    expect(r.active?.pickups[0].overLimit).toEqual([
+      { typeId: 36, quantity: 1, unitM3: 1, unitIsk: 5_000 },
+    ]);
+    for (const h of r.active!.pickups[0].hauls) expect(h.iskValue).toBeLessThanOrEqual(300);
+  });
+
+  it('counts stacks with no price and does not rank by the limit', () => {
+    const r = run(300, new Map([[35, 100]]));
+    expect(r.totals.unpricedCount).toBe(1);
+    expect(r.active?.overLimitCount).toBe(0);
+    expect(run(300).totals.unpricedCount).toBe(2);
+  });
+});

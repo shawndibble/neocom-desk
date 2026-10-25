@@ -20,7 +20,7 @@ export function FromWalletCrumb() {
     <Link
       to="/wallet"
       className={cx(
-        'inline-flex min-h-11 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0',
+        'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0',
         interactiveClassName,
         focusRingClassName
       )}

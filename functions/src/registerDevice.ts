@@ -13,6 +13,8 @@
 import { verifyEveAccessToken, type VerifyOptions } from './verifyEveToken.js';
 import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
+import { parseServerEvents, parseServerInputs, type ServerEventInputs } from './serverEvents.js';
+import type { NearbyRouteRules } from './nearbyAlerts.js';
 
 export type { ProjectionRowInput };
 
@@ -32,6 +34,15 @@ export interface DeviceCharacterInput {
    * client) leaves the stored list untouched.
    */
   eveTypes?: string[];
+  /**
+   * The server-pushed Notification Events (issue #5121) this device enabled
+   * for the browser channel for this Character: sorted, de-duplicated ids.
+   * Same per-device rule as `eveTypes`; absent (an older client) leaves the
+   * stored list untouched. Ids this server does not handle are stored anyway.
+   */
+  serverEvents?: string[];
+  /** What the server needs to evaluate them (price targets, the ship-lost minimum). Absent keeps the stored inputs. */
+  serverInputs?: ServerEventInputs;
 }
 
 /** Bounds a hostile or buggy client's `eveTypes` upload; the real list is a few dozen. */
@@ -47,6 +58,12 @@ export interface RegisterDeviceInput {
    * stored window untouched; `null` clears it.
    */
   quietHours?: QuietHours | null;
+  /**
+   * This device's Travel Settings, as the nearby-alerts poller counts jumps
+   * under them (issue #5122). Absent (an older client, or a value that does not
+   * parse) leaves the stored rules untouched.
+   */
+  routeRules?: NearbyRouteRules;
 }
 
 export interface DeviceRegistrationDoc {
@@ -73,6 +90,10 @@ export interface RegisterDeviceResult {
   projections: CharacterProjection[];
   /** Each verified character's enabled browser types, keyed by characterId; absent when the client sent none. */
   eveTypesByCharacter: Record<number, string[]>;
+  /** Each verified character's server-pushed event ids; absent when the client sent none. */
+  serverEventsByCharacter: Record<number, string[]>;
+  /** Each verified character's server inputs; absent when the client sent none. */
+  serverInputsByCharacter: Record<number, ServerEventInputs>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -123,6 +144,38 @@ function parseEveTypes(raw: unknown, path: string): string[] | undefined {
   return [...new Set(raw as string[])].sort();
 }
 
+/** Avoided Systems, including pod-kill / EDENCOM / Triglavian ones; New Eden has ~8,500 gated systems. */
+export const MAX_AVOIDED_SYSTEMS = 10_000;
+const ROUTE_PREFERENCES = ['shortest', 'prefer-highsec', 'avoid-highsec'] as const;
+
+/**
+ * Lenient, unlike most of the registration: the rules only feed nearby alerts,
+ * so a value that does not parse is dropped (the stored rules stay) instead of
+ * refusing the whole upload with its Projection and types.
+ */
+function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
+  if (!isRecord(raw) || Array.isArray(raw)) return undefined;
+  const { preference, securityPenalty, avoid } = raw;
+  if (!(ROUTE_PREFERENCES as readonly unknown[]).includes(preference)) return undefined;
+  if (
+    typeof securityPenalty !== 'number' ||
+    !Number.isInteger(securityPenalty) ||
+    securityPenalty < 0 ||
+    securityPenalty > 100
+  ) {
+    return undefined;
+  }
+  if (!Array.isArray(avoid) || avoid.length > MAX_AVOIDED_SYSTEMS) return undefined;
+  if (!avoid.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) {
+    return undefined;
+  }
+  return {
+    preference: preference as NearbyRouteRules['preference'],
+    securityPenalty,
+    avoid: [...new Set(avoid as number[])].sort((a, b) => a - b),
+  };
+}
+
 /**
  * A deviceId becomes a `deviceRegistrations` doc id and the prefix of every
  * projection row id (issue #2240), so it must be a safe Firestore id: no `/`,
@@ -135,7 +188,7 @@ const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   if (!isRecord(data)) throw new Error('Request body must be an object');
 
-  const { deviceId, fcmToken, characters, quietHours } = data;
+  const { deviceId, fcmToken, characters, quietHours, routeRules } = data;
   if (typeof deviceId !== 'string' || deviceId.length === 0) {
     throw new Error('deviceId (non-empty string) is required');
   }
@@ -151,7 +204,8 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
 
   const parsedCharacters = characters.map((entry, i) => {
     if (!isRecord(entry)) throw new Error(`characters[${i}] must be an object`);
-    const { characterId, accessToken, projectionRows, eveTypes } = entry;
+    const { characterId, accessToken, projectionRows, eveTypes, serverEvents, serverInputs } =
+      entry;
     if (typeof characterId !== 'number' || !Number.isFinite(characterId)) {
       throw new Error(`characters[${i}].characterId must be a number`);
     }
@@ -164,19 +218,25 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
     const rows = projectionRows.map((row, j) =>
       parseProjectionRow(row, `characters[${i}].projectionRows[${j}]`)
     );
+    const parsedServerEvents = parseServerEvents(serverEvents, `characters[${i}].serverEvents`);
+    const parsedServerInputs = parseServerInputs(serverInputs, `characters[${i}].serverInputs`);
     return {
       characterId,
       accessToken,
       projectionRows: rows,
       eveTypes: parseEveTypes(eveTypes, `characters[${i}].eveTypes`),
+      ...(parsedServerEvents !== undefined ? { serverEvents: parsedServerEvents } : {}),
+      ...(parsedServerInputs !== undefined ? { serverInputs: parsedServerInputs } : {}),
     };
   });
 
+  const parsedRouteRules = parseRouteRules(routeRules);
   return {
     deviceId,
     fcmToken,
     characters: parsedCharacters,
     ...(quietHours !== undefined ? { quietHours: parseQuietHours(quietHours) } : {}),
+    ...(parsedRouteRules !== undefined ? { routeRules: parsedRouteRules } : {}),
   };
 }
 
@@ -195,6 +255,8 @@ export async function buildDeviceRegistration(
   const rejected: number[] = [];
   const projections: CharacterProjection[] = [];
   const eveTypesByCharacter: Record<number, string[]> = {};
+  const serverEventsByCharacter: Record<number, string[]> = {};
+  const serverInputsByCharacter: Record<number, ServerEventInputs> = {};
 
   for (const character of input.characters) {
     try {
@@ -206,6 +268,12 @@ export async function buildDeviceRegistration(
       projections.push({ characterId: character.characterId, rows: character.projectionRows });
       if (character.eveTypes !== undefined) {
         eveTypesByCharacter[character.characterId] = character.eveTypes;
+      }
+      if (character.serverEvents !== undefined) {
+        serverEventsByCharacter[character.characterId] = character.serverEvents;
+      }
+      if (character.serverInputs !== undefined) {
+        serverInputsByCharacter[character.characterId] = character.serverInputs;
       }
     } catch (err) {
       logError('Device registration: character access token rejected', {
@@ -221,5 +289,7 @@ export async function buildDeviceRegistration(
     rejected,
     projections,
     eveTypesByCharacter,
+    serverEventsByCharacter,
+    serverInputsByCharacter,
   };
 }

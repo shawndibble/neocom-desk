@@ -28,7 +28,7 @@ export function SurveyWaypointButton({ location }: { location: { id: number; nam
       <div className={blockedButtonClassName}>
         <Button
           size="sm"
-          className="touch:min-h-11"
+
           // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
           aria-disabled={blockedReason !== null || undefined}
           aria-describedby={blockedReason !== null ? hintId : undefined}

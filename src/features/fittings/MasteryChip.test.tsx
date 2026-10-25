@@ -151,7 +151,7 @@ describe('MasteryChip', () => {
     const slot = container.firstElementChild!;
     expect(slot).toHaveAttribute('aria-hidden', 'true');
     expect(slot).toBeEmptyDOMElement();
-    expect(slot).toHaveClass('size-11', 'md:size-9');
+    expect(slot).toHaveClass('size-9');
 
     release({ '626': [[{ skillTypeID: 3300, level: 2 }], [], [], [], []] });
     expect(await screen.findByRole('button', { name: 'Mastery' })).toBeInTheDocument();

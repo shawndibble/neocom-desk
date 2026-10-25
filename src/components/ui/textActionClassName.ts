@@ -12,12 +12,12 @@ import { disabledClassName, focusRingClassName, interactiveClassName } from './c
  * differences (`gap-1` for a trailing icon, `justify-end`, `whitespace-nowrap`)
  * — there is deliberately no variant prop.
  *
- * `min-h-11` is the 44px touch tier below `md` (DESIGN.md §3); the `md:min-h-0`
+ * `min-h-9` is the 36px touch tier below `md` (DESIGN.md §3); the `md:min-h-0`
  * lets the text height stand on a pointer.
  */
 export function textActionClassName(extra = ''): string {
   return cx(
-    'flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline active:text-accent/75 md:min-h-0',
+    'flex min-h-9 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline active:text-accent/75 md:min-h-0',
     interactiveClassName,
     focusRingClassName,
     disabledClassName,

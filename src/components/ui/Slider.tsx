@@ -16,7 +16,7 @@ interface SliderProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'
  * @summary A native range input in the house recipe: drag, click or arrow-key a value between `min` and `max`. Name it (`aria-label` or a `<label htmlFor>`), set `step`, and print the value beside it.
  *
  * Native, so the `slider` role, arrow/Page/Home/End keys and touch drag come
- * free; the browser draws the track inside the 44px touch tier, so the control
+ * free; the browser draws the track inside the 36px touch tier, so the control
  * is the hit area. On a 0.85–1.2 range the default `step` of 1 moves nothing.
  */
 export const Slider = forwardRef<HTMLInputElement, SliderProps>(function Slider(
@@ -29,7 +29,7 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(function Slider(
       ref={ref}
       type="range"
       className={cx(
-        'h-11 w-full min-w-0 cursor-pointer accent-accent md:h-6 touch:h-11',
+        'h-9 w-full min-w-0 cursor-pointer accent-accent md:h-6 touch:h-9',
         interactiveClassName,
         focusRingClassName,
         disabledClassName,

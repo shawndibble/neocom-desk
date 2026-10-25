@@ -43,6 +43,7 @@ import {
   getCharacterIndustryJobs,
   getMarketsPrices,
   getIndustrySystemCostIndices,
+  getIndustryFacilities,
   postAutopilotWaypoint,
   postOpenWindowContract,
   postOpenWindowNewMail,
@@ -1268,6 +1269,28 @@ describe('market and industry public endpoints', () => {
     );
 
     const result = await getIndustrySystemCostIndices();
+
+    expect(result.data?.[0].solar_system_id).toBe(30000142);
+  });
+
+  it('getIndustryFacilities is unauthenticated and returns the NPC industry stations', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/industry/facilities`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json([
+          {
+            facility_id: 60003760,
+            owner_id: 1000035,
+            region_id: 10000002,
+            solar_system_id: 30000142,
+            type_id: 52678,
+          },
+        ]);
+      })
+    );
+
+    const result = await getIndustryFacilities();
 
     expect(result.data?.[0].solar_system_id).toBe(30000142);
   });

@@ -258,7 +258,11 @@ async function openLocation(
   name: string | RegExp
 ): Promise<void> {
   const matcher = typeof name === 'string' ? new RegExp(escapeRegExp(name)) : name;
-  await user.click(await screen.findByRole('link', { name: matcher }));
+  // Every test opens a location first, and a CI worker running this 111-test
+  // file (~210s) can take longer than the 5s default to paint the first row;
+  // that surfaced as a flake in the "no bulk Add to Compare" test. A wait that
+  // returns the moment the link renders, not a longer test budget.
+  await user.click(await screen.findByRole('link', { name: matcher }, { timeout: 15_000 }));
 }
 
 /** The single back control in the breadcrumb header — steps up exactly one level. */
@@ -2024,7 +2028,7 @@ describe('jumps-away distance (issue #87)', () => {
           facts.children.length - 1
         );
         expect(facts.textContent).toMatch(/^[^·].*·0 jumps$/);
-        expect(jumps.className).toContain('min-h-11');
+        expect(jumps.className).toContain('min-h-9');
       } finally {
         matchMedia.mockRestore();
       }
@@ -2037,7 +2041,7 @@ describe('jumps-away distance (issue #87)', () => {
       const jumps = await screen.findByRole('button', { name: '0 jumps' });
       expect(screen.getAllByRole('button', { name: '0 jumps' })).toHaveLength(1);
       expect(jumps.closest('[class~="sm:flex"]')).not.toBeNull();
-      expect(jumps.className).not.toContain('min-h-11');
+      expect(jumps.className).not.toContain('min-h-9');
     });
   });
 });

@@ -27,8 +27,7 @@ describe('FactionBar', () => {
     renderBar();
     for (const name of ['Caldari State', 'Gallente Federation', 'Guristas Pirates']) {
       const button = screen.getByRole('button', { name: new RegExp(name) });
-      expect(button.className).toMatch(/\bh-11\b/);
-      expect(button.className).toMatch(/\bmd:h-9\b/);
+      expect(button.className).toMatch(/\bh-9\b/);
     }
   });
 

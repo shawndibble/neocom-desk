@@ -1,7 +1,7 @@
 /**
  * Trained-skills page's per-group tile touch target (issue #1071, now the
  * group board of #3643): the tile is a content-sized card that never drops
- * below the 44px touch floor.
+ * below the 36px touch floor.
  *
  * Uses the default seeded character (no route/Dexie overrides needed):
  * `skills.spec.ts` already proves "Spaceship Command" renders as a trained
@@ -23,7 +23,7 @@ async function gotoTrainedSkills(page: Page) {
   await page.waitForURL(/\/skills\/trained$/);
 }
 
-test('skill-group tile meets the 44px touch floor at 390px, and still expands/collapses', async ({
+test('skill-group tile meets the 36px touch floor at 390px, and still expands/collapses', async ({
   page,
 }) => {
   await gotoTrainedSkills(page);
@@ -34,14 +34,14 @@ test('skill-group tile meets the 44px touch floor at 390px, and still expands/co
   await expect(header).toHaveAttribute('aria-expanded', 'false');
 
   const collapsedHeight = await header.evaluate((el) => el.getBoundingClientRect().height);
-  expect(collapsedHeight).toBeGreaterThanOrEqual(44);
+  expect(collapsedHeight).toBeGreaterThanOrEqual(36);
 
   await header.click();
   await expect(header).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
 
   const expandedHeight = await header.evaluate((el) => el.getBoundingClientRect().height);
-  expect(expandedHeight).toBeGreaterThanOrEqual(44);
+  expect(expandedHeight).toBeGreaterThanOrEqual(36);
 
   await header.click();
   await expect(header).toHaveAttribute('aria-expanded', 'false');
@@ -49,7 +49,7 @@ test('skill-group tile meets the 44px touch floor at 390px, and still expands/co
 
 /**
  * The trained-skill rows under each header (#1468): a single `py-1.5 text-xs`
- * line landed at 28px on a phone while the header above it reached 44px.
+ * line landed at 28px on a phone while the header above it reached 36px.
  * `tappableRowClassName` pins the touch tier below `md` and falls back to
  * that same 28px above it.
  */
@@ -63,7 +63,7 @@ async function caldariFrigateRow(page: Page) {
   return row;
 }
 
-test('trained-skill row meets the 44px touch floor at 390px, and opens the skill info', async ({
+test('trained-skill row meets the 36px touch floor at 390px, and opens the skill info', async ({
   page,
 }) => {
   // The skill info's price section reads the order book on open.
@@ -75,7 +75,7 @@ test('trained-skill row meets the 44px touch floor at 390px, and opens the skill
 
   const row = await caldariFrigateRow(page);
   const height = await row.evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBeGreaterThanOrEqual(44);
+  expect(height).toBeGreaterThanOrEqual(36);
 
   await row.click();
   await expect(page.getByRole('dialog', { name: 'Caldari Frigate' })).toBeVisible();
@@ -212,7 +212,7 @@ test('the training row shows its full name with the chip under it at 390px', asy
   const chipBox = (await chip.boundingBox())!;
   expect(chipBox.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
   expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
-  expect(rowBox.height).toBeGreaterThanOrEqual(44);
+  expect(rowBox.height).toBeGreaterThanOrEqual(36);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
@@ -234,7 +234,7 @@ test('a 40-character skill name wraps to at most two lines at 390px', async ({ p
   const fits = await name.evaluate((el) => el.scrollHeight <= el.clientHeight);
   expect(fits).toBe(true);
   const box = (await row.boundingBox())!;
-  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(36);
 });
 
 for (const size of [

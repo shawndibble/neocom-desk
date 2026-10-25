@@ -8,7 +8,7 @@
  * twenty must not do that on every visit), and the panel hides its row without
  * one, so counting it showed a "missing" Permission nobody could see.
  */
-import { SCOPE_GROUPS } from '@/esi/registry';
+import { PERMISSIONS, SCOPE_GROUPS } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
 
 export interface PermissionCount {
@@ -21,8 +21,14 @@ export interface CharacterPermissionCount extends PermissionCount {
   name: string;
 }
 
-/** The Permissions the count covers: every one but Corporation. */
-export const COUNTED_PERMISSIONS = SCOPE_GROUPS.filter((group) => group !== 'corp');
+/**
+ * The Permissions the count covers: every one but Corporation and the Write to
+ * EVE section, which is off by default on purpose — a Character that never
+ * opted in to a write is not missing anything.
+ */
+export const COUNTED_PERMISSIONS = SCOPE_GROUPS.filter(
+  (group) => group !== 'corp' && PERMISSIONS[group].section !== 'write'
+);
 
 export function countGrantedPermissions(scopes: readonly string[]): PermissionCount {
   return {

@@ -4,7 +4,7 @@
  * pair a `sm` button with a `md` search box or select, and nothing caught it
  * until someone looked. See `support/controlHeights.ts` for what counts.
  *
- * Desktop and phone in one page load: the touch tier (`h-11`/`h-9`) is where
+ * Desktop and phone in one page load: the touch tier (`h-9`) is where
  * half the mismatches only show. A deliberate mismatch opts out with
  * `data-inline-height="exempt"`. Surfaces this fixture leaves empty (no rows,
  * no Community backend) are covered by their own specs, e.g.

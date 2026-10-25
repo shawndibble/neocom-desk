@@ -257,7 +257,7 @@ export function PicksStrip({ s }: { s: PlanMapState }) {
                   onClick={(event) => onPlanLinkClick(() => toggleProduct(pick.typeId))(event)}
                   onKeyDown={clickOnSpace}
                   className={cx(
-                    'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-11',
+                    'inline-flex h-7 items-center gap-1.5 rounded-xs border border-line px-2 text-xs max-md:h-9',
                     interactiveClassName,
                     focusRingClassName,
                     traced?.id === pick.typeId

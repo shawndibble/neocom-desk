@@ -13,8 +13,10 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import type { EsiEndpointId } from '@/esi/registry';
-import { ownedAtStation } from '@/engine/market/appraisalOwned';
+import { ownedAtPlace } from '@/engine/market/appraisalOwned';
 import { loadAllCharactersAssets } from '@/features/assets/assets';
+import { loadStationName } from '@/features/character/stations';
+import { loadStructureNameNoRoster } from '@/features/character/structures';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -83,16 +85,28 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       await Promise.all([ownedPref.hydrate(), marketHub.hydrate()]);
       const marketHubStation = getTradeHub(useMarketHub.getState().value)?.stationId;
       const stationId = useAppraisalOwnedPref.getState().value.stationId ?? marketHubStation;
-      const station = TRADE_HUBS.find((h) => h.stationId === stationId);
-      if (stationId === undefined || !station) {
+      if (stationId === undefined) {
         setNotice(t('fittings.export.copyFailed'));
         return;
       }
       const { entries } = await loadAllCharactersAssets();
-      const owned = ownedAtStation(
-        entries.map((entry) => entry.assets),
-        stationId
+      const lists = entries.map((entry) => entry.assets);
+      const owned = ownedAtPlace(lists, stationId);
+      const hub = TRADE_HUBS.find((h) => h.stationId === stationId);
+      const isStructure = lists.some((assets) =>
+        assets.some((a) => a.location_type === 'other' && a.location_id === stationId)
       );
+      const placeName =
+        hub?.systemName ??
+        (isStructure
+          ? await loadStructureNameNoRoster(
+              entries.find((entry) =>
+                entry.assets.some((a) => a.location_type === 'other' && a.location_id === stationId)
+              )?.characterId ?? 0,
+              stationId
+            )
+          : await loadStationName(stationId)) ??
+        t('market.appraisal.minusOwnedUnknownStructure', { id: stationId });
       const text = await exportFitting('multibuy', fitting, cloneImplants, owned);
       if (text === null) return;
       if (text === '') {
@@ -100,7 +114,7 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
         return;
       }
       await writeToClipboard(text);
-      setNotice(t('fittings.export.copied.multibuyMinusOwned', { station: station.systemName }));
+      setNotice(t('fittings.export.copied.multibuyMinusOwned', { station: placeName }));
     } catch {
       setNotice(t('fittings.export.copyFailed'));
     }

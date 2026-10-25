@@ -278,7 +278,7 @@ export function SurveyLocationPicker({
                 role="option"
                 aria-selected={index === active}
                 className={cx(
-                  'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel-2 touch:min-h-11 touch:items-center',
+                  'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel-2 touch:min-h-9 touch:items-center',
                   index === active && `bg-panel-2 ${activeOptionClassName}`
                 )}
                 onMouseDown={(event) => event.preventDefault()}

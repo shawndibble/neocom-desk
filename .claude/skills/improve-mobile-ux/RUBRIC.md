@@ -16,9 +16,10 @@ un-prefixed classes are what a phone gets.
 
 ## A. Touch targets (DESIGN.md §3)
 
-The scale is `sm` = `h-9 md:h-7`, `md` = `h-11 md:h-9`, and it lives in exactly
-one file: `src/components/ui/controlStyles.ts`. Pointer users get the compact
-box; touch users get 44px. `StatChip` and `DataAgeBadge` are the deliberate
+The scale is `sm` = `h-9 md:h-7 touch:h-9`, `md` = `h-9`, and it lives in
+exactly one file: `src/components/ui/controlStyles.ts`. Touch uses the same 36px
+scale as desktop; there is no 44px tier for form controls. Only the bottom nav
+(`NavItem`, `MobileMoreSheet`) stays 44px. `StatChip` and `DataAgeBadge` are the deliberate
 exceptions at a flat `h-7` — readouts, not targets.
 
 Look for:
@@ -189,7 +190,7 @@ class, not a case.
   inherits this app's ambient 1.5 line-height rather than the tighter one a
   `text-xs`/`text-sm` utility sets explicitly, and a multi-line grid's true
   height is the tallest cell in each row, not the one you eyeballed. A
-  touch-target finding whose whole case is "this looks like it's under 44px on
+  touch-target finding whose whole case is "this looks like it's under 36px on
   paper" needs a real render (a Playwright `boundingBox()`, same bar as
   #1160's own requirement) before it reaches the hostile reviewer — two
-  candidate findings this way turned out to measure 48-50px in practice.
+  candidate findings this way turned out to measure well over the floor in practice.

@@ -120,7 +120,7 @@ export function MemberClaimsList({
               {canRefile(c) ? (
                 <Button
                   variant="ghost"
-                  className="min-h-11 w-full whitespace-nowrap sm:min-h-0 sm:w-auto"
+                  className="min-h-9 w-full whitespace-nowrap sm:min-h-0 sm:w-auto"
                   aria-label={t('srpMember.claims.refileShip', { hull: hullName(c.hullTypeId) })}
                   onClick={(e) => {
                     e.stopPropagation();

@@ -992,6 +992,7 @@
       "offenseNoCharge_one": "{{count}} weapon has no charge loaded — load one in Charges.",
       "offenseNoCharge_other": "{{count}} weapons have no charge loaded — load one in Charges.",
       "unheated": "Unheated: {{value}}",
+      "previewedChange": "Previewed change inside",
       "dronesNoOverheat": "Drones don't overheat",
       "defenseEhp": "{{value}} EHP",
       "repair": {
@@ -1299,6 +1300,14 @@
         "coreFuel": "Core fuel {{before}} → {{after}} per activation"
       }
     },
+    "statChange": {
+      "better": "better",
+      "worse": "worse",
+      "spoken": "{{before}} to {{after}}",
+      "capacitor": "Capacitor {{value}}",
+      "stable": "stable at {{pct}}%",
+      "depletes": "depletes in {{time}}"
+    },
     "makeItFit": {
       "fix": {
         "cpu": "Fix CPU",
@@ -1387,8 +1396,15 @@
       "failed": "Could not work out improvements for this Fitting.",
       "swap_one": "{{from}} → {{to}}",
       "swap_other": "{{count}}× {{from}} → {{to}}",
-      "givesUp": "Gives up: {{stats}}",
+      "givesUp": "Gives up:",
       "noPrice": "No price",
+      "gain": "+{{percent}}%",
+      "moreOptions_one": "{{count}} more option",
+      "moreOptions_other": "{{count}} more options",
+      "bestFound": "Now → best found",
+      "sortLabel": "Sort by",
+      "sort": { "gain": "Biggest gain", "value": "Best value", "cheapest": "Cheapest" },
+      "reachLine": "Reach {{before}} → {{after}} km",
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
         "fixFirst": "Fix this first",
@@ -1398,6 +1414,7 @@
         "tradeOffs": "Trade-offs"
       },
       "nothing": {
+        "noModules": "Nothing could be added to this fit within the guardrails.",
         "overall": "No variation of a fitted module improves this fit overall.",
         "damage": "No variation of a fitted module adds damage.",
         "tank": "No variation of a fitted module adds tank.",
@@ -1414,12 +1431,15 @@
         "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails.",
         "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails."
       },
+      "belowPrice": "Your budget ({{budget}}) is below this fit's price ({{price}}). Raise it to search.",
       "closest": "Closest swaps",
       "broke": {
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
         "keepsStats": "Loses more than 5% of damage, tank or speed",
-        "spend": "Costs more than your budget or spend cap"
+        "spend": "Costs more than your budget or spend cap",
+        "spendBudget": "Over your {{cap}} budget by {{over}}",
+        "spendCap": "{{over}} over your {{cap}} cap"
       },
       "widen": {
         "upgrade": "Only variations of the modules already fitted are tried. Rebalance or Rework tries more.",
@@ -1445,7 +1465,14 @@
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
       "sideGain": "up to +{{percent}}%",
-      "moreLabel": "Also try…",
+      "moreLabel": "Rigs and officer modules",
+      "moreGoals": "More goals ({{count}})",
+      "settingsLabel": "Search settings",
+      "summaryNoCap": "no budget",
+      "summaryCap": {
+        "buy": "budget {{cap}}",
+        "refit": "cap {{cap}}"
+      },
       "includeRigs": "Rigs",
       "includeOfficer": "Officer and Deadspace modules",
       "destroysRig": "Removing the old rig destroys it; the new one is paid in full.",
@@ -1498,6 +1525,7 @@
       "holdHint": "Rows are scored on this hold's size alone.",
       "holdLine": "{{hold}} {{before}} → {{after}} m³",
       "alignLine": "Align {{before}} → {{after}} s",
+      "activeTankLine": "Active tank {{before}} → {{after}} HP/s",
       "repairLine": "Repairs {{before}} → {{after}} HP/s",
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
       "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
@@ -1551,6 +1579,8 @@
         "calibrationTotal": "Calibration total {{value}}",
         "totalDps": "Total DPS {{value}}",
         "totalVolley": "Total volley {{value}}",
+        "appliedDps": "Applied DPS {{value}}",
+        "sustainedDamage": "Sustained DPS with drones {{value}}",
         "droneDps": "Drone DPS {{value}}",
         "droneBandwidthUsed": "Drone bandwidth used {{value}} Mbit/s",
         "droneBandwidthTotal": "Drone bandwidth total {{value}} Mbit/s",
@@ -3757,6 +3787,44 @@
     "skillGateFilterChipCount_other": "{{count}} rows hidden",
     "assumesBaseStandingsHint": "Broker fees in these profit figures are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
     "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
+    "buyOre": {
+      "action": "Buy ore instead",
+      "title": "Buy ore instead of minerals",
+      "loading": "Pricing compressed ore…",
+      "loadFailed": "Reprocessing data isn't downloaded yet",
+      "ordering": "Order the ore list by",
+      "cheapest": "Cheapest",
+      "lightest": "Lightest",
+      "routeTitle": "Compressed ore to buy",
+      "oreColumn": "Ore",
+      "unitsColumn": "Units",
+      "priceColumn": "Price each",
+      "mineralsColumn": "Refines into",
+      "noRoute": "No compressed ore at this hub refines into the minerals this plan needs.",
+      "uncovered": "No compressed ore refines into: {{minerals}}. Buy those as minerals.",
+      "oreRoute": "Buy ore and refine (leftovers credited)",
+      "buyMinerals": "Buy the minerals",
+      "saves": "The ore route saves {{amount}} ISK.",
+      "underfilled": "The hub lists fewer units of this ore than the route needs. Buy the minerals.",
+      "pricingDepth": "Pricing the order book…",
+      "buyMineralsCheaper": "Buying the minerals is cheaper.",
+      "mineralsUnpriced": "A mineral has no price, so there is nothing to compare against.",
+      "totals": "Ore costs {{cost}} ISK, {{volume}} m³ to haul.",
+      "leftovers": "Leftover minerals: {{minerals}}, worth {{value}} ISK at the hub buy price.",
+      "leftoverUnpriced": "No buy price for leftover {{minerals}}; counted as worth nothing.",
+      "wholePortions": "Ore is bought in whole portions, so no part-portion remainder is left unrefined.",
+      "pricingBasis": "Ore at {{hub}} order-book prices, walked for the quantity. Leftovers at the hub buy price.",
+      "yieldAssumption": "Refining at {{rate}}% base rate ({{facility}}), plus your skills.",
+      "facilityNpc": "NPC station",
+      "facilityStructure": "your structure",
+      "editYield": "Change facility rate",
+      "structureRateLabel": "Structure refining rate (%)",
+      "cheapestFound": "Cheapest found, not proven optimal.",
+      "lightestFound": "Lightest found, not proven optimal.",
+      "copy": "Copy buy list",
+      "copied": "Copied",
+      "copyFailed": "Copy failed"
+    },
     "errands": {
       "toBuy": "To buy",
       "building": "Building",
@@ -4166,7 +4234,7 @@
       },
       "token": {
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications. Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
+        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications and, if you add them, its location (nearby alerts) and its mail headers (new-mail alerts). Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
       },
       "offline": {
         "name": "Your data stays when the signal goes",
@@ -4187,7 +4255,8 @@
         "industry": "Industry & planets",
         "social": "Social & calendar",
         "location": "Location & ships",
-        "structures": "Structures"
+        "structures": "Structures",
+        "write": "Write to EVE"
       },
       "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
       "separateNote": "Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them.",
@@ -6414,13 +6483,14 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated. In contracts counts your open contracts' items at the same prices, plus a courier reward you have paid in. It leaves out the contract price and collateral, and any contract it cannot price.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",
         "assets": "Assets",
         "escrow": "Order escrow",
-        "sellOrders": "Sell orders"
+        "sellOrders": "Sell orders",
+        "contracts": "In contracts"
       }
     },
     "balanceTab": "Balance",
@@ -7589,9 +7659,21 @@
       "locationFolded": "Folded locations keep their ticks",
       "deliverTo": "Deliver to",
       "yourStations": "Your stations",
+      "corpStations": "Corporation stations",
+      "corpPilotNote": "Plan for {{pilot}}, your active Character. The haulers come from their skills.",
+      "corpPilotFallback": "your active Character",
       "atDestination": "At destination",
       "shipRow": "Ship · fly it",
       "youOwnOne": "You own one",
+      "ownedHull": "Owned",
+      "ownedJumps_one": "Owned · {{count}} jump",
+      "ownedJumps_other": "Owned · {{count}} jumps",
+      "ownedJumpsUnknown": "Owned · jumps unknown",
+      "ownedJumpsAria_one": "Owned, {{count}} jump from {{character}}",
+      "ownedJumpsAria_other": "Owned, {{count}} jumps from {{character}}",
+      "ownedJumpsUnknownAria": "Owned, distance from {{character}} unknown",
+      "ownedFirst": "Owned first",
+      "ownedFirstHint": "List the haulers you own first. The ranking inside each group stays the same.",
       "tripsLabel_one": "trip",
       "tripsLabel_other": "trips",
       "haulCount_one": "{{count}} haul",
@@ -7645,6 +7727,7 @@
       "haul": {
         "title": "Haul in progress",
         "summary": "{{legs}} · {{jumps}} · {{volume}} m³ to {{destination}}",
+        "summaryShipsOnly": "{{legs}} · {{jumps}} to {{destination}}",
         "legCount_one": "{{count}} leg",
         "legCount_other": "{{count}} legs",
         "jumpCount_one": "{{count}} jump",
@@ -7659,6 +7742,8 @@
         "noGateRoute": "no gate route",
         "load": "Load {{volume}} m³ at {{place}}",
         "drop": "Drop {{volume}} m³ at {{place}}",
+        "take": "Take {{ships}} at {{place}}",
+        "fly": "Fly {{ships}} to {{place}}",
         "waypoint": "Set waypoint",
         "waypointAria": "Set waypoint, leg {{n}}",
         "waypointSending": "Setting…",
@@ -7696,7 +7781,8 @@
         "leftOut_cap": "{{place}} ({{name}}): {{volume}} m³ is past the ten-stop limit. Plan another haul for it.",
         "leftOut_unplaced": "{{place}} ({{name}}): {{volume}} m³ is somewhere with no solar system to route to.",
         "leftOut_noCapacity": "{{place}} ({{name}}): {{volume}} m³ has no hold to carry it in.",
-        "flown": "{{name}} flies out: {{ships}}. Not part of this route.",
+        "leftOut_overLimit": "{{place}} ({{name}}): {{volume}} m³ has units worth more than your ISK limit. They cannot ride in one haul.",
+        "flown": "{{name}} flies out: {{ships}}. Not part of this route: no solar system to route from.",
         "markDoneAria": "Leg {{n}} done",
         "marked": "Marked leg {{n}} done",
         "undo": "Undo",
@@ -7704,7 +7790,7 @@
         "hereMark": "Mark done",
         "finished": "Every leg is done. ESI caches assets for about an hour, so the Move plan may show the old stock until ESI refreshes.",
         "replan": "Replan from here",
-        "replanLoaded": "{{names}} still carries a load. Deliver it and tick that leg first, then replan.",
+        "replanLoaded": "{{names}} still carries a load or is flying a ship. Finish that trip and tick its last leg first, then replan.",
         "replanFailed": "Could not replan the route. Try again later.",
         "resetProgress": "Reset progress",
         "clear": "Clear haul",
@@ -7733,6 +7819,17 @@
       "unfitWarning_other": "{{hull}} cannot carry {{count}} stacks whole. No hauler you can fly carries everything.",
       "leavesBehind_one": "leaves {{count}} stack behind",
       "leavesBehind_other": "leaves {{count}} stacks behind",
+      "maxIskLabel": "Max ISK per haul",
+      "maxIskPlaceholder": "No limit",
+      "maxIskUnit": "ISK",
+      "haulValue": "worth {{value}}",
+      "overLimitHeading": "Over your ISK limit",
+      "overLimitLine": "{{value}} ISK each",
+      "overLimitWarning_one": "{{count}} stack is left behind: one unit is worth more than your ISK limit.",
+      "overLimitWarning_other": "{{count}} stacks are left behind: one unit is worth more than your ISK limit.",
+      "unpricedNote_one": "{{count}} stack has no price, so it counts as 0 ISK against your limit.",
+      "unpricedNote_other": "{{count}} stacks have no price, so they count as 0 ISK against your limit.",
+      "pricesUnavailable": "Prices could not be loaded, so your ISK limit cannot be checked. Every stack counts as 0 ISK.",
       "shareOfLoadHauls_one": "{{percent}}% of the load · {{count}} haul",
       "shareOfLoadHauls_other": "{{percent}}% of the load · {{count}} hauls",
       "packed": "Packed",
@@ -7960,6 +8057,9 @@
   },
   "mail": {
     "title": "Mail",
+    "sendGrantTitle": "Permission to send mail",
+    "sendGrantHint": "Grant it to send mail from this character.",
+    "sendGrantAction": "Grant send mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
       "realHost": "Opens {{host}}"
@@ -8017,6 +8117,9 @@
     "searchPlaceholder": "Search subject or sender…",
     "hideRead": "Hide read",
     "capNotice": "Showing the most recent {{count}} matching mails — narrow with a folder or a search to see more.",
+    "markReadGrantTitle": "Mail you open stays unread in EVE",
+    "markReadGrantHint": "Grant the mark-as-read permission to mark mail read in EVE when you open it here.",
+    "markReadGrantAction": "Grant mark as read",
     "reauthTitle": "Log in again to see your mail",
     "reauthHint": "Log in again to fetch this character's mail.",
     "reauthAction": "Log in again with EVE Online",
@@ -8144,6 +8247,9 @@
     "csvResponse": "Response",
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
+    "rsvpGrantTitle": "Permission to respond to events",
+    "rsvpGrantHint": "Grant it to RSVP from this character.",
+    "rsvpGrantAction": "Grant RSVP",
     "rsvpAccept": "Accept",
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
@@ -10890,6 +10996,8 @@
     "offerCount_one": "{{count}} offer",
     "offerCount_other": "{{count}} offers",
     "colItem": "Item",
+    "colSellsPerDay": "Sells/day",
+    "sellsNone": "None",
     "colProfit": "Profit",
     "colIskPerLp": "ISK / LP",
     "emptyTitle": "No offers",
@@ -11003,7 +11111,8 @@
     },
     "alertsOffer": {
       "title": "Get alerts when Neocom is closed?",
-      "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings.",
+      "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings, where mail alerts are an optional extra you can add, after a list of what they read.",
+      "bodyNearby": "Turn on alerts for {{name}}. EVE asks you to authorize notifications and location only, for EVE notifications and nearby Incursions and raidable skyhooks. You can change this per character in Settings, where mail alerts are an optional extra you can add.",
       "enable": "Turn on",
       "dismiss": "Not now"
     },
@@ -11054,7 +11163,10 @@
       },
       "newMail": {
         "title": "New mail",
-        "body": "{{character}} has new mail."
+        "body": "{{character}} has new mail.",
+        "bodyFromSubject": "{{character}} has new mail from {{sender}}: {{subject}}",
+        "bodyFrom": "{{character}} has new mail from {{sender}}.",
+        "bodySubject": "{{character}} has new mail: {{subject}}"
       },
       "spExtractionReady": {
         "title": "SP extraction ready",
@@ -11138,7 +11250,13 @@
         "title_one": "Incursion {{count}} jump away",
         "title_other": "Incursion {{count}} jumps away",
         "body_one": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jump from your current system.",
-        "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system."
+        "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system.",
+        "constellationUnnamed": "Constellation {{id}}",
+        "state": {
+          "mobilizing": "Mobilizing",
+          "established": "Established",
+          "withdrawing": "Withdrawing"
+        }
       },
       "skyhookRaidableNearby": {
         "windowOpen": "now, for another {{duration}}",
@@ -11839,6 +11957,8 @@
       "columnSellAfterTax": "Sell after tax",
       "removeRow": "Remove",
       "minusOwnedEverywhere": "any location",
+      "minusOwnedUnknownStation": "Station #{{id}}",
+      "minusOwnedUnknownStructure": "Unknown structure #{{id}}",
       "minusOwnedChipEverywhere": "Minus owned · all locations",
       "volumeUnit": "m³",
       "totalVolume": "Volume",
@@ -12528,6 +12648,8 @@
   },
   "permissions": {
     "grantMissing": "Grant missing Permissions",
+    "writeSection": "Write to EVE",
+    "writeSectionHint": "These change things in EVE or open windows in your game client. Off by default; Neocom Desk asks the first time you use one.",
     "wallet": {
       "label": "Wallet",
       "caption": "Your wallet balance, transactions and journal."
@@ -12554,15 +12676,15 @@
     },
     "planets": {
       "label": "Planets",
-      "caption": "Your planetary colonies and Mercenary Dens."
+      "caption": "Your planetary colonies."
     },
     "mail": {
       "label": "Mail",
-      "caption": "Reading, organizing and sending your EVE mail."
+      "caption": "Reading your EVE mail."
     },
     "calendar": {
       "label": "Calendar",
-      "caption": "Your calendar events, and responding to them."
+      "caption": "Your calendar events."
     },
     "notifications": {
       "label": "EVE notifications",
@@ -12572,21 +12694,37 @@
       "label": "Character details",
       "caption": "Implants, clones, location, contacts, standings and loyalty."
     },
-    "openWindow": {
-      "label": "Open in EVE",
-      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract, or open a new mail to a Community member from a Request."
+    "fittings": {
+      "label": "Fittings",
+      "caption": "Your in-game Fittings."
+    },
+    "currentShip": {
+      "label": "Current ship",
+      "caption": "The ship you are flying, so the D-Scan danger read can start from it."
+    },
+    "mailSend": {
+      "label": "Send mail",
+      "caption": "Send, reply to and forward EVE mail from Neocom Desk."
+    },
+    "mailOrganize": {
+      "label": "Mark mail read",
+      "caption": "Mark a mail read in EVE when you open it here."
+    },
+    "calendarRespond": {
+      "label": "Calendar RSVP",
+      "caption": "Accept, decline or tentatively accept a calendar event."
+    },
+    "fittingsWrite": {
+      "label": "Save Fittings to EVE",
+      "caption": "Save a Fitting to your EVE client, or replace one you saved before."
     },
     "autopilot": {
       "label": "Autopilot waypoints",
       "caption": "Set waypoints in your EVE client from Route Safety, order books and the station right-click menus."
     },
-    "fittings": {
-      "label": "Fittings",
-      "caption": "Your in-game Fittings, and saving Fittings to EVE."
-    },
-    "currentShip": {
-      "label": "Current ship",
-      "caption": "The ship you are flying, so the D-Scan danger read can start from it."
+    "openWindow": {
+      "label": "Open in EVE",
+      "caption": "Open an item, pilot, corporation, contract or market in your EVE client from a Show info window, a row menu or a contract, or open a new mail to a Community member from a Request."
     },
     "corp": {
       "label": "Corporation",
@@ -12607,6 +12745,10 @@
     "killmails": {
       "label": "Killmails",
       "caption": "Your own losses, so you can pick one to file for ship replacement."
+    },
+    "mercenaryDens": {
+      "label": "Mercenary dens",
+      "caption": "Your Mercenary Dens and their operations, for the Overview widget and den alerts."
     },
     "core": {
       "skills": {
@@ -12845,10 +12987,10 @@
         "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
-        "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences both kinds; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
-        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a notifications-only grant per Character.",
+        "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, nearby Incursions and raidable skyhooks, and, if you add mail, new mail, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences every closed-app push; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
+        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a grant per Character for notifications and, if you add them, location (nearby alerts) and mail headers (new-mail alerts) only.",
         "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
-        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, notifications only, and our server checks EVE's notifications about every 15 minutes and pushes the types you chose, with their text, via Google's push service. It doesn't keep them, and turning it off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
+        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, for the permissions listed before you log in (notifications, and location and mail if you include them), and our server checks EVE's notifications and the Character's solar system about every 15 minutes and pushes the types you chose, with their text, and any Incursion or raidable skyhook within your jump limit, via Google's push service. Before any login, Neocom Desk lists the permissions it will ask for and why, including mail, and you can leave mail or location out. If you include mail, our server then reads only your mail headers, never a message, and pushes each new mail's sender and subject to your device through Google's push service. The sender and subject pass through that service and are shown in the pop-up, so they can appear on a lock screen. Our server keeps only the number of the latest mail it handled, and keeps none of them. Turning Alerts when closed off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
         "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
         "rowMenus": "Tables with several actions per row show a ⋮ (More actions) button at the end. Right-click the row, or touch and hold on a phone, for the same menu. Overview widgets and fitting tiles have menus too. No ⋮: the row has one action, so just click it.",
         "phone": "Yes. A phone browser or home-screen install gets a narrower layout with bottom navigation. It's designed desktop-first, beside the game, so dense tables and editors are easier on a big screen. The age badge is hidden on a phone. On iPhone and iPad, notifications need the installed app.",
@@ -12900,7 +13042,7 @@
           "walletHistory": "A year of wallet journal and transactions, longer than the 30 days EVE returns. Not in backups.",
           "jobHistory": "Delivered industry jobs, kept after ESI stops returning them. Removed with the Character.",
           "login": "Your EVE login token.",
-          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted, notifications-only token on our server for each character you turn it on for, deleted when you turn it off or remove the character. A Corp Tax Book's Automatic sync is the other: an officer who turns it on leaves a separate, encrypted token with a few corporation reads on our server, deleted when they or the CEO turn it off or they lose the role.",
+          "loginNote": "It never leaves this device. Alerts when closed is the one opt-in exception: it keeps a separate, encrypted token on our server, limited to notifications, plus location and mail headers if you add them, for each character you turn it on for, deleted when you turn it off or remove the character. A Corp Tax Book's Automatic sync is the other: an officer who turns it on leaves a separate, encrypted token with a few corporation reads on our server, deleted when they or the CEO turn it off or they lose the role.",
           "preferences": "Display settings (text size, time format) and the sorts, filters and sections each page remembers.",
           "ansiblex": "Route Safety's Ansiblex jump gate list, and whether Route Safety uses it. Structure access is private alliance information, so it never leaves this device."
         },
@@ -13018,29 +13160,70 @@
         "manage": "Manage",
         "manageFor": "Manage Alerts when closed",
         "summary": "{{on}} of {{total}} characters",
-        "needsReauthCount_one": "{{count}} needs re-authorizing",
-        "needsReauthCount_other": "{{count}} need re-authorizing",
         "more": "+{{count}} more",
-        "hint": "EVE notifications, like a structure under attack, while the app is closed. Authorizes one Character for notifications only; Turn off deletes our encrypted token.",
-        "stores": "Stores an encrypted, notifications-only token on our server.",
+        "hint": "Get alerts while the app is closed. Tick Device on an event, then sign each Character in to EVE once: that one login asks for exactly what the Character's ticked events need. Turn off deletes our encrypted token.",
+        "covers": {
+          "line": "Our server holds an encrypted token that reads only {{list}}.",
+          "notifications": "notifications",
+          "location": "location",
+          "mail": "mail headers"
+        },
         "state": {
           "off": "Off",
           "on": "On",
-          "needs-reauth": "Needs re-authorizing"
+          "needs-reauth": "Needs re-authorizing",
+          "onNeedsSignIn": "On, needs a login"
         },
-        "turnOn": "Turn on",
-        "turnOnFor": "Turn on alerts when closed for {{name}}",
         "turnOff": "Turn off",
         "turnOffFor": "Turn off alerts when closed for {{name}}",
-        "reauthorize": "Re-authorize",
+        "reauthorize": "Re-authorize…",
         "reauthorizeFor": "Re-authorize alerts when closed for {{name}}",
-        "turnOnAll": "Turn on for all",
         "result": {
           "on": "Alerts when closed is on for {{name}}.",
           "mismatch": "You authorized {{authorized}}, not {{expected}}. Nothing was saved. Press Turn on for {{expected}} again and pick {{expected}} on EVE's page.",
           "failed": "Could not turn on alerts when closed for {{name}}. Try again.",
           "cancelled": "Authorization cancelled. Nothing was saved.",
           "offFailed": "Could not turn off alerts when closed for {{name}}. Check your connection and try again."
+        },
+        "needsSignInCount_one": "{{count}} needs a login",
+        "needsSignInCount_other": "{{count}} need a login",
+        "needsNone": "Every Character has what its ticked Device alerts need.",
+        "needsLine_one": "{{count}} Character needs a login for: {{list}}.",
+        "needsLine_other": "{{count}} Characters need a login for: {{list}}.",
+        "need": {
+          "notifications": "EVE notifications",
+          "location": "nearby alerts",
+          "mail": "new mail"
+        },
+        "rowNeeds": "Needs a login for: {{list}}.",
+        "offNeeds": "Off. A login would let our server read: {{list}}.",
+        "offNothing": "Off. Nothing ticked for Device needs a login.",
+        "signIn": "Log in…",
+        "signInFor": "Log {{name}} in to EVE for alerts when closed",
+        "signInAll_one": "Log in {{count}} character…",
+        "signInAll_other": "Log in {{count}} characters…",
+        "confirm": {
+          "intro_one": "EVE opens once for 1 Character. Here is what the login will ask for, and why. Nothing is requested until you press Continue.",
+          "intro_other": "EVE opens once for each of {{count}} Characters, one after another. Here is what the logins will ask for, and why. Nothing is requested until you press Continue.",
+          "forCharacters": "For: {{list}}",
+          "forMany": "For {{count}} Characters",
+          "notifications": {
+            "label": "EVE notifications",
+            "why": "Read the Character's in-game notifications (a structure under attack, a war declaration) so they can reach this device while the app is closed."
+          },
+          "location": {
+            "label": "Location, for nearby alerts",
+            "why": "Read where the Character is so Incursions and raidable skyhooks near it can be pushed. Needed for: Incursion nearby, Skyhook raidable nearby.",
+            "leftOut": "Left out: those alerts only arrive while the app is open. Untick their Device boxes in the list to stop being asked."
+          },
+          "mail": {
+            "label": "Mail headers, for new-mail alerts",
+            "why": "Read only the headers (sender and subject, never the message) every 15 minutes. The sender and subject are sent to this device through Google's push service and can show on a lock screen. Needed for: New mail.",
+            "leftOut": "Left out: new mail only alerts while the app is open. Untick New mail's Device box to stop being asked."
+          },
+          "tokenNote": "We keep an encrypted token on our server for each Character, holding only these permissions. It never reaches this device, and Turn off deletes it.",
+          "back": "Back",
+          "continue": "Continue to EVE"
         }
       },
       "pushFailed": {
@@ -13122,6 +13305,9 @@
       "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed, up to 72 hours ahead. Needs notification permission; on iPhone and iPad, the installed app.",
+      "serverPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
+      "nearbyPushBadge": "Arrives even with the app closed, within about 15 minutes, for Characters whose Alerts when closed includes nearby alerts. Needs notification permission; on iPhone and iPad, the installed app.",
+      "mailPushBadge": "Arrives even with the app closed, within about 15 minutes, for Characters whose Alerts when closed includes mail. Needs notification permission; on iPhone and iPad, the installed app.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
       "extractorExpiringLeadTimeOption_one": "{{count}} hour",
       "extractorExpiringLeadTimeOption_other": "{{count}} hours",
@@ -13337,7 +13523,7 @@
     "resetViewPrefsHint": "Resets every page's remembered sorts, filters and expanded sections. Characters, groups and plans stay.",
     "resetViewPrefsConfirm": "View preferences reset.",
     "permissions": {
-      "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
+      "hint": "What this character lets Neocom Desk read from, and write to, EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
       "character": {
         "label": "Character",
@@ -13364,7 +13550,8 @@
       "unlocks": {
         "corp": "Unlocks Corp Board, Members, Corp Wallet, Corp Assets, Moons, SRP officer view",
         "corpProjects": "Unlocks Corp projects in Build Opportunities",
-        "killmails": "Unlocks the SRP lost-ship list"
+        "killmails": "Unlocks the SRP lost-ship list",
+        "mercenaryDens": "Unlocks the Mercenary dens Overview widget and den alerts"
       }
     }
   },
@@ -13664,7 +13851,11 @@
         "impounded": "Impounded",
         "assetSafety": "Asset safety",
         "lockdown": "Lockdown",
-        "capsuleerDeliveries": "Capsuleer deliveries"
+        "capsuleerDeliveries": "Capsuleer deliveries",
+        "move": "Move"
+      },
+      "move": {
+        "owner": "Corporation hangars"
       },
       "state": {
         "offices": "Office",

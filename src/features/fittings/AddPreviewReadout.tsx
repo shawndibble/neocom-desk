@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { changeLabel } from './fittingVariationsCsv';
+import { StatChange } from '@/components/ui';
 import type { AddPreview } from './useModuleAddPreview';
 import { fixed1 } from '@/lib/fixedFormat';
 
@@ -34,11 +34,7 @@ export function AddPreviewReadout({ preview, name }: AddPreviewReadoutProps) {
         <ul className="space-y-0.5">
           {listed.map((change) => (
             <li key={change.key}>
-              {change.key === 'capacitor'
-                ? changeLabel(change, t)
-                : t(`fittings.variations.stat.${change.key}`, {
-                    value: `${change.before} → ${change.after}`,
-                  })}
+              <StatChange change={change} />
             </li>
           ))}
           {hidden > 0 && (

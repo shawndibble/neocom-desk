@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, SlideOver, Toast, useTimedToast } from '@/components/ui';
 import {
@@ -11,6 +11,7 @@ import { overBudgetResources } from '@/engine/fittings/improveFree';
 import { hullRoleOf, rememberedGoal } from '@/engine/fittings/improveRole';
 import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { Fitting, FittingModuleResult } from '@/engine/fittings/types';
+import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import type { FittingContext } from './fittingContext';
 import { useChargeChoices } from './useChargeChoices';
 import type { ChargeLoading } from './useChargeLoading';
@@ -29,7 +30,10 @@ import {
   useImproveMode,
   useImproveOre,
   useImproveReach,
-  useImproveSpendCap,
+  useImproveSort,
+  useImproveBudget,
+  useImproveRefitCap,
+  migrateSpendCap,
 } from './useImprove';
 import type { FittingWorkspace } from './useFittingWorkspace';
 
@@ -73,7 +77,12 @@ export function useImproveDrawer({
   context,
   moduleResults,
   openMakeItFit,
-}: UseImproveDrawerArgs): { open: () => void; drawer: ReactNode } {
+}: UseImproveDrawerArgs): {
+  open: () => void;
+  drawer: ReactNode;
+  /** The stat changes to preview in the stats column; null when Improve is shut or nothing is ticked or hovered. */
+  preview: FittingStatsDelta | null;
+} {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const legacyGoal = useImproveGoal((state) => state.value);
@@ -85,18 +94,30 @@ export function useImproveDrawer({
   const setGoal = (next: ImproveGoal) => setGoalsByRole({ ...goalsByRole, [role]: next });
   const reach = useImproveReach((state) => state.value);
   const setReach = useImproveReach((state) => state.setValue);
+  const sort = useImproveSort((state) => state.value);
+  const setSort = useImproveSort((state) => state.setValue);
   const mode = useImproveMode((state) => state.value);
   const setMode = useImproveMode((state) => state.setValue);
   const oreFamily = useImproveOre((state) => state.value);
   const setOreFamily = useImproveOre((state) => state.setValue);
   const hold = useImproveHold((state) => state.value);
   const setHold = useImproveHold((state) => state.setValue);
-  const spendCap = useImproveSpendCap((state) => state.value);
-  const setSpendCap = useImproveSpendCap((state) => state.setValue);
+  // Planning's budget and Refitting's cap are separate settings; the field shows the mode's own.
+  const budget = useImproveBudget((state) => state.value);
+  const setBudget = useImproveBudget((state) => state.setValue);
+  const refitCap = useImproveRefitCap((state) => state.value);
+  const setRefitCap = useImproveRefitCap((state) => state.setValue);
+  const spendCap = mode === 'buy' ? budget : refitCap;
+  const setSpendCap = mode === 'buy' ? setBudget : setRefitCap;
+  useEffect(() => {
+    void migrateSpendCap();
+  }, []);
   // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
   const [defense, setDefense] = useState<DefenseChoice>('keep');
   const [includeRigs, setIncludeRigs] = useState(false);
   const [includeOfficer, setIncludeOfficer] = useState(false);
+  // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
+  const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
   // The Fitting before the last Apply and the one it made, for the toast's Undo; null once it is gone.
   const [undo, setUndo] = useState<{ before: Fitting; applied: Fitting; message: string } | null>(
     null
@@ -167,6 +188,7 @@ export function useImproveDrawer({
       onApply={apply}
       fitting={fitting}
       target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
+      onPreview={setPreview}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
       onFixFirst={(resource) => {
@@ -207,6 +229,8 @@ export function useImproveDrawer({
       settings={{
         reach,
         onReachChange: (next) => void setReach(next),
+        sort,
+        onSortChange: (next) => void setSort(next),
         mode,
         onModeChange: (next) => void setMode(next),
         spendCap,
@@ -261,5 +285,5 @@ export function useImproveDrawer({
       )}
     </>
   );
-  return { open, drawer };
+  return { open, drawer, preview: isOpen ? preview : null };
 }

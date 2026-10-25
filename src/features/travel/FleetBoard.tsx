@@ -266,7 +266,7 @@ function ShareBar({
         aria-controls={lanesId}
         onClick={onToggle}
         className={cx(
-          'block min-h-11 w-full space-y-2 rounded-xs border border-line p-3 text-left',
+          'block min-h-9 w-full space-y-2 rounded-xs border border-line p-3 text-left',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}

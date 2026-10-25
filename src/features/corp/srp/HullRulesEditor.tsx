@@ -265,7 +265,7 @@ export function HullRulesEditor({
         className={cx(
           'flex min-w-0 items-center gap-1.5 rounded-xs text-left font-semibold',
           focusRingClassName,
-          tall ? 'min-h-11 flex-1' : 'min-h-9'
+          tall ? 'min-h-9 flex-1' : 'min-h-9'
         )}
       >
         <Caret size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
@@ -328,7 +328,7 @@ export function HullRulesEditor({
           kind === 'not-covered' && 'bg-panel-2'
         )}
       >
-        <div className="flex min-h-11 items-center gap-2">
+        <div className="flex min-h-9 items-center gap-2">
           {isClass && row.count > 0 ? (
             toggleButton(row, true)
           ) : (

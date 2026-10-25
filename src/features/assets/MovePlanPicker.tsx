@@ -211,7 +211,7 @@ function StackRow({
     <label
       className={cx(
         tappableRowClassName,
-        'grid grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center border-t border-line pr-3 sm:grid-cols-[2.75rem_minmax(0,1fr)_auto_auto]',
+        'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center border-t border-line pr-3 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto_auto]',
         here ? 'cursor-default' : 'cursor-pointer'
       )}
     >
@@ -276,7 +276,7 @@ function GroupCheckbox({
   }, [count, all]);
   return (
     <label
-      className={`${touchCheckboxLabelClassName} ${tappableRowClassName} w-11 shrink-0 cursor-pointer justify-center`}
+      className={`${touchCheckboxLabelClassName} ${tappableRowClassName} w-9 shrink-0 cursor-pointer justify-center`}
     >
       <Checkbox
         ref={ref}

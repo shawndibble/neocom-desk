@@ -11,6 +11,7 @@ import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
+import type { AlertsExtraState } from '@/features/notifications/alertsGrant';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { assignLocation } from './navigation';
 import { currentRouterPath, isOnRoute } from './routerPath';
@@ -98,14 +99,31 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
 }
 
 /**
- * Turn on Alerts when closed for one Character (ADR 0020): a separate SSO
- * round trip for the notifications scope alone, returning to the page it was
- * pressed on. The callback never stores its token on this device; see
+ * One EVE sign-in for a Character's Alerts Grant (ADR 0020), returning to the
+ * page it was pressed on. `wanted` names the optional scopes the player agreed
+ * to on the permission listing (issue #5156); SSO issues a token with exactly
+ * what was requested, so a scope the Character's grant already holds is always
+ * kept. A scope is asked for only once the deployed server has said it takes it
+ * (ADR 0028, 0029). Called without `wanted` (the first-run offer, which says so
+ * in its own copy) it asks for the location when supported and never for new mail.
+ * The callback never stores its token on this device; see
  * `features/notifications/alertsGrant.ts`.
  */
-export async function beginAlertsLogin(characterId: number): Promise<void> {
+export async function beginAlertsLogin(
+  characterId: number,
+  { nearby = true, mail = false }: { nearby?: boolean; mail?: boolean } = {}
+): Promise<void> {
+  const { readAlertsNearby, readAlertsMail } = await import('@/features/notifications/alertsGrant');
+  const none = (): AlertsExtraState => ({ supported: false, characterIds: [] });
+  const nearbyState = await readAlertsNearby().catch(none);
+  const mailState = await readAlertsMail().catch(none);
   rememberThisPage();
-  assignLocation(await startAlertsLogin(characterId));
+  assignLocation(
+    await startAlertsLogin(characterId, undefined, {
+      nearby: nearbyState.supported && (nearby || nearbyState.characterIds.includes(characterId)),
+      mail: mailState.supported && (mail || mailState.characterIds.includes(characterId)),
+    })
+  );
 }
 
 /**

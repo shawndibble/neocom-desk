@@ -211,7 +211,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
                         type="button"
                         aria-expanded={shown !== undefined}
                         onClick={() => setShown(group.key, shown === undefined ? FIRES_PAGE : null)}
-                        className="ml-2 inline-flex min-h-11 items-center gap-1 rounded-xs text-xs md:min-h-0 font-normal text-text-dim hover:text-text"
+                        className="ml-2 inline-flex min-h-9 items-center gap-1 rounded-xs text-xs md:min-h-0 font-normal text-text-dim hover:text-text"
                       >
                         <Caret expanded={shown !== undefined} />
                         {t('alerts.panel.groupCount', { count: group.count })}
@@ -328,7 +328,7 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
         {/* One link: dismissed alerts have no history view to open, so an "Older alerts" link would only repeat this one. */}
         <Link
           to={NOTIFICATION_SETTINGS_PATH}
-          className={plainTextActionClassName('min-h-11 md:min-h-0')}
+          className={plainTextActionClassName('min-h-9 md:min-h-0')}
           onClick={onClose}
         >
           {t('alerts.panel.notifyMe')}
@@ -367,7 +367,7 @@ function FireRow({
   return (
     <li
       data-fire-id={fire.id}
-      className="flex items-start gap-x-2 border-b border-line py-1 last:border-b-0 min-h-11 md:min-h-0"
+      className="flex items-start gap-x-2 border-b border-line py-1 last:border-b-0 min-h-9 md:min-h-0"
     >
       {/* The × sits outside the wrapping text block so it stays top-right when the body wraps. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 self-center">

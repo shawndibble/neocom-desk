@@ -4,7 +4,7 @@
  * Dismiss on View, and the entry to Alerts when closed.
  *
  * Desktop is one wrapping line with the Alerts when closed summary at its
- * right end. A phone gets plain 44px rows in a fixed order, the two channels
+ * right end. A phone gets plain 36px rows in a fixed order, the two channels
  * indented beneath the master switch. The permission prompt, the blocked
  * notice, the Play-app notice, the iOS install notice and the push-failure
  * retry stay with the Device pop-ups row: above the line on desktop, directly

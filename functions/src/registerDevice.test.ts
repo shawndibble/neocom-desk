@@ -112,6 +112,46 @@ describe('parseRegisterDeviceInput', () => {
     ).toThrow(/eveTypes/);
   });
 
+  describe('server-pushed events (issue #5121)', () => {
+    const character = { characterId: 1, accessToken: 'a', projectionRows: [] };
+
+    it('parses serverEvents sorted and de-duplicated, and serverInputs', () => {
+      const input = parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [
+          {
+            ...character,
+            serverEvents: ['shipLost', 'priceAlertTriggered', 'shipLost'],
+            serverInputs: { shipLostMinimumIsk: 5 },
+          },
+        ],
+      });
+      expect(input.characters[0].serverEvents).toEqual(['priceAlertTriggered', 'shipLost']);
+      expect(input.characters[0].serverInputs).toEqual({ shipLostMinimumIsk: 5 });
+    });
+
+    it('leaves both absent for an older client', () => {
+      const input = parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [character],
+      });
+      expect(input.characters[0].serverEvents).toBeUndefined();
+      expect(input.characters[0].serverInputs).toBeUndefined();
+    });
+
+    it('rejects a malformed list', () => {
+      expect(() =>
+        parseRegisterDeviceInput({
+          deviceId: 'device-1',
+          fcmToken: 'fcm-token',
+          characters: [{ ...character, serverEvents: 'shipLost' }],
+        })
+      ).toThrow(/serverEvents/);
+    });
+  });
+
   it('accepts the client fallback deviceId shape (base36 time + random)', () => {
     expect(
       parseRegisterDeviceInput({
@@ -334,6 +374,38 @@ describe('buildDeviceRegistration', () => {
     expect(result.eveTypesByCharacter).toEqual({ 1: ['StructureDestroyed'] });
   });
 
+  it('keys each verified character’s server events and inputs, omitting rejected and absent ones', async () => {
+    verifyMock.mockImplementation(async (token) => {
+      if (token === 'token-2') throw new Error('expired');
+      return {
+        characterId: token === 'token-1' ? 1 : 3,
+        ownerHash: 'hash',
+        name: 'P',
+        scopes: [],
+        clientId: 'c',
+      };
+    });
+
+    const result = await buildDeviceRegistration(
+      {
+        ...input,
+        characters: [
+          {
+            ...input.characters[0],
+            serverEvents: ['shipLost'],
+            serverInputs: { shipLostMinimumIsk: 1 },
+          },
+          { ...input.characters[1], serverEvents: ['shipLost'] },
+          { characterId: 3, accessToken: 'token-3', projectionRows: [] },
+        ],
+      },
+      opts
+    );
+
+    expect(result.serverEventsByCharacter).toEqual({ 1: ['shipLost'] });
+    expect(result.serverInputsByCharacter).toEqual({ 1: { shipLostMinimumIsk: 1 } });
+  });
+
   it('drops a character whose access token fails verification, keeping the rest', async () => {
     verifyMock.mockImplementation(async (token) => {
       if (token === 'token-1') throw new Error('expired');
@@ -376,5 +448,69 @@ describe('buildDeviceRegistration', () => {
     const serialized = JSON.stringify(logged);
     expect(serialized).not.toContain('token-1');
     expect(serialized).not.toContain('token-2');
+  });
+});
+
+describe('nearby alert inputs and Travel Settings (issue #5122)', () => {
+  const base = {
+    deviceId: 'device-1',
+    fcmToken: 'fcm-token',
+    characters: [{ characterId: 1, accessToken: 'a', projectionRows: [] }],
+  };
+  const withInputs = (serverInputs: Record<string, unknown>) => ({
+    ...base,
+    characters: [{ ...base.characters[0], serverInputs }],
+  });
+
+  it('leaves routeRules absent for an older client', () => {
+    expect('routeRules' in parseRegisterDeviceInput(base)).toBe(false);
+  });
+
+  it('parses each nearby N from serverInputs', () => {
+    const input = parseRegisterDeviceInput(
+      withInputs({ incursionNearbyJumps: 10, skyhookRaidableNearbyJumps: 3 })
+    );
+    expect(input.characters[0].serverInputs).toEqual({
+      incursionNearbyJumps: 10,
+      skyhookRaidableNearbyJumps: 3,
+    });
+  });
+
+  it.each([
+    ['a fraction', 2.5],
+    ['a negative', -1],
+    ['a huge value', 1000],
+    ['a string', '5'],
+  ])('drops a nearby N that is %s, keeping the upload', (_, value) => {
+    const input = parseRegisterDeviceInput(withInputs({ incursionNearbyJumps: value }));
+    expect(input.characters[0].serverInputs).toEqual({});
+  });
+
+  it('parses routeRules, sorting and de-duplicating the Avoided Systems', () => {
+    const input = parseRegisterDeviceInput({
+      ...base,
+      routeRules: { preference: 'shortest', securityPenalty: 40, avoid: [3, 1, 3] },
+    });
+    expect(input.routeRules).toEqual({
+      preference: 'shortest',
+      securityPenalty: 40,
+      avoid: [1, 3],
+    });
+  });
+
+  it.each([
+    ['an unknown preference', { preference: 'fastest', securityPenalty: 50, avoid: [] }],
+    ['a penalty out of range', { preference: 'shortest', securityPenalty: 101, avoid: [] }],
+    ['a non-id in avoid', { preference: 'shortest', securityPenalty: 50, avoid: ['x'] }],
+    [
+      'too many avoided systems',
+      {
+        preference: 'shortest',
+        securityPenalty: 50,
+        avoid: Array.from({ length: 10_001 }, (_, i) => i + 1),
+      },
+    ],
+  ])('drops routeRules with %s, keeping the upload', (_, routeRules) => {
+    expect(parseRegisterDeviceInput({ ...base, routeRules }).routeRules).toBeUndefined();
   });
 });

@@ -366,6 +366,14 @@ function MailView({ scope, scopeControl }: MailViewProps) {
             />
           )}
           {offline && <CachedNotice fetchedAt={fetchedAt} />}
+          {/* Opening a mail marks it read in EVE only with this Permission (Write to EVE, off by default). */}
+          <GrantNote
+            compact
+            endpoints={['putCharacterMail']}
+            title={t('mail.markReadGrantTitle')}
+            hint={t('mail.markReadGrantHint')}
+            actionLabel={t('mail.markReadGrantAction')}
+          />
 
           {(isDesktop || selectedKey === null) && (
             <MailFilterBar

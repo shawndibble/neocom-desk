@@ -64,7 +64,7 @@ describe('nextShape', () => {
 
 describe('reservedNextHeight', () => {
   it("holds the room last time's shape took", () => {
-    expect(reservedNextHeight('link')).toBe('h-11');
+    expect(reservedNextHeight('link')).toBe('h-9');
     expect(reservedNextHeight('text')).toBe('h-5');
     expect(reservedNextHeight('none')).toBeNull();
   });

@@ -42,7 +42,7 @@ export const WithDataAge: Story = {
   },
 };
 
-/** @summary The same header at 390 wide: actions keep a 44px touch target. */
+/** @summary The same header at 390 wide: actions keep a 36px touch target. */
 export const Phone: Story = {
   ...WithMetaAndActions,
   globals: { viewport: { value: 'phone390', isRotated: false } },
@@ -50,7 +50,7 @@ export const Phone: Story = {
 
 /**
  * A stand-in for the page's Character picker, at the header tier the `scope`
- * slot gives the real one (44px tall below `md`, 36px from `md`): a glyph
+ * slot gives the real one (36px tall below `md`, 36px from `md`): a glyph
  * and a caret, no words, at every width.
  * `ui` stories don't import `@/features`; the real picker in this slot is
  * `character/CharacterFilterControl`'s InPageHeader stories.
@@ -59,7 +59,7 @@ const scopeStandIn = (
   <button
     type="button"
     aria-label="All characters"
-    className="inline-flex h-11 shrink-0 items-center gap-0.5 rounded-xs border border-line bg-panel-2 px-1 text-text-dim md:h-9"
+    className="inline-flex h-9 shrink-0 items-center gap-0.5 rounded-xs border border-line bg-panel-2 px-1 text-text-dim"
   >
     <Icon.AllCharacters aria-hidden="true" />
     <Icon.Expanded aria-hidden="true" size="0.75rem" />

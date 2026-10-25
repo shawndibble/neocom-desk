@@ -10,6 +10,7 @@ import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -31,6 +32,8 @@ import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './v
 import {
   AlertGrantError,
   deleteAlertGrant as deleteAlertGrantFor,
+  grantCoversMail,
+  grantCoversNearby,
   parseSaveAlertGrantInput,
   refreshAtSso,
   revokeAtSso,
@@ -39,6 +42,11 @@ import {
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
 import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
+import { firestoreNearbyStore, forgetNearbyCharacter } from './nearbyStore.js';
+import { fetchCharacterLocation, fetchIncursions, fetchRaidableSkyhooks } from './esiNearby.js';
+import type { PushMessage } from './eveNotificationPush.js';
+import { runNearbyPhase } from './pollNearby.js';
+import { fetchMailHeaders } from './esiMail.js';
 import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
@@ -47,6 +55,17 @@ import {
   purgeFiredProjections,
   writeDeviceRegistration,
 } from './projectionStore.js';
+import { pollServerEvents } from './serverEventPoll.js';
+import { createRegistrationReader } from './registrationReader.js';
+import { ALERTS_POLL_STATS_KEYS, SERVER_POLL_STATS_KEYS, createRunStats } from './runStats.js';
+import { fetchFuzzworkPrices, fetchZkillLosses } from './serverEventSources.js';
+import {
+  deleteDeviceIfToken,
+  listPolledDevices,
+  onCommunityChildCreated,
+  onPledgeCreated,
+  saveServerBaselines,
+} from './serverEventStore.js';
 import {
   parseBookCall,
   parseClaimPaymentInput,
@@ -317,8 +336,14 @@ alertsAction('registerDevice', async (request) => {
     );
   }
 
-  const { registration, rejected, projections, eveTypesByCharacter } =
-    await buildDeviceRegistration(input, verifyOptions, logError);
+  const {
+    registration,
+    rejected,
+    projections,
+    eveTypesByCharacter,
+    serverEventsByCharacter,
+    serverInputsByCharacter,
+  } = await buildDeviceRegistration(input, verifyOptions, logError);
 
   if (registration.characterIds.length === 0) {
     throw new HttpsError('unauthenticated', 'No character access token could be verified');
@@ -330,6 +355,9 @@ alertsAction('registerDevice', async (request) => {
     characterIds: registration.characterIds,
     projections,
     eveTypesByCharacter,
+    serverEventsByCharacter,
+    serverInputsByCharacter,
+    routeRules: input.routeRules,
     quietHours: input.quietHours,
   });
 
@@ -337,20 +365,39 @@ alertsAction('registerDevice', async (request) => {
   // so the client can offer a toggle for them. Only `seenTypes` is read out.
   const { store } = alertGrantDeps();
   const seenTypes: Record<string, string[]> = {};
+  // The Characters whose active grant can read the location (ADR 0028). Its
+  // presence also tells the client this server accepts the location scope, so
+  // it never asks EVE for a grant an older deployed function would refuse.
+  let nearbyGrants: number[] | undefined = [];
+  // Likewise the Characters whose active grant can read mail headers (ADR 0029),
+  // present only from a server that takes the mail scope.
+  // Sent only when `nearbyGrants` is: both mark a server that takes the new scopes.
+  const mailGrants: number[] = [];
   try {
     const grants = await store.getMany(registration.characterIds);
     for (const characterId of registration.characterIds) {
-      seenTypes[String(characterId)] = grants.get(characterId)?.seenTypes ?? [];
+      const grant = grants.get(characterId);
+      seenTypes[String(characterId)] = grant?.seenTypes ?? [];
+      if (grant?.status === 'active' && grantCoversNearby(grant)) nearbyGrants?.push(characterId);
+      if (grant?.status === 'active' && grantCoversMail(grant)) mailGrants.push(characterId);
     }
   } catch (err) {
     // The registration already landed; a failed read only delays new toggles.
+    // No `nearbyGrants` then, so the client keeps what it last learned.
+    nearbyGrants = undefined;
     logError('Device registration: seenTypes read failed', {
       characterIds: registration.characterIds,
       error: String(err),
     });
   }
 
-  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
+  return {
+    deviceId: input.deviceId,
+    registered: registration.characterIds,
+    rejected,
+    seenTypes,
+    ...(nearbyGrants ? { nearbyGrants, mailGrants } : {}),
+  };
 });
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
@@ -367,6 +414,7 @@ function alertGrantDeps(): AlertGrantDeps {
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     now: () => Date.now(),
     log: (message, data) => logWarn(message, data),
+    forgetNearby: (characterId) => forgetNearbyCharacter(firestore(), characterId),
   };
 }
 
@@ -415,16 +463,99 @@ export const alertsCall = onCall<unknown>(
  * (ADR 0010). This function only decides *when* to fire what it was handed,
  * and pushes each row only to the device that uploaded it (issue #2240) —
  * see projectionStore.ts.
+ *
+ * The same tick polls the server-pushed price alerts and ship losses (issue
+ * #5121, ADR 0027): public Fuzzwork and zKillboard reads, still no EVE token, rather than a scheduled job of its own.
  */
-export const dispatchProjections = onSchedule('every 15 minutes', async () => {
-  await dispatchDueProjections(firestore(), getMessaging(), Date.now(), logError);
-});
+export const dispatchProjections = onSchedule(
+  // The server-pushed events' zKillboard reads are paced and stop after 5
+  // minutes (serverEventPoll.ts), so the tick can outlast the default minute;
+  // the projection dispatch runs alongside and is unaffected by them.
+  { schedule: 'every 15 minutes', timeoutSeconds: 540, maxInstances: 1 },
+  async () => {
+    const db = firestore();
+    const messaging = getMessaging();
+    const serverStats = createRunStats(SERVER_POLL_STATS_KEYS);
+    // Independent halves: one failing must not stop the other.
+    const [projected, polled] = await Promise.allSettled([
+      dispatchDueProjections(db, messaging, Date.now(), logError),
+      // Price alerts and ship losses for a closed app (issue #5121): public data,
+      // no EVE token, pushed to the devices that enabled them.
+      pollServerEvents({
+        listDevices: () => listPolledDevices(db, serverStats),
+        fetchLosses: (characterId) => fetchZkillLosses(characterId),
+        fetchPrices: (stationId, typeIds) => fetchFuzzworkPrices(stationId, typeIds),
+        send: async (token, data) => {
+          serverStats.add('fcmSends');
+          await messaging.send({ token, data });
+        },
+        saveBaselines: (deviceId, baselines) =>
+          saveServerBaselines(db, deviceId, baselines, serverStats),
+        deleteDevice: (deviceId, fcmToken) =>
+          deleteDeviceIfToken(db, deviceId, fcmToken, serverStats),
+        log: (message, data) => logWarn(message, data),
+        now: () => Date.now(),
+        stats: serverStats,
+      }),
+    ]);
+    if (projected.status === 'rejected')
+      logError('Scheduled Push dispatch failed', { error: String(projected.reason) });
+    if (polled.status === 'rejected')
+      logError('Server event poll failed', { error: String(polled.reason) });
+    // One line per tick, counts only: query `jsonPayload.message="Server event poll finished"`.
+    else logInfo('Server event poll finished', { ...polled.value, ...serverStats.snapshot() });
+  }
+);
+
+/**
+ * Community alerts for a closed app (issue #5121): a join request or a new
+ * Member, pushed to the admin's devices the moment the backend writes it. One
+ * trigger for every doc made directly under a Community; anything but the
+ * waiting list and the roster returns at once (communityPush.ts decides).
+ */
+export const pushCommunityAlert = onDocumentCreated(
+  'communities/{communityId}/{collection}/{docId}',
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const { communityId, collection, docId } = event.params;
+    await onCommunityChildCreated(
+      firestore(),
+      getMessaging(),
+      { communityId, collection, docId },
+      data,
+      Date.now(),
+      logWarn
+    );
+  }
+);
+
+/** A Pledge on a Request (issue #5121): pushed to the requester's devices when it is written. */
+export const pushCommunityPledge = onDocumentCreated(
+  'communities/{communityId}/itemRequests/{requestId}/pledges/{pledgerUid}',
+  async (event) => {
+    const data = event.data?.data();
+    if (!data) return;
+    const { communityId, requestId, pledgerUid } = event.params;
+    await onPledgeCreated(
+      firestore(),
+      getMessaging(),
+      { communityId, requestId, pledgerUid },
+      data,
+      Date.now(),
+      logWarn
+    );
+  }
+);
 
 /**
  * pollEveNotifications (issue #3756, ADR 0020): every 15 minutes, reads each
  * active Alerts Grant's `/notifications/` feed and pushes the types a
- * registered device enabled. The only function that holds an EVE token, and
- * only the notifications-only one. Deploy is manual:
+ * registered device enabled. For a grant that also carries the location scope
+ * (issue #5122, ADR 0028) it reads the Character's Current System with the same
+ * token and pushes nearby Incursions and raidable skyhooks; for one that carries
+ * the mail scope (issue #5143, ADR 0029) it reads the mail headers and pushes new mail. The only function
+ * that holds an EVE token, and only the Alerts Grant's narrow one. Deploy is manual:
  * `firebase deploy --only functions:pollEveNotifications`.
  */
 export const pollEveNotifications = onSchedule(
@@ -436,23 +567,78 @@ export const pollEveNotifications = onSchedule(
   },
   async () => {
     const messaging = getMessaging();
+    const stats = createRunStats(ALERTS_POLL_STATS_KEYS);
+    const registrations = createRegistrationReader(firestore(), stats);
+    // The public lists are read once per run, whoever asks first: the candidates
+    // check before any location read and the nearby phase afterwards share them.
+    const once = <T>(read: () => Promise<T>): (() => Promise<T>) => {
+      let pending: Promise<T> | undefined;
+      return () => (pending ??= read());
+    };
+    const incursions = once(() => {
+      stats.add('esiIncursionsCalls');
+      return fetchIncursions();
+    });
+    const skyhooks = once(() => {
+      stats.add('esiSkyhooksCalls');
+      return fetchRaidableSkyhooks();
+    });
+    const send = async (token: string, message: PushMessage) => {
+      stats.add('fcmSends');
+      await messaging.send({
+        token,
+        data: message.data,
+        ...(message.collapseKey ? { webpush: { headers: { Topic: message.collapseKey } } } : {}),
+      });
+    };
+    const log = (message: string, data?: Record<string, unknown>) => logWarn(message, data);
     const summary = await pollEveNotificationsRun({
       store: firestorePollerStore(firestore(), {
         key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
         refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
+        stats,
+        registrations,
       }),
+      stats,
       fetchNotifications: (characterId, accessToken, etag) =>
         fetchEsiNotifications(characterId, accessToken, etag),
-      send: async (token, message) => {
-        await messaging.send({
-          token,
-          data: message.data,
-          ...(message.collapseKey ? { webpush: { headers: { Topic: message.collapseKey } } } : {}),
-        });
+      send,
+      log,
+      // New mail (issue #5143, ADR 0029): the same run, the same refreshed token.
+      mail: {
+        fetchHeaders: (characterId, accessToken, etag) =>
+          fetchMailHeaders(characterId, accessToken, etag),
       },
-      log: (message, data) => logWarn(message, data),
+      // Nearby alerts (issue #5122, ADR 0028): the same run, the same refreshed token.
+      nearby: {
+        fetchLocation: (characterId, accessToken) =>
+          fetchCharacterLocation(characterId, accessToken),
+        hasCandidates: async (wanted) => {
+          const [incursionList, skyhookList] = await Promise.all([
+            wanted.incursions ? incursions() : null,
+            wanted.skyhooks ? skyhooks() : null,
+          ]);
+          // A list that failed or asked to back off is not known to be empty.
+          const empty = (read: { kind: string; value?: unknown[] } | null) =>
+            read === null || (read.kind === 'ok' && read.value?.length === 0);
+          return !(empty(incursionList) && empty(skyhookList));
+        },
+        runPhase: (locations) =>
+          runNearbyPhase({
+            deps: {
+              store: firestoreNearbyStore(firestore(), { registrations, stats }),
+              fetchIncursions: incursions,
+              fetchRaidableSkyhooks: skyhooks,
+            },
+            locations,
+            send,
+            log,
+            nowMs: Date.now(),
+          }),
+      },
     });
-    logInfo('pollEveNotifications finished', { ...summary });
+    // One line per run, counts only: query `jsonPayload.message="pollEveNotifications finished"`.
+    logInfo('pollEveNotifications finished', { ...summary, ...stats.snapshot() });
   }
 );
 

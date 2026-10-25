@@ -43,7 +43,7 @@ export function WalletTabBar({ tabsId }: { tabsId: string }) {
 }
 
 const CRUMB_CLASS =
-  'inline-flex min-h-11 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0';
+  'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0';
 
 /**
  * The links above an open store: back to the search it was opened from (a

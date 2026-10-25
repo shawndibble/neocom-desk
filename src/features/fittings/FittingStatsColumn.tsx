@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import type { Fitting, FittingModuleResult } from '@/engine/fittings/types';
+import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { tacticalModesFor } from '@/engine/fittings/tacticalModes';
 import { FittingStatsSections } from './FittingStatsSections';
 import { FittingWhatToTrainPanel } from './FittingWhatToTrainPanel';
@@ -29,6 +30,10 @@ interface FittingStatsColumnProps {
   targetProfiles: TargetProfiles;
   overlay: OverlayFitting | undefined;
   onOpenMakeItFit: (resource: FitResource) => void;
+  /** Improve's ticked or hovered rows, to show in place as `current → after`. */
+  preview?: FittingStatsDelta | null;
+  /** Opens Improve from the column's header. */
+  onImprove?: () => void;
 }
 
 /**
@@ -49,6 +54,8 @@ export function FittingStatsColumn({
   targetProfiles,
   overlay,
   onOpenMakeItFit,
+  preview,
+  onImprove,
 }: FittingStatsColumnProps) {
   const { t } = useTranslation();
   // What the stats column's Pilot and Situation panels hold beyond its own sections.
@@ -75,6 +82,8 @@ export function FittingStatsColumn({
         showDrones={dronesShown}
         fitting={fitting}
         moduleResults={moduleResults}
+        preview={preview}
+        onImprove={onImprove}
         whatToTrain={
           <FittingWhatToTrainPanel
             evaluator={workspace.skillGains}

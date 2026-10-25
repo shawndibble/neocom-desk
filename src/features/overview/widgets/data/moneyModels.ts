@@ -258,14 +258,14 @@ export interface NetWorthSeries {
 export function netWorthSeries(characters: readonly NetWorthCharacter[]): NetWorthSeries {
   const out: NetWorthSeries = {
     days: [],
-    layers: { isk: [], assets: [], escrow: [], sellOrders: [] },
+    layers: { isk: [], assets: [], escrow: [], sellOrders: [], contracts: [] },
     totals: [],
   };
   if (characters.length === 0) return out;
   const days = [...new Set(characters.flatMap((c) => c.history.map((row) => row.day)))].sort();
   const cursors = characters.map(() => ({ at: -1 }));
   for (const day of days) {
-    const sum: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0 };
+    const sum: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0, contracts: 0 };
     let everyoneStarted = true;
     characters.forEach((character, i) => {
       const cursor = cursors[i]!;

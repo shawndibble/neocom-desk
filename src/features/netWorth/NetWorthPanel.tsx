@@ -397,7 +397,7 @@ export function NetWorthPanel({
           onClick={onBack}
           className={cx(
             inlineLinkClassName,
-            'mb-2 inline-flex min-h-11 items-center gap-1 md:min-h-0'
+            'mb-2 inline-flex min-h-9 items-center gap-1 md:min-h-0'
           )}
         >
           <span aria-hidden="true">‹</span>

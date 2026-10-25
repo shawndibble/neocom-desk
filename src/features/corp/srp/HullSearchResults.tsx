@@ -35,7 +35,7 @@ export function HullSearchResults({
       className="grid max-h-72 w-full divide-y divide-line overflow-y-auto rounded-xs border border-line bg-panel-2 text-sm sm:max-w-sm"
     >
       {results.map((hull) => (
-        <li key={`${hull.scope}:${hull.id}`} className="flex min-h-11 items-center gap-2 px-3">
+        <li key={`${hull.scope}:${hull.id}`} className="flex min-h-9 items-center gap-2 px-3">
           <span className="min-w-0 flex-1 truncate">
             {hull.name}{' '}
             <span className="text-xs text-text-dim">

@@ -15,7 +15,11 @@ export function resourceFacts(
   const facts: Fact[] = [
     {
       label: t('fittings.stats.fact.cargo'),
-      value: figure((x) => t('fittings.stats.unit.cubicMetres', { value: fmt0(x.holds.cargo) })),
+      value: figure(
+        (x) => t('fittings.stats.unit.cubicMetres', { value: fmt0(x.holds.cargo) }),
+        undefined,
+        ['cargoCapacity']
+      ),
     },
   ];
   if (s.holds.fleetHangar > 0)

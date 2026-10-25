@@ -333,7 +333,7 @@ export function ContractDetailModal({
           <p className="space-y-1">
             <Link
               to={communityRequestPath(buyback.communityId, buyback.requestId)}
-              className={`${inlineLinkClassName} inline-flex min-h-11 items-center md:min-h-0`}
+              className={`${inlineLinkClassName} inline-flex min-h-9 items-center md:min-h-0`}
             >
               {t('contractDetail.buyback', {
                 title: buyback.requestTitle,

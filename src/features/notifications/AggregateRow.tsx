@@ -162,7 +162,7 @@ export function AggregateRow({
             onClick={() => setChosen(!open)}
             className={cx(
               // The name wraps: a truncated name hides which event the row is.
-              'flex min-h-11 min-w-0 items-center gap-1.5 py-2 text-left md:min-h-9',
+              'flex min-h-9 min-w-0 items-center gap-1.5 py-2 text-left',
               tone === 'type' ? 'text-text-dim' : 'text-text',
               interactiveClassName,
               focusRingInsetClassName
@@ -211,7 +211,7 @@ export function AggregateRow({
               aria-expanded={warnOpen}
               onClick={() => setWarnOpen((value) => !value)}
               className={cx(
-                'flex min-h-11 items-center gap-1.5 py-1 text-left text-[0.6875rem] text-text-dim md:min-h-9',
+                'flex min-h-9 items-center gap-1.5 py-1 text-left text-[0.6875rem] text-text-dim',
                 interactiveClassName,
                 focusRingInsetClassName
               )}

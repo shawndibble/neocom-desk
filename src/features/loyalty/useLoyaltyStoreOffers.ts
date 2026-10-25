@@ -25,6 +25,7 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { usePriceBasis } from './priceBasis';
+import { loadLpStoreVolume, type LpStoreVolume } from './lpStoreVolume';
 import {
   useDetectedOwnedStock,
   useOwnedStockSnapshot,
@@ -91,6 +92,11 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [playerLp, setPlayerLp] = useState<number | null>(null);
   const [skills, setSkills] = useState<SkillLevels>({});
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
+  // Tagged with its region so a hub change never reads the previous hub's volume.
+  const [loadedVolume, setLoadedVolume] = useState<{
+    regionId: number;
+    volume: LpStoreVolume | null;
+  } | null>(null);
   const [useOwnMaterialsFor, setUseOwnMaterialsFor] = useState<ReadonlySet<number>>(new Set());
 
   useEffect(() => {
@@ -195,6 +201,21 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     };
   }, [nameableTypeIds]);
 
+  // The hub setting's region, once it hydrates: the default hub's volume would be the wrong number.
+  const volumeRegionId = hubHydrated ? hub.regionId : null;
+  useEffect(() => {
+    if (volumeRegionId === null) return;
+    let cancelled = false;
+    void loadLpStoreVolume(volumeRegionId).then((volume) => {
+      if (!cancelled) setLoadedVolume({ regionId: volumeRegionId, volume });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [volumeRegionId]);
+  // Null until this region's volume loads, and for good when it cannot.
+  const volume = loadedVolume?.regionId === volumeRegionId ? loadedVolume.volume : null;
+
   const ownedStockSnapshot = useOwnedStockSnapshot();
   const { stock } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
 
@@ -235,6 +256,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       itemNames,
       useOwnMaterialsFor,
       playerLp,
+      sellsPerDayByType: volume,
     });
   }, [
     offers,
@@ -247,6 +269,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     itemNames,
     useOwnMaterialsFor,
     playerLp,
+    volume,
   ]);
 
   function toggleUseOwnMaterials(offerId: number): void {

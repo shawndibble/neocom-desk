@@ -54,6 +54,7 @@ import {
   reactionPlanFacilityContextFor,
   autoBuildDepthContext,
 } from './planFacilityContext';
+import { moveSaving } from '@/engine/industry/moveSaving';
 import { REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
@@ -91,6 +92,8 @@ import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
+import { mineralShortfall } from '@/engine/industry/oreBuyPlan';
+import { BuyOreDialog } from './buyOre/BuyOreDialog';
 import { parseTaxPct } from './planInputParsers';
 import { buildItemMenuProps } from './buildItemMenuProps';
 import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
@@ -945,6 +948,11 @@ export function BuildPlanDetail({
    */
   const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
 
+  /** "Buy ore instead", offered only while the plan still buys a mineral. */
+  const [buyOreOpen, setBuyOreOpen] = useState(false);
+  const shortfall = useMemo(() => mineralShortfall(visibleMaterials), [visibleMaterials]);
+  const hasShortfall = Object.keys(shortfall.needs).length > 0;
+
   /** Which Blueprint Acquisition row's picker/override modal (issue #839) is open, if any. */
   const [acquisitionPickerTypeId, setAcquisitionPickerTypeId] = useState<number | null>(null);
   const acquisitionPickerOwnedCopies = useMemo(
@@ -1162,14 +1170,18 @@ export function BuildPlanDetail({
       : undefined;
   const cheapest = cheaperSystems[0];
   const currentIndex = snapshot?.systemCostIndex ?? null;
+  const cheaperNearbySaving =
+    cheapest && result && currentIndex !== null && currentIndex > 0
+      ? moveSaving(result.jobFee, currentIndex, cheapest.index, cheapest.npcStation)
+      : 0;
   const cheaperNearbyLine =
-    cheapest && result && currentIndex !== null && currentIndex > 0 ? (
+    cheapest && cheaperNearbySaving > 0 ? (
       <>
         {t('industry.ledger.cheaperNearby', {
           system: cheapest.name,
           count: cheapest.jumps,
           index: formatCostIndex(cheapest.index),
-          amount: formatIsk(result.jobFee.grossCost * (1 - cheapest.index / currentIndex)),
+          amount: formatIsk(cheaperNearbySaving),
         })}{' '}
         {/* The same move the build-system field makes: the band follows the
             system, and a picked structure is cleared since it was elsewhere. */}
@@ -1182,6 +1194,15 @@ export function BuildPlanDetail({
               buildSystemName: cheapest.name,
               ...clearedBuildLocation,
               security: securityBand(cheapest.security),
+              // The station found there is what the plan builds in: no rigs,
+              // and the tax drops back to the NPC rate `jobFee` applies.
+              ...(cheapest.npcStation
+                ? {
+                    facility: 'npcStation' as const,
+                    rigFit: EMPTY_RIG_FIT,
+                    facilityTaxPct: undefined,
+                  }
+                : {}),
             })
           }
         >
@@ -1867,6 +1888,7 @@ export function BuildPlanDetail({
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
                 onBuildAll={buildHereAll}
+                onBuyOre={hasShortfall ? () => setBuyOreOpen(true) : undefined}
                 ownedSellNet={ownedForSale?.net ?? null}
                 sellValueFor={(typeID) =>
                   ownedForSale?.lines.find((line) => line.typeID === typeID)?.net
@@ -1877,6 +1899,15 @@ export function BuildPlanDetail({
                 characterNameFor={detection.characterNameFor}
                 depthFor={(typeID) => boughtDepth.get(typeID)}
               />
+              {buyOreOpen && (
+                <BuyOreDialog
+                  open
+                  onClose={() => setBuyOreOpen(false)}
+                  hub={hub}
+                  needs={shortfall.needs}
+                  mineralsTotal={shortfall.total}
+                />
+              )}
               <BuildRecipeModal
                 recipe={openRecipe}
                 onClose={() => setRecipeTypeId(null)}

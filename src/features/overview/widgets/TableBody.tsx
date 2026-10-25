@@ -149,7 +149,7 @@ function Row({
     <tr
       className={cx(
         'group relative border-b border-line last:border-b-0',
-        linked || opens ? 'h-11 md:h-7' : 'h-8 md:h-7',
+        linked || opens ? 'h-9 md:h-7' : 'h-8 md:h-7',
         (linked || opens) && rowInteractiveClassName
       )}
     >
@@ -275,7 +275,7 @@ function SortableLabel({
       aria-label={label}
       onClick={onSort}
       className={cx(
-        'inline-flex items-center gap-1 uppercase hover:text-text active:text-text-dim min-h-11 md:min-h-0 touch:min-h-11',
+        'inline-flex items-center gap-1 uppercase hover:text-text active:text-text-dim min-h-9 md:min-h-0 touch:min-h-9',
         focusRingInsetClassName,
         active && 'text-text',
         column.align === 'end' && 'flex-row-reverse'

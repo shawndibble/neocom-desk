@@ -2,9 +2,9 @@
  * Market Browser item-finder tree touch targets (issue #1123): every row in
  * `MarketGroupTree` — the group-header disclosure and the leaf item row, at
  * every depth — was a hand-rolled `py-1` button with no height class, so it
- * rendered 24px tall at every viewport, well under the app's 44px touch
+ * rendered 24px tall at every viewport, well under the app's 36px touch
  * floor, on the Market page's only way to browse to an item on a phone.
- * Fixed with a phone-only `min-h-11 md:min-h-0` on both row shapes — on a
+ * Fixed with a phone-only `min-h-9 md:min-h-0` on both row shapes — on a
  * header only while it's expandable, since a disabled one is no target —
  * rather than the shared `controlHeightClassName.md` tier, whose `md:h-9`
  * would also have grown the dense desktop row.
@@ -46,12 +46,12 @@ async function heightOf(page: Page, name: string) {
   return box!.height;
 }
 
-test('item-finder tree rows meet the 44px touch floor at 390px', async ({ page }) => {
+test('item-finder tree rows meet the 36px touch floor at 390px', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await searchTritanium(page);
 
-  expect(await heightOf(page, 'Minerals')).toBeGreaterThanOrEqual(44);
-  expect(await heightOf(page, 'Tritanium')).toBeGreaterThanOrEqual(44);
+  expect(await heightOf(page, 'Minerals')).toBeGreaterThanOrEqual(36);
+  expect(await heightOf(page, 'Tritanium')).toBeGreaterThanOrEqual(36);
 });
 
 test('item-finder tree rows keep their dense height at and above md (1280px)', async ({ page }) => {

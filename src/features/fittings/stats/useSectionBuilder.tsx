@@ -50,6 +50,7 @@ export function useSectionBuilder() {
   const section: SectionBuilder = (id, meta, body, warning, level = 'h4') => (
     <StatSection
       key={id}
+      id={id}
       title={t(`fittings.stats.section.${id}`)}
       meta={meta}
       warning={warning}

@@ -520,3 +520,252 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     }
   });
 });
+
+describe('server-pushed events (issue #5121)', () => {
+  const priceFire = {
+    eventId: 'priceAlertTriggered',
+    characterId: 7,
+    typeId: 34,
+    name: 'Tritanium',
+    price: 11,
+    targetPrice: 10,
+    direction: 'above',
+  } as const;
+
+  /** What `functions/src/serverEvents.ts`'s `buildServerEventPush` sends. */
+  function serverPush(fire: { eventId: string; characterId: number }, extra = {}): string {
+    return JSON.stringify({
+      data: {
+        characterId: String(fire.characterId),
+        eventId: fire.eventId,
+        occurrenceKey: 'server-key',
+        title: 'Floor title',
+        body: 'Floor body',
+        fireAt: '1000',
+        fire: JSON.stringify(fire),
+        ...extra,
+      },
+    });
+  }
+
+  it('carries the raw fire through the parse', () => {
+    expect(parsePushPayload(serverPush(priceFire))?.serverFire).toBe(JSON.stringify(priceFire));
+  });
+
+  it('renders the fire with the app’s copy and keys the row like the Foreground Poller', async () => {
+    const e = env();
+    await handlePush(e, serverPush(priceFire), 5000);
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('Price alert');
+    expect(options.body).toContain('Tritanium reached');
+    expect(String(options.data?.url)).toContain('type=34');
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: occurrenceKey(priceFire, 5000),
+        subjectId: 34,
+        firedAt: 1000,
+        notifiedHereAt: 5000,
+      })
+    );
+  });
+
+  it('names the ship and system of a loss through the public name lookup', async () => {
+    const fire = {
+      eventId: 'shipLost',
+      characterId: 7,
+      killmailId: 55,
+      timeMs: 900,
+      shipTypeId: 587,
+      systemId: 30000142,
+    } as const;
+    const resolveIds = vi.fn(
+      async () =>
+        new Map([
+          [587, 'Rifter'],
+          [30000142, 'Jita'],
+        ])
+    );
+    const e = env({ resolveIds });
+    await handlePush(e, serverPush(fire), 5000);
+    expect(resolveIds).toHaveBeenCalledWith([587, 30000142]);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('Lost your Rifter in Jita');
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '7:shipLost:55' })
+    );
+  });
+
+  it('falls back to the sender’s copy and key for a fire that is not the push’s own', async () => {
+    const e = env();
+    await handlePush(e, serverPush({ ...priceFire, characterId: 8 }, { characterId: '7' }), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('Floor title');
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(expect.objectContaining({ id: 'server-key' }));
+  });
+
+  it('replaces this device’s earlier pop-up silently when it already notified for the occurrence', async () => {
+    const alreadyNotified = vi.fn(async () => true);
+    const e = env({ alreadyNotified });
+    await handlePush(e, serverPush(priceFire), 5000);
+    expect(alreadyNotified).toHaveBeenCalledWith(occurrenceKey(priceFire, 5000));
+    expect(vi.mocked(e.showNotification).mock.calls[0][1]).toMatchObject({
+      silent: true,
+      renotify: false,
+    });
+  });
+});
+
+describe('server-pushed new mail (issue #5143)', () => {
+  const fire = {
+    eventId: 'newMail',
+    characterId: 7,
+    mailId: 120,
+    sentMs: 900,
+    fromId: 900,
+    subject: 'Fleet tonight',
+  } as const;
+  /** What `functions/src/mailPush.ts`'s `buildMailPush` sends. */
+  const push = (f: object = fire) =>
+    JSON.stringify({
+      data: {
+        characterId: '7',
+        eventId: 'newMail',
+        occurrenceKey: '7:newMail:120',
+        title: 'New mail',
+        body: 'You have new mail.',
+        fireAt: '900',
+        fire: JSON.stringify(f),
+      },
+    });
+  const named = {
+    characterName: vi.fn(async () => 'Aurelia'),
+    resolveIds: vi.fn(async () => new Map([[900, 'Vexor Fan']])),
+  };
+
+  it('words the pop-up with the sender and subject, keyed like the Foreground Poller', async () => {
+    const e = env(named);
+    await handlePush(e, push(), 5000);
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('New mail');
+    expect(options.body).toBe('Aurelia has new mail from Vexor Fan: Fleet tonight');
+    expect(named.resolveIds).toHaveBeenCalledWith([900]);
+  });
+
+  it('never writes the sender or subject into the feed row, which syncs to Firestore', async () => {
+    const e = env(named);
+    await handlePush(e, push(), 5000);
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: occurrenceKey({ eventId: 'newMail', characterId: 7, mailId: 120 }, 5000),
+        body: 'Aurelia has new mail.',
+        firedAt: 900,
+      })
+    );
+    const entry = vi.mocked(e.recordFeedEntry).mock.calls[0][0];
+    expect(JSON.stringify(entry)).not.toMatch(/Fleet tonight|Vexor Fan/);
+  });
+
+  it('leaves out a sender it cannot name (a mailing list) and a missing subject', async () => {
+    const e = env({ ...named, resolveIds: vi.fn(async () => new Map()) });
+    await handlePush(e, push(), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe(
+      'Aurelia has new mail: Fleet tonight'
+    );
+    const bare = env(named);
+    await handlePush(bare, push({ eventId: 'newMail', characterId: 7, mailId: 120 }), 5000);
+    expect(vi.mocked(bare.showNotification).mock.calls[0][1].body).toBe('Aurelia has new mail.');
+  });
+
+  it('shows the generic floor, naming nothing, for a fire that is not the push’s own', async () => {
+    const e = env(named);
+    await handlePush(e, push({ ...fire, characterId: 8 }), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('You have new mail.');
+  });
+
+  it('replaces an earlier pop-up for the same mail silently', async () => {
+    const e = env({ ...named, alreadyNotified: vi.fn(async () => true) });
+    await handlePush(e, push(), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1]).toMatchObject({ silent: true });
+  });
+});
+
+describe('server-pushed nearby alerts (issue #5122)', () => {
+  const NOW = Date.parse('2026-10-25T12:00:00Z');
+  const HOUR = 3_600_000;
+  const skyhook = {
+    eventId: 'skyhookRaidableNearby' as const,
+    characterId: 777,
+    systemId: 30000142,
+    planetId: 40009077,
+    startMs: NOW + HOUR,
+    endMs: NOW + 2 * HOUR,
+    jumps: 2,
+  };
+  const incursion = {
+    eventId: 'incursionNearby' as const,
+    characterId: 777,
+    constellationId: 20000020,
+    stagingSystemId: 30000144,
+    state: 'established' as const,
+    jumps: 1,
+  };
+
+  /** What `functions/src/nearbyPush.ts`'s `buildNearbyPush` sends. */
+  const push = (fire: typeof skyhook | typeof incursion, extra: Record<string, string> = {}) =>
+    JSON.stringify({
+      data: {
+        characterId: '777',
+        eventId: fire.eventId,
+        occurrenceKey: 'server-key',
+        fireAt: String(NOW),
+        title: 'Generic title',
+        body: 'Generic body',
+        fire: JSON.stringify(fire),
+        ...extra,
+      },
+    });
+
+  const names = new Map([
+    [30000142, 'Jita'],
+    [40009077, 'Jita IV'],
+    [20000020, 'Kimotoro'],
+    [30000144, 'Perimeter'],
+  ]);
+
+  it('renders a raid window with the app’s own wording and resolved names', async () => {
+    const e = env({ resolveIds: vi.fn(async () => names) });
+    await handlePush(e, push(skyhook), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Raidable skyhook 2 jumps away',
+      expect.objectContaining({
+        body: 'Jita IV can be raided in 1h 0m, 2 jumps from your current system.',
+      })
+    );
+  });
+
+  it('renders an Incursion with its state, and with ids when no name resolves', async () => {
+    const e = env({ resolveIds: vi.fn(async () => new Map()) });
+    await handlePush(e, push(incursion), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Incursion 1 jump away',
+      expect.objectContaining({
+        body: 'Constellation 20000020, staging in #30000144: Established, 1 jump from your current system.',
+      })
+    );
+  });
+
+  it('writes the feed row under the key the Foreground Poller derives', async () => {
+    const e = env();
+    await handlePush(e, push(skyhook), NOW);
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: occurrenceKey(skyhook, NOW), notifiedHereAt: NOW })
+    );
+  });
+
+  it('falls back to the sender’s copy for a malformed fire', async () => {
+    const e = env();
+    await handlePush(e, push({ ...skyhook, planetId: 'x' } as never), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Generic title',
+      expect.objectContaining({ body: 'Generic body' })
+    );
+  });
+});

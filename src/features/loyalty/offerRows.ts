@@ -12,6 +12,7 @@
  * actual facility/skills.
  */
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import type { LpStoreVolume } from '@/features/loyalty/lpStoreVolume';
 import {
   nameForType,
   toIndustryBlueprint,
@@ -55,6 +56,13 @@ export interface LoyaltyOfferRow {
   /** Manufacturing result at the default facility, for a blueprint offer only. */
   build: BuildResult | null;
   profit: LoyaltyOfferProfit;
+  /**
+   * Units of the offer's output (the product, for a blueprint offer) traded per day
+   * at the hub region, averaged over 30 days. `0`: it did not trade in the window.
+   * `null`: no volume data (not loaded, or the daily publish is unreachable), which
+   * is not the same as zero.
+   */
+  sellsPerDay: number | null;
   /**
    * `offer.required_items`, named/quantified/priced for display. Empty when
    * the offer has none. The same array `requiredItemsCost` below was summed
@@ -127,6 +135,17 @@ export interface LoyaltyOfferComputeInputs {
   useOwnMaterialsFor?: ReadonlySet<number>;
   /** Null when the LP balance has never been read (unknown, not zero). */
   playerLp: number | null;
+  /** Units per day by type at the hub region (`lpStoreVolume.ts`); absent or null when unavailable. */
+  sellsPerDayByType?: LpStoreVolume | null;
+}
+
+/** Null when the volume data is unavailable; 0 when it loaded and this type never traded. */
+function sellsPerDayOf(
+  volume: LpStoreVolume | null | undefined,
+  typeId: number | null
+): number | null {
+  if (!volume || typeId === null) return null;
+  return volume[typeId] ?? 0;
 }
 
 /**
@@ -244,6 +263,7 @@ function computeBlueprintRow(
     productName: entry.productName,
     build,
     profit,
+    sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, entry.productTypeID),
     requiredItems,
     requiredItemsCost: itemsCost,
   };
@@ -277,6 +297,7 @@ function computeItemRow(
     productName: null,
     build: null,
     profit,
+    sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, offer.type_id),
     requiredItems,
     requiredItemsCost: itemsCost,
   };

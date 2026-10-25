@@ -168,6 +168,60 @@ describe('planHaul', () => {
     expect(plan.sections[0].legs[0].jumps).toBeNull();
   });
 
+  describe('flown ships', () => {
+    const ship = (locationId: number, systemId: number | null, ships: string[]) => ({
+      ...pickup(locationId, systemId, 0),
+      ships,
+    });
+
+    it('routes a ships-only move: take the ship at its pickup, fly it to the destination', () => {
+      const plan = run([character([ship(10, P1, ['Rifter'])])], 0);
+      const legs = plan.sections[0]?.legs ?? [];
+      expect(legs.map((l) => [l.kind, l.to.name, l.jumps, l.ships])).toEqual([
+        ['pickup', 'Pickup 10', 1, ['Rifter']],
+        ['delivery', 'Dest Station', 3, ['Rifter']],
+      ]);
+      expect(plan.sections[0]?.trips).toBe(1);
+      expect(plan.flown).toEqual([]);
+      expect(plan.leftOut).toEqual([]);
+    });
+
+    it('flies each ship as a trip of its own, nearest pickup first from where the last one landed', () => {
+      const plan = run(
+        [character([ship(20, P3, ['Merlin']), ship(10, P1, ['Rifter', 'Punisher'])])],
+        0
+      );
+      const legs = plan.sections[0]?.legs ?? [];
+      expect(legs.map((l) => [l.trip, l.kind, l.ships?.[0]])).toEqual([
+        [1, 'pickup', 'Rifter'],
+        [1, 'delivery', 'Rifter'],
+        [2, 'pickup', 'Merlin'],
+        [2, 'delivery', 'Merlin'],
+        [3, 'pickup', 'Punisher'],
+        [3, 'delivery', 'Punisher'],
+      ]);
+      expect(plan.sections[0]?.trips).toBe(3);
+    });
+
+    it('flies after the cargo trips, from the destination', () => {
+      const plan = run([character([pickup(10, P1, 50), ship(20, P2, ['Rifter'])])]);
+      const legs = plan.sections[0]?.legs ?? [];
+      expect(legs.map((l) => [l.kind, l.ships ?? null])).toEqual([
+        ['pickup', null],
+        ['delivery', null],
+        ['pickup', ['Rifter']],
+        ['delivery', ['Rifter']],
+      ]);
+      expect(legs[2]?.from?.name).toBe('Dest Station');
+    });
+
+    it('keeps a ship at a place with no solar system as a note', () => {
+      const plan = run([character([ship(10, null, ['Rifter'])])], 0);
+      expect(plan.sections).toEqual([]);
+      expect(plan.flown).toEqual([{ characterId: 1, name: 'Pilot', ships: ['Rifter'] }]);
+    });
+  });
+
   it('carries the flown-ship notes through', () => {
     const plan = run([character([pickup(10, P1, 10)], { flown: ['Rifter'] })]);
     expect(plan.flown).toEqual([{ characterId: 1, name: 'Pilot', ships: ['Rifter'] }]);
@@ -207,5 +261,105 @@ describe('planHaul', () => {
       run([character([withStacks([trit])])], 30);
       expect(trit.quantity).toBe(100);
     });
+  });
+});
+
+describe('planHaul with a max ISK per haul', () => {
+  const stack = (quantity: number, unitIsk?: number, typeId = 34): HaulStack => ({
+    typeId,
+    name: `Type ${typeId}`,
+    quantity,
+    unitM3: 1,
+    ...(unitIsk === undefined ? {} : { unitIsk }),
+  });
+  const withStacks = (stacks: HaulStack[]): HaulPickupInput => ({
+    ...pickup(
+      P1,
+      P1,
+      stacks.reduce((n, s) => n + s.quantity * s.unitM3, 0)
+    ),
+    stacks,
+  });
+  const go = (stacks: HaulStack[], maxIskPerHaul?: number | null, capacityM3 = 100) =>
+    planHaul({
+      graph: LINE,
+      characters: [character([withStacks(stacks)])],
+      capacityM3,
+      destination,
+      maxIskPerHaul,
+    });
+  const deliveries = (plan: ReturnType<typeof go>) =>
+    plan.sections.flatMap((s) => s.legs).filter((l) => l.kind === 'delivery');
+
+  it('with no limit, one trip carries it all', () => {
+    const plan = go([stack(10, 100)]);
+    expect(plan.sections[0].trips).toBe(1);
+    expect(deliveries(plan)[0].isk).toBe(1_000);
+  });
+
+  it('makes more trips under a limit and no trip is worth more than it', () => {
+    const plan = go([stack(10, 100)], 350);
+    expect(plan.sections[0].trips).toBe(4);
+    expect(deliveries(plan).map((l) => l.isk)).toEqual([300, 300, 300, 100]);
+    expect(plan.leftOut).toEqual([]);
+    expect(plan.totals.m3).toBe(10);
+  });
+
+  it('counts every unit exactly once across trips', () => {
+    const plan = go([stack(7, 100, 34), stack(5, 250, 35)], 600);
+    const units = plan.sections
+      .flatMap((s) => s.legs)
+      .flatMap((l) => (l.kind === 'pickup' ? (l.stacks ?? []) : []))
+      .reduce((n, s) => n + s.quantity, 0);
+    expect(units).toBe(12);
+    for (const d of deliveries(plan)) expect(d.isk).toBeLessThanOrEqual(600);
+  });
+
+  it('reports a unit that cannot ride at all instead of looping', () => {
+    const plan = go([stack(2, 900)], 500);
+    expect(plan.leftOut).toHaveLength(1);
+    expect(plan.leftOut[0].reason).toBe('overLimit');
+  });
+
+  it('ignores the limit for a pickup with no stacks', () => {
+    const plan = planHaul({
+      graph: LINE,
+      characters: [character([pickup(P1, P1, 10)])],
+      capacityM3: 100,
+      destination,
+      maxIskPerHaul: 1,
+    });
+    expect(plan.sections[0].trips).toBe(1);
+  });
+
+  it('fills a trip from another pickup when the nearest cannot add a unit', () => {
+    const near = { ...pickup(P1, P1, 5), stacks: [stack(5, 50, 34)] };
+    const far = { ...pickup(P3, P3, 5), stacks: [stack(5, 10, 35)] };
+    const plan = planHaul({
+      graph: LINE,
+      characters: [character([near, far])],
+      capacityM3: 100,
+      destination,
+      maxIskPerHaul: 100,
+    });
+    // Trip 1: 1 x 50 ISK would fit, so take 2 of the 50s, then nothing near fits; nothing more is added.
+    const first = plan.sections[0].legs.filter((l) => l.trip === 1 && l.kind === 'pickup');
+    expect(first.every((l) => (l.isk ?? 0) <= 100)).toBe(true);
+    const units = plan.sections
+      .flatMap((s) => s.legs)
+      .flatMap((l) => (l.kind === 'pickup' ? (l.stacks ?? []) : []))
+      .reduce((n, s) => n + s.quantity, 0);
+    expect(units).toBe(10);
+  });
+
+  it('treats an empty stack list as having no values', () => {
+    const plan = planHaul({
+      graph: LINE,
+      characters: [character([{ ...pickup(P1, P1, 10), stacks: [] }])],
+      capacityM3: 100,
+      destination,
+      maxIskPerHaul: 100,
+    });
+    expect(plan.leftOut).toEqual([]);
   });
 });

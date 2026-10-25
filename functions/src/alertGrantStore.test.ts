@@ -4,6 +4,7 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { AlertGrantDoc } from './alertGrant.js';
 import { encryptRefreshToken } from './alertGrantCrypto.js';
 import { firestorePollerStore } from './alertGrantStore.js';
+import { ALERTS_POLL_STATS_KEYS, createRunStats } from './runStats.js';
 
 const KEY = randomBytes(32);
 
@@ -59,7 +60,7 @@ describe('firestorePollerStore', () => {
       refreshToken: rt,
     }));
     const store = firestorePollerStore(f.db, { key: () => KEY, refresh });
-    expect(await store.listActive()).toEqual([1, 2]);
+    expect((await store.listActive()).map((l) => l.characterId)).toEqual([1, 2]);
     expect(await store.refresh(1)).toMatchObject({ kind: 'ok', accessToken: 'at-rt-1' });
     expect(await store.refresh(2)).toMatchObject({ kind: 'ok', accessToken: 'at-rt-2' });
     expect(f.reads.docGets).toBe(0);
@@ -85,5 +86,39 @@ describe('firestorePollerStore', () => {
     await store.listActive();
     expect(await store.refresh(1)).toEqual({ kind: 'skip' });
     expect(f.docs.get('1')).toBe(regrant);
+  });
+
+  it('counts its reads and writes, and the rotated-token write apart', async () => {
+    const f = fakeDb({ 1: grant(1), 2: grant(2) });
+    const refresh = vi.fn(async (_c: string, rt: string) => ({
+      accessToken: 'at',
+      refreshToken: rt === 'rt-1' ? 'rt-1-rotated' : rt,
+    }));
+    const stats = createRunStats(ALERTS_POLL_STATS_KEYS);
+    const store = firestorePollerStore(f.db, { key: () => KEY, refresh, stats });
+    await store.listActive();
+    await store.refresh(1); // SSO answered a different token: one write
+    await store.refresh(2); // same token: no write
+    expect(stats.snapshot()).toMatchObject({
+      ssoRefreshCalls: 2,
+      tokenRotationWrites: 1,
+      firestoreWrites: 1,
+      firestoreReads: 2 + 1, // the listing's two documents, the one transaction read
+    });
+  });
+
+  it('marks a grant idle and forgets its mail mark, guarded on the token', async () => {
+    const f = fakeDb({ 1: grant(1, { mailHighWaterId: 5, mailEtag: '"m"' }) });
+    const store = firestorePollerStore(f.db, { key: () => KEY, refresh: vi.fn() });
+    const blob = f.docs.get('1')!.encryptedRefreshToken;
+    await store.markIdle(1, 'stale-blob', { notifications: true, clearMail: true });
+    expect(f.docs.get('1')!.notificationsIdle).toBeUndefined();
+    await store.markIdle(1, blob, { notifications: true, clearMail: true });
+    expect(f.docs.get('1')).toMatchObject({
+      notificationsIdle: true,
+      mailHighWaterId: null,
+      mailEtag: null,
+      mailPushed: [],
+    });
   });
 });

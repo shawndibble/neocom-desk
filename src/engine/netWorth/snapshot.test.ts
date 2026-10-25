@@ -116,4 +116,38 @@ describe('lacksLayer', () => {
     delete old.sellStock;
     expect(lacksLayer(old)).toBe(true);
   });
+
+  it('is true for a row without the contracts layer only when the Character holds the permission', () => {
+    expect(lacksLayer(row, { contracts: true })).toBe(true);
+    expect(lacksLayer({ ...row, contractStock: 0 }, { contracts: true })).toBe(false);
+    expect(lacksLayer(row, { contracts: false })).toBe(false);
+  });
+});
+
+describe('buildSnapshotRow contract stock', () => {
+  it('leaves the layer off the row when contracts could not be read', () => {
+    expect(buildSnapshotRow(base)).not.toHaveProperty('contractStock');
+    expect(buildSnapshotRow({ ...base, contractStock: null })).not.toHaveProperty('contractStock');
+  });
+
+  it('writes the value, zero included, when contracts were read', () => {
+    const empty = { contracts: [], itemsByContractId: new Map() };
+    expect(buildSnapshotRow({ ...base, contractStock: empty })?.contractStock).toBe(0);
+    const open = {
+      contracts: [
+        {
+          contract_id: 7,
+          issuer_id: 1,
+          type: 'item_exchange' as const,
+          status: 'outstanding' as const,
+          for_corporation: false,
+          date_expired: '2026-10-20T00:00:00Z',
+        },
+      ],
+      itemsByContractId: new Map([
+        [7, [{ record_id: 1, type_id: 34, quantity: 10, is_included: true }]],
+      ]),
+    };
+    expect(buildSnapshotRow({ ...base, contractStock: open })?.contractStock).toBe(60);
+  });
 });

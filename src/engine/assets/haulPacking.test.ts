@@ -96,10 +96,83 @@ describe('packHauls', () => {
   });
 
   it('returns nothing for no lines or no holds', () => {
-    expect(packHauls([], MASTODON)).toEqual({ hauls: [], unfit: [] });
+    expect(packHauls([], MASTODON)).toEqual({ hauls: [], unfit: [], overLimit: [] });
     expect(packHauls([{ typeId: 1, quantity: 1, unitM3: 1 }], [])).toEqual({
       hauls: [],
       unfit: [{ typeId: 1, quantity: 1, unitM3: 1 }],
+      overLimit: [],
     });
+  });
+});
+
+describe('packHauls with an ISK limit', () => {
+  const BIG: PackHold[] = [{ kind: 'cargo', capacityM3: 1_000 }];
+
+  it('is unchanged with no limit, and records each haul value', () => {
+    const lines = [{ typeId: 1, quantity: 10, unitM3: 1, unitIsk: 100 }];
+    const none = packHauls(lines, BIG);
+    expect(none.hauls).toHaveLength(1);
+    expect(none.hauls[0].iskValue).toBe(1_000);
+    expect(packHauls(lines, BIG, null).hauls).toHaveLength(1);
+    expect(packHauls(lines, BIG, 0).hauls).toHaveLength(1);
+  });
+
+  it('closes a haul when its value reaches the limit, however much room is left', () => {
+    const { hauls, overLimit, unfit } = packHauls(
+      [{ typeId: 1, quantity: 10, unitM3: 1, unitIsk: 100 }],
+      BIG,
+      350
+    );
+    expect(unfit).toEqual([]);
+    expect(overLimit).toEqual([]);
+    expect(hauls.map((h) => h.iskValue)).toEqual([300, 300, 300, 100]);
+    for (const h of hauls) expect(h.iskValue).toBeLessThanOrEqual(350);
+  });
+
+  it('sums value across different stacks in one haul', () => {
+    const { hauls } = packHauls(
+      [
+        { typeId: 1, quantity: 2, unitM3: 2, unitIsk: 200 },
+        { typeId: 2, quantity: 2, unitM3: 1, unitIsk: 100 },
+      ],
+      BIG,
+      500
+    );
+    expect(hauls.map((h) => h.iskValue)).toEqual([500, 100]);
+    const total = hauls
+      .flatMap((h) => h.holds.flatMap((x) => x.lines))
+      .reduce((n, l) => n + l.quantity, 0);
+    expect(total).toBe(4);
+  });
+
+  it('sends a single unit worth more than the limit to overLimit, never a haul', () => {
+    const { hauls, unfit, overLimit } = packHauls(
+      [
+        { typeId: 1, quantity: 2, unitM3: 1, unitIsk: 600 },
+        { typeId: 2, quantity: 1, unitM3: 1, unitIsk: 10 },
+      ],
+      BIG,
+      500
+    );
+    expect(unfit).toEqual([]);
+    expect(overLimit).toEqual([{ typeId: 1, quantity: 2, unitM3: 1, unitIsk: 600 }]);
+    expect(hauls).toHaveLength(1);
+    expect(hauls[0].iskValue).toBe(10);
+  });
+
+  it('counts an unpriced line as 0 ISK', () => {
+    const { hauls } = packHauls([{ typeId: 1, quantity: 5, unitM3: 1 }], BIG, 1);
+    expect(hauls).toHaveLength(1);
+    expect(hauls[0].iskValue).toBe(0);
+  });
+
+  it('keeps a unit too big for the hold as unfit, not overLimit', () => {
+    const { unfit, overLimit } = packHauls(
+      [{ typeId: 1, quantity: 1, unitM3: 5_000, unitIsk: 600 }],
+      BIG,
+      500
+    );
+    expect(unfit).toHaveLength(1);
+    expect(overLimit).toEqual([]);
   });
 });

@@ -16,6 +16,8 @@ import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
+import { recordAlertsGrantScopes } from './alertsGrant';
+import { routeRulesForServer } from './nearbyRouteRules';
 import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
 export interface EnableWebPushResult {
@@ -44,18 +46,29 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
       const { registerDeviceForWebPush } = await deviceRegistration;
       const registration = await navigator.serviceWorker.ready;
       const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
-      // The Enable tap uploads the same type lists a rebuild would: an empty
-      // default here would wipe this device's list on the server.
-      const [{ enabledEveTypesByCharacter }, { liveDependencies }] = await Promise.all([
+      // The Enable tap uploads the same type and server-event lists a rebuild
+      // would: an empty default here would wipe this device's lists (and the
+      // server's readings) on the server.
+      const [
+        { enabledEveTypesByCharacter },
+        { liveDependencies },
+        { serverRegistrationsByCharacter },
+      ] = await Promise.all([
         import('./projectionRebuild'),
         import('./foregroundPoller'),
+        import('./serverEvents'),
       ]);
+      const live = liveDependencies();
+      const serverEventsByCharacter = await serverRegistrationsByCharacter(live);
       const result = await registerDeviceForWebPush(vapidKey, registration, new Map(), {
-        eveTypesByCharacter: await enabledEveTypesByCharacter(liveDependencies()),
+        eveTypesByCharacter: await enabledEveTypesByCharacter(live),
+        serverEventsByCharacter,
         quietHours: quietHoursPayload(useNotificationPreferences.getState().value),
+        routeRules: await routeRulesForServer(serverEventsByCharacter),
       });
       settlePushRegistration(result);
       await recordSeenEveTypes(result?.seenTypes);
+      await recordAlertsGrantScopes(result);
     } catch (err) {
       // Registration failing must not undo a permission grant the browser
       // already gave — the user is still enrolled for the feed/foreground

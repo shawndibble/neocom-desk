@@ -7,6 +7,8 @@
  * - `mvp`: ships hauled packaged (itemIDs).
  * - `mvh`: hauler pick, `h<hullTypeId>` or `c<m3>`.
  * - `mvr`: the active-haul view is open.
+ * - `mvc`: a corporation's plan (Corp assets → Move). The stack keys name the
+ *   pilot, not the corporation, so a pasted link says which assets it means.
  *
  * Pure. A value that cannot be read is the default, so a stale or hand-edited
  * link opens the empty planner. Nothing here is a token or a secret.
@@ -23,6 +25,7 @@ export interface MovePlanUrlValues {
   mvp: readonly number[];
   mvh: HaulerOverride | null;
   mvr: boolean;
+  mvc: boolean;
 }
 
 const STACK_KEY = /^\d+:\d+:\d+:(?:ship|loose)$/;
@@ -73,6 +76,7 @@ export const MOVE_PLAN_URL_SCHEMA = {
   mvp: packedShipsParam,
   mvh: haulerParam,
   mvr: boolParam(),
+  mvc: boolParam(),
 };
 
 /** What `useUrlParams` writes to clear every Move plan key. */
@@ -82,16 +86,20 @@ export const NO_MOVE_PLAN: MovePlanUrlValues = {
   mvp: [],
   mvh: null,
   mvr: false,
+  mvc: false,
 };
 
-/** The values when a plan can be rebuilt from them (a selection and a destination), else `null`. */
-export function planFromUrl(values: MovePlanUrlValues): MovePlanUrlValues | null {
-  return values.mv.length > 0 && values.mvd !== null ? values : null;
+/**
+ * The values when a plan can be rebuilt from them (a selection and a destination), else `null`.
+ * `corp` is the tab asking: a personal link never rebuilds on the corporation's tab, nor the reverse.
+ */
+export function planFromUrl(values: MovePlanUrlValues, corp = false): MovePlanUrlValues | null {
+  return values.mvc === corp && values.mv.length > 0 && values.mvd !== null ? values : null;
 }
 
 /** One string per distinct plan, `null` when the URL names none. The haul view (`mvr`) is a view of the plan, not part of it. */
-export function movePlanKey(values: MovePlanUrlValues): string | null {
-  const plan = planFromUrl(values);
+export function movePlanKey(values: MovePlanUrlValues, corp = false): string | null {
+  const plan = planFromUrl(values, corp);
   if (!plan) return null;
   return [
     stackKeysParam.serialize(plan.mv),

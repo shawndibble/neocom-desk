@@ -1,14 +1,10 @@
 /**
- * ESI OAuth scopes for Neocom Desk v1. Reads by design (see GLOSSARY.md), with
- * five narrow, user-triggered writes: `esi-mail.organize_mail.v1` marks a
- * mail read on ESI when it's opened here, `esi-calendar.respond_calendar_events.v1`
- * sends an RSVP, `esi-mail.send_mail.v1` sends a reply or forward, and
- * `esi-fittings.write_fittings.v1` (issue #1539) saves a Fitting to EVE — the
- * write itself is Save to EVE's job (#1540), not this ticket's — and
- * `esi-ui.write_waypoint.v1` (issue #2479) sets a trip's autopilot waypoints
- * from Route Safety. Every other
- * scope below is a read — `esi-planets.manage_planets.v1` included, whatever
- * its name says.
+ * ESI OAuth scopes for Neocom Desk v1. Reads by design (see GLOSSARY.md), plus
+ * six user-triggered writes — mail send, mark read, calendar RSVP, Save to EVE,
+ * autopilot waypoints, Open in EVE — each its own opt-in Permission in the
+ * **Write to EVE** section, so the Base Grant requests none of them. Every
+ * other scope below is a read — `esi-planets.manage_planets.v1` included,
+ * whatever its name says.
  * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
  * `structureMarkets` group, never the Base Grant — since checking a player
  * structure's own market is a need almost nobody's orders have.
@@ -61,7 +57,7 @@ export const DEFAULT_ON_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
  * default-on Permission. The plain login and Add Character request exactly
  * this set.
  *
- * Opt-in Permissions (`corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`) are excluded by design
+ * Opt-in Permissions (`corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`, `killmails`, `mercenaryDens`) are excluded by design
  * (issue #295, issue #538). Registering a corp endpoint the ordinary way
  * would put "read your corporation's wallets, assets and members" on the
  * consent screen of the ~95% of users who hold no corp role and can never

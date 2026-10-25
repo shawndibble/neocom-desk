@@ -291,7 +291,7 @@ export const PlanRow = memo(function PlanRow({
           which would blur the rename field and cancel it. The spacer keeps
           the stat columns where they are. */}
           {renaming ? (
-            <span className="w-11 shrink-0 md:w-7" aria-hidden="true" />
+            <span className="w-9 shrink-0 md:w-7" aria-hidden="true" />
           ) : (
             <RowMoreActions />
           )}

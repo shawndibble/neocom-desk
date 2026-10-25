@@ -218,7 +218,7 @@ export function Modal({
                   <span className="h-1 w-10 rounded-full bg-line-bright" />
                 </div>
               )}
-              <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
+              <header className="flex min-h-9 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1">
                 <h2 id={titleId} className={cx(eyebrowClassName, 'min-w-0 flex-1 truncate')}>
                   {title}
                 </h2>
@@ -227,7 +227,7 @@ export function Modal({
                 this replaced: DESIGN.md's icon rules require an icon-only
                 control to be an `IconButton` and forbid a dingbat character
                 standing in for one, and the mobile "More" sheet's close
-                control was flagged at 23×28px — under the documented 44px
+                control was flagged at 23×28px — under the documented 36px
                 touch tier every other icon action in the header now gets. */}
                 <IconButton
                   variant="plain"

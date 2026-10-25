@@ -27,6 +27,8 @@ export interface ActiveHaul {
   id: string;
   createdAt: number;
   capacityM3: number;
+  /** The max ISK per haul the route was worked out under; absent for none, and on a haul saved before the limit. */
+  maxIskPerHaul?: number;
   destination: HaulPlace;
   plan: HaulPlan;
   /**
@@ -47,7 +49,8 @@ function isStack(raw: unknown): boolean {
     typeof s.typeId === 'number' &&
     typeof s.name === 'string' &&
     typeof s.quantity === 'number' &&
-    typeof s.unitM3 === 'number'
+    typeof s.unitM3 === 'number' &&
+    (s.unitIsk === undefined || typeof s.unitIsk === 'number')
   );
 }
 
@@ -55,8 +58,11 @@ function isLeg(leg: Record<string, unknown>): boolean {
   const to = leg.to as Record<string, unknown> | null;
   return (
     (leg.stacks === undefined || (Array.isArray(leg.stacks) && leg.stacks.every(isStack))) &&
+    (leg.ships === undefined ||
+      (Array.isArray(leg.ships) && leg.ships.every((s) => typeof s === 'string'))) &&
     typeof leg.id === 'number' &&
     typeof leg.m3 === 'number' &&
+    (leg.isk === undefined || typeof leg.isk === 'number') &&
     (leg.kind === 'pickup' || leg.kind === 'delivery') &&
     typeof to === 'object' &&
     to !== null &&
@@ -96,13 +102,13 @@ export const useActiveHaul = createLocalSetting<ActiveHaul | null>({
   parse: (raw) => (raw === null ? null : parseActiveHaul(raw)),
 });
 
-/** One pickup's m³ the hauler can actually carry: unfit stacks and too-big ships are left out. */
+/** One pickup's m³ the hauler can actually carry: unfit and over-limit stacks and too-big ships are left out. */
 function carriableM3(plan: MovePlan, characterId: number, locationId: number, totalM3: number) {
   const hauled = plan.active?.pickups.find(
     (h) => h.characterId === characterId && h.locationId === locationId
   );
   if (!hauled) return totalM3;
-  const lost = [...hauled.unfit, ...hauled.tooBigShips].reduce(
+  const lost = [...hauled.unfit, ...hauled.overLimit, ...hauled.tooBigShips].reduce(
     (sum, l) => sum + l.quantity * l.unitM3,
     0
   );
@@ -111,7 +117,7 @@ function carriableM3(plan: MovePlan, characterId: number, locationId: number, to
 
 /**
  * The item stacks of one pickup the hauler carries, by the same rule as
- * `carriableM3`: unfit stacks and too-big ships come out; a stack with no known
+ * `carriableM3`: unfit and over-limit stacks and too-big ships come out; a stack with no known
  * volume was never in the pickup's m³. Quantities are what is left after those.
  */
 export function carriableStacks(
@@ -119,13 +125,18 @@ export function carriableStacks(
   characterId: number,
   locationId: number,
   lines: readonly ConsolidationLine[],
-  name: (typeId: number) => string
+  name: (typeId: number) => string,
+  unitIsk?: ReadonlyMap<number, number>
 ): HaulStack[] {
   const hauled = plan.active?.pickups.find(
     (h) => h.characterId === characterId && h.locationId === locationId
   );
   const lost = new Map<number, number>();
-  for (const l of [...(hauled?.unfit ?? []), ...(hauled?.tooBigShips ?? [])])
+  for (const l of [
+    ...(hauled?.unfit ?? []),
+    ...(hauled?.overLimit ?? []),
+    ...(hauled?.tooBigShips ?? []),
+  ])
     lost.set(l.typeId, (lost.get(l.typeId) ?? 0) + l.quantity);
   const stacks: HaulStack[] = [];
   for (const line of lines) {
@@ -137,6 +148,7 @@ export function carriableStacks(
         name: name(line.typeId),
         quantity,
         unitM3: line.m3 / line.quantity,
+        ...(unitIsk?.has(line.typeId) ? { unitIsk: unitIsk.get(line.typeId) } : {}),
       });
   }
   return stacks;
@@ -151,18 +163,24 @@ export interface BuildHaulArgs {
   systems: ReadonlyMap<number, number | null>;
   /** The station or structure a pickup location is, for the stop's tag; absent for a container. */
   stationIds: ReadonlyMap<number, number>;
+  /** ISK of one unit by typeID; a type absent is unpriced. */
+  unitIsk?: ReadonlyMap<number, number>;
+  /** Most one trip's load may be worth; null or absent for no limit. */
+  maxIskPerHaul?: number | null;
   name: (typeId: number) => string;
 }
 
 /**
  * Works the Haul route out for a plan under the saved Jump Basis, from each
- * Character's Current System. `null` when the plan has no hauler to plan with
- * or the stargate snapshot cannot be read.
+ * Character's Current System. A plan with no hauler (ships only, or nothing
+ * any hull could carry) still routes its flights. `null` when the plan has
+ * nothing to route or the stargate snapshot cannot be read.
  */
 export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul | null> {
-  const { plan, destination, places, systems, stationIds, name } = args;
+  const { plan, destination, places, systems, stationIds, name, unitIsk } = args;
+  const maxIskPerHaul = args.maxIskPerHaul ?? null;
   const active = plan.active;
-  if (!active) return null;
+  if (!active && plan.totals.shipsToFly === 0) return null;
   const basis = await loadJumpBasis();
   const characters: HaulCharacterInput[] = await Promise.all(
     plan.perCharacter.map(async (c) => {
@@ -173,24 +191,26 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
           ? null
           : { systemId, stationId: null, name: entry?.name ?? String(systemId) };
       const hauled = (locationId: number) =>
-        active.pickups.find((h) => h.characterId === c.characterId && h.locationId === locationId);
+        active?.pickups.find((h) => h.characterId === c.characterId && h.locationId === locationId);
       const pickups: HaulPickupInput[] = c.pickups.map((p) => ({
         locationId: p.locationId,
         systemId: systems.get(p.locationId) ?? null,
         stationId: stationIds.get(p.locationId) ?? null,
         name: places.get(p.locationId) ?? String(p.locationId),
         m3: carriableM3(plan, c.characterId, p.locationId, p.totalM3),
-        stacks: carriableStacks(plan, c.characterId, p.locationId, p.lines, name),
+        stacks: carriableStacks(plan, c.characterId, p.locationId, p.lines, name, unitIsk),
+        ships: [
+          ...p.ships.map((s) => name(s.typeId)),
+          ...(hauled(p.locationId)?.tooBigShips.flatMap((s) =>
+            Array<string>(s.quantity).fill(name(s.typeId))
+          ) ?? []),
+        ],
       }));
-      const flown = c.pickups.flatMap((p) => [
-        ...p.ships.map((s) => name(s.typeId)),
-        ...(hauled(p.locationId)?.tooBigShips.map((s) => name(s.typeId)) ?? []),
-      ]);
-      return { characterId: c.characterId, name: c.name, start, pickups, flown };
+      return { characterId: c.characterId, name: c.name, start, pickups, flown: [] };
     })
   );
   const result = await planLocalHaul(
-    { characters, capacityM3: active.hull.capacityM3, destination },
+    { characters, capacityM3: active?.hull.capacityM3 ?? 0, destination, maxIskPerHaul },
     basis.rules,
     basis.network
   );
@@ -198,7 +218,8 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
   return {
     id: newId(),
     createdAt: Date.now(),
-    capacityM3: active.hull.capacityM3,
+    capacityM3: active?.hull.capacityM3 ?? 0,
+    ...(maxIskPerHaul !== null ? { maxIskPerHaul } : {}),
     destination,
     plan: result.plan,
   };
@@ -222,7 +243,12 @@ export async function replanActiveHaul(haul: ActiveHaul): Promise<ReplanResult> 
   if (characters.length === 0) return { status: 'unknown' };
   const basis = await loadJumpBasis();
   const result = await planLocalHaul(
-    { characters, capacityM3: haul.capacityM3, destination: haul.destination },
+    {
+      characters,
+      capacityM3: haul.capacityM3,
+      destination: haul.destination,
+      maxIskPerHaul: haul.maxIskPerHaul ?? null,
+    },
     basis.rules,
     basis.network
   );
@@ -233,6 +259,7 @@ export async function replanActiveHaul(haul: ActiveHaul): Promise<ReplanResult> 
       id: newId(),
       createdAt: Date.now(),
       capacityM3: haul.capacityM3,
+      ...(haul.maxIskPerHaul !== undefined ? { maxIskPerHaul: haul.maxIskPerHaul } : {}),
       destination: haul.destination,
       plan: { ...result.plan, leftOut: [...result.plan.leftOut, ...haul.plan.leftOut] },
     },

@@ -785,7 +785,8 @@ describe('OpenOrdersPanel', () => {
     const picker = await within(screen.getByRole('banner')).findByRole('button', {
       name: 'All characters · 2. Not included: Charlie',
     });
-    expect(picker).toHaveClass('md:h-9');
+    expect(picker).toHaveClass('h-9');
+    expect(picker).not.toHaveClass('md:h-7');
     expect(screen.queryByText("Charlie hasn't shared their orders")).not.toBeInTheDocument();
     // The faces are the two Characters with orders, the active one first (no "+N" from the roster).
     const faces = Array.from(picker.querySelectorAll('img')).map(

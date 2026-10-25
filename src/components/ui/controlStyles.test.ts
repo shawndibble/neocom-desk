@@ -103,35 +103,35 @@ describe('primitives compose the shared recipe', () => {
 describe('touch tier', () => {
   it('keeps the touch height on a coarse pointer above md, and the pointer height otherwise', () => {
     expect(controlHeightClassName.sm).toBe('h-9 md:h-7 touch:h-9');
-    expect(controlHeightClassName.md).toBe('h-11 md:h-9 touch:h-11');
-    expect(tappableRowClassName).toBe('min-h-11 md:min-h-7 touch:min-h-11');
+    expect(controlHeightClassName.md).toBe('h-9');
+    expect(tappableRowClassName).toBe('min-h-9 md:min-h-7 touch:min-h-9');
   });
 
   it('puts `touch:` after `md:` in every sized class, so it wins above md', () => {
-    for (const size of ['md', 'sm', 'row'] as const) {
+    for (const size of ['sm', 'row'] as const) {
       const classes = iconButtonClassName({ size }).split(' ');
       const md = classes.findIndex((c) => c.startsWith('md:size-'));
       const touch = classes.findIndex((c) => c.startsWith('touch:size-'));
       expect(md).toBeGreaterThan(-1);
       expect(touch).toBeGreaterThan(md);
     }
-    expect(iconButtonClassName({ size: 'md' })).toContain('touch:size-11');
-    expect(iconButtonClassName({ size: 'row' })).toContain('touch:size-11');
+    expect(iconButtonClassName({ size: 'md' })).toContain('size-9');
+    expect(iconButtonClassName({ size: 'row' })).toContain('touch:size-9');
     expect(iconButtonClassName({ size: 'sm' })).toContain('touch:size-9');
   });
 
-  it('gives menu items a 44px target on touch', () => {
-    expect(menuItemClassName).toContain('touch:min-h-11');
+  it('gives menu items a 36px target on touch', () => {
+    expect(menuItemClassName).toContain('touch:min-h-9');
   });
 
-  it('gives a bare checkbox its 44px target through its label, never a pseudo-element', () => {
-    expect(touchCheckboxLabelClassName).toContain('touch:size-11');
+  it('gives a bare checkbox its 36px target through its label, never a pseudo-element', () => {
+    expect(touchCheckboxLabelClassName).toContain('touch:size-9');
     for (const file of ['Checkbox', 'Radio']) {
       expect(readFileSync(`src/components/ui/${file}.tsx`, 'utf8')).not.toMatch(/before:/);
     }
   });
 
-  it('keeps a bare checkbox target 44px wide beside long text, so rows stay aligned', () => {
+  it('keeps a bare checkbox target 36px wide beside long text, so rows stay aligned', () => {
     // A flex item shrinks by default: a long caption beside it squeezed the
     // label narrower and slid the box left of its neighbours' boxes.
     expect(touchCheckboxLabelClassName).toContain('shrink-0');
@@ -139,12 +139,12 @@ describe('touch tier', () => {
 
   it('grows a grip hit area along the vertical axis only, so it cannot cover a neighbour', () => {
     expect(gripHitAreaClassName).toContain('touch:before:inset-x-0');
-    expect(gripHitAreaClassName).toContain('touch:before:h-11');
+    expect(gripHitAreaClassName).toContain('touch:before:h-9');
     expect(gripHitAreaClassName).not.toMatch(/before:(size|w|-inset-x|-left|-right)/);
   });
 
-  it('makes the resize separator itself 44px tall on touch, with its hairline centred', () => {
-    expect(resizeHandleTouchClassName).toContain('touch:h-11');
+  it('makes the resize separator itself 36px tall on touch, with its hairline centred', () => {
+    expect(resizeHandleTouchClassName).toContain('touch:h-9');
     expect(resizeHandleTouchClassName).toContain('touch:after:top-1/2');
     expect(resizeHandleTouchClassName).not.toContain('before:');
   });

@@ -136,7 +136,7 @@ const CATALOG = [
   },
   {
     // Per Character: ESI has no corporation den route (issue #4782). The den
-    // scope sits in the `planets` Permission.
+    // scope sits in the opt-in `mercenaryDens` Permission.
     id: 'mercenaryDenReinforced',
     labelKey: 'settings.notifications.event.mercenaryDenReinforced',
     defaultChannels: 'both',
@@ -356,6 +356,11 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
 
 /** One event's i18n label key — a shared lookup so callers don't each build their own copy of this catalog map. */
 const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
+
+/** The ESI scope an event reads, or `undefined` for one that reads only public data. */
+export function eventScope(eventId: NotificationEventId): string | undefined {
+  return SCOPE_BY_EVENT.get(eventId);
+}
 
 /** Whether `scopes` covers this event; a scope-less event (`priceAlertTriggered`) always passes. */
 export function hasEventScope(eventId: NotificationEventId, scopes: ReadonlySet<string>): boolean {

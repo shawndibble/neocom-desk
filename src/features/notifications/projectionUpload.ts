@@ -29,10 +29,14 @@ import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
+import type { ServerEventRegistration } from './serverEvents';
+import { recordAlertsGrantScopes } from './alertsGrant';
+import { routeRulesForServer } from './nearbyRouteRules';
 
 export async function uploadProjectionRows(
   rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
-  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
+  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+  serverEventsByCharacter: ReadonlyMap<number, ServerEventRegistration> = new Map()
 ): Promise<void> {
   if (webPushSupport() !== 'supported') return;
   if (readNotificationPermission() !== 'granted') return;
@@ -44,10 +48,13 @@ export async function uploadProjectionRows(
     const result = await registerDeviceForWebPush(vapidKey, registration, rowsByCharacter, {
       skipIfUnchanged: true,
       eveTypesByCharacter,
+      serverEventsByCharacter,
       quietHours: quietHoursPayload(useNotificationPreferences.getState().value),
+      routeRules: await routeRulesForServer(serverEventsByCharacter),
     });
     settlePushRegistration(result);
     await recordSeenEveTypes(result?.seenTypes);
+    await recordAlertsGrantScopes(result);
   } catch (err) {
     // Same fire-and-forget contract as sendBrowserNotification/
     // recordFeedNotification in foregroundPoller.ts: the poll itself must

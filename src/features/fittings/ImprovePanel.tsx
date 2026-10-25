@@ -6,8 +6,9 @@
  * No downside and Trade-offs, never ranked against each other. Ticked rows
  * are applied together as one unsaved edit.
  */
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   Checkbox,
@@ -22,20 +23,26 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  Caret,
+  StatChange,
+  TypeIcon,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { commandOf } from '@/engine/fittings/improveCommand';
+import { hullRoleOf, roleUnlocks } from '@/engine/fittings/improveRole';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
   bestScore,
+  damageOf,
   DEFENSE_CHOICES,
   goalAvailability,
   effectiveHold,
   remoteRepairOf,
+  COMBAT_GOALS,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
   IMPROVE_MODES,
@@ -51,15 +58,28 @@ import {
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { Resource } from '@/engine/fittings/makeItFit';
+import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import {
+  capacitorChange,
+  diffFittingStats,
+  type FittingStatsDelta,
+  type StatChangeKey,
+} from '@/engine/fittings/variationDelta';
+import {
+  overallTerms,
+  roleChanges,
+  type GainMetric,
+  type RoleMetric,
+} from '@/engine/fittings/skillGains';
+import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
+import { groupByModule, IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
-import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { changeLabel } from './fittingVariationsCsv';
 import { MakeItFitSection } from './MakeItFitSection';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { ImproveSearch } from './useImprove';
@@ -70,6 +90,24 @@ const CHANGES_SHOWN = 4;
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
 const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
+
+/** The furthest a turret's optimal or a missile's range reaches, in km. */
+const reachKm = (s: FittingStats) =>
+  Math.max(
+    0,
+    ...s.applied.weapons.map((w) =>
+      w.kind === 'turret' ? w.optimal : w.kind === 'missile' ? w.range : 0
+    )
+  ) / 1000;
+
+/** What a row leads with: the figure, and the detail-line stats it already shows. */
+interface Lead {
+  node: ReactNode;
+  keys: string[];
+}
+
+/** How many figures Best overall's lead line shows: the two that moved the score most. */
+const OVERALL_LEAD_FIGURES = 2;
 
 const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
@@ -91,6 +129,9 @@ function slotsOf(candidate: ImproveOption['candidate']): string[] {
 export interface ImproveSettings {
   reach: ImproveReach;
   onReachChange: (reach: ImproveReach) => void;
+  /** How each section's rows are ordered. */
+  sort: ImproveSort;
+  onSortChange: (sort: ImproveSort) => void;
   mode: ImproveMode;
   onModeChange: (mode: ImproveMode) => void;
   /** Total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
@@ -129,9 +170,42 @@ interface Props {
   fitting?: Fitting | null;
   /** The page's Target Profile, for the summary's DPS. */
   target?: TargetProfile;
+  /**
+   * Tells the stats column what the ticked rows, plus the row under the
+   * pointer or keyboard focus, would change; null when nothing is previewed.
+   */
+  onPreview?: (delta: FittingStatsDelta | null) => void;
 }
 
+/** The guardrail a rejected swap broke; a budget or cap says by how much. */
+function brokeText(
+  t: TFunction,
+  option: RejectedOption,
+  { mode, spendCap }: Pick<ImproveSettings, 'mode' | 'spendCap'>,
+  fitTotal: number | null
+): string {
+  if (option.guardrail !== 'spend' || spendCap === null || option.iskDelta === null)
+    return t(`fittings.improve.broke.${option.guardrail}`);
+  const planning = mode === 'buy';
+  const over = (planning ? (fitTotal ?? 0) + option.iskDelta : option.iskDelta) - spendCap;
+  return t(planning ? 'fittings.improve.broke.spendBudget' : 'fittings.improve.broke.spendCap', {
+    over: formatIskCompact(over),
+    cap: formatIskCompact(spendCap),
+  });
+}
+
+/** Goals the fit itself decides: they only matter once it has the modules, whatever the hull. */
+const FIT_DERIVED_GOALS: readonly ImproveGoal[] = [
+  'mining',
+  'repair',
+  'transfer',
+  'tackle',
+  'ewar',
+  'command',
+];
+
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
+const NO_OPEN: ReadonlySet<string> = new Set();
 
 export function ImprovePanel({
   goal,
@@ -146,10 +220,21 @@ export function ImprovePanel({
   freeSections,
   fitting,
   target,
+  onPreview,
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
+  const settingsId = useId();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const goalsId = useId();
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const { sort, onSortChange: setSort } = settings;
+  // Modules whose other options, and rows whose other stats, are showing; like ticks, they belong to one result.
+  const [open, setOpen] = useState<{ result: ImproveResult | null; keys: ReadonlySet<string> }>({
+    result: null,
+    keys: new Set(),
+  });
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
   // Ticks belong to the result they were made in: a new search (a goal
   // change, an edit to the fit) starts with none.
@@ -161,8 +246,23 @@ export function ImprovePanel({
   }>({ result: null, byModule: new Map(), replaced: new Map() });
   const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
+  const expanded = open.result === result ? open.keys : NO_OPEN;
+  const flip = (key: string) =>
+    setOpen({
+      result,
+      keys: new Set(
+        expanded.has(key) ? [...expanded].filter((k) => k !== key) : [...expanded, key]
+      ),
+    });
   const ticked = ticks.result === result ? ticks.byModule : NO_TICKS;
   const replaced = ticks.result === result ? ticks.replaced : new Map<string, string>();
+  // The row under the pointer or keyboard focus; like ticks, it belongs to the result it was made in.
+  const [hovering, setHovering] = useState<{
+    result: ImproveResult | null;
+    option: ImproveOption | null;
+  }>({ result: null, option: null });
+  const hovered = hovering.result === result ? hovering.option : null;
+  const setHover = (option: ImproveOption | null) => setHovering({ result, option });
   const setTicked = (
     byModule: ReadonlyMap<string, ImproveOption>,
     nextReplaced: ReadonlyMap<string, string> = new Map()
@@ -185,15 +285,54 @@ export function ImprovePanel({
         })
       : moveLabel(option.candidate);
 
-  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): string {
+  /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
+  function changeLine(
+    option: ImproveOption | RejectedOption,
+    own: FittingStats,
+    all = false,
+    onOpen?: () => void,
+    omit: readonly string[] = []
+  ): ReactNode {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
-    const changes = [...diffFittingStats(own, option.after).changes].sort(
-      (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
-    );
-    const shown = changes.slice(0, CHANGES_SHOWN).map((change) => changeLabel(change, t));
+    const changes = diffFittingStats(own, option.after)
+      .changes.filter((change) => !omit.includes(change.key))
+      .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
+    const shown: ReactNode[] = changes
+      .slice(0, all ? undefined : CHANGES_SHOWN)
+      .map((change) => <StatChange key={change.key} change={change} />);
     const rest = changes.length - shown.length;
-    if (rest > 0) shown.push(t('fittings.makeItFit.otherStats', { count: rest }));
-    return shown.length > 0 ? shown.join(', ') : t('fittings.variations.noChanges');
+    if (rest > 0) {
+      const label = t('fittings.makeItFit.otherStats', { count: rest });
+      shown.push(
+        onOpen ? (
+          <button key="rest" type="button" className={textActionClassName()} onClick={onOpen}>
+            {label}
+          </button>
+        ) : (
+          label
+        )
+      );
+    }
+    if (shown.length === 0) return t('fittings.variations.noChanges');
+    return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
+  }
+
+  /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
+  function lostLine(option: ImproveOption): ReactNode {
+    return option.lost.flatMap(({ kind, change }, i): ReactNode[] => {
+      const node =
+        kind === 'stat' ? (
+          <StatChange key={change.key} change={change} />
+        ) : (
+          <span key={change.key}>
+            {t(`fittings.whatToTrain.role.${change.key}`, {
+              before: change.before,
+              after: change.after,
+            })}
+          </span>
+        );
+      return i === 0 ? [node] : [', ', node];
+    });
   }
 
   function isk(option: ImproveOption) {
@@ -289,6 +428,134 @@ export function ImprovePanel({
     return null;
   }
 
+  /**
+   * The goal's own figure, before → after, first on every row. `keys` are the
+   * detail-line stats it already shows, so the row does not say them twice.
+   */
+  function leadLine(option: ImproveOption, own: FittingStats): Lead | null {
+    const stat = (key: StatChangeKey, before: number, after: number): Lead => ({
+      node: <StatChange key={key} change={{ key, before, after }} />,
+      keys: [key],
+    });
+    const text = (key: string, line: string | null): Lead | null =>
+      line === null ? null : { node: <span key={key}>{line}</span>, keys: [] };
+    const dps = (): Lead => {
+      const [was, now] = [damageOf(own, target), damageOf(option.after, target)];
+      // A damage figure is labelled for what it is: applied to the Target Profile, the fit's own sustained DPS, or that plus its drones and fighters.
+      if (target && own.applied.weapons.length > 0) return stat('appliedDps', was, now);
+      const shipOnly = (s: FittingStats) => damageOf(s, undefined) === s.offense.sustainedDps;
+      return stat(
+        shipOnly(own) && shipOnly(option.after) ? 'sustainedDps' : 'sustainedDamage',
+        was,
+        now
+      );
+    };
+    const tank = () => stat('ehp', own.ehp, option.after.ehp);
+    const role = (metric: RoleMetric): Lead | null => {
+      const change = roleChanges(own, option.after).find((c) => c.key === metric);
+      return change
+        ? {
+            node: (
+              <span key={metric}>
+                {t(`fittings.whatToTrain.role.${metric}`, {
+                  before: change.before,
+                  after: change.after,
+                })}
+              </span>
+            ),
+            keys: [],
+          }
+        : null;
+    };
+    // One figure that earned Best overall's score, worded as the row's other lines word it.
+    const term = (metric: GainMetric): Lead | null => {
+      switch (metric) {
+        case 'dps':
+          return dps();
+        case 'ehp':
+          return tank();
+        case 'activeTank': {
+          const total = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
+          return text(
+            metric,
+            t('fittings.improve.activeTankLine', {
+              before: m3sFormat(total(own)),
+              after: m3sFormat(total(option.after)),
+            })
+          );
+        }
+        case 'speed':
+          return stat(
+            'maxVelocity',
+            own.navigation.maxVelocity,
+            option.after.navigation.maxVelocity
+          );
+        case 'align':
+          return text(
+            metric,
+            t('fittings.improve.alignLine', {
+              before: twoDecimals(alignOf(own)),
+              after: twoDecimals(alignOf(option.after)),
+            })
+          );
+        case 'capacitor': {
+          const change = capacitorChange(own, option.after);
+          return change && stat('capacitor', change.before, change.after);
+        }
+        case 'lockRange':
+          return stat(
+            'maxTargetRange',
+            own.targeting.maxTargetRange / 1000,
+            option.after.targeting.maxTargetRange / 1000
+          );
+        default:
+          return role(metric);
+      }
+    };
+    switch (goal) {
+      case 'damage':
+        return dps();
+      case 'tank':
+        return tank();
+      case 'overall': {
+        // The figures that moved the score most, never one that stood still.
+        const leads = overallTerms(own, option.after)
+          .map(({ metric }) => term(metric))
+          .filter((lead): lead is Lead => lead !== null)
+          .slice(0, OVERALL_LEAD_FIGURES);
+        return leads.length === 0
+          ? null
+          : {
+              node: leads.flatMap((lead, i) => (i === 0 ? [lead.node] : [', ', lead.node])),
+              keys: leads.flatMap((lead) => lead.keys),
+            };
+      }
+      case 'speed':
+        return stat('maxVelocity', own.navigation.maxVelocity, option.after.navigation.maxVelocity);
+      case 'reach':
+        return text(
+          goal,
+          t('fittings.improve.reachLine', {
+            before: m3sFormat(reachKm(own)),
+            after: m3sFormat(reachKm(option.after)),
+          })
+        );
+      case 'mining':
+        return text(goal, oreLine(option, own));
+      default:
+        return text(goal, moveLine(option, own));
+    }
+  }
+
+  /** The goal's figure now → after the single best swap; null when there is no result or the goal has no figure. */
+  function bestFoundLine(result: ImproveResult, own: FittingStats): ReactNode {
+    const best = [...result.noDownside, ...result.tradeOffs].reduce<ImproveOption | null>(
+      (top, option) => (top === null || option.score > top.score ? option : top),
+      null
+    );
+    return best === null ? null : (leadLine(best, own)?.node ?? null);
+  }
+
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
     const nextReplaced = new Map(replaced);
@@ -312,62 +579,114 @@ export function ImprovePanel({
     setTicked(next, nextReplaced);
   }
 
-  function rows(options: ImproveOption[], own: FittingStats) {
+  function optionRow(option: ImproveOption, own: FittingStats, section: string) {
+    const id = `improve-${section}-${optionKey(option)}`;
+    const statsKey = `stats:${id}`;
+    const lead = leadLine(option, own);
+    return (
+      <li
+        key={optionKey(option)}
+        className="border-line rounded-xs border p-2 text-sm"
+        // A mouse hover or a keyboard focus previews it; touch has no hover, so only its tick does (§6c).
+        onPointerEnter={(event) => event.pointerType === 'mouse' && setHover(option)}
+        // Leaving with the pointer keeps a keyboard-focused row previewed; moving focus between the row's own parts keeps it too.
+        onPointerLeave={(event) =>
+          !event.currentTarget.contains(
+            document.activeElement?.matches(':focus-visible') ? document.activeElement : null
+          ) && setHover(null)
+        }
+        onFocus={(event) => event.target.matches(':focus-visible') && setHover(option)}
+        onBlur={(event) =>
+          !event.currentTarget.contains(event.relatedTarget as Node | null) && setHover(null)
+        }
+      >
+        <label
+          htmlFor={id}
+          className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}
+        >
+          <Checkbox
+            id={id}
+            className="mt-0.5"
+            checked={ticked.has(optionKey(option))}
+            onChange={() => toggle(option)}
+          />
+          <TypeIcon typeId={option.candidate.toTypeId} size={32} width={24} height={24} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-start justify-between gap-2">
+              <span className="font-medium">{swapLabel(option)}</span>
+              {goal !== 'cheaper' && (
+                <span className="text-success shrink-0 text-xs font-medium">
+                  {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
+                </span>
+              )}
+            </span>
+            {lead && <span className="block text-xs">{lead.node}</span>}
+            <span className="text-text-dim block text-xs">
+              {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
+            </span>
+            {option.lost.length > 0 && (
+              <span className="text-warning block text-xs">
+                {t('fittings.improve.givesUp')} {lostLine(option)}
+              </span>
+            )}
+            <span className="block text-xs">{isk(option)}</span>
+            {replaced.has(optionKey(option)) && ticked.has(optionKey(option)) && (
+              <span className="text-text-dim block text-xs">
+                {t('fittings.improve.replacesPick', { swap: replaced.get(optionKey(option)) })}
+              </span>
+            )}
+            {option.destroysRigs && (
+              <span className="text-warning block text-xs">
+                {t('fittings.improve.destroysRig')}
+              </span>
+            )}
+          </span>
+        </label>
+      </li>
+    );
+  }
+
+  function rows(options: ImproveOption[], own: FittingStats, section: string) {
     return (
       <ul className="space-y-1">
-        {options.map((option) => {
-          const id = `improve-${optionKey(option)}`;
-          const line = moveLine(option, own);
+        {groupByModule(options, sort).map((group, index) => {
+          const all = [group.best, ...group.others];
+          // A ticked alternative takes the row's place; the rest stay behind it.
+          const shown = all.find((option) => ticked.has(optionKey(option))) ?? group.best;
+          const rest = all.filter((option) => option !== shown);
+          const groupKey = `${section}:${group.key}`;
+          const isOpen = expanded.has(groupKey);
+          const listId = `${moreId}-${section}-${index}`;
           return (
-            <li key={optionKey(option)} className="border-line rounded-xs border p-2 text-sm">
-              <label
-                htmlFor={id}
-                className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}
-              >
-                <Checkbox
-                  id={id}
-                  className="mt-0.5"
-                  checked={ticked.has(optionKey(option))}
-                  onChange={() => toggle(option)}
-                />
-                <span className="min-w-0">
-                  <span className="block font-medium">{swapLabel(option)}</span>
-                  {goal === 'mining' && (
-                    <span className="block text-xs">{oreLine(option, own)}</span>
-                  )}
-                  {line && <span className="block text-xs">{line}</span>}
-                  <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
-                  {option.downsides.length > 0 && (
-                    <span className="text-warning block text-xs">
-                      {t('fittings.improve.givesUp', {
-                        stats: option.downsides
-                          .map((metric) => t(`fittings.whatToTrain.sort.${metric}`))
-                          .join(', '),
-                      })}
-                    </span>
-                  )}
-                  <span className="block text-xs">{isk(option)}</span>
-                  {replaced.has(optionKey(option)) && ticked.has(optionKey(option)) && (
-                    <span className="text-text-dim block text-xs">
-                      {t('fittings.improve.replacesPick', {
-                        swap: replaced.get(optionKey(option)),
-                      })}
-                    </span>
-                  )}
-                  {option.destroysRigs && (
-                    <span className="text-warning block text-xs">
-                      {t('fittings.improve.destroysRig')}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </li>
+            <Fragment key={group.key}>
+              {optionRow(shown, own, section)}
+              {rest.length > 0 && (
+                <li className="pl-2">
+                  <button
+                    type="button"
+                    className={textActionClassName()}
+                    aria-expanded={isOpen}
+                    aria-controls={listId}
+                    onClick={() => flip(groupKey)}
+                  >
+                    {t('fittings.improve.moreOptions', { count: rest.length })}
+                    <Caret expanded={isOpen} />
+                  </button>
+                  <Collapse open={isOpen} id={listId} className="pt-1">
+                    <ul className="space-y-1">
+                      {rest.map((option) => optionRow(option, own, section))}
+                    </ul>
+                  </Collapse>
+                </li>
+              )}
+            </Fragment>
           );
         })}
       </ul>
     );
   }
 
+  const bestFound = state.status === 'done' ? bestFoundLine(state.result, state.before) : null;
   const chosen = useMemo(() => [...ticked.values()], [ticked]);
 
   // The rows were each scored alone: one recalculation of the ticked set checks them together.
@@ -407,11 +726,62 @@ export function ImprovePanel({
           target,
         })
       : null;
+  // The ticked set with the hovered row on top (it displaces a ticked row sharing a slot, as ticking it would).
+  const hoverSet = useMemo(() => {
+    if (!hovered || ticked.has(optionKey(hovered))) return null;
+    const taken = new Set(slotsOf(hovered.candidate));
+    return [
+      ...chosen.filter((pick) => !slotsOf(pick.candidate).some((slot) => taken.has(slot))),
+      hovered,
+    ];
+  }, [hovered, ticked, chosen]);
+  const hoverKey = hoverSet?.map(optionKey).sort().join('|') ?? null;
+  const [hoverResult, setHoverResult] = useState<{
+    key: string;
+    fitting: Fitting;
+    after: FittingStats | null;
+  } | null>(null);
+  // One debounced recalculation per hovered row, so a sweep down the list works out only where the pointer rests.
+  useEffect(() => {
+    if (!fitting || !recalc || !hoverSet || hoverKey === null) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      const folded = hoverSet.reduce(
+        (acc, pick) => applyImproveCandidate(acc, pick.candidate),
+        fitting
+      );
+      recalc(folded)
+        .then((after) => !stale && setHoverResult({ key: hoverKey, fitting, after }))
+        .catch(() => !stale && setHoverResult({ key: hoverKey, fitting, after: null }));
+    }, ADD_PREVIEW_DELAY_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [fitting, recalc, hoverSet, hoverKey]);
+  const hoverAfter =
+    hoverKey !== null && hoverResult?.key === hoverKey && hoverResult.fitting === fitting
+      ? hoverResult.after
+      : null;
+  // Until the hovered row's figures land, the ticked set's stay up.
+  const previewAfter = hoverAfter ?? (chosen.length > 0 ? (checked ?? null) : null);
+  const previewBefore = state.status === 'done' ? state.before : null;
+  const previewDelta = useMemo(
+    () => (previewBefore && previewAfter ? diffFittingStats(previewBefore, previewAfter) : null),
+    [previewBefore, previewAfter]
+  );
+  useEffect(() => {
+    onPreview?.(previewDelta);
+  }, [onPreview, previewDelta]);
+  // Closing Improve (or a new search) takes the panel away: nothing stays previewed.
+  useEffect(() => () => onPreview?.(null), [onPreview]);
   // A pending check holds Apply back; a failed one (each row was valid alone) warns but does not block.
   const canApply =
     chosen.length > 0 &&
     (!checkable || checked === null || (summary !== null && summary.problems.length === 0));
 
+  // A blank hull has no fitted module to vary: the empty state must not talk about one.
+  const noModules = fitting?.modules.length === 0;
   // A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`).
   if (state.status === 'overBudget')
     return (
@@ -432,6 +802,38 @@ export function ImprovePanel({
       </MakeItFitSection>
     );
 
+  const role = hullRoleOf(hull);
+  const availabilityOf = (id: ImproveGoal) =>
+    before ? goalAvailability(id, before, hull) : { available: true as const };
+  const unavailableReason = (id: ImproveGoal): string | undefined => {
+    const availability = availabilityOf(id);
+    return 'reason' in availability
+      ? t(`fittings.improve.unavailable.${availability.reason}`)
+      : undefined;
+  };
+  // Role-relevant goals lead as chips; the rest, and any the fit cannot score, sit under "More goals".
+  const roleGoals: readonly ImproveGoal[] = role === 'combat' ? COMBAT_GOALS : roleUnlocks(role);
+  // The picked goal stays a chip so the pick is visible, unless the fit cannot score it: that one sits with its reason.
+  const isRelevant = (id: ImproveGoal) =>
+    availabilityOf(id).available &&
+    (id === goal || roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id));
+  const relevantGoals = IMPROVE_GOALS.filter(isRelevant);
+  const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
+  const settingsSummary = [
+    t(`fittings.improve.reach.${settings.reach}`),
+    t(`fittings.improve.mode.${settings.mode}`),
+    settings.spendCap === null
+      ? t('fittings.improve.summaryNoCap')
+      : t(`fittings.improve.summaryCap.${settings.mode}`, {
+          cap: formatIskCompact(settings.spendCap),
+        }),
+  ].join(' · ');
+  const pickGoal = (id: ImproveGoal) => {
+    if (goal === id) return;
+    setTicked(new Map());
+    onGoalChange(id);
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -440,35 +842,52 @@ export function ImprovePanel({
           aria-label={t('fittings.improve.goalLabel')}
           className="flex flex-wrap gap-2"
         >
-          {IMPROVE_GOALS.map((id) => {
-            const availability = before ? goalAvailability(id, before, hull) : { available: true };
-            const reason =
-              'reason' in availability
-                ? t(`fittings.improve.unavailable.${availability.reason}`)
-                : undefined;
-            return (
-              <FilterChip
-                key={id}
-                label={t(`fittings.improve.goal.${id}`)}
-                selected={goal === id}
-                disabled={!availability.available}
-                {...(reason ? { tooltip: reason } : {})}
-                onToggle={() => {
-                  if (goal === id) return;
-                  setTicked(new Map());
-                  onGoalChange(id);
-                }}
-              />
-            );
-          })}
+          {relevantGoals.map((id) => (
+            <FilterChip
+              key={id}
+              label={t(`fittings.improve.goal.${id}`)}
+              selected={goal === id}
+              onToggle={() => pickGoal(id)}
+            />
+          ))}
         </div>
-        <p className="text-text-dim text-xs">
-          {t(
-            goal === 'cheaper'
-              ? 'fittings.improve.guardrail.cheaper'
-              : 'fittings.improve.guardrail.combat'
-          )}
-        </p>
+        {otherGoals.length > 0 && (
+          <div>
+            <button
+              type="button"
+              className={textActionClassName('gap-1')}
+              aria-expanded={goalsOpen}
+              aria-controls={goalsId}
+              onClick={() => setGoalsOpen((open) => !open)}
+            >
+              {t('fittings.improve.moreGoals', { count: otherGoals.length })}
+              <Caret expanded={goalsOpen} />
+            </button>
+            <Collapse open={goalsOpen} id={goalsId} className="pt-1">
+              <ul>
+                {otherGoals.map((id) => {
+                  const reason = unavailableReason(id);
+                  return (
+                    <li
+                      key={id}
+                      className="flex flex-col items-start gap-1 py-1 sm:flex-row sm:items-center sm:gap-3"
+                    >
+                      <span className="sm:w-52 sm:shrink-0">
+                        <FilterChip
+                          label={t(`fittings.improve.goal.${id}`)}
+                          selected={goal === id}
+                          disabled={reason !== undefined}
+                          onToggle={() => pickGoal(id)}
+                        />
+                      </span>
+                      {reason && <span className="text-warning text-xs">{reason}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Collapse>
+          </div>
+        )}
         {goal === 'mining' && (
           <div className="space-y-1 text-sm">
             <span aria-hidden="true">{t('fittings.improve.oreLabel')}</span>
@@ -513,85 +932,112 @@ export function ImprovePanel({
         )}
       </div>
 
-      <div className="space-y-3">
-        <SegmentedControl
-          label={t('fittings.improve.reachLabel')}
-          options={IMPROVE_REACHES.map((value) => ({
-            value,
-            label: t(`fittings.improve.reach.${value}`),
-          }))}
-          value={settings.reach}
-          onChange={settings.onReachChange}
-          fill
-        />
-        <p className="text-text-dim text-xs">{t(`fittings.improve.reachHint.${settings.reach}`)}</p>
-        <SegmentedControl
-          label={t('fittings.improve.modeLabel')}
-          options={IMPROVE_MODES.map((value) => ({
-            value,
-            label: t(`fittings.improve.mode.${value}`),
-          }))}
-          value={settings.mode}
-          onChange={settings.onModeChange}
-          fill
-        />
-        <label className="block space-y-1 text-sm">
-          <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
-          <IskInput
-            value={settings.spendCap === null ? '' : String(settings.spendCap)}
-            onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
-          />
-        </label>
-        {TANK_GOALS.has(goal) && (
-          <>
+      <div>
+        <button
+          type="button"
+          className={textActionClassName('w-full justify-between gap-2')}
+          aria-expanded={settingsOpen}
+          aria-controls={settingsId}
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          <span>{t('fittings.improve.settingsLabel')}</span>
+          <span className="text-text-dim flex items-center gap-1 normal-case tracking-normal">
+            {settingsSummary}
+            <Caret expanded={settingsOpen} />
+          </span>
+        </button>
+        <Collapse open={settingsOpen} id={settingsId} className="pt-2">
+          <div className="space-y-3">
+            <p className="text-text-dim text-xs">
+              {t(
+                goal === 'cheaper'
+                  ? 'fittings.improve.guardrail.cheaper'
+                  : 'fittings.improve.guardrail.combat'
+              )}
+            </p>
             <SegmentedControl
-              label={t('fittings.improve.defenseLabel')}
-              options={DEFENSE_CHOICES.map((value) => ({
+              label={t('fittings.improve.reachLabel')}
+              options={IMPROVE_REACHES.map((value) => ({
                 value,
-                label: t(`fittings.improve.defense.${value}`),
-                // Upgrade swaps a module within its own type, so it can't change tank side.
-                ...(value !== 'keep' && settings.reach === 'upgrade'
-                  ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
-                  : {}),
+                label: t(`fittings.improve.reach.${value}`),
               }))}
-              value={settings.defense}
-              onChange={settings.onDefenseChange}
+              value={settings.reach}
+              onChange={settings.onReachChange}
               fill
             />
-            {settings.reach === 'upgrade' && (
-              <p className="text-text-dim text-xs">{t('fittings.improve.defenseUpgrade')}</p>
+            <p className="text-text-dim text-xs">
+              {t(`fittings.improve.reachHint.${settings.reach}`)}
+            </p>
+            <SegmentedControl
+              label={t('fittings.improve.modeLabel')}
+              options={IMPROVE_MODES.map((value) => ({
+                value,
+                label: t(`fittings.improve.mode.${value}`),
+              }))}
+              value={settings.mode}
+              onChange={settings.onModeChange}
+              fill
+            />
+            <label className="block space-y-1 text-sm">
+              <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
+              <IskInput
+                value={settings.spendCap === null ? '' : String(settings.spendCap)}
+                onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
+              />
+            </label>
+            {TANK_GOALS.has(goal) && (
+              <>
+                <SegmentedControl
+                  label={t('fittings.improve.defenseLabel')}
+                  options={DEFENSE_CHOICES.map((value) => ({
+                    value,
+                    label: t(`fittings.improve.defense.${value}`),
+                    // Upgrade swaps a module within its own type, so it can't change tank side.
+                    ...(value !== 'keep' && settings.reach === 'upgrade'
+                      ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
+                      : {}),
+                  }))}
+                  value={settings.defense}
+                  onChange={settings.onDefenseChange}
+                  fill
+                />
+                {settings.reach === 'upgrade' && (
+                  <p className="text-text-dim text-xs">{t('fittings.improve.defenseUpgrade')}</p>
+                )}
+              </>
             )}
-          </>
-        )}
-        <div>
-          <button
-            type="button"
-            className={textActionClassName()}
-            aria-expanded={moreOpen}
-            aria-controls={moreId}
-            onClick={() => setMoreOpen((open) => !open)}
-          >
-            {t('fittings.improve.moreLabel')}
-          </button>
-          <Collapse open={moreOpen} id={moreId} className="pt-2">
-            <div className="space-y-1">
-              <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
-                <Checkbox
-                  checked={settings.includeRigs}
-                  onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
-                />
-                {t('fittings.improve.includeRigs')}
-              </label>
-              <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
-                <Checkbox
-                  checked={settings.includeOfficer}
-                  onChange={(event) => settings.onIncludeOfficerChange(event.target.checked)}
-                />
-                {t('fittings.improve.includeOfficer')}
-              </label>
+            <div>
+              <button
+                type="button"
+                className={textActionClassName('gap-1')}
+                aria-expanded={moreOpen}
+                aria-controls={moreId}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                {t('fittings.improve.moreLabel')}
+                <Caret expanded={moreOpen} />
+              </button>
+              <Collapse open={moreOpen} id={moreId} className="pt-2">
+                <div className="space-y-1">
+                  <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                    <Checkbox
+                      checked={settings.includeRigs}
+                      onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
+                    />
+                    {t('fittings.improve.includeRigs')}
+                  </label>
+                  <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                    <Checkbox
+                      checked={settings.includeOfficer}
+                      onChange={(event) => settings.onIncludeOfficerChange(event.target.checked)}
+                    />
+                    {t('fittings.improve.includeOfficer')}
+                  </label>
+                </div>
+              </Collapse>
             </div>
-          </Collapse>
-        </div>
+          </div>
+        </Collapse>
       </div>
 
       {unloaded && (
@@ -640,6 +1086,15 @@ export function ImprovePanel({
         </div>
       )}
 
+      {state.status === 'belowPrice' && (
+        <p className="text-warning text-sm" data-testid="improve-below-price">
+          {t('fittings.improve.belowPrice', {
+            budget: formatIskCompact(state.budget),
+            price: formatIskCompact(state.fitTotal),
+          })}
+        </p>
+      )}
+
       {state.status === 'failed' && (
         <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
       )}
@@ -666,7 +1121,13 @@ export function ImprovePanel({
       {state.status === 'done' &&
         (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
-            <p className="text-sm">{t(`fittings.improve.nothing.${goal}`)}</p>
+            <p className="text-sm">
+              {t(
+                noModules
+                  ? 'fittings.improve.nothing.noModules'
+                  : `fittings.improve.nothing.${goal}`
+              )}
+            </p>
             {state.result.stopped && (
               <div className="space-y-2">
                 <p className="text-text-dim text-xs">
@@ -694,7 +1155,7 @@ export function ImprovePanel({
                         {line && <p className="text-xs">{line}</p>}
                         <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
                         <p className="text-warning text-xs">
-                          {t(`fittings.improve.broke.${option.guardrail}`)}
+                          {brokeText(t, option, settings, state.fitTotal)}
                         </p>
                       </li>
                     );
@@ -702,26 +1163,46 @@ export function ImprovePanel({
                 </ul>
               </MakeItFitSection>
             )}
-            <p className="text-text-dim text-xs">{t(`fittings.improve.widen.${settings.reach}`)}</p>
+            {!noModules && (
+              <p className="text-text-dim text-xs">
+                {t(`fittings.improve.widen.${settings.reach}`)}
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
+            {bestFound && (
+              <p className="text-sm" data-testid="improve-best-found">
+                <span className="text-text-dim">{t('fittings.improve.bestFound')} </span>
+                <span className="font-medium">{bestFound}</span>
+              </p>
+            )}
             {state.result.stopped && (
               <p className="text-text-dim text-xs">
                 {t('fittings.improve.partial', { checked: state.result.checked })}
               </p>
             )}
+            <SegmentedControl
+              label={t('fittings.improve.sortLabel')}
+              options={IMPROVE_SORTS.map((value) => ({
+                value,
+                label: t(`fittings.improve.sort.${value}`),
+              }))}
+              value={sort}
+              onChange={setSort}
+              fill
+            />
             {state.result.noDownside.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.noDownside')}>
-                {rows(state.result.noDownside, state.before)}
+                {rows(state.result.noDownside, state.before, 'nd')}
               </MakeItFitSection>
             )}
             {state.result.tradeOffs.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.tradeOffs')}>
-                {rows(state.result.tradeOffs, state.before)}
+                {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
-            <div className="bg-surface border-line sticky bottom-0 space-y-2 border-t pt-2">
+            <div className="bg-panel border-line sticky bottom-0 space-y-2 border-t pt-2">
               {chosen.length > 0 && checkable && (
                 <div className="space-y-1 text-sm" data-testid="improve-selection">
                   {summary ? (

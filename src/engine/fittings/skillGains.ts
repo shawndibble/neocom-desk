@@ -12,7 +12,7 @@ import type { AppliedWeapon } from './appliedDps';
 import { alignTimeSeconds } from './stats';
 import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
-import { round } from './fittingStatFields';
+import { round, statDirection } from './fittingStatFields';
 import { budgetOverages } from './skillGaps';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
 
@@ -166,8 +166,6 @@ interface RoleField {
   values: (s: FittingStats) => number[];
   /** Whether this fit's `before` has the role at all; absent: always. */
   applies?: (before: FittingStats) => boolean;
-  /** Less is better: a reload, a fuel bill. The gain is scored the other way up. */
-  lowerIsBetter?: boolean;
 }
 
 /**
@@ -233,7 +231,6 @@ const ROLE_FIELDS: readonly RoleField[] = [
     key: 'burstReload',
     digits: 1,
     values: (s) => s.fleetSupport.bursts.map((burst) => burst.reloadSeconds),
-    lowerIsBetter: true,
   },
   {
     key: 'compressionRange',
@@ -244,7 +241,6 @@ const ROLE_FIELDS: readonly RoleField[] = [
     key: 'coreFuel',
     digits: 0,
     values: (s) => [s.fleetSupport.core?.fuelPerCycle ?? 0],
-    lowerIsBetter: true,
   },
 ];
 
@@ -267,8 +263,9 @@ function roleResults(
     for (let i = 0; i < Math.max(was.length, now.length); i++) {
       const b = round(was[i] ?? 0, field.digits);
       const a = round(now[i] ?? 0, field.digits);
-      if (b === a || (field.lowerIsBetter && b === 0)) continue;
-      const gain = field.lowerIsBetter ? -relative(b, a) : relative(b, a);
+      const lowerIsBetter = statDirection(field.key) === 'lower';
+      if (b === a || (lowerIsBetter && b === 0)) continue;
+      const gain = lowerIsBetter ? -relative(b, a) : relative(b, a);
       if (best === null || gain > best.gain)
         best = { change: { key: field.key, before: b, after: a }, gain };
     }
@@ -293,11 +290,18 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  * alive, so every metric counts whole.
  */
 export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
+  const metrics = rawMetrics(before, after);
+  const weight = overallWeight(before, after);
+  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
+  return { overall, ...metrics };
+}
+
+function rawMetrics(before: FittingStats, after: FittingStats): Record<GainMetric, number> {
   const roleGains = Object.fromEntries([
     ...ROLE_METRICS.map((key): [RoleMetric, number] => [key, 0]),
     ...roleResults(before, after).map(({ change, gain }) => [change.key, gain]),
   ]) as Record<RoleMetric, number>;
-  const metrics: Record<GainMetric, number> = {
+  return {
     dps: relative(before.offense.dps, after.offense.dps),
     ehp: relative(before.ehp, after.ehp),
     activeTank: relative(activeTank(before), activeTank(after)),
@@ -307,12 +311,30 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
     lockRange: relative(before.targeting.maxTargetRange, after.targeting.maxTargetRange),
     ...roleGains,
   };
+}
+
+/** The weight `overall` gives each metric for this swap; see `gainMetrics`. */
+function overallWeight(before: FittingStats, after: FittingStats) {
   const flipped = before.capacitor.stable !== after.capacitor.stable;
   const weighted = isArmed(before);
-  const weight = (metric: GainMetric) =>
+  return (metric: GainMetric) =>
     !weighted || (metric === 'capacitor' && flipped) ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
-  const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
-  return { overall, ...metrics };
+}
+
+/**
+ * The metrics that moved `overall` up, the largest weighted term first —
+ * what earned the score, for a row to lead with. Never a metric that held
+ * still or got worse.
+ */
+export function overallTerms(
+  before: FittingStats,
+  after: FittingStats
+): { metric: GainMetric; term: number }[] {
+  const metrics = rawMetrics(before, after);
+  const weight = overallWeight(before, after);
+  return GAIN_METRICS.map((metric) => ({ metric, term: metrics[metric] * weight(metric) }))
+    .filter(({ term }) => term > 0)
+    .sort((a, b) => b.term - a.term);
 }
 
 export interface SkillGain extends SkillGainCandidate {

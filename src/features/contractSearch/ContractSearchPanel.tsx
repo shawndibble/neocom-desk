@@ -998,7 +998,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                           type="button"
                           onClick={() => selectType(suggestion)}
                           className={cx(
-                            'flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left md:min-h-9',
+                            'flex min-h-9 w-full items-center justify-between gap-3 px-3 py-2 text-left',
                             rowInteractiveClassName,
                             focusRingInsetClassName
                           )}

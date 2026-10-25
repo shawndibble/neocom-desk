@@ -7,7 +7,7 @@ describe('textActionClassName', () => {
   it('carries the uppercase accent recipe with the touch box', () => {
     const tokens = textActionClassName().split(' ');
     for (const token of [
-      'min-h-11',
+      'min-h-9',
       'md:min-h-0',
       'font-semibold',
       'tracking-widest',

@@ -3,10 +3,10 @@
  * a day is selected in the phone Day Ticker, the rail's header grows a
  * "Show all days" link to clear the filter. It was a bare `<button>` with no
  * height/padding-y class at all — its own hit box was ~16-18px, under both
- * the 44px touch tier and the 24px WCAG floor, even though the panel header
- * around it is already `min-h-11` (`Panel`'s header uses `items-center`
+ * the 36px touch tier and the 24px WCAG floor, even though the panel header
+ * around it is already `min-h-9` (`Panel`'s header uses `items-center`
  * without stretching the action to fill that height). Fixed with
- * `flex min-h-11 items-center ... md:min-h-0`, the same precedent as
+ * `flex min-h-9 items-center ... md:min-h-0`, the same precedent as
  * #1064's Open Orders Healthy toggle (identical prior className).
  *
  * No calendar-event fixture is needed: "Show all days" renders purely off
@@ -38,7 +38,7 @@ async function selectFirstCalendarDay(page: Page, viewport: { width: number; hei
   await grid.getByRole('button').first().click();
 }
 
-test('"Show all days" meets the 44px touch floor at 390px, and still clears the filter', async ({
+test('"Show all days" meets the 36px touch floor at 390px, and still clears the filter', async ({
   page,
 }) => {
   await selectFirstCalendarDay(page, PHONE);
@@ -47,7 +47,7 @@ test('"Show all days" meets the 44px touch floor at 390px, and still clears the 
   await expect(clearDay).toBeVisible();
 
   const height = await clearDay.evaluate((el) => el.getBoundingClientRect().height);
-  expect(height).toBeGreaterThanOrEqual(44);
+  expect(height).toBeGreaterThanOrEqual(36);
 
   await clearDay.click();
   await expect(clearDay).not.toBeVisible();
@@ -63,14 +63,14 @@ test('"Show all days" keeps its plain text-link size at and above md (1280px)', 
 
   const height = await clearDay.evaluate((el) => el.getBoundingClientRect().height);
   // `md:min-h-0` drops the floor rather than pinning back to a fixed value
-  // — pinned to the real measured content-driven height, not just "< 44",
+  // — pinned to the real measured content-driven height, not just "< 36",
   // so a loose upper bound can't miss a partial regression toward the
   // touch-tier height.
   expect(height).toBeGreaterThanOrEqual(10);
   expect(height).toBeLessThanOrEqual(20);
 });
 
-test('period-nav controls meet the 44px touch floor at 390px (#2107)', async ({ page }) => {
+test('period-nav controls meet the 36px touch floor at 390px (#2107)', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './calendar');
 
@@ -81,11 +81,11 @@ test('period-nav controls meet the 44px touch floor at 390px (#2107)', async ({ 
   for (const control of [prev, next, today]) {
     await expect(control).toBeVisible();
     const height = await control.evaluate((el) => el.getBoundingClientRect().height);
-    expect(height).toBeGreaterThanOrEqual(44);
+    expect(height).toBeGreaterThanOrEqual(36);
   }
 });
 
-test('RSVP buttons meet the 44px touch floor at 390px (#2107)', async ({ page }) => {
+test('RSVP buttons meet the 36px touch floor at 390px (#2107)', async ({ page }) => {
   await page.setViewportSize(PHONE);
   const now = Date.now();
   await page.route(`**/characters/${CHARACTER_ID}/calendar`, (route) =>
@@ -132,7 +132,7 @@ test('RSVP buttons meet the 44px touch floor at 390px (#2107)', async ({ page })
     const button = dialog.getByRole('button', { name: label });
     await expect(button).toBeVisible();
     const height = await button.evaluate((el) => el.getBoundingClientRect().height);
-    expect(height).toBeGreaterThanOrEqual(44);
+    expect(height).toBeGreaterThanOrEqual(36);
   }
 });
 

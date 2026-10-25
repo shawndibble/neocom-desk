@@ -17,7 +17,8 @@ import type { MailHeader } from '@/esi/endpoints';
 const sendMail = vi.hoisted(() => vi.fn());
 const loadMailingLists = vi.hoisted(() => vi.fn());
 vi.mock('./mail', () => ({ sendMail, loadMailingLists }));
-vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => false }));
+const lacks = vi.hoisted(() => ({ value: false }));
+vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => lacks.value }));
 
 const drafts = vi.hoisted(() => ({
   loadDraft: vi.fn(),
@@ -55,6 +56,7 @@ const resolveRecipientName = (r: { recipient_id: number }) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  lacks.value = false;
   drafts.loadDraft.mockResolvedValue(undefined);
   drafts.saveDraft.mockResolvedValue('ok');
   drafts.clearDraft.mockResolvedValue(undefined);
@@ -463,6 +465,22 @@ describe('sending', () => {
       await screen.findByText('Add at least one recipient before sending.')
     ).toBeInTheDocument();
     expect(sendMail).not.toHaveBeenCalled();
+  });
+});
+
+describe('send-mail Permission', () => {
+  it('offers the grant note when the stored grant lacks it, and still lets Send work', async () => {
+    lacks.value = true;
+    renderBox('reply');
+    expect(await screen.findByText('Permission to send mail')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant send mail' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  });
+
+  it('shows no grant note when the Permission is held', async () => {
+    renderBox('reply');
+    await screen.findByLabelText('Subject');
+    expect(screen.queryByText('Permission to send mail')).not.toBeInTheDocument();
   });
 });
 

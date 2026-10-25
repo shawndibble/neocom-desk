@@ -58,7 +58,7 @@ function Option({
       onClick={unavailable ? undefined : onSelect}
       className={cx(
         unavailable && disabledClassName,
-        'flex min-h-11 min-w-0 items-center gap-2 border-l-2 px-3 py-2 text-left md:min-h-10',
+        'flex min-h-9 min-w-0 items-center gap-2 border-l-2 px-3 py-2 text-left md:min-h-10',
         rowInteractiveClassName,
         focusRingInsetClassName,
         selected ? selectedRowClassName : 'border-l-transparent'

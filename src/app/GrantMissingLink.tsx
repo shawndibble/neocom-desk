@@ -9,7 +9,7 @@ import { grantMissingPath } from './grantMissingPath';
 /**
  * The one line every "this Character hasn't granted X" message shrinks to:
  * a plain text link to the Permissions page, which flashes the Grant button for
- * each of `groups`. Deliberately not a Button, and no 44px touch target: it
+ * each of `groups`. Deliberately not a Button, and no touch-target growth: it
  * sits inline in a sentence-sized slot (DESIGN.md §6c, inline link).
  */
 export function GrantMissingLink({

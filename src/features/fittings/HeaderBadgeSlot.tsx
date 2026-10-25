@@ -6,5 +6,5 @@
  * `aria-hidden` and unfocusable, like `Spinner`'s `delayMs` placeholder.
  */
 export function HeaderBadgeSlot() {
-  return <span aria-hidden="true" className="inline-flex size-11 shrink-0 md:size-9" />;
+  return <span aria-hidden="true" className="inline-flex size-9 shrink-0" />;
 }

@@ -24,7 +24,13 @@ describe('stackRows', () => {
   it('stacks only the shown layers on snapshot days', () => {
     const rows = stackRows(series, ['isk', 'escrow']);
     expect(rows[1]).toMatchObject({ day: '2026-10-02', total: 110 });
-    expect(rows[1]!.values).toEqual({ isk: 100, assets: 0, escrow: 10, sellOrders: 0 });
+    expect(rows[1]!.values).toEqual({
+      isk: 100,
+      assets: 0,
+      escrow: 10,
+      sellOrders: 0,
+      contracts: 0,
+    });
   });
 
   it('keeps only the wallet on wallet-only and gap days', () => {

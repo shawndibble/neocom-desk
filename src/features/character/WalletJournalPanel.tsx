@@ -82,7 +82,7 @@ export function WalletJournalPanel({
           <Link
             to="/market/history"
             className={cx(
-              'inline-flex min-h-11 min-w-11 items-center justify-center text-xs md:min-h-0 md:min-w-0',
+              'inline-flex min-h-9 min-w-9 items-center justify-center text-xs md:min-h-0 md:min-w-0',
               inlineLinkClassName
             )}
           >

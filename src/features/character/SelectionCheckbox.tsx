@@ -33,12 +33,12 @@ export function SelectionCheckbox({
   }, [state]);
 
   return (
-    // The label is the 44px touch target on a coarse pointer (it grows its cell, never overlays a neighbour).
+    // The label is the 36px touch target on a coarse pointer (it grows its cell, never overlays a neighbour).
     <label
       className={
         caption === undefined
           ? touchCheckboxLabelClassName
-          : cx('inline-flex min-h-11 cursor-pointer items-center gap-1.5', 'md:min-h-0')
+          : cx('inline-flex min-h-9 cursor-pointer items-center gap-1.5', 'md:min-h-0')
       }
     >
       <Checkbox

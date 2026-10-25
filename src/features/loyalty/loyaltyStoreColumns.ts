@@ -6,7 +6,7 @@
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
-export const LOYALTY_STORE_OFFERS_COLUMN_IDS = ['profit', 'iskPerLp'] as const;
+export const LOYALTY_STORE_OFFERS_COLUMN_IDS = ['sellsPerDay', 'profit', 'iskPerLp'] as const;
 export type LoyaltyStoreOffersColumnId = (typeof LOYALTY_STORE_OFFERS_COLUMN_IDS)[number];
 
 export const loyaltyStoreOffersColumnsStore = createColumnVisibilitySetting({

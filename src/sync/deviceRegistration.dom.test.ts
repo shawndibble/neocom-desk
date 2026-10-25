@@ -94,8 +94,22 @@ describe('registerDeviceForWebPush', () => {
         fcmToken: 'fcm-token',
         quietHours: null,
         characters: [
-          { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
-          { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
+          {
+            characterId: 1,
+            accessToken: 'token-1',
+            projectionRows: [],
+            eveTypes: [],
+            serverEvents: [],
+            serverInputs: {},
+          },
+          {
+            characterId: 2,
+            accessToken: 'token-2',
+            projectionRows: [],
+            eveTypes: [],
+            serverEvents: [],
+            serverInputs: {},
+          },
         ],
       },
     });
@@ -115,6 +129,35 @@ describe('registerDeviceForWebPush', () => {
       action: 'registerDevice',
       data: expect.objectContaining({ quietHours }),
     });
+  });
+
+  it('sends the Travel Settings it is given, and a change to them is never skipped', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => `token-${id}`);
+    const rules = (penalty: number) => ({
+      preference: 'shortest' as const,
+      securityPenalty: penalty,
+      avoid: [30000142],
+    });
+
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      skipIfUnchanged: true,
+      routeRules: rules(50),
+    });
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      skipIfUnchanged: true,
+      routeRules: rules(50),
+    });
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      skipIfUnchanged: true,
+      routeRules: rules(60),
+    });
+
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(call.mock.calls[0][0].data.routeRules).toEqual(rules(50));
   });
 
   it('includes each Character’s Projection rows from the passed-in map, keyed by characterId', async () => {
@@ -142,8 +185,22 @@ describe('registerDeviceForWebPush', () => {
         fcmToken: 'fcm-token',
         quietHours: null,
         characters: [
-          { characterId: 1, accessToken: 'token-1', projectionRows: [row], eveTypes: [] },
-          { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
+          {
+            characterId: 1,
+            accessToken: 'token-1',
+            projectionRows: [row],
+            eveTypes: [],
+            serverEvents: [],
+            serverInputs: {},
+          },
+          {
+            characterId: 2,
+            accessToken: 'token-2',
+            projectionRows: [],
+            eveTypes: [],
+            serverEvents: [],
+            serverInputs: {},
+          },
         ],
       },
     });
@@ -188,8 +245,22 @@ describe('registerDeviceForWebPush', () => {
         fcmToken: 'fcm-token',
         quietHours: null,
         characters: [
-          { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
-          { characterId: 3, accessToken: 'token-3', projectionRows: [], eveTypes: [] },
+          {
+            characterId: 1,
+            accessToken: 'token-1',
+            projectionRows: [],
+            eveTypes: [],
+            serverEvents: [],
+            serverInputs: {},
+          },
+          {
+            characterId: 3,
+            accessToken: 'token-3',
+            projectionRows: [],
+            eveTypes: [],
+            serverEvents: [],
+            serverInputs: {},
+          },
         ],
       },
     });
@@ -293,6 +364,26 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
     await withTypes(['A', 'B']);
     expect(call).toHaveBeenCalledTimes(1);
     expect(call.mock.calls[0][0].data.characters[0].eveTypes).toEqual(['A', 'B']);
+  });
+
+  it('re-registers when the server events or their inputs change, and sends them (issue #5121)', async () => {
+    const withServer = (minimum: number) =>
+      registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]), {
+        skipIfUnchanged: true,
+        serverEventsByCharacter: new Map([
+          [1, { serverEvents: ['shipLost'], serverInputs: { shipLostMinimumIsk: minimum } }],
+        ]),
+      });
+    await withServer(0);
+    call.mockClear();
+    await withServer(0);
+    expect(call).not.toHaveBeenCalled();
+    await withServer(5);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(call.mock.calls[0][0].data.characters[0]).toMatchObject({
+      serverEvents: ['shipLost'],
+      serverInputs: { shipLostMinimumIsk: 5 },
+    });
   });
 
   it('re-registers when the FCM token rotates', async () => {

@@ -109,8 +109,8 @@ test('reading pane: subject with a long unbroken token wraps at 390px', async ({
 
 // Issue #2106: Reply/Forward were the sole touch targets for an open mail
 // below `md` (no side-by-side list to fall back on), but rendered at the
-// `sm` tier (36px) on phone — below the app's 44px touch floor.
-test('reading pane: Reply/Forward meet the 44px touch target floor at 390px', async ({ page }) => {
+// `sm` tier (36px) on phone — below the app's 36px touch floor.
+test('reading pane: Reply/Forward meet the 36px touch target floor at 390px', async ({ page }) => {
   await seedLongMail(page);
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './mail');
@@ -123,8 +123,8 @@ test('reading pane: Reply/Forward meet the 44px touch target floor at 390px', as
 
   expect(replyBox).not.toBeNull();
   expect(forwardBox).not.toBeNull();
-  expect(replyBox!.height).toBeGreaterThanOrEqual(44);
-  expect(forwardBox!.height).toBeGreaterThanOrEqual(44);
+  expect(replyBox!.height).toBeGreaterThanOrEqual(36);
+  expect(forwardBox!.height).toBeGreaterThanOrEqual(36);
 
   // Pointer-width behavior must stay put: `size="row"` keeps the same
   // `md:size-7` pointer height `size="sm"` already had, unlike `size="md"`

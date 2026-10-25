@@ -1,5 +1,5 @@
 /**
- * The Map on a phone: the planet types as a grid of 44px toggles, then one
+ * The Map on a phone: the planet types as a grid of 36px toggles, then one
  * tier at a time as a list (a tier switcher), then the full map in a container
  * that scrolls sideways on its own. Tapping a product opens the bottom sheet;
  * tapping the one you traced again clears it.
@@ -157,7 +157,7 @@ export function MapPhone(props: MapPhoneProps) {
                   onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                   onKeyDown={clickOnSpace}
                   className={cx(
-                    'flex min-h-11 w-full items-center gap-2 px-1 py-1.5 text-left text-sm [@media(hover:hover)]:hover:bg-panel-2',
+                    'flex min-h-9 w-full items-center gap-2 px-1 py-1.5 text-left text-sm [@media(hover:hover)]:hover:bg-panel-2',
                     interactiveClassName,
                     focusRingClassName,
                     traced && selectedRowClassName,

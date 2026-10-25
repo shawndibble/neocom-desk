@@ -28,6 +28,8 @@ import {
 } from './dispatchProjections.js';
 import type { CharacterProjection } from './registerDevice.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
+import { polledEventsOf, trimBaseline, type ServerEventInputs } from './serverEvents.js';
+import type { NearbyRouteRules } from './nearbyAlerts.js';
 
 export const PROJECTIONS_COLLECTION = 'projections';
 export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
@@ -70,6 +72,48 @@ export interface DeviceRegistrationWrite {
    * keeps what the registration already stores; `null` clears it.
    */
   quietHours?: QuietHours | null;
+  /**
+   * Verified Characters' server-pushed event ids and inputs from this device
+   * (issue #5121). A Character absent from either map (an older client) keeps
+   * what this device stored for it, the `eveTypesByCharacter` rule.
+   */
+  serverEventsByCharacter?: Record<number, string[]>;
+  serverInputsByCharacter?: Record<number, ServerEventInputs>;
+  /** This device's Travel Settings for nearby alerts (issue #5122); `undefined` keeps the stored ones. */
+  routeRules?: NearbyRouteRules;
+}
+
+/** The registration doc's map fields, keyed by characterId as a string. */
+export const SERVER_EVENTS_FIELD = 'serverEventsByCharacter';
+export const SERVER_INPUTS_FIELD = 'serverInputsByCharacter';
+/** The polled events' last readings per Character, written by the dispatch tick (`serverEventPoll.ts`). */
+export const SERVER_BASELINES_FIELD = 'serverEventBaselines';
+/** Which polled events any Character on the device enabled, for the tick's one query. */
+export const POLLED_EVENTS_FIELD = 'polledServerEvents';
+/** The device's Travel Settings the nearby-alerts poller counts jumps under (issue #5122). */
+export const ROUTE_RULES_FIELD = 'routeRules';
+
+/**
+ * Every field `writeDeviceRegistration` owns. Anything else on the doc — the
+ * nearby-alerts poller's `nearbyState` (pollNearby.ts) — is left alone, so a
+ * poll writing it between this upload's read and its write is not undone.
+ */
+const REGISTRATION_FIELDS = [
+  'fcmToken',
+  'characterIds',
+  'eveTypesByCharacter',
+  'quietHours',
+  SERVER_EVENTS_FIELD,
+  SERVER_INPUTS_FIELD,
+  SERVER_BASELINES_FIELD,
+  POLLED_EVENTS_FIELD,
+  ROUTE_RULES_FIELD,
+  'updatedAt',
+  PER_DEVICE_MARKER,
+];
+
+function mapField<T>(raw: unknown): Record<string, T> {
+  return typeof raw === 'object' && raw !== null ? (raw as Record<string, T>) : {};
 }
 
 type Doc = QueryDocumentSnapshot;
@@ -126,6 +170,24 @@ export async function writeDeviceRegistration(
   // below rebuilds the doc, so an omitted field is a deleted one).
   const quietHours =
     write.quietHours === undefined ? readQuietHours(previous?.quietHours) : write.quietHours;
+  const routeRules =
+    write.routeRules ?? (previous?.[ROUTE_RULES_FIELD] as NearbyRouteRules | undefined);
+  const previousServerEvents = mapField<string[]>(previous?.[SERVER_EVENTS_FIELD]);
+  const previousServerInputs = mapField<ServerEventInputs>(previous?.[SERVER_INPUTS_FIELD]);
+  const previousBaselines = mapField<unknown>(previous?.[SERVER_BASELINES_FIELD]);
+  const serverEventsByCharacter = Object.fromEntries(
+    write.characterIds.map((id) => [
+      String(id),
+      write.serverEventsByCharacter?.[id] ?? previousServerEvents[String(id)] ?? [],
+    ])
+  );
+  const keep = <T>(byId: Record<string, T>, fresh?: Record<number, T>): Record<string, T> =>
+    Object.fromEntries(
+      write.characterIds.flatMap((id) => {
+        const value = fresh?.[id] ?? byId[String(id)];
+        return value === undefined ? [] : [[String(id), value]];
+      })
+    );
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
   // Once per Character per device: on the device's first per-device upload,
   // and again for any Character it adds later, which may still carry another
@@ -156,20 +218,39 @@ export async function writeDeviceRegistration(
   // drift check then never sees a fresh row for a Character the registration
   // does not list yet, and if a batch below fails, the next upload still
   // sweeps. The marker is set only once every batch has committed.
-  await registrationRef.set({
-    fcmToken: write.fcmToken,
-    characterIds: write.characterIds,
-    // Firestore map keys are strings; a Character dropped from the roster
-    // falls out because the whole map is rebuilt on every upload.
-    eveTypesByCharacter: Object.fromEntries(
-      write.characterIds.map((id) => [
-        String(id),
-        write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
-      ])
-    ),
-    ...(quietHours ? { quietHours } : {}),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  await registrationRef.set(
+    {
+      fcmToken: write.fcmToken,
+      characterIds: write.characterIds,
+      // Firestore map keys are strings; a Character dropped from the roster
+      // falls out because the whole map is rebuilt on every upload.
+      eveTypesByCharacter: Object.fromEntries(
+        write.characterIds.map((id) => [
+          String(id),
+          write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
+        ])
+      ),
+      ...(quietHours ? { quietHours } : {}),
+      [SERVER_EVENTS_FIELD]: serverEventsByCharacter,
+      [SERVER_INPUTS_FIELD]: keep(previousServerInputs, write.serverInputsByCharacter),
+      // The tick's readings for Characters still held, for events still enabled: a
+      // re-registration must not reset them, or the next tick would seed silently
+      // and miss a crossing.
+      [SERVER_BASELINES_FIELD]: Object.fromEntries(
+        Object.entries(keep(previousBaselines)).map(([id, baseline]) => [
+          id,
+          trimBaseline(baseline, serverEventsByCharacter[id] ?? []),
+        ])
+      ),
+      [POLLED_EVENTS_FIELD]: polledEventsOf(serverEventsByCharacter),
+      ...(routeRules ? { [ROUTE_RULES_FIELD]: routeRules } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    {
+      // A listed field left out is deleted, as a plain `set` would; an unlisted one is kept.
+      mergeFields: REGISTRATION_FIELDS,
+    }
+  );
 
   await Promise.all([
     ...write.projections.map(async ({ characterId, rows }) => {

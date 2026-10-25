@@ -156,7 +156,7 @@ export function QuickWinsPanel({
           const sentenceId = `${baseId}-${win.id}`;
           return (
             <li key={win.id} className="flex items-center gap-3 px-3 py-2">
-              <label className={cx(touchCheckboxLabelClassName, 'max-md:size-11')}>
+              <label className={cx(touchCheckboxLabelClassName, 'max-md:size-9')}>
                 <Checkbox
                   checked={ticked}
                   onChange={() => ticks.toggle(win.id)}

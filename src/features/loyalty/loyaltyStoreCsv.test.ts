@@ -6,7 +6,11 @@ import { loyaltyOfferCsvColumns, loyaltyOfferMaterialsCsvColumns } from './loyal
 
 const t = (k: string) => k;
 
-function offer(profit: number | null, iskPerLp: number | null): LoyaltyOfferRow {
+function offer(
+  profit: number | null,
+  iskPerLp: number | null,
+  sellsPerDay: number | null = 12.5
+): LoyaltyOfferRow {
   return {
     offer: { offer_id: 1, type_id: 2, quantity: 1, lp_cost: 12500, isk_cost: 5000000 },
     itemName: 'Mid-grade Amulet Alpha',
@@ -15,6 +19,7 @@ function offer(profit: number | null, iskPerLp: number | null): LoyaltyOfferRow 
     productName: null,
     build: null,
     profit: { profit, iskPerLp, affordableLp: true },
+    sellsPerDay,
     requiredItems: [],
     requiredItemsCost: 0,
   } as unknown as LoyaltyOfferRow;
@@ -27,6 +32,7 @@ describe('loyaltyOfferCsvColumns', () => {
       'loyaltyStore.colItem',
       'loyaltyStore.csvLpCost',
       'loyaltyStore.csvIskCost',
+      'loyaltyStore.colSellsPerDay',
       'loyaltyStore.colProfit',
       'loyaltyStore.colIskPerLp',
     ]);
@@ -34,6 +40,7 @@ describe('loyaltyOfferCsvColumns', () => {
       'Mid-grade Amulet Alpha',
       12500,
       5000000,
+      12.5,
       7500000.5,
       1234.56,
     ]);
@@ -41,7 +48,7 @@ describe('loyaltyOfferCsvColumns', () => {
 
   it('blanks profit and ISK/LP for an offer that cannot be priced', () => {
     const csv = toCsv([offer(null, null)], loyaltyOfferCsvColumns(t));
-    expect(csv.split('\r\n')[1]).toBe('"Mid-grade Amulet Alpha",12500,5000000,,');
+    expect(csv.split('\r\n')[1]).toBe('"Mid-grade Amulet Alpha",12500,5000000,12.5,,');
   });
 });
 

@@ -2,8 +2,8 @@
  * Balances strip Payee filter button touch target (issue #1055): the button
  * wrapping a Payee's name in the Tax tab's Balances strip had zero
  * height/padding sizing — its hit area was just the text line box, well
- * under the app's 44px touch-target floor (docs/DESIGN.md §3). The fix grows
- * the button to `min-h-11` but cancels the added height with an equal
+ * under the app's 36px touch-target floor (docs/DESIGN.md §3). The fix grows
+ * the button to `min-h-9` but cancels the added height with an equal
  * negative vertical margin (`-my-3`) so the row — and the card — don't grow;
  * jsdom has no real layout engine, so only a real browser can confirm the
  * net effect actually nets back to the original row height. `md:` reverts
@@ -243,7 +243,7 @@ test.describe('Balances strip Payee filter button — touch target', () => {
     await seedPayeeBalance(page);
   });
 
-  test('grows to 44px on phone without growing the row it sits in', async ({ page }) => {
+  test('grows to 36px on phone without growing the row it sits in', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./mining/tax');
 
@@ -255,11 +255,11 @@ test.describe('Balances strip Payee filter button — touch target', () => {
       rowHeight: el.parentElement!.getBoundingClientRect().height,
     }));
 
-    expect(buttonHeight).toBeGreaterThanOrEqual(44);
+    expect(buttonHeight).toBeGreaterThanOrEqual(36);
     // Proves the extra height comes from the button's own box/negative-margin
     // trick, not from the row (and thus the card) genuinely growing to fit
     // it: pinned near the owed figure's own 28px (text-lg) line-height, the
-    // tallest thing the row holds besides the button, not just "under 44".
+    // tallest thing the row holds besides the button, not just "under 36".
     expect(rowHeight).toBeGreaterThan(20);
     expect(rowHeight).toBeLessThan(32);
   });
@@ -285,9 +285,9 @@ test.describe('Balances strip Payee filter button — touch target', () => {
  * Dismiss is the row's whole tap target, and at `px-2 py-1.5 text-xs` it
  * measured 28px — a pointer-sized row reused verbatim on a phone, which
  * docs/DESIGN.md §3 rules out. The fix applies `tappableRowClassName`
- * (`min-h-11 md:min-h-7`, `controlStyles.ts`), so the row grows to the 44px
+ * (`min-h-9 md:min-h-7`, `controlStyles.ts`), so the row grows to the 36px
  * floor on a phone and reverts to exactly its old 28px above `md`. jsdom has
- * no layout engine, so only a real browser can tell 44 from 28 — hence a
+ * no layout engine, so only a real browser can tell 36 from 28 — hence a
  * Playwright spec rather than a unit test.
  *
  * Each dialog needs different state, so `seedPayeeBalance` grew two opt-in
@@ -355,34 +355,34 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     return dialog;
   }
 
-  test('Settle Up: itemized entry row reaches 44px on phone', async ({ page }) => {
+  test('Settle Up: itemized entry row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page);
     await page.goto('./mining/tax');
 
     const dialog = await openSettleUp(page);
-    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
+    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(36);
   });
 
-  test('Link Payment: covered-entry row reaches 44px on phone', async ({ page }) => {
+  test('Link Payment: covered-entry row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });
     await page.goto('./mining/tax');
 
     const dialog = await openLinkPayment(page);
-    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
+    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(36);
   });
 
-  test('Bulk Dismiss: itemized entry row reaches 44px on phone', async ({ page }) => {
+  test('Bulk Dismiss: itemized entry row reaches 36px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withUnassignedEntry: true });
     await page.goto('./mining/tax');
 
     const dialog = await openBulkDismiss(page);
-    expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBeGreaterThanOrEqual(44);
+    expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBeGreaterThanOrEqual(36);
   });
 
   test('all three stay at their old height above md — desktop is unchanged', async ({ page }) => {
@@ -393,7 +393,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
     // One line of `text-xs` (16px) inside `py-1.5` (2 x 6px) is 28px — what
     // `md:min-h-7` reverts to exactly. Pinned as a range rather than asserted
-    // "under 44" so a row that quietly grew for some other reason still fails.
+    // "under 36" so a row that quietly grew for some other reason still fails.
     const expectUnchanged = (height: number) => {
       expect(height).toBeGreaterThan(24);
       expect(height).toBeLessThan(32);
@@ -464,14 +464,14 @@ test.describe('Tax ledger — phone sort picker', () => {
  * bar's one primary, decision-committing action for the whole checked
  * selection rendered at `size="sm"` (36px) like its four ordinary secondary
  * siblings (Select All, Clear, Combine, Dismiss) — under this app's `md`
- * touch tier (44px), the accepted size for a page's sole primary control. Only Settle Up moves; the
+ * touch tier (36px), the accepted size for a page's sole primary control. Only Settle Up moves; the
  * other four stay `sm` at every width, since widening them too would grow
  * four already-conventional secondary actions on desktop pointer for no
  * phone-specific reason (RUBRIC.md's "the desktop layout is the control").
  *
  * A row is ticked through the table's real checkbox column, not by poking
  * state — the toolbar itself only renders once something is checked, so
- * "does the bar even reach 44px once it's actually showing on a phone?" is
+ * "does the bar even reach 36px once it's actually showing on a phone?" is
  * the property under test, the same reasoning the dialog-row spec above
  * gives for driving its own checkboxes for real.
  */
@@ -499,9 +499,9 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     };
   }
 
-  test('Settle Up reaches 44px on phone once the bar is showing', async ({ page }) => {
+  test('Settle Up reaches 36px on phone once the bar is showing', async ({ page }) => {
     const heights = await openToolbarWithOneRowChecked(page, PHONE);
-    expect(await heights.settleUpHeight()).toBeGreaterThanOrEqual(44);
+    expect(await heights.settleUpHeight()).toBeGreaterThanOrEqual(36);
 
     // Select All/Clear stay at the ordinary `sm` size — widening them too
     // isn't this ticket's fix.
@@ -512,7 +512,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     page,
   }) => {
     const heights = await openToolbarWithOneRowChecked(page, DESKTOP);
-    // `md` tier's own pointer-width value (`h-9`), not the 44px touch value —
+    // `md` tier's own pointer-width value (`h-9`), not the 36px touch value —
     // this is the one accepted pointer-size change the ticket calls for.
     expect(await heights.settleUpHeight()).toBeCloseTo(36, 0);
     // Clear's own `sm` pointer value is untouched.
@@ -534,7 +534,7 @@ async function textRect(row: Locator, cellSelector: string) {
 }
 
 test.describe('Mining Tax phone card — tick box on the date line (#2983)', () => {
-  // A coarse pointer grows the tick box's label to 44px (`touch:size-11`).
+  // A coarse pointer grows the tick box's label to 36px (`touch:size-9`).
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
   test('tick box shares the date line, line two starts under it, nothing overflows', async ({
@@ -565,8 +565,8 @@ test.describe('Mining Tax phone card — tick box on the date line (#2983)', () 
     // The status joins line two when it fits.
     expect(Math.abs(status.top - lineTwo.top)).toBeLessThanOrEqual(6);
     // The touch target still meets the floor, without the box's own cell carrying it.
-    expect(labelRect.width).toBeGreaterThanOrEqual(44);
-    expect(labelRect.height).toBeGreaterThanOrEqual(44);
+    expect(labelRect.width).toBeGreaterThanOrEqual(36);
+    expect(labelRect.height).toBeGreaterThanOrEqual(36);
     // And nothing pushes the page sideways.
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -690,9 +690,9 @@ test.describe('Mining Tax attention strip — collapsed header stays one line', 
       await expect(header.first()).toBeVisible();
       const label = header.first().locator('span').first();
       // The row is one line when the preview truncates rather than wraps:
-      // the button is no taller than its 44px touch floor plus padding slack.
+      // the button is no taller than its 36px touch floor plus padding slack.
       const box = (await header.first().boundingBox())!;
-      expect(box.height).toBeLessThanOrEqual(44);
+      expect(box.height).toBeLessThanOrEqual(36);
       const lineHeight = await label.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
       const labelBox = (await label.boundingBox())!;
       expect(labelBox.height).toBeLessThanOrEqual(lineHeight * 1.5);
@@ -723,7 +723,7 @@ test.describe('Tax tab Unassigned prompt — nothing owed (#3120)', () => {
       expect(box).not.toBeNull();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
-      if (viewport.width === PHONE.width) expect(box!.height).toBeGreaterThanOrEqual(44);
+      if (viewport.width === PHONE.width) expect(box!.height).toBeGreaterThanOrEqual(36);
 
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -877,7 +877,7 @@ test.describe('Mining Tax ledger — checkbox names and toolbar clearance (#3391
 /**
  * Split dialog collector radios — touch target (#3674): the "further ore goes
  * to" radios were bare 16px `text-xs` rows. Each label is now a
- * `tappableRowClassName` row: 44px on phone, compact on a fine-pointer desktop.
+ * `tappableRowClassName` row: 36px on phone, compact on a fine-pointer desktop.
  */
 const SECOND_PAYEE_ID = 'e2e-payee-2';
 /** 40 characters: must wrap inside the label, not overflow the page. */
@@ -926,7 +926,7 @@ async function openSplitWithSecondPayee(page: Page): Promise<Locator> {
 }
 
 test.describe('Split dialog collector radios — touch target (#3674)', () => {
-  test('phone: both labels are 44px, apart, and nothing overflows', async ({ page }) => {
+  test('phone: both labels are 36px, apart, and nothing overflows', async ({ page }) => {
     await page.setViewportSize(PHONE);
     const dialog = await openSplitWithSecondPayee(page);
 
@@ -936,8 +936,8 @@ test.describe('Split dialog collector radios — touch target (#3674)', () => {
     await expect(labels).toHaveCount(2);
     const first = (await labels.nth(0).boundingBox())!;
     const second = (await labels.nth(1).boundingBox())!;
-    expect(first.height).toBeGreaterThanOrEqual(44);
-    expect(second.height).toBeGreaterThanOrEqual(44);
+    expect(first.height).toBeGreaterThanOrEqual(36);
+    expect(second.height).toBeGreaterThanOrEqual(36);
     expect(first.y + first.height).toBeLessThanOrEqual(second.y + 1);
 
     const overflow = await page.evaluate(
@@ -955,7 +955,7 @@ test.describe('Split dialog collector radios — touch target (#3674)', () => {
       .filter({ has: page.locator('input[name="split-collector"]') });
     await expect(labels).toHaveCount(2);
     for (const i of [0, 1]) {
-      expect((await labels.nth(i).boundingBox())!.height).toBeLessThan(44);
+      expect((await labels.nth(i).boundingBox())!.height).toBeLessThan(36);
     }
   });
 });

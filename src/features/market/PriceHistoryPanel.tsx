@@ -534,7 +534,7 @@ function RangedHistory({
              * `md`, not the `sm` this was: DESIGN.md §3's touch tier is the
              * reason — `sm` resolves to 36px on a phone, a mouse-pointer size,
              * and this control now owns a full-width row there rather than
-             * sharing a dense one. `md` gives the 44px thumb target on a phone
+             * sharing a dense one. `md` gives the 36px thumb target on a phone
              * and the default 36px to a pointer. Nothing else sits in this row,
              * so no toolbar loses its alignment to the extra 8px.
              */}

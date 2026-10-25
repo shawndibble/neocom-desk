@@ -73,7 +73,7 @@ export function SetStrip({
             })}
             onClick={() => onSelect(key)}
             className={cx(
-              'flex min-h-11 w-full min-w-0 flex-col justify-between rounded-xs border px-1.5 py-1 text-left md:min-h-0',
+              'flex min-h-9 w-full min-w-0 flex-col justify-between rounded-xs border px-1.5 py-1 text-left md:min-h-0',
               interactiveClassName,
               focusRingClassName,
               picked
@@ -121,7 +121,7 @@ export function SetStrip({
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
         className={cx(
-          'flex min-h-11 w-full items-center gap-2 rounded-xs text-left md:hidden',
+          'flex min-h-9 w-full items-center gap-2 rounded-xs text-left md:hidden',
           interactiveClassName,
           focusRingClassName
         )}

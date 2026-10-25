@@ -88,18 +88,40 @@
       <p>
         There is one opt-in exception. If you turn on <strong>Alerts when closed</strong> for a
         character in Settings &rarr; Notifications, you authorize that character a second time on
-        EVE's login page, for one permission only: reading its notifications. An encrypted copy of
-        that separate notifications-only token is stored on the app operator's server (Google
-        Firebase), so the server can check for new notifications while the app is closed. It cannot
-        read assets, wallet, mail, skills or anything else, and it is never written to your device
-        or to logs. About every 15 minutes the server uses it to read that character's notifications
-        from EVE and pushes the types you enabled to your device through Google's push service; each
-        push carries the notification's type, time and (size-capped) text. The server keeps only
-        bookkeeping for this — which notifications it has already handled and which notification
-        types it has seen for the character — not the notifications themselves. Turn the setting
-        off, remove the character, log out or use <strong>Delete all data</strong> and the token is
-        deleted and revoked with EVE. Each character is separate: nothing is stored for a character
-        you did not turn it on for.
+        EVE's login page, for these permissions only: reading its notifications; for nearby alerts,
+        its current location; and, only if you leave it ticked on the permission list shown before
+        you sign in, reading its mail (a character authorized before an extra existed has only the
+        permissions it was authorized with until you re-authorize it). An encrypted copy of that
+        separate token is stored on the app operator's server (Google Firebase), so the server can
+        check for new notifications while the app is closed. It cannot read assets, wallet, skills
+        or anything else, and it is never written to your device or to logs. About every 15 minutes
+        the server uses it to read that character's notifications from EVE and pushes the types you
+        enabled to your device through Google's push service; each push carries the notification's
+        type, time and (size-capped) text. With the location permission it also reads which solar
+        system the character is in, and pushes an Incursion or raidable skyhook within the number of
+        jumps you chose. With the mail permission it also reads that character's mail
+        <em>headers</em> (the list of mails with sender, subject and time, never a message body,
+        mailing list or label) and pushes each new mail, not sent by the character itself, to the
+        devices that enabled new-mail alerts.
+        <strong
+          >Each such push carries the mail's sender and subject and passes through Google's push
+          service, and your device shows them in its pop-up, so they can appear on a lock
+          screen.</strong
+        >
+        The server holds the sender and subject only in memory while it builds the push and never
+        stores them; its own bookkeeping for mail is the number of the latest mail it has handled,
+        an ETag, and, for a push that could not be delivered to every device, which device already
+        got which mail number. The alert list on your device records only that you have new mail,
+        not who sent it or what it was about. For nearby alerts, each device's registration also
+        stores the nearby alerts it enabled, their jump limits and the route settings it counts
+        jumps by. The server keeps only bookkeeping for this — which notifications it has already
+        handled, which notification types it has seen for the character, and which nearby Incursions
+        and raid windows it last saw in range and the system it counted them from, replaced on every
+        check and dropped when the character is not checked or the setting is turned off — not the
+        notifications or mail themselves, and no history of where the character has been. Turn the
+        setting off, remove the character, log out or use <strong>Delete all data</strong> and the
+        token is deleted and revoked with EVE. Each character is separate: nothing is stored for a
+        character you did not turn it on for.
       </p>
       <p>
         There is a second opt-in exception for corporation officers. If a CEO, Director or
@@ -125,7 +147,11 @@
         is not stored. When the device's token is dropped (for example when you log out or remove
         the character), the server deletes its registration and any unsent alert text the next time
         it runs. If you set a quiet time, its start and end times and your time zone are stored with
-        the device's registration too.
+        the device's registration too. For the alerts the server can raise on its own, the
+        registration also lists which of them you turned on for this device and what they need: your
+        Quickbar price targets (item, name, target price and the trade hub) for price alerts, and
+        your minimum ISK for ship-lost alerts. The server then reads public market prices and each
+        such character's public zKillboard losses, and keeps its last reading with the registration.
       </p>
       <p id="sync">
         <strong>Cross-device sync</strong> runs automatically for every character you log in with;

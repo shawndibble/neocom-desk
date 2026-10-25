@@ -26,23 +26,29 @@ export function DroneFacts({ stats }: FactsProps) {
       items={[
         {
           label: t('fittings.stats.fact.droneDps'),
-          value: figure((s) => fmt1(s.droneDps)),
+          value: figure((s) => fmt1(s.droneDps), undefined, ['droneDps']),
         },
         {
           label: t('fittings.stats.fact.bandwidth'),
-          value: figure((s) =>
-            t('fittings.stats.unit.bandwidth', {
-              used: fmt0(s.droneBandwidthUsed),
-              total: fmt0(s.droneBandwidthTotal),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.bandwidth', {
+                used: fmt0(s.droneBandwidthUsed),
+                total: fmt0(s.droneBandwidthTotal),
+              }),
+            undefined,
+            ['droneBandwidthUsed', 'droneBandwidthTotal']
           ),
         },
         {
           label: t('fittings.stats.fact.droneBay'),
-          value: figure((s) =>
-            t('fittings.stats.unit.cubicMetres', {
-              value: fmt0(s.droneCapacity),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.cubicMetres', {
+                value: fmt0(s.droneCapacity),
+              }),
+            undefined,
+            ['droneCapacity']
           ),
         },
         {
@@ -103,38 +109,50 @@ export function NavigationFacts({ stats }: FactsProps) {
       items={[
         {
           label: t('fittings.stats.fact.maxVelocity'),
-          value: figure((s) =>
-            t('fittings.stats.maxVelocityMeta', {
-              value: fmt0(s.navigation.maxVelocity),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.maxVelocityMeta', {
+                value: fmt0(s.navigation.maxVelocity),
+              }),
+            undefined,
+            ['maxVelocity']
           ),
         },
         {
           label: t('fittings.stats.fact.align'),
-          value: figure((s) =>
-            t('fittings.stats.unit.seconds', {
-              value: fmt1(alignTimeSeconds(s.navigation.mass, s.navigation.agility)),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.seconds', {
+                value: fmt1(alignTimeSeconds(s.navigation.mass, s.navigation.agility)),
+              }),
+            undefined,
+            ['agility', 'mass']
           ),
         },
         {
           label: t('fittings.stats.fact.agility'),
-          value: figure((s) => fmt3(s.navigation.agility)),
+          value: figure((s) => fmt3(s.navigation.agility), undefined, ['agility']),
         },
         {
           label: t('fittings.stats.fact.mass'),
-          value: figure((s) =>
-            t('fittings.stats.unit.tonnes', {
-              value: fmt0(s.navigation.mass / 1000),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.tonnes', {
+                value: fmt0(s.navigation.mass / 1000),
+              }),
+            undefined,
+            ['mass']
           ),
         },
         {
           label: t('fittings.stats.fact.warpSpeed'),
-          value: figure((s) =>
-            t('fittings.stats.unit.auPerSecond', {
-              value: fmt1(s.navigation.warpSpeed),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.auPerSecond', {
+                value: fmt1(s.navigation.warpSpeed),
+              }),
+            undefined,
+            ['warpSpeed']
           ),
         },
       ]}
@@ -151,34 +169,46 @@ export function TargetingFacts({ stats }: FactsProps) {
       items={[
         {
           label: t('fittings.stats.fact.targetRange'),
-          value: figure((s) =>
-            t('fittings.stats.unit.km', {
-              value: kmValue(s.targeting.maxTargetRange),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.km', {
+                value: kmValue(s.targeting.maxTargetRange),
+              }),
+            undefined,
+            ['maxTargetRange']
           ),
         },
         {
           label: t('fittings.stats.fact.lockedTargets'),
-          value: figure((s) =>
-            s.lockedTargets.ship === s.lockedTargets.pilot
-              ? String(s.targeting.maxLockedTargets)
-              : t('fittings.stats.lockedTargetsValue', { ...s.lockedTargets })
+          value: figure(
+            (s) =>
+              s.lockedTargets.ship === s.lockedTargets.pilot
+                ? String(s.targeting.maxLockedTargets)
+                : t('fittings.stats.lockedTargetsValue', { ...s.lockedTargets }),
+            undefined,
+            ['maxLockedTargets']
           ),
         },
         {
           label: t('fittings.stats.fact.scanResolution'),
-          value: figure((s) =>
-            t('fittings.stats.unit.mm', {
-              value: fmt0(s.targeting.scanResolution),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.mm', {
+                value: fmt0(s.targeting.scanResolution),
+              }),
+            undefined,
+            ['scanResolution']
           ),
         },
         {
           label: t('fittings.stats.fact.signature'),
-          value: figure((s) =>
-            t('fittings.stats.unit.metres', {
-              value: fmt0(s.targeting.signatureRadius),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.metres', {
+                value: fmt0(s.targeting.signatureRadius),
+              }),
+            undefined,
+            ['signatureRadius']
           ),
         },
       ]}
@@ -196,11 +226,17 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
         items={[
           {
             label: t('fittings.stats.fact.cpu'),
-            value: budgetFigure(figure, 'cpu', stats.cpuUsed, stats.cpuTotal, (s) =>
-              t('fittings.stats.unit.usedOfTotal', {
-                used: fmt1(s.cpuUsed),
-                total: fmt1(s.cpuTotal),
-              })
+            value: budgetFigure(
+              figure,
+              'cpu',
+              stats.cpuUsed,
+              stats.cpuTotal,
+              (s) =>
+                t('fittings.stats.unit.usedOfTotal', {
+                  used: fmt1(s.cpuUsed),
+                  total: fmt1(s.cpuTotal),
+                }),
+              ['cpuUsed', 'cpuTotal']
             ),
           },
           {
@@ -214,7 +250,8 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
                 t('fittings.stats.unit.usedOfTotal', {
                   used: fmt1(s.powergridUsed),
                   total: fmt1(s.powergridTotal),
-                })
+                }),
+              ['powergridUsed', 'powergridTotal']
             ),
           },
           {
@@ -228,7 +265,8 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
                 t('fittings.stats.unit.usedOfTotal', {
                   used: fmt0(s.calibrationUsed),
                   total: fmt0(s.calibrationTotal),
-                })
+                }),
+              ['calibrationUsed', 'calibrationTotal']
             ),
           },
           ...resourceFacts(stats, figure, typeName, t),

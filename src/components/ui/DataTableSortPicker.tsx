@@ -26,7 +26,7 @@ interface DataTableSortPickerProps<T> {
   sort: DataTableSort | undefined;
   onSortChange: (sort: DataTableSort) => void;
   /**
-   * `md` (the default) is the 44px touch target of the bar above a table;
+   * `md` (the default) is the 36px touch target of the bar above a table;
    * `sm` matches the `size="sm"` buttons of a filter row it sits in.
    */
   size?: ControlSize;

@@ -8,9 +8,10 @@
  * user-facing rows (skills & skill queue, structure lookup) rather than
  * `CORE_GRANT`'s four raw scope names, which this dialog never shows
  * (docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md).
- * Below it, all 20 Permissions in a two-column checklist that collapses to one
- * at phone width, Corporation and Structure markets tagged "opt-in" and
- * unchecked by default.
+ * Below it, every Permission in a two-column checklist that collapses to one
+ * at phone width, the opt-in ones tagged and unchecked by default. The
+ * "Write to EVE" Permissions sit under their own heading, derived from the
+ * registry's `section`.
  *
  * The selection persists device-locally only on submit — Cancel discards a
  * half-made change rather than remembering it (`customizeSelection.ts`).
@@ -21,7 +22,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Checkbox, NeedsConnection } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
-import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
+import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { useCustomizePermissionsSelection } from './customizeSelection';
 
 interface CustomizePermissionsDialogProps {
@@ -33,6 +34,9 @@ interface CustomizePermissionsDialogProps {
 
 /** The Core Grant's two user-facing rows — see the module doc for why these are hand-written rather than derived from `CORE_GRANT`. */
 const CORE_ROWS = ['skills', 'structures'] as const;
+
+/** Every Permission outside the Write to EVE section, in catalogue order. */
+const READ_GROUPS = SCOPE_GROUPS.filter((group) => !WRITE_GROUPS.includes(group));
 
 export function CustomizePermissionsDialog({
   open,
@@ -93,6 +97,32 @@ export function CustomizePermissionsDialog({
     }
   }
 
+  function renderGroup(group: ScopeGroup) {
+    const meta = PERMISSIONS[group];
+    return (
+      <label
+        key={group}
+        className="flex min-h-9 cursor-pointer items-start gap-2 rounded-xs border border-line px-3 py-2 md:min-h-0"
+      >
+        <CaptionedCheckbox
+          domId={`permission-${group}`}
+          label={t(meta.labelKey)}
+          caption={t(meta.captionKey)}
+          checked={selected.has(group)}
+          disabled={locked}
+          onChange={() => toggle(group)}
+          tag={
+            !meta.defaultOn && (
+              <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
+                {t('permissions.customize.optInTag')}
+              </span>
+            )
+          }
+        />
+      </label>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -150,33 +180,17 @@ export function CustomizePermissionsDialog({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {SCOPE_GROUPS.map((group) => {
-            const meta = PERMISSIONS[group];
-            return (
-              <label
-                key={group}
-                className="flex min-h-11 cursor-pointer items-start gap-2 rounded-xs border border-line px-3 py-2 md:min-h-0"
-              >
-                <CaptionedCheckbox
-                  domId={`permission-${group}`}
-                  label={t(meta.labelKey)}
-                  caption={t(meta.captionKey)}
-                  checked={selected.has(group)}
-                  disabled={locked}
-                  onChange={() => toggle(group)}
-                  tag={
-                    !meta.defaultOn && (
-                      <span className="rounded-xs bg-panel px-1 py-0.5 text-[0.625rem] text-text-dim">
-                        {t('permissions.customize.optInTag')}
-                      </span>
-                    )
-                  }
-                />
-              </label>
-            );
-          })}
-        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{READ_GROUPS.map(renderGroup)}</div>
+
+        <section aria-labelledby="permissions-write-heading" className="space-y-2">
+          <h3 id="permissions-write-heading" className="font-semibold">
+            {t('permissions.writeSection')}
+          </h3>
+          <p className="text-xs text-text-dim">{t('permissions.writeSectionHint')}</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {WRITE_GROUPS.map(renderGroup)}
+          </div>
+        </section>
       </div>
     </Modal>
   );

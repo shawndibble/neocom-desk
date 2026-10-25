@@ -32,7 +32,7 @@ describe('CharacterFilterControl', () => {
     expect(trigger.querySelector('span')).toHaveTextContent('This character');
     expect(trigger.querySelector('span')?.className).not.toMatch(/hidden/);
     expect(trigger.querySelector('svg')).toBeInTheDocument();
-    expect(trigger.className).toMatch(/\bh-11\b/);
+    expect(trigger.className).toMatch(/\bh-9\b/);
     expect(container.querySelector('img')).toBeNull();
   });
 
@@ -304,7 +304,7 @@ describe('CharacterFilterControl', () => {
           size="md"
         />
       );
-      expect(screen.getByRole('button')).toHaveClass('h-11', 'md:h-9', 'touch:h-11');
+      expect(screen.getByRole('button')).toHaveClass('h-9');
       expect(screen.getByRole('button')).not.toHaveClass('md:h-7');
     });
   });
@@ -355,7 +355,7 @@ describe('CharacterFilterControl', () => {
     const trigger = screen.getByRole('button', { name: 'This character' }).className.split(/\s+/);
     const sibling = screen.getByRole('button', { name: 'Sibling' }).className.split(/\s+/);
     // IconButton's md box is size-N; the trigger's height is the same N at every tier.
-    for (const tier of ['', 'md:', 'touch:']) {
+    for (const tier of ['']) {
       const size = sibling.find((c) => c.startsWith(`${tier}size-`));
       const height = trigger.find((c) => c.startsWith(`${tier}h-`));
       expect(size && height).toBeTruthy();
@@ -535,10 +535,10 @@ describe('CharacterFilterControl', () => {
     );
     const picker = screen.getByRole('button', { name: 'This character' });
     const refresh = screen.getByRole('button', { name: 'Refresh' });
-    // 44px below md, 36px from md, 44px on a touch pointer: Refresh's heights.
-    expect(picker).toHaveClass('h-11', 'md:h-9', 'touch:h-11');
-    expect(refresh).toHaveClass('size-11', 'md:size-9', 'touch:size-11');
-    expect(picker).not.toHaveClass('h-9', 'md:h-7');
+    // 36px at every width, like Refresh.
+    expect(picker).toHaveClass('h-9');
+    expect(refresh).toHaveClass('size-9');
+    expect(picker).not.toHaveClass('md:h-7');
   });
 
   describe("the Corporation glyph is the active Character's corp logo", () => {
@@ -572,7 +572,7 @@ describe('CharacterFilterControl', () => {
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
       fireEvent.load(img);
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeNull();
-      expect(trigger).toHaveClass('h-11', 'md:h-9');
+      expect(trigger).toHaveClass('h-9');
       expect(img.parentElement).toHaveClass('size-6', 'md:size-5', 'touch:size-6');
     });
 

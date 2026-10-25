@@ -126,7 +126,7 @@ export function OverviewNext({ summary }: { summary: OverviewSummary }) {
   );
 }
 
-/** Customize: icon-only on a phone (44px), icon and word from `md`. Hidden while the edit bar owns Done. */
+/** Customize: icon-only on a phone (36px), icon and word from `md`. Hidden while the edit bar owns Done. */
 export function OverviewCustomize() {
   const { t } = useTranslation();
   const { editing, startEditing } = useOverviewEdit();
@@ -134,7 +134,7 @@ export function OverviewCustomize() {
   return (
     // `shrink-0`: its min-content is the 16px icon, so a crowded header row could squeeze it
     // under the 24px target floor (WCAG 2.5.8).
-    <Button className="w-11 shrink-0 px-0 md:w-auto md:px-4" onClick={startEditing}>
+    <Button className="w-9 shrink-0 px-0 md:w-auto md:px-4" onClick={startEditing}>
       <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
       <span className="sr-only md:not-sr-only">{t('overview.header.customize')}</span>
     </Button>

@@ -5,7 +5,7 @@
  * tap — and it rendered at DESIGN.md §3's compact tier (`h-9 md:h-7`, 36px on a
  * phone), the tier for a control sitting beside a view's own. `ReauthBanner`
  * now takes `soleAction` for exactly this case, raising it to the `md` touch
- * tier (`h-11 md:h-9`, 44px).
+ * tier (`h-9`, 36px).
  *
  * Forcing the locked state: `ScopeGate` compares the route's declared scopes
  * (`routeScopes.ts`) against the active Character's stored grant, and that
@@ -54,7 +54,7 @@ function makeAccessTokenWithoutClonesScope(): string {
   return `${header}.${payload}.fakesig`;
 }
 
-test('the locked-route reauth button meets the 44px touch floor at 390px', async ({ page }) => {
+test('the locked-route reauth button meets the 36px touch floor at 390px', async ({ page }) => {
   // Guards the subtraction above: were the scope registry to stop asking for
   // this scope, the filter would quietly become a no-op, `/clones` would render
   // unlocked, and this spec would be measuring nothing.
@@ -96,5 +96,5 @@ test('the locked-route reauth button meets the 44px touch floor at 390px', async
 
   const box = await loginButton.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(36);
 });

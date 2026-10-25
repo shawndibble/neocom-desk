@@ -14,7 +14,7 @@ type RadioProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
  * and focus outlines stay the caller's `className`.
  *
  * No touch hit area of its own: a pseudo-element on a native control is not
- * drawn everywhere, so the 44px target is the wrapping label's
+ * drawn everywhere, so the 36px target is the wrapping label's
  * (`tappableRowClassName` rows, or `touchCheckboxLabelClassName` for a bare one).
  */
 export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio(

@@ -367,7 +367,7 @@ export function useTaxColumns({
               stackEdge: 'start',
               render: (dr: DisplayRow) =>
                 isSelectableRow(dr) ? (
-                  // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
+                  // The label is the 36px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
                   <label className={touchCheckboxLabelClassName}>
                     <Checkbox
                       aria-label={t('miningTax.selectRow', {

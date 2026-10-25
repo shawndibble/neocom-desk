@@ -3,537 +3,317 @@
 What `/add-missing-features` knows about the third-party EVE tool ecosystem and
 Neocom Desk's own coverage. A **reference for the next run**, not a run log:
 updated in place, never appended to. Read it in step 1, curate it in step 7,
-keep it near ~150 lines. Delete run metadata on sight.
+keep it near ~150 lines. Delete run metadata on sight. When a section grows,
+compress it (names over narrative, the reason over the story) instead of adding.
 
 ## Tools surveyed
 
-Gap-analysed at least once; dedup before spending a slot.
+Gap-analysed at least once; dedup before spending a slot. `(#n)` = ticket it
+surfaced.
 
-eve-exchange.com (live; Dashboard of six market-price widgets, Trade Finder, Market Browser, Contracts, Appraisal — widgets surfaced #5002, the rest is class 3/Appraisal), Adam4EVE, Ravworks/Slipway, EVE Tycoon, Janice, EVE Appraisal, Iron Whales
-Appraiser (every piece gated — see Killed), EVE Blue Desk, SolCore Dynamics, EvE
-Blueprint, EVE Courier, Fuzzwork, EVE Ref, EVE Retroindustry, ISK.GG, EVE Miner
-Hub, EQM, EveLens, EVE Horizon, EVE Forge, EVE-Industry-Scanner-Tool, EVE-HUB,
-EVE TradeLooper, EVE Night Trade Tools, TradeRelay, ForgeWire (forgewire.space: Build, 4-hub Market, zKill Predictions, owned-BPC Arsenal, Doctrine fit restock, Freight — all covered except #4550), IndustrialEVE (PI alerts fully covered —
-kill-tests 12 and 17, #956), jEveAssets, EVEAIO, MONW, Mudoteve, Solo Industry
-App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance, EVE Data Site,
-PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve, EVE Fleet Mining
-& Ratting Tool, FW LP Store cart tool, EWT PI Tools ("User Planets" is the
-Advisor worklist), EVE ONE, EVE Buddy, Dr.MoonGoo, CLI Metenox Calculator, Eden
-Buyback, Evernus, GESI, Lazy Blacksmith, EVE Orchestra, Alysii's PI Scheme, EVE
-Planetary Planner, Upwell Fuel Monitor, Quantum Anomaly (surfaced #1040), ETM
-v2, AllianceAuth Market Manager, EVE Tycoon MCP server, Uedama Scout (#1043),
-EVE Metro, EVE Crews (cleared: a lore roleplay crew layer, no
-industry/manufacturing/market/wallet endpoint — out of remit despite the
-category's top post count, 185), EVE-NAV (nav.ceve.cc, live: a 3D capital/JF
-jump planner; DOTLAN and Compass already cover this, so incremental),
-Missioneers' Atlas (live: static-SDE LP store finder with LP/ISK cost and
-required items, plus agent finder, mission browser and zKill system intel — no
-market pricing, wallet or industry; the LP finder is covered by #718/#1050/#1068,
-the rest is mission-running remit), Gatewatch (Discord intel/DScan backend) and
-EVE PvP Corp Activity Search (both intel). Blizbor's skill trio (EvE Modular
-Skillplans, EVEMon Pilot Progression, EVEMon Certificates Enhanced — no license,
-so their data is unusable; surfaced #2390). EVE Ledger (hiram-git/eve-ledger,
-live local desktop wallet accountant: activity split, own-alt netting, journal
-archive, ratting ISK/h, loss replacement matching, doctrine view — surfaced
-#3908–#3910; the rest is Killed). EVE Motor Market / MoMa (PeanutMotor,
-GPL-3 Windows desktop, live, weekly releases: build planner with run planner,
-invention, order-book ladder, Daytrade/Swing/Regional/Firesales scanners,
-Order update work-through, FIFO Profits — surfaced #3985–#3995).
-EVE Omni, Canopus, Eve-Omnitool, Eve Deep Industry, SNOW//OPS, New Eden Command,
-eve-hub.ru, Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas (all
-closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
-already Active Jobs / job-slot count), Pod Warden (native PI/skill/order/in-game-
-notification push app — PI alerts covered by kill-tests 12/17 and ADR 0020),
-Isktracker - Incursions (unexamined, non-pipeline).
-JitaSpace (jita.space, MIT, live: Next.js companion with mail, assets, wallet, orders,
-contracts, calendar, LP store, travel, fittings, skills, SDE/dogma explorer and
-SDE build-diff history — no industry or PI; every pipeline-adjacent page is
-already Mail/Assets/Wallet/Contracts/Calendar/Loyalty Store/Travel; incursions
-are #3540-3542; killmail and ship-scan pages die on decisions/kill-test 2). Its
-issues/PRs (#748-897, all read) hold no other pipeline idea: LP-store
-affordability and LP-held filters ship (LoyaltyOfferFilterBar), Variations is
-variation/meta compare, public-contract model and sov/incursion history are
-server-side crawls (kill-test 1), the rest is themes, perf and SDE-ingest chores.
+**Live, pipeline-relevant (all covered unless a ticket is named):**
+eve-exchange.com (#5002), Eve-Omnitool (#5134), EVE Motor Market / MoMa
+(#3985–#3995), EVE Ledger (#3908–#3910), EVE Farm (#5127, #5128), EVE Console
+(#4530), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
+Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
+17, #956), EWT PI Tools ("User Planets" = Advisor worklist), Pod Warden (ADR
+0020), EVE Nexus (mobile; EVE Empire/Pod-shaped, cleared item by item),
+Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
+(#4022), EVE Appraisal, Iron Whales Appraiser, Fuzzwork, EVE Ref, EveLens
+(#5006), jEveAssets, Evernus, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
+EVE-HUB, EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
+licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043).
 
-**Issue-tracker mining pass (market, industry, character, forum).** Public trackers
-are thin: EVE Tycoon, EVE Ref, eve-exchange, Fuzzwork and Adam4EVE have none; Janice,
-jEveAssets, EVEMon, Pyfa, SeAT/Alliance Auth plugins, EveLens and esi/esi-issues were read.
-Reactions are near zero outside esi-issues, so rank by comments, not 👍. Reddit is
-unreachable (403). Surveyed this pass: evehelper.pages.dev (strict subset of the PI Map),
-eve-webtools PI (only /relations resolves), Anoik.is and ellatha.com (wormhole reference,
-weak gap: J-space class/effect/statics in Place Info), eve-offline.net (weak gap: a
-downtime-vs-ESI-outage stale-data cause line), Forge Ledger, New Eden Trade, Keystar,
-AstraCore (classes 1-3 or covered). scan.eveonline.it returned 503 (unclassifiable).
-**Unconfirmed lead:** New Eden Trade says it reads CCP's "Safety Tax" from the wallet
-journal; nothing in our code or docs models it and a web search could not confirm the
-ref type. Verify against the ESI journal ref types before pitching.
+**Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
+Courier, EVE Retroindustry, ISK.GG, EVE Miner Hub, EQM, EVE-Industry-Scanner,
+EVE TradeLooper, EVE Night Trade Tools, TradeRelay, EVEAIO, MONW, Mudoteve,
+Solo Industry App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance,
+EVE Data Site, PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve,
+EVE Fleet Mining & Ratting Tool, FW LP Store cart tool, EVE ONE, EVE Buddy,
+CLI Metenox Calculator, Eden Buyback, Lazy Blacksmith, EVE Orchestra,
+Alysii's PI Scheme, EVE Planetary Planner, Upwell Fuel Monitor, ETM v2,
+AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni,
+Canopus, Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
+Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
+PvP Corp Activity Search, Forge Ledger, New Eden Trade, Keystar, AstraCore,
+evehelper.pages.dev, eve-webtools PI, LedgerParser, IntelParser and Fitlab (roadmap.json and changelog.json per app; every item shipped here or killed: mining history = 90-day overview, PI alerts/forecast/ISK-hr = Advisor, Local threat/Pilot lookup, fit cost + Improve). EVE Crews (lore roleplay layer, no
+market endpoint) and Isktracker Incursions (non-pipeline) are out of remit.
+Weak gaps noted, never filed: J-space class/effect/statics in Place Info
+(Anoik.is, ellatha.com); a downtime-vs-ESI-outage stale-data line
+(eve-offline.net).
 
-**Remit widened (#2328, decision `20260929-234357`): intel and travel tools are
-in scope** — route safety (kills/jumps along a route), Thera/Turnur connections
-and pilot lookup live in the Travel section. "Intel" or "non-ISK" alone no
-longer clears a tool; re-read any cleared on those grounds for these three
-shapes. Client-reading intel (Local scan, DScan) still dies on kill-test 2.
+**Unconfirmed lead:** New Eden Trade says it reads CCP's "Safety Tax" from the
+wallet journal. Nothing in our code models it; verify the ESI journal ref type
+before pitching.
 
-**Three classes are closed, and with them the ecosystem has no untested class
-left**; a sweep's job is to notice a tool fitting none of them. (1) _Web
-industry planners_ (kill-test 6): eveindustry.app, EVE Cookbook, EveIndy,
-eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
-Industry, calculator.city, Eve Nexus, dev-eve.lothriell.com,
-angrytiki/eve-industry-tracker. (2) _Bulk appraisal_ (Appraisal does this and
-more): Goonpraisal, Fuzzwork's Evaluator, EVE Workbench, dd24tool.de. (3)
-_Market/trading discovery_ (kill-tests 10, 1 and 3): theoz.space, Adam4EVE's
-margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool, EVE
-OS's Screener, Oracle Market Genius, Trading Matrix, EveBoosters.com, ETT.
-All-in-one companion apps are the same closed set, their non-pipeline extras
-dropping on **remit**: EVE Online Tooling, EVE Tools Suite, EVE Console, Koru
-Desktop, EveTogether, ECT EVE Assets, Pod, EVE Empire, Esparto Industries, EVE
-Motor Market, Capsuleers.app/eHub, ISKONOMY, Vigilant, EVE Flipper.
+**Dead or unreachable:** EVE Panel, EVE GURU / Production Ledger,
+EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro (HTTP
+530), scan.eveonline.it (503). Reddit returns 403.
 
-**The only open axis found is eventing/actuation, not calculation** — the three
-closed classes are all calculators. EVE Market Order Assistant (forum 505014,
-mega.nz, 300M ISK/char/mo) hotkeys the market window open on the next order
-needing a reprice and clipboards a price: liveness unverifiable, in-client
-actuation is kill-test 2, and the forum's "Grey Zone Automation" thread makes it
-contested TOS ground. EVE Contract Bot (evecontractbot.space, forum 510398, 25M
-ISK/char/mo) pushes contract accept/complete/fail to Discord — dead, TLS cert
-expired; prior art behind #1091.
+**Remit (#2328, decision `20260929-234357`):** intel and travel tools are in
+scope: route safety, Thera/Turnur connections, pilot lookup. "Intel" alone no
+longer clears a tool. Client-reading intel (Local scan, DScan) still dies on
+kill-test 2.
 
-**CapsuleerKit (capsuleerkit.com) is a tool DIRECTORY, not a tool** — the
-cheapest non-forum discovery source, and **spent**: everything on it is above.
+**Three classes are closed**; a sweep's job is to notice a tool fitting none:
 
-Survey method, all still current:
+1. _Web industry planners_ (kill-test 6): eveindustry.app, EVE Cookbook,
+   EveIndy, eveindustryplanner.com, eve-industry.org, eveonline-industry.com,
+   EVE OS Industry, calculator.city, Eve Nexus, dev-eve.lothriell.com,
+   angrytiki/eve-industry-tracker.
+2. _Bulk appraisal_ (Appraisal does it and more): Goonpraisal, Fuzzwork
+   Evaluator, EVE Workbench, dd24tool.de.
+3. _Market/trading discovery_ (kill-tests 10, 1, 3): theoz.space, Adam4EVE
+   margin finder, evetools.dev, evetrade.space, Oracle Market Genius, Trading
+   Matrix, EveBoosters.com, ETT. All-in-one companion apps are the same set,
+   their extras dropping on remit: EVE Online Tooling, EVE Tools Suite, Koru
+   Desktop, EveTogether, ECT EVE Assets, Pod, EVE Empire, Esparto Industries,
+   Capsuleers.app/eHub, ISKONOMY, Vigilant, EVE Flipper.
 
-- **GitHub is SWEPT — 520 repos, 58 keyword queries plus 6 topic pulls.** One
-  flag, and it was killed. The open-source half of the ecosystem is the same
-  three closed classes rebuilt by solo developers: ~40% industry planners, ~25%
-  market/trading screeners, ~15% ESI libraries and SDE converters, ~15%
-  killboard/intel/multibox, and a long dead tail. Do **not** re-sweep on a
-  calendar. Re-sweep on **new-expansion vocabulary**, within ~6 months of a
-  release, running the expansion's mechanic nouns as queries — an Equinox batch
-  (`skyhook`, `mercenary den`, `sovereignty hub`, `planetary resources`) came
-  back almost empty, which is the point: routes opened in 2026 need
-  `X-Compatibility-Date` or ESI 404s silently, so almost nobody has built on
-  them and this app (which always sends it) would be unusually well-placed.
-- The forum category JSON paginates (`more_topics_url`) — fetch pages 0 **and**
-  1 minimum; 0-15 are surveyed, 16+ is older Q&A. **A bumped thread can carry a
-  new feature**, so sort by `last_posted_at`. Last pass: Nexum shipped a
-  capital Jump Planner (new for it, out of domain), EQM shipped a PI Production
-  Calculator (covered — `pi/chain.ts` expands a target through the recipe graph
-  and `pi/factoryBalance.ts` is the what-runs-out-first read), Iron Whales split
-  Reprocessing out of Bulk Appraisal (class 2). Nothing else new.
-- **The web-search leg is worthless — spend the budget on forum pages.** A
-  targeted sweep returned zero beyond the forum.
-- **The Services category (id 61, under Marketplace) is SWEPT and spent** —
-  120 topics over 4 pages yielded one flag, and that one was already killed.
-  It is structurally hostile: buyback programs, freight, wormhole real estate,
-  corp admin and escrow are cross-player commerce, dead on kill-test 1, and the
-  ~15 tool ads cross-posted there all land in closed classes 1-3. If it is ever
-  re-read, sort by **pin/age, not recency** (the one payload was the oldest
-  pinned thread) and read only two shapes: a service ad that publishes a
-  multiplier or formula, and a WTB-a-tool post. Two WTB posts there asked for
-  undercut alerts and a contract-accepted ping — both already shipped, which is
-  useful confirmation rather than a lead.
-- **Service pricing rules, checked and closed.** Buyback: Horizon Logistics is
-  the only ad publishing its rule, "90% of Jita IV-4 highest buy" — that is
-  Appraisal x 0.9, covered; every other program hides it behind a proprietary
-  appraiser. Freight: only two published numbers across 120 topics, and every
-  hauler either points at an off-site calculator or quotes on contact. Two
-  shared conventions worth knowing: collateral is the Jita **sell** value of
-  the cargo, and rate tiers gate on volume + collateral rather than route.
-  **Do not build a directory of third-party rate cards** — they go stale the
-  day a service reprices and the app then lies to the player.
-- **A title is a weak classifier** — EVE Empire, Pod and ECT EVE Assets sat in
-  the skim list and all carried a full industry surface. Treat these as
-  unexamined, not cleared, and check any touching the ISK pipeline: EveWebMail,
-  Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper, Socketkill, PEARL,
-  EVE Hacking Simulator, Eve PvP Radar, EVE-O Preview, EVE Threat Checker, EVE
-  Fit Assistant, SLH Local Scanner, EVE NewBro, EVE Link, EveHunter, Nicotine,
-  HARUSPEX, icon server, Ascension Labs Libs, Z-S Overview Customiser, SMT Eve
-  Map Tool, Eve-mentor-mcp, WarBeacon, Project Eden, EVE 3D MAP,
-  @strata-eve/esi SDK, Eve Missile Analyst, Eve Ship Stats, Grey Zone
-  Automation, EVE Intelligence Nexus, Eveswitcher, Insurgency Tools,
-  Battlefield.Space. Cleared as non-ISK before the #2328 remit change (re-check
-  any that offer route safety, Thera/Turnur or pilot lookup): Ministry of Pantoscopic Observance
-  (intel desk calculator), Rangefinder (cyno routing), EVE OQM integration
-  (dev-recruitment thread, nothing shipped), Nexum (wormhole chain mapper),
-  Helm (plugin-first corp platform, no industry plugin exists), fleet-manager
-  (in-fleet MOTD), EVE411 (intel + Local scan), Eve Skillsboard (skill browser
-  for character sales), EVEMon Lives (EVEMon fork), W-Space Atlas (wormhole
-  database), PATT (chat-log translator).
-- **Cleared on kill-test 1, not on domain** — each DOES carry an economic
-  surface, so the name alone will not re-clear it: ADAPT (its Internal Contract
-  Market is a member exchange, the EQM Corporate Exchange shape), OpsCore v2
-  (ore/loot buyback plus a payout ledger; assets/market/wallet are
-  roadmap-only), EasyEve (loot split; its ISK/hr is ISKONOMY's remit exclusion,
-  its trade routes are class 3).
-- **Two roster names were phantoms.** "contract-monitoring Discord bot" IS the
-  already-surveyed EVE Contract Bot. "EVE Nexus" is the _mobile app_ (dev
-  Kuastro), not `eve-nexus.app` — now examined, and an EVE Empire/Pod-shaped
-  broad ISK surface cleared item by item: watchlist price alerts are the
-  Quickbar (#680), mining ledger is EVE Miner Hub, PI and job pushes are the
-  IndustrialEVE entry, reprocessing is #672, LP is #718/#1050/#1068, injector
-  value is EveLens. Its one differentiator is a native mobile fitting sim, out
-  of domain.
-- **Dead/unreachable, not gap-analysed:** EVE Panel, EVE GURU / Production
-  Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro
-  (evemarketpro.org returns HTTP 530 — unclassifiable).
+**The only open axis is eventing/actuation, not calculation.** EVE Market
+Order Assistant (hotkeys the next reprice; kill-test 2, contested TOS) and EVE
+Contract Bot (dead; prior art for #1091) are the only examples.
+
+**Survey method:**
+
+- **GitHub is swept** (520 repos, 58 queries): ~40% planners, ~25% screeners,
+  ~15% ESI libraries, ~15% killboard/intel, a dead tail. Re-sweep only on
+  **new-expansion vocabulary**, within ~6 months of a release (query the
+  expansion's mechanic nouns). The web-search leg is worthless.
+- **Forum category JSON** paginates (`more_topics_url`): fetch pages 0 **and**
+  1 minimum, sort by `last_posted_at` (a bumped thread can carry a new feature).
+  Individual tool threads (`/t/<id>.json?print=true`) list every update post.
+- **Services category (id 61) is swept and spent**: buyback, freight and
+  wormhole real estate are cross-player commerce (kill-test 1). Do **not**
+  build a directory of third-party rate cards; they go stale and the app lies.
+- **A title is a weak classifier.** Unexamined, not cleared: EveWebMail,
+  Wayfinder, Atlas, MISMAPS, WHMapper, Socketkill, PEARL, Eve PvP Radar, EVE
+  Fit Assistant, EVE Link, EveHunter, Eveswitcher, Insurgency Tools, Project
+  Eden, Eve Ship Stats. Cleared as non-ISK before #2328 (re-check route
+  safety, Thera or pilot lookup): Rangefinder, Nexum, Helm, EVE411, W-Space
+  Atlas. Cleared on kill-test 1, not domain: ADAPT, OpsCore v2, EasyEve.
+- **CapsuleerKit (capsuleerkit.com)** is a directory and is spent.
 
 ## Already covered — don't re-propose
 
-**A closed issue is not proof** — a number alone can be an owner rejection. Grep
-for the module or route.
+**A closed issue is not proof**; a number alone can be an owner rejection. Grep
+the module or route, in `GLOSSARY.md` vocabulary, on `origin/develop`.
 
 - **Market**: undercut detection, order competition/health, full order book,
-  owned-order hub gap (`hubHaulGaps`), variation/meta compare.
-- **Appraisal**: single/multi-hub, refine-then-sell, contract-line value,
-  reprocessing off the character's REAL skills (only the facility rate is
-  assumed), shareable re-priced pile.
-- **Industry**: realized profit, build-vs-buy, Build Groups/Opportunities
-  (owned-blueprint ranking — covers Ravworks), Order Depth, job-slot count,
-  owned-stock/Craft Sweep, Active Jobs by soonest, Production Log profit chart,
-  price history + 7-day SMA, reactions as an `activity`, blueprint material
-  calc.
+  hub gap (`hubHaulGaps`), variation/meta compare, Open Orders (sell-through,
+  multi-char, outbid suggested price, work-through), Quickbar price alerts,
+  Sold/day (`dailySales`), public structure markets (opt-in `structureMarkets`
+  scope, decision `20260906-203425`).
+- **Appraisal**: single/multi-hub, refine-then-sell off the character's REAL
+  skills (facility rate assumed), contract-line value, shareable pile, saved
+  shopping lists minus owned with hold-fit (#2868, #2931), Copy sell list.
+- **Industry**: realized profit, build-vs-buy, Build Groups/Opportunities and
+  Market-Wide (ranking covers Ravworks and Omnitool "What to build"), "All
+  owned" blueprint library (#2335), Order Depth, job slots, owned stock/Craft
+  Sweep, Active Jobs, Production Log chart, price history + 7-day SMA, reactions
+  as an `activity`, blueprint material calc, `oreDecision` (owned ore).
 - **PI**: stop-tier recommendation, fed/starved pins, reset-run batching,
   measured extraction rate, cross-colony coordination (ADR 0012), richness
-  estimate + fitted plan for unbuilt planets; Advisor is a ranked worklist
-  (#954/#960) with per-colony ISK/hr (#956), restart cadence (#959), pilot prefs
-  (#955), time-to-full (#958), chain revenue.
-- **Wallet/LP**: balance chart, corp division sync, ISK/LP ranking nets ISK
-  cost, the `required_items` turn-in _and_ a build cost. **Assets**: portfolio
-  value.
-- **Appraisal**: saved shopping lists minus owned with a hold-fit bar (#2868,
-  #2931). **Mining**: ISK/m³ survey colouring and chart metric (#3222, #2160).
-  **Stock**: `/market/stock` restock list with Build Group action (the owner
-  rejected #643 before it; it shipped later as Stock Targets). **Orders**:
-  outbid suggested price, copyable.
-- **Open Orders**: sell-through, multi-char aggregation. **Quickbar**: price
-  alerts, multi-hub handoff. **Mining**: moon-ore ledger tax tracking
-  (renter-side only), ore/ice yield. **Corp Ops Board**: structure fuel clock.
-- **Contracts**: item-exchange/auction value; Courier mode ships ISK/jump,
-  ISK/m³, Reverse Lane, Endpoint Space, "From my region", Completion Risk, Going
-  Rate bait detection.
-- **Skills**: plan import (clipboard Append/Replace dedupes — covers any
-  "plan mixer"), EVEMon/EFT/queue import, remap optimizer, ship masteries with
-  "Add tier to plan" (built from SDE certificates), Skill Detail unlocks (#400),
-  Skill Compare matrix, Alpha caps.
+  estimate + fitted plan, Advisor worklist (#954/#960) with ISK/hr (#956),
+  restart cadence (#959), time-to-full (#958); `pi/chain.ts`, `factoryBalance.ts`.
+- **Wallet/LP/Assets**: balance chart, corp divisions, ISK/LP nets cost and
+  `required_items`, portfolio value. **Mining**: ISK/m³ survey (#3222, #2160),
+  moon-ore ledger tax (renter-side), ore/ice yield. **Stock**: `/market/stock`
+  (Stock Targets; #643 was rejected first). **Corp Ops Board**: fuel clock.
+- **Contracts/Courier**: item-exchange/auction value; ISK/jump, ISK/m³,
+  Reverse Lane, Endpoint Space, Completion Risk, Going Rate bait detection.
+- **Travel**: Hauling Trip Plan (`haulPlan.ts`, multi-stop), waypoints, route
+  safety, Thera/Turnur, Ansiblex legs.
+- **Skills**: plan import (Append/Replace dedupes), EVEMon/EFT/queue import,
+  remap optimizer, masteries with "Add tier to plan", Skill Detail unlocks
+  (#400), Skill Compare, Alpha caps.
 
-**The "engine computes it, the UI never shows it" scan is SPENT** — every
-exported `src/engine` field was checked against the whole app and accounted for.
-The productive inverse is a surface drawing a conclusion the engine could
-sharpen.
+**The "engine computes it, the UI never shows it" scan is SPENT.** The
+productive inverse is a surface drawing a conclusion the engine could sharpen.
 
 ## Standing kill-tests
 
-Numbering is stable — later runs cite these by number. Append, never renumber.
+Numbering is stable; later runs cite these by number. Append, never renumber.
 
-1. **Cross-player wall.** No cross-player ESI — kills arbitrage, buybacks.
-2. **No write-scoped ESI** (`esi/registry.ts`) — kills relist, automation.
+1. **Cross-player wall.** No cross-player ESI; kills arbitrage, buybacks.
+2. **No write-scoped ESI** (`esi/registry.ts`); kills relist, automation.
 3. **Picture of data already on screen.** Killed: depth chart x2, Gantt.
-4. **One caller ≠ covered** — the finding is a surface acting WRONG (#824).
-5. **No historical ESI series** — kills cost-index-over-time.
-6. **Settled scope wins** — check `docs/context/decisions/`, `.out-of-scope/`.
-7. **Assets endpoint has no timestamp** — kills staleness/idle-inventory.
+4. **One caller ≠ covered**; the finding is a surface acting WRONG (#824).
+5. **No historical ESI series**; kills cost-index-over-time.
+6. **Settled scope wins**: `docs/context/decisions/`, `.out-of-scope/`.
+7. **Assets endpoint has no timestamp**; kills staleness/idle-inventory.
 8. **Not in `pollDomains/` ≠ sampled.** Assets is page-visit-only.
-9. **A scope wired for one feature isn't free for another**
-   (`structureMarkets`).
-10. **Materials are fungible** — kills FIFO cost reconstruction either side.
-11. **`walletJournalFilter.ts` exists** — a ref_type view is only a saved
-    filter.
-12. **A module header comment can be a settled decision** if it ARGUES a
-    boundary.
+9. **A scope wired for one feature isn't free for another** (`structureMarkets`).
+10. **Materials are fungible**; kills FIFO cost reconstruction either side.
+11. **`walletJournalFilter.ts` exists**; a ref_type view is only a saved filter.
+12. **A module header comment can be a settled decision** if it ARGUES a boundary.
 13. **A pre-investment calc with no ESI ground truth is a maintenance trap.**
-14. **No bulk market-history endpoint** — kills market-wide movers/trending.
-15. **Every real route requires a Character** (`FEATURE_ROUTES`, `ScopeGate`) —
-    a logged-out-only tool dies here, but a travel/intel tool behind sign-in is
-    on remit (#2328).
-16. **`invTypes.volume` is assembled, not packaged** — narrows product volume.
+14. **No bulk market-history endpoint**; kills market-wide movers/trending.
+15. **Every real route requires a Character** (`FEATURE_ROUTES`, `ScopeGate`);
+    a logged-out-only tool dies here, a travel/intel tool behind sign-in is on remit.
+16. **`invTypes.volume` is assembled, not packaged**; narrows product volume.
 17. **A PI pin's live state is untrustworthy or deliberately unread.**
-18. **A badge is noise when most rows pass** — mark exceptions only (#1015).
-19. **Shipped copy can promise what doesn't exist** — grep `en.json` (#1020).
-20. **A baked SDE field that looks like the answer usually is not** — the claim
-    this skill gets wrong most often. `stations.json`'s `typeId` is not station
-    capability; `staStations.operationID` is, unread by `build-sde.mjs` (#1040).
-21. **A shipped premise makes a decision stale — prove it moved** (#942/#1040).
+18. **A badge is noise when most rows pass**; mark exceptions only (#1015).
+19. **Shipped copy can promise what doesn't exist**; grep `en.json` (#1020).
+20. **A baked SDE field that looks like the answer usually is not** (the claim
+    this skill gets wrong most). `stations.json` `typeId` is not capability;
+    `staStations.operationID` is, unread by `build-sde.mjs` (#1040).
+21. **A shipped premise makes a decision stale**; prove it moved (#942/#1040).
 22. **A prohibition's REASON is narrower than its title** (#946, #1043).
-23. **Check what the ADJACENT cell is computed from** — unify sources (#1043).
-24. **A decision can scope ITSELF** (mirror of 22) — read the LAST bullets.
+23. **Check what the ADJACENT cell is computed from**; unify sources (#1043).
+24. **A decision can scope ITSELF** (mirror of 22); read the LAST bullets.
 25. **Bound error against the DECISION MARGIN, not the total** (#1048).
 26. **A counterfactual must be an action available AT THAT VENUE.**
-27. **Fees are a fault line — check every ISK figure.** Right in `buildVsBuy`,
+27. **Fees are a fault line**; check every ISK figure. Right in `buildVsBuy`,
     `ownedStockSale`, `orderExits`; absent in `makeOrBuy`; wrong in #1050/#1051.
-28. **A stale code comment can send a run down a dead end** — check the fact.
-29. **Before "the SDE has no mapping", search `market/attributes.json`**
-    (#1058).
-30. **Character coverage is a fault line** — resolve inputs per ROW (#1062).
+28. **A stale code comment can send a run down a dead end**; check the fact.
+29. **Before "the SDE has no mapping", search `market/attributes.json`** (#1058).
+30. **Character coverage is a fault line**; resolve inputs per ROW (#1062).
 31. **Check the ACTION, not just the number, on another's row** (#1061).
 32. **"Already fetched" means the FETCH OPTIONS, not the endpoint.**
-33. **The ESI-boundary scan is SPENT** — unread fields accounted for (#1065).
-34. **The i18n scan works only for keys that RENDER** — match `t('key')`
-    (#1020).
-35. **The "read in exactly one place" scan is NOISE — do not run it.**
-36. **Industry/market CONSTANTS are verified — stop re-checking.** Structure
+33. **The ESI-boundary scan is SPENT** (#1065).
+34. **The i18n scan works only for keys that RENDER**; match `t('key')` (#1020).
+35. **The "read in exactly one place" scan is NOISE**; do not run it.
+36. **Industry/market CONSTANTS are verified; stop re-checking.** Structure
     ME/TE/cost 2600/2602/2601 (Tatara 2721), rig ME 2594, TE 2593, security
     2355/2356/2357, reactor rigs 2714/2713. Un-checkable: SCC 4%, NPC facility
     tax 0.25%, 100 ISK broker minimum; the 50% refine base is disclosed.
-37. **Advanced Industry does NOT apply to reaction time, rightly excluded.**
-38. **Mining forum REPLIES isn't worth its own scan** — fold into bumped
-    threads.
+37. **Advanced Industry does NOT apply to reaction time**, rightly excluded.
+38. **Mining forum REPLIES isn't worth its own scan**; fold into bumped threads.
 39. **Mining `docs/context/decisions/` broadly is low-yield** (#537, #538).
-40. **`.out-of-scope/`'s reasons are re-checked; both files are done.**
-41. **A snapshot's per-row field can mean something other than the row** —
-    `price: contract.price` is the CONTRACT's, read as the BLUEPRINT's; a
-    symmetric error turns systematic under a min()/max() reduce (#1076).
-42. **`functions/` (Firebase) is swept** — #1076/#1080 came from it.
+40. **`.out-of-scope/` reasons are re-checked; both files are done.**
+41. **A snapshot's per-row field can mean something other than the row**:
+    `price: contract.price` is the CONTRACT's; a min()/max() reduce makes the
+    error systematic (#1076).
+42. **`functions/` (Firebase) is swept** (#1076/#1080).
 43. **Ask any publisher:** what does it DROP? which field is the PARENT's?
 44. **Ask for a COLD READ after your own small sweep** (#1080, #1084).
-45. **`scripts/` is swept; `build-sde.mjs` is exemplary** — its defects
-    (#1084, #1085) share one shape: a baked field narrower than consumers
-    assume.
-46. **A proxy is not a measurement — name the property, then test it** (#1085).
-47. **A rate divided by a guessed duration is a typed-in estimate** — tick
-    counts and session gaps are not time played; show per-day totals
-    (`20261006-085420`).
+45. **`scripts/` is swept**; `build-sde.mjs` defects (#1084, #1085) share one
+    shape: a baked field narrower than consumers assume.
+46. **A proxy is not a measurement**; name the property, then test it (#1085).
+47. **A rate divided by a guessed duration is a typed-in estimate**; show
+    per-day totals (`20261006-085420`).
 48. **The public contract snapshot drops asked-for lines** (only PLEX survives
-    as `requestedPlex`) — any value-vs-asking ranking ranks item-swap bait
-    first until #3986's `requestsItems` flag lands.
+    as `requestedPlex`); value-vs-asking ranking ranks item-swap bait first
+    until #3986's `requestsItems` flag lands.
 
 ## Filed candidates
 
-#4550 NARROW — Fittings: several Fittings x hull counts into one netted shortfall (fit set; not named "Doctrine").
+`SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
+`SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
-#4736 NARROW — Transactions: per-row reason for a missing margin (engine-decided causes only) plus an uncosted-revenue total (EVE Market Tool).
+- #5134 NARROW Build Plans "Buy ore instead": compressed ore bought and
+  refined vs buying minerals, cheapest/lightest only (Omnitool, MoMa).
+- #5128 NARROW Net worth "In contracts" layer (EVE Farm). #5127 NARROW LP Store
+  Sells/day column (EVE Farm). #5007 SHIP Sale Profitability on a Sell-now basis.
+- #5006 NARROW Skills "Who's closest" (EveLens #137). #5002 NARROW Overview
+  Market Trend widget (eve-exchange). #4736 NARROW Transactions missing-margin
+  reason + uncosted-revenue total. #4550 NARROW Fitting set, netted shortfall.
+- #4530 NARROW Corp Projects tab (EVE Console). #4022 NARROW Appraisal reads
+  grouped quantities (Janice).
+- MoMa batch, ready-for-agent by owner override: #3991 Open Orders
+  work-through, #3985 slot-aware schedule (#3988 splits, ready-for-human),
+  #3992 group claims, #3993 order-book walk, #3986 → #3989 below-market
+  contracts, #3994 vs 90d, #3995 History totals, #3987 → #3990 invention as a
+  Blueprint Acquisition tier.
+- Earlier NARROWs: #3791 Market-Wide invention note, #3792 fit-diff on hover,
+  #3793 Assets copy with quantities, #3796 Local "new since last paste", #3797
+  contract-expiry alerts, #3798 History "By item", #2390 Certificates tab,
+  #1091 contract completion/failure notices, #3908 Where the ISK went panel
+  (#3914 daily chart, #3915 phone rows), #3910 "Your Characters" fit stats.
+  #3909 SHIP wallet archive. #1092 bug: courier countdown shows offer expiry.
 
-#5006 NARROW — Skills: a read-only "Who's closest" list in the plan editor's Plan tools pane (SP missing and time to finish per roster Character, own attributes/implants, no queue offset; EveLens #137).
+**Owner-rejected, do not re-pitch without new evidence:** #643 restock points;
+#722 unowned-blueprint coverage; #725 PI Production Run/Log (no PI cost basis);
+#822/#827/#925 Skill ROI panels; #858 Quickbar unrealized P&L vs typed cost.
 
-#5007 SHIP — Build Plans: Sale Profitability on a Sell now (buy orders) basis beside Sell order, inside the Calculation Breakdown (EVE Industry Scanner Instant/Patient).
-
-**Verdict is the hostile review's, not the ticket's fate.** `SHIP` means the
-reviewer cleared it, never that Shawn accepted it — #858 carries `SHIP` and was
-closed "the quickbar already has enough". Check `gh issue view <n> --comments`.
-
-**Owner-rejected — do not re-pitch without new evidence:** #643 restock/reorder
-points ("no current users are asking"); #722 unowned-blueprint coverage (build
-cost); #725 PI Production Run/Log (no PI cost basis — kills PI realized-profit
-tracking generally); #822/#827/#925 Skill ROI panels; #858 Quickbar unrealized
-P&L vs. a typed cost basis.
-
-**Shipped or closed clean:** #671, #672, #679, #680, #689, #690, #711, #712,
-#713, #717, #726, #730, #831, #874 — all in "Already covered" above.
-
-**Open, unsequenced** — read each with `gh issue view`: #642, #718, #819, #821,
-#824, #826 (superseded by Courier mode), #880 (needs a human ESI check), #926,
-#1015, #1017, #1018, #1026, #1040, #1043, #1061, #1062, #1065, #1074, #1076,
-#1080.
-
-**Open, ordered.** #1048 (refine-vs-sell compares whole-batch refine against
-full-quantity sell) **before** #1058 (reprocessing specialisation modelled three
-ways; attribute 790 names the right one). #1050 (LP net profit / ISK per LP are
-GROSS; 61 offers shown profitable are losses) **blocks** #1068 (30.3% of offers
-demand a turn-in `offerProfit` subtracts and the `<dl>` never shows). #1051
-(market-wide `iskPerHour` nets no tax, broker or job fee) **blocks** #1084
-(`marketWideTrees.json` bakes the TOP blueprint's `time`). Unblocked: #1085
-(assembled volume on hull material lines).
-
-**New.** #3791 NARROW — Market-Wide says invention-only T2/T3 products are not
-ranked (static note, no count: "no source" also covers faction/lottery BPOs).
-#3792 NARROW — Fitting Add panel previews whole-fit stat change on hover/focus,
-pointer only (generic `diffFittingStats`; touch has no path). #3793 NARROW —
-Assets select bar "Copy with quantities" (`Name xQty`), no Appraisal hand-off.
-#3796 NARROW — Local list "new since last paste", only when the re-paste
-overlaps the previous one (a jump would mark everyone new; 18). #3797 NARROW —
-lead-time alerts for issued contracts expiring unaccepted and ONE batched
-"N orders lapse" event per Character (per-order events would burst). #3798
-NARROW — Market History "By item" rollup of the existing FIFO Margin column,
-covered items only, truncation caveat shown. #2390 NARROW — Skills › Certificates tab: CCP's SDE certificates,
-combat groups only, grade + next-grade gap + "Add to plan"; Alpha cap shown only
-on Alpha characters. #1091 NARROW — contract notifications announce completion and failure,
-not just acceptance; every status is stored but only the edge into `in_progress`
-is diffed. Two events, silent on rejected/cancelled/deleted/reversed, gated on a
-known-live prior status and on the character being issuer or acceptor (the
-endpoint also returns contracts merely offered TO them),
-feed-on/browser-off. #1092 bug — an accepted courier's Character Board countdown
-shows the offer expiry, not `date_accepted + days_to_complete`; symptom is
-UNDER-warning. #3908 NARROW — Where the ISK went becomes a side panel that
-filters the Journal (owner: no new Wallet tab, decision fatigue); This/All
-Characters on the Journal; own-Character transfers netted (N of M loaded;
-corp journal untouched); PLEX bought as one row. #3914 — hideable daily
-In/Out chart in that panel, click a day to filter (owner ask; position, not
-colour, carries In/Out). #3915 — phone Journal as day-grouped two-line rows;
-sort by Date, Amount, Type only. #3909 SHIP — wallet journal +
-transactions archived 365 days device-only, poll-fed, gaps shown. #3910 NARROW
-— "Your Characters" stats section on an open Fitting: can fly, missing
-skills, training time; chips + search for 20+ Characters (owner: a popover
-was the wrong place).
-
-**MoMa batch, ready-for-agent by owner override** (shapes settled in an owner
-interview, then reviewed): #3991 NARROW — Open Orders work-through, controls in
-the current row, Next re-reads the book, phone drops copy. #3985 NARROW —
-slot-aware schedule and done-by, one job per node; #3988 decision ticket
-(ready-for-human) for multi-Character / multi-copy splits. #3992 NARROW — group
-member Use assets offer subtracts sibling claims; overlay kept. #3993 NARROW —
-order-book walk on plan/group pages for need ≥ 1% of listed. #3986 → #3989
-below-market contracts (first shape KILLed by kill-test 48; revived behind the
-snapshot flag). #3994 NARROW — vs 90d, region average vs region average. #3995
-NARROW — History margin/broker totals, By day, All characters FIFO, Trading
-profit widget. #3987 → #3990 NARROW — invention reopened (SDE kept only
-activities 1/11) as a Blueprint Acquisition tier per decryptor.
-
-**EVE Console 0.9.17 re-read (GPL-3, live):** its earlier gaps all shipped
-since (stock targets, net worth, jump planner); the one unexplored feature was
-Corp Projects (`esi-corporations.read_projects.v1`). #4530 NARROW — Corp Projects
-tab: open projects, pool, reward per contribution, my cap use, build cost vs
-reward on manufacture rows; no alerts, no contributors list, no mining compare.
-
-**Janice open GitHub issues (appraisal sweep):** #4022 NARROW — Appraisal paste
-reads dot/space/apostrophe-grouped quantities and flags unreadable ones instead
-of pricing them as 1 (Janice #34/#28/#22).
-
-#5002 NARROW — Overview: Market Trend widget, fixed basket (minerals, PLEX, Large Skill Injector) with 7d/30d change (eve-exchange dashboard).
+**Open ordering:** #1048 before #1058; #1050 blocks #1068; #1051 blocks #1084.
+Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
+#1026, #1040, #1043, #1061, #1062, #1065, #1074, #1076, #1080, #1085.
 
 ## Killed / dropped candidates (never filed)
 
-Grouped by the test that killed them; the reason is what stops a re-pitch.
+The reason is what stops a re-pitch. Numbers are kill-tests.
 
-- **Ship insurance price/payout lookup** (JitaSpace #860/#866): ESI
-  `/insurance/prices` is public but the payout is a fixed fraction of a hull base
-  value; the player pays one premium per ship. Not an ISK-pipeline step; the
-  Production Log already takes a manual `insurancePayout`.
-
-- **Hull demand board** (ForgeWire Predictions): needs a new killmail ingest job and archive dependency while Functions are not auto-deployed; popular fits and route safety read zKillboard client-side by decision; loss rate is an input, not a build decision Opportunities/Market don't already make.
-- **Structured WTS/WTB listing board** (TradeRelay, early test, no replies): a cross-player listing book needs a server holding every user's listings — the cross-player aggregation wall in a local-first PWA. Settlement is plain EVE contracts, which the app already reads.
-- **Build-cost history series** (EVE Console): realized margin, Production Log and
-  price history already exist; a per-item daily series is gappy per device, and a
-  stored cost is only comparable with the ME/TE/rig/tax inputs stored beside it.
-- **Multi-format sale post** (Slack/Discord/BBCode matrix; EVE Console): Appraisal
-  Copy sell list + share links cover it; only a single Markdown copy option
-  would be defensible. Storefront and webhooks stay out of scope.
-
-- **Janice-issue seeds, Appraisal:** already shipped — remembered hub and Price
-  Percent plus `?hub=`/`?percent=` (#33/#24/#48), Price % as the multiplier
-  (#26), 5 Trade Hubs (#25), Clear, refine leftover hint (#43), Moon Mining
-  Tax/Survey (#44). Hostile KILL: ISK/m³ column (#32/#46; volume column and
-  total exist, courier decision `20260912-143620` ranks ISK/m³ secondary),
-  compress-ore action (#18; Ore Form setting and decision `20261006-185915`
-  cover it, widest build for the narrowest reach), per-row exclude (#35;
-  deleting a paste line does the same and the paste is the share-link source).
-- **MoMa leftovers:** station-trading flip finder (owner: needed a new tab —
-  no new pages; Hauling's 3-pass scan is the feasible shape if
-  revived inline). Compressed-ore buying (structure refine rates are out,
-  `20260906-180034`). Optimizer score (47 — made-up 45/25/15/15 weights).
-  Swing below-average scanner and recovery days (47; residue #3994). Guided
-  tutorial (not a capability gap). Merging the Group Owned Overlay into member
-  claims (reverses `20260909-212724`; residue #3992).
-- **EVE Ledger leftovers:** Omega self-funding / "does it cover its PLEX" (13 —
-  the Omega price in PLEX is in neither ESI nor the SDE and varies by term;
-  Omega is per Account, which has no identity; residue is #3908's PLEX row).
-  Ratting ISK/h (47 — 20-minute bounty ticks; ESS lags; loot and LP never hit
-  the journal). Own-loss replacement matching (10 — a later hull buy is not
-  provably the replacement; SRP and builders read unreplaced; the loss cost
-  ships in Pilot Lookup). Journal activity groups and a fees total (3, 11 — a
-  ratter's ship and ammo buys read as a trading loss). Doctrine "wallet
-  covers it" and per-Character injector ISK (3).
-- **1**: hub arbitrage/trade finder (ships as `hubHaulGaps`), corp
-  buyback/payout split, EQM Corporate Exchange, dd24tool.de, Element43 and
-  EveMarketProphet (dead), Space Trucker / EVE Flipper route sequencing (also
-  14), Vigilant, OCR appraisal (the client already copies exact text). **2**:
-  bulk relist / buy queue; the keybind-and-clipboard reprice helper
-  (`orderFloor.ts` already shows the relist price). **3**: depth chart, EVE
-  Forge Gantt, Working Capital Locked, EVE Motor Market build-tree viz, Open
-  Orders slot ceiling. **5**: cost-index watch. **6**: multi-hop reaction
-  chains; public contract browser and sell-advisor (ADR 0013, twice);
-  corp-placed order split (+24 — **residue:** `watchCandidates` books a corp
-  sell as personal profit; a "Corp" chip, not exclusion). **7**: asset
-  staleness. **8**: Appraisal Portfolios' chart half. **9**: player-structure
-  pricing incl. Iron Whales' nullsec markets; Order Floor standings in the
-  broker fee (re-confirmed: `fees.ts` implements the standing terms and
-  `orderFloor.ts` accepts them, but nothing populates either and
-  `read_standings` is not in the scope set, so the app always shows the
-  standing-0 fee. USIA has sold standings-raising for 17 years off exactly this
-  formula, so demand is real — the kill is the scope plus unbuilt consent UI
-  against a <=0.5pp swing, and that has not changed. Do not re-pitch it as new). **10**: station-trading FIFO P&L, Production Run cost from wallet
-  purchases, EVE Motor Market's trade journal. **11**: LP redemption ledger (ESI
-  has no LP transaction log). **12**: PI Advisor arbitrary-system search;
-  Records tab unlink/unwatch. **13**: Moon Survey / Metenox estimator and ledger
-  in any framing (filed as #859, closed on rediscovering this — do not re-file);
-  EQM HyperNet. **1 (reach)**: Equinox skyhook reagent-reservoir and
-  theft-window tracker in any framing (prior art `yilifaer/aa-holdfast`) —
-  needs a corp role, in a sov-holding corp, that has deployed skyhooks, and
-  skyhooks exist in neither highsec nor lowsec, so it is a sub-slice of the
-  ~5% who hold any Corp Role at all (`20260903-145528`). Narrower than the
-  Metenox kill. Second cost: `esi-structures` is missing from
-  `esi/registry.ts` as an entire scope **group**, so it is a registry entry, a
-  Corp Capability, a `corpScopes` mapping, a scopes-test assertion and consent
-  copy — kill-test 9, not a formality. Note carefully that kill-test **13 does
-  NOT apply**: the ESI ground truth is real, and the existing
-  `StructureLow/NoReagentsAlert` plumbing answers "production is stopping",
-  not "a raider can take this" — so the overlap bar does not kill it either.
-  Reach carries it alone. **This is the candidate to reopen first if the app
-  ever acquires a sov-nullsec audience.** Also note its headline number (51
-  reagent-holding skyhooks out of 413) is an alliance-wide aggregate, which
-  kill-test 1 means this app structurally cannot produce. **14**: Market Movers. **16**: Build Plan product volume + haul
-  distance (+3); pricing that haul at the courier corpus' going rate (a median
-  is scale-dependent — an outlier detector, not a quote). **17**: PI haul-out
-  volume, misrouted-factory alert, colony staleness (+4), Advisor buffer
-  headroom, `ColonyFit.limitedBy`. **24**: `refineUnitsLeftOver` (#1048 is the
-  real defect beside it), Compare Hubs unpriced disclosure (+26; each hub's
-  total is correct), skill-reduced job time as denominator (+12; folded
-  into #1051), Production Log double-sale detection (no join key — **watch:** an
-  ESI order↔transaction correlation makes the FIX proposable). **32**:
-  Production Run using `IndustryJob.cost` (no job id).
-- **Re-pitched, still dead:** invention/decryptor planning (`.out-of-scope/
-invention-planning.md`, #2848 not planned — only the Market-Wide label
-  survived, #3791); Per-blueprint "Need Hauling / Need BP" status in a Build Plan
-  (EVE Horizon; 18 — shows only on exceptions — plus `OwnedBlueprintsPanel`
-  location, Assets Move, and a station/container matching join); wallet top/flop
-  items, ROI and weekday-by-hour heatmap (10, 11 — no cost basis, ~30 days of
-  journal); hauling top-routes list (needs order books for many hub pairs, the
-  shared ESI budget); quiet hours/digest (#2871 not planned); repeat "still not
-  fixed" reminders and auto-resolve (noise; could erase a live fire).
-- **Assets leftovers (reviewed, killed):** CSV Value/Location-type columns (ESI
-  average price only — a number already on screen (3), exported as authoritative;
-  every table exports what the screen shows, `20260929-085650`). Showing the bay
-  in search-result trails is a label fix, not a feature. Wormhole "which of ALL my
-  ships can pass" (#2906 shipped the single-ship check). Reliability popover on
-  Market-Wide profit (Depth was hidden by default for width, #3071; the signals
-  exist).
-- **On remit, not a kill-test:** "can this character fly this fit" (EVE Empire —
-  PvP/PvE; distinct from #1015); Compass and EVE-NAV capital jump planning (a
-  second account plus a multi-billion hull, no ISK-pipeline leg); Eve Supply
-  Chain (closed planner class); EVE MCP Server (developer infrastructure);
-  Abyssal pricing (`unpricedRows` flags them); Skill Extractor ISK/hr; Corp
-  Wallet chart by division (Accountant-only).
-- **Reach:** Capsuleers.app Asset Consolidator (multi-character haul plan via
-  0-ISK contracts between own alts) and EVE Console (buffer/priority management
-  across dozens of indy alts, nullsec capital builder) — second-account and
-  null-scale play, few players.
-- **On merit:** Skill ROI in any framing incl. the owner's invited re-frame — no
-  realized ISK/hr per job exists. Curated starter-plan/template library (13:
-  hand-authored role modules rot on every CCP rework; masteries are CCP's own
-  templates). Certificate grades in Skill Compare (3). A hand-typed "lagging
-  support skills"/Magic-14 audit rule (13 + 18). Cross-plan material reservation and LP
-  required-item re-pricing — `20260909-212724-group-ownership-overlay` rejected
-  an allocation solver outright. Hand-entered cost basis with no linked run — a
-  per-unit average over fungible lots. Per-order undercut timeline — narrowed
-  to #1018. BPC price-trend badge and contract-derived pricing — need
-  server-side retention for a gameable payoff overlapping #926. Hauler
-  trip-count estimator — an unverifiable typed number relabeled. Price-history
-  %-change stat — thin-volume days. Build Plan → PI colony link — Dexie-only
-  cache. Mining-ledger opportunity finder — the shape of #819. PI Colony Layout
-  Template — superseded by the Advisor's fitted plan. Reopening research/copying
-  (~10 researched BPOs region-wide); invention since reopened as #3990.
-  No-buyout auction exclusion — 0 of 8,000 live Forge contracts.
-  Reprocessing implant — false precision against a labelled 50% assumption.
-  Housekeeping only: Mining Yield's `specialisationLevel: 0`, dead i18n keys.
-- **Order-problem alerts** (undercut / below-floor; prior art Iron Whales'
-  undercut watcher, EVE Night Trade Tools) — two decisions stack: the Open
-  Orders worklist decision defers order-problem alerts to a later PR, and the
-  notification-catalog decision made `marketOrderFilled` feed-only, so an
-  undercut can only ever be a feed row duplicating the Open Orders page.
-  Detection also needs competitor prices, which the page's eager/on-demand split
-  exists to avoid. Only revival shape: `belowFloor` alone,
-  Production-Run-linked, station scope, feed-only — after the cost-basis work.
-
-- **EVE Market Tool** (evemarkettool.com, live, paid tiers — gating is not copied): profit ledger by source (trade/build/contract/gathered), FIFO warehouse, pending-cost bucket, plus PI throughput and calendar, margin and industry calculators. Mostly covered (Market History FIFO, Open Orders, PI Advisor, Calendar). Killed: **Gathered Items "mined vs sold"** — "unsold" is mined-minus-sold over fungible ore (reprocessed, taxed, compressed, 30-day ledger vs sale-day axis) and a sold-ore total is a Transactions type filter; **hand-entered cost on pending sales** — settled killed (hand-entered cost basis); **extractor-end ICS subscription feed** — needs a server holding colony data, app is local-first and already pushes extractor ends; **HyperNet calculator** and **abyssal roll scanner** — EQM HyperNet is a standing kill, abyssal crafters are a niche (abyssal pricing already ships).
-- **eve-exchange dashboard leftovers:** PLEX-only price chart (subset of Price History + #5002), ISK traded in PLEX (market-wide vanity metric, low reach), per-hub Large Skill Injector widget (InjectorFacts and the extraction-net decision cover it), free-form item picker and indexed-to-100 chart (scope creep until #5002 shows demand).
-
-- **Issue-tracker mining leftovers:** copy prices in the in-game import format (Janice #52) — already ships as Copy sell list (decisions `20260924-131419`, `20261007-220503`); extending it to Stock Targets/Open Orders re-list is one 0-reaction request; **busy-blueprint-counts-as-owned** (jEveAssets #516/#543) — that bug is the assets endpoint, we read `/characters/{id}/blueprints`; verify one live Character with a blueprint in research before any ticket, and never grow it toward research/copy job planning (`.out-of-scope/blueprint-job-planning.md`); **per-structure industry tax split**, **batched job-done digest**, **find Characters by capability**, **gas sell-vs-react**, **strip charges on EFT export** — weak demand, narrow audience or covered; **hauling cost in a Build Plan** — third-party rate cards go stale (standing rule).
+- **By kill-test.** **1**: hub arbitrage/trade finder (`hubHaulGaps`), corp
+  buyback/payout split, EQM Corporate Exchange, dd24tool.de, route sequencing
+  (also 14), OCR appraisal, structured WTS/WTB board (TradeRelay). **2**: bulk
+  relist/buy queue, keybind reprice helper, Gamelog/Abyss timer/cargo watcher.
+  **3**: depth chart, Gantt, Working Capital Locked, build-tree viz, Open
+  Orders slot ceiling, hull demand board (needs a killmail ingest). **5**:
+  cost-index watch, build-cost history series. **6**: multi-hop reaction chains;
+  public contract browser/sell-advisor (ADR 0013); corp-placed order split
+  (residue: `watchCandidates` books a corp sell as personal; a "Corp" chip).
+  **7**: asset staleness. **8**: Appraisal Portfolios chart. **9**: player-
+  structure pricing; Order Floor standings in the broker fee (`fees.ts` takes
+  standings but `read_standings` is not in the scope set, so the fee always
+  shows standing 0; kill is scope + consent UI against a ≤0.5pp swing).
+  **10**: station-trading FIFO P&L, Production Run cost from wallet purchases,
+  own-loss replacement matching. **11**: LP redemption ledger (no ESI log),
+  journal activity groups. **12**: PI Advisor arbitrary-system search. **13**:
+  Moon Survey/Metenox estimator in any framing (#859, do not re-file), EQM
+  HyperNet, Omega self-funding (price in neither ESI nor SDE). **14**: Market
+  Movers. **16**: product volume + haul distance; pricing the haul at the
+  courier going rate. **17**: PI haul-out volume, misrouted-factory alert,
+  colony staleness, buffer headroom. **24**: `refineUnitsLeftOver`, Compare
+  Hubs unpriced disclosure, Production Log double-sale detection (watch: an ESI
+  order↔transaction correlation makes it proposable). **32**: Production Run
+  using `IndustryJob.cost`. **47**: ratting ISK/h, optimizer score, swing
+  scanner.
+- **Reach (few players):** Equinox skyhook reagent/theft tracker (needs a corp
+  role in a sov corp; `esi-structures` scope group missing, kill-test 9; 13
+  does NOT apply, the first candidate to reopen if a sov-nullsec audience
+  appears); Asset Consolidator and EVE Console buffer management (second-
+  account/null scale); Metenox.
+- **On remit:** "can this character fly this fit"; Compass/EVE-NAV capital jump
+  planning; Eve Supply Chain; EVE MCP Server; abyssal pricing (`unpricedRows`);
+  Skill Extractor ISK/hr; Corp Wallet by division; ship insurance lookup (a
+  fixed fraction of hull value; the Production Log takes `insurancePayout`).
+- **On merit:** Skill ROI in any framing; starter-plan library (rots on CCP
+  reworks); Certificate grades in Skill Compare; lagging-skills audit; cross-
+  plan material reservation (`20260909-212724` rejected an allocation solver);
+  hand-entered cost basis; per-order undercut timeline (→ #1018); BPC price-
+  trend badge; hauler trip-count estimator; price-history %-change; Build Plan
+  → PI link; mining-ledger opportunity finder (#819); PI layout template;
+  research/copying planning (`.out-of-scope/blueprint-job-planning.md`);
+  invention planning (`.out-of-scope/invention-planning.md`, reopened as #3990);
+  no-buyout auction exclusion; reprocessing implant (false precision); multi-
+  format sale post (Appraisal Copy sell list covers it); "Need Hauling / Need
+  BP" status; wallet top/flop and weekday heatmap; hauling top-routes list;
+  quiet hours/digest (#2871); "still not fixed" reminders.
+- **Assets/Appraisal leftovers:** CSV Value/Location columns (ESI average price
+  only, `20260929-085650`); bay in search trails (label fix); "which of ALL my
+  ships can pass" (#2906 shipped one); Market-Wide reliability popover (#3071);
+  Janice seeds shipped (#33/#24/#48/#26/#25/#43/#44), ISK/m³ column and per-row
+  exclude killed, compress-ore action (`20261006-185915`); copy in-game import
+  format (shipped, `20260924-131419`).
+- **Order-problem alerts** (undercut/below-floor): the Open Orders decision
+  defers them and `marketOrderFilled` is feed-only, so an undercut can only be
+  a feed row duplicating Open Orders; detection needs competitor prices. Only
+  revival: `belowFloor` alone, Production-Run-linked, station scope, feed-only,
+  after the cost-basis work.
+- **MoMa leftovers:** station-trading flip finder (no new tabs; Hauling's 3-pass
+  scan if revived inline); compressed-ore buying as a facility-rate model
+  (structure rates out, `20260906-180034`; #5134 is the narrowed shape); guided
+  tutorial; merging the Group Owned Overlay into claims (`20260909-212724`).
+- **EVE Market Tool:** "mined vs sold" gathered items (fungible ore), hand-
+  entered pending-sale cost, extractor ICS feed (needs a server), HyperNet,
+  abyssal roll scanner.
+- **eve-exchange leftovers:** PLEX-only chart, ISK traded in PLEX, per-hub
+  injector widget (InjectorFacts), free-form picker and indexed-to-100 chart.
+- **Issue-tracker leftovers:** busy-blueprint-counts-as-owned (jEveAssets #516;
+  we read `/characters/{id}/blueprints`, verify one live Character first);
+  per-structure industry tax split, job-done digest, find Characters by
+  capability, gas sell-vs-react, strip charges on EFT export (weak or covered);
+  hauling cost in a Build Plan (rate cards go stale).
+- **EVE Farm leftovers:** LP Purchases lots (journal row has no offer or
+  quantity; matching is a guess, decision `20260924-001906`); LP per Day
+  calendar (points cache ~1h, spend between reads invisible); In production
+  net-worth layer (books profit before the sale); month-end item snapshots,
+  Best-item tiles; Gamelog NPC kills, Abyss timer, aggro voice (client reads).
+- **Eve-Omnitool leftovers:** Collection gaps (unowned blueprints per group:
+  SDE-wide list, no decision value, collector minority); Hubs on route (thin
+  filter over Hauling Trip Plan; cheap fix is hubs as optional Trip Plan
+  stops); gate-camp check, D-Scan, live map (intel, kill-test 2).
+- **IntelParser leftover:** per-pilot cyno/hot-drop/bait/FC chips on Local rows from zKillboard stats (non-ISK, thin; only revive if intel gets asked for).
+- **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.

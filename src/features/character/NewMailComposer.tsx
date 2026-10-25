@@ -12,6 +12,8 @@
 import { useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { GrantNote } from '@/app/GrantNote';
+import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { Button, FieldError, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -378,6 +380,14 @@ export function NewMailComposer({
           </p>
         )}
       </div>
+
+      <GrantNote
+        characterId={characterId}
+        endpoints={SEND_MAIL_ENDPOINTS}
+        title={t('mail.sendGrantTitle')}
+        hint={t('mail.sendGrantHint')}
+        actionLabel={t('mail.sendGrantAction')}
+      />
 
       <MailComposeFooter
         size="md"

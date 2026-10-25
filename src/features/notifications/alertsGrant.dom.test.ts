@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { db } from '@/db';
 
 const remote = vi.hoisted(() => ({
-  save: vi.fn<(tokens: { accessToken: string; refreshToken: string }) => Promise<void>>(),
+  save: vi.fn<
+    (tokens: {
+      accessToken: string;
+      refreshToken: string;
+    }) => Promise<{ nearby?: boolean; mail?: boolean } | void>
+  >(),
   del: vi.fn<(characterId: number) => Promise<void>>(),
 }));
 vi.mock('@/sync/alertsGrantApi', () => ({
@@ -22,10 +27,14 @@ import {
   forgetAlertsGrants,
   markAlertsNeedReauth,
   readAlertsGrants,
-  queueAlertsForAll,
+  queueAlertsWalk,
   takeNextQueuedAlerts,
   clearAlertsQueue,
   deleteAlertGrantsBestEffort,
+  readAlertsMail,
+  readAlertsNearby,
+  recordAlertsGrantScopes,
+  recordAlertsNearby,
 } from './alertsGrant';
 
 const result = (characterId: number, expectedCharacterId = characterId) => ({
@@ -126,18 +135,95 @@ describe('removal', () => {
   });
 });
 
-describe('Turn on for all', () => {
+describe('the sign-in walk', () => {
   it('hands out Characters one at a time and then runs dry', () => {
-    queueAlertsForAll([1, 2, 3]);
-    expect(takeNextQueuedAlerts()).toBe(1);
-    expect(takeNextQueuedAlerts()).toBe(2);
-    expect(takeNextQueuedAlerts()).toBe(3);
+    const step = (characterId: number, nearby: boolean, mail: boolean) => ({
+      characterId,
+      nearby,
+      mail,
+    });
+    queueAlertsWalk([step(1, true, false), step(2, false, true), step(3, true, true)]);
+    expect(takeNextQueuedAlerts()).toEqual(step(1, true, false));
+    expect(takeNextQueuedAlerts()).toEqual(step(2, false, true));
+    expect(takeNextQueuedAlerts()).toEqual(step(3, true, true));
     expect(takeNextQueuedAlerts()).toBeNull();
   });
 
   it('clearing stops it', () => {
-    queueAlertsForAll([1, 2]);
+    queueAlertsWalk([
+      { characterId: 1, nearby: false, mail: false },
+      { characterId: 2, nearby: false, mail: false },
+    ]);
     clearAlertsQueue();
     expect(takeNextQueuedAlerts()).toBeNull();
+  });
+});
+
+describe('mail alerts on the grant (ADR 0029)', () => {
+  it('knows nothing until a registration says the server takes the mail scope, apart from nearby', async () => {
+    expect(await readAlertsMail()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsGrantScopes({ nearbyGrants: [1] });
+    expect(await readAlertsMail()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsGrantScopes({ nearbyGrants: [1], mailGrants: [3, 2] });
+    expect(await readAlertsMail()).toEqual({ supported: true, characterIds: [2, 3] });
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [1] });
+    await recordAlertsGrantScopes(null);
+    expect((await readAlertsMail()).characterIds).toEqual([2, 3]);
+  });
+
+  it('records what the server said the saved grant covers, and an older server changes nothing', async () => {
+    auth.complete.mockResolvedValue(result(111));
+    remote.save.mockResolvedValue({ nearby: false, mail: true });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect(await readAlertsMail()).toEqual({ supported: true, characterIds: [111] });
+
+    remote.save.mockResolvedValue({ nearby: false });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsMail()).characterIds).toEqual([111]);
+
+    remote.save.mockResolvedValue({ nearby: false, mail: false });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsMail()).characterIds).toEqual([]);
+  });
+
+  it('turning alerts off forgets the Character', async () => {
+    await recordAlertsGrantScopes({ mailGrants: [111, 222] });
+    await turnOffAlerts(111);
+    expect((await readAlertsMail()).characterIds).toEqual([222]);
+  });
+});
+
+describe('nearby alerts on the grant (ADR 0028)', () => {
+  it('knows nothing until a registration says the server takes the location scope', async () => {
+    expect(await readAlertsNearby()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsNearby(undefined);
+    expect(await readAlertsNearby()).toEqual({ supported: false, characterIds: [] });
+    await recordAlertsNearby([2, 1]);
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [1, 2] });
+  });
+
+  it('records what the server said the saved grant covers', async () => {
+    auth.complete.mockResolvedValue(result(111));
+    remote.save.mockResolvedValue({ nearby: true });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect(await readAlertsNearby()).toEqual({ supported: true, characterIds: [111] });
+
+    remote.save.mockResolvedValue({ nearby: false });
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsNearby()).characterIds).toEqual([]);
+  });
+
+  it('an older server answers without `nearby`: nothing changes', async () => {
+    await recordAlertsNearby([111]);
+    auth.complete.mockResolvedValue(result(111));
+    remote.save.mockResolvedValue(undefined);
+    await completeAlertsGrant({ code: 'c', state: 's' });
+    expect((await readAlertsNearby()).characterIds).toEqual([111]);
+  });
+
+  it('turning alerts off forgets the Character', async () => {
+    await recordAlertsNearby([111, 222]);
+    await turnOffAlerts(111);
+    expect((await readAlertsNearby()).characterIds).toEqual([222]);
   });
 });

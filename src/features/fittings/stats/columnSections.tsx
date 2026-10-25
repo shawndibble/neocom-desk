@@ -78,7 +78,9 @@ export function damageSections({
     section(
       'offense',
       stats && stats.offense.weapons.length > 0
-        ? figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.offense.dps) }))
+        ? figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.offense.dps) }), undefined, [
+            'totalDps',
+          ])
         : undefined,
       stats ? (
         stats.offense.weapons.length > 0 ? (
@@ -117,7 +119,9 @@ export function damageSections({
     showDrones &&
       section(
         'drones',
-        figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.droneDps) })),
+        figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.droneDps) }), undefined, [
+          'droneDps',
+        ]),
         stats ? <DroneFacts stats={stats} /> : placeholder
       ),
     stats &&
@@ -149,7 +153,9 @@ export function tankSections({
   return [
     section(
       'defense',
-      figure((s) => t('fittings.stats.defenseEhp', { value: formatEhp(s.ehp) })),
+      figure((s) => t('fittings.stats.defenseEhp', { value: formatEhp(s.ehp) }), undefined, [
+        'ehp',
+      ]),
       <>
         <StatFields>
           <DamageProfilePicker damageProfiles={damageProfiles} field />
@@ -194,21 +200,29 @@ export function shipSections({
             : t('fittings.stats.capacitorDepletes', {
                 time: formatSeconds(s.capacitor.depletesInSeconds),
               }),
-        stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined
+        stats ? CAPACITOR_TONE_CLASS[capacitorTone(stats.capacitor)] : undefined,
+        ['capacitor']
       ),
       stats ? <CapacitorFacts stats={stats} /> : placeholder
     ),
     section(
       'navigation',
-      figure((s) => t('fittings.stats.maxVelocityMeta', { value: fmt0(s.navigation.maxVelocity) })),
+      figure(
+        (s) => t('fittings.stats.maxVelocityMeta', { value: fmt0(s.navigation.maxVelocity) }),
+        undefined,
+        ['maxVelocity']
+      ),
       stats ? <NavigationFacts stats={stats} /> : placeholder
     ),
     section(
       'targeting',
-      figure((s) =>
-        t('fittings.stats.unit.km', {
-          value: kmValue(s.targeting.maxTargetRange),
-        })
+      figure(
+        (s) =>
+          t('fittings.stats.unit.km', {
+            value: kmValue(s.targeting.maxTargetRange),
+          }),
+        undefined,
+        ['maxTargetRange']
       ),
       stats ? <TargetingFacts stats={stats} /> : placeholder
     ),
@@ -227,7 +241,8 @@ export function shipSections({
               cal: fmt0(pctOf(s.calibrationUsed, s.calibrationTotal)),
             }
           ),
-        stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined
+        stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined,
+        ['cpuUsed', 'powergridUsed', 'calibrationUsed']
       ),
       stats ? <FittingBudgetFacts stats={stats} typeName={typeName} /> : placeholder,
       stats && stats.unknownItemTypeIds.length > 0 ? t('fittings.stats.incomplete') : undefined

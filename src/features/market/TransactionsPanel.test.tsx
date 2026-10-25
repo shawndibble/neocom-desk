@@ -159,7 +159,7 @@ describe('TransactionsPanel — page header controls', () => {
       const header = screen.getByRole('banner');
       const picker = await within(header).findByRole('button', { name: 'This character' });
       // The header's touch tier reaches through the portal (re-provided context), not the panel's sm.
-      expect(picker).toHaveClass('h-11', 'md:h-9');
+      expect(picker).toHaveClass('h-9');
       expect(picker).not.toHaveClass('md:h-7');
       expect(screen.getAllByRole('button', { name: 'This character' })).toHaveLength(1);
     });

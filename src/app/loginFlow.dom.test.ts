@@ -13,6 +13,7 @@ vi.mock('./navigation', () => ({ assignLocation }));
 import {
   beginAddCharacterLogin,
   beginCustomizedAddCharacterLogin,
+  beginAlertsLogin,
   beginEveLogin,
   retryLastLogin,
 } from './loginFlow';
@@ -484,5 +485,66 @@ describe('beginEveLogin: a broken Dexie', () => {
 
     get.mockRestore();
     expect(requestedScopes()).toEqual(expect.arrayContaining([...scopesForGroup('corp')]));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Alerts Grant (ADR 0020, 0028, 0029): EVE issues a token with exactly what was
+// requested, so every round trip must name every extra the Character keeps.
+// ---------------------------------------------------------------------------
+
+describe('beginAlertsLogin', () => {
+  const NOTIFICATIONS = 'esi-characters.read_notifications.v1';
+  const LOCATION = 'esi-location.read_location.v1';
+  const MAIL = 'esi-mail.read_mail.v1';
+  const known = (nearby: number[] | null, mail: number[] | null) =>
+    Promise.all([
+      nearby &&
+        db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: nearby } }),
+      mail &&
+        db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: mail } }),
+    ]);
+
+  it('asks for notifications alone from a server that takes neither extra', async () => {
+    await beginAlertsLogin(CHAR_ID);
+    expect(requestedScopes()).toEqual([NOTIFICATIONS]);
+  });
+
+  it('never asks for mail on a plain press, even once the server takes it', async () => {
+    await known([], []);
+    await beginAlertsLogin(CHAR_ID);
+    expect(requestedScopes().sort()).toEqual([LOCATION, NOTIFICATIONS].sort());
+  });
+
+  it('asks for mail when the walk includes it, keeping the location the Character already had', async () => {
+    await known([CHAR_ID], []);
+    await beginAlertsLogin(CHAR_ID, { mail: true });
+    expect(requestedScopes().sort()).toEqual([LOCATION, MAIL, NOTIFICATIONS].sort());
+  });
+
+  it('keeps a Character’s mail through a re-authorization', async () => {
+    await known([], [CHAR_ID]);
+    await beginAlertsLogin(CHAR_ID);
+    expect(requestedScopes().sort()).toEqual([LOCATION, MAIL, NOTIFICATIONS].sort());
+  });
+
+  it('leaves the location out when the player left it out, unless the grant already holds it', async () => {
+    await known([], []);
+    await beginAlertsLogin(CHAR_ID, { nearby: false });
+    expect(requestedScopes()).toEqual([NOTIFICATIONS]);
+    await known([CHAR_ID], []);
+    await beginAlertsLogin(CHAR_ID, { nearby: false });
+    expect(requestedScopes().sort()).toEqual([LOCATION, NOTIFICATIONS].sort());
+  });
+
+  it('does not ask for mail another Character has, nor before the server takes it', async () => {
+    await known(null, [OTHER_CHAR_ID]);
+    await beginAlertsLogin(CHAR_ID);
+    expect(requestedScopes()).toEqual([NOTIFICATIONS]);
+    await beginAlertsLogin(CHAR_ID, { mail: true });
+    expect(requestedScopes().sort()).toEqual([MAIL, NOTIFICATIONS].sort());
+    await db.settings.clear();
+    await beginAlertsLogin(CHAR_ID, { mail: true });
+    expect(requestedScopes()).toEqual([NOTIFICATIONS]);
   });
 });

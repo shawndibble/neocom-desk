@@ -6,6 +6,7 @@
 import { utcDay } from '../localDay';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { assetStackValue } from '@/engine/assetTree';
+import { contractStockValue, type StockContract, type StockContractItem } from './contractStock';
 
 export interface NetWorthSnapshotRow {
   /** `${characterId}:${day}` */
@@ -22,6 +23,8 @@ export interface NetWorthSnapshotRow {
   escrow: number;
   /** Remaining sell-order stock, `volume_remain x price`. Absent on rows written before it existed (read as 0). */
   sellStock?: number;
+  /** Items and courier rewards locked in the Character's own open contracts. Absent on rows written before it existed, or without the contracts permission. */
+  contractStock?: number;
   hubId: string;
   /** Epoch ms of the write — the sync merge's last-write-wins key. */
   updatedAt: number;
@@ -30,10 +33,15 @@ export interface NetWorthSnapshotRow {
 /**
  * Whether a stored row predates a layer added since (an optional field, like
  * `sellStock`): today's row is then re-read once rather than left reading 0.
- * Add each new optional layer here.
+ * Add each new optional layer here. `contracts` is whether the Character holds
+ * the contracts permission: without it the layer is absent for good, so a row
+ * missing it is complete rather than old.
  */
-export function lacksLayer(row: NetWorthSnapshotRow): boolean {
-  return row.sellStock === undefined;
+export function lacksLayer(
+  row: NetWorthSnapshotRow,
+  { contracts = false }: { contracts?: boolean } = {}
+): boolean {
+  return row.sellStock === undefined || (contracts && row.contractStock === undefined);
 }
 
 export { utcDay };
@@ -67,6 +75,11 @@ export interface SnapshotInputs {
   assets: readonly SnapshotAsset[] | null;
   orders: readonly SnapshotOrder[] | null;
   priceByTypeId: ReadonlyMap<number, number>;
+  /** The Character's contracts and their items; `null` = not readable (no permission, or the read failed), which leaves the layer off the row. */
+  contractStock?: {
+    contracts: readonly StockContract[];
+    itemsByContractId: ReadonlyMap<number, readonly StockContractItem[] | null>;
+  } | null;
   /**
    * Items valued on their own rather than by type: an abyssal module at its
    * last known MutaMarket estimate. Such an item never takes a type price.
@@ -100,6 +113,16 @@ export function buildSnapshotRow(input: SnapshotInputs): NetWorthSnapshotRow | n
     assetValue,
     escrow,
     sellStock,
+    ...(input.contractStock
+      ? {
+          contractStock: contractStockValue({
+            characterId: input.characterId,
+            now: input.now,
+            priceByTypeId: input.priceByTypeId,
+            ...input.contractStock,
+          }),
+        }
+      : {}),
     hubId: input.hubId,
     updatedAt: input.now,
   };

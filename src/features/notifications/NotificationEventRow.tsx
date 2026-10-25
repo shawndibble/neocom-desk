@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import { AggregateRow } from './AggregateRow';
 import { PermissionNote } from './PermissionNote';
-import { ScheduledPushBadge } from './ScheduledPushBadge';
+import { MailPushBadge, NearbyPushBadge, ScheduledPushBadge } from './ScheduledPushBadge';
 import { EventThresholdsList } from './EventThresholdsList';
 import { eventEntry } from './eventEntries';
 import { eventLabelKey, isCorpEventId, type NotificationEventId } from './events';
@@ -20,7 +20,7 @@ import {
   useNotificationPreferences,
 } from './preferences';
 import {
-  isPushBadged,
+  pushBadgeKind,
   missingPermissionSummary,
   useEventAvailability,
   type EventRowContext,
@@ -39,6 +39,7 @@ export function NotificationEventRow({
 }) {
   const { t } = useTranslation();
   const entry = eventEntry(eventId);
+  const badge = pushBadgeKind(eventId);
   // A corp event's note is said once on its group header, not on every row.
   const isCorp = isCorpEventId(eventId);
   const availability = useEventAvailability(eventId, context);
@@ -73,7 +74,15 @@ export function NotificationEventRow({
   return (
     <AggregateRow
       label={t(eventLabelKey(eventId))}
-      labelAccessory={isPushBadged(eventId) ? <ScheduledPushBadge /> : undefined}
+      labelAccessory={
+        badge === null ? undefined : badge === 'nearby' ? (
+          <NearbyPushBadge />
+        ) : badge === 'mail' ? (
+          <MailPushBadge />
+        ) : (
+          <ScheduledPushBadge kind={badge} />
+        )
+      }
       characters={context.characters}
       availability={availability}
       readValue={(id, channel) =>

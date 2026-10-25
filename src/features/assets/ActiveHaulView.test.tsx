@@ -119,6 +119,30 @@ function renderView(
 }
 
 describe('ActiveHaulView', () => {
+  it('names a stack left out over the ISK limit, not a raw key', () => {
+    renderView(vi.fn().mockResolvedValue(undefined), {
+      haul: {
+        ...haul,
+        plan: {
+          ...haul.plan,
+          leftOut: [
+            {
+              characterId: 1,
+              name: 'Alice',
+              locationId: 9,
+              place: 'Rens VI',
+              m3: 4,
+              reason: 'overLimit',
+            },
+          ],
+        },
+      },
+    });
+    expect(
+      screen.getByText(/Rens VI \(Alice\): 4 m³ has units worth more than your ISK limit/)
+    ).toBeTruthy();
+  });
+
   it('summarises the route and lists every leg, repeat station included', () => {
     renderView();
     expect(screen.getByText('3 legs · 16 jumps · 100 m³ to Jita 4-4')).toBeTruthy();
@@ -186,6 +210,30 @@ describe('ActiveHaulView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 3' }));
     await userEvent.click(screen.getByRole('button', { name: 'and 2 more types' }));
     expect(screen.getByText('11 × Item 1')).toBeTruthy();
+  });
+
+  it('reads a flight as take the ship, fly it out, with no hold to open', () => {
+    const flight: HaulLeg[] = [
+      { ...legs[0], m3: 0, ships: ['Rifter'] },
+      { ...legs[1], m3: 0, ships: ['Rifter'] },
+    ];
+    renderView(undefined, {
+      haul: {
+        ...haul,
+        capacityM3: 0,
+        plan: {
+          ...haul.plan,
+          sections: [{ ...haul.plan.sections[0], legs: flight }],
+          leftOut: [],
+          flown: [],
+          totals: { legs: 2, jumps: 10, m3: 0 },
+        },
+      },
+    });
+    expect(screen.getByText('2 legs · 10 jumps to Jita 4-4')).toBeTruthy();
+    expect(screen.getByText('Take Rifter at Dodixie IX')).toBeTruthy();
+    expect(screen.getByText('Fly Rifter to Jita 4-4')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /cargo for leg/ })).toBeNull();
   });
 
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {

@@ -20,20 +20,26 @@ interface Row {
   cpu?: number;
   /** Turns the capacitor unstable. */
   capUnstable?: boolean;
+  /** Signature radius added, in m. */
+  sig?: number;
+  /** Capacitor recharge time added, in ms. */
+  recharge?: number;
 }
 
 function stats(rows: Row[]): FittingStats {
-  const sum = (key: 'dps' | 'ehp' | 'speed' | 'cpu') =>
+  const sum = (key: 'dps' | 'ehp' | 'speed' | 'cpu' | 'sig' | 'recharge') =>
     rows.reduce((total, row) => total + (row[key] ?? 0), 0);
   const base = baseFittingStats();
   return {
     ...base,
     cpuUsed: sum('cpu'),
+    capacitorRechargeTime: base.capacitorRechargeTime + sum('recharge'),
     ehp: base.ehp + sum('ehp'),
     capacitor: rows.some((row) => row.capUnstable)
       ? { stable: false, depletesInSeconds: 120 }
       : base.capacitor,
     navigation: { ...base.navigation, maxVelocity: base.navigation.maxVelocity + sum('speed') },
+    targeting: { ...base.targeting, signatureRadius: base.targeting.signatureRadius + sum('sig') },
     offense: {
       ...base.offense,
       dps: base.offense.dps + sum('dps'),
@@ -111,7 +117,33 @@ describe('findImprovements goals', () => {
     const result = await search('overall', table, [candidate(1, 2), candidate(1, 3)]);
     expect(toIds([...result.noDownside, ...result.tradeOffs])).toContain(2);
     expect(result.tradeOffs[0].candidate.toTypeId).toBe(2);
-    expect(result.tradeOffs[0].downsides).toContain('speed');
+    expect(result.tradeOffs[0].lost.map((l) => l.change.key)).toContain('maxVelocity');
+  });
+
+  it('a swap that raises signature radius lands in Trade-offs with its size', async () => {
+    const table = { 1: {}, 2: { ehp: 100, sig: 10 } };
+    const result = await search('overall', table, [candidate(1, 2)]);
+    expect(result.noDownside).toEqual([]);
+    const lost = result.tradeOffs[0].lost;
+    expect(lost).toHaveLength(1);
+    expect(lost[0].change).toMatchObject({ key: 'signatureRadius' });
+    expect(lost[0].change.after - lost[0].change.before).toBe(10);
+  });
+
+  it('a longer capacitor recharge is a downside', async () => {
+    const table = { 1: {}, 2: { ehp: 100, recharge: 28000 } };
+    const result = await search('tank', table, [candidate(1, 2)]);
+    expect(result.noDownside).toEqual([]);
+    expect(result.tradeOffs[0].lost.map((l) => l.change.key)).toEqual(['capacitorRechargeTime']);
+  });
+
+  it('a swap that gains nothing on the goal is listed under no goal but Cheaper', async () => {
+    const table = { 1: {}, 2: { ehp: 100 } };
+    const priced = { 1: 2000, 2: 1000 };
+    const tank = await search('speed', table, [candidate(1, 2)], priced);
+    expect([...tank.noDownside, ...tank.tradeOffs]).toEqual([]);
+    const cheaper = await search('cheaper', table, [candidate(1, 2)], priced);
+    expect(toIds(cheaper.noDownside)).toEqual([2]);
   });
 
   it('Longer reach scores the guns’ optimal and falloff', async () => {

@@ -134,7 +134,7 @@ export function ModuleRow({
 }
 
 /**
- * A List select's touch tier: 44px below `md`, its own `sm` height above.
+ * A List select's touch tier: 36px below `md`, its own `sm` height above.
  * `NativeSelect` puts `className` on its wrapper, hence the child selector.
  */
-const TOUCH_SELECT_CLASS = '[&>select]:min-h-11 md:[&>select]:min-h-7';
+const TOUCH_SELECT_CLASS = '[&>select]:min-h-9 md:[&>select]:min-h-7';

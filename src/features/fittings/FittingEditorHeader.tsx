@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { useOnline } from '@/stores/network';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { fittingCompareHref } from './fittingRoutes';
@@ -32,6 +33,9 @@ interface FittingEditorHeaderProps {
   /** Opens Improve. */
   onImprove: () => void;
 }
+
+/** The Permission Save to EVE needs, from the registry so a regrouping can't strand a hard-coded name. */
+const SAVE_TO_EVE_GROUPS = permissionsForEndpoints(['postCharacterFitting']);
 
 /**
  * The open Fitting's header with its Save menu, plus the dialogs that menu
@@ -122,7 +126,7 @@ export function FittingEditorHeader({
                   : undefined
             }
             saveToEveMissingGroups={
-              characterId !== null && canSaveToEve === false ? ['fittings'] : undefined
+              characterId !== null && canSaveToEve === false ? SAVE_TO_EVE_GROUPS : undefined
             }
           />
         }

@@ -84,14 +84,22 @@ export function isAttackType(eveType: string | undefined): boolean {
   return eveType !== undefined && ATTACK_TYPES.has(eveType);
 }
 
-/** True when a push for `eveType` (absent for a scheduled alert) must not be sent now. */
+/** Notification Events that are a loss, let through with the attack types (issue #5121). */
+const LOSS_EVENTS: ReadonlySet<string> = new Set(['shipLost']);
+
+/**
+ * True when a push for `eveType` (absent for a scheduled alert) or, for a
+ * server-pushed event, `eventId` must not be sent now.
+ */
 export function suppressPush(
   nowMs: number,
   quietHours: QuietHours | undefined,
-  eveType: string | undefined
+  eveType: string | undefined,
+  eventId?: string
 ): boolean {
   if (!quietHours || !isQuiet(nowMs, quietHours)) return false;
-  return !(quietHours.allowAttacks && isAttackType(eveType));
+  const lossOrAttack = isAttackType(eveType) || (eventId !== undefined && LOSS_EVENTS.has(eventId));
+  return !(quietHours.allowAttacks && lossOrAttack);
 }
 
 /**

@@ -51,8 +51,8 @@ export function EveSsoButton({
         aria-disabled={pending || undefined}
         className={cx(
           'relative inline-block rounded-xs',
-          // The small artwork is 30px tall; a touch screen still gets a 44px hit area.
-          size === 'small' && 'touch:inline-flex touch:min-h-11 touch:items-center',
+          // The small artwork is 30px tall; a touch screen still gets a 36px hit area.
+          size === 'small' && 'touch:inline-flex touch:min-h-9 touch:items-center',
           interactiveClassName,
           focusRingClassName,
           disabledClassName

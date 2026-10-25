@@ -719,3 +719,35 @@ describe('occurrenceKey: shared-world alerts', () => {
     );
   });
 });
+
+describe('nearby alerts keys pinned with the server (functions/src/nearbyAlerts.test.ts)', () => {
+  it('matches the literals the server derives', () => {
+    expect(
+      occurrenceKey(
+        {
+          eventId: 'skyhookRaidableNearby',
+          characterId: 1,
+          systemId: 30000142,
+          planetId: 40009077,
+          startMs: 1_700_000_000_000,
+          endMs: 1_700_000_360_000,
+          jumps: 3,
+        },
+        0
+      )
+    ).toBe('skyhookRaidableNearby:30000142:40009077:1700000000000');
+    expect(
+      occurrenceKey(
+        {
+          eventId: 'incursionNearby',
+          characterId: 1,
+          constellationId: 20000020,
+          stagingSystemId: 30000142,
+          state: 'established',
+          jumps: 3,
+        },
+        0
+      )
+    ).toBe('incursionNearby:20000020:30000142');
+  });
+});

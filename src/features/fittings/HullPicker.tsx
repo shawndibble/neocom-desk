@@ -86,7 +86,7 @@ export function HullPicker({ catalogue, onStart, onOpenPopular }: HullPickerProp
                           onClick={() => setSelected(hull)}
                           onDoubleClick={() => onStart(hull)}
                           className={cx(
-                            'flex min-h-11 w-full items-center px-2 text-left text-sm md:min-h-9',
+                            'flex min-h-9 w-full items-center px-2 text-left text-sm',
                             rowInteractiveClassName,
                             focusRingInsetClassName,
                             isSelected

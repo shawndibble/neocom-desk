@@ -77,7 +77,7 @@ export function StockTargetCell({
         }
         className={cx(
           popoverValueClassName,
-          'tabular-nums touch:min-h-11',
+          'tabular-nums touch:min-h-9',
           target === undefined && 'text-text-dim'
         )}
         onClick={() => {

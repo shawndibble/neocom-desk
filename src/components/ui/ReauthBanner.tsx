@@ -15,7 +15,7 @@ interface ReauthBannerProps {
   /**
    * The banner *is* the view, so its button is the only thing on the page to
    * tap — `ScopeGate` replacing a locked route's whole body. Raises the action
-   * to DESIGN.md §3's `md` touch tier (44px on a phone); everywhere else it
+   * to DESIGN.md §3's `md` touch tier (36px on a phone); everywhere else it
    * stays `sm`, the tier for a control sitting beside a view's own.
    *
    * Opt-in rather than keyed off `variant === 'primary'`: most of this
@@ -24,7 +24,7 @@ interface ReauthBannerProps {
    * all of them.
    *
    * It moves the pointer-width height too, 28px to 36px (plus that tier's
-   * padding and type scale), because the scale has no `h-11 md:h-7` rung and
+   * padding and type scale), because the scale has no `h-9 md:h-7` rung and
    * DESIGN.md §3 forbids hand-writing one. 36px is what every other primary
    * button in the app already renders at on a pointer, so the sole CTA of a
    * locked route matching them is the outcome to want.

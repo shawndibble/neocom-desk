@@ -35,7 +35,7 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   /** @summary Called with the value the user picked. */
   onChange: (value: T) => void;
-  /** Height from the shared control scale; `md` (default) is 44px on a phone, 36px for a pointer. */
+  /** Height from the shared control scale; `md` (default) is 36px on a phone, 36px for a pointer. */
   size?: ControlSize;
   /** Stretch to the container's full width, segments sharing it equally. */
   fill?: boolean;

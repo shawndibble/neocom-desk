@@ -488,7 +488,7 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
                 aria-expanded={expanded}
                 aria-controls={regionId}
                 aria-label={toggleLabel}
-                className="-m-1 inline-flex min-h-11 min-w-11 shrink-0 items-start justify-center rounded-xs p-1 pt-3 hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0 md:pt-2.5"
+                className="-m-1 inline-flex min-h-9 min-w-9 shrink-0 items-start justify-center rounded-xs p-1 pt-3 hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0 md:pt-2.5"
               >
                 <Caret expanded={expanded} />
               </button>

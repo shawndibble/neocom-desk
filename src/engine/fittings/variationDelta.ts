@@ -2,7 +2,7 @@ import { NUMERIC_FIELDS, round, type StatChangeKey } from './fittingStatFields';
 import type { FittingStats } from './types';
 
 export type { FittingStatKey, StatChangeKey } from './fittingStatFields';
-export { STAT_DIGITS } from './fittingStatFields';
+export { STAT_DIGITS, changeVerdict } from './fittingStatFields';
 
 export interface StatChange {
   key: StatChangeKey;
@@ -20,7 +20,7 @@ export interface FittingStatsDelta {
  * `NUMERIC_FIELDS`. `before`/`after` hold a negated depletion time on the
  * unstable side so it never collides with a stable percentage's positive range.
  */
-function capacitorChange(before: FittingStats, after: FittingStats): StatChange | null {
+export function capacitorChange(before: FittingStats, after: FittingStats): StatChange | null {
   const metric = (capacitor: FittingStats['capacitor']) =>
     capacitor.stable ? capacitor.stablePercentage : -capacitor.depletesInSeconds;
 

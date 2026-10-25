@@ -210,7 +210,7 @@ export function CalendarKindFilterMenu({
             event.preventDefault();
             onShowAll();
           }}
-          className="mt-1 rounded-none border-t border-line touch:min-h-11"
+          className="mt-1 rounded-none border-t border-line touch:min-h-9"
         >
           {t('calendar.filter.showAll')}
         </DropdownMenuItem>

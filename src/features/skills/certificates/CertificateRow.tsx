@@ -129,7 +129,7 @@ export function CertificateRow({
           }
           onClick={onToggle}
           className={cx(
-            'flex min-h-11 min-w-0 items-center gap-1.5 rounded-xs text-left text-sm font-medium text-text md:min-h-9',
+            'flex min-h-9 min-w-0 items-center gap-1.5 rounded-xs text-left text-sm font-medium text-text',
             interactiveClassName,
             focusRingClassName
           )}
