@@ -34,6 +34,8 @@ interface FittingStatsColumnProps {
   preview?: FittingStatsDelta | null;
   /** Opens Improve from the column's header. */
   onImprove?: () => void;
+  /** The fit's rule breaks as sentences. */
+  ruleBreaks?: readonly string[];
 }
 
 /**
@@ -56,6 +58,7 @@ export function FittingStatsColumn({
   onOpenMakeItFit,
   preview,
   onImprove,
+  ruleBreaks,
 }: FittingStatsColumnProps) {
   const { t } = useTranslation();
   // What the stats column's Pilot and Situation panels hold beyond its own sections.
@@ -84,6 +87,7 @@ export function FittingStatsColumn({
         moduleResults={moduleResults}
         preview={preview}
         onImprove={onImprove}
+        ruleBreaks={ruleBreaks}
         whatToTrain={
           <FittingWhatToTrainPanel
             evaluator={workspace.skillGains}

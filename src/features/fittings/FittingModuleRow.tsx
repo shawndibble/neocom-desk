@@ -11,6 +11,7 @@ import { ListChargePicker } from './ListChargePicker';
 import { ModuleMenuItems } from './FittingItemMenu';
 import { useFittingDropTarget, useFittingItemActions } from './fittingItemActions';
 import { MutationBadge } from './MutationBadge';
+import { RuleBreakBadge } from './RuleBreakBadge';
 import { catalogueTypeName } from './useFittingCatalogue';
 import { MODULE_STATE_STYLE } from './moduleStateStyle';
 import { SlotCard, SlotName, type EditContext } from './RackListParts';
@@ -91,6 +92,7 @@ export function ModuleRow({
           <TypeIcon typeId={typeId} size={32} width={24} height={24} />
           <SlotName typeId={typeId} name={name} />
           <MutationBadge items={[module]} />
+          <RuleBreakBadge module={module} />
           {cantUse && (
             <span className="shrink-0 text-[0.6875rem] font-semibold text-danger">
               {t('fittings.list.cantUse')}

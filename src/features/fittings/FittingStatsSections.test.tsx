@@ -176,7 +176,8 @@ function renderSections(
   fittingStats: FittingStats,
   profiles: DamageProfiles = damageProfiles(),
   targets: TargetProfiles = targetProfiles(),
-  overlay?: OverlayFitting
+  overlay?: OverlayFitting,
+  ruleBreaks?: readonly string[]
 ) {
   return render(
     <FittingStatsSections
@@ -188,6 +189,7 @@ function renderSections(
       targetProfiles={targets}
       overlay={overlay}
       typeName={typeName}
+      ruleBreaks={ruleBreaks}
     />
   );
 }
@@ -201,6 +203,18 @@ async function openPanel(name: 'Pilot' | 'Situation'): Promise<HTMLElement> {
   await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }));
   return screen.findByRole('dialog', { name });
 }
+
+describe('FittingStatsSections rule breaks', () => {
+  it('lists each break above the sections with the stats caveat; nothing for a legal fit', () => {
+    const line = 'Only 1 Damage Control can be fitted (2 are).';
+    const { unmount } = renderSections(stats(), undefined, undefined, undefined, [line]);
+    expect(screen.getByText(line)).toBeTruthy();
+    expect(screen.getByText(/Stats count every module as fitted/)).toBeTruthy();
+    unmount();
+    renderSections(stats(), undefined, undefined, undefined, []);
+    expect(screen.queryByTestId('rule-breaks')).toBeNull();
+  });
+});
 
 describe('FittingStatsSections Improve entry', () => {
   it('opens Improve from the header, and shows no entry without a handler', async () => {

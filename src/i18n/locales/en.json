@@ -2158,6 +2158,60 @@
       "turnInToBuy_one": "buy {{count}}× {{name}} ({{isk}} ISK, included)",
       "turnInToBuy_other": "buy {{count}}× {{name}} ({{isk}} ISK, included)"
     },
+    "ruleBreak": {
+      "label": "Breaks a rule",
+      "tooltip": "This module breaks a fitting rule. The warning at the top of the stats says which.",
+      "statsCountAll": "Stats count every module as fitted, so they are not what the game would show.",
+      "aModule": "A module",
+      "limit": {
+        "fitted": "fitted",
+        "online": "online",
+        "active": "active"
+      },
+      "maxGroup": "Only {{allowed}} {{name}} can be {{limit}} ({{used}} are).",
+      "maxGroupUnknown": "Only {{allowed}} of this kind of module can be {{limit}} ({{used}} are).",
+      "maxType": "Only {{allowed}} {{name}} can be fitted ({{used}} are).",
+      "hardpoints": "{{fitted}}, {{room}}.",
+      "hardpoint": {
+        "turret": {
+          "fitted_one": "{{count}} turret",
+          "fitted_other": "{{count}} turrets",
+          "room_one": "{{count}} turret hardpoint",
+          "room_other": "{{count}} turret hardpoints"
+        },
+        "launcher": {
+          "fitted_one": "{{count}} launcher",
+          "fitted_other": "{{count}} launchers",
+          "room_one": "{{count}} launcher hardpoint",
+          "room_other": "{{count}} launcher hardpoints"
+        }
+      },
+      "rack": "{{fitted}} in {{room}}.",
+      "rackFitted_one": "{{count}} module",
+      "rackFitted_other": "{{count}} modules",
+      "rackName": {
+        "high": "high",
+        "medium": "mid",
+        "low": "low",
+        "rig": "rig",
+        "subsystem": "subsystem"
+      },
+      "rackRoom_one": "{{count}} {{rack}} slot",
+      "rackRoom_other": "{{count}} {{rack}} slots",
+      "charge": "{{charge}} doesn't fit {{name}}.",
+      "chargeUnknown": "A loaded charge doesn't fit its module.",
+      "item": {
+        "wrong_slot": "{{name}} is in the wrong kind of slot.",
+        "slot_taken": "{{name}} shares a slot with another module.",
+        "wrong_slot_index": "{{name}} is in a slot it can't use.",
+        "subsystem_taken": "{{name}} takes a subsystem slot that is already used.",
+        "rig_size": "{{name}} is the wrong size of rig for this hull.",
+        "ship_restricted": "{{name}} can't be fitted on this hull.",
+        "capital_item": "{{name}} needs a capital ship.",
+        "structure_item": "{{name}} fits structures, not ships.",
+        "ship_item": "{{name}} fits ships, not structures."
+      }
+    },
     "mutation": {
       "menu": "Mutate…",
       "title": "Mutation",
