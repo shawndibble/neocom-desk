@@ -1514,12 +1514,12 @@
         }
       },
       "unloaded": {
-        "launcher_one": "{{count}} launcher has no missiles loaded, so damage goals ignore it.",
-        "launcher_other": "{{count}} launchers have no missiles loaded, so damage goals ignore them.",
-        "turret_one": "{{count}} turret has no ammo loaded, so damage goals ignore it.",
-        "turret_other": "{{count}} turrets have no ammo loaded, so damage goals ignore them.",
-        "weapon_one": "{{count}} weapon has no charge loaded, so damage goals ignore it.",
-        "weapon_other": "{{count}} weapons have no charge loaded, so damage goals ignore them."
+        "launcher_one": "{{count}} launcher has no missiles loaded, so swaps are scored as if it held the best one.",
+        "launcher_other": "{{count}} launchers have no missiles loaded, so swaps are scored as if they held the best one.",
+        "turret_one": "{{count}} turret has no ammo loaded, so swaps are scored as if it held the best one.",
+        "turret_other": "{{count}} turrets have no ammo loaded, so swaps are scored as if they held the best one.",
+        "weapon_one": "{{count}} weapon has no charge loaded, so swaps are scored as if it held the best one.",
+        "weapon_other": "{{count}} weapons have no charge loaded, so swaps are scored as if they held the best one."
       },
       "loadBestCharge": "Load best charge",
       "chargesLoaded_one": "Loaded charges into {{count}} weapon. Not saved yet.",

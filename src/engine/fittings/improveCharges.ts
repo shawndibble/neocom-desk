@@ -89,3 +89,27 @@ export function loadBestCharges(
   }
   return steps;
 }
+
+/**
+ * `fitting` scored as if `steps` (made for `planned`) were loaded: each empty
+ * module still of the type it was planned as takes its charge. A swapped-out
+ * weapon, or one already loaded, is left alone. Cargo is not drawn down —
+ * this is for ranking swaps, not for editing the Fitting.
+ */
+export function assumeCharges(
+  fitting: Fitting,
+  planned: Fitting,
+  steps: readonly ChargeLoadStep[]
+): Fitting {
+  if (steps.length === 0) return fitting;
+  const modules = fitting.modules.map((m) => {
+    if (m.chargeTypeId !== undefined) return m;
+    const step = steps.find((s) =>
+      s.at.some((a) => a.slot === m.slot && a.slotIndex === m.slotIndex)
+    );
+    if (!step) return m;
+    const was = planned.modules.find((p) => p.slot === m.slot && p.slotIndex === m.slotIndex);
+    return was?.typeId === m.typeId ? { ...m, chargeTypeId: step.chargeTypeId } : m;
+  });
+  return { ...fitting, modules };
+}
