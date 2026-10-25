@@ -58,7 +58,17 @@ class FakeFirestore {
     return {
       id,
       get: async () => this.snapshotOf(name, id),
-      set: async (data: Data) => void store.set(id, { ...data }),
+      set: async (data: Data, options?: { mergeFields?: string[] }) => {
+        if (!options?.mergeFields) return void store.set(id, { ...data });
+        // Real Firestore: listed fields are written, a listed field absent from
+        // `data` is deleted, every other field is kept.
+        const next: Data = { ...(store.get(id) ?? {}) };
+        for (const field of options.mergeFields) {
+          if (field in data) next[field] = data[field];
+          else delete next[field];
+        }
+        store.set(id, next);
+      },
       update: async (data: Data) => {
         const existing = store.get(id);
         if (!existing) throw new Error(`update of missing doc ${name}/${id}`);

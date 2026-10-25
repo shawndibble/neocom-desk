@@ -288,3 +288,16 @@ describe('grantCoversNearby', () => {
     expect(grantCoversNearby({ scopes: [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE] })).toBe(true);
   });
 });
+
+describe('deleteAlertGrant: nearby state (ADR 0027)', () => {
+  it('drops the Character from its devices’ nearby state, and a failure there still deletes and revokes', async () => {
+    const forgetNearby = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    const { deps, docs } = makeDeps({ forgetNearby });
+    await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(await deleteAlertGrant(deps, 42)).toEqual({ deleted: true, revoked: true });
+    expect(forgetNearby).toHaveBeenCalledWith(42);
+    expect(docs.size).toBe(0);
+  });
+});

@@ -430,10 +430,11 @@ describe('server-pushed events and nearby choices (issues #5121, #5122)', () => 
     ['a negative', -1],
     ['a huge value', 1000],
     ['a string', '5'],
-  ])('rejects a nearbyJumps value that is %s', (_, value) => {
-    expect(() =>
-      parseRegisterDeviceInput(withCharacter({ nearbyJumps: { incursionNearby: value } }))
-    ).toThrow(/nearbyJumps/);
+  ])('drops nearbyJumps with a value that is %s, keeping the upload', (_, value) => {
+    const input = parseRegisterDeviceInput(
+      withCharacter({ nearbyJumps: { incursionNearby: value } })
+    );
+    expect(input.characters[0].nearbyJumps).toBeUndefined();
   });
 
   it('parses routeRules, sorting and de-duplicating the Avoided Systems', () => {
@@ -460,8 +461,8 @@ describe('server-pushed events and nearby choices (issues #5121, #5122)', () => 
         avoid: Array.from({ length: 10_001 }, (_, i) => i),
       },
     ],
-  ])('rejects routeRules with %s', (_, routeRules) => {
-    expect(() => parseRegisterDeviceInput({ ...base, routeRules })).toThrow(/routeRules/);
+  ])('drops routeRules with %s, keeping the upload', (_, routeRules) => {
+    expect(parseRegisterDeviceInput({ ...base, routeRules }).routeRules).toBeUndefined();
   });
 
   it('keys serverEvents and nearbyJumps by verified Character only', async () => {

@@ -40,6 +40,19 @@ export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
  */
 export const PER_DEVICE_MARKER = 'perDeviceProjections';
 
+/** Every field `writeDeviceRegistration` owns; anything else on the doc (the poller's `nearbyState`) is left alone. */
+const REGISTRATION_FIELDS = [
+  'fcmToken',
+  'characterIds',
+  'eveTypesByCharacter',
+  'serverEventsByCharacter',
+  'nearbyJumpsByCharacter',
+  'routeRules',
+  'quietHours',
+  'updatedAt',
+  PER_DEVICE_MARKER,
+];
+
 /** Firestore's cap on writes in one batch. */
 const MAX_BATCH_OPS = 500;
 
@@ -180,25 +193,34 @@ export async function writeDeviceRegistration(
   // drift check then never sees a fresh row for a Character the registration
   // does not list yet, and if a batch below fails, the next upload still
   // sweeps. The marker is set only once every batch has committed.
-  await registrationRef.set({
-    fcmToken: write.fcmToken,
-    characterIds: write.characterIds,
-    // Firestore map keys are strings; a Character dropped from the roster
-    // falls out because the whole map is rebuilt on every upload.
-    eveTypesByCharacter: Object.fromEntries(
-      write.characterIds.map((id) => [
-        String(id),
-        write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
-      ])
-    ),
-    serverEventsByCharacter: perCharacter('serverEventsByCharacter', write.serverEventsByCharacter),
-    nearbyJumpsByCharacter: perCharacter('nearbyJumpsByCharacter', write.nearbyJumpsByCharacter),
-    ...(routeRules ? { routeRules } : {}),
-    // The nearby-alerts poller's state (pollNearby.ts): never the client's to set.
-    ...(previous?.nearbyState ? { nearbyState: previous.nearbyState } : {}),
-    ...(quietHours ? { quietHours } : {}),
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  await registrationRef.set(
+    {
+      fcmToken: write.fcmToken,
+      characterIds: write.characterIds,
+      // Firestore map keys are strings; a Character dropped from the roster
+      // falls out because the whole map is rebuilt on every upload.
+      eveTypesByCharacter: Object.fromEntries(
+        write.characterIds.map((id) => [
+          String(id),
+          write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
+        ])
+      ),
+      serverEventsByCharacter: perCharacter(
+        'serverEventsByCharacter',
+        write.serverEventsByCharacter
+      ),
+      nearbyJumpsByCharacter: perCharacter('nearbyJumpsByCharacter', write.nearbyJumpsByCharacter),
+      ...(routeRules ? { routeRules } : {}),
+      ...(quietHours ? { quietHours } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    {
+      // Every field this upload owns is rewritten (a listed field left out is
+      // deleted, as a plain `set` would); the poller's `nearbyState`
+      // (pollNearby.ts) is not listed, so a concurrent poll's write survives.
+      mergeFields: REGISTRATION_FIELDS,
+    }
+  );
 
   await Promise.all([
     ...write.projections.map(async ({ characterId, rows }) => {

@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { AggregateRow } from './AggregateRow';
 import { PermissionNote } from './PermissionNote';
 import { NearbyPushBadge, ScheduledPushBadge } from './ScheduledPushBadge';
+import { isNearbyServerEvent } from './serverPushChoices';
 import { EventThresholdsList } from './EventThresholdsList';
 import { eventEntry } from './eventEntries';
 import { eventLabelKey, isCorpEventId, type NotificationEventId } from './events';
@@ -76,7 +77,7 @@ export function NotificationEventRow({
       labelAccessory={
         isPushBadged(eventId) ? (
           <ScheduledPushBadge />
-        ) : eventId === 'incursionNearby' || eventId === 'skyhookRaidableNearby' ? (
+        ) : isNearbyServerEvent(eventId) ? (
           <NearbyPushBadge />
         ) : undefined
       }

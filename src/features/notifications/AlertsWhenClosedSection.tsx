@@ -86,6 +86,8 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     }
   });
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Which of a row's two buttons is working, so only that one spins.
+  const [addingNearby, setAddingNearby] = useState(false);
   const isDesktop = useMediaQuery(MD_UP_QUERY);
   // Closed to start, so the list never pushes the Topics below the fold; open on
   // arrival from EVE, where it holds the outcome of the round trip.
@@ -127,6 +129,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
     }
   };
   const turnOff = async (characterId: number) => {
+    setAddingNearby(false);
     setBusyId(characterId);
     const ok = await turnOffAlerts(characterId);
     setBusyId(null);
@@ -272,12 +275,15 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                       <Button
                         size="sm"
                         variant="ghost"
-                        loading={busy}
+                        loading={busy && addingNearby}
                         disabled={busyId !== null}
                         aria-label={t('settings.notifications.alertsWhenClosed.addNearbyFor', {
                           name: character.name,
                         })}
-                        onClick={() => turnOn(character.characterId)}
+                        onClick={() => {
+                          setAddingNearby(true);
+                          turnOn(character.characterId);
+                        }}
                       >
                         {t('settings.notifications.alertsWhenClosed.addNearby')}
                       </Button>
@@ -286,7 +292,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                   {state === 'on' ? (
                     <Button
                       size="sm"
-                      loading={busy}
+                      loading={busy && !addingNearby}
                       disabled={busyId !== null}
                       aria-label={t('settings.notifications.alertsWhenClosed.turnOffFor', {
                         name: character.name,

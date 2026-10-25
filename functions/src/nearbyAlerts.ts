@@ -353,28 +353,71 @@ export function computeDeviceNearby(input: DeviceNearbyInput): DeviceNearbyResul
 }
 
 /**
- * How long a device remembers it was pushed an occurrence: the app's
- * `TOAST_STALE_AFTER_MS`, past which a feed row no longer stops a toast either.
- * Covers a second Character coming into range of the same Incursion later.
+ * Occurrence Key → epoch ms it was first pushed to this device. An entry stays
+ * while its occurrence is still listed (the Incursion, or a raid window not yet
+ * over), as the app's own feed row with `notifiedHereAt` stops a second toast
+ * for as long as it exists: a second Character reaching the same Incursion a
+ * day later is not pushed again.
  */
-export const NEARBY_PUSH_LOG_TTL_MS = 24 * 60 * 60 * 1000;
-
-/** Occurrence Key → epoch ms until which it is not pushed to this device again. */
 export type NearbyPushLog = Record<string, number>;
 
-export function notYetPushed(log: Readonly<NearbyPushLog>, key: string, nowMs: number): boolean {
-  const until = log[key];
-  return until === undefined || until <= nowMs;
+/** The occurrences each list still names; `null` for a list not read this run. */
+export interface LiveOccurrences {
+  incursions: ReadonlySet<string> | null;
+  skyhooks: ReadonlySet<string> | null;
 }
 
-/** The log with `keys` added and every expired entry dropped. */
+export function liveOccurrences(lists: NearbyLists, nowMs: number): LiveOccurrences {
+  return {
+    incursions:
+      lists.incursions === null
+        ? null
+        : new Set(
+            lists.incursions.map((i) =>
+              incursionNearbyOccurrenceKey(i.constellation_id, i.staging_solar_system_id)
+            )
+          ),
+    skyhooks:
+      lists.skyhooks === null
+        ? null
+        : new Set(
+            lists.skyhooks.flatMap((hook) => {
+              const startMs = parseInstant(hook.theft_vulnerability?.start);
+              const endMs = parseInstant(hook.theft_vulnerability?.end);
+              return startMs === null || endMs === null || endMs <= nowMs
+                ? []
+                : [
+                    skyhookRaidableNearbyOccurrenceKey(
+                      hook.solar_system_id,
+                      hook.planet_id,
+                      startMs
+                    ),
+                  ];
+            })
+          ),
+  };
+}
+
+export function notYetPushed(log: Readonly<NearbyPushLog>, key: string): boolean {
+  return log[key] === undefined;
+}
+
+/**
+ * The log with `keys` added, dropping entries whose occurrence a list read this
+ * run no longer names. An entry for a list that could not be read is kept.
+ */
 export function recordPushed(
   log: Readonly<NearbyPushLog>,
   keys: readonly string[],
-  nowMs: number
+  nowMs: number,
+  live: LiveOccurrences
 ): NearbyPushLog {
+  const stillListed = (key: string) => {
+    const set = key.startsWith('incursionNearby:') ? live.incursions : live.skyhooks;
+    return set === null || set.has(key);
+  };
   const kept: NearbyPushLog = {};
-  for (const [key, until] of Object.entries(log)) if (until > nowMs) kept[key] = until;
-  for (const key of keys) kept[key] = nowMs + NEARBY_PUSH_LOG_TTL_MS;
+  for (const [key, at] of Object.entries(log)) if (stillListed(key)) kept[key] = at;
+  for (const key of keys) kept[key] = nowMs;
   return kept;
 }

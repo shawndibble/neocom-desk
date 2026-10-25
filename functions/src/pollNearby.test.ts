@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PushMessage } from './eveNotificationPush.js';
-import { NEARBY_PUSH_LOG_TTL_MS, type StoredNearby } from './nearbyAlerts.js';
+import type { StoredNearby } from './nearbyAlerts.js';
 import {
   runNearbyPhase,
   type NearbyDeps,
@@ -101,7 +101,7 @@ describe('runNearbyPhase', () => {
     });
     expect(s.sent[0].m.data.title).toBeTruthy();
     expect(s.states.phone.pushed).toEqual({
-      [`incursionNearby:20000020:${PERIMETER}`]: NOW + NEARBY_PUSH_LOG_TTL_MS,
+      [`incursionNearby:20000020:${PERIMETER}`]: NOW,
     });
   });
 
@@ -182,6 +182,14 @@ describe('runNearbyPhase', () => {
     expect(s.store.writeState).not.toHaveBeenCalled();
   });
 
+  it('writes nothing when nothing changed', async () => {
+    const s = setup({});
+    await run(s);
+    s.store.writeState.mockClear();
+    await run(s);
+    expect(s.store.writeState).not.toHaveBeenCalled();
+  });
+
   it('deletes a device whose FCM token is dead', async () => {
     const s = setup({
       state: { phone: { characters: { '1': quietBaseline }, pushed: {} } },
@@ -205,7 +213,7 @@ describe('runNearbyPhase', () => {
     expect(s.states.phone.characters['1'].incursion).toEqual(quietBaseline.incursion);
   });
 
-  it('drops state for a Character no longer on the device', async () => {
+  it('drops state for a Character not located this run', async () => {
     const s = setup({
       state: { phone: { characters: { '1': quietBaseline, '99': quietBaseline }, pushed: {} } },
     });

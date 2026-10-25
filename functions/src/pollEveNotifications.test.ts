@@ -54,6 +54,7 @@ function setup(opts: {
     }),
     patch: vi.fn(async () => {}),
     markRevoked: vi.fn(async () => {}),
+    dropLocationScope: vi.fn(async () => {}),
     devicesFor: vi.fn(async () => opts.devices ?? [phone]),
     deleteDevice: vi.fn(async () => {}),
   } satisfies PollerStore;
@@ -362,12 +363,23 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
     expect(fetchLocation).not.toHaveBeenCalled();
   });
 
-  it('leaves out a Character whose location could not be read, and does not revoke it', async () => {
+  it('a refused location drops that scope from the grant but never revokes it', async () => {
     const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
     const { deps, runPhase } = withNearby(s, () => ({ kind: 'forbidden' }));
     await pollEveNotifications(deps);
     expect(runPhase).toHaveBeenCalledWith(new Map());
     expect(s.store.markRevoked).not.toHaveBeenCalled();
+    expect(s.store.dropLocationScope).toHaveBeenCalledWith(1, 'blob', [
+      'esi-characters.read_notifications.v1',
+    ]);
+  });
+
+  it('a failed location read just leaves the Character out', async () => {
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const { deps, runPhase } = withNearby(s, () => ({ kind: 'error', status: 502 }));
+    await pollEveNotifications(deps);
+    expect(runPhase).toHaveBeenCalledWith(new Map());
+    expect(s.store.dropLocationScope).not.toHaveBeenCalled();
   });
 
   it('skips the nearby phase once the shared error budget is spent', async () => {

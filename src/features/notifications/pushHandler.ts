@@ -86,6 +86,12 @@ export interface PushEnv {
   characterName?: (characterId: number) => Promise<string | undefined>;
   /** Names for a raw EVE notification, already within the resolution budget; never rejects. */
   resolveNames?: (fire: EveNotificationFire) => Promise<EveNotificationNames>;
+  /**
+   * Whether this device already raised (or the pilot dismissed) the occurrence
+   * this push is about: the open app's Foreground Poller got there first. The
+   * push then still shows (WebKit), but silently. Never rejects.
+   */
+  alreadyNotifiedHere?: (occurrenceKey: string) => Promise<boolean>;
   /** Public names for system, planet and constellation ids (a nearby push); never rejects. */
   resolveIdNames?: (ids: readonly number[]) => Promise<ReadonlyMap<number, string>>;
   /** The Time format zone (`'UTC'` for EVE time) the body's times render in; absent means the host's own. Never rejects. */
@@ -380,9 +386,22 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
     PRESENT_BUDGET_MS
   );
 
+  // The open app toasted it already (a server push lags the 5-minute poll):
+  // a push must still show something, so it replaces quietly instead.
+  const seenHere =
+    feedKey !== null &&
+    (await withinBudget(
+      Promise.resolve(env.alreadyNotifiedHere?.(feedKey) ?? false).catch(() => false),
+      false,
+      NAME_READ_BUDGET_MS
+    ));
+  const options = notificationOptionsFor(
+    { eventId: payload.eventId, characterId: payload.characterId },
+    body
+  );
   const notify = env.showNotification(
     title,
-    notificationOptionsFor({ eventId: payload.eventId, characterId: payload.characterId }, body)
+    seenHere ? { ...options, silent: true, renotify: false } : options
   );
 
   const feedWrite =

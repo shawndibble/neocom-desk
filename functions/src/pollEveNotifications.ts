@@ -4,7 +4,7 @@
 // and batching live in eveNotificationSelection.ts / eveNotificationPush.ts.
 // Nothing here logs or returns a token.
 
-import { grantCoversNearby, type AlertGrantDoc } from './alertGrant.js';
+import { ALERTS_LOCATION_SCOPE, grantCoversNearby, type AlertGrantDoc } from './alertGrant.js';
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import type { LocationResult } from './esiNearby.js';
 import type { NotificationsResult } from './esiNotifications.js';
@@ -47,6 +47,8 @@ export interface PollerStore {
     state: { highWaterId: number | null; etag: string | null; seenTypes: string[] }
   ): Promise<void>;
   markRevoked(characterId: number, guard: string): Promise<void>;
+  /** Store the grant's scopes without the location one, after ESI refused it (guarded like `patch`). */
+  dropLocationScope(characterId: number, guard: string, scopes: string[]): Promise<void>;
   devicesFor(characterId: number): Promise<PollDevice[]>;
   deleteDevice(deviceId: string): Promise<void>;
 }
@@ -176,9 +178,19 @@ async function pollOne(
       summary.budgetStopped = true;
       deps.log('ESI error budget hit; stopping this run', { retryAfterMs: location.retryAfterMs });
       return;
+    case 'forbidden':
+      // The location scope alone was refused: the notifications still work, so
+      // the grant is not revoked. It stops being asked, so a dead scope does
+      // not spend the shared error budget every run; the device then sees the
+      // Character in no `nearbyGrants` and offers Add nearby again.
+      await deps.store.dropLocationScope(
+        characterId,
+        grant.encryptedRefreshToken,
+        (grant.scopes ?? []).filter((scope) => scope !== ALERTS_LOCATION_SCOPE)
+      );
+      deps.log('ESI refused the location scope (403); nearby alerts off for it', { characterId });
+      return;
     default:
-      // A 403 here is the location scope alone: the notifications still work,
-      // so the grant is not revoked. The Character just has no nearby alerts this run.
       deps.log('ESI location call failed', { characterId, kind: location.kind });
   }
 }

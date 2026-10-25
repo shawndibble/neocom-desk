@@ -39,11 +39,8 @@ import {
   type AlertGrantDeps,
 } from './alertGrant.js';
 import { parseAlertsKey } from './alertGrantCrypto.js';
-import {
-  firestoreAlertGrantStore,
-  firestoreNearbyStore,
-  firestorePollerStore,
-} from './alertGrantStore.js';
+import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStore.js';
+import { firestoreNearbyStore, forgetNearbyCharacter } from './nearbyStore.js';
 import { fetchCharacterLocation, fetchIncursions, fetchRaidableSkyhooks } from './esiNearby.js';
 import type { PushMessage } from './eveNotificationPush.js';
 import { runNearbyPhase } from './pollNearby.js';
@@ -398,6 +395,7 @@ function alertGrantDeps(): AlertGrantDeps {
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     now: () => Date.now(),
     log: (message, data) => logWarn(message, data),
+    forgetNearby: (characterId) => forgetNearbyCharacter(firestore(), characterId),
   };
 }
 

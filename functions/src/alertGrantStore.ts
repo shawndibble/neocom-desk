@@ -11,8 +11,6 @@ import {
 import { rotateStoredToken, decryptRefreshToken } from './alertGrantCrypto.js';
 import { DEVICE_REGISTRATIONS_COLLECTION, readQuietHours } from './projectionStore.js';
 import type { PollDevice, PollerStore } from './pollEveNotifications.js';
-import type { NearbyDevice, NearbyDeviceState, NearbyStore } from './pollNearby.js';
-import type { NearbyRouteRules } from './nearbyAlerts.js';
 
 export const ALERT_GRANTS_COLLECTION = 'alertGrants';
 
@@ -115,6 +113,10 @@ export function firestorePollerStore(
       await guardedUpdate(characterId, guard, { status: 'revoked' });
     },
 
+    async dropLocationScope(characterId, guard, scopes) {
+      await guardedUpdate(characterId, guard, { scopes });
+    },
+
     async devicesFor(characterId) {
       const snap = await db
         .collection(DEVICE_REGISTRATIONS_COLLECTION)
@@ -138,75 +140,6 @@ export function firestorePollerStore(
 
     async deleteDevice(deviceId) {
       await db.collection(DEVICE_REGISTRATIONS_COLLECTION).doc(deviceId).delete();
-    },
-  };
-}
-
-/** Firestore's cap on `array-contains-any` values. */
-const ARRAY_CONTAINS_ANY_MAX = 30;
-
-const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-
-/** The poller's stored state on a registration doc; anything malformed reads as none. */
-function readNearbyState(raw: unknown): NearbyDeviceState {
-  const state = asRecord(raw);
-  const pushed: Record<string, number> = {};
-  for (const [key, until] of Object.entries(asRecord(state.pushed))) {
-    if (typeof until === 'number') pushed[key] = until;
-  }
-  return {
-    characters: asRecord(state.characters) as NearbyDeviceState['characters'],
-    pushed,
-  };
-}
-
-/** Firestore side of the nearby phase (issue #5122): see `NearbyStore`. */
-export function firestoreNearbyStore(db: Firestore): NearbyStore {
-  const registrations = db.collection(DEVICE_REGISTRATIONS_COLLECTION);
-  return {
-    async devicesFor(characterIds) {
-      const devices = new Map<string, NearbyDevice>();
-      for (let i = 0; i < characterIds.length; i += ARRAY_CONTAINS_ANY_MAX) {
-        const snap = await registrations
-          .where(
-            'characterIds',
-            'array-contains-any',
-            characterIds.slice(i, i + ARRAY_CONTAINS_ANY_MAX)
-          )
-          .get();
-        for (const doc of snap.docs) {
-          const data = doc.data();
-          if (typeof data.fcmToken !== 'string' || devices.has(doc.id)) continue;
-          devices.set(doc.id, {
-            deviceId: doc.id,
-            fcmToken: data.fcmToken,
-            characterIds: Array.isArray(data.characterIds)
-              ? data.characterIds.filter((id): id is number => typeof id === 'number')
-              : [],
-            serverEventsByCharacter: asRecord(
-              data.serverEventsByCharacter
-            ) as NearbyDevice['serverEventsByCharacter'],
-            nearbyJumpsByCharacter: asRecord(
-              data.nearbyJumpsByCharacter
-            ) as NearbyDevice['nearbyJumpsByCharacter'],
-            routeRules: data.routeRules as NearbyRouteRules | undefined,
-            quietHours: readQuietHours(data.quietHours),
-            state: readNearbyState(data.nearbyState),
-          });
-        }
-      }
-      return [...devices.values()];
-    },
-    async writeState(deviceId, state) {
-      // `update`, not `set`: a registration deleted meanwhile (a dead token) must
-      // stay deleted, so this throws instead of recreating a doc with no token.
-      await registrations.doc(deviceId).update({ nearbyState: state });
-    },
-    async deleteDevice(deviceId) {
-      await registrations.doc(deviceId).delete();
     },
   };
 }

@@ -76,10 +76,11 @@ raid windows.
   more sensitive than a notification feed: it is a live position. It still
   cannot read assets, wallet, mail or skills, nor act as the Character. Only
   Characters whose owner pressed Turn on, or Add nearby, after this ADR carry
-  it. The server stores no location history: the per-device state keeps, for
-  the in-range Incursions and raid windows, the origin system they were counted
-  from, until the next poll replaces it; the registration doc holds it and goes
-  with it.
+  it. The server stores no location history: each device's `nearbyState`
+  keeps, per Character located in the last run, the system it was counted
+  from, which the next run replaces. A Character not located in a run loses its
+  entry; deleting the grant drops it from every device; the registration doc
+  holds the state and goes with it.
 - **Disclosure.** Settings, the alerts offer, the FAQ, `public/privacy.html` and
   `public/delete-data.html` now say the grant reads notifications and, for
   nearby alerts, location. Copy no longer calls it "notifications-only" where
@@ -96,5 +97,5 @@ raid windows.
 - **Error budget.** The location call and the two public lists follow ADR 0020's
   etiquette: `X-Compatibility-Date`, a descriptive `X-User-Agent` with no email
   address, stop on 420/429 or a low `X-ESI-Error-Limit-Remain`, skip rather than
-  retry. A 403 on the location skips that Character's nearby alerts for the run
-  without revoking the grant.
+  retry. A 403 on the location drops that scope from the grant's stored
+  `scopes` without revoking the grant, so it is not retried every run.

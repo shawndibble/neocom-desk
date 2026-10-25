@@ -32,7 +32,7 @@ import {
   urlFromNotificationData,
 } from '@/features/notifications/notificationClick';
 import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
-import { recordFeedEntry } from '@/features/notifications/feed';
+import { feedSuppressesToast, recordFeedEntry } from '@/features/notifications/feed';
 import { resolveIdNames, resolvePushNames } from '@/features/notifications/pushNames';
 import { db } from '@/db';
 import { readTimeZone } from '@/lib/timeFormat';
@@ -243,6 +243,7 @@ function pushEnv(): PushEnv {
     characterName: async (characterId) => (await db.characters.get(characterId))?.name,
     resolveNames: (fire) => resolvePushNames(fire),
     resolveIdNames: (ids) => resolveIdNames(ids),
+    alreadyNotifiedHere: (key) => feedSuppressesToast(key, Date.now()).catch(() => false),
     timeZone: readTimeZone,
   };
 }

@@ -14,6 +14,7 @@ import {
   NEARBY_EVENT_IDS,
   computeDeviceNearby,
   jumpDistancesUnder,
+  liveOccurrences,
   notYetPushed,
   recordPushed,
   type DeviceCharacterNearby,
@@ -146,6 +147,7 @@ export async function runNearbyPhase(args: {
   };
   // A 420/429 ends the phase with nothing written: the next run diffs against the old baseline.
   if (aborted) return result;
+  const live = liveOccurrences(lists, nowMs);
 
   // One sweep per origin and rule set for the whole run, however many devices share them.
   const sweeps = new Map<string, ReadonlyMap<number, number>>();
@@ -180,16 +182,17 @@ export async function runNearbyPhase(args: {
       nowMs,
       distancesFrom: distances(device.routeRules ?? DEFAULT_NEARBY_ROUTE_RULES),
     });
-    const onDevice = new Set(device.characterIds.map(String));
-    const next = Object.fromEntries(
-      Object.entries(computed.next).filter(([id]) => onDevice.has(id))
-    );
+    // Only the Characters checked this run keep state: one whose location was
+    // not read (grant ended, location refused, off the device) loses the system
+    // it was last counted from, and baselines again silently when it is back.
+    const polled = new Set(characters.map((c) => String(c.characterId)));
+    const next = Object.fromEntries(Object.entries(computed.next).filter(([id]) => polled.has(id)));
 
     // Quiet time: skipped, not queued, and not logged as pushed. The edge is
     // still consumed, as the EVE notification poller's high-water mark is.
     const fresh = suppressPush(nowMs, device.quietHours, undefined)
       ? []
-      : computed.fires.filter((f) => notYetPushed(state.pushed, f.occurrenceKey, nowMs));
+      : computed.fires.filter((f) => notYetPushed(state.pushed, f.occurrenceKey));
     const pushed: string[] = [];
     for (const keyed of fresh) {
       try {
@@ -211,9 +214,12 @@ export async function runNearbyPhase(args: {
         return;
       }
     }
-    await deps.store.writeState(device.deviceId, {
+    const nextState: NearbyDeviceState = {
       characters: next,
-      pushed: recordPushed(state.pushed, pushed, nowMs),
-    });
+      pushed: recordPushed(state.pushed, pushed, nowMs, live),
+    };
+    // Most runs change nothing: skip the write.
+    if (JSON.stringify(nextState) === JSON.stringify(state)) return;
+    await deps.store.writeState(device.deviceId, nextState);
   }
 }

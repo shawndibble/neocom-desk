@@ -68,7 +68,15 @@ export async function serverPushChoicesByCharacter(
   return choices;
 }
 
-const NEARBY_EVENT_IDS: readonly string[] = ['incursionNearby', 'skyhookRaidableNearby'];
+/** The server-pushed events that need the Character's location (ADR 0027). */
+export const NEARBY_SERVER_EVENT_IDS = [
+  'incursionNearby',
+  'skyhookRaidableNearby',
+] as const satisfies readonly NotificationEventId[];
+
+export function isNearbyServerEvent(eventId: string): boolean {
+  return (NEARBY_SERVER_EVENT_IDS as readonly string[]).includes(eventId);
+}
 
 /**
  * This device's Travel Settings for the upload, so the server counts nearby
@@ -81,7 +89,7 @@ export async function routeRulesForServer(
   choices: ReadonlyMap<number, ServerPushChoices>
 ): Promise<RouteRules | null> {
   const wanted = [...choices.values()].some((choice) =>
-    choice.serverEvents.some((id) => NEARBY_EVENT_IDS.includes(id))
+    choice.serverEvents.some(isNearbyServerEvent)
   );
   if (!wanted) return null;
   try {

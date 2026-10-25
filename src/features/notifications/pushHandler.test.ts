@@ -628,3 +628,25 @@ describe('server-pushed nearby alerts (ADR 0027)', () => {
     );
   });
 });
+
+describe('a push for an occurrence the open app already raised', () => {
+  it('still shows, but silently and without re-alerting', async () => {
+    const e = env({ alreadyNotifiedHere: vi.fn(async () => true) });
+    await handlePush(e, rawFcmPayload({ ...VALID_PAYLOAD, characterId: '12345' }), 1_000);
+    expect(e.alreadyNotifiedHere).toHaveBeenCalledWith(VALID_PAYLOAD.occurrenceKey);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      VALID_PAYLOAD.title,
+      expect.objectContaining({ silent: true, renotify: false })
+    );
+  });
+
+  it('alerts normally when this device has not raised it', async () => {
+    const e = env({ alreadyNotifiedHere: vi.fn(async () => false) });
+    await handlePush(e, rawFcmPayload({ ...VALID_PAYLOAD, characterId: '12345' }), 1_000);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      VALID_PAYLOAD.title,
+      expect.objectContaining({ renotify: true })
+    );
+    expect(vi.mocked(e.showNotification).mock.calls[0][1]).not.toHaveProperty('silent');
+  });
+});

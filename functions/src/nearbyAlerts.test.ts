@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NEARBY_ROUTE_RULES,
-  NEARBY_PUSH_LOG_TTL_MS,
+  liveOccurrences,
   computeDeviceNearby,
   incursionNearbyOccurrenceKey,
   jumpDistancesUnder,
@@ -211,16 +211,26 @@ describe('computeDeviceNearby', () => {
 });
 
 describe('push log', () => {
-  it('drops fires already pushed to the device inside the TTL, and records new ones', () => {
-    const log = recordPushed({}, ['a'], NOW);
-    expect(log).toEqual({ a: NOW + NEARBY_PUSH_LOG_TTL_MS });
-    expect(notYetPushed(log, 'a', NOW + 1)).toBe(false);
-    expect(notYetPushed(log, 'a', NOW + NEARBY_PUSH_LOG_TTL_MS)).toBe(true);
-    expect(notYetPushed(log, 'b', NOW)).toBe(true);
-    // Expired entries are pruned on the next write.
-    expect(recordPushed(log, ['b'], NOW + NEARBY_PUSH_LOG_TTL_MS)).toEqual({
-      b: NOW + 2 * NEARBY_PUSH_LOG_TTL_MS,
-    });
+  const live = {
+    incursions: new Set(['incursionNearby:1:2']),
+    skyhooks: null,
+  };
+  it('remembers a pushed occurrence for as long as its list still names it', () => {
+    const log = recordPushed({}, ['incursionNearby:1:2'], NOW, live);
+    expect(log).toEqual({ 'incursionNearby:1:2': NOW });
+    expect(notYetPushed(log, 'incursionNearby:1:2')).toBe(false);
+    expect(notYetPushed(log, 'incursionNearby:3:4')).toBe(true);
+    // A day later, still listed: still remembered.
+    expect(recordPushed(log, [], NOW + 2 * HOUR * 24, live)).toEqual(log);
+  });
+  it('forgets one the list no longer names, and keeps one whose list was not read', () => {
+    const log = { 'incursionNearby:9:9': 1, 'skyhookRaidableNearby:1:2:3': 1 };
+    expect(recordPushed(log, [], NOW, live)).toEqual({ 'skyhookRaidableNearby:1:2:3': 1 });
+  });
+  it('names an ended raid window as no longer live', () => {
+    const occ = liveOccurrences(lists(), NOW + 3 * HOUR);
+    expect(occ.skyhooks?.size).toBe(0);
+    expect(occ.incursions?.has('incursionNearby:900:4')).toBe(true);
   });
 });
 

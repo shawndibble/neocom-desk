@@ -73,6 +73,8 @@ export interface AlertGrantDeps {
   now: () => number;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
+  /** Drop the Character's nearby-alerts state from its devices (ADR 0027); best effort. */
+  forgetNearby?: (characterId: number) => Promise<void>;
 }
 
 export type AlertGrantErrorCode = 'invalid-argument' | 'unauthenticated' | 'permission-denied';
@@ -208,6 +210,12 @@ export async function deleteAlertGrant(
   const doc = await deps.store.get(characterId);
   if (!doc) return { deleted: false, revoked: false };
   await deps.store.delete(characterId);
+  await deps.forgetNearby?.(characterId).catch((err: unknown) =>
+    deps.log('Nearby state cleanup failed', {
+      characterId,
+      error: err instanceof Error ? err.name : 'unknown',
+    })
+  );
   return { deleted: true, revoked: await revokeStored(deps, characterId, doc) };
 }
 

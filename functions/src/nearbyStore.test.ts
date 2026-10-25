@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { firestoreNearbyStore } from './alertGrantStore.js';
+import { firestoreNearbyStore, forgetNearbyCharacter } from './nearbyStore.js';
 
 /** `deviceRegistrations` in memory, with the one query the nearby store runs. */
 function fakeDb(docs: Record<string, Record<string, unknown>>) {
@@ -71,5 +71,32 @@ describe('firestoreNearbyStore', () => {
     const state = { characters: {}, pushed: {} };
     await firestoreNearbyStore(db).writeState('phone', state);
     expect(update).toHaveBeenCalledWith('phone', { nearbyState: state });
+  });
+});
+
+describe('forgetNearbyCharacter', () => {
+  it('deletes only that Character’s entry, only on docs that hold one', async () => {
+    const updates: [string, unknown][] = [];
+    const docs = [
+      { id: 'a', data: { nearbyState: { characters: { '7': {}, '8': {} } } } },
+      { id: 'b', data: { nearbyState: { characters: { '8': {} } } } },
+    ];
+    const db = {
+      collection: () => ({
+        where: () => ({
+          get: async () => ({
+            docs: docs.map((d) => ({
+              id: d.id,
+              data: () => d.data,
+              ref: { update: async (v: unknown) => void updates.push([d.id, v]) },
+            })),
+          }),
+        }),
+      }),
+    } as unknown as Firestore;
+    await forgetNearbyCharacter(db, 7);
+    expect(updates.map(([id, v]) => [id, Object.keys(v as object)])).toEqual([
+      ['a', ['nearbyState.characters.7']],
+    ]);
   });
 });

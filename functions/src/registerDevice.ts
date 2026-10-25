@@ -171,42 +171,33 @@ function parseServerEvents(raw: unknown, path: string): string[] | undefined {
 const isWholeIn = (value: unknown, max: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max;
 
-/** Only the nearby events' keys are kept: a later client's extra key is ignored, not an error. */
-function parseNearbyJumps(
-  raw: unknown,
-  path: string
-): Partial<Record<NearbyEventId, number>> | undefined {
-  if (raw === undefined) return undefined;
-  if (!isRecord(raw) || Array.isArray(raw))
-    throw new Error(`${path}, if present, must be an object`);
+/**
+ * Lenient, unlike the fields above: these only feed nearby alerts, so a value a
+ * later or buggy client sends that does not parse is dropped (the stored one
+ * stays) instead of refusing the whole upload with its Projection and types.
+ * Only the nearby events' keys are kept; another key is ignored.
+ */
+function parseNearbyJumps(raw: unknown): Partial<Record<NearbyEventId, number>> | undefined {
+  if (!isRecord(raw) || Array.isArray(raw)) return undefined;
   const jumps: Partial<Record<NearbyEventId, number>> = {};
   for (const eventId of NEARBY_EVENT_IDS) {
     const value = raw[eventId];
     if (value === undefined) continue;
-    if (!isWholeIn(value, MAX_NEARBY_JUMPS)) {
-      throw new Error(`${path}.${eventId} must be a whole number from 0 to ${MAX_NEARBY_JUMPS}`);
-    }
+    if (!isWholeIn(value, MAX_NEARBY_JUMPS)) return undefined;
     jumps[eventId] = value;
   }
   return jumps;
 }
 
+/** Lenient for the same reason as `parseNearbyJumps`. */
 function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
-  if (raw === undefined) return undefined;
-  if (!isRecord(raw) || Array.isArray(raw))
-    throw new Error('routeRules, if present, must be an object');
+  if (!isRecord(raw) || Array.isArray(raw)) return undefined;
   const { preference, securityPenalty, avoid } = raw;
-  if (!(ROUTE_PREFERENCES as readonly unknown[]).includes(preference)) {
-    throw new Error(`routeRules.preference must be one of ${ROUTE_PREFERENCES.join(', ')}`);
-  }
-  if (!isWholeIn(securityPenalty, 100)) {
-    throw new Error('routeRules.securityPenalty must be a whole number from 0 to 100');
-  }
-  if (!Array.isArray(avoid) || avoid.length > MAX_AVOIDED_SYSTEMS) {
-    throw new Error(`routeRules.avoid must be an array of at most ${MAX_AVOIDED_SYSTEMS} ids`);
-  }
+  if (!(ROUTE_PREFERENCES as readonly unknown[]).includes(preference)) return undefined;
+  if (!isWholeIn(securityPenalty, 100)) return undefined;
+  if (!Array.isArray(avoid) || avoid.length > MAX_AVOIDED_SYSTEMS) return undefined;
   if (!avoid.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) {
-    throw new Error('routeRules.avoid must contain only system ids');
+    return undefined;
   }
   return {
     preference: preference as NearbyRouteRules['preference'],
@@ -262,7 +253,7 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
       projectionRows: rows,
       eveTypes: parseEveTypes(eveTypes, `characters[${i}].eveTypes`),
       serverEvents: parseServerEvents(serverEvents, `characters[${i}].serverEvents`),
-      nearbyJumps: parseNearbyJumps(nearbyJumps, `characters[${i}].nearbyJumps`),
+      nearbyJumps: parseNearbyJumps(nearbyJumps),
     };
   });
   const parsedRouteRules = parseRouteRules(routeRules);
