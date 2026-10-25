@@ -6,13 +6,32 @@
  * No downside and Trade-offs, never ranked against each other. Ticked rows
  * are applied together as one unsaved edit.
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, FilterChip, IskAmount, ProgressBar, Spinner } from '@/components/ui';
 import {
+  Button,
+  Checkbox,
+  FilterChip,
+  IskAmount,
+  IskInput,
+  ProgressBar,
+  SegmentedControl,
+  Spinner,
+} from '@/components/ui';
+import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import { Collapse } from '@/components/ui/Collapse';
+import { textActionClassName } from '@/components/ui/textActionClassName';
+import {
+  bestScore,
   COMBAT_GOALS,
+  DEFENSE_CHOICES,
   goalAvailability,
+  IMPROVE_MODES,
+  IMPROVE_REACHES,
+  type DefenseChoice,
   type ImproveGoal,
+  type ImproveMode,
+  type ImproveReach,
   type ImproveOption,
   type ImproveResult,
   type RejectedOption,
@@ -31,8 +50,34 @@ const CHANGES_SHOWN = 4;
 
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
-const optionKey = (option: ImproveOption) =>
-  `${option.candidate.fromTypeId}-${option.candidate.toTypeId}`;
+const moveKey = (candidate: ImproveOption['candidate']): string =>
+  `${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
+  (candidate.pairedWith ? `+${moveKey(candidate.pairedWith)}` : '');
+
+const optionKey = (option: ImproveOption) => moveKey(option.candidate);
+
+/** Every slot a suggestion changes, its paired downgrade's included: two ticked rows never share one. */
+function slotsOf(candidate: ImproveOption['candidate']): string[] {
+  const own = candidate.at.map((at) => `${at.slot}${at.slotIndex}`);
+  return candidate.pairedWith ? [...own, ...slotsOf(candidate.pairedWith)] : own;
+}
+
+/** What the drawer asks of a search beyond the goal; the hook that owns the state passes it whole. */
+export interface ImproveSettings {
+  reach: ImproveReach;
+  onReachChange: (reach: ImproveReach) => void;
+  mode: ImproveMode;
+  onModeChange: (mode: ImproveMode) => void;
+  /** Total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
+  spendCap: number | null;
+  onSpendCapChange: (cap: number | null) => void;
+  defense: DefenseChoice;
+  onDefenseChange: (defense: DefenseChoice) => void;
+  includeRigs: boolean;
+  onIncludeRigsChange: (on: boolean) => void;
+  includeOfficer: boolean;
+  onIncludeOfficerChange: (on: boolean) => void;
+}
 
 interface Props {
   goal: ImproveGoal;
@@ -40,30 +85,42 @@ interface Props {
   search: ImproveSearch;
   catalogue: FittingCatalogue | null;
   onApply: (options: ImproveOption[]) => void;
+  settings: ImproveSettings;
 }
 
-export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }: Props) {
+export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply, settings }: Props) {
   const { t } = useTranslation();
+  const moreId = useId();
+  const [moreOpen, setMoreOpen] = useState(false);
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
   // Ticks belong to the result they were made in: a new search (a goal
   // change, an edit to the fit) starts with none.
   const [ticks, setTicks] = useState<{
     result: ImproveResult | null;
-    byModule: ReadonlyMap<number, ImproveOption>;
+    byModule: ReadonlyMap<string, ImproveOption>;
   }>({ result: null, byModule: new Map() });
   const { state, before } = search;
   const result = state.status === 'done' ? state.result : null;
-  const ticked = ticks.result === result ? ticks.byModule : new Map<number, ImproveOption>();
-  const setTicked = (byModule: ReadonlyMap<number, ImproveOption>) =>
+  const ticked = ticks.result === result ? ticks.byModule : new Map<string, ImproveOption>();
+  const setTicked = (byModule: ReadonlyMap<string, ImproveOption>) =>
     setTicks({ result, byModule });
   const name = (typeId: number) => catalogueTypeName(catalogue, typeId);
 
+  const moveLabel = (candidate: ImproveOption['candidate']) =>
+    candidate.fromTypeId === null
+      ? t('fittings.improve.fill', { count: candidate.at.length, to: name(candidate.toTypeId) })
+      : t('fittings.improve.swap', {
+          count: candidate.at.length,
+          from: name(candidate.fromTypeId),
+          to: name(candidate.toTypeId),
+        });
   const swapLabel = (option: ImproveOption) =>
-    t('fittings.improve.swap', {
-      count: option.candidate.at.length,
-      from: name(option.candidate.fromTypeId),
-      to: name(option.candidate.toTypeId),
-    });
+    option.candidate.pairedWith
+      ? t('fittings.improve.pair', {
+          add: moveLabel({ ...option.candidate, pairedWith: undefined }),
+          downgrade: moveLabel(option.candidate.pairedWith),
+        })
+      : moveLabel(option.candidate);
 
   function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): string {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
@@ -92,9 +149,14 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
 
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
-    const from = option.candidate.fromTypeId;
-    if (next.get(from) === option) next.delete(from);
-    else next.set(from, option);
+    const key = optionKey(option);
+    if (next.has(key)) next.delete(key);
+    else {
+      const taken = new Set(slotsOf(option.candidate));
+      for (const [other, ticked] of next)
+        if (slotsOf(ticked.candidate).some((slot) => taken.has(slot))) next.delete(other);
+      next.set(key, option);
+    }
     setTicked(next);
   }
 
@@ -112,7 +174,7 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
                 <Checkbox
                   id={id}
                   className="mt-0.5"
-                  checked={ticked.get(option.candidate.fromTypeId) === option}
+                  checked={ticked.has(optionKey(option))}
                   onChange={() => toggle(option)}
                 />
                 <span className="min-w-0">
@@ -128,6 +190,11 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
                     </span>
                   )}
                   <span className="block text-xs">{isk(option)}</span>
+                  {option.destroysRigs && (
+                    <span className="text-warning block text-xs">
+                      {t('fittings.improve.destroysRig')}
+                    </span>
+                  )}
                 </span>
               </label>
             </li>
@@ -178,6 +245,79 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
         </p>
       </div>
 
+      <div className="space-y-3">
+        <SegmentedControl
+          label={t('fittings.improve.reachLabel')}
+          options={IMPROVE_REACHES.map((value) => ({
+            value,
+            label: t(`fittings.improve.reach.${value}`),
+          }))}
+          value={settings.reach}
+          onChange={settings.onReachChange}
+          fill
+        />
+        <p className="text-text-dim text-xs">{t(`fittings.improve.reachHint.${settings.reach}`)}</p>
+        <SegmentedControl
+          label={t('fittings.improve.modeLabel')}
+          options={IMPROVE_MODES.map((value) => ({
+            value,
+            label: t(`fittings.improve.mode.${value}`),
+          }))}
+          value={settings.mode}
+          onChange={settings.onModeChange}
+          fill
+        />
+        <label className="block space-y-1 text-sm">
+          <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
+          <IskInput
+            value={settings.spendCap === null ? '' : String(settings.spendCap)}
+            onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
+          />
+        </label>
+        <SegmentedControl
+          label={t('fittings.improve.defenseLabel')}
+          options={DEFENSE_CHOICES.map((value) => ({
+            value,
+            label: t(`fittings.improve.defense.${value}`),
+          }))}
+          value={settings.defense}
+          onChange={settings.onDefenseChange}
+          fill
+        />
+        {!TANK_GOALS.has(goal) && (
+          <p className="text-text-dim text-xs">{t('fittings.improve.defenseHint')}</p>
+        )}
+        <div>
+          <button
+            type="button"
+            className={textActionClassName()}
+            aria-expanded={moreOpen}
+            aria-controls={moreId}
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            {t('fittings.improve.moreLabel')}
+          </button>
+          <Collapse open={moreOpen} id={moreId} className="pt-2">
+            <div className="space-y-1">
+              <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                <Checkbox
+                  checked={settings.includeRigs}
+                  onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
+                />
+                {t('fittings.improve.includeRigs')}
+              </label>
+              <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                <Checkbox
+                  checked={settings.includeOfficer}
+                  onChange={(event) => settings.onIncludeOfficerChange(event.target.checked)}
+                />
+                {t('fittings.improve.includeOfficer')}
+              </label>
+            </div>
+          </Collapse>
+        </div>
+      </div>
+
       {state.status === 'searching' && (
         <div className="space-y-2">
           <p className="text-text-dim flex items-center gap-2 text-sm">
@@ -215,6 +355,23 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
         <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
       )}
 
+      {state.status === 'done' && state.sides && (
+        <p className="text-sm" data-testid="improve-sides">
+          {(['shield', 'armor'] as const)
+            .map((side) => {
+              const score = bestScore(state.sides![side]);
+              return t('fittings.improve.sideResult', {
+                side: t(`fittings.improve.defense.${side}`),
+                result:
+                  score === null
+                    ? t('fittings.improve.sideNone')
+                    : t('fittings.improve.sideGain', { percent: Math.round(score * 100) }),
+              });
+            })
+            .join(' · ')}
+        </p>
+      )}
+
       {state.status === 'done' &&
         (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
@@ -247,7 +404,7 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
                 </ul>
               </MakeItFitSection>
             )}
-            <p className="text-text-dim text-xs">{t('fittings.improve.widen')}</p>
+            <p className="text-text-dim text-xs">{t(`fittings.improve.widen.${settings.reach}`)}</p>
           </div>
         ) : (
           <div className="space-y-4">
