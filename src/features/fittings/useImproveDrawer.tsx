@@ -232,7 +232,14 @@ export function useImproveDrawer({
           {body}
         </Modal>
       ) : (
-        <SlideOver open={isOpen} onClose={close} side="left" title={t('fittings.improve.title')}>
+        <SlideOver
+          open={isOpen}
+          onClose={close}
+          side="left"
+          // Clears the app's 12rem nav, over the Add column, so the stats stay visible.
+          className="md:left-48"
+          title={t('fittings.improve.title')}
+        >
           {body}
         </SlideOver>
       )}

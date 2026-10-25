@@ -497,6 +497,8 @@ export function useImprove(
     return () => {
       cancelled = true;
       controller.abort();
+      // Its signal is aborted: a recalculation through it would fail.
+      setRecalc(null);
       clearTimeout(slowTimer);
     };
   }, [

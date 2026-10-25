@@ -302,7 +302,10 @@ export function ImprovePanel({
         if (slotsOf(pick.candidate).some((slot) => taken.has(slot))) {
           next.delete(other);
           nextReplaced.delete(other);
-          nextReplaced.set(key, swapLabel(pick));
+          nextReplaced.set(
+            key,
+            [nextReplaced.get(key), swapLabel(pick)].filter(Boolean).join(', ')
+          );
         }
       next.set(key, option);
     }
@@ -370,9 +373,11 @@ export function ImprovePanel({
   // The rows were each scored alone: one recalculation of the ticked set checks them together.
   const chosenKey = chosen.map(optionKey).sort().join('|');
   const recalc = search.recalc;
-  const [combined, setCombined] = useState<{ key: string; after: FittingStats | null } | null>(
-    null
-  );
+  const [combined, setCombined] = useState<{
+    key: string;
+    fitting: Fitting;
+    after: FittingStats | null;
+  } | null>(null);
   useEffect(() => {
     if (!fitting || !recalc || chosen.length === 0) return;
     let stale = false;
@@ -381,14 +386,15 @@ export function ImprovePanel({
       fitting
     );
     recalc(folded)
-      .then((after) => !stale && setCombined({ key: chosenKey, after }))
-      .catch(() => !stale && setCombined({ key: chosenKey, after: null }));
+      .then((after) => !stale && setCombined({ key: chosenKey, fitting, after }))
+      .catch(() => !stale && setCombined({ key: chosenKey, fitting, after: null }));
     return () => {
       stale = true;
     };
   }, [fitting, recalc, chosen, chosenKey]);
   const checkable = Boolean(fitting && recalc && state.status === 'done');
-  const checked = combined?.key === chosenKey ? combined.after : undefined;
+  const checked =
+    combined?.key === chosenKey && combined.fitting === fitting ? combined.after : undefined;
   const summary =
     checkable && checked && state.status === 'done'
       ? summariseSelection({
@@ -401,9 +407,10 @@ export function ImprovePanel({
           target,
         })
       : null;
-  // Pending or failed checks hold Apply back too: an unchecked set may not fit.
+  // A pending check holds Apply back; a failed one (each row was valid alone) warns but does not block.
   const canApply =
-    chosen.length > 0 && (!checkable || (summary !== null && summary.problems.length === 0));
+    chosen.length > 0 &&
+    (!checkable || checked === null || (summary !== null && summary.problems.length === 0));
 
   // A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`).
   if (state.status === 'overBudget')

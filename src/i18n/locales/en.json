@@ -1471,7 +1471,7 @@
         "dps": "DPS {{before}} → {{after}}",
         "ehp": "EHP {{before}} → {{after}}",
         "checking": "Checking the ticked changes together…",
-        "failed": "Couldn't check the ticked changes together.",
+        "failed": "Couldn't check the ticked changes together. They may not fit together.",
         "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
         "problem": {
           "over": "Together these over-run the {{resource}}.",
