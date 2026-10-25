@@ -234,7 +234,7 @@ describe('FittingAddPanel', () => {
       await user.hover(dc1);
       const readout = await screen.findByRole('status');
       expect(readout).toHaveTextContent('Adding Damage Control I');
-      expect(readout).toHaveTextContent('EHP 20000 → 24000');
+      expect(readout).toHaveTextContent('EHP 20,000 → 24,000');
       expect(readout).toHaveTextContent('Fits · Can fly');
       expect(compare).toHaveBeenCalledTimes(1);
 
@@ -251,7 +251,7 @@ describe('FittingAddPanel', () => {
 
       const dc1 = await screen.findByRole('button', { name: /Damage Control I$/ });
       act(() => dc1.focus());
-      expect(await screen.findByRole('status')).toHaveTextContent('EHP 20000 → 24000');
+      expect(await screen.findByRole('status')).toHaveTextContent('EHP 20,000 → 24,000');
 
       act(() => dc1.blur());
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
