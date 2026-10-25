@@ -1,6 +1,8 @@
 /**
- * The officer view's copy of a Corp Tax Book (issue #5047), so re-opening an
- * unchanged book reads its settings document and little else.
+ * This tab's copy of a Corp Tax Book (issue #5047), so re-opening an unchanged
+ * book reads its settings document and little else: the officer view's whole
+ * book, and each member's own lines on the Mining Tax tab (#5050), under
+ * separate keys.
  *
  * The server restamps `corps/{id}` on every write to the book: a version per
  * subcollection it touched (functions/src/corpTaxBookVersionKeys.ts). A part
@@ -49,7 +51,7 @@ interface Copy {
   data: unknown;
 }
 
-/** `${characterId}:${corporationId}` → subcollection → copy. */
+/** Caller's key (officer `${characterId}:${corporationId}`, member `member:…`) → slot → copy. */
 const copies = new Map<string, Map<string, Copy>>();
 
 export function clearBookCache(): void {

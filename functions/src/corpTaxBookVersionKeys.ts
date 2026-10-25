@@ -50,6 +50,8 @@ export const VERSIONED_COLLECTIONS = [
   'writeOffs',
   'feeders',
   'meta',
+  // The member side (issue #5050) caches it too.
+  'feederCoverage',
 ] as const;
 
 export type VersionedCollection = (typeof VERSIONED_COLLECTIONS)[number];
