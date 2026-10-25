@@ -362,6 +362,27 @@ describe('structures', () => {
       expect(view.emptyMessage).toBe('overview.widgets.structures.noProblems');
     });
 
+    it('takes its deadline and summary from the structures it lists, not hidden ones', () => {
+      const fleet = feeds([
+        // Healthy, but its fuel runs out first and it is unanchoring: neither is a problem.
+        source(1, 'Efa - Watch Raitaru', {
+          fuelExpiresMs: NOW + 5 * DAY,
+          unanchorsAtMs: NOW + 4 * DAY,
+        }),
+        source(2, 'Efa - Offline Athanor', {
+          services: [{ name: 'Reprocessing', state: 'offline' }],
+        }),
+      ]);
+      const everything = buildView('structures', fleet, ctx());
+      expect(everything.deadlines[0].note).toContain('Efa - Watch Raitaru');
+      expect(everything.summary).toContain('structuresTimers');
+
+      const view = buildView('structures', fleet, problems);
+      expect(view.deadlines).toHaveLength(1);
+      expect(view.deadlines[0].note).toContain('Efa - Offline Athanor');
+      expect(view.summary).toBe('overview.board.structuresOffline{"count":1}');
+    });
+
     it('lists every structure under the default', () => {
       const view = buildView('structures', feeds(troubled()), ctx({ structuresShow: 'all' }));
       expect(view.table!.rows).toHaveLength(5);

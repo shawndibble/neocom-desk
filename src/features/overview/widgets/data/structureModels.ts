@@ -123,8 +123,6 @@ export const structures: Builder = (feeds, { t, now, structuresShow }) => {
       summary: structuresSummary(t, view),
     };
   }
-  const counts = structureCounts(items);
-  const clock = structuresDeadline(items, now);
 
   // One row per structure, healthy ones too: the pilot asks "is everything fuelled", not only "what is wrong".
   const all = (raw.structures ?? []).map((source) => {
@@ -132,6 +130,7 @@ export const structures: Builder = (feeds, { t, now, structuresShow }) => {
     const fuel = items.find((item) => item.id === `fuel:${id}`);
     const timer = items.find((item) => item.id === `state:${id}`);
     const offline = items.filter((item) => item.id.startsWith(`service:${id}:`));
+    const unanchor = items.find((item) => item.id === `unanchor:${id}`);
     const own = [fuel, timer, ...offline].filter(
       (item): item is CorpBoardItem => item !== undefined
     );
@@ -147,6 +146,8 @@ export const structures: Builder = (feeds, { t, now, structuresShow }) => {
           : t('overview.widgets.structures.state.ok');
     return {
       id,
+      // Every board item of this structure, so Problems only can keep exactly these.
+      items: unanchor ? [...own, unanchor] : own,
       name: shortStructureName(source.name),
       // What the Problems only setting keeps: the same three things the State column names.
       problem: timer !== undefined || offline.length > 0 || lowFuel,
@@ -167,11 +168,12 @@ export const structures: Builder = (feeds, { t, now, structuresShow }) => {
   );
   const problemsOnly = structuresShow === 'problems';
   const rows = problemsOnly ? all.filter((row) => row.problem) : all;
-  // Every structure item's id is `<what>:<structureId>[:<service>]`.
-  const shownIds = new Set(rows.map((row) => String(row.id)));
-  const shown = (item: CorpBoardItem) => shownIds.has(item.id.split(':')[1]);
-  const flagged = items.filter(
-    (item) => (item.kind !== 'structureFuel' || item.severity !== 'clear') && shown(item)
+  // Problems only reads the board of the structures it lists, so no hidden one sets a deadline or the summary.
+  const shown = problemsOnly ? rows.flatMap((row) => row.items) : items;
+  const counts = structureCounts(shown);
+  const clock = structuresDeadline(shown, now);
+  const flagged = shown.filter(
+    (item) => item.kind !== 'structureFuel' || item.severity !== 'clear'
   );
   const table: TableModel = {
     columns: [
@@ -228,12 +230,12 @@ export const structures: Builder = (feeds, { t, now, structuresShow }) => {
           },
         ]
       : [],
-    summary: structuresSummary(t, view),
+    summary: structuresSummary(t, { ...view, items: shown }),
     chart:
       hbarsFromRows(
         t,
-        items
-          .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed' && shown(item))
+        shown
+          .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed')
           .map((item) => {
             const seconds = Math.max(0, item.remainingMs ?? 0) / 1000;
             return {
