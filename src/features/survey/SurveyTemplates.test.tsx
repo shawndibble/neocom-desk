@@ -79,6 +79,7 @@ describe('Templates in the info panel', () => {
     expect(screen.queryByText('Edited')).toBeNull();
     await waitFor(() =>
       expect(setSurveyInfo).toHaveBeenCalledWith({
+        characterId: 7,
         id: 'abc123XYZ',
         expiresAt: 5000,
         location: { id: 40001, name: 'Efa IX - Moon 4' },
