@@ -875,8 +875,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   if (data) {
     // Per-character re-login, never one flag hiding every other character's
     // data behind a full-page banner — a lapsed alt must stay visible as
-    // needing attention, not disappear.
-    for (const c of data.reauthCharacters) {
+    // needing attention, not disappear. Only for the Characters in view: the
+    // all-Characters view names every one, a narrowed view only its own.
+    for (const c of data.reauthCharacters.filter(
+      (c) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(c.characterId)
+    )) {
       attentionItems.push({
         id: `reauth:${c.characterId}`,
         tone: 'warning',
