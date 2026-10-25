@@ -34,9 +34,16 @@ service cloud.firestore {
       // stamped after each successful sync, which the scheduled
       // purgeStaleAccounts function reads. Owner-only, that one field only —
       // no ownerHash guard, it carries no user data.
+      //
+      // The same doc carries the change marker (issue #5073): `syncVersion`, a
+      // counter every pass that pushes bumps, so an idle background pass reads
+      // this one doc instead of querying every collection. Owner-only, whole
+      // number only; either field may be absent (a marker-only create).
+      allow get: if isOwner();
       allow create, update: if isOwner()
-        && request.resource.data.keys().hasOnly(['lastSyncedAt'])
-        && request.resource.data.lastSyncedAt is number;
+        && request.resource.data.keys().hasOnly(['lastSyncedAt', 'syncVersion'])
+        && (!('lastSyncedAt' in request.resource.data) || request.resource.data.lastSyncedAt is number)
+        && (!('syncVersion' in request.resource.data) || request.resource.data.syncVersion is int);
 
       match /plans/{planId} {
         allow get: if isOwner() && hashMatches();

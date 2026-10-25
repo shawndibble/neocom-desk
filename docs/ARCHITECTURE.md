@@ -581,6 +581,17 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `import.meta.env.DEV`, so a production build never connects. Steps:
   `docs/agents/testing-and-ci.md`.
   Not deployed by CI: `firebase deploy --only functions,firestore:rules`.
+- **Sync change marker** (issue #5073): `src/sync/syncMarker.ts`. `characters/{uid}.syncVersion`
+  is a counter that every pass that pushed bumps (`increment(1)`) once its pushes landed
+  (`ctx.onPush` in `collectionSync`/`feedSync`/`settingsSync`, bump in `syncCharacter`). A
+  `background` full pass (the sweep) reads that one doc and ends there when it equals what
+  this device stored at its last full pass (`syncMarkerKey` in `localBookkeeping.ts`, dropped
+  with the pull cursors); 1 read instead of ~16. Foreground passes (boot, sync now, edits)
+  never skip, a full pass is forced every `SAFETY_RECONCILE_INTERVAL_MS` (3 h), and any
+  failure clears the stored value. A marker the rules refuse or a failed bump costs only the
+  shortcut, never the sync. Functions that only delete synced docs (`purgeFeed`,
+  `purgeStaleAccounts`) do not bump: an incremental pull never reads absence. Deploy
+  `firestore:rules` before the client ships: `firebase deploy --only firestore:rules`.
 - **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
   `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
   reminder rule) and `statementMail.ts` (the short Statement mail). Client:

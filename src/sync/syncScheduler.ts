@@ -108,10 +108,15 @@ export interface SyncScheduler {
  * `runCharacterPass` is one Character's sync over `scope`; it rejects on
  * failure. It may widen a narrowed scope itself (an ownerHash change wipes
  * every collection) and resolves with `'all'` when it did, so that pass counts
- * as the full pull it was.
+ * as the full pull it was. `priority` lets a `background` pass skip its reads
+ * when nothing changed remotely (planSync.ts).
  */
 export function createSyncScheduler(
-  runCharacterPass: (characterId: number, scope: SyncScope) => Promise<SyncScope | void>,
+  runCharacterPass: (
+    characterId: number,
+    scope: SyncScope,
+    priority: SyncPriority
+  ) => Promise<SyncScope | void>,
   { now = Date.now }: { now?: () => number } = {}
 ): SyncScheduler {
   const running = new Map<number, SyncJob>();
@@ -176,7 +181,7 @@ export function createSyncScheduler(
     let failure: { error: unknown } | undefined;
     setStatus(characterId, { state: 'syncing', error: null, offline: false });
     try {
-      const ran = (await runCharacterPass(characterId, scope)) ?? scope;
+      const ran = (await runCharacterPass(characterId, scope, job.priority)) ?? scope;
       const full = ran === 'all';
       if (full) lastFullPullAt.set(characterId, startedAt);
       const finishedAt = now();
