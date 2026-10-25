@@ -30,8 +30,12 @@ fills in the missing modifiers and derived attributes such as align time.
   runtime-cached so fitting works offline afterwards, and neither is
   precached with the app shell.
 - Both versions are pinned together and bumped when a game patch changes
-  dogma.
-- The engine takes everything a Fitting carries: modules with offline, online, active and overload state, loaded charges, drones, fighters, cargo, **implants and boosters** (as slots, with booster side effects), mutated modules, a skills map, and a damage profile. Checked against the v13.0.1 typings.
+  dogma. Pinned now: `@eveshipfit/dogma-engine` 13.6.0 with `@eveshipfit/sde`
+  12.3646012.0 (the old pair gave Tech 3 cruisers no slots or hardpoints). The
+  cache bucket name carries both versions, so a bump makes every pilot fetch
+  the new files. The engine runs without the data package's `texts.dat`, so the
+  app does not serve it.
+- The engine takes everything a Fitting carries: modules with offline, online, active and overload state, loaded charges, drones, fighters, cargo, **implants and boosters** (as slots, with booster side effects), mutated modules, a skills map, and a damage profile. Checked against the v13.0.1 typings; v13.6.0 only adds loaders and savers.
 - The engine is reached only through one seam module that takes a Fitting
   plus a skills/implants profile and returns stats. Nothing else imports it,
   so it could be swapped out.
