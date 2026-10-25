@@ -33,6 +33,7 @@ import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
 import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
+import { bookVersionsOf, cachedPart } from '@/features/corp/taxBook/bookCache';
 
 type Data = Record<string, unknown>;
 
@@ -344,6 +345,8 @@ export async function loadCorpBooks(
     byCorp.set(corporationId, held);
     return held;
   };
+  /** `${characterId}:${corporationId}` for each book whose pointer names the Character. */
+  const billed = new Set<string>();
   for (const c of characters) {
     entry(c.corporationId).characterIds.add(c.characterId);
     entry(c.corporationId).members.add(c.characterId);
@@ -354,12 +357,17 @@ export async function loadCorpBooks(
     for (const corporationId of await readBilledBy(c.characterId)) {
       entry(corporationId).characterIds.add(c.characterId);
       entry(corporationId).members.add(c.characterId);
+      billed.add(`${c.characterId}:${corporationId}`);
     }
   }
   const books: LoadedCorpBook[] = [];
   for (const [corporationId, { characterIds, members }] of byCorp) {
     try {
-      const book = await underFirebaseSession(() => readOneBook(corporationId, [...characterIds]));
+      const book = await underFirebaseSession(() =>
+        readOneBook(corporationId, [...characterIds], (characterId) =>
+          billed.has(`${characterId}:${corporationId}`)
+        )
+      );
       if (!book) continue;
       // ESI names what no Statement did; no Firebase session needed for that.
       const named = book.structureNames ?? {};
@@ -422,18 +430,39 @@ async function rememberCorp(characterIds: readonly number[], corporationId: numb
   }
 }
 
+/** A query's documents as plain data, the shape a book's parts are cached in. */
+type Docs = { id: string; data: Data }[];
+const docsOf = (snap: QuerySnapshot): Docs => snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+
+/**
+ * One book, with the Characters' own lines.
+ *
+ * Each part is reused from this tab's copy while the book's version marker
+ * for its subcollection is unchanged (issue #5050, on #5047's marker; see
+ * features/corp/taxBook/bookCache.ts), so an unchanged book costs its settings
+ * document — and a ledger reload or Settle up's 10-minute recheck reads only
+ * that, unless something was written.
+ *
+ * Serving a copy never outlives the member's access: every line here is
+ * readable by its own `uid`/`uids` field alone (firestore.rules
+ * `isOwnLine`/`isOnOwnLine`), so access only changes with a write, which moves
+ * the stamp. The one part gated on anything else, `feederCoverage`
+ * (`isBilledHere`: the Character's `corpTaxBookBilledBy` pointer, outside the
+ * book and so never stamped), is read only while that pointer — read fresh on
+ * every load — still names the book.
+ */
 async function readOneBook(
   corporationId: number,
-  characterIds: readonly number[]
+  characterIds: readonly number[],
+  billedHere: (characterId: number) => boolean
 ): Promise<LoadedCorpBook | null> {
   const fs = getSyncFirestore();
   const root = `corps/${corporationId}`;
   await ensureSignedIn(characterIds[0]);
-  const settings = readBookSettings(
-    corporationId,
-    (await getDoc(doc(fs, 'corps', String(corporationId)))).data()
-  );
+  const bookDoc = (await getDoc(doc(fs, 'corps', String(corporationId)))).data();
+  const settings = readBookSettings(corporationId, bookDoc);
   if (!settings) return null;
+  const versions = bookVersionsOf(bookDoc);
 
   const rows: ObservedRow[] = [];
   const payments: TaxPayment[] = [];
@@ -447,53 +476,66 @@ async function readOneBook(
   let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
+    // Its own key: a member's copy holds only its own lines, never an officer's whole book.
+    const key = `member:${characterId}:${corporationId}`;
+    const part = (name: string, field: 'uid' | 'uids'): Promise<Docs> =>
+      cachedPart(key, name, versions, async () =>
+        docsOf(
+          await getDocs(
+            query(
+              collection(fs, root, name),
+              field === 'uid' ? where('uid', '==', uid) : where('uids', 'array-contains', uid)
+            )
+          )
+        )
+      );
     // Readable by a Character the book bills; any one of them will do.
-    const coverageRead: Promise<QuerySnapshot | null> =
-      feeders === null
-        ? orNone(getDocs(collection(fs, root, 'feederCoverage')))
+    const coverageRead: Promise<Docs | null> =
+      feeders === null && billedHere(characterId)
+        ? orNone(
+            cachedPart(key, 'feederCoverage', versions, async () =>
+              docsOf(await getDocs(collection(fs, root, 'feederCoverage')))
+            )
+          )
         : Promise.resolve(null);
-    const own = (name: string) =>
-      orNone(getDocs(query(collection(fs, root, name), where('uids', 'array-contains', uid))));
     const [
-      observedSnap,
-      paymentSnap,
-      dismissalSnap,
-      statementSnap,
-      minerSnap,
-      adjustmentSnap,
-      writeOffSnap,
-      coverageSnap,
+      observedDocs,
+      paymentDocs,
+      dismissalDocs,
+      statementDocs,
+      minerDocs,
+      adjustmentDocs,
+      writeOffDocs,
+      coverageDocs,
     ] = await Promise.all([
-      getDocs(query(collection(fs, root, 'observed'), where('uid', '==', uid))),
-      getDocs(query(collection(fs, root, 'payments'), where('uid', '==', uid))),
-      getDocs(query(collection(fs, root, 'dismissals'), where('uids', 'array-contains', uid))),
-      getDocs(query(collection(fs, root, 'statements'), where('uids', 'array-contains', uid))),
-      getDocs(query(collection(fs, root, 'miners'), where('uids', 'array-contains', uid))),
-      own('adjustments'),
-      own('writeOffs'),
+      part('observed', 'uid'),
+      part('payments', 'uid'),
+      part('dismissals', 'uids'),
+      part('statements', 'uids'),
+      part('miners', 'uids'),
+      orNone(part('adjustments', 'uids')),
+      orNone(part('writeOffs', 'uids')),
       coverageRead,
     ]);
-    adjustments.push(
-      adjustmentSnap?.docs.flatMap((d) => readAdjustment(d.id, d.data()) ?? []) ?? []
-    );
-    writeOffs.push(writeOffSnap?.docs.flatMap((d) => readWriteOff(d.id, d.data()) ?? []) ?? []);
-    if (coverageSnap) {
-      feeders = coverageSnap.docs.flatMap((d) => readFeederCoverage(d.id, d.data()) ?? []);
+    adjustments.push(adjustmentDocs?.flatMap((d) => readAdjustment(d.id, d.data) ?? []) ?? []);
+    writeOffs.push(writeOffDocs?.flatMap((d) => readWriteOff(d.id, d.data) ?? []) ?? []);
+    if (coverageDocs) {
+      feeders = coverageDocs.flatMap((d) => readFeederCoverage(d.id, d.data) ?? []);
     }
-    for (const d of observedSnap.docs) {
-      const row = readObservedRow(d.data());
+    for (const d of observedDocs) {
+      const row = readObservedRow(d.data);
       if (row) rows.push(row);
     }
-    for (const d of paymentSnap.docs) {
-      const read = readPayment(d.id, d.data());
+    for (const d of paymentDocs) {
+      const read = readPayment(d.id, d.data);
       if (!read) continue;
       held.push(read.held);
       if (read.payment) payments.push(read.payment);
       if (read.claimable) claimable.push(read.claimable);
     }
-    dismissals.push(dismissalSnap.docs.flatMap((d) => readDismissal(d.id, d.data()) ?? []));
-    statements.push(statementSnap.docs.flatMap((d) => readStatement(d.id, d.data()) ?? []));
-    miners.push(minerSnap.docs.flatMap((d) => readMiner(d.id, d.data()) ?? []));
+    dismissals.push(dismissalDocs.flatMap((d) => readDismissal(d.id, d.data) ?? []));
+    statements.push(statementDocs.flatMap((d) => readStatement(d.id, d.data) ?? []));
+    miners.push(minerDocs.flatMap((d) => readMiner(d.id, d.data) ?? []));
   }
   const merged = mergeById(statements);
   const structureNames = refineryNamesOf(merged as { refineryNames?: Record<string, string> }[]);
