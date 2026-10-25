@@ -1238,8 +1238,10 @@ export const syncActiveWars = onSchedule(
  *
  * Every 60 minutes (issue #5066, was 30): the job was ~70% of billable function
  * time. An hourly publish leaves a snapshot up to ~90 minutes behind EVE Ref.
- * Memory stays 2GiB: the real peak was not measurable here (no read access to
- * the Cloud Run memory metric), so it is not lowered on a guess.
+ * Memory is 1GiB (issue #5108, was 2GiB): the Cloud Run memory-utilization
+ * metric put the 14-day p99 at 35% of 2GiB (~720MiB), after the bundle-shard
+ * read of #4820. The 2GiB was sized for the Firestore row write #4286 removed.
+ * To roll back, set it to 2GiB and redeploy.
  *
  * The archive is streamed rather than buffered: `contracts.csv` is read into
  * a lookup of only the fields the join needs, then `contract_items.csv` is
@@ -1260,9 +1262,9 @@ export const syncActiveWars = onSchedule(
  * out of this snapshot client-side — so the archive is fetched once per cycle
  * again rather than twice.
  *
- * Memory is 2GiB against the retired blueprint-only sync's 1GiB, and the
- * timeout 540s against its 300s. Neither is measured at this volume; both are provisioned for
- * ~3x the rows on the evidence that exists. That evidence is specific: a
+ * History: memory was provisioned at 2GiB against the retired blueprint-only
+ * sync's 1GiB, and the timeout 540s against its 300s, for ~3x the rows on the
+ * evidence that existed then (superseded for memory by the note above). That evidence is specific: a
  * 512MiB ceiling died at 527MiB *during the (then Firestore) write* with ~122k rows, having
  * survived the streaming parse — so the ceiling scales with the retained rows
  * and their encoding, which is exactly what triples here. Under-provisioning
@@ -1284,7 +1286,7 @@ export const syncActiveWars = onSchedule(
 export const syncPublicContractOffers = onSchedule(
   {
     schedule: 'every 60 minutes',
-    memory: '2GiB',
+    memory: '1GiB',
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
