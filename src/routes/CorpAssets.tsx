@@ -823,6 +823,7 @@ function CorpAssetsView({
                     pilotId: snapshot.activeCharacterId,
                     name: t('corp.assets.move.owner'),
                     inputs: data.inputs,
+                    version: String(data.fetchedAt?.getTime() ?? ''),
                   }}
                   onClose={() => selectTab('all')}
                 />

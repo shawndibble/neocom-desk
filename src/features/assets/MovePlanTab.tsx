@@ -98,27 +98,20 @@ interface Loaded {
   pilotName: string | null;
 }
 
-/**
- * The corporation's hangar stock as the one source the plan reads. It is keyed
- * by the pilot who flies it: the plan's pickups resolve, measure and start from
- * that pilot, and the corporation read needed a Director, not a second pilot.
- */
-async function loadCorpSources(corp: CorpMoveSource): Promise<{
-  entries: MovePlanSource[];
-  skipped: SkippedCharacterAssets[];
-}> {
-  return {
-    entries: [{ characterId: corp.pilotId, name: corp.name, assets: corpMoveAssets(corp.inputs) }],
-    skipped: [],
-  };
-}
-
 async function load(
   characterIds: readonly number[],
   corp: CorpMoveSource | undefined
 ): Promise<Loaded> {
   const [{ entries: sources, skipped }, types, groupCategories] = await Promise.all([
-    corp ? loadCorpSources(corp) : loadOtherCharactersAssetsDetailed(characterIds),
+    // Keyed by the pilot who flies it: pickups resolve, measure jumps and start the route from them.
+    corp
+      ? Promise.resolve({
+          entries: [
+            { characterId: corp.pilotId, name: corp.name, assets: corpMoveAssets(corp.inputs) },
+          ],
+          skipped: [] as SkippedCharacterAssets[],
+        })
+      : loadOtherCharactersAssetsDetailed(characterIds),
     loadTypes(),
     loadGroupCategories().catch(() => ({}) as Record<string, number>),
   ]);
@@ -242,6 +235,8 @@ export interface CorpMoveSource {
   /** What the picker calls the stock's owner. */
   name: string;
   inputs: readonly CorpAssetInput[];
+  /** Changes when `inputs` is re-read, so the tab plans from the fresh stock. */
+  version: string;
 }
 
 interface MovePlanTabProps {
@@ -265,7 +260,9 @@ interface MovePlanTabProps {
  * opens the leg list, and Route Safety answers the safety question.
  */
 export function MovePlanTab(props: MovePlanTabProps) {
-  const key = props.corp ? `corp:${props.corp.pilotId}` : idSetKey(props.characterIds);
+  const key = props.corp
+    ? `corp:${props.corp.pilotId}:${props.corp.version}`
+    : idSetKey(props.characterIds);
   return <MovePlanTabBody key={key} {...props} />;
 }
 

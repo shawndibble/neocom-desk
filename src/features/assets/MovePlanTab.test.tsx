@@ -146,7 +146,7 @@ function openCorp(entry = '/') {
         onClose={() => {}}
         characterIds={[]}
         activeCharacterId={1}
-        corp={{ pilotId: 1, name: 'Corporation hangars', inputs: corpInputs }}
+        corp={{ pilotId: 1, name: 'Corporation hangars', inputs: corpInputs, version: '1' }}
       />
     </MemoryRouter>
   );
