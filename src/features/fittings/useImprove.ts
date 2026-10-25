@@ -483,7 +483,8 @@ export function useImprove(
           if (cancelled) return;
           const crystalFor = plan?.crystalFor;
           if (crystalFor) {
-            load = (fitting) => loadCrystals(fitting, crystalFor);
+            load = (fitting) =>
+              loadCrystals(assumeCharges(fitting, variants.fitting, charges), crystalFor);
             scoredBefore = (await variants.compare(load(variants.fitting), controller.signal))
               .after;
           }
