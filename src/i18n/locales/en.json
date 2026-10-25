@@ -1387,9 +1387,39 @@
       "broke": {
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
-        "keepsStats": "Loses more than 5% of damage, tank or speed"
+        "keepsStats": "Loses more than 5% of damage, tank or speed",
+        "spend": "Costs more than your budget or spend cap"
       },
-      "widen": "Only variations of the modules already fitted are tried.",
+      "widen": {
+        "upgrade": "Only variations of the modules already fitted are tried. Rebalance or Rework tries more.",
+        "rebalance": "Variations and other modules of the same kind are tried. Rework tries more.",
+        "rework": "Only the module groups that can move this goal are tried."
+      },
+      "reachLabel": "Improve Reach",
+      "reach": { "upgrade": "Upgrade", "rebalance": "Rebalance", "rework": "Rework" },
+      "reachHint": {
+        "upgrade": "Turns a fitted module into a variation of itself.",
+        "rebalance": "Also tries a different module doing the same job.",
+        "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
+      },
+      "modeLabel": "Improve mode",
+      "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
+      "cap": {
+        "buy": "Total budget (ISK)",
+        "refit": "Extra spend cap (ISK)"
+      },
+      "defenseLabel": "Defense Choice",
+      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
+      "sideResult": "{{side}}: {{result}}",
+      "sideNone": "no gain",
+      "sideGain": "up to +{{percent}}%",
+      "moreLabel": "Also try…",
+      "includeRigs": "Rigs",
+      "includeOfficer": "Officer and Deadspace modules",
+      "destroysRig": "Removing the old rig destroys it; the new one is paid in full.",
+      "fill_one": "Add {{to}}",
+      "fill_other": "Add {{count}}× {{to}}",
+      "pair": "{{add}}, paid for by {{downgrade}}",
       "partial": "Best of the first {{checked}} swaps checked.",
       "checked_one": "Checked {{count}} swap in {{seconds}} s",
       "checked_other": "Checked {{count}} swaps in {{seconds}} s",

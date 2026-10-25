@@ -5,7 +5,7 @@ import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveOption, ImproveResult } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { ImprovePanel } from './ImprovePanel';
+import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
 const before = baseFittingStats();
@@ -16,11 +16,16 @@ function option(
   extra: Partial<ImproveOption> = {}
 ) {
   return {
-    candidate: { fromTypeId: toTypeId < 20 ? 1 : 2, toTypeId, at: [{ slot: 'low', slotIndex: 0 }] },
+    candidate: {
+      fromTypeId: toTypeId < 20 ? 1 : 2,
+      toTypeId,
+      at: [{ slot: 'low', slotIndex: toTypeId < 20 ? 0 : 1 }],
+    },
     fitting: {} as Fitting,
     after: { ...before, ...patch },
     score: 0.1,
     iskDelta: 1000,
+    destroysRigs: false,
     downsides: [],
     ...extra,
   } as ImproveOption;
@@ -46,7 +51,28 @@ function done(result: Partial<ImproveResult>): ImproveState {
   };
 }
 
-const renderPanel = (s: ImproveSearch, onApply = vi.fn(), onGoalChange = vi.fn()) =>
+const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
+  reach: 'upgrade',
+  onReachChange: vi.fn(),
+  mode: 'buy',
+  onModeChange: vi.fn(),
+  spendCap: null,
+  onSpendCapChange: vi.fn(),
+  defense: 'keep',
+  onDefenseChange: vi.fn(),
+  includeRigs: false,
+  onIncludeRigsChange: vi.fn(),
+  includeOfficer: false,
+  onIncludeOfficerChange: vi.fn(),
+  ...patch,
+});
+
+const renderPanel = (
+  s: ImproveSearch,
+  onApply = vi.fn(),
+  onGoalChange = vi.fn(),
+  config: ImproveSettings = settings()
+) =>
   render(
     <ImprovePanel
       goal="damage"
@@ -54,6 +80,7 @@ const renderPanel = (s: ImproveSearch, onApply = vi.fn(), onGoalChange = vi.fn()
       search={s}
       catalogue={null}
       onApply={onApply}
+      settings={config}
     />
   );
 
@@ -111,6 +138,82 @@ describe('ImprovePanel', () => {
     expect(screen.getByRole('button', { name: /More damage/ })).toHaveAttribute(
       'aria-disabled',
       'true'
+    );
+  });
+
+  it('shows Reach, mode, Defense Choice and the spend cap, and reports a pick', async () => {
+    const config = settings();
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config);
+    expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Defense Choice' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Rework' }));
+    expect(config.onReachChange).toHaveBeenCalledWith('rework');
+    await userEvent.click(screen.getByRole('button', { name: 'Refitting a ship I own' }));
+    expect(config.onModeChange).toHaveBeenCalledWith('refit');
+    await userEvent.click(screen.getByRole('button', { name: 'Armor' }));
+    expect(config.onDefenseChange).toHaveBeenCalledWith('armor');
+  });
+
+  it('keeps Rigs and Officer behind a collapsed, unticked group', async () => {
+    const config = settings();
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config);
+    expect(screen.queryByRole('checkbox', { name: 'Rigs' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Also try…' }));
+    const rigs = screen.getByRole('checkbox', { name: 'Rigs' });
+    expect(rigs).not.toBeChecked();
+    await userEvent.click(rigs);
+    expect(config.onIncludeRigsChange).toHaveBeenCalledWith(true);
+  });
+
+  it('flags a rig change in a refit and labels an add and a pair', () => {
+    const add = option(
+      30,
+      {},
+      {
+        candidate: { fromTypeId: null, toTypeId: 30, at: [{ slot: 'low', slotIndex: 2 }] },
+      }
+    );
+    const rig = option(
+      31,
+      {},
+      {
+        destroysRigs: true,
+        candidate: { fromTypeId: 5, toTypeId: 31, at: [{ slot: 'rig', slotIndex: 0 }] },
+      }
+    );
+    const pair = option(
+      32,
+      {},
+      {
+        candidate: {
+          fromTypeId: null,
+          toTypeId: 32,
+          at: [{ slot: 'low', slotIndex: 3 }],
+          pairedWith: { fromTypeId: 3, toTypeId: 4, at: [{ slot: 'low', slotIndex: 1 }] },
+        },
+      }
+    );
+    renderPanel(search(done({ noDownside: [add, rig, pair] })));
+    expect(screen.getByText('Add #30')).toBeInTheDocument();
+    expect(screen.getByText(/Removing the old rig destroys it/)).toBeInTheDocument();
+    expect(screen.getByText('Add #32, paid for by #3 → #4')).toBeInTheDocument();
+  });
+
+  it('shows both Defense sides, a side with nothing to offer as no gain', () => {
+    const state = done({ noDownside: [option(30, {})] });
+    if (state.status !== 'done') throw new Error('state');
+    const empty = { noDownside: [], tradeOffs: [], rejected: [], checked: 2, stopped: false };
+    renderPanel(
+      search({
+        ...state,
+        sides: { shield: state.result, armor: empty },
+      }),
+      vi.fn(),
+      vi.fn(),
+      settings({ defense: 'shield' })
+    );
+    expect(screen.getByTestId('improve-sides')).toHaveTextContent(
+      'Shield: up to +10% · Armor: no gain'
     );
   });
 });

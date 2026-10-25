@@ -1,13 +1,22 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, SlideOver, Toast } from '@/components/ui';
-import type { ImproveOption } from '@/engine/fittings/improve';
-import { applyModuleUpgrade } from '@/engine/fittings/moduleUpgrades';
+import {
+  applyImproveCandidate,
+  type DefenseChoice,
+  type ImproveOption,
+} from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
 import { ImprovePanel } from './ImprovePanel';
 import type { TargetProfiles } from './targetProfiles';
 import type { FittingCatalogue } from './useFittingCatalogue';
-import { useImprove, useImproveGoal } from './useImprove';
+import {
+  useImprove,
+  useImproveGoal,
+  useImproveMode,
+  useImproveReach,
+  useImproveSpendCap,
+} from './useImprove';
 import type { FittingWorkspace } from './useFittingWorkspace';
 
 const moduleKey = (f: Fitting) =>
@@ -41,6 +50,16 @@ export function useImproveDrawer({
   const [isOpen, setIsOpen] = useState(false);
   const goal = useImproveGoal((state) => state.value);
   const setGoal = useImproveGoal((state) => state.setValue);
+  const reach = useImproveReach((state) => state.value);
+  const setReach = useImproveReach((state) => state.setValue);
+  const mode = useImproveMode((state) => state.value);
+  const setMode = useImproveMode((state) => state.setValue);
+  const spendCap = useImproveSpendCap((state) => state.value);
+  const setSpendCap = useImproveSpendCap((state) => state.setValue);
+  // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
+  const [defense, setDefense] = useState<DefenseChoice>('keep');
+  const [includeRigs, setIncludeRigs] = useState(false);
+  const [includeOfficer, setIncludeOfficer] = useState(false);
   // The Fitting before the last Apply and the one it made, for the toast's Undo; null once it is gone.
   const [undo, setUndo] = useState<{ before: Fitting; applied: Fitting; message: string } | null>(
     null
@@ -56,14 +75,15 @@ export function useImproveDrawer({
     catalogue,
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
-    isOpen
+    isOpen,
+    { reach, mode, spendCap, defense, includeRigs, includeOfficer }
   );
 
   function apply(options: ImproveOption[]) {
     if (!fitting) return;
     // One edit for every ticked row, so Back undoes them together.
     const applied = options.reduce(
-      (acc, option) => applyModuleUpgrade(acc, option.candidate),
+      (acc, option) => applyImproveCandidate(acc, option.candidate),
       fitting
     );
     edit(() => applied);
@@ -81,6 +101,20 @@ export function useImproveDrawer({
       search={search}
       catalogue={catalogue}
       onApply={apply}
+      settings={{
+        reach,
+        onReachChange: (next) => void setReach(next),
+        mode,
+        onModeChange: (next) => void setMode(next),
+        spendCap,
+        onSpendCapChange: (next) => void setSpendCap(next),
+        defense,
+        onDefenseChange: setDefense,
+        includeRigs,
+        onIncludeRigsChange: setIncludeRigs,
+        includeOfficer,
+        onIncludeOfficerChange: setIncludeOfficer,
+      }}
     />
   );
 
