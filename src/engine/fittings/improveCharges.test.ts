@@ -64,6 +64,16 @@ describe('unloadedWeapons', () => {
     ).toBeNull();
   });
 
+  it('skips online modules and counts overloaded ones', () => {
+    const online = { ...module(0, 500), state: 'online' as const };
+    expect(unloadedWeapons(fit([online]), [launchers([choice(900)])])).toBeNull();
+    const overloaded = { ...module(0, 500), state: 'overload' as const };
+    expect(unloadedWeapons(fit([overloaded]), [launchers([choice(900)])])).toEqual({
+      count: 1,
+      kind: 'launcher',
+    });
+  });
+
   it('skips offline modules and groups with no charges to choose from', () => {
     const offline = { ...module(0, 500), state: 'offline' as const };
     expect(unloadedWeapons(fit([offline]), [launchers([choice(900)])])).toBeNull();

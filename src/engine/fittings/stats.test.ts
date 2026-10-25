@@ -574,6 +574,16 @@ describe('extractOffense', () => {
     expect(offense.chargelessWeaponCount).toBe(1);
   });
 
+  it('does not count an empty active launcher none of whose charges deal damage', () => {
+    const offense = extractOffense(
+      [{ ...BLASTER, chargeTypeId: undefined, chargeDamages: false }],
+      [chargeSlotResult('active')],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
+  });
+
   it('does not count a charge-taking slot that is simply not active as chargeless', () => {
     const offense = extractOffense(
       [{ ...BLASTER, chargeTypeId: undefined }],

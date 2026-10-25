@@ -5,6 +5,7 @@
  */
 import { chargeScore, quickPicks, type ChargeChoice } from './chargeChoice';
 import type { ModuleAt } from './fittingEdit';
+import { isFiring } from './stats';
 import type { Fitting } from './types';
 
 /** One weapon group as the Charge Picker lists it (`WeaponChargeGroup`'s share). */
@@ -35,12 +36,11 @@ const kindOf = (group: ChargeGroup): Exclude<UnloadedKind, 'weapon'> =>
   group.choices.every((c) => c.falloff === 0) ? 'launcher' : 'turret';
 
 function emptyModulesOf(fitting: Fitting, group: ChargeGroup): ModuleAt[] {
-  // Offline guns aren't firing, so the stats panel doesn't count them either.
+  // A gun that is only online isn't firing, so the stats panel doesn't count it either.
   if (!group.isWeapon || group.choices.length === 0) return [];
   return fitting.modules
     .filter(
-      (m) =>
-        m.typeId === group.moduleTypeId && m.chargeTypeId === undefined && m.state !== 'offline'
+      (m) => m.typeId === group.moduleTypeId && m.chargeTypeId === undefined && isFiring(m.state)
     )
     .map(({ slot, slotIndex }) => ({ slot, slotIndex }));
 }
