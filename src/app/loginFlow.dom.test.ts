@@ -516,26 +516,35 @@ describe('beginAlertsLogin', () => {
     expect(requestedScopes().sort()).toEqual([LOCATION, NOTIFICATIONS].sort());
   });
 
-  it('asks for mail on Add mail, keeping the location the Character already had', async () => {
+  it('asks for mail when the walk includes it, keeping the location the Character already had', async () => {
     await known([CHAR_ID], []);
-    await beginAlertsLogin(CHAR_ID, { add: 'mail' });
+    await beginAlertsLogin(CHAR_ID, { mail: true });
     expect(requestedScopes().sort()).toEqual([LOCATION, MAIL, NOTIFICATIONS].sort());
   });
 
-  it('keeps a Character’s mail through a re-authorization or Add nearby', async () => {
+  it('keeps a Character’s mail through a re-authorization', async () => {
     await known([], [CHAR_ID]);
     await beginAlertsLogin(CHAR_ID);
     expect(requestedScopes().sort()).toEqual([LOCATION, MAIL, NOTIFICATIONS].sort());
+  });
+
+  it('leaves the location out when the player left it out, unless the grant already holds it', async () => {
+    await known([], []);
+    await beginAlertsLogin(CHAR_ID, { nearby: false });
+    expect(requestedScopes()).toEqual([NOTIFICATIONS]);
+    await known([CHAR_ID], []);
+    await beginAlertsLogin(CHAR_ID, { nearby: false });
+    expect(requestedScopes().sort()).toEqual([LOCATION, NOTIFICATIONS].sort());
   });
 
   it('does not ask for mail another Character has, nor before the server takes it', async () => {
     await known(null, [OTHER_CHAR_ID]);
     await beginAlertsLogin(CHAR_ID);
     expect(requestedScopes()).toEqual([NOTIFICATIONS]);
-    await beginAlertsLogin(CHAR_ID, { add: 'mail' });
+    await beginAlertsLogin(CHAR_ID, { mail: true });
     expect(requestedScopes().sort()).toEqual([MAIL, NOTIFICATIONS].sort());
     await db.settings.clear();
-    await beginAlertsLogin(CHAR_ID, { add: 'mail' });
+    await beginAlertsLogin(CHAR_ID, { mail: true });
     expect(requestedScopes()).toEqual([NOTIFICATIONS]);
   });
 });

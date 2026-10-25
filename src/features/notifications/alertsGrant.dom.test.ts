@@ -27,7 +27,7 @@ import {
   forgetAlertsGrants,
   markAlertsNeedReauth,
   readAlertsGrants,
-  queueAlertsForAll,
+  queueAlertsWalk,
   takeNextQueuedAlerts,
   clearAlertsQueue,
   deleteAlertGrantsBestEffort,
@@ -135,17 +135,25 @@ describe('removal', () => {
   });
 });
 
-describe('Turn on for all', () => {
+describe('the sign-in walk', () => {
   it('hands out Characters one at a time and then runs dry', () => {
-    queueAlertsForAll([1, 2, 3]);
-    expect(takeNextQueuedAlerts()).toBe(1);
-    expect(takeNextQueuedAlerts()).toBe(2);
-    expect(takeNextQueuedAlerts()).toBe(3);
+    const step = (characterId: number, nearby: boolean, mail: boolean) => ({
+      characterId,
+      nearby,
+      mail,
+    });
+    queueAlertsWalk([step(1, true, false), step(2, false, true), step(3, true, true)]);
+    expect(takeNextQueuedAlerts()).toEqual(step(1, true, false));
+    expect(takeNextQueuedAlerts()).toEqual(step(2, false, true));
+    expect(takeNextQueuedAlerts()).toEqual(step(3, true, true));
     expect(takeNextQueuedAlerts()).toBeNull();
   });
 
   it('clearing stops it', () => {
-    queueAlertsForAll([1, 2]);
+    queueAlertsWalk([
+      { characterId: 1, nearby: false, mail: false },
+      { characterId: 2, nearby: false, mail: false },
+    ]);
     clearAlertsQueue();
     expect(takeNextQueuedAlerts()).toBeNull();
   });

@@ -13,6 +13,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { completeAlertsLogin } from '@/auth/session';
 import { db } from '@/db';
 import { reportFailure } from '@/observability/reportFailure';
+import type { AlertsWalkStep } from './alertsNeeds';
 
 const GRANTS_KEY = 'alertsGrants';
 const NEARBY_KEY = 'alertsNearby';
@@ -271,24 +272,39 @@ export async function deleteAlertGrantsBestEffort(characterIds: readonly number[
 }
 
 interface Queue {
-  remaining: number[];
+  remaining: AlertsWalkStep[];
   createdAt: number;
 }
 
-/** "Turn on for all": the Characters still to authorize, kept across the SSO round trips between them. */
-export function queueAlertsForAll(characterIds: readonly number[]): void {
+function isStep(value: unknown): value is AlertsWalkStep {
+  const step = value as Partial<AlertsWalkStep> | null;
+  return (
+    typeof step === 'object' &&
+    step !== null &&
+    typeof step.characterId === 'number' &&
+    typeof step.nearby === 'boolean' &&
+    typeof step.mail === 'boolean'
+  );
+}
+
+/**
+ * The walk: the Characters still to sign in, each with the exact optional
+ * scopes the player agreed to on the listing, kept across the SSO round trips
+ * between them.
+ */
+export function queueAlertsWalk(steps: readonly AlertsWalkStep[]): void {
   try {
     sessionStorage.setItem(
       QUEUE_KEY,
-      JSON.stringify({ remaining: [...characterIds], createdAt: Date.now() } satisfies Queue)
+      JSON.stringify({ remaining: [...steps], createdAt: Date.now() } satisfies Queue)
     );
   } catch {
     // No queue: only the first Character is offered, the rest stay one press each.
   }
 }
 
-/** The next Character to authorize, or `null` when the queue is empty, expired or absent. */
-export function takeNextQueuedAlerts(): number | null {
+/** The next step of the walk, or `null` when the queue is empty, expired or absent. */
+export function takeNextQueuedAlerts(): AlertsWalkStep | null {
   try {
     const raw = sessionStorage.getItem(QUEUE_KEY);
     if (raw === null) return null;
@@ -301,8 +317,8 @@ export function takeNextQueuedAlerts(): number | null {
       sessionStorage.removeItem(QUEUE_KEY);
       return null;
     }
-    const [next, ...rest] = queue.remaining;
-    if (typeof next !== 'number') {
+    const [next, ...rest] = queue.remaining as unknown[];
+    if (!isStep(next)) {
       sessionStorage.removeItem(QUEUE_KEY);
       return null;
     }
