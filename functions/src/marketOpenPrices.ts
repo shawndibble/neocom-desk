@@ -219,9 +219,6 @@ export function implausibleReason(fold: OpenPriceFold, minPerRegion = MIN_PAIRS_
   return null;
 }
 
-/** Doc `marketOpenPricesMeta/lastRun`: what the last published day looked like, for `shrunkRegion`. Admin-only (no rule matches it). */
-export const MARKET_OPEN_PRICES_META_PATH = 'marketOpenPricesMeta/lastRun';
-
 /** Priced-type count per region, as stored in the meta doc (string keys: Firestore field names). */
 export function regionCounts(fold: OpenPriceFold): Record<string, number> {
   return Object.fromEntries([...fold.pairsByRegion()].map(([id, n]) => [String(id), n]));
@@ -231,7 +228,7 @@ export function regionCounts(fold: OpenPriceFold): Record<string, number> {
  * The second 'publish nothing' guard: names a tracked region whose priced-type
  * count fell under `minShare` of the previous published day's, or `null`. No
  * previous counts (first run) means nothing to compare. A real, lasting drop
- * must be accepted by deleting the meta doc.
+ * must be accepted by deleting the state object (`open-prices-state/last-run.json`).
  */
 export function shrunkRegion(
   fold: OpenPriceFold,
