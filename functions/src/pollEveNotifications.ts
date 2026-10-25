@@ -4,12 +4,20 @@
 // and batching live in eveNotificationSelection.ts / eveNotificationPush.ts.
 // Nothing here logs or returns a token.
 
-import { ALERTS_LOCATION_SCOPE, grantCoversNearby, type AlertGrantDoc } from './alertGrant.js';
+import {
+  ALERTS_LOCATION_SCOPE,
+  ALERTS_MAIL_SCOPE,
+  grantCoversMail,
+  grantCoversNearby,
+  type AlertGrantDoc,
+} from './alertGrant.js';
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import type { LocationResult } from './esiNearby.js';
+import type { MailHeadersResult } from './esiMail.js';
 import type { NotificationsResult } from './esiNotifications.js';
 import { buildPushes, type PushMessage } from './eveNotificationPush.js';
 import { selectPushable } from './eveNotificationSelection.js';
+import { MAX_MAIL_PUSHES, buildMailPush, mailPushedEntry, selectNewMail } from './mailPush.js';
 import type { NearbyPhaseResult } from './pollNearby.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
 
@@ -20,6 +28,8 @@ export interface PollDevice {
   fcmToken: string;
   /** ESI types this device enabled for the browser channel for the Character. */
   eveTypes: string[];
+  /** The server-pushed event ids this device enabled for the Character (`newMail` is read here). */
+  serverEvents?: string[];
   /** Quiet time (issue #4566): no pushes inside the window. */
   quietHours?: QuietHours;
 }
@@ -49,6 +59,14 @@ export interface PollerStore {
   markRevoked(characterId: number, guard: string): Promise<void>;
   /** Store the grant's scopes without the location one, after ESI refused it (guarded like `patch`). */
   dropLocationScope(characterId: number, guard: string, scopes: string[]): Promise<void>;
+  /** New-mail state (ADR 0029), guarded like `patch`. Ids and an ETag only, never mail content. */
+  patchMail(
+    characterId: number,
+    guard: string,
+    state: { mailHighWaterId: number | null; mailEtag: string | null; mailPushed: string[] }
+  ): Promise<void>;
+  /** Store the grant's scopes without the mail one, after ESI refused it, and forget its mail state (guarded like `patch`). */
+  dropMailScope(characterId: number, guard: string, scopes: string[]): Promise<void>;
   devicesFor(characterId: number): Promise<PollDevice[]>;
   deleteDevice(deviceId: string): Promise<void>;
 }
@@ -66,6 +84,18 @@ export interface PollDeps {
   concurrency?: number;
   /** Clock, injectable for tests. */
   now?: () => number;
+  /**
+   * New-mail alerts (issue #5143, ADR 0029). For a grant that carries the mail
+   * scope and a device that wants `newMail`, the same refreshed token reads the
+   * mail HEADERS and the run pushes what is new. Absent: no mail is read.
+   */
+  mail?: {
+    fetchHeaders: (
+      characterId: number,
+      accessToken: string,
+      etag: string | null
+    ) => Promise<MailHeadersResult>;
+  };
   /**
    * Nearby alerts (issue #5122, ADR 0028). For a grant that carries the
    * location scope, the same refreshed token reads the Current System; once
@@ -164,8 +194,20 @@ async function pollOne(
     summary.skipped++;
     return;
   }
-  const grantAlive = await pollNotifications(deps, summary, characterId, accessToken, grant);
-  if (!grantAlive || !deps.nearby || !grantCoversNearby(grant) || summary.budgetStopped) return;
+  // The Character's devices, read at most once however many of the reads below want them.
+  let devicesRead: Promise<PollDevice[]> | undefined;
+  const devices = () => (devicesRead ??= store.devicesFor(characterId));
+  const grantAlive = await pollNotifications(
+    deps,
+    summary,
+    characterId,
+    accessToken,
+    grant,
+    devices
+  );
+  if (!grantAlive) return;
+  await pollMailSafely(deps, summary, characterId, accessToken, grant, devices);
+  if (!deps.nearby || !grantCoversNearby(grant) || summary.budgetStopped) return;
 
   const location = await deps.nearby.fetchLocation(characterId, accessToken);
   switch (location.kind) {
@@ -201,7 +243,8 @@ async function pollNotifications(
   summary: PollSummary,
   characterId: number,
   accessToken: string,
-  grant: AlertGrantDoc
+  grant: AlertGrantDoc,
+  readDevices: () => Promise<PollDevice[]>
 ): Promise<boolean> {
   const { store } = deps;
   const guard = grant.encryptedRefreshToken;
@@ -232,7 +275,7 @@ async function pollNotifications(
   summary.polled++;
   if (result.budgetLow) summary.budgetStopped = true;
 
-  const devices = await store.devicesFor(characterId);
+  const devices = await readDevices();
   const selection = selectPushable({
     notifications: result.notifications,
     highWaterId: grant.highWaterId,
@@ -282,4 +325,140 @@ async function pollNotifications(
     seenTypes: selection.seenTypes,
   });
   return true;
+}
+
+/** One Character's mail must never cost it its nearby read, or the run its other Characters. */
+async function pollMailSafely(
+  deps: PollDeps,
+  summary: PollSummary,
+  characterId: number,
+  accessToken: string,
+  grant: AlertGrantDoc,
+  readDevices: () => Promise<PollDevice[]>
+): Promise<void> {
+  try {
+    await pollMail(deps, summary, characterId, accessToken, grant, readDevices);
+  } catch (err) {
+    deps.log('Mail alerts failed for a Character', {
+      characterId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
+}
+
+/**
+ * New-mail alerts (ADR 0029): the grant's mail HEADERS, pushed to each device
+ * that enabled `newMail` for the Character. Edge semantics are `diffNewMail`'s
+ * (mailCalendar.ts): a mark seeds silently, then every id above it not sent by
+ * the Character itself is new. Only ids are kept — never a sender or a subject.
+ */
+async function pollMail(
+  deps: PollDeps,
+  summary: PollSummary,
+  characterId: number,
+  accessToken: string,
+  grant: AlertGrantDoc,
+  readDevices: () => Promise<PollDevice[]>
+): Promise<void> {
+  if (!deps.mail || !grantCoversMail(grant) || summary.budgetStopped) return;
+  const { store } = deps;
+  const guard = grant.encryptedRefreshToken;
+  const wanting = (await readDevices()).filter((d) => d.serverEvents?.includes('newMail'));
+
+  if (wanting.length === 0) {
+    // Nobody wants it: read nothing, and forget the mark, so turning it on again
+    // seeds afresh instead of announcing everything that arrived meanwhile.
+    if (grant.mailHighWaterId != null || grant.mailEtag != null) {
+      await store.patchMail(characterId, guard, {
+        mailHighWaterId: null,
+        mailEtag: null,
+        mailPushed: [],
+      });
+    }
+    return;
+  }
+
+  const seeded = grant.mailHighWaterId != null;
+  const result = await deps.mail.fetchHeaders(
+    characterId,
+    accessToken,
+    seeded ? (grant.mailEtag ?? null) : null
+  );
+  switch (result.kind) {
+    case 'not-modified':
+      if (result.budgetLow) summary.budgetStopped = true;
+      return;
+    case 'forbidden':
+      // The mail scope alone was refused: notifications still work, so the grant
+      // is not revoked. It stops being asked, so a dead scope does not spend the
+      // shared error budget every run, and Settings offers Add mail again.
+      await store.dropMailScope(
+        characterId,
+        guard,
+        (grant.scopes ?? []).filter((scope) => scope !== ALERTS_MAIL_SCOPE)
+      );
+      deps.log('ESI refused the mail scope (403); mail alerts off for it', { characterId });
+      return;
+    case 'backoff':
+      summary.budgetStopped = true;
+      deps.log('ESI error budget hit; stopping this run', { retryAfterMs: result.retryAfterMs });
+      return;
+    case 'error':
+      deps.log('ESI mail call failed', { characterId, status: result.status });
+      return;
+    case 'ok':
+      break;
+  }
+  if (result.budgetLow) summary.budgetStopped = true;
+
+  const selection = selectNewMail(characterId, grant.mailHighWaterId ?? null, result.headers);
+  const alreadyPushed = new Set(grant.mailPushed ?? []);
+  const pushedNow: string[] = [];
+  let transientFailure = false;
+  // A burst pushes only its newest mails; the Alerts list gets the rest when the app opens.
+  const fires = selection.fires.slice(-MAX_MAIL_PUSHES);
+  const nowMs = (deps.now ?? Date.now)();
+  for (const device of wanting) {
+    // Quiet time: skipped, not queued. The mark still advances below.
+    // Logged as handled, so a retry after another device's failure cannot push it later.
+    if (suppressPush(nowMs, device.quietHours, undefined)) {
+      for (const fire of fires) pushedNow.push(mailPushedEntry(device.deviceId, fire));
+      continue;
+    }
+    for (const fire of fires) {
+      const entry = mailPushedEntry(device.deviceId, fire);
+      if (alreadyPushed.has(entry)) continue;
+      try {
+        await deps.send(device.fcmToken, buildMailPush(fire, nowMs));
+        summary.pushesSent++;
+        pushedNow.push(entry);
+      } catch (err) {
+        const code = err instanceof Error && 'code' in err ? String(err.code) : '';
+        const text = err instanceof Error ? err.message : '';
+        if (shouldDeleteDeviceToken(code, text)) {
+          await store.deleteDevice(device.deviceId);
+          break;
+        }
+        transientFailure = true;
+        deps.log('Mail push failed', { deviceId: device.deviceId, error: code || 'unknown' });
+      }
+    }
+  }
+
+  // A transient failure leaves the mark (and the ETag, which would otherwise
+  // answer 304) where it was, so the next run retries; what already went out is
+  // logged so it is not sent twice. Otherwise the mark advances past everything
+  // and the log is empty, since nothing at or below the mark can come back.
+  await store.patchMail(
+    characterId,
+    guard,
+    transientFailure
+      ? {
+          mailHighWaterId: grant.mailHighWaterId ?? null,
+          mailEtag: grant.mailEtag ?? null,
+          mailPushed: [...alreadyPushed, ...pushedNow],
+        }
+      : { mailHighWaterId: selection.highWaterId, mailEtag: result.etag, mailPushed: [] }
+  );
+  if (transientFailure) summary.skipped++;
 }

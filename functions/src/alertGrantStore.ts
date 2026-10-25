@@ -1,7 +1,7 @@
 // Firestore side of the Alerts Grant (issue #3753, ADR 0020): `alertGrants/{characterId}`,
 // function-only (firestore.rules denies every client). Logic lives in alertGrant.ts.
 
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import {
   SsoRefreshError,
   type AlertGrantDoc,
@@ -9,7 +9,11 @@ import {
   type RefreshedTokens,
 } from './alertGrant.js';
 import { rotateStoredToken, decryptRefreshToken } from './alertGrantCrypto.js';
-import { DEVICE_REGISTRATIONS_COLLECTION, readQuietHours } from './projectionStore.js';
+import {
+  DEVICE_REGISTRATIONS_COLLECTION,
+  SERVER_EVENTS_FIELD,
+  readQuietHours,
+} from './projectionStore.js';
 import type { PollDevice, PollerStore } from './pollEveNotifications.js';
 
 export const ALERT_GRANTS_COLLECTION = 'alertGrants';
@@ -117,6 +121,20 @@ export function firestorePollerStore(
       await guardedUpdate(characterId, guard, { scopes });
     },
 
+    async patchMail(characterId, guard, state) {
+      await guardedUpdate(characterId, guard, state);
+    },
+
+    async dropMailScope(characterId, guard, scopes) {
+      // The mail state goes with the scope: asking for mail again starts unmarked.
+      await guardedUpdate(characterId, guard, {
+        scopes,
+        mailHighWaterId: FieldValue.delete(),
+        mailEtag: FieldValue.delete(),
+        mailPushed: FieldValue.delete(),
+      });
+    },
+
     async devicesFor(characterId) {
       const snap = await db
         .collection(DEVICE_REGISTRATIONS_COLLECTION)
@@ -128,10 +146,16 @@ export function firestorePollerStore(
         if (typeof data.fcmToken !== 'string') continue;
         const byCharacter = data.eveTypesByCharacter as Record<string, unknown> | undefined;
         const types = byCharacter?.[String(characterId)];
+        const serverEvents = (data[SERVER_EVENTS_FIELD] as Record<string, unknown> | undefined)?.[
+          String(characterId)
+        ];
         devices.push({
           deviceId: doc.id,
           fcmToken: data.fcmToken,
           eveTypes: Array.isArray(types) ? types.filter((t) => typeof t === 'string') : [],
+          serverEvents: Array.isArray(serverEvents)
+            ? serverEvents.filter((id) => typeof id === 'string')
+            : [],
           quietHours: readQuietHours(data.quietHours),
         });
       }

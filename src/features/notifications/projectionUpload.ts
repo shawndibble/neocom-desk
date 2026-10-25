@@ -30,7 +30,7 @@ import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
 import type { ServerEventRegistration } from './serverEvents';
-import { recordAlertsNearby } from './alertsGrant';
+import { recordAlertsGrantScopes } from './alertsGrant';
 import { routeRulesForServer } from './nearbyRouteRules';
 
 export async function uploadProjectionRows(
@@ -54,7 +54,7 @@ export async function uploadProjectionRows(
     });
     settlePushRegistration(result);
     await recordSeenEveTypes(result?.seenTypes);
-    await recordAlertsNearby(result?.nearbyGrants);
+    await recordAlertsGrantScopes(result);
   } catch (err) {
     // Same fire-and-forget contract as sendBrowserNotification/
     // recordFeedNotification in foregroundPoller.ts: the poll itself must

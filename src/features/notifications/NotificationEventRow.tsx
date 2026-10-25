@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import { AggregateRow } from './AggregateRow';
 import { PermissionNote } from './PermissionNote';
-import { NearbyPushBadge, ScheduledPushBadge } from './ScheduledPushBadge';
+import { MailPushBadge, NearbyPushBadge, ScheduledPushBadge } from './ScheduledPushBadge';
 import { EventThresholdsList } from './EventThresholdsList';
 import { eventEntry } from './eventEntries';
 import { eventLabelKey, isCorpEventId, type NotificationEventId } from './events';
@@ -77,6 +77,8 @@ export function NotificationEventRow({
       labelAccessory={
         badge === null ? undefined : badge === 'nearby' ? (
           <NearbyPushBadge />
+        ) : badge === 'mail' ? (
+          <MailPushBadge />
         ) : (
           <ScheduledPushBadge kind={badge} />
         )

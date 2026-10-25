@@ -16,6 +16,7 @@ import { reportFailure } from '@/observability/reportFailure';
 
 const GRANTS_KEY = 'alertsGrants';
 const NEARBY_KEY = 'alertsNearby';
+const MAIL_KEY = 'alertsMail';
 const QUEUE_KEY = 'neocom.alerts.queue';
 /** Same bound as a Pending Login: a queue outlives no login that could still complete. */
 const QUEUE_TTL_MS = 15 * 60_000;
@@ -67,19 +68,29 @@ async function writeGrants(
 }
 
 /**
- * Nearby alerts on the grant (ADR 0028), as the server last reported it:
- * whether it takes the location scope at all, and which Characters' grants
- * carry it. `supported` stays false until a `registerDevice` answer says so,
- * so this device never asks EVE for a grant an older deployed function would
- * refuse.
+ * What an Alerts Grant may carry beyond notifications, as the server last
+ * reported it: `nearby` is the location scope (ADR 0028), `mail` the mail scope
+ * (ADR 0029). Each is stored apart, with the same shape.
  */
-export interface AlertsNearby {
+export type AlertsExtra = 'nearby' | 'mail';
+const EXTRA_KEYS: Record<AlertsExtra, string> = { nearby: NEARBY_KEY, mail: MAIL_KEY };
+const ALERTS_EXTRAS = Object.keys(EXTRA_KEYS) as AlertsExtra[];
+
+/**
+ * One extra on the grant, as the server last reported it: whether it takes the
+ * scope at all, and which Characters' grants carry it. `supported` stays false
+ * until a `registerDevice` answer says so, so this device never asks EVE for a
+ * grant an older deployed function would refuse.
+ */
+export interface AlertsExtraState {
   supported: boolean;
   characterIds: number[];
 }
+export type AlertsNearby = AlertsExtraState;
 
-export async function readAlertsNearby(): Promise<AlertsNearby> {
-  const value = (await db.settings.get(NEARBY_KEY))?.value as Partial<AlertsNearby> | undefined;
+export async function readAlertsExtra(extra: AlertsExtra): Promise<AlertsExtraState> {
+  const value = (await db.settings.get(EXTRA_KEYS[extra]))?.value as
+    Partial<AlertsExtraState> | undefined;
   return {
     supported: value?.supported === true,
     characterIds: Array.isArray(value?.characterIds)
@@ -88,35 +99,56 @@ export async function readAlertsNearby(): Promise<AlertsNearby> {
   };
 }
 
-const NO_NEARBY: AlertsNearby = { supported: false, characterIds: [] };
+const NONE: AlertsExtraState = { supported: false, characterIds: [] };
 
-/** {@link readAlertsNearby}, live. Reads as unsupported until loaded. */
-export function useAlertsNearby(): AlertsNearby {
-  return useLiveQuery(readAlertsNearby, []) ?? NO_NEARBY;
+/** {@link readAlertsExtra}, live. Reads as unsupported until loaded. */
+export function useAlertsExtra(extra: AlertsExtra): AlertsExtraState {
+  return useLiveQuery(() => readAlertsExtra(extra), [extra]) ?? NONE;
 }
 
-async function writeNearby(change: (ids: Set<number>) => void, supported?: true): Promise<void> {
+async function writeExtra(
+  extra: AlertsExtra,
+  change: (ids: Set<number>) => void,
+  supported?: true
+): Promise<void> {
   await db.transaction('rw', db.settings, async () => {
-    const current = await readAlertsNearby();
+    const current = await readAlertsExtra(extra);
     const ids = new Set(current.characterIds);
     change(ids);
-    const value: AlertsNearby = {
+    const value: AlertsExtraState = {
       supported: supported ?? current.supported,
       characterIds: [...ids].sort((a, b) => a - b),
     };
-    await db.settings.put({ key: NEARBY_KEY, value });
+    await db.settings.put({ key: EXTRA_KEYS[extra], value });
   });
 }
 
-/** A `registerDevice` answer's `nearbyGrants`; absent (an older server, a failed read) changes nothing. */
-export async function recordAlertsNearby(
-  nearbyGrants: readonly number[] | undefined
+/** A `registerDevice` answer's grant list for one extra; absent (an older server, a failed read) changes nothing. */
+async function recordExtra(extra: AlertsExtra, grants: readonly number[] | undefined) {
+  if (grants === undefined) return;
+  await writeExtra(
+    extra,
+    (ids) => {
+      ids.clear();
+      for (const id of grants) ids.add(id);
+    },
+    true
+  );
+}
+
+export const readAlertsNearby = () => readAlertsExtra('nearby');
+export const useAlertsNearby = () => useAlertsExtra('nearby');
+export const recordAlertsNearby = (nearbyGrants: readonly number[] | undefined) =>
+  recordExtra('nearby', nearbyGrants);
+export const readAlertsMail = () => readAlertsExtra('mail');
+export const useAlertsMail = () => useAlertsExtra('mail');
+
+/** Everything a `registerDevice` answer says about the grants' scopes. */
+export async function recordAlertsGrantScopes(
+  result: { nearbyGrants?: number[]; mailGrants?: number[] } | null | undefined
 ): Promise<void> {
-  if (nearbyGrants === undefined) return;
-  await writeNearby((ids) => {
-    ids.clear();
-    for (const id of nearbyGrants) ids.add(id);
-  }, true);
+  await recordExtra('nearby', result?.nearbyGrants);
+  await recordExtra('mail', result?.mailGrants);
 }
 
 /** The server told us, or a poll learned, that this Character's grant is dead. */
@@ -134,9 +166,11 @@ export async function forgetAlertsGrants(characterIds: readonly number[]): Promi
   await writeGrants((grants) => {
     for (const id of characterIds) delete grants[id];
   });
-  await writeNearby((ids) => {
-    for (const id of characterIds) ids.delete(id);
-  });
+  for (const extra of ALERTS_EXTRAS) {
+    await writeExtra(extra, (ids) => {
+      for (const id of characterIds) ids.delete(id);
+    });
+  }
 }
 
 /**
@@ -158,7 +192,7 @@ export async function completeAlertsGrant(params: {
       authorizedName: result.name,
     };
   }
-  let saved: { nearby?: boolean } | void;
+  let saved: { nearby?: boolean; mail?: boolean } | void;
   try {
     const { saveAlertGrantRemote } = await import('@/sync/alertsGrantApi');
     saved = await saveAlertGrantRemote({
@@ -172,14 +206,19 @@ export async function completeAlertsGrant(params: {
   await writeGrants((grants) => {
     grants[result.characterId] = { status: 'active', enabledAt: Date.now() };
   });
-  // Only a server that knows the location scope says `nearby`, so this also
-  // proves the server takes it.
-  if (typeof saved?.nearby === 'boolean') {
-    const nearby = saved.nearby;
-    await writeNearby((ids) => {
-      if (nearby) ids.add(result.characterId);
-      else ids.delete(result.characterId);
-    }, true);
+  // Only a server that knows a scope says so in its answer, so this also proves
+  // the server takes it.
+  for (const extra of ALERTS_EXTRAS) {
+    const covered = saved?.[extra];
+    if (typeof covered !== 'boolean') continue;
+    await writeExtra(
+      extra,
+      (ids) => {
+        if (covered) ids.add(result.characterId);
+        else ids.delete(result.characterId);
+      },
+      true
+    );
   }
   return { status: 'on', characterId: result.characterId, name: result.name };
 }

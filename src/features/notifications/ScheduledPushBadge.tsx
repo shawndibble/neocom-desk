@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
-import { useAlertsNearby } from './alertsGrant';
+import { useAlertsMail, useAlertsNearby } from './alertsGrant';
 
 /**
  * The "arrives with the app closed" mark on a Scheduled Push event's row, or on
@@ -18,12 +18,13 @@ const BADGE_LABELS = {
   scheduled: 'settings.notifications.scheduledPushBadge',
   server: 'settings.notifications.serverPushBadge',
   nearby: 'settings.notifications.nearbyPushBadge',
+  mail: 'settings.notifications.mailPushBadge',
 } as const;
 
 export function ScheduledPushBadge({
   kind = 'scheduled',
 }: {
-  kind?: 'scheduled' | 'server' | 'nearby';
+  kind?: 'scheduled' | 'server' | 'nearby' | 'mail';
 }) {
   const { t } = useTranslation();
   const label = t(BADGE_LABELS[kind]);
@@ -44,4 +45,14 @@ export function ScheduledPushBadge({
 export function NearbyPushBadge() {
   const { characterIds } = useAlertsNearby();
   return characterIds.length > 0 ? <ScheduledPushBadge kind="nearby" /> : null;
+}
+
+/**
+ * The same mark on the new-mail row (ADR 0029), shown once some Character on
+ * this device has an Alerts Grant that carries the mail scope: only then can the
+ * server push mail to a closed app.
+ */
+export function MailPushBadge() {
+  const { characterIds } = useAlertsMail();
+  return characterIds.length > 0 ? <ScheduledPushBadge kind="mail" /> : null;
 }

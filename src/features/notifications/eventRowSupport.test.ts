@@ -9,6 +9,7 @@ describe('pushBadgeKind', () => {
     expect(pushBadgeKind('priceAlertTriggered')).toBe('server');
     // Only one sub-case projects, so no promise about every occurrence.
     expect(pushBadgeKind('eveNotification')).toBeNull();
-    expect(pushBadgeKind('newMail')).toBeNull();
+    // Mail reaches a closed app only under a mail-capable Alerts Grant (ADR 0029).
+    expect(pushBadgeKind('newMail')).toBe('mail');
   });
 });

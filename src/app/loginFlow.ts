@@ -11,6 +11,7 @@ import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
+import type { AlertsExtraState } from '@/features/notifications/alertsGrant';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { assignLocation } from './navigation';
 import { currentRouterPath, isOnRoute } from './routerPath';
@@ -98,17 +99,32 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
 }
 
 /**
- * Turn on Alerts when closed for one Character (ADR 0020): a separate SSO
- * round trip for the grant's narrow scopes, returning to the page it was
- * pressed on. The location scope for nearby alerts (ADR 0028) is asked for
- * only once the deployed server has said it takes it. The callback never
- * stores its token on this device; see `features/notifications/alertsGrant.ts`.
+ * Turn on Alerts when closed for one Character (ADR 0020), or add a scope to it:
+ * a separate SSO round trip for the grant's narrow scopes, returning to the page
+ * it was pressed on. The location scope for nearby alerts (ADR 0028) is asked for
+ * only once the deployed server has said it takes it; the mail scope (ADR 0029)
+ * only on an explicit `add: 'mail'`, or to keep a Character's mail alerts through
+ * a re-authorization, since SSO issues a token with exactly what was requested.
+ * The callback never stores its token on this device; see
+ * `features/notifications/alertsGrant.ts`.
  */
-export async function beginAlertsLogin(characterId: number): Promise<void> {
-  const { readAlertsNearby } = await import('@/features/notifications/alertsGrant');
+export async function beginAlertsLogin(
+  characterId: number,
+  { add }: { add?: 'mail' } = {}
+): Promise<void> {
+  const { readAlertsNearby, readAlertsMail } = await import('@/features/notifications/alertsGrant');
   const { supported } = await readAlertsNearby().catch(() => ({ supported: false }));
+  const mail = await readAlertsMail().catch((): AlertsExtraState => ({
+    supported: false,
+    characterIds: [],
+  }));
   rememberThisPage();
-  assignLocation(await startAlertsLogin(characterId, undefined, { nearby: supported }));
+  assignLocation(
+    await startAlertsLogin(characterId, undefined, {
+      nearby: supported,
+      mail: mail.supported && (add === 'mail' || mail.characterIds.includes(characterId)),
+    })
+  );
 }
 
 /**

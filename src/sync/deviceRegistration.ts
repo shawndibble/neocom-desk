@@ -39,6 +39,11 @@ interface RegisterDeviceResponse {
    * carrying the location scope.
    */
   nearbyGrants?: number[];
+  /**
+   * The Characters whose Alerts Grant can read mail headers (ADR 0029). Absent
+   * from a function older than it, which would refuse a grant with the mail scope.
+   */
+  mailGrants?: number[];
 }
 
 /** No Projection to upload for a Character this call doesn't mention. */
