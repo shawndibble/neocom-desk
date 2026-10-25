@@ -1189,6 +1189,15 @@ export function BuildPlanDetail({
               buildSystemName: cheapest.name,
               ...clearedBuildLocation,
               security: securityBand(cheapest.security),
+              // The station found there is what the plan builds in: no rigs,
+              // and the tax drops back to the NPC rate `jobFee` applies.
+              ...(cheapest.npcStation
+                ? {
+                    facility: 'npcStation' as const,
+                    rigFit: EMPTY_RIG_FIT,
+                    facilityTaxPct: undefined,
+                  }
+                : {}),
             })
           }
         >

@@ -20,12 +20,22 @@ export function cheaperNearbySystems(
   originSystemId: number,
   indices: ReadonlyMap<number, number>,
   currentIndex: number,
-  { maxJumps = DEFAULT_MAX_JUMPS, limit = DEFAULT_LIMIT } = {}
+  {
+    maxJumps = DEFAULT_MAX_JUMPS,
+    limit = DEFAULT_LIMIT,
+    isEligible,
+  }: {
+    maxJumps?: number;
+    limit?: number;
+    /** Applied before the limit, so a system the pilot cannot build in never takes a slot. */
+    isEligible?: (systemId: number) => boolean;
+  } = {}
 ): NearbySystem[] {
   const found: NearbySystem[] = [];
   for (const [systemId, jumps] of jumpDistancesFrom(graph, originSystemId)) {
     if (systemId === originSystemId || jumps > maxJumps) continue;
     const index = indices.get(systemId);
+    if (isEligible && !isEligible(systemId)) continue;
     if (index !== undefined && index < currentIndex) found.push({ systemId, jumps, index });
   }
   found.sort((a, b) => a.index - b.index || a.jumps - b.jumps || a.systemId - b.systemId);

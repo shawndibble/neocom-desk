@@ -63,4 +63,19 @@ describe('cheaperNearbySystems', () => {
   it('is empty when nothing is cheaper (the cheapest system itself)', () => {
     expect(cheaperNearbySystems(graph, 1, new Map([[2, 0.05]]), 0.05)).toEqual([]);
   });
+
+  it('applies the eligibility filter before the limit, so ineligible systems never crowd out eligible ones', () => {
+    const indices = new Map([
+      [1, 0.05],
+      [2, 0.01],
+      [3, 0.02],
+      [8, 0.03],
+    ]);
+    expect(
+      cheaperNearbySystems(graph, 1, indices, 0.05, {
+        limit: 1,
+        isEligible: (systemId) => systemId !== 2,
+      })
+    ).toEqual([{ systemId: 3, jumps: 2, index: 0.02 }]);
+  });
 });
