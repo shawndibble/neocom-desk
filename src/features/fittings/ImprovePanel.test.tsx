@@ -218,6 +218,20 @@ describe('ImprovePanel', () => {
     expect(row).toHaveTextContent('90.7');
   });
 
+  it('heads the results with the goal figure now → best found, hidden with no result', () => {
+    const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
+    const small = option(11, { offense: { ...before.offense, sustainedDps: 100 } }, { score: 0.1 });
+    const big = option(12, { offense: { ...before.offense, sustainedDps: 128 } }, { score: 0.4 });
+    renderPanel(search(done({ noDownside: [small], tradeOffs: [big] }, own), own));
+    const header = screen.getByTestId('improve-best-found');
+    expect(header).toHaveTextContent('Now → best found');
+    expect(header).toHaveTextContent('90.7');
+    expect(header).toHaveTextContent('→ 128');
+    cleanup();
+    renderPanel(search(done({}, own), own));
+    expect(screen.queryByTestId('improve-best-found')).not.toBeInTheDocument();
+  });
+
   it('orders each section by the remembered sort, and reports a change', async () => {
     const pricey = option(11, { ehp: 1100 }, { score: 0.5, iskDelta: 900_000_000 });
     const cheap = option(21, { ehp: 1100 }, { score: 0.1, iskDelta: 1_000_000 });
@@ -461,7 +475,8 @@ describe('ImprovePanel', () => {
     );
     renderPanel(noGain, vi.fn(), vi.fn(), settings(), { goal: 'mining' });
     const lines = screen.getAllByText(/Mines 10 → 12\.5 m³\/s of Veldspar, Scordite/);
-    expect(lines).toHaveLength(2);
+    // Two rows plus the best-found header.
+    expect(lines).toHaveLength(3);
     expect(lines[0]).toHaveTextContent('(Simple Asteroid crystals)');
     cleanup();
     renderPanel(search(done({ rejected: [broke] }, own), own), vi.fn(), vi.fn(), settings(), {
@@ -508,7 +523,7 @@ describe('ImprovePanel', () => {
       settings({ onHoldChange }),
       { goal: 'haul' }
     );
-    expect(screen.getByText('Cargo hold 1,000 → 1,250 m³')).toBeInTheDocument();
+    expect(screen.getAllByText('Cargo hold 1,000 → 1,250 m³')).toHaveLength(2);
     await userEvent.click(screen.getByRole('combobox', { name: 'Hold' }));
     await userEvent.click(await screen.findByRole('option', { name: /Ice hold/ }));
     expect(onHoldChange).toHaveBeenCalledWith('iceHold');
@@ -520,7 +535,7 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'warp',
     });
-    expect(screen.getByText(/Align 55\.45 → 27\.73 s · Warp 3 → 3\.6 AU\/s/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Align 55\.45 → 27\.73 s · Warp 3 → 3\.6 AU\/s/)).toHaveLength(2);
   });
 
   it('disables Repair more and Transfer more with their reasons on a fit that gives neither', async () => {
@@ -544,12 +559,12 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'repair',
     });
-    expect(screen.getByText('Repairs 100 → 125.5 HP/s')).toBeInTheDocument();
+    expect(screen.getAllByText('Repairs 100 → 125.5 HP/s')).toHaveLength(2);
     cleanup();
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'transfer',
     });
-    expect(screen.getByText('Transfers 0 → 40 GJ/s')).toBeInTheDocument();
+    expect(screen.getAllByText('Transfers 0 → 40 GJ/s')).toHaveLength(2);
   });
   it('disables Hold tighter and Stronger EWAR with their reasons on a fit with neither', async () => {
     renderPanel(search({ status: 'idle' }));
@@ -591,14 +606,14 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'tackle',
     });
-    expect(screen.getByText('Points 2 → 3 · Web 50 → 60% · Reach 9 → 12 km')).toBeInTheDocument();
+    expect(screen.getAllByText('Points 2 → 3 · Web 50 → 60% · Reach 9 → 12 km')).toHaveLength(2);
     cleanup();
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'ewar',
     });
     expect(
-      screen.getByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
-    ).toBeInTheDocument();
+      screen.getAllByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
+    ).toHaveLength(2);
   });
   it('disables Stronger fleet support with its reason on a fit with no fleet modules', async () => {
     renderPanel(search({ status: 'idle' }));
@@ -633,10 +648,10 @@ describe('ImprovePanel', () => {
       goal: 'command',
     });
     expect(
-      screen.getByText(
+      screen.getAllByText(
         'Burst strength 10 → 12 · Burst reach 30 → 40 km · Core fuel 200 → 150 per cycle'
       )
-    ).toBeInTheDocument();
+    ).toHaveLength(2);
   });
 
   describe('combined check', () => {

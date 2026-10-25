@@ -1401,6 +1401,7 @@
       "gain": "+{{percent}}%",
       "moreOptions_one": "{{count}} more option",
       "moreOptions_other": "{{count}} more options",
+      "bestFound": "Now → best found",
       "sortLabel": "Sort by",
       "sort": { "gain": "Biggest gain", "value": "Best value", "cheapest": "Cheapest" },
       "reachLine": "Reach {{before}} → {{after}} km",
