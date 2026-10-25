@@ -56,6 +56,10 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
   };
 }
 
+const openMoreGoals = () => userEvent.click(screen.getByRole('button', { name: /^More goals/ }));
+const openSettings = () =>
+  userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
+
 const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   reach: 'upgrade',
   onReachChange: vi.fn(),
@@ -295,6 +299,17 @@ describe('ImprovePanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('leads with the hull role goals and keeps the settings collapsed', () => {
+    renderPanel(search({ status: 'idle' }));
+    expect(screen.getByRole('button', { name: /Best overall/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Carry more/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Search settings/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.queryByRole('group', { name: 'Improve Reach' })).not.toBeInTheDocument();
+  });
+
   it('says nothing could be added on a fit with no modules', () => {
     const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
     renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });
@@ -304,18 +319,21 @@ describe('ImprovePanel', () => {
     expect(screen.queryByText(/No variation of a fitted/)).not.toBeInTheDocument();
   });
 
-  it('disables a goal the fit cannot score', () => {
+  it('moves a goal the fit cannot score under More goals, disabled, with its reason', async () => {
     const unarmed = { ...before, offense: { ...before.offense, dps: 0, sustainedDps: 0 } };
-    renderPanel(search({ status: 'idle' }, unarmed));
-    expect(screen.getByRole('button', { name: /More damage/ })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
+    renderPanel(search({ status: 'idle' }, unarmed), vi.fn(), vi.fn(), settings(), {
+      goal: 'overall',
+    });
+    expect(screen.queryByRole('button', { name: /More damage/ })).not.toBeInTheDocument();
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /More damage/ })).toBeDisabled();
+    expect(screen.getByText('Nothing on this fit deals damage')).toBeInTheDocument();
   });
 
   it('shows Reach, mode, Defense Choice and the spend cap, and reports a pick', async () => {
     const config = settings({ reach: 'rebalance' });
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config, { goal: 'tank' });
+    await openSettings();
     expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Defense Choice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Rework' }));
@@ -326,13 +344,15 @@ describe('ImprovePanel', () => {
     expect(config.onDefenseChange).toHaveBeenCalledWith('armor');
   });
 
-  it('hides Defense Choice on goals it does not change', () => {
+  it('hides Defense Choice on goals it does not change', async () => {
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings(), { goal: 'mining' });
+    await openSettings();
     expect(screen.queryByRole('group', { name: 'Defense Choice' })).not.toBeInTheDocument();
   });
 
-  it('disables Shield and Armor under Upgrade, with the reason', () => {
+  it('disables Shield and Armor under Upgrade, with the reason', async () => {
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings(), { goal: 'tank' });
+    await openSettings();
     expect(screen.getByRole('button', { name: 'Armor' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Shield' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Pick Rebalance or Rework to change tank side')).toBeInTheDocument();
@@ -341,8 +361,9 @@ describe('ImprovePanel', () => {
   it('keeps Rigs and Officer behind a collapsed, unticked group', async () => {
     const config = settings();
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config);
+    await openSettings();
     expect(screen.queryByRole('checkbox', { name: 'Rigs' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Also try…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rigs and officer modules' }));
     const rigs = screen.getByRole('checkbox', { name: 'Rigs' });
     expect(rigs).not.toBeChecked();
     await userEvent.click(rigs);
@@ -403,10 +424,9 @@ describe('ImprovePanel', () => {
 
   it('disables Mine more with its reason on a fit with no miners', async () => {
     renderPanel(search({ status: 'idle' }, before));
-    const chip = screen.getByRole('button', { name: /Mine more/ });
-    expect(chip).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.hover(chip);
-    expect(await screen.findByText('No miners on this fit')).toBeInTheDocument();
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /Mine more/ })).toBeDisabled();
+    expect(screen.getByText('No miners on this fit')).toBeInTheDocument();
   });
 
   it('shows the ore on every Mine more row and in the closest swaps, with the m³/s it gives', () => {
@@ -466,15 +486,14 @@ describe('ImprovePanel', () => {
       navigation: { ...before.navigation, agility: 0, warpSpeed: 0 },
     };
     renderPanel(search({ status: 'idle' }, bare));
+    await openMoreGoals();
     for (const [name, reason] of [
       [/Carry more/, 'This hull has no cargo or other hold'],
       [/^Align faster/, 'This hull has no align time to improve'],
       [/Align and warp faster/, 'This hull has no align time or warp speed to improve'],
     ] as const) {
-      const chip = screen.getByRole('button', { name });
-      expect(chip).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.hover(chip);
-      expect(await screen.findByText(reason)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByText(reason)).toBeInTheDocument();
     }
   });
 
@@ -506,14 +525,13 @@ describe('ImprovePanel', () => {
 
   it('disables Repair more and Transfer more with their reasons on a fit that gives neither', async () => {
     renderPanel(search({ status: 'idle' }));
+    await openMoreGoals();
     for (const [name, reason] of [
       [/Repair more/, 'No remote repairers on this fit'],
       [/Transfer more/, 'No remote capacitor transmitters on this fit'],
     ] as const) {
-      const chip = screen.getByRole('button', { name });
-      expect(chip).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.hover(chip);
-      expect(await screen.findByText(reason)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByText(reason)).toBeInTheDocument();
     }
   });
 
@@ -535,14 +553,13 @@ describe('ImprovePanel', () => {
   });
   it('disables Hold tighter and Stronger EWAR with their reasons on a fit with neither', async () => {
     renderPanel(search({ status: 'idle' }));
+    await openMoreGoals();
     for (const [name, reason] of [
       [/Hold tighter/, 'No warp scramblers, disruptors or webs on this fit'],
       [/Stronger EWAR/, 'No electronic warfare modules on this fit'],
     ] as const) {
-      const chip = screen.getByRole('button', { name });
-      expect(chip).toHaveAttribute('aria-disabled', 'true');
-      await userEvent.hover(chip);
-      expect(await screen.findByText(reason)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      expect(screen.getByText(reason)).toBeInTheDocument();
     }
   });
 
@@ -585,11 +602,10 @@ describe('ImprovePanel', () => {
   });
   it('disables Stronger fleet support with its reason on a fit with no fleet modules', async () => {
     renderPanel(search({ status: 'idle' }));
-    const chip = screen.getByRole('button', { name: /Stronger fleet support/ });
-    expect(chip).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.hover(chip);
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /Stronger fleet support/ })).toBeDisabled();
     expect(
-      await screen.findByText('No command bursts, compressors or industrial core on this fit')
+      screen.getByText('No command bursts, compressors or industrial core on this fit')
     ).toBeInTheDocument();
   });
 

@@ -12,7 +12,9 @@
 // Character, one Fuzzwork call per hub station.
 
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
+import { deviceCadence } from './pollerEfficiency.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
+import { SERVER_POLL_STATS_KEYS, createRunStats, type RunStats } from './runStats.js';
 import {
   buildServerEventPush,
   diffPriceAlerts,
@@ -48,6 +50,8 @@ export interface PolledDevice {
   deviceId: string;
   fcmToken: string;
   quietHours?: QuietHours;
+  /** When the registration was last written (the open app re-registers hourly); absent on old docs. */
+  updatedAtMs?: number | null;
   characters: PolledCharacter[];
 }
 
@@ -77,11 +81,14 @@ export interface ServerPollDeps {
   /** Receives only ids and counts, never a token. */
   log(message: string, data?: Record<string, unknown>): void;
   now(): number;
+  /** The run's counters (issue #5144); the store wrappers share it. Absent: counted privately. */
+  stats?: RunStats;
   /** Spacing between zKillboard reads; injectable so tests don't wait. */
   pause?(ms: number): Promise<void>;
 }
 
 export interface ServerPollSummary {
+  /** Devices polled this run (those whose turn it is; see pollerEfficiency.ts). */
   devices: number;
   lossReads: number;
   priceReads: number;
@@ -171,6 +178,8 @@ async function sendFire(
 }
 
 export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPollSummary> {
+  const startedAt = deps.now();
+  const stats = deps.stats ?? createRunStats(SERVER_POLL_STATS_KEYS);
   const summary: ServerPollSummary = {
     devices: 0,
     lossReads: 0,
@@ -178,8 +187,26 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
     pushesSent: 0,
     lossReadsStopped: false,
   };
-  const devices = await deps.listDevices();
+  const listed = await deps.listDevices();
+  stats.set('devicesListed', listed.length);
+  // Back-off for registrations the app has stopped refreshing (pollerEfficiency.ts).
+  const devices: PolledDevice[] = [];
+  for (const device of listed) {
+    const cadence = deviceCadence(device.updatedAtMs, startedAt);
+    if (cadence === 'due') devices.push(device);
+    else if (cadence === 'sleeping') stats.add('devicesSkippedSleeping');
+    else {
+      stats.add('devicesSkippedDormant');
+      // Once: forget its readings, so the app registering it again seeds them
+      // silently instead of announcing every loss and crossing since.
+      if (device.characters.some((c) => Object.keys(c.baseline).length > 0)) {
+        await deps.saveBaselines(device.deviceId, {});
+        stats.add('dormantBaselineClears');
+      }
+    }
+  }
   summary.devices = devices.length;
+  stats.set('devicesPolled', devices.length);
 
   const lossCharacters = new Set<number>();
   const typesByStation = new Map<number, Set<number>>();
@@ -272,5 +299,8 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
     );
     if (!unchanged) await deps.saveBaselines(device.deviceId, baselines);
   }
+  stats.set('zkillboardCalls', summary.lossReads);
+  stats.set('fuzzworkCalls', summary.priceReads);
+  stats.set('durationMs', deps.now() - startedAt);
   return summary;
 }
