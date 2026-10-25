@@ -338,6 +338,7 @@ function WidgetFrame({
   const keys = widgetKeys(kind, widget.show);
   const title = widget.title ?? t(keys.titleKey);
   const endpoints = endpointsOf(widget.kind, widget);
+  const grantTarget = view.grantCharacterId ?? characterId;
 
   let body;
   if (state === 'loading') {
@@ -345,13 +346,13 @@ function WidgetFrame({
   } else if (state === 'needsPermission') {
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
-        {characterId !== null && endpoints.length > 0 ? (
+        {grantTarget !== null && endpoints.length > 0 ? (
           <GrantBanner
             variant="ghost"
-            characterId={characterId}
+            characterId={grantTarget}
             endpoints={endpoints}
             title={t('overview.widgets.needsPermission')}
-            hint={t('overview.widgets.needsPermissionHint', { title })}
+            hint={view.grantHint ?? t('overview.widgets.needsPermissionHint', { title })}
             actionLabel={t('overview.widgets.grantAction')}
           />
         ) : (
@@ -436,17 +437,17 @@ function WidgetFrame({
     );
   }
 
-  if (state === 'ok' && view.grantEndpoints !== undefined && characterId !== null) {
+  if (state === 'ok' && view.grantEndpoints !== undefined && grantTarget !== null) {
     body = (
       <>
         {body}
         <div className="px-3 pb-3">
           <GrantBanner
             variant="ghost"
-            characterId={characterId}
+            characterId={grantTarget}
             endpoints={view.grantEndpoints}
             title={t('overview.widgets.needsPermission')}
-            hint={t('overview.widgets.needsPermissionHint', { title })}
+            hint={view.grantHint ?? t('overview.widgets.needsPermissionHint', { title })}
             actionLabel={t('overview.widgets.grantAction')}
           />
         </div>

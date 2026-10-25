@@ -528,6 +528,59 @@ describe('the Number view says one new thing', () => {
     expect(buildView('miningTax', { mining: ok(data) as never }, ctx()).table).toBeUndefined();
   });
 
+  describe('mining tax with a Character whose ledger cannot be read', () => {
+    const base = {
+      unpaidIsk: 10_900_000,
+      oldestUnpaidDays: 13,
+      payeeCount: 1,
+      unassignedCount: 0,
+      needsReauth: true,
+      fetchedAt: new Date(NOW),
+      characterCount: 2,
+    };
+
+    it('keeps the figures and asks the Character missing the permission, by name', () => {
+      const view = buildView(
+        'miningTax',
+        {
+          mining: ok({
+            ...base,
+            missingCharacterNames: ['Shadow Ruler'],
+            missingCharacterIds: [2],
+          }) as never,
+        },
+        ctx()
+      );
+      expect(view.status.needsPermission).toBe(false);
+      expect(view.number.iskAmount).toBe(10_900_000);
+      expect(view.grantEndpoints).toEqual(['getCharacterMining']);
+      expect(view.grantCharacterId).toBe(2);
+      expect(view.grantHint).toContain('Shadow Ruler');
+    });
+
+    it('needs permission only when no Character can read, and asks one of them', () => {
+      const view = buildView(
+        'miningTax',
+        {
+          mining: ok({
+            ...base,
+            missingCharacterNames: ['Shadow Ruler', 'Krish Mero'],
+            missingCharacterIds: [2, 3],
+          }) as never,
+        },
+        ctx()
+      );
+      expect(view.status.needsPermission).toBe(true);
+      expect(view.grantCharacterId).toBe(2);
+    });
+
+    it('a snapshot cached before the ids were kept reads as before', () => {
+      const view = buildView('miningTax', { mining: ok(base) as never }, ctx());
+      expect(view.status.needsPermission).toBe(true);
+      expect(view.grantCharacterId).toBeUndefined();
+    });
+  });
+
   it('price watch names the nearest target that has not been hit', () => {
     const alerts = [
       { typeId: 1, name: 'Tritanium', targetPrice: 4, direction: 'below', price: 3, crossed: true },

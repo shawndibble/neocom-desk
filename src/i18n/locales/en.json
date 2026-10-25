@@ -5131,6 +5131,7 @@
         "empty": "Nothing is owed.",
         "oldest": "Oldest unpaid {{days}}d",
         "noPayee": "No payee",
+        "leavesOut": "Leaves out {{names}}: reading their mining ledger needs a permission not granted yet.",
         "days": "{{count}}d",
         "unassigned_one": "{{count}} entry has no assignment yet",
         "unassigned_other": "{{count}} entries have no assignment yet",

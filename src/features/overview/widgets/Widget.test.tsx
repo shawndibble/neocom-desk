@@ -16,6 +16,9 @@ import type { Widget as WidgetModel } from './layout';
 import type { KillsEntry } from './data/kindLoaders';
 import { heightKey, rememberedBodyHeight, resetRememberedHeights } from './skeletonHeight';
 
+const grant = vi.hoisted(() => ({ begin: vi.fn(async () => undefined) }));
+vi.mock('@/app/grantAction', () => ({ beginGrant: grant.begin }));
+
 vi.mock('./data/useWidgetView', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./data/useWidgetView')>();
   return { ...actual, useWidgetView: vi.fn(actual.useWidgetView) };
@@ -364,6 +367,31 @@ describe('Widget states', () => {
     const region = screen.getByRole('region', { name: 'Jump timers' });
     expect(within(region).getAllByText('Ready').length).toBeGreaterThan(0);
     expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+  });
+
+  it('mining tax asks the Character missing the permission, not the active one, and keeps the figures', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderWidget(model({ kind: 'miningTax' }), (store) =>
+      store.set('mining', {
+        data: {
+          unpaidIsk: 10_900_000,
+          payeeCount: 1,
+          unassignedCount: 0,
+          oldestUnpaidDays: 3,
+          needsReauth: true,
+          fetchedAt: new Date(),
+          characterCount: 2,
+          missingCharacterNames: ['Shadow Ruler'],
+          missingCharacterIds: [92],
+        },
+        error: false,
+        loading: false,
+      })
+    );
+    const region = screen.getByRole('region', { name: 'Mining tax' });
+    expect(within(region).getByText(/Leaves out Shadow Ruler/)).toBeInTheDocument();
+    await userEvent.click(within(region).getByRole('button', { name: 'Grant access' }));
+    expect(grant.begin).toHaveBeenCalledWith(92, ['getCharacterMining']);
   });
 
   it('asks for permission outright when neither Jump timer can be read', () => {

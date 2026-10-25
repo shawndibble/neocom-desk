@@ -168,6 +168,8 @@ export interface MiningTaxBoardData {
   characterCount: number;
   /** Characters whose ledger could not be read (re-auth), so the figures leave them out. */
   missingCharacterNames: string[];
+  /** The same Characters' ids, for the grant to ask. Absent in a snapshot cached before this field existed. */
+  missingCharacterIds?: number[];
 }
 
 export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
@@ -210,6 +212,7 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
     ),
     characterCount: await db.characters.count(),
     missingCharacterNames: snapshot.reauthCharacters.map((character) => character.characterName),
+    missingCharacterIds: snapshot.reauthCharacters.map((character) => character.characterId),
   };
 }
 

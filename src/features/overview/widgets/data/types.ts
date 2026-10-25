@@ -259,6 +259,14 @@ export interface KindView {
   emptyHealthy?: boolean;
   /** Endpoints whose permission is missing while the rest of the widget reads fine: a Grant access is drawn under the body. */
   grantEndpoints?: readonly EsiEndpointId[];
+  /**
+   * Who a Grant access asks, when not the active Character: an account-wide kind whose
+   * missing permission is another Character's. Asking the active one would open EVE for
+   * a grant it already holds.
+   */
+  grantCharacterId?: number;
+  /** The Grant access hint, when it can say more than the generic one (who is left out). */
+  grantHint?: string;
   /** Text for a link from the empty state to `to`, for a kind whose page is where its data gets made. */
   emptyLinkLabel?: string;
   /**

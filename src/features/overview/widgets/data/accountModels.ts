@@ -350,8 +350,24 @@ const miningTax: Builder = (feeds, { t }) => {
   const data = feed?.data ?? null;
   const to = '/mining/tax';
   if (!data) return blank(to, statusOf(feed));
+  // Account-wide, like Mining yield: one Character without the permission leaves its
+  // ledger out of the figures rather than blanking them, and the grant asks that
+  // Character, not the active one, which may hold it already.
+  const missing = data.missingCharacterIds;
+  const known = missing !== undefined && missing.length > 0;
+  const everyoneMissing = known ? missing.length >= data.characterCount : data.needsReauth;
+  const grant = known
+    ? {
+        grantCharacterId: missing[0],
+        grantHint: t('overview.widgets.miningTax.leavesOut', {
+          names: data.missingCharacterNames.join(', '),
+        }),
+        ...(everyoneMissing ? {} : { grantEndpoints: ['getCharacterMining' as const] }),
+      }
+    : {};
   return {
-    ...blank(to, statusOf(feed, { needsPermission: data.needsReauth })),
+    ...blank(to, statusOf(feed, { needsPermission: everyoneMissing })),
+    ...grant,
     fetchedAt: data.fetchedAt,
     number: {
       value: formatIskCompact(data.unpaidIsk),
