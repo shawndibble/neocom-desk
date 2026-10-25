@@ -27,12 +27,14 @@ const { getDoc, setDoc, FakeTimestamp } = vi.hoisted(() => {
 
 vi.mock('firebase/firestore/lite', () => ({
   getDoc,
+  getFirestore: () => ({}),
+  connectFirestoreEmulator: vi.fn(),
   setDoc,
   doc: (_db: unknown, collection: string, id: string) => ({ path: `${collection}/${id}` }),
   serverTimestamp: () => 'SERVER_TIME',
   Timestamp: FakeTimestamp,
 }));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
+vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}), getFirebaseApp: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:1') }));
 
 const NOW = Date.UTC(2026, 9, 2, 12);

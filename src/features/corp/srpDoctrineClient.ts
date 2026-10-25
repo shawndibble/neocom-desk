@@ -22,7 +22,7 @@ export async function readSrpDoctrines(
   if (stand) return stand.list();
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    collection(getSyncFirestore(), 'corps', String(corporationId), 'srpDoctrines')
+    collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'srpDoctrines')
   );
   return snap.docs.map((d) => d.data() as DoctrineFit).sort((a, b) => b.createdAt - a.createdAt);
 }

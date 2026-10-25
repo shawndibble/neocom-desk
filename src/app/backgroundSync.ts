@@ -12,13 +12,13 @@
  * it covers every Character, it runs on a tick *and* on `visibilitychange`
  * (neither alone catches an app switch that leaves the tab foregrounded), and
  * it is gated per Character by {@link BACKGROUND_SYNC_MIN_GAP_MS} because
- * `sync/syncAuth.ensureSignedIn` mints a Firebase custom token per Character.
+ * every pass reads each synced collection. Each Character has its own
+ * persisted Firebase session (`sync/syncAuth.ts`), so a sweep mints a token
+ * only for a Character whose session is gone.
  *
- * That one Firebase session is also why the order matters: the sweep queues
- * the active Character last, so the session is left on the Character the
- * user is editing, and it queues everything as background priority so an
- * edit-triggered sync overtakes the rest of the sweep (`sync/planSync.ts`
- * `SyncPriority`) instead of waiting behind every Character.
+ * The sweep queues the active Character last and everything as background
+ * priority, so an edit-triggered sync overtakes the rest of the sweep
+ * (`sync/planSync.ts` `SyncPriority`) instead of waiting behind every Character.
  */
 import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
@@ -36,7 +36,7 @@ export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * 60 * 1000;
 
 /**
  * The same gap for every *other* Character. Nobody is looking through them,
- * and each one costs a token mint and a session swap, so they can wait longer.
+ * and each one costs a full pass of reads, so they can wait longer.
  */
 export const BACKGROUND_SYNC_NON_ACTIVE_GAP_MS = 20 * 60 * 1000;
 
@@ -87,9 +87,7 @@ function writeSharedStamps(stamps: ReadonlyMap<number, number>): void {
  * sweep them. Pure so the throttle is testable without a clock or a DOM event.
  *
  * The active Character has the shorter gap and always comes last. It is also
- * appended whenever any other Character is swept, due or not: the sweep signs
- * the one Firebase session in as each Character in turn, and ending on anyone
- * else would make the next edit re-mint the active Character's token.
+ * appended whenever any other Character is swept, due or not.
  */
 export function idsToSweep(
   ids: readonly number[],

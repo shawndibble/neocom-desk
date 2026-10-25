@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { joinTabElection } from '@/lib/tabLeader';
 import { hasShareSelections } from './shareSelection';
 
 /** First publish waits out boot, like the background sync sweep. */
@@ -12,8 +13,8 @@ let sweeping = false;
 /**
  * Keeps each Character's Shared Blueprints current in its Communities (issue
  * #3600): one sweep after boot, then on a timer. Only Characters that share
- * something are signed in for, and the active Character goes last so the
- * Firebase session is left on it (see `app/backgroundSync.ts`).
+ * something are swept. Runs only in the visible Tab Leader for the sweep, like
+ * `app/backgroundSync.ts`: a hidden or follower tab would repeat the work.
  */
 export function usePublishSharedLibraries(
   characterIds: readonly number[] | undefined,
@@ -22,7 +23,9 @@ export function usePublishSharedLibraries(
   const key = characterIds?.join(',') ?? '';
   useEffect(() => {
     if (!characterIds?.length || !isSyncConfigured()) return;
+    const seat = joinTabElection('sweep', () => {});
     const sweep = async () => {
+      if (document.visibilityState !== 'visible' || !seat.isLeader()) return;
       if (sweeping) return;
       sweeping = true;
       try {
@@ -46,6 +49,7 @@ export function usePublishSharedLibraries(
     const boot = setTimeout(() => void sweep(), PUBLISH_BOOT_DELAY_MS);
     const timer = setInterval(() => void sweep(), PUBLISH_INTERVAL_MS);
     return () => {
+      seat.leave();
       clearTimeout(boot);
       clearInterval(timer);
     };

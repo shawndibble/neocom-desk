@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
-import { ensureAnySession, ensureSignedIn, signOutOfSync, uidForCharacter } from './syncAuth';
+import {
+  ensureAnySession,
+  ensureSignedIn,
+  removeCharacterSession,
+  signOutOfSync,
+  uidForCharacter,
+} from './syncAuth';
 import { deferred } from '@/test/deferred';
 
 vi.mock('firebase/auth', () => ({
@@ -16,25 +22,54 @@ vi.mock('@/auth/session', () => ({
   getValidAccessToken: vi.fn(),
 }));
 
-const fakeAuth = { currentUser: null as { uid: string } | null };
+interface FakeAuth {
+  id: number;
+  currentUser: { uid: string; getIdToken?: () => Promise<string> } | null;
+  authStateReady?: () => Promise<void>;
+}
+/** One Auth per Character, like the named apps in `firebaseApp.ts`. */
+const auths = new Map<number, FakeAuth>();
+const fakeAuthFor = (id: number): FakeAuth => {
+  let auth = auths.get(id);
+  if (!auth) {
+    auth = { id, currentUser: null };
+    auths.set(id, auth);
+  }
+  return auth;
+};
+const legacyAuth = { id: 0, currentUser: null };
+const started = vi.hoisted(() => ({ ids: [] as number[] }));
+const disposeCharacterApp = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('./firebaseApp', () => ({
-  getSyncAuth: () => fakeAuth,
+  getSyncAuth: (id: number) => fakeAuthFor(id),
+  getLegacySyncAuth: () => legacyAuth,
   getSyncFunctions: () => ({}),
+  disposeCharacterApp,
 }));
+vi.mock('./firebaseCore', () => ({ startedCharacterIds: () => started.ids }));
 
 const mint = vi.fn();
 
-beforeEach(async () => {
-  vi.clearAllMocks();
-  fakeAuth.currentUser = null;
-  vi.mocked(httpsCallable).mockReturnValue(mint as never);
-  vi.mocked(getValidAccessToken).mockResolvedValue('eve-access-token');
-  mint.mockResolvedValue({ data: { token: 'custom-token', uid: 'char:1', ownerHash: 'h' } });
-  vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-    const user = { uid: token === 'custom-token' ? 'char:1' : 'char:999' };
-    fakeAuth.currentUser = user;
+/** Mint returns `token-<id>`; signing in with it makes that Auth `char:<id>`. */
+function mintPerCharacter() {
+  vi.mocked(getValidAccessToken).mockImplementation(async (id) => `access-${id}`);
+  mint.mockImplementation(async ({ accessToken }: { accessToken: string }) => {
+    const id = accessToken.replace('access-', '');
+    return { data: { token: `token-${id}`, uid: `char:${id}`, ownerHash: 'h' } };
+  });
+  vi.mocked(signInWithCustomToken).mockImplementation(async (auth, token) => {
+    const user = { uid: token.replace('token-', 'char:') };
+    (auth as unknown as FakeAuth).currentUser = user;
     return { user } as never;
   });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  auths.clear();
+  started.ids = [];
+  vi.mocked(httpsCallable).mockReturnValue(mint as never);
+  mintPerCharacter();
 });
 
 describe('uidForCharacter', () => {
@@ -48,257 +83,140 @@ describe('ensureSignedIn', () => {
     const uid = await ensureSignedIn(1);
     expect(uid).toBe('char:1');
     expect(getValidAccessToken).toHaveBeenCalledWith(1);
-    expect(mint).toHaveBeenCalledWith({ accessToken: 'eve-access-token' });
-    expect(signInWithCustomToken).toHaveBeenCalledWith(fakeAuth, 'custom-token');
+    expect(mint).toHaveBeenCalledWith({ accessToken: 'access-1' });
+    expect(signInWithCustomToken).toHaveBeenCalledWith(fakeAuthFor(1), 'token-1');
   });
 
-  it('is a no-op when already signed in as this character', async () => {
-    fakeAuth.currentUser = { uid: 'char:1' };
-    await ensureSignedIn(1);
-    expect(mint).not.toHaveBeenCalled();
-    expect(signInWithCustomToken).not.toHaveBeenCalled();
-  });
-
-  it('re-authenticates on character switch', async () => {
-    fakeAuth.currentUser = { uid: 'char:1' };
-    mint.mockResolvedValue({ data: { token: 'other-token', uid: 'char:2', ownerHash: 'h' } });
-    vi.mocked(signInWithCustomToken).mockImplementation(async () => {
-      const user = { uid: 'char:2' };
-      fakeAuth.currentUser = user;
-      return { user } as never;
-    });
-    const uid = await ensureSignedIn(2);
-    expect(uid).toBe('char:2');
-    expect(mint).toHaveBeenCalledTimes(1);
-  });
-
-  it('coalesces concurrent sign-ins for the same character', async () => {
-    const [a, b] = await Promise.all([ensureSignedIn(1), ensureSignedIn(1)]);
-    expect(a).toBe('char:1');
-    expect(b).toBe('char:1');
-    expect(mint).toHaveBeenCalledTimes(1);
-  });
-
-  it('signs out and throws when the minted uid does not match the character', async () => {
-    mint.mockResolvedValue({ data: { token: 'wrong-token', uid: 'char:999', ownerHash: 'h' } });
-    await expect(ensureSignedIn(1)).rejects.toThrow(/unexpected uid/);
-    expect(signOut).toHaveBeenCalled();
-  });
-});
-
-/** Mint returns `token-<id>`; signing in with it becomes `char:<id>`. */
-function mintPerCharacter() {
-  vi.mocked(getValidAccessToken).mockImplementation(async (id) => `access-${id}`);
-  mint.mockImplementation(async ({ accessToken }: { accessToken: string }) => {
-    const id = accessToken.replace('access-', '');
-    return { data: { token: `token-${id}`, uid: `char:${id}`, ownerHash: 'h' } };
-  });
-}
-
-/** Flush enough microtasks for queued sign-ins to reach `signInWithCustomToken`. */
-async function flush() {
-  for (let i = 0; i < 20; i++) await Promise.resolve();
-}
-
-describe('ensureSignedIn under concurrent sign-ins', () => {
-  beforeEach(async () => {
-    // A leftover sign-in from an earlier test must not leak into this one.
-    await signOutOfSync();
-    fakeAuth.currentUser = null;
-    vi.clearAllMocks();
-    mintPerCharacter();
-  });
-
-  it('never resolves while another character owns the session', async () => {
-    // Firebase swaps `currentUser` as soon as a sign-in lands, but the promise
-    // only settles when the test says so: the last sign-in to land owns the
-    // session, whichever order the callers hear back in.
-    const landings = new Map<string, ReturnType<typeof deferred<void>>>();
-    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-      const user = { uid: token.replace('token-', 'char:') };
-      fakeAuth.currentUser = user;
-      const gate = deferred<void>();
-      landings.set(token, gate);
-      await gate.promise;
-      return { user } as never;
-    });
-
-    const ownerWhenResolved: Record<string, string | undefined> = {};
-    const a = ensureSignedIn(1).then((uid) => {
-      ownerWhenResolved.a = fakeAuth.currentUser?.uid;
-      return uid;
-    });
-    const b = ensureSignedIn(2).then((uid) => {
-      ownerWhenResolved.b = fakeAuth.currentUser?.uid;
-      return uid;
-    });
-
-    await flush();
-    // B hears back first (if it was allowed to start), A last.
-    landings.get('token-2')?.resolve();
-    await flush();
-    landings.get('token-1')?.resolve();
-    await flush();
-    landings.get('token-2')?.resolve();
-    await flush();
-    landings.get('token-1')?.resolve();
-
-    // Serialized, so neither overtakes the other: both resolve, each while it
-    // owns the session.
-    await expect(a).resolves.toBe('char:1');
-    await expect(b).resolves.toBe('char:2');
-    expect(ownerWhenResolved).toEqual({ a: 'char:1', b: 'char:2' });
-  });
-
-  // The two tests below make `currentUser` change under a sign-in without any
-  // `ensureSignedIn` call: in-app sign-ins are serialized, so this models the
-  // cross-tab case, where another tab's sign-in swaps the shared persisted
-  // session.
-
-  it('retries once when a concurrent sign-in overtook it, then resolves as itself', async () => {
-    let calls = 0;
-    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-      calls++;
-      const user = { uid: token.replace('token-', 'char:') };
-      // First landing is immediately overtaken by another character's session.
-      fakeAuth.currentUser = calls === 1 ? { uid: 'char:2' } : user;
-      return { user } as never;
-    });
-
-    await expect(ensureSignedIn(1)).resolves.toBe('char:1');
-    expect(fakeAuth.currentUser?.uid).toBe('char:1');
-    expect(signInWithCustomToken).toHaveBeenCalledTimes(2);
-  });
-
-  it('throws when it is overtaken again on the retry', async () => {
-    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-      const user = { uid: token.replace('token-', 'char:') };
-      fakeAuth.currentUser = { uid: 'char:2' };
-      return { user } as never;
-    });
-
-    await expect(ensureSignedIn(1)).rejects.toThrow(/char:2/);
-    expect(signInWithCustomToken).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('ensureAnySession', () => {
-  beforeEach(async () => {
-    await signOutOfSync();
-    fakeAuth.currentUser = null;
-    vi.clearAllMocks();
-    mintPerCharacter();
-    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-      const user = { uid: token.replace('token-', 'char:') };
-      fakeAuth.currentUser = user;
-      return { user } as never;
-    });
-  });
-
-  it('reuses whatever session is already signed in, even another character', async () => {
-    fakeAuth.currentUser = { uid: 'char:2' };
-    await expect(ensureAnySession(1)).resolves.toBe('char:2');
-    expect(mint).not.toHaveBeenCalled();
-    expect(signInWithCustomToken).not.toHaveBeenCalled();
-    expect(fakeAuth.currentUser?.uid).toBe('char:2');
-  });
-
-  it('waits for an in-flight sign-in instead of starting its own', async () => {
-    const gate = deferred<void>();
-    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-      await gate.promise;
-      const user = { uid: token.replace('token-', 'char:') };
-      fakeAuth.currentUser = user;
-      return { user } as never;
-    });
-
-    const alt = ensureSignedIn(2);
-    await flush();
-    const any = ensureAnySession(1);
-    await flush();
-    gate.resolve();
-
-    await expect(alt).resolves.toBe('char:2');
-    await expect(any).resolves.toBe('char:2');
-    expect(signInWithCustomToken).toHaveBeenCalledTimes(1);
-    expect(fakeAuth.currentUser?.uid).toBe('char:2');
-  });
-
-  it('signs in as the fallback character only when there is no session', async () => {
-    await expect(ensureAnySession(1)).resolves.toBe('char:1');
-    expect(getValidAccessToken).toHaveBeenCalledWith(1);
-    expect(signInWithCustomToken).toHaveBeenCalledTimes(1);
-    expect(fakeAuth.currentUser?.uid).toBe('char:1');
-  });
-
-  it('does not replace a session another sign-in took while it waited its turn', async () => {
-    // Alt 3's sign-in fails with the reader queued behind it and alt 2 behind
-    // that. The reader may sign in as 1 into the empty slot, but only before
-    // alt 2's turn: once alt 2 lands, its pass must keep the session.
-    mint.mockRejectedValueOnce(new Error('mint failed'));
-    const failed = ensureSignedIn(3).catch(() => undefined);
-    const any = ensureAnySession(1);
-    const alt = ensureSignedIn(2);
-
-    await Promise.all([failed, any, alt]);
-
-    expect(fakeAuth.currentUser?.uid).toBe('char:2');
-    expect(vi.mocked(signInWithCustomToken).mock.calls.at(-1)?.[1]).toBe('token-2');
-  });
-
-  it('falls back when the in-flight sign-in failed and left no session', async () => {
-    mint.mockRejectedValueOnce(new Error('mint failed'));
-    const alt = ensureSignedIn(2);
-    const any = ensureAnySession(1);
-
-    await expect(alt).rejects.toThrow(/mint failed/);
-    await expect(any).resolves.toBe('char:1');
-  });
-});
-
-describe('sign-in bounds and restored sessions', () => {
-  beforeEach(async () => {
-    await signOutOfSync();
-    fakeAuth.currentUser = null;
-    vi.clearAllMocks();
-    mintPerCharacter();
-    vi.mocked(signInWithCustomToken).mockImplementation(async (_auth, token) => {
-      const user = { uid: token.replace('token-', 'char:') };
-      fakeAuth.currentUser = user;
-      return { user } as never;
-    });
-  });
-
-  afterEach(() => {
-    delete (fakeAuth as { authStateReady?: unknown }).authStateReady;
-  });
-
-  it('bounds the mint callable so one slow mint cannot stall the sign-in queue', async () => {
+  it('bounds the mint callable', async () => {
     await ensureSignedIn(1);
     expect(httpsCallable).toHaveBeenCalledWith({}, 'mintFirebaseToken', { timeout: 20_000 });
   });
 
-  it('ensureAnySession reuses a persisted session Firebase has not restored yet', async () => {
-    // The session is on disk but `currentUser` is null until restore lands.
-    Object.assign(fakeAuth, {
-      authStateReady: async () => {
-        fakeAuth.currentUser = { uid: 'char:2' };
-      },
-    });
-
-    await expect(ensureAnySession(1)).resolves.toBe('char:2');
+  it('is a no-op when this character already has a session', async () => {
+    fakeAuthFor(1).currentUser = { uid: 'char:1' };
+    await ensureSignedIn(1);
+    expect(mint).not.toHaveBeenCalled();
     expect(signInWithCustomToken).not.toHaveBeenCalled();
-    expect(fakeAuth.currentUser?.uid).toBe('char:2');
   });
 
-  it('ensureSignedIn skips the mint when the restored session is already this character', async () => {
-    Object.assign(fakeAuth, {
-      authStateReady: async () => {
-        fakeAuth.currentUser = { uid: 'char:1' };
-      },
-    });
-
+  it('skips the mint when the restored session is this character', async () => {
+    const auth = fakeAuthFor(1);
+    auth.authStateReady = async () => {
+      auth.currentUser = { uid: 'char:1' };
+    };
     await expect(ensureSignedIn(1)).resolves.toBe('char:1');
     expect(mint).not.toHaveBeenCalled();
+  });
+
+  it('mints again when the session can no longer refresh', async () => {
+    fakeAuthFor(1).currentUser = {
+      uid: 'char:1',
+      getIdToken: async () => {
+        throw new Error('token expired');
+      },
+    };
+    await expect(ensureSignedIn(1)).resolves.toBe('char:1');
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the session when its token refreshes', async () => {
+    const getIdToken = vi.fn(async () => 'fresh');
+    fakeAuthFor(1).currentUser = { uid: 'char:1', getIdToken };
+    await ensureSignedIn(1);
+    expect(getIdToken).toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it('coalesces concurrent sign-ins for the same character', async () => {
+    const [a, b] = await Promise.all([ensureSignedIn(1), ensureSignedIn(1)]);
+    expect([a, b]).toEqual(['char:1', 'char:1']);
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it('signs out and throws when the minted uid does not match the character', async () => {
+    mint.mockResolvedValue({ data: { token: 'token-999', uid: 'char:999', ownerHash: 'h' } });
+    await expect(ensureSignedIn(1)).rejects.toThrow(/unexpected uid/);
+    expect(signOut).toHaveBeenCalledWith(fakeAuthFor(1));
+  });
+});
+
+describe('one session per character', () => {
+  it('a sweep over 4 characters with valid persisted sessions mints nothing', async () => {
+    for (const id of [1, 2, 3, 4]) fakeAuthFor(id).currentUser = { uid: `char:${id}` };
+    for (const id of [1, 2, 3, 4]) await ensureSignedIn(id);
+    await ensureSignedIn(1);
+    expect(mint).not.toHaveBeenCalled();
+    expect(signInWithCustomToken).not.toHaveBeenCalled();
+  });
+
+  it('signing in as another character leaves the first one signed in', async () => {
+    await ensureSignedIn(1);
+    await ensureSignedIn(2);
+    expect(fakeAuthFor(1).currentUser?.uid).toBe('char:1');
+    expect(fakeAuthFor(2).currentUser?.uid).toBe('char:2');
+    // Back to the first: still no second mint for it.
+    await ensureSignedIn(1);
+    expect(mint).toHaveBeenCalledTimes(2);
+  });
+
+  it('two tabs syncing different characters never invalidate each other', async () => {
+    // Each tab's own app instance restores its character's persisted session.
+    const tabA = fakeAuthFor(1);
+    const tabB = fakeAuthFor(2);
+    tabA.currentUser = { uid: 'char:1' };
+    tabB.currentUser = { uid: 'char:2' };
+    await Promise.all([ensureSignedIn(1), ensureSignedIn(2)]);
+    expect(tabA.currentUser?.uid).toBe('char:1');
+    expect(tabB.currentUser?.uid).toBe('char:2');
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it('sign-ins for different characters run side by side', async () => {
+    const gate = deferred<void>();
+    vi.mocked(signInWithCustomToken).mockImplementation(async (auth, token) => {
+      if (token === 'token-1') await gate.promise;
+      const user = { uid: token.replace('token-', 'char:') };
+      (auth as unknown as FakeAuth).currentUser = user;
+      return { user } as never;
+    });
+    const slow = ensureSignedIn(1);
+    await expect(ensureSignedIn(2)).resolves.toBe('char:2');
+    gate.resolve();
+    await expect(slow).resolves.toBe('char:1');
+  });
+});
+
+describe('ensureAnySession', () => {
+  it('is that character’s own session', async () => {
+    await expect(ensureAnySession(1)).resolves.toBe('char:1');
+    expect(fakeAuthFor(1).currentUser?.uid).toBe('char:1');
+  });
+});
+
+describe('removing sessions', () => {
+  afterEach(() => {
+    started.ids = [];
+  });
+
+  it('removeCharacterSession signs out and deletes that character’s app', async () => {
+    await ensureSignedIn(1);
+    await removeCharacterSession(1);
+    expect(signOut).toHaveBeenCalledWith(fakeAuthFor(1));
+    expect(disposeCharacterApp).toHaveBeenCalledWith(1);
+  });
+
+  it('still deletes the app when the sign-out fails', async () => {
+    vi.mocked(signOut).mockRejectedValueOnce(new Error('offline'));
+    await expect(removeCharacterSession(1)).rejects.toThrow('offline');
+    expect(disposeCharacterApp).toHaveBeenCalledWith(1);
+  });
+
+  it('signOutOfSync clears named ids, started apps and the legacy session', async () => {
+    started.ids = [3];
+    await signOutOfSync([1, 2]);
+    expect(
+      (disposeCharacterApp.mock.calls as unknown as number[][]).map((c) => c[0]).sort()
+    ).toEqual([1, 2, 3]);
+    expect(signOut).toHaveBeenCalledWith(legacyAuth);
   });
 });

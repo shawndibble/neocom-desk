@@ -94,7 +94,9 @@ export async function loadRequests(
   if (override?.loadItemRequests) return override.loadItemRequests(communityId);
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
-    return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'));
+    return getDocs(
+      collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests')
+    );
   });
   return snap.docs
     .map((entry) => readRequest(entry.id, entry.data()))
@@ -123,7 +125,7 @@ export async function loadRequestsSince(
       await ensureSignedIn(characterId);
       return getDocs(
         query(
-          collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'),
+          collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests'),
           where('createdAt', '>', since)
         )
       );
@@ -155,7 +157,7 @@ export async function loadMyRequests(
     await ensureSignedIn(characterId);
     return getDocs(
       query(
-        collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'),
+        collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests'),
         where('ownerUid', '==', myUid)
       )
     );
@@ -293,7 +295,7 @@ export async function loadPledges(
     await ensureSignedIn(characterId);
     return getDocs(
       collection(
-        getSyncFirestore(),
+        getSyncFirestore(characterId),
         'communities',
         communityId,
         'itemRequests',
@@ -328,7 +330,10 @@ export async function loadCommunityPledges(
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     return getDocs(
-      query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
+      query(
+        collectionGroup(getSyncFirestore(characterId), 'pledges'),
+        where('communityId', '==', communityId)
+      )
     );
   });
   for (const entry of snap.docs) {
@@ -369,7 +374,7 @@ export async function loadMyPledges(
       await ensureSignedIn(characterId);
       return getDocs(
         query(
-          collectionGroup(getSyncFirestore(), 'pledges'),
+          collectionGroup(getSyncFirestore(characterId), 'pledges'),
           where('communityId', '==', communityId),
           where('ownerHash', '==', ownerHash)
         )
@@ -404,7 +409,7 @@ export async function loadRequestsById(
     await ensureSignedIn(characterId);
     return Promise.all(
       requestIds.map((id) =>
-        getDoc(doc(getSyncFirestore(), 'communities', communityId, 'itemRequests', id))
+        getDoc(doc(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests', id))
       )
     );
   });
@@ -451,7 +456,7 @@ async function writeMyPledge(
   const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
   if (!ownerHash) throw new Error('This Character has no owner hash yet');
   const ref = doc(
-    getSyncFirestore(),
+    getSyncFirestore(characterId),
     'communities',
     communityId,
     'itemRequests',
@@ -459,7 +464,7 @@ async function writeMyPledge(
     'pledges',
     uid
   );
-  const withdrawn = await runTransaction(getSyncFirestore(), async (tx) => {
+  const withdrawn = await runTransaction(getSyncFirestore(characterId), async (tx) => {
     const stored = await tx.get(ref);
     const before = stored.exists() ? readPledge(uid, stored.data()) : null;
     const next = change(before?.lines ?? {});
@@ -516,7 +521,7 @@ export async function saveMyQuote(
     underFirebaseSession(async () => {
       await ensureSignedIn(characterId);
       const ref = doc(
-        getSyncFirestore(),
+        getSyncFirestore(characterId),
         'communities',
         communityId,
         'itemRequests',
@@ -575,7 +580,7 @@ export async function saveQuoteLinks(
       const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
       if (!ownerHash) throw new Error('This Character has no owner hash yet');
       const ref = doc(
-        getSyncFirestore(),
+        getSyncFirestore(characterId),
         'communities',
         communityId,
         'itemRequests',
@@ -583,7 +588,7 @@ export async function saveQuoteLinks(
         'pledges',
         uid
       );
-      await runTransaction(getSyncFirestore(), async (tx) => {
+      await runTransaction(getSyncFirestore(characterId), async (tx) => {
         const stored = await tx.get(ref);
         const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
         if (!quote || quote.quotedAt !== quotedAt) return;

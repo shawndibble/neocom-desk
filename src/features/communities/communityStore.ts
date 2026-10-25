@@ -73,7 +73,9 @@ export function isCommunityAdmin(community: CommunitySummary, characterId: numbe
 /** The Communities a Character belongs to, from its own membership index. */
 export async function listCommunityIds(characterId: number): Promise<string[]> {
   const uid = await ensureSignedIn(characterId);
-  const index = await getDocs(collection(getSyncFirestore(), 'characters', uid, 'communities'));
+  const index = await getDocs(
+    collection(getSyncFirestore(characterId), 'characters', uid, 'communities')
+  );
   return index.docs.map((entry) => entry.id);
 }
 
@@ -169,7 +171,7 @@ export async function loadMyCommunities(characterId: number): Promise<CommunityS
 
 async function readMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const uid = await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const index = await getDocs(collection(db, 'characters', uid, 'communities'));
   const loaded = await Promise.all(
     index.docs.map(async (entry): Promise<CommunitySummary | null> => {
@@ -228,7 +230,9 @@ async function readCommunityMembers(
   communityId: string
 ): Promise<CommunityMember[]> {
   await ensureSignedIn(characterId);
-  const snap = await getDocs(collection(getSyncFirestore(), 'communities', communityId, 'members'));
+  const snap = await getDocs(
+    collection(getSyncFirestore(characterId), 'communities', communityId, 'members')
+  );
   return snap.docs
     .map((entry) => ({
       uid: entry.id,
@@ -248,7 +252,7 @@ export async function loadJoinRequests(
   if (override) return override.loadRequests(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    collection(getSyncFirestore(), 'communities', communityId, 'requests')
+    collection(getSyncFirestore(characterId), 'communities', communityId, 'requests')
   );
   return snap.docs
     .map((entry) => ({
@@ -291,7 +295,7 @@ export async function loadMemberLibrariesFor(
       strict
     );
   }
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const failedUids: string[] = [];
   const libraries = await Promise.all(
     members.map(async ({ uid, libraryAsOf: asOf }): Promise<MemberLibrary> => {
@@ -353,7 +357,7 @@ async function readMemberLibraries(
     };
   }
   await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const failedUids: string[] = [];
   const libraries = await Promise.all(
     memberUids.map(async (uid) => {
@@ -520,7 +524,7 @@ export async function loadMailInviteStatus(
 ): Promise<{ remaining: number; sent: SentMailInvite[] }> {
   if (communityBackendOverride()) return { remaining: MAX_MAIL_INVITES_PER_DAY, sent: [] };
   const uid = await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const day = new Date(now).toISOString().slice(0, 10);
   const [quota, invites] = await Promise.all([
     getDoc(doc(db, 'characters', uid, 'mailInviteQuota', day)),

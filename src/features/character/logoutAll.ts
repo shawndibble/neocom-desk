@@ -42,7 +42,7 @@ export async function logoutAllCharacters(
   scheduleProjectionRebuild.cancel();
   await unregisterProjectionRegistration();
   if (syncConfigured) {
-    await signOutOfSync().catch(() => {
+    await signOutOfSync(ids).catch(() => {
       // Nothing more to undo: the tokens that could re-mint it are gone.
     });
   }

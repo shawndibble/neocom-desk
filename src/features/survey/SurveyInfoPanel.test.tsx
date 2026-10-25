@@ -65,6 +65,7 @@ describe('SurveyInfoEditor', () => {
     fireEvent.click(screen.getByText('pick'));
     await waitFor(() =>
       expect(setSurveyInfo).toHaveBeenCalledWith({
+        characterId: expect.any(Number),
         id: 'abc123XYZ',
         expiresAt: 5000,
         location: { id: 30001, name: 'Efa' },
@@ -96,6 +97,7 @@ describe('SurveyInfoEditor', () => {
     fireEvent.blur(notes);
     await waitFor(() =>
       expect(setSurveyInfo).toHaveBeenCalledWith({
+        characterId: expect.any(Number),
         id: 'abc123XYZ',
         expiresAt: 5000,
         location: { id: 30001, name: 'Efa' },
@@ -119,6 +121,7 @@ describe('SurveyInfoEditor', () => {
     fireEvent.click(screen.getByText('clear'));
     await waitFor(() =>
       expect(setSurveyInfo).toHaveBeenCalledWith({
+        characterId: expect.any(Number),
         id: 'abc123XYZ',
         expiresAt: 5000,
         location: null,

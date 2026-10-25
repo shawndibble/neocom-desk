@@ -15,7 +15,8 @@ import { deleteCommunitySnapshots } from '@/features/communities/communityCache'
 import { deleteShareSelections } from '@/features/communities/shareSelection';
 import { db } from '@/db';
 import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/cachePurge';
-import { clearCharacterSyncBookkeeping, triggerSync } from '@/sync';
+import { isSyncConfigured } from '@/app/syncStatus';
+import { clearCharacterSyncBookkeeping, removeCharacterSession, triggerSync } from '@/sync';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { deleteFeedForCharacter } from '@/features/notifications/feed';
@@ -152,6 +153,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
     }
   );
   await forgetAlertsGrants([characterId]);
+  // Its own Firebase app and persisted session go with it (issue #5074).
+  if (isSyncConfigured()) await removeCharacterSession(characterId).catch(() => {});
   await refreshAppBadge();
   await purgeCharacterCacheOrSuppress(characterId);
   // Not part of that purge: the shared rows aren't this Character's own —

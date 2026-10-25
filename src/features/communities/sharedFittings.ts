@@ -154,7 +154,7 @@ async function readCommunityFittings(
   communityId: string
 ): Promise<SharedFitting[]> {
   await ensureSignedIn(characterId);
-  const snap = await getDocs(fittingsOf(getSyncFirestore(), communityId));
+  const snap = await getDocs(fittingsOf(getSyncFirestore(characterId), communityId));
   const loaded: SharedFitting[] = [];
   for (const entry of snap.docs) {
     const parsed = parseSharedFittingId(entry.id);
@@ -195,7 +195,7 @@ export async function loadMySharedFittingKeys(
   }
   const uid = await ensureSignedIn(characterId);
   const mine = await getDocs(
-    query(fittingsOf(getSyncFirestore(), communityId), where('ownerUid', '==', uid))
+    query(fittingsOf(getSyncFirestore(characterId), communityId), where('ownerUid', '==', uid))
   );
   const keys = new Set<string>();
   for (const entry of mine.docs) {
@@ -291,7 +291,7 @@ export async function shareFitting(
   await changingFittings(characterId, communityId, () =>
     setDoc(
       doc(
-        getSyncFirestore(),
+        getSyncFirestore(characterId),
         'communities',
         communityId,
         'fittings',
@@ -312,7 +312,7 @@ export async function unshareFitting(
   await changingFittings(characterId, communityId, () =>
     deleteDoc(
       doc(
-        getSyncFirestore(),
+        getSyncFirestore(characterId),
         'communities',
         communityId,
         'fittings',
@@ -339,7 +339,7 @@ export async function shareFittings(
     )
   ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   await changingFittings(characterId, communityId, async () => {
     for (let start = 0; start < docs.length; start += BATCH_SIZE) {
       const batch = writeBatch(db);
@@ -356,7 +356,7 @@ export async function shareFittings(
 /** Stops sharing every Fitting this Character put in one Community. */
 export async function unshareAllFittings(characterId: number, communityId: string): Promise<void> {
   const uid = await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const mine = await getDocs(query(fittingsOf(db, communityId), where('ownerUid', '==', uid)));
   await changingFittings(characterId, communityId, async () => {
     for (let start = 0; start < mine.docs.length; start += BATCH_SIZE) {
@@ -390,7 +390,7 @@ export async function followSavedFitting(
       key: record.id,
     });
     await ensureSignedIn(characterId);
-    const db = getSyncFirestore();
+    const db = getSyncFirestore(characterId);
     // The list may be cached; each copy's existence is read fresh, so one deleted on another
     // device is never brought back.
     await withMyCommunities(characterId, (communities) =>

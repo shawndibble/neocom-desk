@@ -115,7 +115,7 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
     import('./requestStore'),
   ]);
   const myUid = uidForCharacter(characterId);
-  if (getSyncAuth().currentUser?.uid !== myUid) return;
+  if (getSyncAuth(characterId).currentUser?.uid !== myUid) return;
   const started = generation;
   const next = await store.withMyCommunities(
     characterId,

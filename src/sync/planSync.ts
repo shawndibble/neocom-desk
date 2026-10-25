@@ -456,7 +456,7 @@ async function syncCharacter(characterId: number, requested: SyncScope): Promise
   const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
 
   const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore();
+  const firestore = getSyncFirestore(characterId);
   const ownerHash = character.ownerHash;
   const now = Date.now();
   const ctx: SyncContext = { firestore, uid, ownerHash, characterId, now };

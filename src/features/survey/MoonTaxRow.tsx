@@ -219,8 +219,10 @@ export function MoonTaxRow({
     const key = `${surveyId}|${name}|${pct}`;
     if (sent.current === key) return;
     sent.current = key;
-    void setSurveyTax({ id: surveyId, expiresAt: surveyExpires, name, pct }).catch(() => undefined);
-  }, [surveyId, surveyExpires, published, focused, name, pct]);
+    void setSurveyTax({ id: surveyId, expiresAt: surveyExpires, name, pct, characterId }).catch(
+      () => undefined
+    );
+  }, [surveyId, surveyExpires, published, focused, name, pct, characterId]);
 
   function changeName(next: string) {
     // Picking a known Payee brings its rate along; typing a new name keeps the rate.

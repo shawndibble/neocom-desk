@@ -125,7 +125,7 @@ export async function loadCommunityAlertEntries(
     import('./requestStore'),
   ]);
   const myUid = uidForCharacter(characterId);
-  if (getSyncAuth().currentUser?.uid !== myUid) return null;
+  if (getSyncAuth(characterId).currentUser?.uid !== myUid) return null;
   return store.withMyCommunities(characterId, async (mine) => {
     if (admin) await rememberCommunityAdmin(characterId, mine);
     const entries: CommunityAlertEntry[] = [];

@@ -83,7 +83,7 @@ async function readMyClaims(characterId: number, corporationId: number): Promise
   // Both fields are what the rule checks, so a query without either is refused outright.
   const snap = await getDocs(
     query(
-      collection(getSyncFirestore(), 'corps', String(corporationId), 'srpClaims'),
+      collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'srpClaims'),
       where('uid', '==', uid),
       where('ownerHash', '==', ownerHash)
     )

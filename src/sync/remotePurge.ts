@@ -26,7 +26,7 @@ async function deleteAllDocs(firestore: Firestore, uid: string, name: string): P
  */
 export async function purgeCharacterRemoteData(characterId: number): Promise<void> {
   const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore();
+  const firestore = getSyncFirestore(characterId);
   for (const name of REMOTE_COLLECTION_NAMES) {
     await deleteAllDocs(firestore, uid, name);
   }
