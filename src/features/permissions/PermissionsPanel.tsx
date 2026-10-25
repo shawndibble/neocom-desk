@@ -174,9 +174,10 @@ export function PermissionsPanel() {
             <>
               <span className="text-text-dim">{t('settings.permissions.missing')}</span>
               {/*
-                `ghost`, not `primary`: /settings already spends its
-                one primary on the notifications panel's Enable
-                (docs/DESIGN.md §6, "One `primary` button per view").
+                `ghost`, not `primary`: the per-row grants repeat down the
+                list, so the one `primary` of this view is the bulk
+                "Grant selected" button (docs/DESIGN.md §6, "One `primary`
+                button per view"; each Settings section is its own view).
               */}
               <NeedsConnection>
                 <Button
@@ -254,7 +255,7 @@ export function PermissionsPanel() {
                     <Button
                       size="sm"
                       variant="primary"
-                      className="slide-in-left"
+                      className="grant-selected-in"
                       onClick={() => grant(chosen)}
                     >
                       {t('settings.permissions.grantSelected', { count: chosen.length })}

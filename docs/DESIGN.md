@@ -987,7 +987,8 @@ row.
 **Bulk selection.** A list where one action applies to many rows (Settings ›
 Permissions: grant several at once) puts a leading checkbox only on rows the
 action can still apply to, with Select all / Select none above the list and a
-count-labelled button ("Grant selected (3)") that appears once a row is ticked.
+count-labelled `primary` button ("Grant selected (3)") that appears once a row is ticked,
+sliding in from the left (200ms; none under reduced motion).
 The per-row action stays. Ticks belong to the context they were made in and
 clear when it changes (a different Character).
 
