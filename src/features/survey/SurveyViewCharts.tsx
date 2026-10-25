@@ -52,7 +52,7 @@ function useScannedBy(summary: SurveySummary) {
     });
 }
 
-function Swatch({ tone }: { tone: string }) {
+export function Swatch({ tone }: { tone: string }) {
   return (
     <span aria-hidden="true" className="size-2 shrink-0 rounded-xs" style={{ background: tone }} />
   );
@@ -335,6 +335,21 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
+/** A scan interval tooltip's first lines: its EVE time range and its length. */
+export function IntervalTipHeader({ from, to }: { from: number; to: number }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="font-semibold text-text">
+        {t('survey.paceRange', { from: formatEveClock(from), to: formatEveClock(to) })}
+      </div>
+      <div className="text-text-dim">
+        {t('survey.paceLength', { length: formatDuration(to - from) })}
+      </div>
+    </>
+  );
+}
+
 /** The pace tooltip's content for one interval: ores ranked by share, idle ones left out. */
 export function PaceTipBody({
   interval,
@@ -352,15 +367,7 @@ export function PaceTipBody({
   return (
     <ChartTooltipShell>
       <div className="min-w-48 space-y-1 text-xs">
-        <div className="font-semibold text-text">
-          {t('survey.paceRange', {
-            from: formatEveClock(interval.from),
-            to: formatEveClock(interval.to),
-          })}
-        </div>
-        <div className="text-text-dim">
-          {t('survey.paceLength', { length: formatDuration(interval.to - interval.from) })}
-        </div>
+        <IntervalTipHeader from={interval.from} to={interval.to} />
         <div>{t('survey.paceProgress', { percent: formatPace(interval.progress) })}</div>
         {ranked.length > 0 && (
           <div className="space-y-0.5 border-t border-line pt-1">
