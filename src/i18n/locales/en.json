@@ -6740,7 +6740,6 @@
     "chartVolume": "Volume left",
     "chartRate": "Mining rate",
     "chartRateAxis": "m³/s",
-    "rateValue": "{{rate}} m³/s",
     "chartRateByOre": "Share of each scan's progress, by ore",
     "paceRange": "{{from}} to {{to}} EVE",
     "paceLength": "{{length}} between scans",

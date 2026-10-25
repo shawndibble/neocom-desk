@@ -37,25 +37,6 @@ describe('SurveyCharts text version', () => {
     expect(rate.closest('figure')).not.toBeNull();
     expect(rate.closest('[role="img"]')).toBeNull();
   });
-
-  it('splits the rate table by ore, with a dash where an ore was not mined', () => {
-    render(<SurveyCharts summary={summary} />);
-    const rate = screen.getByRole('table', { name: /mining rate/i });
-    expect(within(rate).getByRole('columnheader', { name: 'Veldspar' })).toBeInTheDocument();
-    expect(within(rate).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
-    const [, first, second] = within(rate).getAllByRole('row');
-    // 200 + 100 m3 over 60 s, then 300 m3 of Veldspar only.
-    expect(
-      within(first)
-        .getAllByRole('cell')
-        .map((c) => c.textContent)
-    ).toEqual(expect.arrayContaining(['5 m³/s', '3.3 m³/s', '1.7 m³/s']));
-    expect(
-      within(second)
-        .getAllByRole('cell')
-        .map((c) => c.textContent)
-    ).toEqual(expect.arrayContaining(['5 m³/s', '–']));
-  });
 });
 
 describe('SurveyCharts views', () => {

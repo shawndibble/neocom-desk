@@ -1,7 +1,7 @@
 /**
  * The pace figures under the Survey's charts, on the same time axis as the chart
  * above them: `TotalPaceFigure` (Ore left) is the mining rate between each pair
- * of scans, stacked by the ores mined in it; `ByOrePaceFigure` (Depletion by ore) is, per interval, each ore's
+ * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per interval, each ore's
  * share of the progress made (a 100% bar). Each carries its hidden data table.
  * Statically imports `recharts`, so — same rule as `SurveyCharts.tsx` — this must only
  * be reached through a dynamic `import()` from `SurveyBoard.tsx`.
@@ -17,27 +17,14 @@ import {
   LabelList,
   ReferenceLine,
   ResponsiveContainer,
-  Tooltip,
-  type TooltipContentProps,
 } from 'recharts';
-import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
-import {
-  paceShareSeries,
-  rateByOreSeries,
-  type PaceInterval,
-  type RateInterval,
-  type RateRow,
-} from '@/engine/survey/chartViews';
+import { paceShareSeries, type PaceInterval } from '@/engine/survey/chartViews';
 import { formatCount } from '@/lib/formatCount';
 import { MARGIN, formatPace, thinLabels, timeAxis, yAxis } from './surveyChartParts';
-import { IntervalTipHeader, PaceByOreChart, Swatch } from './SurveyViewCharts';
-import { oreTone } from './surveyTones';
-
-/** A rate, m³/s: one decimal under 10 so a slow ore doesn't read as 0, else a grouped whole number. */
-const formatRate = (v: number): string => (v >= 10 ? formatCount(v) : formatPace(v));
+import { PaceByOreChart } from './SurveyViewCharts';
 
 /** Room a rate label needs, in px: "1,116" at 10px. */
 const RATE_LABEL_GAP = 34;
@@ -65,67 +52,29 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
   const [plotWidth, setPlotWidth] = useState(0);
   const { domain, xAxis } = timeAxis(summary);
   const label = t('survey.chartRate');
-  const series = useMemo(() => rateByOreSeries(summary), [summary]);
-  const { intervals, rows, activeOres, toneIndex } = series;
-  const columns = useMemo<DataTableColumn<RateInterval>[]>(
+  const columns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
     () => [
       { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
       { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
       {
         id: 'rate',
         header: t('survey.tableRate'),
-        render: (i) => t('survey.rateValue', { rate: formatRate(i.rate) }),
+        render: (i) => `${formatCount(i.rate)} m³/s`,
       },
-      ...activeOres.map((ore) => ({
-        id: `ore:${ore}`,
-        header: ore,
-        render: (i: RateInterval) =>
-          i.rates[ore] === undefined
-            ? '–'
-            : t('survey.rateValue', { rate: formatRate(i.rates[ore]) }),
-      })),
     ],
-    [activeOres, t]
+    [t]
   );
 
-  function Tip({ active, payload }: TooltipContentProps) {
-    const row = payload?.[0]?.payload as RateRow | undefined;
-    const interval = row === undefined ? undefined : intervals[row.interval];
-    if (!active || interval === undefined) return null;
-    const ranked = activeOres
-      .filter((ore) => interval.rates[ore] !== undefined)
-      .sort((a, b) => interval.rates[b] - interval.rates[a]);
-    return (
-      <ChartTooltipShell>
-        <div className="min-w-48 space-y-1 text-xs">
-          <IntervalTipHeader from={interval.from} to={interval.to} />
-          {ranked.length > 0 && (
-            <div className="space-y-0.5 border-t border-line pt-1">
-              {ranked.map((ore) => (
-                <div key={ore} className="flex items-center gap-2">
-                  <Swatch tone={oreTone(toneIndex[ore])} />
-                  <span className="min-w-0 flex-1 truncate">{ore}</span>
-                  <span className="text-text">
-                    {t('survey.rateValue', { rate: formatRate(interval.rates[ore]) })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-between gap-4 border-t border-line pt-1 font-semibold text-text">
-            <span>{t('survey.chartTotal')}</span>
-            <span>{t('survey.rateValue', { rate: formatRate(interval.rate) })}</span>
-          </div>
-        </div>
-      </ChartTooltipShell>
-    );
-  }
-
-  // Each interval is one flat block from the earlier scan to the later, stacked
-  // by the ores mined in it: step areas over the series' rows, closed at the
-  // last scan. The totals are labelled at the middle of each block.
-  if (intervals.length === 0) return null;
-  const rateLabels = intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
+  // The rate is one flat block per pair of scans, from the earlier scan to the
+  // later: a step area drawn from each interval's start, closed at the last
+  // scan. The values are labelled at the middle of each block.
+  const last = summary.intervals[summary.intervals.length - 1];
+  if (last === undefined) return null;
+  const rateSteps = [
+    ...summary.intervals.map((i) => ({ at: i.from, rate: i.rate })),
+    { at: last.to, rate: last.rate },
+  ];
+  const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
   // Labels are thinned to the ones that fit; the tooltip carries the rest.
   const shown = thinLabels(
     rateLabels.map((r) => ({ at: r.at, weight: r.rate })),
@@ -133,24 +82,14 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
     plotWidth,
     scalePx(RATE_LABEL_GAP)
   );
-  // Each shown total rides on its interval's middle row. No item-level `data`: Recharts would
-  // index the tooltip by it and snap to the wrong interval.
-  const labelAt = new Set(rateLabels.filter((_, i) => shown.has(i)).map((r) => r.at));
-  const chartRows = rows.map((r) =>
-    r.interval >= 0 && labelAt.has(r.at) ? { ...r, rateLabel: r.total } : r
-  );
+  const shownRateLabels = rateLabels.filter((_, i) => shown.has(i));
 
   return (
     <PaceFigure
       label={label}
       chart={
         <ResponsiveContainer onResize={(w) => setPlotWidth(w)}>
-          {/* Recharts stacks in the order the areas first registered, so a new set of ores remounts the chart. */}
-          <ComposedChart
-            key={activeOres.join('|')}
-            data={chartRows}
-            margin={{ ...MARGIN, top: 20 }}
-          >
+          <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
             <CartesianGrid stroke="var(--color-line)" vertical={false} />
             {xAxis(false)}
             {yAxis({
@@ -162,45 +101,37 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
                 fontSize: '0.625rem',
               },
             })}
-            {/* Stacked bottom-up, so the most valuable ore (first) is drawn last, on top, as on Ore left. No outline: an idle ore's zero-height layer would draw its colour along the stack's edge. */}
-            {activeOres
-              .slice()
-              .reverse()
-              .map((ore) => (
-                <Area
-                  key={ore}
-                  dataKey={ore}
-                  name={ore}
-                  type="stepAfter"
-                  stackId="rate"
-                  stroke="none"
-                  fill={oreTone(toneIndex[ore])}
-                  fillOpacity={0.6}
-                  activeDot={false}
-                  isAnimationActive={false}
-                />
-              ))}
+            <Area
+              data={rateSteps}
+              dataKey="rate"
+              type="stepAfter"
+              stroke="var(--color-accent)"
+              fill="var(--color-accent-dim)"
+              fillOpacity={0.75}
+              isAnimationActive={false}
+            />
             <Line
-              dataKey="rateLabel"
+              data={shownRateLabels}
+              dataKey="rate"
               stroke="none"
               dot={false}
-              activeDot={false}
               isAnimationActive={false}
               legendType="none"
             >
               <LabelList
-                dataKey="rateLabel"
+                dataKey="rate"
                 position="top"
                 offset={4}
                 fill="var(--color-text)"
                 fontSize="0.625rem"
-                formatter={(value: unknown) => (typeof value === 'number' ? formatRate(value) : '')}
+                formatter={(value: unknown) =>
+                  typeof value === 'number' ? formatCount(value) : ''
+                }
               />
             </Line>
             {summary.pace !== null && (
               <ReferenceLine y={summary.pace} stroke="var(--color-text)" strokeDasharray="5 4" />
             )}
-            <Tooltip content={Tip} cursor={false} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       }
@@ -208,7 +139,7 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
         <DataTable
           columns={columns}
           responsive="table"
-          rows={intervals}
+          rows={summary.intervals}
           rowKey={(i) => i.from}
           label={label}
         />
