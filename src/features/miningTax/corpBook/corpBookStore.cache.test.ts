@@ -57,6 +57,7 @@ vi.mock('@/features/character/structures', () => ({ loadStructureName: async () 
 const { clearBookCache } = await import('@/features/corp/taxBook/bookCache');
 const { loadCorpBooks } = await import('./corpBookStore');
 const { db } = await import('@/db');
+const { clearNotFound } = await import('@/sync/notFoundCache');
 
 const CORP = 98000001;
 const BOOK = `corps/${CORP}`;
@@ -107,6 +108,28 @@ describe('loadCorpBooks over the version marker', () => {
     expect(again).toEqual(first);
     expect(again?.miners).toEqual([{ id: 'solo:5', characterIds: [ME], mainCharacterId: ME }]);
     expect(again?.feeders).toHaveLength(1);
+  });
+
+  it('skips the pointer and book reads while their misses are remembered', async () => {
+    store.docs.delete(POINTER);
+    store.docs.delete(BOOK);
+    expect(await loadCorpBooks(me)).toEqual([]);
+    store.reads.length = 0;
+
+    expect(await loadCorpBooks(me)).toEqual([]);
+
+    expect(store.reads).toEqual([]);
+  });
+
+  it('reads the book again once its miss is cleared', async () => {
+    store.docs.delete(BOOK);
+    await loadCorpBooks(me);
+    store.docs.set(BOOK, stamped());
+    await clearNotFound(BOOK);
+
+    const [book] = await loadCorpBooks(me);
+
+    expect(book?.corporationId).toBe(CORP);
   });
 
   it('re-reads only the part a write restamped', async () => {

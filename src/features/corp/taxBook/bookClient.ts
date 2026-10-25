@@ -605,13 +605,17 @@ export async function turnOnBook(
   startRatePct: number
 ): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'turnOnCorpTaxBookCallable', {
-    corporationId,
-    accessToken,
-    startDate,
-    startRatePct,
-  });
-  await clearNotFound(`corps/${corporationId}`);
+  try {
+    await call(characterId, 'turnOnCorpTaxBookCallable', {
+      corporationId,
+      accessToken,
+      startDate,
+      startRatePct,
+    });
+  } finally {
+    // Also on a throw: the server may have written the book before the call failed.
+    await clearNotFound(`corps/${corporationId}`);
+  }
 }
 
 /**

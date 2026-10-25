@@ -12,7 +12,7 @@ const KEY_PREFIX = 'notFound:';
 /** How long each kind of miss is trusted before the document is read again. */
 export const NOT_FOUND_TTL_MS = {
   /** Written by the sync when a book starts billing the Character, so recheck often. */
-  billedByPointer: 2 * 3_600_000,
+  billedByPointer: 3_600_000,
   /** A corp with no book: turning one on clears this on this device. */
   corpBook: 6 * 3_600_000,
   /** A deleted Community never returns (new ones get new ids). */
