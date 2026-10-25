@@ -1,9 +1,9 @@
 /**
  * The pace figures under the Survey's charts, on the same time axis as the chart
  * above them: `TotalPaceFigure` (Ore left) is the mining rate between each pair
- * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is that rate stacked
- * by ore. Each carries its hidden data table. Statically imports `recharts`, so —
- * same rule as `SurveyCharts.tsx` — this must only be reached through a dynamic
+ * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per ore, the percent of
+ * its starting total mined in each interval. Each carries its hidden data table.
+ * Statically imports `recharts`, so — same rule as `SurveyCharts.tsx` — this must only be reached through a dynamic
  * `import()` from `SurveyBoard.tsx`.
  */
 import { scalePx } from '@/lib/fontScale';
@@ -23,7 +23,7 @@ import { formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
 import { paceByOreSeries, type PaceInterval } from '@/engine/survey/chartViews';
 import { formatCount } from '@/lib/formatCount';
-import { MARGIN, thinLabels, timeAxis, yAxis } from './surveyChartParts';
+import { MARGIN, formatPace, thinLabels, timeAxis, yAxis } from './surveyChartParts';
 import { PaceByOreChart } from './SurveyViewCharts';
 
 /** Room a rate label needs, in px: "1,116" at 10px. */
@@ -152,19 +152,21 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
   const label = t('survey.chartRateByOre');
   const pace = useMemo(() => paceByOreSeries(summary), [summary]);
-  const columns = useMemo<DataTableColumn<PaceInterval>[]>(() => {
-    const unit = (rate: number) => t('survey.paceUnit', { rate: formatCount(rate) });
-    return [
+  const columns = useMemo<DataTableColumn<PaceInterval>[]>(
+    () => [
       { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
       { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
-      { id: 'total', header: t('survey.chartTotal'), render: (i) => unit(i.total) },
       ...pace.activeOres.map((ore) => ({
         id: `ore:${ore}`,
         header: ore,
-        render: (i: PaceInterval) => unit(i.rates[ore] ?? 0),
+        render: (i: PaceInterval) =>
+          i.percents[ore] === undefined
+            ? ''
+            : t('survey.paceTablePercent', { percent: formatPace(i.percents[ore]) }),
       })),
-    ];
-  }, [pace.activeOres, t]);
+    ],
+    [pace.activeOres, t]
+  );
 
   if (summary.intervals.length === 0) return null;
   return (

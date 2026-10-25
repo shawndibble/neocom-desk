@@ -85,60 +85,73 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   return { rows, pricedOres, unpricedOres, toneIndex };
 }
 
-/** One scan interval's pace split by ore. */
+/** One scan interval: how much of each ore's starting total was mined in it. */
 export interface PaceInterval {
   from: number;
   to: number;
-  /** m³/s over the interval: the sum of `rates`. */
-  total: number;
-  /** m³/s per active ore; 0 when nobody mined it. */
-  rates: Record<string, number>;
+  /**
+   * Percent of the ore's starting total (`SurveyOre.startVolume`) mined in this interval, raw
+   * (not per hour: a long gap reads as a tall value). Only ores mined in it are present.
+   */
+  percents: Record<string, number>;
+  /** m³ mined per ore, for the tooltip's secondary figure. */
+  minedByOre: Record<string, number>;
 }
 
 export interface PaceByOreSeries {
-  /** One entry per interval, for tables. */
+  /** One entry per interval, for tables and the tooltip. */
   intervals: PaceInterval[];
   /**
-   * Plot rows for a stacked area: two per interval, at its start and 1 ms before its end, so
-   * the nearest-row hover reads the interval under the cursor. Each carries `from`/`to`, `total`
-   * and one key per active ore (m³/s).
+   * Plot rows for per-ore lines: three per interval (its start, its middle and 1 ms before its
+   * end), each with `from`/`to` and a key per ore mined in it. An ore not mined in an interval
+   * has no key, so its line breaks. The middle row carries `mid: 1`, where a lone interval gets
+   * its dot.
    */
   rows: SurveySeriesRow[];
   /** Ores mined in at least one interval, in `oreNames` order. */
   activeOres: string[];
   /** Each ore's index in `summary.oreNames`, for its colour. */
   toneIndex: Record<string, number>;
+  /** The largest percent in any interval; 0 when nothing was mined. */
+  maxPercent: number;
 }
 
 /**
- * The pace panel's "By ore" view: each interval's rate split by ore. Intervals are as long as the
- * gap between scans, so every value is m³ over the interval's own seconds, however uneven.
+ * The Depletion view's pace chart: per scan interval, the percent of each ore's starting total
+ * that was mined. The denominator is fixed per ore (its `startVolume`, as the depletion lines
+ * use), so ores of any size read on the same scale.
  */
 export function paceByOreSeries(summary: SurveySummary): PaceByOreSeries {
   const toneIndex: Record<string, number> = {};
   summary.oreNames.forEach((ore, i) => {
     toneIndex[ore] = i;
   });
-  const mined = new Set<string>();
-  for (const i of summary.intervals) for (const ore of Object.keys(i.minedByOre)) mined.add(ore);
-  const activeOres = summary.oreNames.filter((o) => mined.has(o));
+  const startOf = new Map(summary.ores.map((o) => [o.ore, o.startVolume]));
+  const active = new Set<string>();
+  let maxPercent = 0;
 
   const intervals: PaceInterval[] = summary.intervals.map((i) => {
-    const seconds = (i.to - i.from) / 1000;
-    const rates: Record<string, number> = {};
-    let total = 0;
-    for (const ore of activeOres) {
-      rates[ore] = (i.minedByOre[ore] ?? 0) / seconds;
-      total += rates[ore];
+    const percents: Record<string, number> = {};
+    const minedByOre: Record<string, number> = {};
+    for (const [ore, volume] of Object.entries(i.minedByOre)) {
+      const start = startOf.get(ore) ?? 0;
+      if (volume <= 0 || start <= 0) continue;
+      const percent = clampPercent((volume / start) * 100);
+      percents[ore] = percent;
+      minedByOre[ore] = volume;
+      active.add(ore);
+      maxPercent = Math.max(maxPercent, percent);
     }
-    return { from: i.from, to: i.to, total, rates };
+    return { from: i.from, to: i.to, percents, minedByOre };
   });
   const rows = intervals.flatMap((i) => {
-    const row = { from: i.from, to: i.to, total: i.total, ...i.rates };
+    const row = { from: i.from, to: i.to, ...i.percents };
     return [
       { ...row, at: i.from },
+      { ...row, at: (i.from + i.to) / 2, mid: 1 },
       { ...row, at: i.to - 1 },
     ];
   });
-  return { intervals, rows, activeOres, toneIndex };
+  const activeOres = summary.oreNames.filter((o) => active.has(o));
+  return { intervals, rows, activeOres, toneIndex, maxPercent };
 }

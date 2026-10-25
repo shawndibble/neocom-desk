@@ -49,7 +49,11 @@ export function timeAxis(summary: SurveySummary): {
 
 /** The standard value axis; `compact` narrows it, `label` adds an axis title. */
 export function yAxis(
-  opts: { compact?: boolean; label?: React.ComponentProps<typeof YAxis>['label'] } = {}
+  opts: {
+    compact?: boolean;
+    label?: React.ComponentProps<typeof YAxis>['label'];
+    domain?: React.ComponentProps<typeof YAxis>['domain'];
+  } = {}
 ): ReactElement {
   return (
     <YAxis
@@ -58,6 +62,7 @@ export function yAxis(
       stroke="var(--color-line-bright)"
       tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
       label={opts.label}
+      domain={opts.domain}
     />
   );
 }
@@ -106,3 +111,7 @@ export function thinLabels(
     gap
   );
 }
+
+/** A percent for display: whole numbers from 10 up, one decimal below, so small ores stay readable. */
+export const formatPace = (v: number): string =>
+  String(v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
