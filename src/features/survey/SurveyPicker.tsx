@@ -19,7 +19,7 @@ import * as Icon from '@/components/ui/icons';
 import type { SurveyHistoryEntry } from '@/engine/survey/history';
 import { countedScans, summarizeSurvey } from '@/engine/survey/series';
 import { forgetSurvey, useSurveyHistory } from './surveyHistory';
-import { loadSurvey } from './surveyStore';
+import { loadSurveyCached } from './surveyStore';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** What a survey's link says about it, kept so a rename relabels it without a reload. */
@@ -61,7 +61,8 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       for (const entry of wanted) {
         if (requested.current.has(entry.id)) continue;
         requested.current.add(entry.id);
-        const result = await loadSurvey(entry.id);
+        // Cache first: a label needs no fresh read, and the survey in view is loaded by the page.
+        const result = await loadSurveyCached(entry.id);
         if (cancelled) {
           requested.current.delete(entry.id);
           return;

@@ -573,6 +573,17 @@
       "indexes": []
     },
     {
+      "collectionGroup": "surveyScans",
+      "fieldPath": "createdAt",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
+    },
+    {
       "collectionGroup": "surveyTax",
       "fieldPath": "*",
       "ttl": false,
@@ -583,6 +594,17 @@
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []
+    },
+    {
+      "collectionGroup": "surveyTax",
+      "fieldPath": "createdAt",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
     },
     {
       "collectionGroup": "surveyInfo",
@@ -597,6 +619,17 @@
       "indexes": []
     },
     {
+      "collectionGroup": "surveyInfo",
+      "fieldPath": "createdAt",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
+    },
+    {
       "collectionGroup": "surveyIgnores",
       "fieldPath": "*",
       "ttl": false,
@@ -607,6 +640,17 @@
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []
+    },
+    {
+      "collectionGroup": "surveyIgnores",
+      "fieldPath": "createdAt",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
     },
     {
       "collectionGroup": "netWorthSnapshots",

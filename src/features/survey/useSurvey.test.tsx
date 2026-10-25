@@ -5,7 +5,13 @@ import type { SurveyScan } from '@/engine/survey/series';
 const { loadSurvey } = vi.hoisted(() => ({ loadSurvey: vi.fn() }));
 vi.mock('./surveyStore', () => ({ loadSurvey }));
 
-import { SURVEY_POLL_MS, useSurvey } from './useSurvey';
+import {
+  SURVEY_IDLE_AFTER_MS,
+  SURVEY_IDLE_POLL_MS,
+  SURVEY_POLL_MS,
+  surveyPollDelay,
+  useSurvey,
+} from './useSurvey';
 
 const ID = 'abc123XYZ';
 const scan = (at: number): SurveyScan => ({ at, rocks: [{ ore: 'Veldspar', volume: 100 }] });
@@ -114,5 +120,35 @@ describe('useSurvey polling', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect((result.current.state as { scans: SurveyScan[] }).scans).toHaveLength(2);
+  });
+
+  it('slows down once no new scan has come in for a while, and speeds up when one does', async () => {
+    loadSurvey.mockResolvedValue(ok([scan(1)]));
+    renderHook(() => useSurvey(ID));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SURVEY_IDLE_AFTER_MS);
+    });
+    const busy = loadSurvey.mock.calls.length;
+    expect(busy).toBe(1 + SURVEY_IDLE_AFTER_MS / SURVEY_POLL_MS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SURVEY_IDLE_POLL_MS - 1);
+    });
+    expect(loadSurvey).toHaveBeenCalledTimes(busy);
+    loadSurvey.mockResolvedValue(ok([scan(1), scan(2)]));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(loadSurvey).toHaveBeenCalledTimes(busy + 1);
+    // A new scan came in: back to the quick pace.
+    await tick();
+    expect(loadSurvey).toHaveBeenCalledTimes(busy + 2);
+  });
+});
+
+describe('surveyPollDelay', () => {
+  it('polls quickly while scans are coming in, and slowly once the field is quiet', () => {
+    expect(surveyPollDelay(0)).toBe(SURVEY_POLL_MS);
+    expect(surveyPollDelay(SURVEY_IDLE_AFTER_MS - 1)).toBe(SURVEY_POLL_MS);
+    expect(surveyPollDelay(SURVEY_IDLE_AFTER_MS)).toBe(SURVEY_IDLE_POLL_MS);
   });
 });

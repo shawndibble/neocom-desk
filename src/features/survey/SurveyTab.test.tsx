@@ -24,6 +24,8 @@ vi.mock('./surveyStore', () => ({
   startSurvey,
   addSurveyScan,
   loadSurvey,
+  // The survey picker's labels read through the cache; here it is the same load.
+  loadSurveyCached: loadSurvey,
   setSurveyScanIgnored,
   finishSurvey,
 }));
