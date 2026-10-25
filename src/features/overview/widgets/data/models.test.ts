@@ -528,6 +528,63 @@ describe('the Number view says one new thing', () => {
     expect(buildView('miningTax', { mining: ok(data) as never }, ctx()).table).toBeUndefined();
   });
 
+  describe('mining tax with a Character whose ledger cannot be read', () => {
+    const base = {
+      unpaidIsk: 10_900_000,
+      oldestUnpaidDays: 13,
+      payeeCount: 1,
+      unassignedCount: 0,
+      fetchedAt: new Date(NOW),
+      characterCount: 2,
+    };
+    const build = (data: object, patch = {}) =>
+      buildView('miningTax', { mining: ok({ ...base, ...data }) as never }, ctx(patch));
+
+    it('shows the Characters that could be read, in a calm tone, and asks about none', () => {
+      const view = build({
+        needsReauth: false,
+        missingCharacterNames: ['Shadow Ruler'],
+        missingCharacterIds: [2],
+      });
+      expect(view.status.needsPermission).toBe(false);
+      expect(view.number.iskAmount).toBe(10_900_000);
+      expect(view.number.tone).not.toBe('warning');
+      expect(view.summary).not.toContain('reauth');
+      expect(view.grantEndpoints).toBeUndefined();
+      expect(view.grantCharacterId).toBeUndefined();
+    });
+
+    it('when none can be read, asks a Character that failed, by name', () => {
+      const view = build({
+        needsReauth: true,
+        missingCharacterNames: ['Shadow Ruler', 'Krish Mero'],
+        missingCharacterIds: [2, 3],
+      });
+      expect(view.status.needsPermission).toBe(true);
+      expect(view.grantCharacterId).toBe(2);
+      expect(view.grantCharacterName).toBe('Shadow Ruler');
+    });
+
+    it('prefers the active Character when it is among those that failed', () => {
+      const view = build(
+        {
+          needsReauth: true,
+          missingCharacterNames: ['Shadow Ruler', 'Krish Mero'],
+          missingCharacterIds: [2, 3],
+        },
+        { activeCharacterId: 3 }
+      );
+      expect(view.grantCharacterId).toBe(3);
+      expect(view.grantCharacterName).toBe('Krish Mero');
+    });
+
+    it('a snapshot cached before the ids were kept asks as before', () => {
+      const view = build({ needsReauth: true, missingCharacterNames: [] });
+      expect(view.status.needsPermission).toBe(true);
+      expect(view.grantCharacterId).toBeUndefined();
+    });
+  });
+
   it('price watch names the nearest target that has not been hit', () => {
     const alerts = [
       { typeId: 1, name: 'Tritanium', targetPrice: 4, direction: 'below', price: 3, crossed: true },

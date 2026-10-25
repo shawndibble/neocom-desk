@@ -11,6 +11,7 @@ import {
   type LayerDefense,
   type LocalRepair,
   type OffenseStats,
+  type SpoolFigures,
   type OverheatedStats,
   type WeaponRange,
   type WeaponRow,
@@ -37,6 +38,7 @@ import {
   type RepairLayer,
   type Repairer,
 } from './tank';
+import { isMobileDrone } from './appliedDps';
 import { droneSpeed, weaponRange } from './appliedWeapons';
 import type { CapBoosterFigures } from './capBoosterChoice';
 
@@ -461,15 +463,34 @@ function damageFigures(
 }
 
 /**
+ * A spool weapon's first-cycle DPS and its time to full bonus, from the
+ * engine's own attributes: `damagePerSecond` is fully spooled, the volley never
+ * is, and the bonus grows by a fixed step each rate-of-fire cycle up to a cap.
+ */
+function spoolFigures(attributes: AttributeMap, quantity: number): SpoolFigures | null {
+  const read = (id: number) => readAttribute(attributes, id);
+  const perCycle = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusPerCycle);
+  const cycleSeconds = read(ITEM_DOGMA_ATTRIBUTE.rateOfFire) / 1000;
+  const max = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax);
+  if (perCycle <= 0 || max <= 0 || cycleSeconds <= 0) return null;
+  // Single-precision attributes: 2.1/0.07 must not tip a whole cycle count up.
+  const cycles = Math.ceil(max / perCycle - 1e-6);
+  return {
+    unspooledDps: (read(ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity) / cycleSeconds,
+    secondsToFull: cycles * cycleSeconds,
+  };
+}
+
+/**
  * The row's reach: a module's or a sentry's. A drone that flies to its
  * target, or a fighter, fights wherever it's sent — its own optimal says
  * nothing about where the ship can fight from.
  */
 function offenseRange(item: OffenseItem, result: ModuleCalculationResult): { range?: WeaponRange } {
   if (item.isFighter) return {};
-  if (item.isDrone && droneSpeed(result.attributes) > 0) return {};
+  if (item.isDrone && isMobileDrone(droneSpeed(result.attributes))) return {};
   const range = weaponRange(result.attributes, result.charge?.attributes);
-  // A charge the engine reads no flight for (a Vorton pack) reaches nowhere shown.
+  // A charge the engine reads no flight for reaches nowhere shown.
   return range && range.optimal > 0 ? { range } : {};
 }
 
@@ -546,11 +567,22 @@ export function extractOffense(
     row.dps += figures.dps;
     row.sustainedDps += figures.sustainedDps;
     row.volley += figures.volley;
+    const spool = spoolFigures(result.attributes, item.quantity);
+    if (spool) {
+      row.spool = {
+        unspooledDps: (row.spool?.unspooledDps ?? 0) + spool.unspooledDps,
+        secondsToFull: Math.max(row.spool?.secondsToFull ?? 0, spool.secondsToFull),
+      };
+    }
     if (heated && row.overheated) {
       const heatedFigures = damageFigures(heated.attributes, item.quantity, item.isDrone);
       row.overheated.dps += heatedFigures.dps;
       row.overheated.sustainedDps += heatedFigures.sustainedDps;
       row.overheated.volley += heatedFigures.volley;
+      const heatedSpool = spoolFigures(heated.attributes, item.quantity);
+      if (heatedSpool) {
+        row.overheated.unspooledDps = (row.overheated.unspooledDps ?? 0) + heatedSpool.unspooledDps;
+      }
     }
   });
 

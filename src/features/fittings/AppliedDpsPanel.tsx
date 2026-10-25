@@ -97,6 +97,7 @@ export function AppliedDpsPanel({
   applied,
   unheatedApplied = null,
   chargelessWeaponCount,
+  hasSpoolWeapons = false,
   targetProfiles,
   overlay,
 }: {
@@ -105,6 +106,8 @@ export function AppliedDpsPanel({
   unheatedApplied?: AppliedDpsInputs | null;
   /** Active turrets/launchers with no charge loaded — why `applied.weapons` may be empty. */
   chargelessWeaponCount: number;
+  /** A spool weapon is fitted: its figures here are fully spooled. */
+  hasSpoolWeapons?: boolean;
   targetProfiles: TargetProfiles;
   /** Absent where there's no Character to have saved Fittings (the Fitting Share Code view). */
   overlay?: OverlayFitting;
@@ -192,6 +195,7 @@ export function AppliedDpsPanel({
             />
           </Suspense>
           <StatNote>{t('fittings.appliedDps.assumptions')}</StatNote>
+          {hasSpoolWeapons && <StatNote>{t('fittings.appliedDps.spooled')}</StatNote>}
         </>
       ) : chargelessWeaponCount > 0 ? (
         <StatNote>{t('fittings.stats.offenseNoCharge', { count: chargelessWeaponCount })}</StatNote>

@@ -6,6 +6,7 @@ import {
   bestRange,
   graphMaxRange,
   graphMaxSpeed,
+  isMobileDrone,
   missileApplication,
   rawDps,
   sustainedInputs,
@@ -207,6 +208,30 @@ describe('appliedDps fighters', () => {
     expect(graphMaxRange([inputs([fighter], 57000)])).toBe(65000);
     // Beside weapons with a reach, fighters don't stretch the axis.
     expect(graphMaxRange([inputs([fighter, missile], 57000)])).toBe(45000);
+  });
+});
+
+describe('appliedDps area weapons', () => {
+  const area: Extract<AppliedWeapon, { kind: 'area' }> = { kind: 'area', dps: 80, range: 7500 };
+
+  it('applies at full inside range, whatever the target does, and nothing past it', () => {
+    const fast = { signatureRadius: 35, velocity: 3000 };
+    expect(appliedDps(inputs([area]), fast, 7500)).toBeCloseTo(80, 6);
+    expect(appliedDps(inputs([area]), fast, 7501)).toBe(0);
+  });
+
+  it('counts in raw DPS and stretches the range axis', () => {
+    expect(rawDps(inputs([area, missile]))).toBe(180);
+    // 7.5 km x1.1 = 8.25 -> 10 km
+    expect(graphMaxRange([inputs([area])])).toBe(10000);
+  });
+});
+
+describe('isMobileDrone', () => {
+  it('reads a sentry’s near-zero speed as not mobile', () => {
+    expect(isMobileDrone(1.25e-5)).toBe(false);
+    expect(isMobileDrone(0)).toBe(false);
+    expect(isMobileDrone(5040)).toBe(true);
   });
 });
 

@@ -70,6 +70,9 @@ const RIFTER = 587;
 const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
 // Looked up by exact name in `public/data/types.json`, 2026-10-25.
+const VEDMAK = 47270;
+const HEAVY_ENTROPIC_DISINTEGRATOR_II = 47918;
+const VOID_M = 12789;
 const BUZZARD = 11192;
 const CORE_PROBE_LAUNCHER_I = 17938;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
@@ -513,6 +516,41 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       expect(offense.weapons[0].dps).toBeGreaterThan(0);
       expect(offense.weapons[0].sustainedDps).toBe(offense.weapons[0].dps);
     }
+  });
+
+  it("carries a spool weapon's unspooled DPS and time to full spool beside its spooled DPS", () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Vedmak',
+      shipTypeId: VEDMAK,
+      modules: [0, 1].map((slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId: HEAVY_ENTROPIC_DISINTEGRATOR_II,
+        state: 'active' as const,
+        chargeTypeId: VOID_M,
+      })),
+      drones: [],
+      cargo: [],
+    };
+    const calculation = calculate(
+      fittingToDogmaFit(fitting, buildAllVProfile([...SUPPORT_SKILL_IDS, 3436, 3442]))
+    );
+    const offense = extractOffense(
+      fitting.modules.map((module) => ({
+        typeId: module.typeId,
+        chargeTypeId: module.chargeTypeId,
+        quantity: 1,
+        isDrone: false,
+      })),
+      calculation.items,
+      null
+    );
+    const [row] = offense.weapons;
+    // The engine's DPS is fully spooled: the first cycle's, times 1 + the
+    // 2.125 maximum bonus. Both modules' unspooled figures sum.
+    expect(row.spool?.unspooledDps).toBeCloseTo(row.dps / 3.125, 6);
+    // 2.125 / 0.07 a cycle = 31 cycles of 3.96 s.
+    expect(row.spool?.secondsToFull).toBeCloseTo(31 * 3.96, 6);
   });
 
   it('measures EHP against a damage profile and adapts a Reactive Armor Hardener to it', () => {

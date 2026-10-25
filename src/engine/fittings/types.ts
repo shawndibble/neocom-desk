@@ -412,6 +412,16 @@ export interface WeaponRow {
   overheated: DamageFigures | null;
   /** Absent for a fighter, or a drone that flies to its target. */
   range?: WeaponRange;
+  /** Only a spool weapon (a Precursor disintegrator): its `dps` is fully spooled. */
+  spool?: SpoolFigures;
+}
+
+/** What a weapon whose damage grows every cycle does before it has spooled. */
+export interface SpoolFigures {
+  /** The row's DPS on its first cycle, summed over its modules. */
+  unspooledDps: number;
+  /** Until the slowest module in the row reaches its full bonus. */
+  secondsToFull: number;
 }
 
 /** How far one weapon reaches, metres. A missile has no falloff: 0. */
@@ -429,6 +439,8 @@ export interface DamageFigures {
    */
   sustainedDps: number;
   volley: number;
+  /** A spool weapon's first-cycle DPS at these figures (heated, under overheat). */
+  unspooledDps?: number;
 }
 
 export interface OffenseStats {
@@ -730,6 +742,12 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   // an online (not firing) launcher still reports its volley.
   damagePerSecond: -12,
   damageVolley: -21,
+  // "Damage Multiplier Bonus Per Cycle" and "Maximum Damage Multiplier Bonus"
+  // (public/data/market/attributes.json); ratios, on a spool weapon only. A live
+  // run of the pinned engine (2026-10-25) on a Heavy Entropic Disintegrator II:
+  // 0.07 and 2.125, with `damagePerSecond` fully spooled (unspooled x 3.125).
+  spoolBonusPerCycle: 2733,
+  spoolBonusMax: 2734,
   // "resistanceShiftAmount" — only the Reactive Armor Hardener family carries
   // it (6 on a RAH, absent on a Damage Control II; live run of the pinned
   // engine, 2026-09-24). Marks the module whose own armor resonances
