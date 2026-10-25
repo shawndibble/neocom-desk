@@ -1129,7 +1129,7 @@
         "peakRecharge": "Peak recharge",
         "drain": "Drain",
         "boosters": "Cap boosters",
-        "nosferatu": "Nosferatu",
+        "nosferatu": "Nosferatu (not in Delta)",
         "delta": "Delta",
         "boosterCharge": "Booster charge to hold peak",
         "chargeEvery": "1 every {{seconds}} s"

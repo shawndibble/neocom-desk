@@ -8,7 +8,12 @@
  */
 import { useMemo, useSyncExternalStore } from 'react';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { readyDogmaEngine, subscribeDogmaEngine, type DogmaEngine } from './dogmaFittingEngine';
+import {
+  readyDogmaEngine,
+  subscribeDogmaEngine,
+  type ChargeBasis,
+  type DogmaEngine,
+} from './dogmaFittingEngine';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 /** The ready engine, or null until `loadDogmaEngine` has resolved somewhere. */
@@ -22,19 +27,22 @@ export interface FittingContext {
   /** The pilot the checks run under — skills for "can fly". */
   profile: PilotProfile;
   catalogue: FittingCatalogue;
+  /** What a charge's figures are worked out under; absent: the pilot's own profile, no conditions. */
+  basis?: ChargeBasis;
 }
 
 /** One fitting context per engine, pilot and catalogue; null while any of the three is loading. */
 export function useFittingContext(
   profile: PilotProfile | null,
-  catalogue: FittingCatalogue | null
+  catalogue: FittingCatalogue | null,
+  basis: ChargeBasis | null = null
 ): FittingContext | null {
   const engine = useDogmaEngine();
   return useMemo(
     () =>
       engine === null || profile === null || catalogue === null
         ? null
-        : { engine, profile, catalogue },
-    [engine, profile, catalogue]
+        : { engine, profile, catalogue, ...(basis === null ? {} : { basis }) },
+    [engine, profile, catalogue, basis]
   );
 }

@@ -920,6 +920,17 @@ function chargesMissingSkills(
   return missing;
 }
 
+/**
+ * What a charge is worked out under beyond the Fitting: the pilot the stats
+ * run under, the Damage Profile, and the weather and projected effects.
+ * Without one, the pilot's own profile and the engine's defaults.
+ */
+export interface ChargeBasis {
+  pilot: PilotProfile;
+  damageProfile?: DamageProfile;
+  options: Pick<StatsOptions, 'weatherTypeId' | 'incoming'>;
+}
+
 /** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
 export interface ChargeEngineStats extends Pick<
   ChargeChoice,
@@ -933,7 +944,8 @@ export interface ChargeEngineStats extends Pick<
  * of `chargeTypeIds`, the whole Fitting calculated once with that charge in
  * every module of `moduleTypeId` and those modules active — so the hull,
  * skills, implants and damage mods all count, as they do on the loaded
- * charge. A cap booster's charge also gets its capacitor figures, and a
+ * charge, under `basis` (the stats' own pilot, Damage Profile, weather and
+ * projected effects) when given. A cap booster's charge also gets its capacitor figures, and a
  * mining crystal its yield and residue, off the
  * same calculation. One `calculate` per charge (no overheated pass): the Charges tab
  * pays this only while it is open, memoized by its caller.
@@ -942,7 +954,8 @@ function compareCharges(
   fitting: Fitting,
   profile: PilotProfile,
   moduleTypeId: number,
-  chargeTypeIds: readonly number[]
+  chargeTypeIds: readonly number[],
+  basis?: ChargeBasis
 ): ChargeEngineStats[] {
   const indices = fitting.modules.flatMap((module, index) =>
     module.typeId === moduleTypeId ? [index] : []
@@ -963,7 +976,15 @@ function compareCharges(
       ),
     };
     // `fittingToDogmaFit` puts the modules first, so module i is items[i].
-    const dogmaFit = toDogmaFit(trial, profile);
+    const dogmaFit = basis
+      ? withIncoming(
+          withWeather(
+            toDogmaFit(trial, basis.pilot, basis.damageProfile),
+            basis.options.weatherTypeId
+          ),
+          basis.options.incoming
+        )
+      : toDogmaFit(trial, profile);
     const { items, ship } = calculate(dogmaFit);
     const cap = extractCapBoosterFigures(dogmaFit.items, ship.attributes, items, indices);
     const mining = extractCrystalFigures(dogmaFit.items, items, indices);
