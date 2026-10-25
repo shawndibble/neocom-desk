@@ -520,3 +520,95 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     }
   });
 });
+
+describe('server-pushed events (issue #5121)', () => {
+  const priceFire = {
+    eventId: 'priceAlertTriggered',
+    characterId: 7,
+    typeId: 34,
+    name: 'Tritanium',
+    price: 11,
+    targetPrice: 10,
+    direction: 'above',
+  } as const;
+
+  /** What `functions/src/serverEvents.ts`'s `buildServerEventPush` sends. */
+  function serverPush(fire: { eventId: string; characterId: number }, extra = {}): string {
+    return JSON.stringify({
+      data: {
+        characterId: String(fire.characterId),
+        eventId: fire.eventId,
+        occurrenceKey: 'server-key',
+        title: 'Floor title',
+        body: 'Floor body',
+        fireAt: '1000',
+        fire: JSON.stringify(fire),
+        ...extra,
+      },
+    });
+  }
+
+  it('carries the raw fire through the parse', () => {
+    expect(parsePushPayload(serverPush(priceFire))?.serverFire).toBe(JSON.stringify(priceFire));
+  });
+
+  it('renders the fire with the app’s copy and keys the row like the Foreground Poller', async () => {
+    const e = env();
+    await handlePush(e, serverPush(priceFire), 5000);
+    const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
+    expect(title).toBe('Price alert');
+    expect(options.body).toContain('Tritanium reached');
+    expect(String(options.data?.url)).toContain('type=34');
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: occurrenceKey(priceFire, 5000),
+        subjectId: 34,
+        firedAt: 1000,
+        notifiedHereAt: 5000,
+      })
+    );
+  });
+
+  it('names the ship and system of a loss through the public name lookup', async () => {
+    const fire = {
+      eventId: 'shipLost',
+      characterId: 7,
+      killmailId: 55,
+      timeMs: 900,
+      shipTypeId: 587,
+      systemId: 30000142,
+    } as const;
+    const resolveIds = vi.fn(
+      async () =>
+        new Map([
+          [587, 'Rifter'],
+          [30000142, 'Jita'],
+        ])
+    );
+    const e = env({ resolveIds });
+    await handlePush(e, serverPush(fire), 5000);
+    expect(resolveIds).toHaveBeenCalledWith([587, 30000142]);
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('Lost your Rifter in Jita');
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '7:shipLost:55' })
+    );
+  });
+
+  it('falls back to the sender’s copy and key for a fire that is not the push’s own', async () => {
+    const e = env();
+    await handlePush(e, serverPush({ ...priceFire, characterId: 8 }, { characterId: '7' }), 5000);
+    expect(vi.mocked(e.showNotification).mock.calls[0][0]).toBe('Floor title');
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(expect.objectContaining({ id: 'server-key' }));
+  });
+
+  it('replaces this device’s earlier pop-up silently when it already notified for the occurrence', async () => {
+    const alreadyNotified = vi.fn(async () => true);
+    const e = env({ alreadyNotified });
+    await handlePush(e, serverPush(priceFire), 5000);
+    expect(alreadyNotified).toHaveBeenCalledWith(occurrenceKey(priceFire, 5000));
+    expect(vi.mocked(e.showNotification).mock.calls[0][1]).toMatchObject({
+      silent: true,
+      renotify: false,
+    });
+  });
+});
