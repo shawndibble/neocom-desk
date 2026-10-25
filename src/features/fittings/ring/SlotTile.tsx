@@ -28,6 +28,7 @@ import {
   type FittingItemActions,
 } from '../fittingItemActions';
 import { useUnknownMutation, useUnknownMutationTip } from '../useUnknownMutation';
+import { useBreaksRule } from '../ruleBreakFlags';
 import { MODULE_STATE_STYLE } from '../moduleStateStyle';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 
@@ -112,6 +113,7 @@ export function SlotTile({
   const state = shownState ? t(`fittings.list.moduleState.${shownState}`) : '';
   const unknownMutation = useUnknownMutation(module ? [module] : []);
   const unknownMutationTip = useUnknownMutationTip(unknownMutation);
+  const breaksRule = useBreaksRule(module);
   const label = module
     ? [
         t('fittings.ring.slotFitted', {
@@ -122,6 +124,7 @@ export function SlotTile({
         }),
         hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Label`) : null,
         unknownMutation ? t(`fittings.mutation.badge.${unknownMutation}`) : null,
+        breaksRule ? t('fittings.ruleBreak.label') : null,
         cantUse ? t('fittings.list.cantUse') : null,
       ]
         .filter(Boolean)
@@ -182,6 +185,7 @@ export function SlotTile({
           : null,
         hardpoint ? t(`fittings.ring.hardpoints.${hardpoint}Tile`) : null,
         unknownMutationTip,
+        breaksRule ? t('fittings.ruleBreak.tooltip') : null,
         cantUse ? t('fittings.ring.tooltipCantUse') : null,
         cycleHint,
       ]
@@ -312,6 +316,15 @@ export function SlotTile({
           <span
             data-mutation-flag={unknownMutation}
             className="absolute top-0 left-0 flex h-[34%] w-[34%] bg-warning p-px text-bg"
+          >
+            <Warn aria-hidden className="h-full w-full" />
+          </span>
+        )}
+        {/* A module that breaks a fitting rule: an amber flag in the bottom-right corner. */}
+        {breaksRule && (
+          <span
+            data-rule-break-flag
+            className="absolute right-0 bottom-0 flex h-[34%] w-[34%] bg-warning p-px text-bg"
           >
             <Warn aria-hidden className="h-full w-full" />
           </span>

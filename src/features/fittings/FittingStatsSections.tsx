@@ -100,6 +100,8 @@ interface FittingStatsSectionsProps {
   preview?: FittingStatsDelta | null;
   /** Opens Improve from the header; absent where the Fitting cannot be edited. */
   onImprove?: () => void;
+  /** One sentence per fitting rule the fit breaks; empty or absent for a legal fit. */
+  ruleBreaks?: readonly string[];
 }
 
 /**
@@ -132,6 +134,7 @@ export function FittingStatsSections({
   yourCharacters,
   showDrones = true,
   onImprove,
+  ruleBreaks = [],
   fitting = null,
   moduleResults = null,
   preview = null,
@@ -277,6 +280,21 @@ export function FittingStatsSections({
           <p className="border-b border-line px-3 py-2 text-xs text-warning">
             {t('fittings.stats.skillsUnknown')}
           </p>
+        )}
+
+        {ruleBreaks.length > 0 && (
+          <div
+            role="alert"
+            data-testid="rule-breaks"
+            className="space-y-1 border-b border-line px-3 py-2 text-xs"
+          >
+            <ul className="space-y-0.5 text-warning">
+              {ruleBreaks.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="text-text-dim">{t('fittings.ruleBreak.statsCountAll')}</p>
+          </div>
         )}
 
         {group('damageTank', [...damage, ...tank])}
