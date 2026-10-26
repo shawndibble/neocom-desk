@@ -102,7 +102,7 @@ export function FleetBoard({
       const type = types[String(typeId)];
       return type === undefined
         ? undefined
-        : { groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
+        : { typeId, groupId: type.groupID, categoryId: categories[String(type.groupID)] ?? 0 };
     };
     const nameOf = (typeId: number) => types[String(typeId)]?.name ?? `#${typeId}`;
     const board = buildFleetBoard(heldRows, infoOf);
