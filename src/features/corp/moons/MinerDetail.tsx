@@ -628,9 +628,7 @@ export function MinerDetail({ id }: { id: string }) {
       {daysSection(
         t('corpTaxBook.moons.sections.nextStatement'),
         'nextStatement',
-        t('corpTaxBook.moons.miner.daysHint', {
-          date: view.billableThrough ? shortDate(view.billableThrough) : '—',
-        }),
+        t('corpTaxBook.moons.miner.daysHint'),
         { select: true, status: false, startOpen: true }
       )}
       {daysSection(
