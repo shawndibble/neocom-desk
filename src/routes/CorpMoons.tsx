@@ -1,6 +1,6 @@
 /**
- * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Extractions,
- * Miners and Statements as path-segment tabs (ADR 0015), the moon and Miner
+ * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
+ * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
  * pages below their tabs, settings behind the header's gear and the audit log
  * behind Activity.
  *
@@ -19,6 +19,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   EmptyState,
   IconButton,
   LoadFailedState,
@@ -32,7 +33,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
-import { formatAge } from '@/lib/age';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { bookPartsFor } from '@/features/corp/taxBook/bookParts';
@@ -49,6 +49,7 @@ import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
 import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
 import { MinerDetail } from '@/features/corp/moons/MinerDetail';
 import { MinersTab } from '@/features/corp/moons/MinersTab';
+import { OverviewTab } from '@/features/corp/moons/OverviewTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
@@ -94,20 +95,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const detail = moonsDetail(pathname);
-  const status = sync.status;
-  const meta =
-    status.kind === 'never' ? (
-      <span className="text-xs text-text-dim">{t('corpTaxBook.moons.neverSynced')}</span>
-    ) : (
-      <span className="text-xs text-text-dim">
-        {t('corpTaxBook.moons.syncedBy', {
-          age: formatAge(status.ageMs, t),
-          name: status.scheduled
-            ? t('corpTaxBook.moons.scheduledBy', { name: status.byName })
-            : status.byName,
-        })}
-      </span>
-    );
   // A corporation with no refineries of its own has nothing for Extractions to show.
   if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
     return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
@@ -118,7 +105,19 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         <>
           <PageHeader
             title={t('corp.moons.title')}
-            meta={meta}
+            meta={
+              sync.status.kind !== 'never' ? (
+                <DataAgeBadge
+                  date={new Date(sync.status.at)}
+                  note={t('corpTaxBook.moons.health.syncedBy', {
+                    name: sync.status.scheduled
+                      ? t('corpTaxBook.moons.scheduledBy', { name: sync.status.byName })
+                      : sync.status.byName,
+                  })}
+                  alwaysVisible
+                />
+              ) : undefined
+            }
             actions={
               <span className="flex items-center gap-1">
                 {tab === 'moon-owners' && canEdit && hasMoonOwners && (
@@ -159,14 +158,15 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             </p>
           )}
           <BookHealthStrip sync={sync} />
+          {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
           {tab === 'statements' && <StatementsTab />}
           {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
         </>
       )}
-      {detail?.kind === 'extraction' && <MoonDetail id={detail.id} />}
-      {detail?.kind === 'miner' && <MinerDetail id={detail.id} />}
+      {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+      {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
       {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
       {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
       {view && settingsOpen && (

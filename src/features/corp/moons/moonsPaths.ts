@@ -6,6 +6,7 @@
 import { definePageTabs } from '@/lib/pageTabs';
 
 export const MOONS_TABS = definePageTabs('/corp/moons', [
+  { id: 'overview', labelKey: 'corpTaxBook.moons.tabs.overview' },
   { id: 'extractions', labelKey: 'corpTaxBook.moons.tabs.extractions', deep: true },
   { id: 'miners', labelKey: 'corpTaxBook.moons.tabs.miners', deep: true },
   { id: 'statements', labelKey: 'corpTaxBook.moons.tabs.statements', deep: true },

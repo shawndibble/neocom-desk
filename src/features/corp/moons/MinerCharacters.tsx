@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, textActionClassName } from '@/components/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { GroupMinersDialog } from './GroupMinersDialog';
 import { callableErrorText } from './feederErrorText';
@@ -14,12 +15,15 @@ interface StoredGrouping {
 
 /**
  * A Miner's characters (D18, issue #4194): who gets the mail, who is waiting
- * for their own confirmation, and the officer's group / unlink actions.
+ * for their own confirmation, and the officer's group / unlink actions. On the
+ * Miner's page it is the "3 characters" link in the header, opening a popover:
+ * the link is the owner's call, where §6c's popover cue is field chrome.
  */
 export function MinerCharacters({ miner }: { miner: MinerRow }) {
   const { t } = useTranslation();
   const { names, edit, canEdit, data } = useBook();
   const [grouping, setGrouping] = useState(false);
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stored = (data.state.miners as StoredGrouping[]).find((m) => m.id === miner.id);
   // A character that said no is no longer in the group, so its answer is listed on its own (#4210).
@@ -59,86 +63,103 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
     run(() => edit({ action: 'unlink', minerId: miner.id, characterId }));
 
   return (
-    <Panel
-      title={t('corpTaxBook.moons.grouping.title')}
-      meta={<span className="text-xs text-text-dim">{t('corpTaxBook.moons.grouping.hint')}</span>}
-      actions={
-        canEdit ? (
-          <Button size="sm" variant="ghost" onClick={() => setGrouping(true)}>
-            {t('corpTaxBook.moons.grouping.group')}
-          </Button>
-        ) : undefined
-      }
-    >
-      <ul className="space-y-1.5 text-sm">
-        {miner.characterIds.map((characterId) => (
-          <li key={characterId} className="flex items-center justify-between gap-3">
-            <span>
-              {names.character(characterId)}
-              {characterId === miner.mainCharacterId && (
-                <span className="text-xs text-text-dim">
-                  {' '}
-                  · {t('corpTaxBook.moons.grouping.main')}
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button type="button" className={entityLinkClassName()}>
+            {t('corpTaxBook.moons.grouping.count', { count: miner.characterIds.length })}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="w-80 max-w-[calc(100vw-2rem)] space-y-2 p-3"
+          // The dialog takes focus itself when Group opens it.
+          onCloseAutoFocus={(e) => grouping && e.preventDefault()}
+        >
+          <p className="text-xs text-text-dim">{t('corpTaxBook.moons.grouping.hint')}</p>
+          <ul className="space-y-1.5 text-sm">
+            {miner.characterIds.map((characterId) => (
+              <li key={characterId} className="flex items-center justify-between gap-3">
+                <span>
+                  {names.character(characterId)}
+                  {characterId === miner.mainCharacterId && (
+                    <span className="text-xs text-text-dim">
+                      {' '}
+                      · {t('corpTaxBook.moons.grouping.main')}
+                    </span>
+                  )}
+                  {pending.has(characterId) && (
+                    <span className="text-xs text-warning">
+                      {' '}
+                      · {t('corpTaxBook.moons.grouping.pending')}
+                    </span>
+                  )}
+                  {confirmed.has(characterId) && !pending.has(characterId) && (
+                    <span className="text-xs text-success">
+                      {' '}
+                      · {t('corpTaxBook.moons.grouping.confirmed')}
+                    </span>
+                  )}
                 </span>
-              )}
-              {pending.has(characterId) && (
-                <span className="text-xs text-warning">
-                  {' '}
-                  · {t('corpTaxBook.moons.grouping.pending')}
-                </span>
-              )}
-              {confirmed.has(characterId) && !pending.has(characterId) && (
-                <span className="text-xs text-success">
-                  {' '}
-                  · {t('corpTaxBook.moons.grouping.confirmed')}
-                </span>
-              )}
-            </span>
-            {canEdit && miner.characterIds.length > 1 && (
-              <span className="flex gap-3">
-                {characterId !== miner.mainCharacterId && (
-                  <button
-                    type="button"
-                    className={textActionClassName('shrink-0')}
-                    onClick={() => void makeMain(characterId)}
-                  >
-                    {t('corpTaxBook.moons.grouping.makeMain')}
-                  </button>
+                {canEdit && miner.characterIds.length > 1 && (
+                  <span className="flex gap-3">
+                    {characterId !== miner.mainCharacterId && (
+                      <button
+                        type="button"
+                        className={entityLinkClassName('shrink-0 whitespace-nowrap')}
+                        onClick={() => void makeMain(characterId)}
+                      >
+                        {t('corpTaxBook.moons.grouping.makeMain')}
+                      </button>
+                    )}
+                    {isStored && (
+                      <button
+                        type="button"
+                        className={entityLinkClassName('shrink-0 whitespace-nowrap')}
+                        onClick={() => void unlink(characterId)}
+                      >
+                        {t('corpTaxBook.moons.grouping.unlink')}
+                      </button>
+                    )}
+                  </span>
                 )}
-                {isStored && (
-                  <button
-                    type="button"
-                    className={textActionClassName('shrink-0')}
-                    onClick={() => void unlink(characterId)}
-                  >
-                    {t('corpTaxBook.moons.grouping.unlink')}
-                  </button>
-                )}
-              </span>
-            )}
-          </li>
-        ))}
-        {declined.map((a) => (
-          <li key={`declined-${a.characterId}`} className="text-sm">
-            {names.character(a.characterId)}
-            <span className="text-xs text-danger">
-              {' '}
-              ·{' '}
-              {t(
-                a.via === 'verify-link'
-                  ? 'corpTaxBook.moons.grouping.declinedByLink'
-                  : 'corpTaxBook.moons.grouping.declined'
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {error && (
-        <p role="alert" className="mt-2 text-xs text-danger">
-          {error}
-        </p>
-      )}
+              </li>
+            ))}
+            {declined.map((a) => (
+              <li key={`declined-${a.characterId}`} className="text-sm">
+                {names.character(a.characterId)}
+                <span className="text-xs text-danger">
+                  {' '}
+                  ·{' '}
+                  {t(
+                    a.via === 'verify-link'
+                      ? 'corpTaxBook.moons.grouping.declinedByLink'
+                      : 'corpTaxBook.moons.grouping.declined'
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {error && (
+            <p role="alert" className="text-xs text-danger">
+              {error}
+            </p>
+          )}
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setGrouping(true);
+                setOpen(false);
+              }}
+            >
+              {t('corpTaxBook.moons.grouping.group')}
+            </Button>
+          )}
+        </PopoverContent>
+      </Popover>
       {grouping && <GroupMinersDialog open onClose={() => setGrouping(false)} miner={miner} />}
-    </Panel>
+    </>
   );
 }
