@@ -155,6 +155,7 @@ import {
   startFeederRemoval,
 } from './corpTaxBookFeederRemoval.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
+import { verifyAllMinerTotals } from './corpTaxBookMinerTotalsStore.js';
 import {
   claimPayment,
   confirmGrouping,
@@ -1354,6 +1355,25 @@ export const dailyHousekeeping = onSchedule(
               });
             } else {
               logInfo('Community Fleet Payout sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+        {
+          // Shadow-mode verifier for the Miner running totals (#5255, ADR 0032): recomputes each
+          // book's totals, flags and repairs any drift. Inside the daily job, not a new function.
+          name: 'verifyMinerTotals',
+          run: async () => {
+            const { books, failed, truncated } = await bookVersioned(() =>
+              verifyAllMinerTotals(firestore(), Date.now)
+            );
+            if (failed > 0 || truncated) {
+              logWarn('Miner totals verifier incomplete, continues next run', {
+                books,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('Miner totals verifier done', { books, failed, truncated });
             }
           },
         },

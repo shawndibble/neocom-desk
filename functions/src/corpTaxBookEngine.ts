@@ -289,8 +289,8 @@ export function allocatePayments(rawInput: {
 // Extraction dismissal waives. functionsMirror.test.ts keeps them in step.
 
 const HOUR_MS = 3_600_000;
-const DEFAULT_EXPIRY_HOURS = 48;
-const MAX_EXPIRY_HOURS = 96;
+export const DEFAULT_EXPIRY_HOURS = 48;
+export const MAX_EXPIRY_HOURS = 96;
 
 /** A stored Extraction, as `syncBook` writes it. */
 export interface MirrorExtraction {
@@ -392,6 +392,49 @@ export function dismissalCredits(input: {
     }
   }
   return credits;
+}
+
+// --- Overdue clock (issue #5255) ----------------------------------------------
+// Mirror of src/engine/corpTaxBook/overdue.ts `overdueStatus(...).overdueAt`: when an
+// unsettled Statement goes Overdue, every declaration pause counted. It does not depend
+// on `now`, so a running total can store it.
+
+const DECLARATION_PAUSE_DAYS = 14;
+const REJECTION_GRACE_DAYS = 14;
+
+export interface MirrorDeclaration {
+  at: string;
+  resolution?: { kind: 'confirmed' | 'rejected'; at: string };
+}
+
+export function overdueAtFor(
+  issuedAt: string,
+  overdueDays: number,
+  declarations: readonly MirrorDeclaration[]
+): string {
+  const cap = DECLARATION_PAUSE_DAYS * DAY_MS;
+  const requested = declarations
+    .map((d) => {
+      const start = Date.parse(d.at);
+      const capped = start + cap;
+      return { start, end: d.resolution ? Math.min(Date.parse(d.resolution.at), capped) : capped };
+    })
+    .sort((a, b) => a.start - b.start);
+  let paused = 0;
+  let cursor = -Infinity;
+  for (const w of requested) {
+    const start = Math.max(w.start, cursor);
+    const end = Math.min(w.end, start + (cap - paused));
+    if (end > start) paused += end - start;
+    cursor = Math.max(cursor, w.end);
+  }
+  let overdueAt = Date.parse(issuedAt) + overdueDays * DAY_MS + paused;
+  for (const d of declarations) {
+    if (d.resolution?.kind === 'rejected') {
+      overdueAt = Math.max(overdueAt, Date.parse(d.resolution.at) + REJECTION_GRACE_DAYS * DAY_MS);
+    }
+  }
+  return new Date(overdueAt).toISOString();
 }
 
 // --- Guest close-account (issue #4184) ---------------------------------------
