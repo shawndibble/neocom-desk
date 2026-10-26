@@ -24,11 +24,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
   if (!row) return null;
   const mined = minersOnMoon(view, id).flatMap((m) => m.lines);
   const loss = moonLoss(row.oreLines, mined, row.fullyMined !== undefined);
-  if (!loss)
-    return <p className="text-sm text-text-dim">{t('corpTaxBook.moons.fullyMined.noSource')}</p>;
-
-  const flagged = loss.kind === 'residue';
-  const set = async (fullyMined: boolean) => {
+  const setMark = async (fullyMined: boolean) => {
     setBusy(true);
     setError(undefined);
     try {
@@ -39,6 +35,27 @@ export function FullyMinedPanel({ id }: { id: string }) {
       setBusy(false);
     }
   };
+  if (!loss)
+    return (
+      <p className="text-sm text-text-dim">
+        {t('corpTaxBook.moons.fullyMined.noSource')}
+        {row.fullyMined && canEdit && (
+          <>
+            {' '}
+            <button
+              type="button"
+              className={entityLinkClassName()}
+              disabled={busy}
+              onClick={() => void setMark(false)}
+            >
+              {t('corpTaxBook.moons.fullyMined.clear')}
+            </button>
+          </>
+        )}
+      </p>
+    );
+
+  const flagged = loss.kind === 'residue';
   const head = 'py-1 font-normal ' + eyebrowClassName;
   return (
     <section className="space-y-3" aria-labelledby={`fully-mined-${id}`}>
@@ -58,8 +75,8 @@ export function FullyMinedPanel({ id }: { id: string }) {
             )}
           </p>
         </div>
-        {canEdit && !flagged && (
-          <Button size="sm" disabled={busy} onClick={() => void set(true)}>
+        {canEdit && !flagged && row.state !== 'extracting' && (
+          <Button size="sm" disabled={busy} onClick={() => void setMark(true)}>
             {t('corpTaxBook.moons.fullyMined.mark')}
           </Button>
         )}
@@ -78,7 +95,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
                   type="button"
                   className={entityLinkClassName()}
                   disabled={busy}
-                  onClick={() => void set(false)}
+                  onClick={() => void setMark(false)}
                 >
                   {t('corpTaxBook.moons.fullyMined.clear')}
                 </button>
