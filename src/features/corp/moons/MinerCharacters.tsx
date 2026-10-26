@@ -6,6 +6,7 @@ import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { GroupMinersDialog } from './GroupMinersDialog';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
+import { tapTargetClassName } from './sectionHelpers';
 
 /** The stored grouping carries the guest-confirmation state the engine's Miner shape leaves out (D26b). */
 interface StoredGrouping {
@@ -66,7 +67,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className={entityLinkClassName()}>
+          <button type="button" className={entityLinkClassName(tapTargetClassName)}>
             {t('corpTaxBook.moons.grouping.count', { count: miner.characterIds.length })}
           </button>
         </PopoverTrigger>

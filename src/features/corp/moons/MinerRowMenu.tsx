@@ -1,8 +1,9 @@
 /**
  * The Miners table's row menu (right-click, touch-and-hold, ⋮): Show info for the main
  * character, then Record payment, Dismiss tax and Mark not tax. Open page is the opened row's
- * link, so it is not repeated here; Send reminder lives on the Miner's page header. Officers
- * only: without edit rights the row has no actions, so no menu.
+ * link, so it is not repeated here; Send reminder lives on the Miner's page header. Mark not tax
+ * acts on the latest payment with tax in it, and the item names it. Officers only: without edit
+ * rights the row has no actions, so no menu.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +11,7 @@ import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { EntityShowInfoMenuItem } from '../corpRowMenus';
 import { useBook } from './useBook';
-import { shortDate } from './moonsFormat';
+import { isk, shortDate } from './moonsFormat';
 
 export function MinerRowMenu({
   miner,
@@ -55,7 +56,16 @@ export function MinerRowMenu({
           </MenuItem>
           {payment ? (
             <MenuItem onSelect={() => onNotTax(miner, payment.id)}>
-              {t('corpTaxBook.moons.payment.markNotTaxFor', { date: shortDate(payment.at) })}
+              <span>
+                {t('corpTaxBook.moons.payment.markNotTax')}
+                {/* The item acts on the latest payment with tax in it: say which, in view. */}
+                <span className="block text-xs text-text-dim">
+                  {t('corpTaxBook.moons.payment.markNotTaxTarget', {
+                    date: shortDate(payment.at),
+                    amount: isk(payment.amount),
+                  })}
+                </span>
+              </span>
             </MenuItem>
           ) : (
             <DisabledMenuItem reason={t('corpTaxBook.moons.payment.markNotTaxNone')}>

@@ -5,6 +5,7 @@
  * duplicates it.
  */
 import { useTranslation } from 'react-i18next';
+import { oldestUnsettled } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -67,10 +68,19 @@ export function useCorporationName(): string | null {
   return known || resolved || null;
 }
 
+/** The Statement a Miner owes first: the oldest one not yet settled. */
+export function oldestOpenStatement(view: BookContextValue['view'], minerId: string) {
+  const inner = view.internals.byMiner.get(minerId);
+  return oldestUnsettled(
+    minerDetail(view, minerId)?.statements ?? [],
+    (id) => inner?.allocation.byStatement.get(id)?.settled === true
+  );
+}
+
 /**
  * "Send reminder" for one Miner, as the Miner's page and the Miners row menu both offer it:
  * `block` is why it cannot be sent (null when it can) and `send` queues the mail for the Miner's
- * oldest unsettled Statement, then reports the outcome through `onNotice` and reloads the book.
+ * oldest unsettled Statement (named in the notice), then reports the outcome through `onNotice` and reloads the book.
  */
 export function useMinerReminder(minerId: string, onNotice: (text: string) => void) {
   const { t } = useTranslation();
@@ -78,11 +88,13 @@ export function useMinerReminder(minerId: string, onNotice: (text: string) => vo
   const { view, names, corporationId, characterId } = ctx;
   const corporationName = useCorporationName();
   const detail = minerDetail(view, minerId);
-  const openStatement = detail?.statements.find(
-    (s) => !view.internals.byMiner.get(minerId)?.allocation.byStatement.get(s.id)?.settled
-  );
+  const openStatement = oldestOpenStatement(view, minerId);
   const block = !openStatement
-    ? t('corpTaxBook.moons.miner.remindNone')
+    ? t(
+        detail && detail.row.owed > 0
+          ? 'corpTaxBook.moons.miner.remindNone'
+          : 'corpTaxBook.moons.miner.remindNothingOwed'
+      )
     : corporationName === null
       ? t('corpTaxBook.moons.run.loadingCorporation')
       : null;
@@ -104,8 +116,9 @@ export function useMinerReminder(minerId: string, onNotice: (text: string) => vo
     });
     onNotice(
       result.ok
-        ? t('corpTaxBook.moons.needs.reminderQueued', {
+        ? t('corpTaxBook.moons.needs.reminderQueuedFor', {
             name: names.character(detail.row.mainCharacterId),
+            period: periodLabel(openStatement.periodStart, openStatement.periodEnd),
           })
         : t(`corpTaxBook.moons.needs.reminderRefused.${result.reason}`)
     );

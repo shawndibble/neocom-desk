@@ -169,7 +169,7 @@ export function NeedsYouQueue() {
                     <MinerTitle minerId={item.minerId}>
                       {t('corpTaxBook.moons.needs.overdue.title', {
                         name: nameOf(item.minerId),
-                        days: item.days,
+                        count: item.days,
                         amount: isk(item.owed),
                       })}
                     </MinerTitle>

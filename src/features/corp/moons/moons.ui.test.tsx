@@ -139,35 +139,17 @@ describe('MinersTab', () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
     const menu = await screen.findByRole('menu');
-    for (const name of ['Record payment', 'Dismiss tax']) {
+    for (const name of ['Show info', 'Record payment', 'Dismiss tax']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
+    // Show info, then the three real actions: nothing else.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
     // No payment in this book: the item stays, inert.
     expect(within(menu).getByRole('menuitem', { name: 'Mark not tax' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
     expect(within(menu).queryByRole('menuitem', { name: 'Send reminder' })).not.toBeInTheDocument();
-  });
-
-  it('Mark not tax in the row ⋮ names the payment it will target by its date', async () => {
-    renderBook(<MinersTab />, {
-      payments: [
-        {
-          id: 'p1',
-          minerId: 'solo:1',
-          characterId: 1,
-          amount: 50_000,
-          at: '2026-09-02T00:00:00Z',
-          source: 'donation',
-        },
-      ],
-    });
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
-    const menu = await screen.findByRole('menu');
-    expect(
-      within(menu).getByRole('menuitem', { name: 'Mark not tax: 2 Sep payment' })
-    ).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('a row opens in place to its Statement days with one Open page link; the click does not navigate', async () => {

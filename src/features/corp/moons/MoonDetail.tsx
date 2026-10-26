@@ -11,15 +11,21 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
-import { minersOnMoon, splitPlace, type MinerOnMoon } from '@/engine/corpTaxBook/bookSections';
+import {
+  extractionBilling,
+  minersOnMoon,
+  splitPlace,
+  type MinerOnMoon,
+} from '@/engine/corpTaxBook/bookSections';
 import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
-import { extractionWindowLabel, isk, shortDateTime } from './moonsFormat';
+import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
 import { Crumb, OreLine, StateWord } from './moonsParts';
+import { tapTargetClassName } from './sectionHelpers';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader } from './sectionParts';
 
@@ -35,6 +41,7 @@ export function MoonDetail({ id }: { id: string }) {
   const [linking, setLinking] = useState(false);
   const detail = extractionDetail(view, id);
   const miners = useMemo(() => minersOnMoon(view, id), [view, id]);
+  const billing = useMemo(() => extractionBilling(view, id), [view, id]);
   if (!detail) {
     return (
       <div className="space-y-4">
@@ -50,6 +57,16 @@ export function MoonDetail({ id }: { id: string }) {
     row.estimatedValue !== null && row.minedPct !== null
       ? Math.round(row.estimatedValue * (1 - row.minedPct / 100))
       : null;
+  const billedPeriods = billing.statementIds.flatMap((sid) => {
+    const st = view.input.statements.find((x) => x.id === sid);
+    return st ? [periodLabel(st.periodStart, st.periodEnd)] : [];
+  });
+  // The tax says what state it is in: still counting, or already on a Statement.
+  const minersHint = !billing.billed
+    ? t('corpTaxBook.moons.moon.minersHint')
+    : billedPeriods.length === 1
+      ? t('corpTaxBook.moons.moon.minersHintBilled', { period: billedPeriods[0] })
+      : t('corpTaxBook.moons.moon.minersHintBilledMany');
   const minerName = (m: MinerOnMoon) =>
     names.character(view.miners.find((x) => x.id === m.minerId)?.mainCharacterId ?? 0);
   const minerColumns: DataTableColumn<MinerOnMoon>[] = [
@@ -65,6 +82,7 @@ export function MoonDetail({ id }: { id: string }) {
       header: t('corpTaxBook.moons.cols.amount'),
       align: 'right',
       className: 'tabular-nums',
+      stackAffix: { after: t('corpTaxBook.moons.sections.affix.units') },
       render: (m) => formatCount(m.units),
       sortValue: (m) => m.units,
     },
@@ -73,6 +91,7 @@ export function MoonDetail({ id }: { id: string }) {
       header: t('corpTaxBook.moons.cols.estValue'),
       align: 'right',
       className: 'tabular-nums',
+      stackAffix: { after: t('corpTaxBook.moons.sections.affix.est') },
       render: (m) => isk(m.value),
       sortValue: (m) => m.value,
     },
@@ -90,16 +109,17 @@ export function MoonDetail({ id }: { id: string }) {
     {
       id: 'fractured',
       header: t('corpTaxBook.moons.cols.fractured'),
-      render: (r) => (
-        <Link to={extractionLink(r.id)} className={entityLinkClassName()}>
-          {r.fracturedAt ? shortDateTime(r.fracturedAt) : shortDateTime(r.chunkArrivalAt)}
-        </Link>
-      ),
+      render: (r) => (r.fracturedAt ? dateTimeUtc(r.fracturedAt) : '—'),
     },
     {
       id: 'state',
       header: t('corpTaxBook.moons.cols.state'),
-      render: (r) => <StateWord state={r.state} />,
+      // The row's one link: a cycle that never fractured has no date to carry it.
+      render: (r) => (
+        <Link to={extractionLink(r.id)} className={entityLinkClassName(tapTargetClassName)}>
+          <StateWord state={r.state} />
+        </Link>
+      ),
     },
     {
       id: 'est',
@@ -157,7 +177,9 @@ export function MoonDetail({ id }: { id: string }) {
         }
       />
       <EntityHeader
-        label={t('corpTaxBook.moons.moon.taxSoFar')}
+        label={t(
+          billing.billed ? 'corpTaxBook.moons.moon.taxBilled' : 'corpTaxBook.moons.moon.taxSoFar'
+        )}
         value={isk(row.tax)}
         note={
           <>
@@ -184,7 +206,7 @@ export function MoonDetail({ id }: { id: string }) {
             value: row.estimatedValue ? isk(row.estimatedValue) : '—',
           },
           {
-            label: t('corpTaxBook.moons.cols.minedShort'),
+            label: t('corpTaxBook.moons.moon.minedEst'),
             value: row.minedPct === null ? '—' : `${isk(mined)} · ${row.minedPct}%`,
           },
           // An expired chunk has no "left": the field is gone, so only what was mined says anything.
@@ -198,12 +220,12 @@ export function MoonDetail({ id }: { id: string }) {
               ]),
           {
             label: t('corpTaxBook.moons.moon.fractured'),
-            value: row.fracturedAt ? shortDateTime(row.fracturedAt) : '—',
+            value: row.fracturedAt ? dateTimeUtc(row.fracturedAt) : '—',
           },
           {
             label: t('corpTaxBook.moons.moon.fieldGone'),
             value: row.expiresAt
-              ? t('corpTaxBook.moons.moon.about', { at: shortDateTime(row.expiresAt) })
+              ? t('corpTaxBook.moons.moon.about', { at: dateTimeUtc(row.expiresAt) })
               : '—',
           },
         ]}
@@ -213,9 +235,8 @@ export function MoonDetail({ id }: { id: string }) {
         noun={t('corpTaxBook.moons.sections.nouns.miners')}
         rows={miners}
         sortColumns={minerColumns}
-        meta={
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.moon.minersHint')}</span>
-        }
+        empty={t('corpTaxBook.moons.moon.nobody')}
+        meta={<span className="text-xs text-text-dim">{minersHint}</span>}
         phone={phone}
         summary={t('corpTaxBook.moons.moon.minersSummary', {
           count: miners.length,
@@ -237,7 +258,10 @@ export function MoonDetail({ id }: { id: string }) {
                   showTotal={false}
                   label={t('corpTaxBook.moons.moon.oreOf', { name: minerName(m) })}
                   foot={
-                    <Link to={minerPath(m.minerId)} className={entityLinkClassName()}>
+                    <Link
+                      to={minerPath(m.minerId)}
+                      className={entityLinkClassName(tapTargetClassName)}
+                    >
                       {t('corpTaxBook.moons.moon.openMiner')}
                     </Link>
                   }
@@ -252,14 +276,16 @@ export function MoonDetail({ id }: { id: string }) {
       <BookSection
         title={t('corpTaxBook.moons.moon.past')}
         noun={t('corpTaxBook.moons.sections.nouns.cycles')}
-        rows={detail.past}
+        empty={t('corpTaxBook.moons.moon.noOtherCycles')}
+        rows={detail.otherCycles}
         meta={<span className="text-xs text-text-dim">{t('corpTaxBook.moons.moon.pastHint')}</span>}
         phone={phone}
         startOpen={false}
-        summary={t('corpTaxBook.moons.moon.pastSummary', { count: detail.past.length })}
+        summary={t('corpTaxBook.moons.moon.pastSummary', { count: detail.otherCycles.length })}
       >
-        {(shown) => (
+        {(shown, table) => (
           <DataTable
+            stacked={table.stacked}
             label={t('corpTaxBook.moons.moon.past')}
             columns={cycleColumns}
             rows={[...shown]}

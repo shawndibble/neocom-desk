@@ -3,22 +3,20 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import {
-  daysByPhase,
-  minerMoons,
-  statementAdjustment,
-  type MinerMoon,
-} from '@/engine/corpTaxBook/bookSections';
+import { daysByPhase, minerMoons, statementAdjustment } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
 import { isk, shortDate } from './moonsFormat';
 import { extractionPath, minerPath } from './moonsPaths';
+import { moonLabel, tapTargetClassName } from './sectionHelpers';
 
 const SHOWN = 3;
 
 const LIST_ROW = 'flex justify-between gap-3 tabular-nums';
+/** An amount stays on one line: a figure broken mid-number reads as two. */
+const AMOUNT = 'shrink-0 whitespace-nowrap';
 
-/** A titled column of short rows; the empty dash shows when no row was given. */
+/** A titled column of short rows: the title in small caps, the rows below it. The caller prints its own empty dash. */
 function MiniList({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
@@ -37,8 +35,6 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
   const payments = (detail?.payments ?? []).slice(0, 2);
   const moons = minerMoons(view, miner.id);
   const adjust = statementAdjustment(next, miner);
-  const moonName = (m: MinerMoon) =>
-    m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId);
   return (
     <div className="sticky left-0 w-[calc(100cqw-1.5rem)] max-w-full space-y-3 p-3">
       <div className="grid gap-4 @2xl:grid-cols-3">
@@ -48,7 +44,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
               <span className="min-w-0 truncate">
                 {shortDate(d.date)} · {d.oreLines.map((l) => names.ore(l.typeId)).join(', ')}
               </span>
-              <span>{isk(d.tax)}</span>
+              <span className={AMOUNT}>{isk(d.tax)}</span>
             </li>
           ))}
           {next.length > SHOWN && (
@@ -74,7 +70,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
               <span className="min-w-0 truncate">
                 {shortDate(p.at)} · {names.character(p.characterId)}
               </span>
-              <span className="text-isk-pos">{isk(p.amount)}</span>
+              <span className={`${AMOUNT} text-isk-pos`}>{isk(p.amount)}</span>
             </li>
           ))}
           {payments.length === 0 && <li className="text-text-dim">—</li>}
@@ -83,16 +79,16 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
           {moons.slice(0, SHOWN).map((m) => (
             <li key={m.key} className={LIST_ROW}>
               {m.extractionId === undefined ? (
-                <span className="min-w-0 truncate">{moonName(m)}</span>
+                <span className="min-w-0 truncate">{moonLabel(names, m)}</span>
               ) : (
                 <Link
                   to={extractionPath(m.extractionId)}
-                  className={entityLinkClassName('min-w-0 truncate')}
+                  className={entityLinkClassName(`min-w-0 truncate ${tapTargetClassName}`)}
                 >
-                  {moonName(m)}
+                  {moonLabel(names, m)}
                 </Link>
               )}
-              <span>{isk(m.tax)}</span>
+              <span className={AMOUNT}>{isk(m.tax)}</span>
             </li>
           ))}
           {moons.length > SHOWN && (
@@ -112,7 +108,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
         </span>
         <Link
           to={minerPath(miner.id)}
-          className={entityLinkClassName('shrink-0 whitespace-nowrap')}
+          className={entityLinkClassName(`shrink-0 whitespace-nowrap ${tapTargetClassName}`)}
         >
           {t('corpTaxBook.moons.miners.openPage')}
         </Link>

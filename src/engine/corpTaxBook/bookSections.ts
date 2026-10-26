@@ -176,6 +176,26 @@ export function minersOnMoon(view: BookView, extractionId: string): MinerOnMoon[
 }
 
 /**
+ * Whether an Extraction's tax is already billed: it has days, and none of them is still waiting
+ * for a Statement or accruing. `statementIds` are the Statements those days sit on.
+ */
+export function extractionBilling(
+  view: BookView,
+  extractionId: string
+): { billed: boolean; statementIds: string[] } {
+  const days = [...view.internals.byMiner.values()].flatMap((inner) =>
+    inner.days.filter((d) => d.extractionId === extractionId)
+  );
+  const open = days.some((d) => d.status === 'unbilled' || d.status === 'not-billable');
+  const statementIds = [
+    ...new Set(days.flatMap((d) => (d.statementId === undefined ? [] : [d.statementId]))),
+  ];
+  // A moon whose days were all dismissed was never billed: one day has to sit on a Statement.
+  const onStatement = days.some((d) => d.status === 'on-statement' || d.status === 'paid');
+  return { billed: onStatement && !open, statementIds };
+}
+
+/**
  * The moon each refinery sits at. A day mined while no Extraction ran carries no moon id, but
  * its refinery's moon is known from the Extractions and the days that do.
  */
@@ -287,8 +307,13 @@ export function paymentLedger<
 
 export type ActivityKind = 'mail' | 'dismissed' | 'audit';
 
+/** Audit actions that are mail going out: the Mail chip counts them, not Audit. */
+const MAIL_AUDIT_ACTIONS: ReadonlySet<string> = new Set(['recordMail', 'recordReminder']);
+
 export interface ActivityItem<K extends ActivityKind, T> {
   kind: K;
+  /** The filter chip the row is counted under; a mail's audit row is Mail, not Audit. */
+  chip: ActivityKind;
   id: string;
   /** Epoch ms. */
   at: number;
@@ -297,21 +322,58 @@ export interface ActivityItem<K extends ActivityKind, T> {
 
 type Timed = { id: string; at: number };
 
-/** A Miner's Activity: queued mail, dismissals and the audit log in one feed, newest first. */
-export function activityFeed<M extends Timed, D extends Timed, A extends Timed>(sources: {
+/**
+ * A Miner's Activity: queued mail, dismissals and the audit log in one feed, newest first. A
+ * queued mail and the audit row logged for it (same mail id) are one event, shown as the queue
+ * row (its subject and status); once the queue is cleared the audit row stands alone.
+ */
+export function activityFeed<
+  M extends Timed & { mailId?: string },
+  D extends Timed,
+  A extends Timed & { action?: string; detail?: Record<string, unknown> },
+>(sources: {
   mail: readonly M[];
   dismissed: readonly D[];
   audit: readonly A[];
 }): (ActivityItem<'mail', M> | ActivityItem<'dismissed', D> | ActivityItem<'audit', A>)[] {
+  const queued = new Set(sources.mail.flatMap((m) => (m.mailId ? [String(m.mailId)] : [])));
+  const isMail = (a: A) => a.action !== undefined && MAIL_AUDIT_ACTIONS.has(a.action);
   const rows = [
-    ...sources.mail.map((item) => ({ kind: 'mail' as const, id: item.id, at: item.at, item })),
-    ...sources.dismissed.map((item) => ({
-      kind: 'dismissed' as const,
+    ...sources.mail.map((item) => ({
+      kind: 'mail' as const,
+      chip: 'mail' as const,
       id: item.id,
       at: item.at,
       item,
     })),
-    ...sources.audit.map((item) => ({ kind: 'audit' as const, id: item.id, at: item.at, item })),
+    ...sources.dismissed.map((item) => ({
+      kind: 'dismissed' as const,
+      chip: 'dismissed' as const,
+      id: item.id,
+      at: item.at,
+      item,
+    })),
+    ...sources.audit
+      .filter(
+        (a) => !(isMail(a) && a.detail?.mailId !== undefined && queued.has(String(a.detail.mailId)))
+      )
+      .map((item) => ({
+        kind: 'audit' as const,
+        chip: (isMail(item) ? 'mail' : 'audit') as ActivityKind,
+        id: item.id,
+        at: item.at,
+        item,
+      })),
   ];
   return rows.sort((a, b) => b.at - a.at || a.id.localeCompare(b.id));
+}
+
+/** The oldest issued Statement that is not settled: the one an overdue Miner owes first. */
+export function oldestUnsettled<S extends { id: string; issuedAt: string }>(
+  statements: readonly S[],
+  isSettled: (id: string) => boolean
+): S | undefined {
+  return statements
+    .filter((s) => !isSettled(s.id))
+    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))[0];
 }
