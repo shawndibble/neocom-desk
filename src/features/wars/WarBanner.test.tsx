@@ -8,10 +8,10 @@ import type { StoredWar } from '@/engine/wars';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { WarBanner } from './WarBanner';
 
-const loadActiveWars = vi.fn<(characterId: number) => Promise<readonly StoredWar[]>>();
+const loadActiveWars = vi.fn<() => Promise<readonly StoredWar[]>>();
 vi.mock('./activeWars', () => ({
   ACTIVE_WARS_POLL_MS: 3_600_000,
-  loadActiveWars: (characterId: number) => loadActiveWars(characterId),
+  loadActiveWars: () => loadActiveWars(),
 }));
 const loadRecentWars = vi.fn<() => Promise<readonly StoredWar[]>>();
 vi.mock('./recentWars', () => ({

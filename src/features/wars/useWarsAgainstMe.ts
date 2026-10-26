@@ -29,7 +29,7 @@ export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
   useEffect(() => {
     let cancelled = false;
     const load = () =>
-      void loadActiveWars(characterId).then((next) => {
+      void loadActiveWars().then((next) => {
         if (!cancelled) setListed(next.length === 0 ? NONE : next);
       });
     load();
@@ -39,7 +39,7 @@ export function useWarsAgainstMe(characterId: number): readonly WarAgainstMe[] {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [characterId]);
+  }, []);
 
   // A war-declared Alert asks ESI for the newest wars, so the banner does not
   // wait for the next sweep; the sweep's list covers pilots with no Alerts.

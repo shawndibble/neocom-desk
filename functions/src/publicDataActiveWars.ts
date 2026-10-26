@@ -1,13 +1,13 @@
 /**
  * The active-wars job for the GitHub Actions runner (`scripts/public-data/active-wars.mjs`,
  * `.github/workflows/public-data-active-wars.yml`): runs the sweep and publishes the open
- * list to R2, where the app reads it with a plain fetch. The sweep's bookkeeping, which
- * `syncActiveWars` keeps in the Firestore doc, lives in a second R2 object next to it.
+ * list to R2, where the app reads it with a plain fetch. The sweep's bookkeeping
+ * lives in a second R2 object next to it.
  */
 import { runActiveWarsSweep, type ActiveWarsDoc } from './activeWarsSweep.js';
 import { createR2Get, createR2Put, type R2Config, type R2Get, type R2Put } from './r2Client.js';
 
-/** What the app reads: `{ updatedAt, wars }`, the shape of `systemConditions/activeWars`. */
+/** What the app reads: `{ updatedAt, wars }`, what `src/features/wars/activeWars.ts` reads. */
 export const ACTIVE_WARS_R2_KEY = 'active-wars/wars.json';
 /** The sweep's cursor and the open list it holds; the runner starts from it. */
 export const ACTIVE_WARS_STATE_R2_KEY = 'active-wars/state.json';
