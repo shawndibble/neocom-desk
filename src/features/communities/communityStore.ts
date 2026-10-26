@@ -102,6 +102,9 @@ const mineCache = createReadCache<CommunitySummary[]>();
  * someone joins or leaves, or pushes a library (its `pushedAt`); the libraries themselves are
  * re-read only when that stamp moves (`loadMemberLibrariesFor`).
  */
+/** Most documents one roster or join-request read takes. */
+export const COMMUNITY_LIST_CAP = 1000;
+
 export const ROSTER_TTL_MS = 20 * 60_000;
 
 const rosterCache = createReadCache<CommunityMember[]>();
@@ -243,7 +246,10 @@ async function readCommunityMembers(
 ): Promise<CommunityMember[]> {
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    collection(getSyncFirestore(characterId), 'communities', communityId, 'members')
+    query(
+      collection(getSyncFirestore(characterId), 'communities', communityId, 'members'),
+      limit(COMMUNITY_LIST_CAP)
+    )
   );
   return snap.docs
     .map((entry) => ({
@@ -264,7 +270,10 @@ export async function loadJoinRequests(
   if (override) return override.loadRequests(communityId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    collection(getSyncFirestore(characterId), 'communities', communityId, 'requests')
+    query(
+      collection(getSyncFirestore(characterId), 'communities', communityId, 'requests'),
+      limit(COMMUNITY_LIST_CAP)
+    )
   );
   return snap.docs
     .map((entry) => ({

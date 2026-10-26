@@ -4,7 +4,7 @@
  * creating, marking paid and removing go through the callables, which hold the
  * caps and the boss-only checks.
  */
-import { collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { collection, getDocs, limit, orderBy, query, where } from 'firebase/firestore/lite';
 import type { FleetPayout, FleetPayoutDraft, FleetShare } from '@/engine/communities/fleetPayouts';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -47,6 +47,9 @@ function readShare(id: string, d: Record<string, unknown>): FleetShare | null {
   };
 }
 
+/** Most Fleet Payouts one read takes, newest first. */
+export const FLEET_PAYOUTS_CAP = 500;
+
 const byIndex = (a: FleetShare, b: FleetShare) => Number(a.id) - Number(b.id);
 
 /** Every Fleet Payout in a Community, newest first. A document that does not read as one is skipped. */
@@ -60,7 +63,11 @@ export async function loadFleetPayouts(
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     return getDocs(
-      collection(getSyncFirestore(characterId), 'communities', communityId, 'fleetPayouts')
+      query(
+        collection(getSyncFirestore(characterId), 'communities', communityId, 'fleetPayouts'),
+        orderBy('createdAt', 'desc'),
+        limit(FLEET_PAYOUTS_CAP)
+      )
     );
   });
   return readAll(

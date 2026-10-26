@@ -18,14 +18,19 @@ vi.mock('firebase/firestore/lite', () => ({
   where: vi.fn(),
 }));
 
+import { getDocs, limit, orderBy } from 'firebase/firestore/lite';
 import {
+  SRP_READ_CAP,
   approveSrpClaim,
   approveSrpClaims,
   changeSrpClaimAmount,
   markSrpClaimPaid,
   markSrpClaimsPaid,
+  readAllSrpClaims,
+  readSrpActivity,
   rejectSrpClaim,
 } from './srpOfficerClient';
+import { DOCTRINE_READ_CAP, readSrpDoctrines } from './srpDoctrineClient';
 import { invalidateSrpOfficer, verifySrpOfficer } from './srpClient';
 
 const CORP = 98000001;
@@ -78,5 +83,32 @@ describe('SRP officer client', () => {
     await expect(rejectSrpClaim(7, CORP, 5, 'x')).rejects.toThrow();
     await verifySrpOfficer(7, CORP);
     expect(verifies()).toBe(3);
+  });
+});
+
+describe('SRP list reads', () => {
+  beforeEach(() => {
+    vi.mocked(getDocs).mockResolvedValue({ docs: [] } as never);
+  });
+
+  it('bound the whole-collection claim read', async () => {
+    await readAllSrpClaims(7, CORP);
+    expect(limit).toHaveBeenCalledWith(SRP_READ_CAP);
+  });
+
+  it('bound the whole audit log read, newest first', async () => {
+    await readSrpActivity(7, CORP, null);
+    expect(orderBy).toHaveBeenCalledWith('at', 'desc');
+    expect(limit).toHaveBeenCalledWith(SRP_READ_CAP);
+  });
+
+  it('keep a requested audit count', async () => {
+    await readSrpActivity(7, CORP, 25);
+    expect(limit).toHaveBeenCalledWith(25);
+  });
+
+  it('bound the Doctrine Fit read', async () => {
+    await readSrpDoctrines(7, CORP);
+    expect(limit).toHaveBeenCalledWith(DOCTRINE_READ_CAP);
   });
 });

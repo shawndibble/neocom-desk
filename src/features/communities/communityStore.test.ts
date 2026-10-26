@@ -20,6 +20,7 @@ const routed = vi.hoisted(() => ({ callRouted: vi.fn() }));
 vi.mock('@/sync/routedCallable', () => routed);
 
 import {
+  COMMUNITY_LIST_CAP,
   MAIL_INVITES_SHOWN,
   MY_COMMUNITIES_TTL_MS,
   ROSTER_TTL_MS,
@@ -29,6 +30,7 @@ import {
   joinCommunity,
   loadCommunityMembers,
   loadCommunityMembersCached,
+  loadJoinRequests,
   loadMailInviteStatus,
   loadMemberLibrariesFor,
   loadMyCommunities,
@@ -251,6 +253,16 @@ describe('rosters and libraries', () => {
     const before = indexReads();
     await loadMyCommunitiesCached(1, NOW);
     expect(indexReads()).toBe(before + 1);
+  });
+});
+
+describe('roster and join-request reads', () => {
+  it('ask for at most COMMUNITY_LIST_CAP documents', async () => {
+    fs.getDocs.mockResolvedValue({ docs: [] });
+    await loadCommunityMembers(1, 'c1');
+    await loadJoinRequests(1, 'c1');
+    const parts = fs.getDocs.mock.calls.map(([ref]) => ref.parts);
+    expect(parts).toEqual([[['limit', COMMUNITY_LIST_CAP]], [['limit', COMMUNITY_LIST_CAP]]]);
   });
 });
 
