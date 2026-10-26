@@ -12,7 +12,8 @@
 // returns a token.
 
 import { FieldPath, FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
+import { BOOKS_COLLECTION, FEEDERS, REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
+import { isMissingIndex, isTopLevelChild } from './indexedSweep.js';
 import {
   BOOK_DEFAULTS,
   advanceFeederHealth,
@@ -275,4 +276,50 @@ export async function feedersToRead(
       ? [{ feederCorporationId: feeder, collectorCorporationId: collector }]
       : [];
   });
+}
+
+export interface ReadableFeeder {
+  feederCorporationId: number;
+  collectorCorporationId: number;
+  /** The record as the query saw it; absent on the pointer fallback. */
+  record?: FeederRecord;
+}
+
+/**
+ * The feeders a run still reads: one collection-group query over the records whose status is
+ * readable, not every pointer and then every record. Disconnected, left and removed feeders
+ * cost nothing. Until its index is deployed (indexes go out by hand) the query fails and the
+ * run falls back to the pointer scan, whose records the caller reads itself.
+ */
+export async function readableFeeders(
+  db: Firestore,
+  pointerCollection: string,
+  log: (message: string, detail?: Record<string, unknown>) => void
+): Promise<ReadableFeeder[]> {
+  try {
+    const snap = await db
+      .collectionGroup(FEEDERS)
+      .where('status', 'in', [...READABLE_FEEDER_STATUSES])
+      .get();
+    return snap.docs.flatMap((d) => {
+      if (!isTopLevelChild(d, BOOKS_COLLECTION)) return [];
+      const collector = Number(d.ref.parent.parent!.id);
+      const feeder = Number(d.id);
+      return Number.isSafeInteger(collector) && Number.isSafeInteger(feeder)
+        ? [
+            {
+              feederCorporationId: feeder,
+              collectorCorporationId: collector,
+              record: d.data() as FeederRecord,
+            },
+          ]
+        : [];
+    });
+  } catch (err) {
+    if (!isMissingIndex(err)) throw err;
+    log('Collection-group index not deployed yet; using the pointer scan', {
+      sweep: 'runFeederSyncs',
+    });
+  }
+  return feedersToRead(db, pointerCollection);
 }
