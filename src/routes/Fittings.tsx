@@ -429,10 +429,6 @@ function FittingsPage() {
       else if (!was.improve) setAddOpen(false);
     }
   }, [addOpen, improveDocked, closeImprove]);
-  const itemActionsWithImprove = useMemo(
-    () => (itemActions === null ? null : { ...itemActions, openImprove: improve.open }),
-    [itemActions, improve.open]
-  );
   const overlay = useOverlayFitting({
     characterId: activeCharacterId,
     profile: workspace.profile,
@@ -516,7 +512,6 @@ function FittingsPage() {
       overlay={overlay}
       onOpenMakeItFit={makeItFit.open}
       preview={improve.preview}
-      onImprove={improve.open}
       ruleBreaks={ruleBreaks.lines}
     />
   );
@@ -544,7 +539,7 @@ function FittingsPage() {
     // every Ring slot stays a drop target. (It can't get out of the way
     // mid-drag instead: moving or hiding a drag's source element cancels it.)
     <ItemActionsProvider page={pageItemActions}>
-      <FittingItemActionsProvider value={itemActionsWithImprove}>
+      <FittingItemActionsProvider value={itemActions}>
         <RuleBreakFlags.Provider value={ruleBreaks.flagged}>
           {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
         panel (scope decision `20261016-171349`). */}
@@ -593,6 +588,7 @@ function FittingsPage() {
               editor={editor}
               statsSections={statsSections}
               statsFirst={statsFirst}
+              improveColumn={improve.column}
             />
             {makeItFit.dialog}
             {improve.drawer}

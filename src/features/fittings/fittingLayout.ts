@@ -16,13 +16,14 @@ export function addModeFor(threeColumns: boolean, isDesktop: boolean): AddMode {
 
 /**
  * Who holds the page's left column, and whether the page is pushed aside for it.
- * Improve open on desktop (`improveDocked`) takes the column: the docked browser
- * steps aside (laid out as a shut slide-out), an Add slide-out stays shut, and the
- * page makes room, so the stats stay in view while rows are ticked. On three
- * columns' width the stats keep their place beside the editor; narrower, the
- * 26rem leaves no room for both, so the stats go above the editor (`statsFirst`):
- * they are what Improve changes. Below desktop nothing is pushed: the stats are a
- * tab of their own there. Otherwise the Add slide-out pushes the page as before.
+ * Improve open on desktop (`improveDocked`) takes the column: a column in the page
+ * itself (`FittingEditorLayout`'s `improveColumn`), so nothing is pushed. The docked
+ * browser steps aside (laid out as a shut slide-out) and an Add slide-out stays
+ * shut, so the stats stay in view while rows are ticked. On three columns' width
+ * the stats keep their place beside the editor; narrower, there is no room for
+ * both beside the column, so the stats go above the editor (`statsFirst`): they
+ * are what Improve changes. Below desktop the stats are a tab of their own and
+ * Improve a sheet. Otherwise the Add slide-out pushes the page as before.
  */
 export function leftColumn(
   addMode: AddMode,
@@ -33,7 +34,7 @@ export function leftColumn(
     return {
       addMode: 'slideOut',
       addOpen: false,
-      pushed: true,
+      pushed: false,
       statsFirst: addMode === 'slideOut',
     };
   }

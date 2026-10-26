@@ -58,21 +58,22 @@ describe('leftColumn', () => {
     });
   });
 
-  it('gives Improve the docked browser column: the browser steps aside, the page makes room', () => {
+  it('gives Improve the docked browser column: the browser steps aside, nothing is pushed', () => {
+    // Improve is a column in the page itself, not an overlay the page must clear.
     expect(leftColumn('docked', false, true)).toEqual({
       ...base,
       addMode: 'slideOut',
       addOpen: false,
-      pushed: true,
+      pushed: false,
     });
   });
 
-  it('on a narrower desktop, Improve pushes the page and puts the stats above the editor', () => {
+  it('on a narrower desktop, Improve puts the stats above the editor beside it', () => {
     // 26rem gone leaves no room for both side by side; the stats are what Improve changes.
     expect(leftColumn('slideOut', true, true)).toEqual({
       addMode: 'slideOut',
       addOpen: false,
-      pushed: true,
+      pushed: false,
       statsFirst: true,
     });
   });

@@ -45,9 +45,6 @@ export function EmptySlotMenuItems({ rack, index }: { rack: FittingSlotKind; ind
           ? t('fittings.item.fillRackNone')
           : t('fittings.item.fillRack', { name: actions.typeName(last) })}
       </MenuItem>
-      {actions.openImprove && (
-        <MenuItem onSelect={actions.openImprove}>{t('fittings.improve.menuItem')}</MenuItem>
-      )}
     </>
   );
 }

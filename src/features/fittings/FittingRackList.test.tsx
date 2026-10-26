@@ -481,17 +481,6 @@ describe('FittingRackList with the editor’s item actions', () => {
     expect(actions.fillRack).toHaveBeenCalledWith('high', 10);
   });
 
-  it('opens Improve from an empty slot’s menu', async () => {
-    const actions = fakeItemActions({ names }, { openImprove: vi.fn() });
-    renderList(actions);
-    fireEvent.pointerDown(screen.getAllByRole('button', { name: /More actions for Empty/ })[0], {
-      button: 0,
-      pointerType: 'mouse',
-    });
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Improve…' }));
-    expect(actions.openImprove).toHaveBeenCalled();
-  });
-
   it('opens the empty-slot menu on a right-click of the slot itself', async () => {
     const actions = fakeItemActions({ names });
     renderList(actions);

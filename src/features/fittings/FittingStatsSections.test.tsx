@@ -216,29 +216,6 @@ describe('FittingStatsSections rule breaks', () => {
   });
 });
 
-describe('FittingStatsSections Improve entry', () => {
-  it('opens Improve from the header, and shows no entry without a handler', async () => {
-    const onImprove = vi.fn();
-    const { unmount } = render(
-      <FittingStatsSections
-        stats={stats()}
-        statsProgress={null}
-        statsError={false}
-        price={null}
-        damageProfiles={damageProfiles()}
-        targetProfiles={targetProfiles()}
-        typeName={typeName}
-        onImprove={onImprove}
-      />
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Improve…' }));
-    expect(onImprove).toHaveBeenCalledTimes(1);
-    unmount();
-    renderSections(stats());
-    expect(screen.queryByRole('button', { name: 'Improve…' })).toBeNull();
-  });
-});
-
 describe('FittingStatsSections implants & skills group', () => {
   it('starts collapsed, holding the implant controls and the skills override', async () => {
     render(

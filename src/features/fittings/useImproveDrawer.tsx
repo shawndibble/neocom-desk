@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Close } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -6,7 +7,7 @@ import { ASSETS_ENDPOINTS, useAppraisalOwnedPref } from '@/features/market/appra
 import { useMarketHub } from '@/features/market/hub';
 import { useOwnedAtStation, type OwnedScope } from '@/features/market/useOwnedAtStation';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
-import { Modal, SlideOver, Toast, useTimedToast } from '@/components/ui';
+import { IconButton, Modal, Panel, Toast, useTimedToast } from '@/components/ui';
 import {
   applyImproveCandidate,
   type DefenseChoice,
@@ -88,7 +89,9 @@ export function useImproveDrawer({
   open: () => void;
   close: () => void;
   drawer: ReactNode;
-  /** Open beside the editor (desktop), so the page makes room for it rather than sitting under it. */
+  /** Desktop: the open panel as a page column, for FittingEditorLayout's `improveColumn`; null when shut or on a phone. */
+  column: ReactNode;
+  /** Open as that column (desktop). */
   docked: boolean;
   /** The stat changes to preview in the stats column; null when Improve is shut or nothing is ticked or hovered. */
   preview: FittingStatsDelta | null;
@@ -157,6 +160,11 @@ export function useImproveDrawer({
   useTimedToast(implantApplied, () => setImplantApplied(null));
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
+  // The column's heading takes focus as it opens, so a keyboard user lands in it.
+  const columnHeading = useRef<HTMLHeadingElement | null>(null);
+  useEffect(() => {
+    if (isOpen && !isPhone) columnHeading.current?.focus({ preventScroll: true });
+  }, [isOpen, isPhone]);
   // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
   const { groups: chargeGroups } = useChargeChoices({
     fitting: isOpen ? fitting : null,
@@ -351,6 +359,32 @@ export function useImproveDrawer({
     search.state.result.noDownside.length + search.state.result.tradeOffs.length > 0;
   const footer = found && <div ref={setFooterTarget} />;
 
+  // Desktop: a column in the page, left of the editor (FittingEditorLayout's
+  // `improveColumn`), where the docked browser sits: never over the nav, and the
+  // stats stay in view while rows are ticked. Sticky, a viewport tall, with its own
+  // scroll and the selection bar below it.
+  const column = fitting && isOpen && !isPhone && (
+    <Panel
+      title={t('fittings.improve.title')}
+      headingRef={columnHeading}
+      actions={<IconButton icon={<Close />} label={t('common.close')} onClick={close} />}
+      padded={false}
+      fill
+      className="slide-in-left sticky top-3 flex h-[calc(100vh-1.5rem)] flex-col"
+    >
+      <div
+        className="min-h-0 flex-1 overflow-y-auto p-3"
+        // Escape closes it, as it did the slide-out, unless a dialog opened from it owns the key.
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !document.querySelector('dialog[open]')) close();
+        }}
+      >
+        {body}
+      </div>
+      {footer && <div className="border-line shrink-0 border-t px-3 py-2">{footer}</div>}
+    </Panel>
+  );
+
   const drawer = fitting && (
     <>
       {isPhone ? (
@@ -363,20 +397,8 @@ export function useImproveDrawer({
         >
           {body}
         </Modal>
-      ) : (
-        <SlideOver
-          open={isOpen}
-          onClose={close}
-          side="left"
-          // Docked beside the app's 12rem nav as the editor's left column: the page
-          // makes room (`docked`), so the stats stay visible while rows are ticked.
-          className="slide-in-left md:left-48"
-          title={t('fittings.improve.title')}
-          footer={footer}
-        >
-          {body}
-        </SlideOver>
-      )}
+      ) : // Desktop: `column`, a column in the page itself.
+      null}
       {implantApplied !== null && <Toast message={implantApplied} />}
       {undo && undoable && (
         <Toast
@@ -395,5 +417,12 @@ export function useImproveDrawer({
       )}
     </>
   );
-  return { open, close, drawer, docked: isOpen && !isPhone, preview: isOpen ? preview : null };
+  return {
+    open,
+    close,
+    drawer,
+    column: column || null,
+    docked: isOpen && !isPhone,
+    preview: isOpen ? preview : null,
+  };
 }
