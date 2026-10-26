@@ -196,7 +196,7 @@ describe('Statements drill-down (#5285)', () => {
       await openMenu('Pilot 2');
       const item = await screen.findByRole('menuitem', { name: /Send reminder/ });
       expect(item).toHaveAttribute('aria-disabled', 'true');
-      expect(item).toHaveTextContent('One reminder already sent');
+      expect(item).toHaveTextContent('Reminders stopped; one already sent');
       await userEvent.click(item);
       expect(enqueueReminder).not.toHaveBeenCalled();
     });

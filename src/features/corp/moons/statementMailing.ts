@@ -100,23 +100,25 @@ export function useMinerReminder(
   const openStatement = statementId
     ? detail?.statements.find((s) => s.id === statementId)
     : oldestOpenStatement(view, minerId);
-  const block = !openStatement
-    ? t(
+  const blockReason = () => {
+    if (!openStatement) {
+      return t(
         detail && detail.row.owed > 0
           ? 'corpTaxBook.moons.miner.remindNone'
           : 'corpTaxBook.moons.miner.remindNothingOwed'
-      )
-    : statementId && settledOf(openStatement.id)
-      ? t('corpTaxBook.moons.statementPeriod.alreadyPaid')
-      : statementId &&
-          !reminderAllowed({
-            remindersStopped: openStatement.remindersStopped === true,
-            manualRemindersSent: openStatement.manualRemindersSent ?? 0,
-          })
-        ? t('corpTaxBook.moons.statementPeriod.reminderCap')
-        : corporationName === null
-          ? t('corpTaxBook.moons.run.loadingCorporation')
-          : null;
+      );
+    }
+    if (statementId) {
+      if (settledOf(openStatement.id)) return t('corpTaxBook.moons.statementPeriod.alreadyPaid');
+      const capped = !reminderAllowed({
+        remindersStopped: openStatement.remindersStopped === true,
+        manualRemindersSent: openStatement.manualRemindersSent ?? 0,
+      });
+      if (capped) return t('corpTaxBook.moons.statementPeriod.reminderCap');
+    }
+    return corporationName === null ? t('corpTaxBook.moons.run.loadingCorporation') : null;
+  };
+  const block = blockReason();
 
   const send = async () => {
     if (block || !detail || !openStatement || corporationName === null) return;
@@ -127,7 +129,10 @@ export function useMinerReminder(
       senderCharacterId: characterId,
       refineryName: (sid) => names.refinery(sid),
       statement: mailTarget(ctx, openStatement, detail.row, {
-        amountDue: detail.row.owed,
+        amountDue: statementId
+          ? (view.internals.byMiner.get(minerId)?.allocation.byStatement.get(statementId)
+              ?.remaining ?? detail.row.owed)
+          : detail.row.owed,
         carried: 0,
       }),
       remindersStopped: openStatement.remindersStopped === true,

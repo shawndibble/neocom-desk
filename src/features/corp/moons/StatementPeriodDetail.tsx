@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -57,23 +57,21 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [tableRef, cards] = useCards();
   const minerOf = (r: PeriodStatementRow) => view.miners.find((m) => m.id === r.statement.minerId);
-  const rowContextMenu = useCallback(
-    (r: PeriodStatementRow, tr: ReactElement) => {
-      const miner = view.miners.find((m) => m.id === r.statement.minerId);
-      return (
-        <StatementRowMenu
-          row={r}
-          minerName={miner ? names.character(miner.mainCharacterId) : r.statement.minerId}
-          onRecord={(row) => run(() => setRecording(row))}
-          onNotice={setNotice}
-          onCloseAutoFocus={onCloseAutoFocus}
-        >
-          {tr}
-        </StatementRowMenu>
-      );
-    },
-    [view, names, run, onCloseAutoFocus]
-  );
+  const recordingMiner = recording ? minerOf(recording) : undefined;
+  const rowContextMenu = (r: PeriodStatementRow, tr: ReactElement) => {
+    const miner = minerOf(r);
+    return (
+      <StatementRowMenu
+        row={r}
+        minerName={miner ? names.character(miner.mainCharacterId) : r.statement.minerId}
+        onRecord={(row) => run(() => setRecording(row))}
+        onNotice={setNotice}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        {tr}
+      </StatementRowMenu>
+    );
+  };
   const statements = periodStatements(view, periodStart);
   const period = periodRows(view).find((r) => r.start === periodStart && r.statements > 0);
   if (!statements || !period) {
@@ -176,7 +174,7 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
             rows={statements}
             rowKey={(r) => r.statement.id}
             density="compact"
-            rowContextMenu={rowContextMenu}
+            {...(canEdit ? { rowContextMenu } : {})}
             rowMoreActions={canEdit}
             defaultSort={{ columnId: 'outstanding', direction: 'desc' }}
             mobileSort
@@ -185,12 +183,12 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
           />
         </div>
       </Panel>
-      {recording && minerOf(recording) && (
+      {recording && recordingMiner && (
         <RecordPaymentDialog
           open
           onClose={() => setRecording(null)}
-          miner={minerOf(recording)!}
-          minerName={names.character(minerOf(recording)!.mainCharacterId)}
+          miner={recordingMiner}
+          minerName={names.character(recordingMiner.mainCharacterId)}
           defaultAmount={recording.outstanding}
           statementId={recording.statement.id}
         />
