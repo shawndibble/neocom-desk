@@ -311,9 +311,6 @@ export function CorpBookSyncNote() {
           18 Oct: safe to pay once it is closed, after 06:00 on 19 Oct and the corp&apos;s next
           sync.
         </span>
-        <span className="text-warning">
-          {isk(WAITING.tax ?? 0)} sent at 13:10, waiting for the corp to credit it.
-        </span>
       </p>
     </NewComponent>
   );
