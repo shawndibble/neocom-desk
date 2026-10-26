@@ -33,6 +33,9 @@ import { call } from './taxBook/bookClient';
 const corpDoc = (characterId: number, corporationId: number, name: string) =>
   collection(getSyncFirestore(characterId), 'corps', String(corporationId), name);
 
+/** Most documents an export or audit read takes; far past what a corporation files inside retention. */
+export const SRP_READ_CAP = 2000;
+
 const isOpen = (c: SrpClaim) => c.state === 'pending' || c.state === 'approved';
 
 /** The Pending and Approved claims: what an officer works. A bounded, single-field query. */
@@ -80,7 +83,7 @@ export async function readSrpHistory(
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
 
-/** The newest entries of the corporation's audit log, newest first; `count` null reads it whole. */
+/** The newest entries of the corporation's audit log, newest first; `count` null reads up to `SRP_READ_CAP`. */
 export async function readSrpActivity(
   characterId: number,
   corporationId: number,
@@ -92,13 +95,13 @@ export async function readSrpActivity(
   const log = corpDoc(characterId, corporationId, 'srpAudit');
   const snap = await getDocs(
     count === null
-      ? query(log, orderBy('at', 'desc'))
+      ? query(log, orderBy('at', 'desc'), limitTo(SRP_READ_CAP))
       : query(log, orderBy('at', 'desc'), limitTo(count))
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SrpAuditEntry, 'id'>) }));
 }
 
-/** Every claim, any state. Retention bounds the closed ones. */
+/** Every claim, any state, up to `SRP_READ_CAP`. Retention bounds the closed ones. */
 export async function readAllSrpClaims(
   characterId: number,
   corporationId: number
@@ -106,7 +109,9 @@ export async function readAllSrpClaims(
   const stand = srpOfficerBackendOverride();
   if (stand) return stand.claims();
   await ensureSignedIn(characterId);
-  const snap = await getDocs(corpDoc(characterId, corporationId, 'srpClaims'));
+  const snap = await getDocs(
+    query(corpDoc(characterId, corporationId, 'srpClaims'), limitTo(SRP_READ_CAP))
+  );
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
 

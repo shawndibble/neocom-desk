@@ -4,7 +4,7 @@
  * callables. Only a short-lived access token is sent; the refresh token never leaves Dexie.
  */
 import type { CallableAction } from '../../../functions/src/callableManifest';
-import { collection, getDocs } from 'firebase/firestore/lite';
+import { collection, getDocs, limit, query } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -12,6 +12,9 @@ import { srpDoctrineBackendOverride } from './srpDoctrineBackendOverride';
 import { invalidateSrpOfficer } from './srpClient';
 import { call } from './taxBook/bookClient';
 import type { DoctrineFit, DoctrinePreview, SaveDoctrineInput } from './srpTypes';
+
+/** Most Doctrine Fits one read takes. */
+export const DOCTRINE_READ_CAP = 500;
 
 /** The corp's Doctrine Fits, newest first. Officer rules; the Director's settings read them. */
 export async function readSrpDoctrines(
@@ -22,7 +25,10 @@ export async function readSrpDoctrines(
   if (stand) return stand.list();
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'srpDoctrines')
+    query(
+      collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'srpDoctrines'),
+      limit(DOCTRINE_READ_CAP)
+    )
   );
   return snap.docs.map((d) => d.data() as DoctrineFit).sort((a, b) => b.createdAt - a.createdAt);
 }
