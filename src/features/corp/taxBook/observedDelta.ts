@@ -23,7 +23,7 @@ export interface ObservedCopyMeta {
   version: string | undefined;
   /** When the copy was last confirmed current. */
   checkedAt: number;
-  /** When the whole collection was last read. */
+  /** When the whole collection was last read (a clock check only; no longer a refresh timer). */
   fullAt: number;
   /** The newest `updatedAt` held, ms; null while no held row is stamped. */
   watermark: number | null;
@@ -41,7 +41,7 @@ export function planObservedRead(
 ): ObservedPlan {
   // A clock that ran backwards makes a mark untrustworthy: read everything.
   if (!held || held.fullAt > now || held.checkedAt > now) return { kind: 'full' };
-  // A recreated book shares nothing with the copy, whatever its stamps say.
+  // A book with no `createdAt` skips this check. A recreated book shares nothing with the copy, whatever its stamps say.
   if (bookCreatedAt !== undefined && held.bookCreatedAt !== bookCreatedAt) return { kind: 'full' };
   if (
     version !== undefined &&

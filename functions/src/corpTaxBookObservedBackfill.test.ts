@@ -21,6 +21,7 @@ function fakeDb(rows: Record<string, Row>, marked = false) {
       const docs = ids.map((id) => ({
         id,
         ref: ref(id),
+        updateTime: { t: id },
         get: (f: string) => (state.rows[id] as Record<string, unknown>)[f],
       }));
       return { empty: docs.length === 0, size: docs.length, docs };
@@ -45,7 +46,10 @@ function fakeDb(rows: Record<string, Row>, marked = false) {
     batch: () => {
       const updates: { id: string; data: Row }[] = [];
       return {
-        update: (r: { id: string }, data: Row) => updates.push({ id: r.id, data }),
+        update: (r: { id: string }, data: Row, pre?: unknown) => {
+          if (!pre) throw new Error('update without a precondition');
+          updates.push({ id: r.id, data });
+        },
         commit: async () => {
           state.commits += 1;
           for (const u of updates) Object.assign(state.rows[u.id], u.data);
@@ -73,6 +77,13 @@ describe('backfillObservedUpdatedAt', () => {
     const { db, state } = fakeDb(rows);
     expect(await backfillObservedUpdatedAt(db, 1, () => 9)).toBe(1000);
     expect(state.commits).toBe(3);
+  });
+
+  it('restarts from the top after a run that died midway, skipping stamped rows', async () => {
+    const stamped = { toMillis: () => 5 };
+    const { db, state } = fakeDb({ a: { updatedAt: stamped }, b: {} });
+    expect(await backfillObservedUpdatedAt(db, 1, () => 9)).toBe(1);
+    expect(state.rows.a.updatedAt).toBe(stamped);
   });
 
   it('does nothing once the book is marked', async () => {

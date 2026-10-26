@@ -41,7 +41,12 @@ export async function backfillObservedUpdatedAt(
     let pending = 0;
     for (const doc of page.docs) {
       if (doc.get(OBSERVED_UPDATED_AT_FIELD) !== undefined) continue;
-      batch.update(doc.ref, { [OBSERVED_UPDATED_AT_FIELD]: epoch });
+      // The precondition keeps a merge's fresh stamp: a row written since this page was read fails the batch, and the next sync retries.
+      batch.update(
+        doc.ref,
+        { [OBSERVED_UPDATED_AT_FIELD]: epoch },
+        { lastUpdateTime: doc.updateTime }
+      );
       pending += 1;
     }
     if (pending > 0) await batch.commit();
