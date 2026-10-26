@@ -86,6 +86,7 @@ export function MoonOwnerPanel({
         view={view}
         names={load.names}
         nameOf={load.nameOf}
+        typeName={load.typeName}
         canEdit={access.canEdit}
         onSetRefineryLabel={async (structureId, label) => {
           await setOwnRefineryLabel(characterId, corporationId, structureId, label);

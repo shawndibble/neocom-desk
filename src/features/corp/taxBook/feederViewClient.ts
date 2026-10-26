@@ -70,17 +70,16 @@ export interface FeederViewSummary {
 export interface FeederViewLine {
   characterId: number;
   structureId: number;
+  /** The ore; absent on a view built before #5261. */
+  typeId?: number;
   volume: number;
-  valueIsk: number;
+  /** Same as `volume`; absent on a view built before #5261. */
+  quantity?: number;
 }
 
 /** `feederViews/{feeder}/days/{date}`: covered days only. */
 export interface FeederViewDay {
   date: string;
-  billable: boolean;
-  pct: number | null;
-  dueIsk: number;
-  valueIsk: number;
   lines: FeederViewLine[];
 }
 

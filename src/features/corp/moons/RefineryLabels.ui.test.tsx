@@ -33,7 +33,10 @@ function chainView(): FeederView {
     ],
     days: base.days.map((d) => ({
       ...d,
-      lines: [...d.lines, { characterId: 1, structureId: 12, volume: 10, valueIsk: 1_000 }],
+      lines: [
+        ...d.lines,
+        { characterId: 1, structureId: 12, typeId: 45490, volume: 10, quantity: 10 },
+      ],
     })),
   };
 }

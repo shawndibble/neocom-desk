@@ -158,27 +158,25 @@ describe('parseRequestedRate', () => {
 describe('minedRows', () => {
   const day = (date: string, lines: FeederViewDay['lines']): FeederViewDay => ({
     date,
-    billable: true,
-    pct: 8,
-    dueIsk: 0,
-    valueIsk: 0,
     lines,
   });
-  it('sums per character and refinery across days, biggest first, none dropped', () => {
+  it('sums per character, refinery and ore across days, most first, none dropped', () => {
     const rows = minedRows([
       day('2026-10-01', [
-        { characterId: 1, structureId: 10, volume: 5, valueIsk: 100 },
-        { characterId: 2, structureId: 10, volume: 1, valueIsk: 500 },
+        { characterId: 1, structureId: 10, typeId: 45490, volume: 5, quantity: 5 },
+        { characterId: 2, structureId: 10, typeId: 45490, volume: 1, quantity: 1 },
       ]),
       day('2026-10-02', [
-        { characterId: 1, structureId: 10, volume: 5, valueIsk: 100 },
-        { characterId: 1, structureId: 11, volume: 2, valueIsk: 50 },
+        { characterId: 1, structureId: 10, typeId: 45490, volume: 5, quantity: 5 },
+        { characterId: 1, structureId: 10, typeId: 45492, volume: 2, quantity: 2 },
+        { characterId: 1, structureId: 11, volume: 2 },
       ]),
     ]);
-    expect(rows.map((r) => [r.characterId, r.structureId, r.volume, r.valueIsk])).toEqual([
-      [2, 10, 1, 500],
-      [1, 10, 10, 200],
-      [1, 11, 2, 50],
+    expect(rows.map((r) => [r.characterId, r.structureId, r.typeId, r.volume])).toEqual([
+      [1, 10, 45490, 10],
+      [1, 10, 45492, 2],
+      [1, 11, null, 2],
+      [2, 10, 45490, 1],
     ]);
   });
 });

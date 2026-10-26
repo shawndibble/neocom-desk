@@ -22,6 +22,8 @@ import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee
 import { isk, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
+/** An ore's name; undefined until it resolves. */
+type TypeNames = (typeId: number) => string | undefined;
 
 /** Page B's plain statement: who handles the tax, what is owed, what was paid. */
 function Statement({ view, name }: { view: FeederView; name: string }) {
@@ -114,16 +116,20 @@ function SettledOtherwise({ view, name }: { view: FeederView; name: string }) {
 function MinedTable({
   view,
   names,
+  typeName,
   label,
   title,
 }: {
   view: FeederView;
   names: Names;
+  typeName?: TypeNames | undefined;
   label: (structureId: number) => string;
   title: string;
 }) {
   const { t } = useTranslation();
   const rows = minedRows(view.days);
+  const oreName = (r: MinedRow) =>
+    r.typeId === null ? '—' : (typeName?.(r.typeId) ?? `#${r.typeId}`);
   return (
     <Panel title={title} padded={rows.length === 0}>
       {rows.length === 0 ? (
@@ -133,7 +139,7 @@ function MinedTable({
           label={title}
           rows={rows}
           rowKey={(r) => r.key}
-          defaultSort={{ columnId: 'value', direction: 'desc' }}
+          defaultSort={{ columnId: 'volume', direction: 'desc' }}
           columns={[
             {
               id: 'character',
@@ -149,20 +155,18 @@ function MinedTable({
               sortValue: (r) => label(r.structureId),
             },
             {
+              id: 'ore',
+              header: t('corpTaxBook.moons.ownerView.cols.ore'),
+              render: (r) => oreName(r),
+              sortValue: (r) => oreName(r),
+            },
+            {
               id: 'volume',
               header: t('corpTaxBook.moons.ownerView.cols.volume'),
               align: 'right',
               className: 'tabular-nums',
               render: (r) => isk(r.volume),
               sortValue: (r) => r.volume,
-            },
-            {
-              id: 'value',
-              header: t('corpTaxBook.moons.ownerView.cols.value'),
-              align: 'right',
-              className: 'tabular-nums',
-              render: (r) => isk(r.valueIsk),
-              sortValue: (r) => r.valueIsk,
             },
           ]}
         />
@@ -273,6 +277,7 @@ function AskRateDialog({
 export function MoonOwnerView({
   view,
   names,
+  typeName,
   nameOf,
   canEdit,
   onSetRefineryLabel,
@@ -286,6 +291,8 @@ export function MoonOwnerView({
   view: FeederView;
   /** Character and corporation names, the payee's included. */
   names: Names;
+  /** Ore names for the Mined table's Ore column. */
+  typeName?: TypeNames;
   /** A resolved name (a system, the moon owner) or undefined, for the refinery label chain. */
   nameOf?: (id: number) => string | undefined;
   canEdit: boolean;
@@ -355,6 +362,7 @@ export function MoonOwnerView({
               <MinedTable
                 view={view}
                 names={names}
+                typeName={typeName}
                 label={refineryName}
                 title={t(
                   ended
