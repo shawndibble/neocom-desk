@@ -14,11 +14,13 @@ import {
   periodStatements,
   type PeriodStatementRow,
 } from '@/engine/corpTaxBook/bookView';
+import { tabPath } from '@/lib/pageTabs';
 import { useBook } from './useBook';
+import { MOONS_TABS } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { Crumb, DueWord } from './moonsParts';
 
-const STATEMENTS_PATH = '/corp/moons/statements';
+const STATEMENTS_PATH = tabPath(MOONS_TABS, 'statements');
 
 function MailWord({ mail }: { mail: PeriodStatementRow['mail'] }) {
   const { t } = useTranslation();
@@ -64,7 +66,7 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
       id: 'miner',
       header: t('corpTaxBook.moons.cols.miner'),
       primary: true,
-      render: (r) => <span className="text-accent">{nameOf(r)}</span>,
+      render: nameOf,
       sortValue: nameOf,
     },
     {
@@ -102,6 +104,7 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
       id: 'mail',
       header: t('corpTaxBook.moons.cols.mail'),
       render: (r) => <MailWord mail={r.mail} />,
+      sortValue: (r) => r.mail.kind,
     },
   ];
   return (

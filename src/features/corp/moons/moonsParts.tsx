@@ -135,8 +135,9 @@ export function Fact({ label, value }: { label: string; value: ReactNode }) {
 export function DueWord({ dueAt, now }: { dueAt: string | null; now: string }) {
   const { t } = useTranslation();
   if (dueAt === null) return <span className="text-text-dim">—</span>;
-  const late = Math.floor((Date.parse(now) - Date.parse(dueAt)) / DAY_MS);
-  if (late < 1) return <span className="whitespace-nowrap">{shortDate(dueAt)}</span>;
+  const elapsed = Date.parse(now) - Date.parse(dueAt);
+  if (elapsed < 0) return <span className="whitespace-nowrap">{shortDate(dueAt)}</span>;
+  const late = Math.max(1, Math.floor(elapsed / DAY_MS));
   return (
     <span className="font-semibold whitespace-nowrap text-danger">
       {t('corpTaxBook.moons.statementPeriod.dueLate', { date: shortDate(dueAt), count: late })}
