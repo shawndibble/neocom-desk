@@ -490,7 +490,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     await expect(boxes).toHaveCount(1);
     await boxes.first().check();
 
-    const settleUp = page.getByRole('button', { name: /^Settle up \d+…$/ });
+    const settleUp = page.getByRole('button', { name: /^Settle up \d+$/ });
     await expect(settleUp).toBeVisible();
     return {
       settleUpHeight: async () => (await settleUp.boundingBox())?.height,
