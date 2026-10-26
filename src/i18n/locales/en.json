@@ -15994,6 +15994,25 @@
         "taxBilled": "Tax",
         "noOtherCycles": "No other cycles on record for this moon."
       },
+      "fullyMined": {
+        "residue": "Residue",
+        "lost": "Ore lost so far",
+        "summaryResidue": "{{pct}}% of the chunk never delivered",
+        "summaryCombined": "{{pct}}% of the chunk: residue plus ore never mined",
+        "mark": "Mark fully mined",
+        "clear": "Clear",
+        "markedBy": "Marked fully mined by {{name}}, {{at}}.",
+        "why": "Residue is ore that came off the rock but was never delivered (strip-miner waste, which becomes space dust). Until the moon is marked fully mined it cannot be told apart from ore nobody mined yet.",
+        "noSource": "Loss needs the chunk's ore. Link a Survey above to see it.",
+        "tableLabel": "Ore lost per ore",
+        "cols": {
+          "ore": "Ore",
+          "chunk": "In chunk",
+          "mined": "Mined",
+          "residue": "Residue",
+          "lost": "Lost"
+        }
+      },
       "miners": {
         "search": "Search Miners or characters…",
         "searchLabel": "Search Miners",
