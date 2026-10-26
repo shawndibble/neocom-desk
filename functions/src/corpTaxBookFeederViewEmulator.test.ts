@@ -914,13 +914,13 @@ suite('moon owner payouts (emulator)', () => {
 
   describe('payout totals on the moon owner record (#5242)', () => {
     const totals = async () => (await feederRecord())?.payoutTotals;
-    const record = (amount: number, date = '2026-10-18') =>
+    const record = (amount: number, date = '2026-10-18', method: 'donation' | 'other' = 'other') =>
       recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
         ...officer,
         feederCorporationId: FEEDER,
         amount,
         date,
-        method: 'other',
+        method,
       });
 
     it('adds a recorded payout, and a journal row the sync records', async () => {
@@ -932,7 +932,7 @@ suite('moon owner payouts (emulator)', () => {
     });
 
     it('does not count a journal row twice when it confirms an officer record', async () => {
-      await record(5_000_000);
+      await record(5_000_000, '2026-10-18', 'donation');
       journalRows = [giveIsk(504, 5_000_000)];
       await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
       expect(await totals()).toEqual({ count: 1, amount: 5_000_000 });
