@@ -6,7 +6,7 @@ Proposed (2026-10-26). Issue #5247. Builds on ADR 0023 and ADR 0031; amends neit
 
 ## Context
 
-`corps/{id}/observed` holds one **Observed Mining Entry** per miner, ore, day and refinery. An officer's open of the book reads all of it, and so did every feeder rebuild. Firestore Query Insights showed scans of 4,939 and 14,817 reads on that collection (#5234).
+`corps/{id}/observed` holds one **Observed Mining Entry** per miner, ore, day and refinery. An officer's open of the book reads all of it, and so did every feeder rebuild. Firestore Query Insights showed scans of 4,939 and 14,817 reads on that collection (#5234 description).
 
 Two PRs cut the cost without changing the shape:
 
@@ -32,7 +32,8 @@ Screens read **Read Models**: small docs the server builds from raw rows and eve
 - **The open set is computed on the device.** It loads a miner's unbilled and unpaid days and runs the existing engine, so late prices, rate changes and dismissals never need a stored total recomputed.
 - **Miner doc.** Running totals of the frozen part only (billed, paid, lifetime mined, value, tax), updated on events: Statement issued, payment recorded or matched, dismissal and reversal, adjustment, write-off, rebill, regroup. Not on ledger-row merge, which removes the hot-doc contention of officer sync, the 6-hourly sync and a feeder pull writing one doc. Volatile fields (balances) stay out of large lists.
 - **Miner list doc.** One doc with the sortable and filterable fields of every miner, small enough to load whole. The Miners tab searches by name, and names are never stored: ESI resolves them by character id. Standing (member, left, guest) needs current ESI membership and is never stored.
-- **Per-pull moon doc.** One per `extractionId`, built server-side from raw structure-and-date rows, never from miner docs. It holds per-ore mined quantity from every row at that structure in the fracture-to-expiry window (including rows no charge covers: before the book, unrated, outside coverage, guests, feeder rows), `minerCount`, per-ore chunk total and its source (notification, survey, unknown), total tax under the frozen-or-live rule (frozen once a Statement issues, D22), and the Fully Mined flag. Past cycles read each pull's `minedPct` and `minerCount` from it. A moon page is one read.
+- **Per-pull moon doc.** One per `extractionId`, built server-side from raw structure-and-date rows, never from miner docs. It holds per-ore mined quantity from every row at that structure in the fracture-to-expiry window (including rows no charge covers: before the book, unrated, outside coverage, guests, feeder rows), `minerCount`, per-ore chunk total and its source (notification, survey, unknown), total tax under the frozen-or-live rule (frozen once a Statement issues, D22), and the Fully Mined flag. Past cycles read each pull's `minedPct` (`bookView.ts`) and `minerCount` from it. A moon page is one read.
+- **Miner row fields.** Owed (excludes credit), overdue days, unbilled vs pending, credit, last paid, paused, character ids, tolerance and officer write-offs are either fields of the miner list doc or computed from the open set. Phase 1 decides each by whether it changes on an event (stored) or with now and prices (computed).
 - **Overview doc.** Outstanding and overdue miners, declarations, unmatched and unattributed payments, leavers with debt, unrated count, ledger gaps, health flags, and a rolling window of Extractions with state counts. State, overdue days, billable-through and "in chunks" ISK depend on now and today's prices: the doc stores inputs and the device computes on read.
 - **Feeder summary only.** A **Feeder** sees the existing `feederViews` summary (minedVolume, minedValueIsk, accruedIsk, paidIsk, balance). Day lines show only what the in-game mining ledger shows: character, ore, quantity, structure, date. Per-line value, due and % are dropped, and character names come from ESI by id. A corp that owns its moons and runs its own taxes sees what an officer sees.
 
@@ -44,7 +45,7 @@ Stamp every ledger row with `extractionId` at write time and backfill old rows. 
 
 **Assumption (owner decision): a refinery never pops a new rock on the day the previous one expires.** The minimum cycle is 6 days and a pop is mineable for at most 3 (the book's expiry setting allows up to 96 h, still under 6 days). So every `(structureId, date)` belongs to at most one pull and the lookup is deterministic, with no "newest pull wins" rule. The verifier writes a health flag whenever two pulls at one structure cover the same day, and treats that as bad data to surface, not a case to resolve. A pull is never ended early by "mined out": only the expiry window or a cancel notification ends it; the Fully Mined flag does not end it.
 
-An Extraction correction rebuilds the affected moon doc and re-stamps its rows. Regroup, and rate or start-date changes, change miner ids (`solo:<characterId>` changes on regroup) or charges, and each defines its own rebuild of the miner doc and list.
+An Extraction correction rebuilds the affected moon doc and re-stamps its rows. Regroup, and rate or start-date changes, change miner ids (`solo:<characterId>` changes on regroup) or charges, and each needs a defined rebuild of the miner doc and list: regroup moves the frozen totals from the old miner ids to the new; a rate or start-date change touches only open days, so it rebuilds nothing stored. Phase 1 writes these as tests.
 
 ### Fully Mined flag and Residue
 
@@ -112,7 +113,7 @@ Estimates, not measurements. Today an officer open is thousands of reads.
 - A backfill that misassigns old rows if an Extraction was corrected or is missing. The backfill reports rows it cannot assign.
 - Docs growing past 1 MiB (a very long pull history). Page old moon records into separate docs.
 
-## Rejected alternatives
+## Considered Options (rejected)
 
 - **Per-month buckets.** Books bill weekly or every N days; a bucket would assume Statement equals month.
 - **Postgres or another database.** A second store for one feature, with its own auth, rules and deploy; Firestore rules already gate the book.
