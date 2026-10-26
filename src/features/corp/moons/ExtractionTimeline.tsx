@@ -1,17 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { RowCaret } from '@/components/ui';
+import { CheckboxSelect, FilterChip, Panel, RowCaret, Tooltip } from '@/components/ui';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { cx } from '@/lib/cx';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { useBook } from './useBook';
-import { shortDate } from './moonsFormat';
+import { extractionWindowLabel, shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
 import { StateWord } from './moonsParts';
 
 const DAY = 86_400_000;
 const BEFORE_DAYS = 20;
 const AFTER_DAYS = 27;
+
+type TimelineState = 'expired' | 'fractured' | 'ready' | 'extracting';
+/** Filter order: the way a chunk's life reads backwards, newest concern first. */
+const FILTER_STATES: readonly TimelineState[] = ['expired', 'fractured', 'ready', 'extracting'];
+/** Expired is history: off until asked for, so the live chunks lead. */
+const DEFAULT_STATES: ReadonlySet<TimelineState> = new Set(['fractured', 'ready', 'extracting']);
 
 /**
  * Every chunk on one time axis (#4056 step 1): Extracting, Ready, then
@@ -20,18 +28,82 @@ const AFTER_DAYS = 27;
  */
 export function ExtractionTimeline({ rows }: { rows: readonly ExtractionRow[] }) {
   const { t } = useTranslation();
-  const { view, names } = useBook();
+  const phone = useIsPhone();
+  const { view } = useBook();
+  const [states, setStates] = useState<ReadonlySet<TimelineState>>(DEFAULT_STATES);
+  const toggle = (state: TimelineState) =>
+    setStates((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(state)) next.add(state);
+      return next;
+    });
   const now = Date.parse(view.input.now);
+  const from = now - BEFORE_DAYS * DAY;
+  const inWindow = rows.filter(
+    (r) => r.state !== 'cancelled' && Date.parse(r.expiresAt ?? r.chunkArrivalAt) >= from
+  );
+  const shown = inWindow.filter((r) => states.has(r.state as TimelineState));
+  const countOf = (state: TimelineState) => inWindow.filter((r) => r.state === state).length;
+  const filter = phone ? (
+    <CheckboxSelect
+      label={t('corpTaxBook.moons.timeline.filter')}
+      options={FILTER_STATES.map((s) => ({
+        value: s,
+        label: `${t(`corpTaxBook.moons.state.${s}`)} (${countOf(s)})`,
+      }))}
+      selected={states}
+      onToggle={toggle}
+    />
+  ) : (
+    <div
+      role="group"
+      aria-label={t('corpTaxBook.moons.timeline.filter')}
+      className="flex flex-wrap gap-1.5"
+    >
+      {FILTER_STATES.map((s) => (
+        <FilterChip
+          key={s}
+          label={t(`corpTaxBook.moons.state.${s}`)}
+          count={countOf(s)}
+          selected={states.has(s)}
+          onToggle={() => toggle(s)}
+        />
+      ))}
+    </div>
+  );
+  return (
+    <Panel
+      title={t('corpTaxBook.moons.timeline.title')}
+      meta={
+        <span className="hidden text-xs text-text-dim sm:inline">
+          {t('corpTaxBook.moons.timeline.hint')}
+        </span>
+      }
+      actions={filter}
+    >
+      {shown.length === 0 ? (
+        <p className="text-sm text-text-dim">
+          {t(
+            inWindow.length === 0
+              ? 'corpTaxBook.moons.timeline.empty'
+              : 'corpTaxBook.moons.timeline.emptyFiltered'
+          )}
+        </p>
+      ) : (
+        <TimelineBody shown={shown} now={now} />
+      )}
+    </Panel>
+  );
+}
+
+function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: number }) {
+  const { t } = useTranslation();
+  const { names } = useBook();
   const from = now - BEFORE_DAYS * DAY;
   const span = (BEFORE_DAYS + AFTER_DAYS) * DAY;
   const pct = (ms: number) => `${(Math.min(Math.max(ms - from, 0), span) / span) * 100}%`;
   const width = (a: number, b: number) =>
     `${((Math.min(Math.max(b, from), from + span) - Math.min(Math.max(a, from), from + span)) / span) * 100}%`;
-  const shown = rows.filter(
-    (r) => r.state !== 'cancelled' && Date.parse(r.expiresAt ?? r.chunkArrivalAt) >= from
-  );
-  if (shown.length === 0)
-    return <p className="text-sm text-text-dim">{t('corpTaxBook.moons.timeline.empty')}</p>;
   const ticks = [-BEFORE_DAYS + 1, 0, 7, 14, 21].map((d) => now + d * DAY);
   return (
     <div className="space-y-3">
@@ -75,26 +147,28 @@ export function ExtractionTimeline({ rows }: { rows: readonly ExtractionRow[] })
                 </span>
                 <StateWord state={e.state} />
               </span>
-              <div className="relative h-4 w-full rounded-xs bg-panel-2 sm:w-auto sm:flex-1">
-                <span
-                  className="absolute inset-y-1 rounded-xs bg-line-bright"
-                  style={{ left: pct(start), width: width(start, ready) }}
-                />
-                <span
-                  className="absolute inset-y-0 rounded-xs bg-success"
-                  style={{
-                    left: pct(ready),
-                    width: width(ready, Math.max(fracture, ready + DAY / 24)),
-                  }}
-                />
-                <span
-                  className={cx(
-                    'absolute inset-y-0 rounded-xs',
-                    e.state === 'expired' ? 'bg-text-faint' : 'bg-warning'
-                  )}
-                  style={{ left: pct(fracture), width: width(fracture, end) }}
-                />
-              </div>
+              <Tooltip content={extractionWindowLabel(t, e)}>
+                <div className="relative h-4 w-full rounded-xs bg-panel-2 sm:w-auto sm:flex-1">
+                  <span
+                    className="absolute inset-y-1 rounded-xs bg-line-bright"
+                    style={{ left: pct(start), width: width(start, ready) }}
+                  />
+                  <span
+                    className="absolute inset-y-0 rounded-xs bg-success"
+                    style={{
+                      left: pct(ready),
+                      width: width(ready, Math.max(fracture, ready + DAY / 24)),
+                    }}
+                  />
+                  <span
+                    className={cx(
+                      'absolute inset-y-0 rounded-xs',
+                      e.state === 'expired' ? 'bg-text-faint' : 'bg-warning'
+                    )}
+                    style={{ left: pct(fracture), width: width(fracture, end) }}
+                  />
+                </div>
+              </Tooltip>
               <span className="hidden w-6 justify-end sm:flex">
                 <RowCaret />
               </span>

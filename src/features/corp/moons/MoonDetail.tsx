@@ -1,4 +1,3 @@
-import { createNumberFormat } from '@/lib/numberLocale';
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,7 +7,6 @@ import {
   DataTable,
   EmptyState,
   PageHeader,
-  Panel,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -19,13 +17,11 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
-import { isk, shortDateTime } from './moonsFormat';
+import { extractionWindowLabel, isk, shortDateTime } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
-import { Crumb, Fact, OreLine, StateWord } from './moonsParts';
+import { Crumb, OreLine, StateWord } from './moonsParts';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader } from './sectionParts';
-
-const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 /**
  * A moon's page: this extraction's header, then one scroll of
@@ -163,8 +159,30 @@ export function MoonDetail({ id }: { id: string }) {
       <EntityHeader
         label={t('corpTaxBook.moons.moon.taxSoFar')}
         value={isk(row.tax)}
-        note={<OreLine row={row} {...(canEdit ? { onLink: () => setLinking(true) } : {})} />}
+        note={
+          <>
+            <OreLine row={row} {...(canEdit ? { onLink: () => setLinking(true) } : {})} />
+            {/* Ore known from a Survey: the link to change it. An unknown one has OreLine's own. */}
+            {canEdit && row.oreLines.length > 0 && row.oreSource === 'survey' && (
+              <button
+                type="button"
+                className={entityLinkClassName('ml-2')}
+                onClick={() => setLinking(true)}
+              >
+                {t('corpTaxBook.moons.moon.link.change')}
+              </button>
+            )}
+          </>
+        }
         facts={[
+          {
+            label: t('corpTaxBook.moons.moon.window'),
+            value: extractionWindowLabel(t, row),
+          },
+          {
+            label: t('corpTaxBook.moons.moon.estValue'),
+            value: row.estimatedValue ? isk(row.estimatedValue) : '—',
+          },
           {
             label: t('corpTaxBook.moons.cols.minedShort'),
             value: row.minedPct === null ? '—' : `${isk(mined)} · ${row.minedPct}%`,
@@ -190,46 +208,6 @@ export function MoonDetail({ id }: { id: string }) {
           },
         ]}
       />
-      <Panel title={t('corpTaxBook.moons.moon.thisExtraction')}>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
-          <Fact label={t('corpTaxBook.moons.moon.started')} value={shortDateTime(row.startedAt)} />
-          <Fact
-            label={t('corpTaxBook.moons.moon.arrived')}
-            value={shortDateTime(row.chunkArrivalAt)}
-          />
-          <Fact
-            label={t('corpTaxBook.moons.cols.estValue')}
-            value={row.estimatedValue ? isk(row.estimatedValue) : '—'}
-          />
-          <Fact
-            label={t('corpTaxBook.moons.moon.oreFrom')}
-            value={
-              <span>
-                {t(`corpTaxBook.moons.moon.source.${row.oreSource}`)}
-                {row.chunkRate && (
-                  <span className="block text-xs text-text-dim">
-                    {t(`corpTaxBook.moons.moon.rate.${row.chunkRate.basis}`, {
-                      rate: formatDecimal(row.chunkRate.m3PerHour),
-                      count: row.chunkRate.cycles,
-                    })}
-                  </span>
-                )}
-                {canEdit && row.oreSource !== 'notification' && (
-                  <button
-                    type="button"
-                    className={entityLinkClassName('ml-2')}
-                    onClick={() => setLinking(true)}
-                  >
-                    {row.oreSource === 'survey'
-                      ? t('corpTaxBook.moons.moon.link.change')
-                      : t('corpTaxBook.moons.moon.link.open')}
-                  </button>
-                )}
-              </span>
-            }
-          />
-        </dl>
-      </Panel>
       <BookSection
         title={t('corpTaxBook.moons.moon.whoMined')}
         noun={t('corpTaxBook.moons.sections.nouns.miners')}
@@ -256,6 +234,7 @@ export function MoonDetail({ id }: { id: string }) {
               renderDetail: (m) => (
                 <OreLinesTable
                   lines={m.lines}
+                  showTotal={false}
                   label={t('corpTaxBook.moons.moon.oreOf', { name: minerName(m) })}
                   foot={
                     <Link to={minerPath(m.minerId)} className={entityLinkClassName()}>

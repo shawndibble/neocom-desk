@@ -181,7 +181,6 @@ export function RecordPaymentDialog({
   const { edit, names } = useBook();
   const [amount, setAmount] = useState(String(Math.round(defaultAmount)));
   const [payer, setPayer] = useState(String(miner.mainCharacterId));
-  const [note, setNote] = useState('');
   const value = Number(amount);
   return (
     <DialogShell
@@ -189,7 +188,7 @@ export function RecordPaymentDialog({
       onClose={onClose}
       title={t('corpTaxBook.moons.dialogs.record.title', { name: minerName })}
       confirmLabel={t('corpTaxBook.moons.dialogs.record.confirm', { amount: isk(value || 0) })}
-      canConfirm={value > 0 && note.trim().length > 0}
+      canConfirm={value > 0}
       run={async () => {
         await edit({
           action: 'recordPayment',
@@ -198,7 +197,6 @@ export function RecordPaymentDialog({
           characterId: Number(payer),
           amount: value,
           at: new Date().toISOString(),
-          note: note.trim(),
           ...(statementId ? { statementId } : {}),
         });
         await onRecorded?.();
@@ -226,9 +224,6 @@ export function RecordPaymentDialog({
           />
         </Label>
       )}
-      <Label text={t('corpTaxBook.moons.dialogs.record.note')}>
-        <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-      </Label>
       <Effect>{t('corpTaxBook.moons.dialogs.record.effect', { name: minerName })}</Effect>
     </DialogShell>
   );

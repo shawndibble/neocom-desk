@@ -15840,6 +15840,8 @@
       "oreUnknownWhy": "No extraction notification gave this chunk's ore. A Survey can stand in for it.",
       "minedVsLeft": "{{mined}}% mined · {{left}}% left",
       "startedOn": "started {{date}}",
+      "windowDays_one": "{{count}} day",
+      "windowDays_other": "{{count}} days",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "state": {
@@ -15937,6 +15939,8 @@
       "timeline": {
         "title": "Timeline",
         "hint": "A row opens the moon's page",
+        "filter": "States shown",
+        "emptyFiltered": "No chunk in this window matches the states shown.",
         "now": "Now",
         "empty": "No chunk in this window.",
         "legend": {
@@ -15948,26 +15952,13 @@
       },
       "moon": {
         "notFound": "This extraction is not in the book",
-        "thisExtraction": "This extraction",
         "dismiss": "Dismiss tax for this extraction…",
         "dismissNone": "No tax recorded yet",
-        "started": "Started",
-        "arrived": "Chunk arrived",
+        "window": "Extraction window",
+        "estValue": "Est. value",
         "fractured": "Fractured",
         "fieldGone": "Field gone",
         "about": "about {{at}}",
-        "oreFrom": "Ore from",
-        "source": {
-          "notification": "Extraction notification",
-          "survey": "Linked Survey (estimate)",
-          "unknown": "Ore unknown"
-        },
-        "rate": {
-          "measured_one": "Estimated at this refinery's measured {{rate}} m³/h, from {{count}} extraction",
-          "measured_other": "Estimated at this refinery's measured {{rate}} m³/h, from {{count}} extractions",
-          "manual": "Estimated at the book's chunk rate, {{rate}} m³/h",
-          "default": "Estimated at the default {{rate}} m³/h"
-        },
         "link": {
           "open": "Link a Survey…",
           "change": "Change survey…",
@@ -16164,10 +16155,8 @@
         "unratedDetail": "Add a corp default rate in Settings; those days are not billed until then.",
         "never": "Never synced",
         "neverDetail": "Sync the book to pull the refinery ledger, extractions and donations.",
-        "synced": "Last synced {{age}} by {{name}}",
+        "syncedBy": "Synced by {{name}}",
         "stale": "Last synced {{age}} by {{name}} — the book is going stale",
-        "billableThrough": "Billable through {{date}}",
-        "noBillable": "No day is Billable until an officer syncs.",
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
@@ -16182,7 +16171,6 @@
         },
         "noRefineries": "This corporation has no refineries the book can read",
         "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Donations still sync, but no mining is recorded until one is readable.",
-        "billableLabel": "Billable through",
         "billableHint": "Day end + {{hours}}h grace, then a sync. The book warns here once nobody has synced for about 3 days.",
         "hiddenLabel": "hidden from members",
         "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
@@ -16698,7 +16686,6 @@
           "intro": "For ISK the wallet journal cannot show: a contract, another division, a handover in person. A donation into the corporation's wallet is found on its own.",
           "amount": "Amount",
           "paidBy": "Paid by",
-          "note": "Reason (required, shown to the Miner)",
           "effect": "Credited oldest debt first. An overpayment is held as credit for {{name}}."
         },
         "notTax": {

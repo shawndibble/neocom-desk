@@ -72,6 +72,8 @@ export function OverviewTab({ showMoons }: { showMoons: boolean }) {
         <StatChip
           label={t('corpTaxBook.moons.overview.billableThrough')}
           value={view.billableThrough ? shortDate(view.billableThrough) : '—'}
+          tooltip={t('corpTaxBook.moons.health.billableHint', { hours: view.input.graceHours })}
+          tooltipGlyph="info"
         />
       </StatChips>
       {view.donationsBeforeBook > 0 && (

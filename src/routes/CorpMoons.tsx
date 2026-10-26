@@ -19,6 +19,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   EmptyState,
   IconButton,
   LoadFailedState,
@@ -102,6 +103,19 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         <>
           <PageHeader
             title={t('corp.moons.title')}
+            meta={
+              sync.status.kind !== 'never' ? (
+                <DataAgeBadge
+                  date={new Date(sync.status.at)}
+                  note={t('corpTaxBook.moons.health.syncedBy', {
+                    name: sync.status.scheduled
+                      ? t('corpTaxBook.moons.scheduledBy', { name: sync.status.byName })
+                      : sync.status.byName,
+                  })}
+                  alwaysVisible
+                />
+              ) : undefined
+            }
             actions={
               <span className="flex items-center gap-1">
                 {tab === 'moon-owners' && canEdit && hasMoonOwners && (

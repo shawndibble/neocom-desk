@@ -147,12 +147,7 @@ export function ExtractionsTab() {
           tooltipGlyph="info"
         />
       </StatChips>
-      <Panel
-        title={t('corpTaxBook.moons.timeline.title')}
-        meta={<span className="text-xs text-text-dim">{t('corpTaxBook.moons.timeline.hint')}</span>}
-      >
-        <ExtractionTimeline rows={rows} />
-      </Panel>
+      <ExtractionTimeline rows={rows} />
       <Panel title={t('corpTaxBook.moons.tabs.extractions')} padded={false}>
         <div className="overflow-x-auto">
           <DataTable

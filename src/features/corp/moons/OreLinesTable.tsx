@@ -7,17 +7,20 @@ import { isk } from './moonsFormat';
 import { useBook } from './useBook';
 
 /**
- * What an opened row says: one line per ore (amount, estimated value, tax) and a total line.
+ * What an opened row says: one line per ore (amount, estimated value, tax) and, unless the row itself shows them, a total line.
  * `foot` is the row's one link ("Open miner", "Open page"), set apart under the lines.
  */
 export function OreLinesTable({
   lines,
   label,
   foot,
+  showTotal = true,
 }: {
   lines: readonly OreTaxLine[];
   label: string;
   foot?: ReactNode;
+  /** Off where the opened row's own cells already carry the totals. */
+  showTotal?: boolean;
 }) {
   const { t } = useTranslation();
   const { names } = useBook();
@@ -51,14 +54,16 @@ export function OreLinesTable({
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          <tr className="border-t border-line font-semibold">
-            <td className="py-1 pr-2 font-sans">{t('corpTaxBook.moons.sections.total')}</td>
-            <td className="py-1 text-right">{formatCount(total.q)}</td>
-            <td className="py-1 text-right">{isk(total.v)}</td>
-            <td className="py-1 text-right">{isk(total.t)}</td>
-          </tr>
-        </tfoot>
+        {showTotal && (
+          <tfoot>
+            <tr className="border-t border-line font-semibold">
+              <td className="py-1 pr-2 font-sans">{t('corpTaxBook.moons.sections.total')}</td>
+              <td className="py-1 text-right">{formatCount(total.q)}</td>
+              <td className="py-1 text-right">{isk(total.v)}</td>
+              <td className="py-1 text-right">{isk(total.t)}</td>
+            </tr>
+          </tfoot>
+        )}
       </table>
       {foot && <div className="text-sm">{foot}</div>}
     </div>

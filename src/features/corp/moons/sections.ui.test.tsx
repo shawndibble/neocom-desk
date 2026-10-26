@@ -72,6 +72,15 @@ describe('Corrections menu', () => {
 });
 
 describe('Moon page', () => {
+  it('merges Started and Arrived into one Extraction window and drops the This extraction box', () => {
+    renderBook(<MoonDetail id={MOON_ID} />);
+    expect(screen.getByText('Extraction window')).toBeInTheDocument();
+    expect(screen.getByText(/\d+ \w{3} - \d+ \w{3} \(\d+ days?\)/)).toBeInTheDocument();
+    expect(screen.queryByText('This extraction')).not.toBeInTheDocument();
+    expect(screen.queryByText('Chunk arrived')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ore from')).not.toBeInTheDocument();
+  });
+
   it('a Miner row opens to ore lines with one Open miner link and does not navigate', async () => {
     renderBook(<MoonDetail id={MOON_ID} />);
     expect(screen.queryByRole('link', { name: 'Open miner' })).not.toBeInTheDocument();
@@ -79,6 +88,7 @@ describe('Moon page', () => {
     const link = await screen.findByRole('link', { name: 'Open miner' });
     expect(link).toHaveAttribute('href', expect.stringContaining('/corp/moons/miners/'));
     expect(screen.getByRole('table', { name: /Ore mined by Varro Kestane/ })).toBeInTheDocument();
-    expect(screen.getByText('Total')).toBeInTheDocument();
+    // The clicked row already carries the totals.
+    expect(screen.queryByText('Total')).not.toBeInTheDocument();
   });
 });

@@ -174,6 +174,24 @@ describe('MinersTab row menu dialogs', () => {
   });
 });
 
+describe('Record payment dialog', () => {
+  it('asks no reason and records with an amount alone', async () => {
+    renderBook(<MinersTab />);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment…' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/Reason/)).not.toBeInTheDocument();
+    const amount = within(dialog).getByRole('textbox', { name: 'Amount' });
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '1000');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
+    await waitFor(() => expect(editBook).toHaveBeenCalled());
+    const sent = editBook.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(sent).toMatchObject({ action: 'recordPayment', amount: 1000 });
+    expect(sent).not.toHaveProperty('note');
+  });
+});
+
 describe('StatementRun', () => {
   it('keeps Send disabled until the corporation name resolves, then previews with it', async () => {
     corpName.value = null;

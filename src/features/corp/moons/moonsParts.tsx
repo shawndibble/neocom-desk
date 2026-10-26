@@ -1,5 +1,3 @@
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -120,14 +118,5 @@ export function Crumb({ to, label }: { to: string; label: string }) {
       <Icon.Back size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {label}
     </Link>
-  );
-}
-
-export function Fact({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt className={eyebrowClassName}>{label}</dt>
-      <dd className="text-sm">{value}</dd>
-    </div>
   );
 }

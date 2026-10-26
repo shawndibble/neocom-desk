@@ -116,9 +116,6 @@ export function RecordPaymentDialog({ open }: { open: boolean }) {
         <Label text="Received on (EVE time)">
           <TextInput value="2026-10-18 13:40" onChange={() => {}} aria-label="Received on" />
         </Label>
-        <Label text="Reason (required, shown to the Miner)">
-          <TextArea value="Item contract #4417 to Kestrel Vane" onChange={() => {}} rows={2} />
-        </Label>
         <Effect>
           Credited oldest debt first, to the Aug 2026 Statement. Varro Kestane owes{' '}
           {isk(VARRO.owed)} → {isk(0)}. An overpayment would be held as credit.
