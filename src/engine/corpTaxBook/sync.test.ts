@@ -8,7 +8,11 @@ import {
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  restampPlan,
+  stampExtractionIds,
   syncStatus,
+  moonOnDay,
+  toEngineExtraction,
   type SyncExtraction,
 } from './sync';
 import type { Statement } from './statements';
@@ -523,5 +527,70 @@ describe('reconcileExtractions', () => {
     expect(reconcileExtractions([esi], [], stored)[0].extractionStartTime).toBe(
       '2026-07-01T12:00:03.000Z'
     );
+  });
+});
+
+describe('extractionId stamping', () => {
+  const pull: SyncExtraction = {
+    structureId: 1001,
+    moonId: 40,
+    extractionStartTime: '2026-07-01T12:00:00.000Z',
+    chunkArrivalTime: '2026-07-10T12:00:00.000Z',
+    naturalDecayTime: '2026-07-10T15:00:00.000Z',
+  };
+  const id = `1001_${Date.parse('2026-07-01T12:00:00.000Z')}`;
+  const row = (date: string, over: Record<string, unknown> = {}) => ({
+    structureId: 1001,
+    characterId: 7,
+    recordedCorporationId: 9,
+    typeId: 45490,
+    date,
+    quantity: 5,
+    cachedAt: '2026-07-12T10:00:00.000Z',
+    ...over,
+  });
+
+  it('stamps each day from the fracture through the expiry day, and no other', () => {
+    const days = ['2026-07-09', '2026-07-10', '2026-07-12', '2026-07-13'];
+    const stamped = stampExtractionIds(
+      days.map((d) => row(d)),
+      [pull]
+    );
+    expect(stamped.map((r) => r.extractionId)).toEqual([undefined, id, id, undefined]);
+    expect(stamped[0]).not.toHaveProperty('extractionId');
+  });
+
+  it('uses the structure’s own expiry, where the 48 h default would miss the day', () => {
+    const late = row('2026-07-14');
+    expect(stampExtractionIds([late], [pull])[0]).not.toHaveProperty('extractionId');
+    expect(stampExtractionIds([late], [pull], { '1001': 96 })[0].extractionId).toBe(id);
+    // The default the old placement used, and what read-time placement says.
+    expect(moonOnDay([toEngineExtraction(pull)], 1001, '2026-07-14').extractionId).toBeUndefined();
+    expect(
+      moonOnDay([toEngineExtraction(pull)], 1001, '2026-07-14', { '1001': 96 }).extractionId
+    ).toBe(id);
+  });
+
+  it('leaves a stamped row alone', () => {
+    const held = row('2026-07-10', { extractionId: 'old' });
+    expect(stampExtractionIds([held], [pull])[0]).toBe(held);
+  });
+
+  it('plans a re-stamp only for rows whose stamp the corrected Extraction changes', () => {
+    const rows = [row('2026-07-10', { extractionId: id }), row('2026-07-12', { extractionId: id })];
+    expect(restampPlan(rows, [pull])).toEqual([]);
+    // Laser fired a day later: the first day is no longer covered... the window moves later.
+    const corrected = { ...pull, laserFiredAt: '2026-07-11T12:00:00.000Z' };
+    expect(restampPlan(rows, [corrected])).toEqual([{ row: rows[0], extractionId: undefined }]);
+    // A cancel clears every stamp.
+    const cancelled = { ...pull, cancelledAt: '2026-07-10T13:00:00.000Z' };
+    expect(restampPlan(rows, [cancelled]).map((x) => x.extractionId)).toEqual([
+      undefined,
+      undefined,
+    ]);
+    // An unstamped row a new pull covers is stamped.
+    expect(restampPlan([row('2026-07-11')], [pull])).toEqual([
+      { row: row('2026-07-11'), extractionId: id },
+    ]);
   });
 });

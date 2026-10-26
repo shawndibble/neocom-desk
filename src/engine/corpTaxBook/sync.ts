@@ -290,11 +290,14 @@ export function toEngineExtraction(x: SyncExtraction): Extraction {
 export function moonOnDay(
   extractions: readonly Extraction[],
   structureId: number | undefined,
-  date: string
+  date: string,
+  expiryHours: Readonly<Record<string, number>> = {}
 ): { moonId?: number; extractionId?: string } {
   for (const ex of extractions) {
     if (ex.structureId !== structureId) continue;
-    const status = extractionStatus(ex, `${date}T23:59:59Z`);
+    const status = extractionStatus(ex, `${date}T23:59:59Z`, {
+      expiryHours: expiryHours[String(structureId)],
+    });
     if (
       status.fracturedAt &&
       date >= status.fracturedAt.slice(0, 10) &&
@@ -326,6 +329,41 @@ export function placeObservedRows(
       ...(solarSystemId !== undefined ? { solarSystemId } : {}),
       ...(moonId !== undefined ? { moonId } : {}),
     };
+  });
+}
+
+/**
+ * Rows with the `extractionId` of the pull covering their day, for rows that have none. Uses
+ * the per-structure expiry, like read-time placement (`placeOfFactory`), so the stamp and the
+ * view agree. A row no pull covers keeps no stamp; a stamped row is left as it is.
+ */
+export function stampExtractionIds(
+  rows: readonly ObservedRow[],
+  extractions: readonly SyncExtraction[],
+  expiryHours: Readonly<Record<string, number>> = {}
+): ObservedRow[] {
+  const engine = extractions.map(toEngineExtraction);
+  return rows.map((row) => {
+    if (row.extractionId !== undefined) return row;
+    const id = moonOnDay(engine, row.structureId, row.date, expiryHours).extractionId;
+    return id === undefined ? row : { ...row, extractionId: id };
+  });
+}
+
+/**
+ * The rows whose stamp is not the one the current Extractions give: after an Extraction is
+ * corrected (a later laser time, a cancel) or an expiry changes. `extractionId` undefined means
+ * no pull covers the row any more, so its stamp is cleared.
+ */
+export function restampPlan(
+  rows: readonly ObservedRow[],
+  extractions: readonly SyncExtraction[],
+  expiryHours: Readonly<Record<string, number>> = {}
+): { row: ObservedRow; extractionId: string | undefined }[] {
+  const engine = extractions.map(toEngineExtraction);
+  return rows.flatMap((row) => {
+    const id = moonOnDay(engine, row.structureId, row.date, expiryHours).extractionId;
+    return id === row.extractionId ? [] : [{ row, extractionId: id }];
   });
 }
 

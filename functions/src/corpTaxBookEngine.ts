@@ -17,6 +17,8 @@ export interface ObservedRow {
   /** Where the refinery is and which moon it drilled, when the syncing officer's client knew (#4065). */
   solarSystemId?: number;
   moonId?: number;
+  /** The Extraction whose window covers this row's day (server-stamped). */
+  extractionId?: string;
   /** The feeder corporation that recorded the row; absent is the book's own. */
   sourceCorporationId?: number;
 }

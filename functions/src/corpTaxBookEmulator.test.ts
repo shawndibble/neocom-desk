@@ -320,6 +320,40 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('extractions').get()).size).toBe(1);
     });
 
+    it('stamps rows with their Extraction, backfills old rows, and re-stamps on a correction', async () => {
+      await turnOn();
+      const id = '50_45490_2026-10-17_1000';
+      const read = async () => (await book().collection('observed').doc(id).get()).data();
+      const pull = {
+        structureId: 1000,
+        moonId: 7,
+        extractionStartTime: '2026-10-10T00:00:00Z',
+        chunkArrivalTime: '2026-10-17T00:00:00Z',
+        naturalDecayTime: '2026-10-17T03:00:00Z',
+      };
+      const pullId = `1000_${Date.parse(pull.extractionStartTime)}`;
+      identities.set(ACCOUNTANT, as(['Accountant', 'Station_Manager']));
+      now = T0 + 25 * 60_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+
+      // A row that arrives before any Extraction is not stamped, and is when the Extraction lands.
+      await sync(ACCOUNTANT, { observed: [row(100, '2026-10-18T10:00:00Z')] });
+      expect((await read())?.extractionId).toBeUndefined();
+      await sync(ACCOUNTANT, { extractions: [pull] });
+      expect((await read())?.extractionId).toBe(pullId);
+      const stampedAt = (await read())?.updatedAt;
+
+      // A later quantity keeps the stamp, and a stamp never moves `updatedAt`.
+      await sync(ACCOUNTANT, { observed: [row(300, '2026-10-18T11:30:00Z')] });
+      expect((await read())?.extractionId).toBe(pullId);
+      expect((await read())?.quantity).toBe(300);
+      expect(stampedAt.toMillis()).toEqual(expect.any(Number));
+
+      // A correction (the pull was cancelled) clears the stamp of the rows it no longer covers.
+      await sync(ACCOUNTANT, { extractions: [{ ...pull, cancelledAt: '2026-10-17T01:00:00Z' }] });
+      expect((await read())?.extractionId).toBeUndefined();
+    });
+
     it('adds a donation once and never undoes a "not tax" mark', async () => {
       await turnOn();
       const donation = {
