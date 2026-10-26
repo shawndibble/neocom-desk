@@ -59,7 +59,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
           {next.length === 0 && <li className="text-text-dim">—</li>}
           {adjust !== 0 && (
             <li className="text-text-dim tabular-nums">
-              {t('corpTaxBook.moons.miner.statementAdjust', { amount: isk(adjust) })}
+              {t('corpTaxBook.moons.miners.statementAdjust', { amount: isk(adjust) })}
             </li>
           )}
           {miner.pending > 0 && (

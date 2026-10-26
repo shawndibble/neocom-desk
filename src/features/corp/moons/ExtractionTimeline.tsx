@@ -139,12 +139,11 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
               className="group flex flex-col gap-1 rounded-xs py-0.5 hover:bg-panel-2 sm:flex-row sm:items-center sm:gap-0"
             >
               <span className="flex min-w-0 items-baseline gap-1 text-xs sm:w-48 sm:shrink-0">
-                <span
-                  className="truncate text-accent group-hover:underline"
-                  title={place.moon !== undefined ? place.station : undefined}
-                >
-                  {place.moon ?? place.station}
-                </span>
+                <Tooltip content={place.moon !== undefined ? place.station : undefined}>
+                  <span className="truncate text-accent group-hover:underline">
+                    {place.moon ?? place.station}
+                  </span>
+                </Tooltip>
                 <StateWord state={e.state} />
               </span>
               <Tooltip content={extractionWindowLabel(t, e)}>
