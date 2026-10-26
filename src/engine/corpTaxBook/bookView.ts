@@ -271,6 +271,81 @@ function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
   };
 }
 
+/** What the next Statement would bill one Miner, in full: the draft every figure below it reads. */
+export function minerDraft(
+  input: BookViewInput,
+  minerId: string,
+  statements: readonly Statement[],
+  charges: readonly DayCharge[],
+  billableThrough: string | undefined
+): StatementDraft {
+  return draftStatement({
+    minerId,
+    startDate: input.startDate,
+    period: { start: input.startDate, end: billableThrough ?? input.startDate },
+    charges,
+    adjustments: input.adjustments,
+    issued: statements,
+    paidStatementIds: input.paidStatementIds,
+    dismissals: input.dismissals,
+    billableThrough,
+    final: true,
+  });
+}
+
+/** Tax on days that are not Billable yet: not dismissed, not on a Statement, after the last Billable day. */
+export function pendingTax(
+  input: BookViewInput,
+  charges: readonly DayCharge[],
+  billedKeys: ReadonlySet<string>,
+  billableThrough: string | undefined
+): number {
+  return charges
+    .filter(
+      (c) =>
+        !activeDismissalFor(c, input.dismissals) &&
+        !billedKeys.has(c.key) &&
+        (billableThrough === undefined || c.date > billableThrough)
+    )
+    .reduce((sum, c) => sum + c.taxOwed, 0);
+}
+
+/** The Miner ids a view lists, in order: groupings, then the ids days, Statements and payments name. */
+export function minerIdsOf(input: BookViewInput, charges: readonly DayCharge[]): Set<string> {
+  const minerIds = new Set<string>(input.miners.map((m) => m.id));
+  for (const c of charges) minerIds.add(c.minerId);
+  for (const s of input.statements) minerIds.add(s.minerId);
+  for (const p of input.payments) if (p.minerId) minerIds.add(p.minerId);
+  return minerIds;
+}
+
+/** Each character's latest recorded corporation, from the ledger rows. */
+export function latestCorporationOf(
+  entries: readonly ObservedMiningEntry[]
+): Map<number, { date: string; corp: number }> {
+  const latest = new Map<number, { date: string; corp: number }>();
+  for (const e of entries) {
+    const held = latest.get(e.characterId);
+    if (!held || e.date >= held.date)
+      latest.set(e.characterId, { date: e.date, corp: e.recordedCorporationId });
+  }
+  return latest;
+}
+
+/** Member while a character is in the corporation now; left if it was; else a guest. */
+export function standingOf(
+  characterIds: readonly number[],
+  latestCorp: ReadonlyMap<number, { corp: number }>,
+  input: Pick<BookViewInput, 'corporationId' | 'memberIds'>
+): MinerStanding {
+  const corps = characterIds.map((cid) => latestCorp.get(cid)?.corp);
+  const wasMember = corps.some((c) => c === input.corporationId);
+  const isMember = input.memberIds
+    ? characterIds.some((cid) => input.memberIds!.has(cid))
+    : wasMember;
+  return isMember ? 'member' : wasMember ? 'left' : 'guest';
+}
+
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
   // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
@@ -294,17 +369,8 @@ export function buildBookView(input: BookViewInput): BookView {
     graceHours: input.graceHours,
   });
 
-  const minerIds = new Set<string>(input.miners.map((m) => m.id));
-  for (const c of charges) minerIds.add(c.minerId);
-  for (const s of input.statements) minerIds.add(s.minerId);
-  for (const p of input.payments) if (p.minerId) minerIds.add(p.minerId);
-
-  const latestCorp = new Map<number, { date: string; corp: number }>();
-  for (const e of input.entries) {
-    const held = latestCorp.get(e.characterId);
-    if (!held || e.date >= held.date)
-      latestCorp.set(e.characterId, { date: e.date, corp: e.recordedCorporationId });
-  }
+  const minerIds = minerIdsOf(input, charges);
+  const latestCorp = latestCorporationOf(input.entries);
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
@@ -334,18 +400,7 @@ export function buildBookView(input: BookViewInput): BookView {
       startDate: input.startDate,
     });
     const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
-    const draft = draftStatement({
-      minerId: id,
-      startDate: input.startDate,
-      period: { start: input.startDate, end: billableThrough ?? input.startDate },
-      charges: mine,
-      adjustments: input.adjustments,
-      issued: statements,
-      paidStatementIds: input.paidStatementIds,
-      dismissals: input.dismissals,
-      billableThrough,
-      final: true,
-    });
+    const draft = minerDraft(input, id, statements, mine, billableThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
@@ -432,26 +487,14 @@ export function buildBookView(input: BookViewInput): BookView {
       }
     }
     const unbilled = draftLines.reduce((sum, l) => sum + l.tax, 0);
-    const pending = mine
-      .filter(
-        (c) =>
-          !activeDismissalFor(c, input.dismissals) &&
-          !billedBy.has(c.key) &&
-          (billableThrough === undefined || c.date > billableThrough)
-      )
-      .reduce((sum, c) => sum + c.taxOwed, 0);
+    const pending = pendingTax(input, mine, new Set(billedBy.keys()), billableThrough);
     const lastPaid = payments
       .filter((p) => p.amount - (p.notTaxAmount ?? 0) > 0)
       .map((p) => p.at)
       .sort()
       .at(-1);
 
-    const corps = characterIds.map((cid) => latestCorp.get(cid)?.corp);
-    const wasMember = corps.some((c) => c === input.corporationId);
-    const isMember = input.memberIds
-      ? characterIds.some((cid) => input.memberIds!.has(cid))
-      : wasMember;
-    const standing: MinerStanding = isMember ? 'member' : wasMember ? 'left' : 'guest';
+    const standing = standingOf(characterIds, latestCorp, input);
 
     const row: MinerRow = {
       id,
@@ -545,6 +588,50 @@ export function measurable(x: SyncExtraction) {
   };
 }
 
+/** The fields of an Extraction's row that need no ledger day: its state, dates, make-up and estimate. */
+export type ExtractionRowBase = Omit<ExtractionRow, 'minedPct' | 'tax' | 'minerCount'>;
+
+type ExtractionRowInput = Pick<
+  BookViewInput,
+  'now' | 'structureExpiryHours' | 'chunkM3PerHour' | 'surveyOreLines'
+>;
+
+/** One Extraction's row without the ledger-derived fields; the same rows the Overview schedule reads. */
+export function extractionRowBase(
+  x: SyncExtraction,
+  input: ExtractionRowInput,
+  todayPrices: ReadonlyMap<number, number>,
+  chunkRates: ReadonlyMap<number, LearnedChunkRate>
+): ExtractionRowBase & { fracturedAt?: string } {
+  const ex = toEngineExtraction(x);
+  const expiryHours = input.structureExpiryHours[String(x.structureId)];
+  const status = extractionStatus(ex, input.now, { expiryHours });
+  // Source order (D13): the ExtractionStarted notification, then a linked Survey.
+  const notified = x.oreLines ?? [];
+  const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
+  const oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
+  const estimatedValue = oreLines.length
+    ? oreLines.reduce((sum, l) => sum + l.quantity * (todayPrices.get(l.typeId) ?? 0), 0)
+    : null;
+  return {
+    id: ex.id,
+    structureId: x.structureId,
+    moonId: x.moonId,
+    state: status.state,
+    startedAt: ex.startedAt,
+    chunkArrivalAt: ex.chunkArrivalAt,
+    ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
+    ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
+    ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
+    oreSource: notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
+    oreLines,
+    ...(surveyed.length > 0
+      ? { chunkRate: chunkRateFor(chunkRates.get(x.structureId), input.chunkM3PerHour) }
+      : {}),
+    estimatedValue,
+  };
+}
+
 function buildExtractionRows(
   input: BookViewInput,
   charges: readonly DayCharge[],
@@ -555,21 +642,14 @@ function buildExtractionRows(
   const todayPrices = input.pricesOn(today).prices;
   return input.extractions
     .map((x): ExtractionRow => {
+      const base = extractionRowBase(x, input, todayPrices, chunkRates);
       const ex = toEngineExtraction(x);
       const expiryHours = input.structureExpiryHours[String(x.structureId)];
-      const status = extractionStatus(ex, input.now, { expiryHours });
-      // Source order (D13): the ExtractionStarted notification, then a linked Survey.
-      const notified = x.oreLines ?? [];
-      const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
-      const oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
-      const estimatedValue = oreLines.length
-        ? oreLines.reduce((sum, l) => sum + l.quantity * (todayPrices.get(l.typeId) ?? 0), 0)
-        : null;
       let minedPct: number | null = null;
-      if (status.fracturedAt && oreLines.length) {
+      if (base.fracturedAt && base.oreLines.length) {
         const mined = minedDuringExtraction(ex, input.entries, { expiryHours });
-        const total = oreLines.reduce((s, l) => s + l.quantity, 0);
-        const got = oreLines.reduce(
+        const total = base.oreLines.reduce((s, l) => s + l.quantity, 0);
+        const got = base.oreLines.reduce(
           (s, l) =>
             s + Math.min(l.quantity, mined.find((m) => m.typeId === l.typeId)?.quantity ?? 0),
           0
@@ -578,22 +658,7 @@ function buildExtractionRows(
       }
       const mine = charges.filter((c) => c.extractionId === ex.id);
       return {
-        id: ex.id,
-        structureId: x.structureId,
-        moonId: x.moonId,
-        state: status.state,
-        startedAt: ex.startedAt,
-        chunkArrivalAt: ex.chunkArrivalAt,
-        ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
-        ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
-        ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
-        oreSource:
-          notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
-        oreLines,
-        ...(surveyed.length > 0
-          ? { chunkRate: chunkRateFor(chunkRates.get(x.structureId), input.chunkM3PerHour) }
-          : {}),
-        estimatedValue,
+        ...base,
         minedPct,
         tax: mine.reduce((s, c) => s + (frozenByKey.get(c.key)?.tax ?? c.taxOwed), 0),
         minerCount: new Set(mine.map((c) => c.minerId)).size,

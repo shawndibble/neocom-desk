@@ -93,7 +93,8 @@ function lines(statement: Data): Data[] {
   return Array.isArray(statement.lines) ? (statement.lines as Data[]) : [];
 }
 
-export function computeMinerTotals(rec: MinerRecords, rules: BookRules): MinerTotals {
+/** One Miner's Statements, payments and what the allocation settled, before any totals are summed. */
+export function allocateMiner(rec: MinerRecords, rules: BookRules) {
   const statements = rec.statements.map((s) => ({
     id: s.id as string,
     amount: num(s.amount),
@@ -124,6 +125,11 @@ export function computeMinerTotals(rec: MinerRecords, rules: BookRules): MinerTo
     officerWriteOffs: rec.writeOffs.flatMap((d) => writeOffForAllocation(d) ?? []),
     startDate: rules.startDate,
   });
+  return { statements, payments, credits, allocation };
+}
+
+export function computeMinerTotals(rec: MinerRecords, rules: BookRules): MinerTotals {
+  const { statements, payments, credits, allocation } = allocateMiner(rec, rules);
 
   // The payments the allocation counted (a donation before the book is neither credited nor shown).
   const counted = payments.filter(

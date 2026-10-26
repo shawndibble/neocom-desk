@@ -117,6 +117,7 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   miners: 'corpTaxBook',
   minerTotals: 'corpTaxBook',
   moonDocs: 'corpTaxBook',
+  readModels: 'corpTaxBook',
   feeders: 'corpTaxBook',
   feederViews: 'corpTaxBook',
   adjustments: 'corpTaxBook',
