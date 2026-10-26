@@ -1,5 +1,5 @@
 /**
- * The "Log production…" job-row action (issue #1787) resolves to exactly one
+ * The "Log production" job-row action (issue #1787) resolves to exactly one
  * Build Plan before it navigates anywhere: this dialog is what asks the
  * pilot when that isn't already obvious — no plan builds the job's
  * blueprint yet (offer to create one), or more than one does (pick which).

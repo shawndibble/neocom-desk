@@ -269,7 +269,7 @@ test("naming a milestone from an entry row shows it as the header's next milesto
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
   await page.getByRole('button', { name: 'More actions for Spaceship Command I' }).click();
-  await page.getByRole('menuitem', { name: 'Add milestone…' }).click();
+  await page.getByRole('menuitem', { name: 'Add milestone' }).click();
   const nameDialog = page.getByRole('dialog', { name: 'Name this milestone' });
   await nameDialog.getByRole('textbox').fill('Fly Loki');
   await nameDialog.getByRole('button', { name: 'Save' }).click();
@@ -302,7 +302,7 @@ test('a long milestone name does not overflow the header chip or squeeze the ent
   await page
     .getByRole('button', { name: 'More actions for Gallente Drone Specialization IV' })
     .click();
-  await page.getByRole('menuitem', { name: 'Add milestone…' }).click();
+  await page.getByRole('menuitem', { name: 'Add milestone' }).click();
   const nameDialog = page.getByRole('dialog', { name: 'Name this milestone' });
   await nameDialog.getByRole('textbox').fill(longName);
   await nameDialog.getByRole('button', { name: 'Save' }).click();

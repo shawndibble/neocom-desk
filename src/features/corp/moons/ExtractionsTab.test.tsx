@@ -83,9 +83,9 @@ describe('ExtractionsTab on a phone', () => {
       <MemoryRouter>{menuFor(rows[0], <div data-testid="row">row</div>)}</MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByTestId('row'));
-    expect(screen.getByRole('menuitem', { name: 'Change survey…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Change survey' })).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Dismiss tax for this extraction…' })
+      screen.getByRole('menuitem', { name: 'Dismiss tax for this extraction' })
     ).toBeInTheDocument();
     unmount();
     // Unknown ore (the visible Link button), zero tax (inert Dismiss), Notification ore: no menu.
@@ -123,11 +123,11 @@ describe('ExtractionsTab ⋮', () => {
       const more = screen.getAllByRole('button', { name: /More actions for/ });
       expect(more).toHaveLength(1);
       await userEvent.click(more[0]!);
-      await userEvent.click(await screen.findByRole('menuitem', { name: 'Change survey…' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Change survey' }));
       expect(await screen.findByText('link survey dialog')).toBeInTheDocument();
       await userEvent.click(screen.getAllByRole('button', { name: /More actions for/ })[0]!);
       await userEvent.click(
-        await screen.findByRole('menuitem', { name: 'Dismiss tax for this extraction…' })
+        await screen.findByRole('menuitem', { name: 'Dismiss tax for this extraction' })
       );
       expect(await screen.findByText(/reason dialog/)).toBeInTheDocument();
     } finally {

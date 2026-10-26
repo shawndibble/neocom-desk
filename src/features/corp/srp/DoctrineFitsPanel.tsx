@@ -1,6 +1,6 @@
 /**
- * The Director's Doctrine Fits: a list of the corp's own copies, with Add from my Fittings… and
- * Paste EFT…. Each row carries one action, Delete…, so there is no ⋮ (§6c). Adds and deletes
+ * The Director's Doctrine Fits: a list of the corp's own copies, with Add from my Fittings and
+ * Paste EFT. Each row carries one action, Delete, so there is no ⋮ (§6c). Adds and deletes
  * are their own writes, apart from the settings form's Save (a Hull Rule names a fit by the id its
  * add returns, so a fit cannot wait for Save); each says so with a toast.
  * Which hull checks which fit is set in Hull Rules.

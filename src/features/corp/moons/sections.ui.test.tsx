@@ -48,7 +48,7 @@ describe('Miner page', () => {
     ])
       expect(screen.getByText(title)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '2 characters' }));
-    expect(await screen.findByRole('button', { name: 'Group with…' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Group with' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Mail/ }));
     expect(screen.getByText('No entries.')).toBeInTheDocument();
   });

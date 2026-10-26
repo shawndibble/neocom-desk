@@ -117,7 +117,7 @@ describe('CorpMoons moon owners', () => {
     mount('/corp/moons/extractions');
     expect(screen.queryByRole('tab', { name: 'Extractions' })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Moon owners', selected: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Invite a moon owner…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Invite a moon owner' })).toBeInTheDocument();
   });
 
   it('keeps Extractions, and the invite button, for a book with refineries of its own', () => {
@@ -138,6 +138,6 @@ describe('CorpMoons moon owners', () => {
   it('keeps the invite button off the other tabs', () => {
     book.entries = [entry(undefined)];
     mount('/corp/moons/miners');
-    expect(screen.queryByRole('button', { name: 'Invite a moon owner…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Invite a moon owner' })).toBeNull();
   });
 });

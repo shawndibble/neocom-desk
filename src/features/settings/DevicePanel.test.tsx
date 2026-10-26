@@ -37,7 +37,7 @@ afterEach(() => {
 async function openDeleteDialog() {
   const user = userEvent.setup();
   render(<DevicePanel />);
-  await user.click(await screen.findByRole('button', { name: 'Delete all…' }));
+  await user.click(await screen.findByRole('button', { name: 'Delete all' }));
   const dialog = await screen.findByRole('dialog');
   return { user, dialog };
 }
@@ -56,7 +56,7 @@ describe('DevicePanel log out', () => {
   async function openLogoutDialog() {
     const user = userEvent.setup();
     render(<DevicePanel />);
-    await user.click(await screen.findByRole('button', { name: 'Log out…' }));
+    await user.click(await screen.findByRole('button', { name: 'Log out' }));
     return within(await screen.findByRole('dialog'));
   }
 

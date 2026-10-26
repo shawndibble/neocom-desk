@@ -23,7 +23,7 @@ const quantityOf = (
 ) => lines?.find((l) => l.typeId === id)?.quantity;
 
 /**
- * "Compare with the book…" (D28): the member's own record next to the book's,
+ * "Compare with the book" (D28): the member's own record next to the book's,
  * with what differs marked — quantity, rate and the tax that follows. Opens
  * from the row detail, never inline.
  */

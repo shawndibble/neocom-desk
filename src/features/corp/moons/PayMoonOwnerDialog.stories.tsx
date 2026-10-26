@@ -3,7 +3,7 @@ import { PayMoonOwnerDialog } from './PayMoonOwnerDialog';
 
 const PAY_SCOPES = ['esi-ui.open_window.v1'] as const;
 
-/** @summary Pay… a moon owner: Settle up's shell with one row, the whole-ISK balance, a generated reason and a before → after line. */
+/** @summary Pay a moon owner: Settle up's shell with one row, the whole-ISK balance, a generated reason and a before → after line. */
 const meta = {
   title: 'corp/PayMoonOwnerDialog',
   component: PayMoonOwnerDialog,

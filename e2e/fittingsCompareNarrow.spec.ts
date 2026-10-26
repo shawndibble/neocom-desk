@@ -22,9 +22,9 @@ const FIT_B = ['[Merlin, Fit B]', '125mm Gatling AutoCannon I'].join('\n');
 const FIT_C = ['[Punisher, Fit C]', '125mm Gatling AutoCannon I'].join('\n');
 
 async function addFitting(page: Page, eft: string) {
-  await page.getByRole('button', { name: 'Compare with…' }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Compare with…' });
-  await dialog.getByRole('button', { name: 'Import…', exact: true }).click();
+  await page.getByRole('button', { name: 'Compare with' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Compare with' });
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
   await dialog.getByLabel('Link or text').fill(eft);
   await dialog.getByRole('button', { name: 'Load', exact: true }).click();
   await expect(dialog).not.toBeVisible();

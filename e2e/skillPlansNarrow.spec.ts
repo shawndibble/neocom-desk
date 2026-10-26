@@ -1,6 +1,6 @@
 /**
  * Skill Plans on a phone (issue #1096; the list now lives in the Plans page's
- * "All plans…" dialog, so the check is that every row stays reachable there): `useViewportBoundedHeight`
+ * "All plans" dialog, so the check is that every row stays reachable there): `useViewportBoundedHeight`
  * sizes the list's scroller off the raw viewport height, with no knowledge of
  * `Layout.tsx`'s fixed mobile tab bar below `md` — the same bug class already
  * shipped as #1054 for Mail. `PlanListPane` applied that height unconditionally
@@ -67,7 +67,7 @@ test('plans page: the current plan opens from the page, and every other plan is 
   // not a 40-row list: one tap to its editor.
   await expect(page.getByRole('link', { name: new RegExp(`^${LAST_PLAN_NAME}\\b`) })).toBeVisible();
 
-  await page.getByRole('button', { name: 'All plans…' }).click();
+  await page.getByRole('button', { name: 'All plans' }).click();
   const dialog = page.getByRole('dialog', { name: 'All plans' });
 
   // The first plan sits 39 rows down the popover's own scroller; it must scroll

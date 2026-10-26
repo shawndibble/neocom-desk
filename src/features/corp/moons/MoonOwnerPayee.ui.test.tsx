@@ -53,7 +53,7 @@ function ownerView(
 async function pick(name: string, kind: 'character' | 'corporation' | 'alliance', id: number) {
   const user = userEvent.setup();
   searchMock.searchPayeeEntities.mockResolvedValue([{ id, name, kind }]);
-  await user.click(screen.getByRole('button', { name: 'Change who gets paid…' }));
+  await user.click(screen.getByRole('button', { name: 'Change who gets paid' }));
   await user.type(screen.getByLabelText('Corporation or player'), name.slice(0, 5));
   await user.click(await screen.findByRole('option', { name: new RegExp(name) }));
   return user;
@@ -114,7 +114,7 @@ describe('moon owner payee line', () => {
   it('saves nothing typed but not picked, and refuses an alliance', async () => {
     ownerView();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Change who gets paid…' }));
+    await user.click(screen.getByRole('button', { name: 'Change who gets paid' }));
     await user.type(screen.getByLabelText('Corporation or player'), 'Somebody');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -123,20 +123,20 @@ describe('moon owner payee line', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
-  it('has no Change… for a viewer who may not edit', () => {
+  it('has no Change for a viewer who may not edit', () => {
     ownerView({}, { canEdit: false });
-    expect(screen.queryByRole('button', { name: 'Change who gets paid…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change who gets paid' })).toBeNull();
   });
 
-  it('has no Change… once the ledger link is disconnected', () => {
+  it('has no Change once the ledger link is disconnected', () => {
     ownerView({ status: 'disconnected' });
     expect(screen.getByText('Who gets paid: Ashfall Mining Collective')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Change who gets paid…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Change who gets paid' })).toBeNull();
   });
 
   it('never explains a waiting period in the dialog', async () => {
     ownerView();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Change who gets paid…' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Change who gets paid' }));
     expect(screen.getByRole('dialog').textContent).not.toMatch(/48|hour|wait|feeder|collector/i);
   });
 });
@@ -190,7 +190,7 @@ describe('accounting side payee', () => {
     expect(screen.queryByRole('button', { name: /who gets paid/i })).toBeNull();
   });
 
-  it('offers Change… to an officer who may edit (#4653)', async () => {
+  it('offers Change to an officer who may edit (#4653)', async () => {
     const onChangePayee = vi.fn();
     render(
       <MoonOwnerPage
@@ -206,7 +206,7 @@ describe('accounting side payee', () => {
       />,
       { wrapper: Router }
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Change who gets paid…' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Change who gets paid' }));
     expect(onChangePayee).toHaveBeenCalled();
     expect(screen.getByText('notice slot')).toBeVisible();
   });

@@ -592,7 +592,7 @@ describe('FittingRing with the editor’s item actions', () => {
     const actions = fakeItemActions({ names });
     renderRing(actions);
     fireEvent.contextMenu(screen.getByLabelText(/^High slots 1: .*, active$/));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Put EMP S in cargo…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Put EMP S in cargo' }));
     expect(actions.changeCargoQuantity).toHaveBeenCalledWith(20);
   });
 

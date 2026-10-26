@@ -99,7 +99,7 @@ describe('AutomaticSyncSection', () => {
   it("lets another editor replace someone else's, but only the CEO revoke it", async () => {
     renderSection(status({ characterId: 9, characterName: 'Pilot 9' }));
     expect(screen.getByText(/replaces the current holder/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Turn on for Pilot 7…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Turn on for Pilot 7' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Revoke/ })).not.toBeInTheDocument();
   });
 
@@ -125,7 +125,7 @@ describe('AutomaticSyncSection', () => {
     expect(screen.getByTestId('auto-sync-state')).toHaveTextContent(
       'Stopped: Pilot 9 no longer has the Accountant, Director or CEO role.'
     );
-    expect(screen.getByRole('button', { name: 'Turn on for Pilot 7…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Turn on for Pilot 7' })).toBeInTheDocument();
   });
 
   it('only offers the opt-in to a book editor', () => {

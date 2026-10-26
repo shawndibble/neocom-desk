@@ -63,7 +63,7 @@ export const RefineryLabels: Story = {
   },
 };
 
-/** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change…. */
+/** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change. */
 export const PayeeSet: Story = {
   args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
 };

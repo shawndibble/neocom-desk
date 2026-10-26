@@ -1,5 +1,5 @@
 /**
- * "New market…" and "Change market…": pick the station or structure the pilot
+ * "New market" and "Change market": pick the station or structure the pilot
  * sells at, name the market, and (new only) start the list from what they
  * already sell there.
  *

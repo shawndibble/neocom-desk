@@ -26,7 +26,7 @@ interface SkillPlanCardProps {
  * plans picks up where they left off, and a one-plan pilot sees that plan.
  *
  * All plan management (rename, duplicate, copy, delete, the certified and
- * community starts) stays in the `PlanListPane` the "All plans…" popover opens;
+ * community starts) stays in the `PlanListPane` the "All plans" popover opens;
  * the editor's own sidebar uses that same pane, so it is not rebuilt here.
  */
 export function SkillPlanCard({
@@ -49,7 +49,7 @@ export function SkillPlanCard({
       ),
     [plans]
   );
-  // Only the current plan is shown here; the "All plans…" pane costs the rest.
+  // Only the current plan is shown here; the "All plans" pane costs the rest.
   const stats = usePlanStats(plans, scheduleInputs, activeCharacterId, current ? [current.id] : []);
   const currentStats = current ? stats?.get(current.id) : undefined;
   const meta = !currentStats

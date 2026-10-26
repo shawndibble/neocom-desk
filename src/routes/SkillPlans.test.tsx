@@ -275,9 +275,9 @@ afterEach(() => {
 });
 beforeEach(resetSession);
 
-/** Opens the "All plans…" popover from the plan card. */
+/** Opens the "All plans" popover from the plan card. */
 async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'All plans…' }));
+  await user.click(await screen.findByRole('button', { name: 'All plans' }));
   return screen.findByRole('dialog', { name: 'All plans' });
 }
 
@@ -359,11 +359,11 @@ describe('SkillPlans CRUD', () => {
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
-  it('offers New plan and its other starts before any plan exists, and no All plans… to open', async () => {
+  it('offers New plan and its other starts before any plan exists, and no All plans to open', async () => {
     render(<App />);
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'More ways to start a plan' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'All plans…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All plans' })).not.toBeInTheDocument();
   });
 
   it('shows the plan edited last on the page, not the oldest', async () => {
@@ -469,7 +469,7 @@ describe('SkillPlans CRUD', () => {
     await user.click(
       await within(plans).findByRole('button', { name: 'More actions for Test plan' })
     );
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
 
@@ -490,7 +490,7 @@ describe('SkillPlans CRUD', () => {
     await user.click(
       await within(plans).findByRole('button', { name: 'More actions for Test plan' })
     );
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
@@ -1835,7 +1835,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III\nNot A Real Skill II');
@@ -1867,7 +1867,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.click(textarea);
@@ -1910,7 +1910,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     // Gunnery III: already trained to V. Spaceship Command I: not trained.
@@ -1949,7 +1949,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III');

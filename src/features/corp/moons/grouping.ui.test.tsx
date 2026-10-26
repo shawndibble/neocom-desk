@@ -151,7 +151,7 @@ describe('MinerCharacters', () => {
   it('groups another Miner into this one with the engine’s plan', async () => {
     renderPanel([], 'solo:1', (row) => <MinerCharacters miner={row} />);
     await openCharacters();
-    await userEvent.click(screen.getByRole('button', { name: 'Group with…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Group with' }));
     await userEvent.click(await screen.findByText('Pilot 2'));
     await userEvent.click(screen.getByRole('button', { name: 'Group 1 Miner' }));
     await waitFor(() =>

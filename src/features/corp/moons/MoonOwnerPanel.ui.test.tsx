@@ -107,7 +107,7 @@ describe('MoonOwnerPanel', () => {
     ready();
     mount();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Ask for a different rate…' }));
+    await user.click(await screen.findByRole('button', { name: 'Ask for a different rate' }));
     const field = screen.getByLabelText('Rate you ask for (%)');
     await user.clear(field);
     await user.type(field, '7');

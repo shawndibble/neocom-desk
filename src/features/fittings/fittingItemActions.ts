@@ -62,7 +62,7 @@ export interface FittingItemActions {
   openVariations: (rack: FittingSlotKind, index: number) => void;
   /**
    * Whether a module can be mutated, or already is: some mutaplasmid takes
-   * the type, or it is an abyssal type. The menu's "Mutate…" shows only then;
+   * the type, or it is an abyssal type. The menu's "Mutate" shows only then;
    * false while the mutaplasmid data loads.
    */
   canMutate: (typeId: number) => boolean;

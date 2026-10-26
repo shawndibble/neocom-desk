@@ -216,7 +216,7 @@ describe('OfficerQueue pending', () => {
 describe('OfficerQueue reject', () => {
   it('needs a reason before Reject claim does anything, then sends it trimmed', async () => {
     const data = setup(pendingSet());
-    await userEvent.click(screen.getAllByRole('button', { name: 'Reject…' })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reject' })[0]!);
     const dialog = await screen.findByRole('dialog');
     const confirm = within(dialog).getByRole('button', { name: 'Reject claim' });
     expect(confirm).toHaveAttribute('aria-disabled', 'true');
@@ -230,7 +230,7 @@ describe('OfficerQueue reject', () => {
   it('mails the pilot the reason and reports it', async () => {
     mailResult.mockResolvedValue({ queued: ['Pilot1'], failed: [], missingScope: false });
     setup(pendingSet());
-    await userEvent.click(screen.getAllByRole('button', { name: 'Reject…' })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reject' })[0]!);
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByRole('textbox'), 'Solo roam');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reject claim' }));
@@ -245,7 +245,7 @@ describe('OfficerQueue reject', () => {
     data.reject.mockRejectedValueOnce(
       Object.assign(new Error('x'), { details: { reason: 'illegal-transition' } })
     );
-    await userEvent.click(screen.getAllByRole('button', { name: 'Reject…' })[0]!);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reject' })[0]!);
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByRole('textbox'), 'why');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reject claim' }));
@@ -258,7 +258,7 @@ describe('OfficerQueue detail and change amount', () => {
   it('opens the detail on a row click and changes the amount with a reason', async () => {
     const data = setup(pendingSet());
     await userEvent.click(screen.getAllByText('Pilot1')[0]!);
-    await userEvent.click(await screen.findByRole('button', { name: 'Change amount…' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Change amount' }));
     const dialog = await screen.findByRole('dialog', { name: /Change amount/ });
     await userEvent.type(within(dialog).getByLabelText('New amount'), '700000');
     const save = within(dialog).getByRole('button', { name: 'Save amount' });
@@ -278,13 +278,13 @@ describe('OfficerQueue row menu', () => {
     expect(more.length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /More actions.*Pilot3/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /More actions.*Pilot1/ }));
-    expect(await screen.findByRole('menuitem', { name: 'Change amount…' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Change amount' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
     // Approve and Reject are the row's own buttons: not repeated in the menu.
     expect(screen.queryByRole('menuitem', { name: 'Approve' })).toBeNull();
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Change amount…' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Change amount' }));
     expect(await screen.findByRole('dialog', { name: /Change amount/ })).toBeInTheDocument();
   });
 });
@@ -305,7 +305,7 @@ describe('OfficerQueue own claim', () => {
     const data = setup([...pendingSet(), claim(6, { state: 'approved', characterId: 5001 })]);
     const approve = screen.getAllByRole('button', { name: 'Approve' })[0]!;
     expect(approve).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getAllByRole('button', { name: 'Reject…' })[0]).toHaveAttribute(
+    expect(screen.getAllByRole('button', { name: 'Reject' })[0]).toHaveAttribute(
       'aria-disabled',
       'true'
     );

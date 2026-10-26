@@ -321,10 +321,6 @@ export function InteractionGrammar() {
           <IconButton icon={<Icon.Back />} label={k('samples.previous')} />
           <IconButton icon={<Icon.Descend />} label={k('samples.next')} />
         </Cue>
-        <Cue rule={k('rules.dialogOpener')} note={k('notes.dialogOpener')}>
-          <Button>{k('samples.renameDialog')}</Button>
-          <Button>{k('samples.showWindow')}</Button>
-        </Cue>
         <Cue rule={k('rules.legendPopover')}>
           <Popover>
             <PopoverTrigger asChild>

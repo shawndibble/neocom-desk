@@ -317,7 +317,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   async function openSettleUp(page: Page): Promise<Locator> {
     // Exact: the selection toolbar's own action is "Settle up {{count}}".
-    await page.getByRole('button', { name: 'Settle up…', exact: true }).click();
+    await page.getByRole('button', { name: 'Settle up', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Settle up — ${PAYEE_NAME}` });
     await expect(dialog).toBeVisible();
     // A single entry starts folded into its summary line; the itemized row
@@ -917,7 +917,7 @@ async function openSplitWithSecondPayee(page: Page): Promise<Locator> {
   // The status pill is a focusable hint trigger and swallows the row click.
   await page.getByRole('cell', { name: ENTRY_DATE }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Give new ore to another Payee…' }).click();
+  await page.getByRole('button', { name: 'Give new ore to another Payee' }).click();
   const dialog = page.getByRole('dialog', { name: /^Split — / });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('combobox', { name: 'Move part of this day to' }).click();

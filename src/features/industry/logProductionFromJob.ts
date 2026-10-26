@@ -1,5 +1,5 @@
 /**
- * Resolves a completed job's "Log production…" row action (issue #1787) to a
+ * Resolves a completed job's "Log production" row action (issue #1787) to a
  * target Build Plan: the character's own plans building the job's blueprint,
  * or a freshly created one when none exist. `ActiveJobsPanel` picks among the
  * result (0/1/many) and navigates the pilot to whichever plan wins, carrying
@@ -31,7 +31,7 @@ export function jobProductionSeed(
   };
 }
 
-/** The character's own Build Plans that build this job's blueprint — the candidates "Log production…" resolves against. */
+/** The character's own Build Plans that build this job's blueprint — the candidates "Log production" resolves against. */
 export async function findMatchingBuildPlans(
   characterId: number,
   job: Pick<ActiveJob, 'blueprint_type_id'>

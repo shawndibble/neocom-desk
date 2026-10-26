@@ -151,10 +151,10 @@ describe('Community Fittings in the library', () => {
       await screen.findByRole('button', { name: 'More actions for Bob’s Rifter' })
     );
     expect(await screen.findByRole('menuitem', { name: 'Open' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Compare with…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Compare with' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Save a copy' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Rename…' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Delete…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
   });
 });
 

@@ -112,7 +112,7 @@ export interface FittingWorkspace extends FittingEvaluation {
    */
   save: () => Promise<boolean>;
   /**
-   * "Save as new…" (issue #1747): always adds a new My Fittings record from
+   * "Save as new" (issue #1747): always adds a new My Fittings record from
    * what's on screen, leaving the record the Fitting was opened from
    * untouched. Becomes the Fitting's own saved record afterward, same as a
    * first-time Save.

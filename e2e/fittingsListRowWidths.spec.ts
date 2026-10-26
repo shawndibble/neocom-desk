@@ -52,7 +52,7 @@ test.describe('Fitter List rows', () => {
   test('keep names readable at every width', async ({ page }) => {
     await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
-    await page.getByRole('button', { name: 'Import…', exact: true }).click();
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await page.getByRole('tab', { name: 'List', exact: true }).click();

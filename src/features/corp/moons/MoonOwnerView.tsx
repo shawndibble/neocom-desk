@@ -175,7 +175,7 @@ function MinedTable({
   );
 }
 
-/** The rate line, with "Ask for a different rate…" for the corporation's officers. */
+/** The rate line, with "Ask for a different rate" for the corporation's officers. */
 function RateLine({
   view,
   name,
@@ -299,7 +299,7 @@ export function MoonOwnerView({
   /** Label a refinery for both sides; null clears it. With `canEdit`, shows the pencil. */
   onSetRefineryLabel?: (structureId: number, label: string | null) => Promise<void>;
   onRequestRate: (pct: number) => Promise<void>;
-  /** Whose token the payee name search runs under; with `onSetPayee`, shows Change…. */
+  /** Whose token the payee name search runs under; with `onSetPayee`, shows Change. */
   characterId?: number;
   onSetPayee?: (payee: Payee, name: string) => Promise<void>;
   banner?: ReactNode;

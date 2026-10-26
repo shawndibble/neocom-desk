@@ -123,7 +123,7 @@ describe('AlertsWhenClosedSection', () => {
     expect(
       await screen.findByText('2 Characters need a login for: nearby alerts and new mail.')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Log in 2 characters…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log in 2 characters' })).toBeInTheDocument();
   });
 
   it('never nags about a Character that is off: off is a choice', async () => {
@@ -148,7 +148,7 @@ describe('AlertsWhenClosedSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('nothing is requested from the list: Log in… only opens the permission screen', async () => {
+  it('nothing is requested from the list: Log in only opens the permission screen', async () => {
     await renderSection();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Log Beta in to EVE for alerts when closed' })
@@ -177,7 +177,7 @@ describe('AlertsWhenClosedSection', () => {
     await seedTokens(1, 2);
     await turnOn(1, 2);
     await renderSection();
-    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters…' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters' }));
     expect(screen.getByText(/never the message/)).toBeInTheDocument();
     expect(screen.getByText(/Needed for: Incursion nearby/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: /Mail headers/ }));
@@ -200,7 +200,7 @@ describe('AlertsWhenClosedSection', () => {
     });
     await turnOn(1, 2);
     await renderSection();
-    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters…' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters' }));
     await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
     expect(login.begin).toHaveBeenCalledTimes(1);
     expect(login.begin).toHaveBeenCalledWith(1, { nearby: true, mail: true });

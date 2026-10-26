@@ -59,7 +59,7 @@ interface FittingStartScreenProps {
   /**
    * `page`: the Start screen with nothing open — New from hull and Import
    * beside the search, and on a desktop the picked row previewed beside the
-   * list. `dialog`: the list alone, in the editor's "Open a fitting…" dialog
+   * list. `dialog`: the list alone, in the editor's "Open a fitting" dialog
    * or the Compare picker.
    */
   variant?: 'page' | 'dialog';

@@ -307,7 +307,7 @@ export function pendingColumns(selectedIds: string[]): DataTableColumn<SrpClaim>
             Approve
           </Button>
           <Button size="sm" className="whitespace-nowrap">
-            Reject…
+            Reject
           </Button>
         </span>
       ),
@@ -634,7 +634,7 @@ export function ClaimDetail({ claim, audit }: { claim: SrpClaim; audit: AuditEnt
                 </span>
                 {claim.state === 'Pending' && (
                   <button type="button" className={cx(textActionClassName(), 'mt-1')}>
-                    Change amount…
+                    Change amount
                   </button>
                 )}
               </Row>
@@ -654,7 +654,7 @@ export function ClaimDetail({ claim, audit }: { claim: SrpClaim; audit: AuditEnt
         >
           {claim.state === 'Pending' && (
             <>
-              <Button>Reject…</Button>
+              <Button>Reject</Button>
               <Button variant="success">Approve</Button>
             </>
           )}

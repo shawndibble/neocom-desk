@@ -12,7 +12,7 @@ import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 const k = (key: string) => `corpTaxBook.moons.ownerView.payee.${key}`;
 
 /**
- * "Who gets paid" on the moon owner's page, with Change… for its officers. `setBy` says
+ * "Who gets paid" on the moon owner's page, with Change for its officers. `setBy` says
  * which side set it and when; absent for a payee set before that was kept.
  */
 export function PayeeLine({

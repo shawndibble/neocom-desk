@@ -2098,7 +2098,7 @@ describe('Ask to copy on a Community Offer row', () => {
     render(<App />);
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
-    await user.click(await within(table).findByRole('button', { name: 'ask Ann to copy…' }));
+    await user.click(await within(table).findByRole('button', { name: 'ask Ann to copy' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'ask to copy dialog' });
     expect(dialog).toHaveTextContent('Rifter Blueprint in c1');

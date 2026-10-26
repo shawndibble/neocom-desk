@@ -729,7 +729,7 @@ describe('FittingAddPanel', () => {
         pointerType: 'mouse',
       }
     );
-    await user.click(await screen.findByRole('menuitem', { name: 'Change quantity…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Change quantity' }));
     expect(actions.changeCargoQuantity).toHaveBeenCalledWith(4);
     fireEvent.pointerDown(
       screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
@@ -773,7 +773,7 @@ describe('FittingAddPanel', () => {
       screen.getByRole('menuitem', { name: /Build Plan|No blueprint options/ })
     ).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'View blueprint in Market' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Change quantity…' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Change quantity' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
   });
 
