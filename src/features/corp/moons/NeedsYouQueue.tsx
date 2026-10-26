@@ -151,7 +151,7 @@ export function NeedsYouQueue() {
                     <Link to={minerPath(item.minerId)} className="hover:underline">
                       {t('corpTaxBook.moons.needs.overdue.title', {
                         name: nameOf(item.minerId),
-                        days: item.days,
+                        count: item.days,
                         amount: isk(item.owed),
                       })}
                     </Link>

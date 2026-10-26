@@ -707,8 +707,8 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
 export interface ExtractionDetail {
   row: ExtractionRow;
   miners: { minerId: string; units: number; value: number; tax: number }[];
-  /** Earlier cycles at the same refinery and moon, newest first. */
-  past: ExtractionRow[];
+  /** The moon's other cycles, newer and older, newest first. */
+  otherCycles: ExtractionRow[];
 }
 
 export function extractionDetail(view: BookView, id: string): ExtractionDetail | undefined {
@@ -727,14 +727,8 @@ export function extractionDetail(view: BookView, id: string): ExtractionDetail |
   return {
     row,
     miners: [...byMiner].map(([minerId, v]) => ({ minerId, ...v })).sort((a, b) => b.tax - a.tax),
-    past: view.extractions
-      .filter(
-        (x) =>
-          x.id !== id &&
-          x.structureId === row.structureId &&
-          x.moonId === row.moonId &&
-          x.startedAt < row.startedAt
-      )
+    otherCycles: view.extractions
+      .filter((x) => x.id !== id && x.structureId === row.structureId && x.moonId === row.moonId)
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
   };
 }

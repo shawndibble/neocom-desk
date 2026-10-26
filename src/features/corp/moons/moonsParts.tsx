@@ -8,6 +8,7 @@ import type { ExtractionRow, MinerStanding } from '@/engine/corpTaxBook/bookView
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
 import { cx } from '@/lib/cx';
 import { useBook } from './useBook';
+import { tapTargetClassName } from './sectionHelpers';
 
 const STATE_TONE: Record<ExtractionState, string> = {
   extracting: 'text-text-dim',
@@ -114,7 +115,7 @@ export function MinedBar({ pct, label }: { pct: number | null; label: string }) 
 /** A labelled way up from a drill-down page (§6c: never a bare CaretLeft). */
 export function Crumb({ to, label }: { to: string; label: string }) {
   return (
-    <Link to={to} className={cx(inlineLinkClassName, 'inline-flex items-center gap-1 text-xs')}>
+    <Link to={to} className={cx(inlineLinkClassName, 'gap-1 text-xs', tapTargetClassName)}>
       <Icon.Back size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {label}
     </Link>

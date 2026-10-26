@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { readAudit } from '../taxBook/bookClient';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -35,7 +36,7 @@ describe('Overview', () => {
 });
 
 describe('Miner page', () => {
-  it('is one scroll of sections with counts, no tabs, and the old panels stay reachable', async () => {
+  it('is one scroll of sections with counts and no tabs', () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     for (const title of [
@@ -47,10 +48,38 @@ describe('Miner page', () => {
       /^Activity · 0/,
     ])
       expect(screen.getByText(title)).toBeInTheDocument();
+  });
+
+  it('keeps the characters panel reachable from the header', async () => {
+    renderBook(<MinerDetail id={VARRO_ID} />);
     await userEvent.click(screen.getByRole('button', { name: '2 characters' }));
     expect(await screen.findByRole('button', { name: 'Group with…' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Mail/ }));
-    expect(screen.getByText('No entries.')).toBeInTheDocument();
+  });
+
+  it('says so, with no chips, when nothing has happened for the Miner', () => {
+    renderBook(<MinerDetail id={VARRO_ID} />);
+    expect(screen.getByText('Nothing has happened for this Miner yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Filter activity' })).not.toBeInTheDocument();
+  });
+
+  it('counts a mailed Statement from the audit log under Mail, not Audit', async () => {
+    vi.mocked(readAudit).mockResolvedValue([
+      {
+        id: 'a1',
+        at: Date.parse('2026-10-20T10:00:00Z'),
+        by: 1,
+        byName: 'Test Pilot',
+        action: 'recordMail',
+        detail: { minerId: VARRO_ID, kind: 'statement' },
+      },
+    ]);
+    renderBook(<MinerDetail id={VARRO_ID} />);
+    const chips = await screen.findByRole('group', { name: 'Filter activity' });
+    expect(within(chips).getByRole('button', { name: /^Mail/ })).toHaveTextContent('1');
+    expect(within(chips).getByRole('button', { name: /^Audit/ })).toHaveTextContent('0');
+    await userEvent.click(within(chips).getByRole('button', { name: /^Mail/ }));
+    await waitFor(() => expect(screen.getByText(/mailed a Statement/)).toBeInTheDocument());
+    vi.mocked(readAudit).mockResolvedValue([]);
   });
 
   it('shows a moon once, with only the station under it', () => {

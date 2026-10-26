@@ -139,9 +139,11 @@ describe('MinersTab', () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
     const menu = await screen.findByRole('menu');
-    for (const name of ['Record payment…', 'Dismiss tax…']) {
+    for (const name of ['Show info', 'Record payment…', 'Dismiss tax…']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
+    // Show info, then the three real actions: nothing else.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
     // No payment in this book: the item stays, inert.
     expect(within(menu).getByRole('menuitem', { name: 'Mark not tax…' })).toHaveAttribute(
       'aria-disabled',

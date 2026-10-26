@@ -19,6 +19,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { cx } from '@/lib/cx';
+import { useCards } from './sectionHelpers';
 import { usePaged } from './usePaged';
 
 /** A link to another entity page from outside a table (a moon in a list, a Miner in a header): a bordered accent link. In a table row it is plain `entityLinkClassName` text. */
@@ -121,6 +122,7 @@ export function EntityHeader({
 export function BookSection<T>({
   title,
   noun,
+  empty,
   rows,
   count = rows.length,
   meta,
@@ -135,6 +137,8 @@ export function BookSection<T>({
   title: string;
   /** What "Load older" and the end line name: "days", "payments". */
   noun: string;
+  /** What the section says with no rows; "No {noun}." when left out. */
+  empty?: string;
   rows: readonly T[];
   /** The title's count when it is not the rows shown (a filtered list). */
   count?: number;
@@ -151,7 +155,11 @@ export function BookSection<T>({
   /** The rows to print, plus the sort props to hand the table. */
   children: (
     shown: readonly T[],
-    table: { sort: DataTableSort | null; onSortChange: (sort: DataTableSort) => void }
+    table: {
+      sort: DataTableSort | null;
+      onSortChange: (sort: DataTableSort) => void;
+      stacked: boolean;
+    }
   ) => ReactNode;
 }) {
   const { t } = useTranslation();
@@ -163,6 +171,7 @@ export function BookSection<T>({
     return sort && column ? sortRows(rows, column, sort.direction) : rows;
   }, [rows, sortColumns, sort]);
   const paged = usePaged(sorted);
+  const [widthRef, cards] = useCards();
   return (
     <CollapsiblePanel
       title={`${title} · ${count}`}
@@ -183,28 +192,32 @@ export function BookSection<T>({
       }
       padded={false}
     >
-      {toolbar && (
-        <div className="flex flex-wrap items-center gap-1 border-b border-line p-2">{toolbar}</div>
-      )}
-      {rows.length === 0 ? (
-        <p className="px-3 py-2.5 text-xs text-text-dim">
-          {t('corpTaxBook.moons.sections.none', { noun })}
-        </p>
-      ) : (
-        children(paged.rows, { sort, onSortChange: setSort })
-      )}
-      {paged.remaining > 0 && (
-        <div className="border-t border-line p-2">
-          <Button size="sm" variant="ghost" className="w-full" onClick={paged.loadOlder}>
-            {t('corpTaxBook.moons.sections.loadOlder', { noun, count: paged.remaining })}
-          </Button>
-        </div>
-      )}
-      {paged.atEnd && (
-        <p className="border-t border-line px-3 py-2 text-center text-xs text-text-dim">
-          {t('corpTaxBook.moons.sections.end', { noun })}
-        </p>
-      )}
+      <div ref={widthRef}>
+        {toolbar && (
+          <div className="flex flex-wrap items-center gap-1 border-b border-line p-2">
+            {toolbar}
+          </div>
+        )}
+        {rows.length === 0 ? (
+          <p className="px-3 py-2.5 text-xs text-text-dim">
+            {empty ?? t('corpTaxBook.moons.sections.none', { noun })}
+          </p>
+        ) : (
+          children(paged.rows, { sort, onSortChange: setSort, stacked: cards })
+        )}
+        {paged.remaining > 0 && (
+          <div className="border-t border-line p-2">
+            <Button size="sm" variant="ghost" className="w-full" onClick={paged.loadOlder}>
+              {t('corpTaxBook.moons.sections.loadOlder', { noun, count: paged.remaining })}
+            </Button>
+          </div>
+        )}
+        {paged.atEnd && (
+          <p className="border-t border-line px-3 py-2 text-center text-xs text-text-dim">
+            {t('corpTaxBook.moons.sections.end', { noun })}
+          </p>
+        )}
+      </div>
     </CollapsiblePanel>
   );
 }
