@@ -1288,11 +1288,6 @@ export function Market() {
                               stationId={
                                 effectiveLocation.mode === 'hub' ? effectiveHub.stationId : null
                               }
-                              stationName={
-                                effectiveLocation.mode === 'hub'
-                                  ? (npcStationMap.get(effectiveHub.stationId)?.name ?? null)
-                                  : null
-                              }
                               onView={() =>
                                 handleBrowserFiltersChange({
                                   ...browserFilterValue,
