@@ -92,6 +92,8 @@ import { SRP_COLLECTIONS } from './srpTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
+import { editScope } from './corpTaxBookMinerTotals.js';
+import { paymentOwner, refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import {
   fail,
   requireLiveRoles,
@@ -600,6 +602,8 @@ export async function syncBookAs(
 
   const payments = sub(deps.db, input.corporationId, PAYMENTS);
   let donationsAdded = 0;
+  /** Miners a new donation was matched to: their totals move (ADR 0032). */
+  const paidMiners = new Set<string>();
   for (const dn of input.donations) {
     const id = `j${dn.division}_${dn.refId}`;
     const data: Data = {
@@ -618,6 +622,7 @@ export async function syncBookAs(
       // create(): a re-synced donation never overwrites an officer's "not tax" mark.
       await payments.doc(id).create(data);
       donationsAdded += 1;
+      if (dn.minerId !== undefined) paidMiners.add(dn.minerId);
     } catch (err) {
       if ((err as { code?: number }).code !== 6) throw err;
     }
@@ -648,6 +653,7 @@ export async function syncBookAs(
       }
     );
   });
+  if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
@@ -1546,6 +1552,11 @@ export async function editBookAs(
   via?: string
 ) {
   const ref = bookRef(deps.db, call.corporationId);
+  // Who held a payment before it moves: that Miner's totals change too (ADR 0032).
+  const priorOwner =
+    action.action === 'assignPayment'
+      ? await paymentOwner(deps.db, call.corporationId, action.paymentId).catch(() => undefined)
+      : undefined;
   const result = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.get('active') !== true)
@@ -1562,6 +1573,8 @@ export async function editBookAs(
     appendAudit(tx, deps, call.corporationId, actorOf(access, via), action.action, outcome.detail);
     return outcome.result ?? {};
   });
+  // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
+  await refreshAfterEvent(deps.db, call.corporationId, editScope(action, priorOwner));
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
     await restampStructures(
@@ -1603,6 +1616,7 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
+  await refreshAfterEvent(deps.db, corporationId, [minerId]);
 }
 
 /** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
@@ -1630,6 +1644,7 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
+  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`]);
 }
 
 /** The added character itself declines, signed in as itself. */
@@ -1700,6 +1715,17 @@ export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
  * that the player did it, never anything else.
  */
 export async function claimPayment(
+  deps: BookDeps,
+  caller: Caller,
+  corporationId: number,
+  paymentId: string
+) {
+  const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId);
+  await refreshAfterEvent(deps.db, corporationId, [claimed.minerId]);
+  return claimed;
+}
+
+async function claimPaymentTx(
   deps: BookDeps,
   caller: Caller,
   corporationId: number,

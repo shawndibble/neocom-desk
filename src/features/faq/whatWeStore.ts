@@ -115,6 +115,7 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   statements: 'corpTaxBook',
   dismissals: 'corpTaxBook',
   miners: 'corpTaxBook',
+  minerTotals: 'corpTaxBook',
   feeders: 'corpTaxBook',
   feederViews: 'corpTaxBook',
   adjustments: 'corpTaxBook',

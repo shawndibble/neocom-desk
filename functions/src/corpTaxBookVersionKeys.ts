@@ -52,6 +52,8 @@ export const VERSIONED_COLLECTIONS = [
   'writeOffs',
   'feeders',
   'meta',
+  // Server-built running totals per Miner (#5255, ADR 0032); shadow mode, no client reads yet.
+  'minerTotals',
   // The member side (issue #5050) caches it too.
   'feederCoverage',
 ] as const;
