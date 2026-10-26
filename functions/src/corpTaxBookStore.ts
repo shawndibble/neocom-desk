@@ -598,6 +598,12 @@ export async function syncBookAs(
     const held = (await extractions.doc(id).get()).data();
     if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
       corrected.add(x.structureId);
+    // A new Extraction, or one whose make-up or dates moved, changes its moon doc (ADR 0032).
+    if (
+      !held ||
+      Object.keys(fields).some((k) => JSON.stringify(fields[k]) !== JSON.stringify(held[k]))
+    )
+      touchedPulls.add(id);
     await extractions.doc(id).set(fields, { merge: true });
   }
   // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort, like the pass below.
@@ -663,8 +669,6 @@ export async function syncBookAs(
   });
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
-  for (const x of input.extractions)
-    touchedPulls.add(`${x.structureId}_${Date.parse(x.extractionStartTime)}`);
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
@@ -1555,8 +1559,7 @@ export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, a
   return editBookAs(deps, access, call, action);
 }
 
-/** An edit once the caller is established; the scheduled sync passes `via` (ADR 0025). */
-/** The pulls an edit changed the moon docs of; an expiry change rebuilds every pull. */
+/** Rebuilds the moon docs an edit changed; an expiry change or a regroup rebuilds every pull. */
 async function refreshMoonDocsAfterEdit(
   db: Firestore,
   corporationId: number,
@@ -1572,7 +1575,12 @@ async function refreshMoonDocsAfterEdit(
           : []
       );
       await refreshMoonDocs(db, corporationId, await pullsOfDays(db, corporationId, days));
-    } else if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
+    } else if (
+      (action.action === 'updateSettings' && action.patch.structureExpiryHours) ||
+      action.action === 'setMiner' ||
+      action.action === 'unlink' ||
+      action.action === 'regroupMiner'
+    ) {
       const snap = await sub(db, corporationId, EXTRACTIONS).get();
       await refreshMoonDocs(
         db,
@@ -1585,6 +1593,7 @@ async function refreshMoonDocsAfterEdit(
   }
 }
 
+/** An edit once the caller is established; the scheduled sync passes `via` (ADR 0025). */
 export async function editBookAs(
   deps: BookDeps,
   access: OfficerAccess,

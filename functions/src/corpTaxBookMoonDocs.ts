@@ -126,12 +126,11 @@ export function computeMoonDoc(
   // Source order (D13): the ExtractionStarted notification, then a linked survey.
   const source: ChunkSource =
     notified.length > 0 ? 'notification' : surveyId !== null ? 'survey' : 'unknown';
-  const oreLines = notified;
 
   let minedPct: number | null = null;
-  if (oreLines.length > 0) {
-    const total = oreLines.reduce((s, l) => s + l.quantity, 0);
-    const got = oreLines.reduce((s, l) => s + Math.min(l.quantity, mined.get(l.typeId) ?? 0), 0);
+  if (notified.length > 0) {
+    const total = notified.reduce((s, l) => s + l.quantity, 0);
+    const got = notified.reduce((s, l) => s + Math.min(l.quantity, mined.get(l.typeId) ?? 0), 0);
     minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
   }
 
@@ -159,7 +158,7 @@ export function computeMoonDoc(
     fracturedAt: window ? new Date(window.fracturedAt).toISOString() : null,
     expiresAt: window ? new Date(window.expiresAt).toISOString() : null,
     cancelled: Boolean(x.cancelledAt),
-    chunk: { source, oreLines },
+    chunk: { source, oreLines: notified },
     surveyId,
     mined: sorted(mined),
     minedPct,

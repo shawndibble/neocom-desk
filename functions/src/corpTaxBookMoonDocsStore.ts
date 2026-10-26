@@ -62,7 +62,12 @@ export async function reconcileMoonDocs(
     const ops = [
       ...plan.writes.map((doc) => ({
         ref: sub(db, corporationId, MOON_DOCS).doc(doc.extractionId),
-        data: { ...doc, updatedAt: FieldValue.serverTimestamp() } as Data,
+        // A legacy Extraction doc may lack a field; `set` throws on undefined and would fail the batch.
+        data: Object.fromEntries(
+          Object.entries({ ...doc, updatedAt: FieldValue.serverTimestamp() }).filter(
+            ([, v]) => v !== undefined
+          )
+        ) as Data,
       })),
       ...plan.deletes.map((id) => ({
         ref: sub(db, corporationId, MOON_DOCS).doc(id),
