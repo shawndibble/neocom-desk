@@ -6486,6 +6486,8 @@
     "loadingEllipsis": "Loading…",
     "unknown": "—",
     "aboutLabel": "About {{label}}",
+    "scrollTabsBefore": "Scroll tabs left",
+    "scrollTabsAfter": "Scroll tabs right",
     "moreActionsLabel": "More actions for {{name}}",
     "moreActions": "More actions",
     "tableExport": {
@@ -15822,7 +15824,6 @@
       "scheduledBy": "Scheduled sync ({{name}})",
       "syncNow": "Sync now",
       "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
-      "syncing": "Syncing…",
       "failed": "Couldn't load the Corp Tax Book",
       "declared": "Declared paid, overdue paused",
       "overdueDays_one": "Overdue {{count}} day",
@@ -15837,6 +15838,7 @@
       "startedOn": "started {{date}}",
       "windowDays_one": "{{count}} day",
       "windowDays_other": "{{count}} days",
+      "extractionsNoneShown": "No Extraction matches the states shown",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "state": {
@@ -15873,12 +15875,12 @@
         "donation": "Donation",
         "manual": "Recorded by hand",
         "markNotTax": "Mark not tax",
+        "markNotTaxFor": "Mark not tax: {{date}} payment",
         "markedNotTax": "{{amount}} marked not tax",
         "oldestFirst": "Oldest debt first",
         "correction": "Correction by {{name}}",
         "correctsDay": "Next Statement, for {{date}}",
         "billedOn": "On the {{period}} Statement, for {{date}}",
-        "markNotTaxMenu": "Mark not tax",
         "markNotTaxNone": "No payment to mark"
       },
       "cols": {
@@ -15964,10 +15966,8 @@
           "effect": "The ore is estimated from the Survey's first scan and the chunk rate in Settings; it is an estimate, not what the structure holds."
         },
         "whoMined": "Who mined this chunk",
-        "nobody": "Nobody has mined this chunk yet.",
         "past": "Past extractions",
         "pastHint": "Earlier cycles, not this one",
-        "noPast": "No earlier cycle is on record for this moon.",
         "dismissTitle": "Dismiss this extraction's tax?",
         "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed.",
         "leftToMine": "Left to mine",
@@ -16025,7 +16025,7 @@
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
           "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
           "assign": "Assign to a Miner",
-          "notTax": "Not tax"
+          "notTax": "Mark not tax"
         },
         "leaver": {
           "title": "{{name}} left the corp · owes {{amount}}",
@@ -16051,13 +16051,10 @@
         "selectDay": "Select {{date}}",
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
-        "days": "Days",
         "daysHint": "Newest first · Billable through {{date}}",
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals = {{owed}} owed",
-        "dismissals": "Dismissals",
-        "noDismissals": "Nothing has been dismissed.",
         "scope": {
           "record": "A day",
           "miner": "This Miner",
@@ -16066,8 +16063,6 @@
         },
         "reversed": "reversed",
         "reverse": "Reverse",
-        "mail": "Mail",
-        "noMail": "No mail has been queued for this Miner.",
         "activity": "Activity",
         "activityHint": "Audit log for this Miner, newest first",
         "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is still accruing.",
@@ -16151,7 +16146,7 @@
         "never": "Never synced",
         "neverDetail": "Sync the book to pull the refinery ledger, extractions and donations.",
         "syncedBy": "Synced by {{name}}",
-        "stale": "Last synced {{age}} by {{name}} — the book is going stale",
+        "stale": "Synced by {{name}} {{age}} — the book is going stale",
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
@@ -16314,14 +16309,9 @@
         "continue": "Continue to EVE"
       },
       "owner": {
-        "title": "{{name}} handles the tax on your moons",
         "waiting": "Waiting for the first sync.",
-        "synced": "Last synced {{date}}.",
-        "noRate": "No rate set.",
-        "rate": "Your rate is {{pct}}%.",
         "noMining": "Nobody has mined at your refineries yet.",
         "anonymous": "The accounting corporation",
-        "volume": "{{volume}} units mined",
         "leave": {
           "open": "Leave",
           "title": "Leave this accounting corporation?",
@@ -16495,7 +16485,6 @@
       "settings": {
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
-        "rates": "Tax rates",
         "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
         "rateScope": {
           "corp": "Corp default",
@@ -16517,7 +16506,6 @@
           "compressed": "Compressed",
           "raw": "Raw"
         },
-        "billing": "Billing",
         "startDate": "Start date (EVE time)",
         "grace": "Grace after day end (hours)",
         "overdue": "Overdue after (days)",
@@ -16580,7 +16568,6 @@
         "divisionNamed": "Division {{n}}, {{name}}"
       },
       "grouping": {
-        "title": "Characters",
         "hint": "One payment covers them all; mail goes to the main.",
         "group": "Group with",
         "main": "main",
@@ -16602,9 +16589,6 @@
         "count_other": "{{count}} characters"
       },
       "corrections": {
-        "title": "Corrections",
-        "hint": "Logged under your name; corrections go on the next Statement.",
-        "none": "No correction lines.",
         "reason": "Reason (logged, shown on the line)",
         "rate": {
           "open": "Change a day's rate",

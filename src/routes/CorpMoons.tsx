@@ -130,10 +130,10 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                 </Button>
                 {sync.ledger.state === 'ready' && (
                   <IconButton
-                    icon={<Icon.Refresh />}
+                    icon={sync.run.phase === 'syncing' ? <Spinner /> : <Icon.Refresh />}
                     label={t('corpTaxBook.moons.syncNow')}
                     onClick={() => void sync.sync()}
-                    disabled={sync.run.phase === 'syncing'}
+                    busy={sync.run.phase === 'syncing'}
                   />
                 )}
                 <IconButton

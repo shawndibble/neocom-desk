@@ -10,6 +10,7 @@ import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { EntityShowInfoMenuItem } from '../corpRowMenus';
 import { useBook } from './useBook';
+import { shortDate } from './moonsFormat';
 
 export function MinerRowMenu({
   miner,
@@ -54,11 +55,11 @@ export function MinerRowMenu({
           </MenuItem>
           {payment ? (
             <MenuItem onSelect={() => onNotTax(miner, payment.id)}>
-              {t('corpTaxBook.moons.payment.markNotTaxMenu')}
+              {t('corpTaxBook.moons.payment.markNotTaxFor', { date: shortDate(payment.at) })}
             </MenuItem>
           ) : (
             <DisabledMenuItem reason={t('corpTaxBook.moons.payment.markNotTaxNone')}>
-              {t('corpTaxBook.moons.payment.markNotTaxMenu')}
+              {t('corpTaxBook.moons.payment.markNotTax')}
             </DisabledMenuItem>
           )}
         </>

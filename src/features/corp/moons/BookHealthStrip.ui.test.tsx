@@ -54,7 +54,7 @@ describe('BookHealthStrip, no readable refineries', () => {
       sync: vi.fn(),
     } as unknown as CorpTaxBookSync);
     expect(screen.getByText(/no refineries the book can read/)).toBeInTheDocument();
-    expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Synced by/)).not.toBeInTheDocument();
   });
 
   it('reads as synced for a book that collects for moon owners', () => {
@@ -68,14 +68,14 @@ describe('BookHealthStrip, no readable refineries', () => {
       [{ corporationId: 98000002, status: 'active' }]
     );
     expect(screen.queryByText(/no refineries the book can read/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Synced by/)).not.toBeInTheDocument();
   });
 });
 
 describe('BookHealthStrip, scheduled sync', () => {
   it('leaves the age of a fresh sync to the page title and says nothing', () => {
     renderStrip(null);
-    expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Synced by/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Automatic sync stopped/)).not.toBeInTheDocument();
   });
 
@@ -90,7 +90,7 @@ describe('BookHealthStrip, scheduled sync', () => {
         gaps: [],
       },
     } as unknown as CorpTaxBookSync);
-    expect(screen.getByText(/Last synced .* by Scheduled sync \(Pilot 9\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Synced by Scheduled sync \(Pilot 9\) 4d ago/)).toBeInTheDocument();
   });
 
   it.each([
@@ -133,7 +133,7 @@ describe('BookHealthStrip, member hold', () => {
 describe('BookHealthStrip, plain status', () => {
   it('is no strip at all, and no Sync now or Billable line, while every check passes', () => {
     renderStrip(null);
-    expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Synced by/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Sync now/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Billable through/)).not.toBeInTheDocument();
     expect(screen.queryByText(/need attention|needs attention/)).not.toBeInTheDocument();

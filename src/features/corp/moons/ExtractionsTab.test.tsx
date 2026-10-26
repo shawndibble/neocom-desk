@@ -22,7 +22,10 @@ vi.mock('@/components/ui', async (importOriginal) => {
     },
   };
 });
-vi.mock('./ExtractionTimeline', () => ({ ExtractionTimeline: () => null }));
+vi.mock('./ExtractionTimeline', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./ExtractionTimeline')>()),
+  ExtractionTimeline: () => null,
+}));
 vi.mock('./LinkSurveyDialog', () => ({ LinkSurveyDialog: () => <div>link survey dialog</div> }));
 vi.mock('./BookDialogs', () => ({
   ReasonDialog: ({ title }: { title: string }) => <div>{`reason dialog: ${title}`}</div>,
@@ -49,6 +52,7 @@ vi.mock('./useBook', () => ({
         ex('b', 'unknown', 0),
         ex('c', 'survey', 0),
         ex('d', 'notification', 50),
+        { ...ex('e', 'survey', 0), state: 'expired' },
       ],
     },
     canEdit: book.canEdit,
@@ -68,6 +72,19 @@ describe('ExtractionsTab on a phone', () => {
     expect(props.mobileSort).toBe(true);
     expect(props.stackColumns).toBe(2);
     expect(props.stackSummary).toBe('4 Extractions');
+  });
+
+  it('lists only the states the chips have on, Expired off by default, and counts what each adds', async () => {
+    render(
+      <MemoryRouter>
+        <ExtractionsTab />
+      </MemoryRouter>
+    );
+    expect(tableProps.calls.at(-1)!.stackSummary).toBe('4 Extractions');
+    const expired = screen.getByRole('button', { name: /Expired/ });
+    expect(expired).toHaveTextContent('1');
+    await userEvent.click(expired);
+    expect(tableProps.calls.at(-1)!.stackSummary).toBe('5 Extractions');
   });
 
   it('right-click menu: both items on a surveyed row with tax; no menu otherwise', () => {
