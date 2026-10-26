@@ -23,6 +23,7 @@ import {
   activityFeed,
   daysByPhase,
   minerMoons,
+  moonByStructure,
   paymentLedger,
   type ActivityKind,
   type LedgerRow,
@@ -104,6 +105,7 @@ export function MinerDetail({ id }: { id: string }) {
   );
   const phases = useMemo(() => daysByPhase(detail?.days ?? []), [detail]);
   const moons = useMemo(() => minerMoons(view, id), [view, id]);
+  const moonOf = useMemo(() => moonByStructure(view), [view]);
   const ledger = useMemo(
     () =>
       paymentLedger(
@@ -153,6 +155,8 @@ export function MinerDetail({ id }: { id: string }) {
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
+  const moonName = (moonId: number | undefined) =>
+    moonId === undefined ? undefined : names.moon(moonId);
   const noun = (key: string) => t(`corpTaxBook.moons.sections.nouns.${key}`);
 
   const dayColumns = (withSelect: boolean, withStatus: boolean): DataTableColumn<DayRow>[] => [
@@ -193,7 +197,7 @@ export function MinerDetail({ id }: { id: string }) {
       render: (d) => (
         <PlaceCell
           refinery={names.refinery(d.structureId)}
-          moon={d.moonId === undefined ? undefined : names.moon(d.moonId)}
+          moon={moonName(d.moonId ?? moonOf.get(d.structureId))}
           to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
         />
       ),
@@ -609,11 +613,12 @@ export function MinerDetail({ id }: { id: string }) {
         title={t('corpTaxBook.moons.miner.activity')}
         noun={noun('activity')}
         rows={shownFeed}
+        count={feed.length}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.activityHint')}</span>
         }
-        actions={
-          <span className="flex flex-wrap items-center gap-1">
+        toolbar={
+          <>
             {(['all', 'mail', 'dismissed', 'audit'] as const).map((f) => (
               <FilterChip
                 key={f}
@@ -623,7 +628,7 @@ export function MinerDetail({ id }: { id: string }) {
                 count={f === 'all' ? feed.length : feed.filter((x) => x.kind === f).length}
               />
             ))}
-          </span>
+          </>
         }
         phone={phone}
         startOpen={false}

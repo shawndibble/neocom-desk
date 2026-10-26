@@ -191,7 +191,7 @@ export function MinersTab() {
             count={counts.guests}
           />
         </div>
-        <div className="overflow-x-auto">
+        <div className="@container overflow-x-auto">
           <DataTable
             label={t('corpTaxBook.moons.tabs.miners')}
             columns={columns}

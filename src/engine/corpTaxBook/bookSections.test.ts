@@ -11,6 +11,7 @@ import {
   daysByPhase,
   minerMoons,
   minersOnMoon,
+  moonByStructure,
   moonSchedule,
   oreTaxLines,
   paymentLedger,
@@ -266,6 +267,26 @@ describe('per Miner and moon ore lines (against the book view)', () => {
       expect(row.lines.reduce((s, l) => s + l.tax, 0)).toBeCloseTo(m.tax, 6);
       expect(row).toMatchObject({ units: m.units, tax: m.tax });
     }
+  });
+
+  it('puts a refinery on one moon row, and knows its moon for a day outside any Extraction', () => {
+    const outside = buildBookView({
+      ...input,
+      entries: [
+        ...input.entries,
+        {
+          characterId: 1,
+          recordedCorporationId: CORP,
+          structureId: 1001,
+          date: '2026-08-20',
+          oreLines: [{ typeId: ORE, quantity: 10 }],
+        },
+      ],
+    });
+    expect(moonByStructure(outside).get(1001)).toBe(7);
+    const moons = minerMoons(outside, 'solo:1');
+    expect(moons).toHaveLength(1);
+    expect(moons[0]).toMatchObject({ moonId: 7, days: 2 });
   });
 
   it("lists a Miner's moons with their ore lines", () => {

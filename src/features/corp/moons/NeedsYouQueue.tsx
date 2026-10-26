@@ -35,11 +35,11 @@ function QueueCard({
           tone === 'danger' ? 'bg-danger' : tone === 'warning' ? 'bg-warning' : 'bg-line'
         )}
       />
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 basis-60">
         <span className="block text-sm font-semibold">{title}</span>
         <span className="block text-xs text-text-dim">{body}</span>
       </span>
-      <span className="flex shrink-0 flex-wrap items-center gap-2">{actions}</span>
+      <span className="flex shrink-0 flex-wrap items-center gap-2 max-sm:pl-3">{actions}</span>
     </li>
   );
 }

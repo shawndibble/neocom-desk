@@ -24,8 +24,8 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
   const moonName = (m: (typeof moons)[number]) =>
     m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId);
   return (
-    <div className="space-y-3 p-3">
-      <div className="grid gap-4 md:grid-cols-3">
+    <div className="sticky left-0 w-[100cqw] max-w-full space-y-3 p-3">
+      <div className="grid gap-4 @2xl:grid-cols-3">
         <div>
           <p className={eyebrowClassName}>
             {t('corpTaxBook.moons.sections.nextStatement')} · {next.length}

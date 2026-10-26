@@ -53,11 +53,11 @@ export function PlaceCell({
       ) : (
         <>
           {to ? (
-            <Link to={to} className={entityLinkClassName()}>
+            <Link to={to} className={entityLinkClassName('whitespace-nowrap')}>
               {place.moon}
             </Link>
           ) : (
-            place.moon
+            <span className="whitespace-nowrap">{place.moon}</span>
           )}
           <span className="block text-xs text-text-dim">{place.station}</span>
         </>
@@ -81,7 +81,7 @@ export function EntityHeader({
   facts: { label: string; value: ReactNode }[];
 }) {
   return (
-    <div className="grid gap-4 rounded-xs border border-line bg-panel p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center">
+    <div className="grid gap-4 rounded-xs border border-line bg-panel p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-center">
       <div>
         <p className={eyebrowClassName}>{label}</p>
         <p
@@ -94,7 +94,7 @@ export function EntityHeader({
         </p>
         {note && <p className="mt-1 text-xs text-text-dim">{note}</p>}
       </div>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
         {facts.map((f) => (
           <div key={f.label}>
             <dt className={eyebrowClassName}>{f.label}</dt>
@@ -116,8 +116,10 @@ export function BookSection<T>({
   title,
   noun,
   rows,
+  count = rows.length,
   meta,
   actions,
+  toolbar,
   phone,
   startOpen = true,
   summary,
@@ -127,8 +129,12 @@ export function BookSection<T>({
   /** What "Load older" and the end line name: "days", "payments". */
   noun: string;
   rows: readonly T[];
+  /** The title's count when it is not the rows shown (a filtered list). */
+  count?: number;
   meta?: ReactNode;
   actions?: ReactNode;
+  /** Controls over the rows (filter chips), shown even when the filter leaves none. */
+  toolbar?: ReactNode;
   phone: boolean;
   startOpen?: boolean;
   /** One line shown while folded on a phone. */
@@ -141,7 +147,7 @@ export function BookSection<T>({
   const paged = usePaged(rows);
   return (
     <CollapsiblePanel
-      title={`${title} · ${rows.length}`}
+      title={`${title} · ${count}`}
       meta={meta}
       actions={actions}
       wrapMeta
@@ -159,6 +165,9 @@ export function BookSection<T>({
       }
       padded={false}
     >
+      {toolbar && (
+        <div className="flex flex-wrap items-center gap-1 border-b border-line p-2">{toolbar}</div>
+      )}
       {rows.length === 0 ? (
         <p className="px-3 py-2.5 text-xs text-text-dim">
           {t('corpTaxBook.moons.sections.none', { noun })}

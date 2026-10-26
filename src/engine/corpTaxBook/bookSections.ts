@@ -126,8 +126,21 @@ export function minersOnMoon(view: BookView, extractionId: string): MinerOnMoon[
   return rows.sort((a, b) => b.tax - a.tax || a.minerId.localeCompare(b.minerId));
 }
 
+/**
+ * The moon each refinery sits at. A day mined while no Extraction ran carries no moon id, but
+ * its refinery's moon is known from the Extractions and the days that do.
+ */
+export function moonByStructure(view: BookView): Map<number, number> {
+  const moons = new Map<number, number>();
+  for (const x of view.extractions) moons.set(x.structureId, x.moonId);
+  for (const inner of view.internals.byMiner.values())
+    for (const d of inner.days)
+      if (d.moonId !== undefined && !moons.has(d.structureId)) moons.set(d.structureId, d.moonId);
+  return moons;
+}
+
 export interface MinerMoon {
-  /** The moon id, else the refinery: a day mined outside any Extraction still has a place. */
+  /** The refinery: one row per moon, whether or not an Extraction was running on the day. */
   key: string;
   moonId?: number;
   structureId: number;
@@ -144,9 +157,10 @@ export interface MinerMoon {
 /** The moons one Miner mined at, newest first, each with that Miner's ore lines there. */
 export function minerMoons(view: BookView, minerId: string): MinerMoon[] {
   const days = view.internals.byMiner.get(minerId)?.days ?? [];
+  const moonOf = moonByStructure(view);
   const groups = new Map<string, DayRow[]>();
   for (const d of days) {
-    const key = d.moonId !== undefined ? `m${d.moonId}` : `s${d.structureId}`;
+    const key = `s${d.structureId}`;
     groups.set(key, [...(groups.get(key) ?? []), d]);
   }
   return [...groups]
@@ -158,7 +172,7 @@ export function minerMoons(view: BookView, minerId: string): MinerMoon[] {
         .find((d) => d.extractionId !== undefined)?.extractionId;
       return {
         key,
-        ...(newest.moonId !== undefined ? { moonId: newest.moonId } : {}),
+        ...(moonOf.has(newest.structureId) ? { moonId: moonOf.get(newest.structureId) } : {}),
         structureId: newest.structureId,
         ...(extractionId !== undefined ? { extractionId } : {}),
         days: rows.length,

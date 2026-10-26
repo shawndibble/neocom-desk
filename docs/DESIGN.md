@@ -1260,6 +1260,14 @@ Rows:
   under the Ring names the colours, since touch has no hover. A tile that
   holds no state (an empty slot, a cargo item) may keep its hover border.
 
+### Load more
+
+A list that pages shows its newest ten rows, then a full-width ghost `Button size="sm"` in the foot of its panel: "Load older {noun} ({n} more)". Each press adds ten more. Once everything is on screen after the reader asked for more, the foot becomes one quiet end line ("That is every {noun} there is.") and the button is gone; a list that fits its first page has neither. It is a button, not a link: it changes this page, it goes nowhere. Mail's "Load more" is the older precedent. The Corp Tax Book's `BookSection` is the shared shape.
+
+### Entity chip
+
+A bordered accent link to another entity's page, for a place where a bare name would be lost: a moon inside a list or a header, a Miner on a moon's summary. Same cue as an entity name (accent, underline on hover and focus, a real `<a href>`), so it is a link, never a button. **Not in a table row**: a table cell uses the plain `entityLinkClassName` text link (a column is all links or none), and a row that opens in place keeps its entity links in the opened detail. Where a link opens a small panel of the entity's parts (the Miner page's "3 characters" link opening a popover), it is the same text link; the owner chose that over the popover cue's field chrome with a trailing `CaretDown`.
+
 ### Transient messages
 
 A write the app makes on the pilot's behalf (Continue the session's automatic mode, a Survey connection assigning moon ore) announces itself with the same Undo `Toast`, naming what it did. A confirmation that offers Undo or another action is a `Toast` with `onClose` and stays until dismissed — close button, Escape, the next toast, or a route change — because a timer can remove the button while it has focus (WCAG 2.2.1). A plain note ("Copied") expires on its own and pauses while hovered or focused.
