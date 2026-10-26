@@ -156,3 +156,39 @@ export function wakeCutoffMs(
   }
   return cutoff;
 }
+
+/** An idle grant (nobody live wants anything it covers) is looked at again after this many runs. */
+export const IDLE_RECHECK_RUNS = 12;
+
+/** Once a day, on this run of the day (`floor(now / POLL_RUN_MS) % RUNS_PER_DAY`), every active grant is listed. */
+export const RUNS_PER_DAY = 96;
+export const FULL_LISTING_RUN = 12;
+
+/** True on the one run a day that lists every active grant, to find any with no `nextPollAt`. */
+export function isFullListingRun(nowMs: number): boolean {
+  return Math.floor(nowMs / POLL_RUN_MS) % RUNS_PER_DAY === FULL_LISTING_RUN;
+}
+
+/**
+ * When a grant should next be listed (issue #5236), given what this run knows
+ * of it. Run-slot aligned, so a slow-cadence device's hourly turn
+ * (`deviceCadence`) is never missed by a few seconds of jitter. An idle grant
+ * waits `IDLE_RECHECK_RUNS`, rounded up to an hourly slot. Otherwise the first
+ * of the next few runs at which the plan would poll.
+ */
+export function nextPollAtMs(
+  grant: Pick<AlertGrantDoc, 'scopes' | 'seenTypes'>,
+  devices: readonly WantingDevice[],
+  nowMs: number
+): number {
+  const slot = Math.floor(nowMs / POLL_RUN_MS);
+  if (planGrant(grant, devices, nowMs).action === 'idle') {
+    const wake = slot + IDLE_RECHECK_RUNS;
+    return Math.ceil(wake / SLEEPING_POLL_EVERY_RUNS) * SLEEPING_POLL_EVERY_RUNS * POLL_RUN_MS;
+  }
+  for (let k = 1; k < SLEEPING_POLL_EVERY_RUNS; k++) {
+    const at = (slot + k) * POLL_RUN_MS;
+    if (planGrant(grant, devices, at).action === 'poll') return at;
+  }
+  return (slot + SLEEPING_POLL_EVERY_RUNS) * POLL_RUN_MS;
+}

@@ -1,13 +1,14 @@
 // Firestore side of the Alerts Grant (issue #3753, ADR 0020): `alertGrants/{characterId}`,
 // function-only (firestore.rules denies every client). Logic lives in alertGrant.ts.
 
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import {
   SsoRefreshError,
   type AlertGrantDoc,
   type AlertGrantStore,
   type RefreshedTokens,
 } from './alertGrant.js';
+import { isFullListingRun } from './pollerEfficiency.js';
 import { rotateStoredToken, decryptRefreshToken } from './alertGrantCrypto.js';
 import {
   DEVICE_REGISTRATIONS_COLLECTION,
@@ -23,6 +24,9 @@ import {
 import type { RunStats } from './runStats.js';
 
 export const ALERT_GRANTS_COLLECTION = 'alertGrants';
+
+/** Grants per page of the due listing (issue #5236). */
+export const DUE_PAGE_SIZE = 300;
 
 /** Firestore side of the poller (issue #3756): see `PollerStore` for the contract. */
 export function firestorePollerStore(
@@ -63,18 +67,51 @@ export function firestorePollerStore(
   // SSO, so that refresh fails and every write stays guarded on the old blob.
   const listed = new Map<number, AlertGrantDoc>();
   return {
-    async listActive() {
-      const snap = await grants.where('status', '==', 'active').get();
-      stats?.add('firestoreReads', Math.max(1, snap.docs.length));
+    // Pages of the grants due now (`nextPollAt <= now`, index status + nextPollAt).
+    // A grant with no `nextPollAt` never matches that, so once a day every active
+    // grant is read, the missing ones are treated as due and stamped `0`: a grant
+    // saved before the field, or by a function version without it, is never lost.
+    async listDue(nowMs) {
       const active: ListedGrant[] = [];
-      for (const d of snap.docs) {
+      const take = (d: QueryDocumentSnapshot) => {
         const id = Number(d.id);
-        if (!Number.isSafeInteger(id)) continue;
+        if (!Number.isSafeInteger(id)) return;
         const grant = d.data() as AlertGrantDoc;
         listed.set(id, grant);
         active.push({ characterId: id, grant });
+      };
+      if (isFullListingRun(nowMs)) {
+        const snap = await grants.where('status', '==', 'active').get();
+        stats?.add('firestoreReads', Math.max(1, snap.docs.length));
+        for (const d of snap.docs) {
+          const next = (d.data() as AlertGrantDoc).nextPollAt;
+          if (typeof next === 'number' && next > nowMs) continue;
+          take(d);
+          if (typeof next !== 'number') {
+            await d.ref.update({ nextPollAt: 0 });
+            stats?.add('firestoreWrites');
+          }
+        }
+        return active;
       }
-      return active;
+      const due = grants
+        .where('status', '==', 'active')
+        .where('nextPollAt', '<=', nowMs)
+        .orderBy('nextPollAt')
+        .limit(DUE_PAGE_SIZE);
+      let after: QueryDocumentSnapshot | undefined;
+      for (;;) {
+        const snap = await (after ? due.startAfter(after) : due).get();
+        stats?.add('firestoreReads', Math.max(1, snap.docs.length));
+        snap.docs.forEach(take);
+        if (snap.docs.length < DUE_PAGE_SIZE) return active;
+        after = snap.docs[snap.docs.length - 1];
+      }
+    },
+
+    async deferNextPoll(characterId, atMs) {
+      await ref(characterId).update({ nextPollAt: atMs });
+      stats?.add('firestoreWrites');
     },
 
     // SSO rotates the token, so the SSO call must not run inside a retryable

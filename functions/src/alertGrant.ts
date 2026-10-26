@@ -77,6 +77,13 @@ export interface AlertGrantDoc {
    * device's registration instead of replaying what passed meanwhile.
    */
   notificationsIdle?: boolean;
+  /**
+   * When the poller next looks at this grant (issue #5236), epoch ms. The poller
+   * lists only grants whose value is `<=` now, so one it can already tell has
+   * nothing to do is not read every run. `0` is due now. Absent on a grant
+   * saved before this field: the poller's daily full listing finds those.
+   */
+  nextPollAt?: number;
 }
 
 export interface AlertGrantStore {
@@ -177,6 +184,7 @@ export async function saveAlertGrant(
     seenTypes: previousActive?.seenTypes ?? [],
     status: 'active',
     scopes,
+    nextPollAt: 0,
     // A re-grant keeps the idle mark with the stale high-water mark it guards.
     ...(previousActive?.notificationsIdle ? { notificationsIdle: true } : {}),
     ...(withMail
