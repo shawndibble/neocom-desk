@@ -23,6 +23,7 @@ import {
   activityFeed,
   daysByPhase,
   minerMoons,
+  statementAdjustment,
   moonByStructure,
   paymentLedger,
   type ActivityKind,
@@ -62,7 +63,7 @@ type Payment = Detail['payments'][number];
 type PaymentRow = LedgerRow<Payment, Adjustment>;
 
 /**
- * A Miner's page (#4056 step 4, sections #5247): the owed figure and its facts first, then one
+ * A Miner's page: the owed figure and its facts first, then one
  * scroll of Next Statement, Still accruing, Earlier days, Payments (corrections are a kind of
  * row in it), Moons and Activity (mail, dismissals and the audit log behind filter chips).
  * No inner tabs; each section carries its count and pages its newest ten rows.
@@ -251,9 +252,9 @@ export function MinerDetail({ id }: { id: string }) {
   ];
 
   const dismissSelected =
-    canEdit && selected.size > 0 ? (
+    canEdit && selectedDays.length > 0 ? (
       <Button size="sm" onClick={() => setDialog({ kind: 'dismiss' })}>
-        {t('corpTaxBook.moons.miner.dismissSelected', { count: selected.size })}
+        {t('corpTaxBook.moons.miner.dismissSelected', { count: selectedDays.length })}
       </Button>
     ) : undefined;
 
@@ -262,32 +263,38 @@ export function MinerDetail({ id }: { id: string }) {
     key: 'nextStatement' | 'stillAccruing' | 'earlier',
     hint: string,
     opts: { select: boolean; status: boolean; startOpen: boolean }
-  ) => (
-    <BookSection
-      title={title}
-      noun={noun('days')}
-      rows={phases[key]}
-      meta={<span className="text-xs text-text-dim">{hint}</span>}
-      actions={opts.select ? dismissSelected : undefined}
-      phone={phone}
-      startOpen={opts.startOpen}
-      summary={t('corpTaxBook.moons.miner.daysSummary', {
-        count: phases[key].length,
-        tax: isk(sumTax(phases[key])),
-      })}
-    >
-      {(shown) => (
-        <DataTable
-          label={title}
-          columns={dayColumns(opts.select, opts.status)}
-          rows={[...shown]}
-          rowKey={(d) => d.key}
-          density="compact"
-          stackLayout="dense"
-        />
-      )}
-    </BookSection>
-  );
+  ) => {
+    const columns = dayColumns(opts.select, opts.status);
+    const adjust = key === 'nextStatement' ? statementAdjustment(phases.nextStatement, row) : 0;
+    return (
+      <BookSection
+        title={title}
+        noun={noun('days')}
+        rows={phases[key]}
+        sortColumns={columns}
+        meta={<span className="text-xs text-text-dim">{hint}</span>}
+        actions={opts.select ? dismissSelected : undefined}
+        phone={phone}
+        startOpen={opts.startOpen}
+        summary={t('corpTaxBook.moons.miner.daysSummary', {
+          count: phases[key].length,
+          tax: isk(sumTax(phases[key]) + adjust),
+        })}
+      >
+        {(shown, table) => (
+          <DataTable
+            label={title}
+            columns={columns}
+            rows={[...shown]}
+            rowKey={(d) => d.key}
+            density="compact"
+            stackLayout="dense"
+            {...table}
+          />
+        )}
+      </BookSection>
+    );
+  };
 
   const paymentColumns: DataTableColumn<PaymentRow>[] = [
     {
@@ -568,6 +575,7 @@ export function MinerDetail({ id }: { id: string }) {
         title={t('corpTaxBook.moons.miner.moons')}
         noun={noun('moons')}
         rows={moons}
+        sortColumns={moonColumns}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.moonsHint')}</span>
         }
@@ -579,8 +587,9 @@ export function MinerDetail({ id }: { id: string }) {
           )
           .join(' · ')}
       >
-        {(shown) => (
+        {(shown, table) => (
           <DataTable
+            {...table}
             label={t('corpTaxBook.moons.miner.moons')}
             columns={moonColumns}
             rows={[...shown]}

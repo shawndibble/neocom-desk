@@ -12,7 +12,7 @@ import { tabBarTabs } from '@/lib/pageTabs';
 import { useTranslation } from 'react-i18next';
 
 /**
- * The Corp Tax Book's section pages (#5247) on a sample book the real engine built: the
+ * The Corp Tax Book's section pages on a sample book the real engine built: the
  * Overview, the Miners list (a row opened in place) and the Miner and moon pages, each at
  * desktop and phone width. The components are the route's own.
  */

@@ -29,7 +29,7 @@ import { BookSection, EntityHeader } from './sectionParts';
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 /**
- * A moon's page (#4056 step 2, sections #5247): this extraction's header, then one scroll of
+ * A moon's page: this extraction's header, then one scroll of
  * who mined it (a row opens in place to that Miner's ore lines) and earlier cycles.
  */
 export function MoonDetail({ id }: { id: string }) {
@@ -234,6 +234,7 @@ export function MoonDetail({ id }: { id: string }) {
         title={t('corpTaxBook.moons.moon.whoMined')}
         noun={t('corpTaxBook.moons.sections.nouns.miners')}
         rows={miners}
+        sortColumns={minerColumns}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.moon.minersHint')}</span>
         }
@@ -243,8 +244,9 @@ export function MoonDetail({ id }: { id: string }) {
           tax: isk(row.tax),
         })}
       >
-        {(shown) => (
+        {(shown, table) => (
           <DataTable
+            {...table}
             label={t('corpTaxBook.moons.moon.whoMined')}
             columns={minerColumns}
             rows={[...shown]}

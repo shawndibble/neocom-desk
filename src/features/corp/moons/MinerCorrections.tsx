@@ -17,7 +17,7 @@ import { useBook } from './useBook';
 /**
  * A Miner's corrections (D31, D22, issue #4194): a per-record rate, a correction line for the
  * next Statement, and Rebill from date. Each is a logged officer action. They live in the
- * Payments section's ⋮ (#5247); the correction lines already given are rows of its ledger.
+ * Payments section's ⋮; the correction lines already given are rows of its ledger.
  */
 export function CorrectionsMenu({
   miner,

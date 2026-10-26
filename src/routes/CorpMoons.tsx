@@ -165,8 +165,8 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
         </>
       )}
-      {detail?.kind === 'extraction' && <MoonDetail id={detail.id} />}
-      {detail?.kind === 'miner' && <MinerDetail id={detail.id} />}
+      {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+      {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
       {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
       {view && settingsOpen && (
         <BookSettingsDialog

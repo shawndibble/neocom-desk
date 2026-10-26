@@ -11,7 +11,7 @@ import { extractionPath } from './moonsPaths';
 import { PlaceCell } from './sectionParts';
 
 /**
- * The book at a glance (#5247): the totals, what needs an officer, and the moons that can be
+ * The book at a glance: the totals, what needs an officer, and the moons that can be
  * mined now or soon. Fractured first (mineable, field going), then Ready (mineable now), then
  * Extracting moons whose chunk arrives within a week. Every Extraction, a month long at most,
  * stays on the Extractions tab.

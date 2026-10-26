@@ -22,8 +22,8 @@ interface StoredGrouping {
 /**
  * A Miner's characters (D18, issue #4194): who gets the mail, who is waiting
  * for their own confirmation, and the officer's group / unlink actions. On the
- * Miner's page it is the "3 characters" link in the header, opening a popover
- * (#5247): the link is the owner's call, where §6c's popover cue is field chrome.
+ * Miner's page it is the "3 characters" link in the header, opening a popover:
+ * the link is the owner's call, where §6c's popover cue is field chrome.
  */
 export function MinerCharacters({ miner }: { miner: MinerRow }) {
   const { t } = useTranslation();

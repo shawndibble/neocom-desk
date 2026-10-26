@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildBookView,
   extractionDetail,
+  planStatementRun,
+  statementForLine,
   type BookViewInput,
   type DayRow,
   type ExtractionRow,
@@ -9,6 +11,7 @@ import {
 import {
   activityFeed,
   daysByPhase,
+  statementAdjustment,
   minerMoons,
   minersOnMoon,
   moonByStructure,
@@ -86,9 +89,9 @@ describe('moonSchedule', () => {
     expect(s.pops.map((r) => r.id)).toEqual(['soon', 'edge']);
   });
 
-  it('keeps an extracting row whose arrival has already passed', () => {
+  it('leaves an extracting row whose arrival has already passed out of Pops', () => {
     const s = moonSchedule([row('late', { chunkArrivalAt: '2026-10-19T00:00:00Z' })], now);
-    expect(s.pops.map((r) => r.id)).toEqual(['late']);
+    expect(s.pops).toEqual([]);
   });
 });
 
@@ -134,6 +137,30 @@ describe('oreTaxLines', () => {
     });
     const lines = oreTaxLines([d]);
     expect(lines.find((l) => l.typeId === VELDSPAR)!.tax).toBeCloseTo(30, 6);
+  });
+});
+
+describe('oreTaxLines edge cases', () => {
+  it('keeps the tax of a day with no ore lines as one other line', () => {
+    const lines = oreTaxLines([day({ key: 'a', oreLines: [], tax: 40, estimatedValue: 400 })]);
+    expect(lines).toEqual([{ typeId: 0, quantity: 0, value: 400, tax: 40 }]);
+  });
+
+  it('adds up to the days exactly when a day splits unevenly', () => {
+    const d = day({
+      key: 'a',
+      oreLines: [
+        { typeId: VELDSPAR, quantity: 1 },
+        { typeId: SCORDITE, quantity: 1 },
+        { typeId: 1224, quantity: 1 },
+      ],
+      unitPrices: { [VELDSPAR]: 1, [SCORDITE]: 1, 1224: 1 },
+      estimatedValue: 100,
+      tax: 10,
+    });
+    const lines = oreTaxLines([d, { ...d, key: 'b' }, { ...d, key: 'c' }]);
+    expect(lines.reduce((s, l) => s + l.tax, 0)).toBe(30);
+    expect(lines.reduce((s, l) => s + l.value, 0)).toBe(300);
   });
 });
 
@@ -294,5 +321,83 @@ describe('per Miner and moon ore lines (against the book view)', () => {
     expect(moons).toHaveLength(1);
     expect(moons[0]).toMatchObject({ moonId: 7, extractionId: extraction.id, days: 1 });
     expect(moons[0].lines.map((l) => l.typeId).sort()).toEqual([ORE, ORE + 1]);
+  });
+});
+
+describe('day phases against the Miner row figures', () => {
+  const ORE = 45490;
+  const base: BookViewInput = {
+    corporationId: CORP,
+    now: '2026-09-16T14:00:00Z',
+    startDate: '2026-08-01',
+    graceHours: 6,
+    minimumStatement: 0,
+    overdueDays: 14,
+    cadence: { kind: 'monthly' },
+    hubId: 'jita',
+    oreForm: 'compressed',
+    structureExpiryHours: {},
+    lastSyncedAt: '2026-09-16T12:00:00Z',
+    rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
+    entries: ['2026-09-10', '2026-09-11', '2026-09-16', '2026-09-17'].map((date) => ({
+      characterId: 1,
+      recordedCorporationId: CORP,
+      structureId: 1001,
+      date,
+      oreLines: [{ typeId: ORE, quantity: 100 }],
+    })),
+    miners: [],
+    statements: [],
+    payments: [],
+    dismissals: [],
+    declarations: [],
+    adjustments: [
+      {
+        id: 'adj1',
+        minerId: 'solo:1',
+        date: '2026-09-10',
+        amount: 25,
+        reason: 'fix',
+        by: 1,
+        at: '2026-09-16T13:00:00Z',
+      },
+    ],
+    extractions: [],
+    paidStatementIds: new Set(),
+    pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
+  };
+  const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
+
+  it('the phase sums match the row figures, correction lines included', () => {
+    const view = buildBookView(base);
+    const row = view.miners.find((m) => m.id === 'solo:1')!;
+    const phases = daysByPhase(view.internals.byMiner.get('solo:1')!.days);
+    expect(phases.stillAccruing.length).toBeGreaterThan(0);
+    expect(sumTax(phases.stillAccruing)).toBeCloseTo(row.pending, 6);
+    const lines = view.internals.byMiner.get('solo:1')!.draft;
+    const correction =
+      lines.kind === 'nothing' ? 0 : lines.lines.filter((l) => !l.chargeKey).length;
+    expect(correction).toBeGreaterThan(0);
+    expect(
+      sumTax(phases.nextStatement) + statementAdjustment(phases.nextStatement, row)
+    ).toBeCloseTo(row.unbilled, 6);
+    expect(statementAdjustment(phases.nextStatement, row)).toBeCloseTo(25, 6);
+  });
+
+  it('the phase sums match the row figures when ore arrives late for a billed day', () => {
+    const solo = { ...base, adjustments: [], entries: [base.entries[0]] };
+    const first = buildBookView(solo);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-09-15' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    const grown = buildBookView({
+      ...solo,
+      statements: [statement],
+      entries: [{ ...base.entries[0], oreLines: [{ typeId: ORE, quantity: 150 }] }],
+    });
+    const row = grown.miners.find((m) => m.id === 'solo:1')!;
+    const phases = daysByPhase(grown.internals.byMiner.get('solo:1')!.days);
+    expect(row.unbilled).toBeGreaterThan(0);
+    // The day lists its full tax; the Statement bills only the growth.
+    expect(statementAdjustment(phases.nextStatement, row)).toBeCloseTo(-10_000, 6);
   });
 });

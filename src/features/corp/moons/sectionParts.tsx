@@ -1,13 +1,19 @@
 /**
- * The pieces the Corp Tax Book's entity pages are stacked from (#5247): a header
+ * The pieces the Corp Tax Book's entity pages are stacked from: a header
  * with the big number first, sections with a count in the title, a link to
  * another entity, and the place line. They compose `Panel`, `CollapsiblePanel`,
  * `Button` and the link classes; nothing here is a new primitive.
  */
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, CollapsiblePanel } from '@/components/ui';
+import {
+  Button,
+  CollapsiblePanel,
+  sortRows,
+  type DataTableColumn,
+  type DataTableSort,
+} from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { focusRingClassName } from '@/components/ui/controlStyles';
@@ -22,7 +28,7 @@ export function EntityChip({ to, children }: { to: string; children: ReactNode }
       to={to}
       className={cx(
         'inline-flex max-w-full items-center rounded-xs border border-line px-1.5 py-0.5 text-xs text-accent',
-        'hover:underline',
+        'hover:underline focus-visible:underline',
         focusRingClassName
       )}
     >
@@ -123,6 +129,7 @@ export function BookSection<T>({
   phone,
   startOpen = true,
   summary,
+  sortColumns,
   children,
 }: {
   title: string;
@@ -139,12 +146,23 @@ export function BookSection<T>({
   startOpen?: boolean;
   /** One line shown while folded on a phone. */
   summary?: ReactNode;
-  /** The newest rows, to print. */
-  children: (shown: readonly T[]) => ReactNode;
+  /** Columns whose `sortValue` orders the whole list before it is paged. */
+  sortColumns?: readonly DataTableColumn<T>[];
+  /** The rows to print, plus the sort props to hand the table. */
+  children: (
+    shown: readonly T[],
+    table: { sort: DataTableSort | null; onSortChange: (sort: DataTableSort) => void }
+  ) => ReactNode;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(startOpen);
-  const paged = usePaged(rows);
+  const [sort, setSort] = useState<DataTableSort | null>(null);
+  // Sorting only the loaded page would miss the older rows, so order everything, then page.
+  const sorted = useMemo(() => {
+    const column = sortColumns?.find((c) => c.id === sort?.columnId);
+    return sort && column ? sortRows(rows, column, sort.direction) : rows;
+  }, [rows, sortColumns, sort]);
+  const paged = usePaged(sorted);
   return (
     <CollapsiblePanel
       title={`${title} · ${count}`}
@@ -173,7 +191,7 @@ export function BookSection<T>({
           {t('corpTaxBook.moons.sections.none', { noun })}
         </p>
       ) : (
-        children(paged.rows)
+        children(paged.rows, { sort, onSortChange: setSort })
       )}
       {paged.remaining > 0 && (
         <div className="border-t border-line p-2">

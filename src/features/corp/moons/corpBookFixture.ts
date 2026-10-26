@@ -1,5 +1,5 @@
 /**
- * Sample Corp Tax Book for the section pages' stories (#5247): a view built by the real engine
+ * Sample Corp Tax Book for the section pages' stories: a view built by the real engine
  * (`buildBookView`) from invented entries and handed to the real tabs and pages through
  * `BookProvider`, so the stories are the shipped components.
  */

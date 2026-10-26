@@ -16007,6 +16007,7 @@
         "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
         "hidden_other": "{{count}} other Miners owe nothing and have no credit.",
         "accruing": "{{amount}} still accruing",
+        "statementAdjust": "Corrections and late ore: {{amount}}",
         "lastPayments": "Last payments",
         "moreDays_one": "and {{count}} more day",
         "moreDays_other": "and {{count}} more days",
@@ -16937,6 +16938,7 @@
         "none": "No {{noun}}.",
         "loadOlder": "Load older {{noun}} ({{count}} more)",
         "end": "That is every {{noun}} there is.",
+        "otherOre": "Other",
         "total": "Total",
         "nouns": {
           "days": "days",

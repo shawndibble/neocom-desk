@@ -1,13 +1,14 @@
 /**
- * The Miners table's row menu (right-click, touch-and-hold, ⋮): Record payment, Dismiss tax
- * and Mark not tax, the three actions a Miner's row earns beyond opening it (#5247). Open page
- * is the opened row's link, so it is not repeated here; Send reminder lives on the Miner's
- * page header. Officers only: without edit rights the row has no actions, so no menu.
+ * The Miners table's row menu (right-click, touch-and-hold, ⋮): Show info for the main
+ * character, then Record payment, Dismiss tax and Mark not tax. Open page is the opened row's
+ * link, so it is not repeated here; Send reminder lives on the Miner's page header. Officers
+ * only: without edit rights the row has no actions, so no menu.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
+import { EntityShowInfoMenuItem } from '../corpRowMenus';
 import { useBook } from './useBook';
 
 export function MinerRowMenu({
@@ -44,6 +45,7 @@ export function MinerRowMenu({
       onOpenChange={onOpenChange}
       items={
         <>
+          <EntityShowInfoMenuItem entity={{ kind: 'character', id: miner.mainCharacterId }} />
           <MenuItem onSelect={() => onRecord(miner)}>
             {t('corpTaxBook.moons.miner.record')}
           </MenuItem>

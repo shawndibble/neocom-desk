@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import type { OreTaxLine } from '@/engine/corpTaxBook/bookSections';
+import { OTHER_ORE_TYPE_ID, type OreTaxLine } from '@/engine/corpTaxBook/bookSections';
 import { formatCount } from '@/lib/formatCount';
 import { isk } from './moonsFormat';
 import { useBook } from './useBook';
@@ -40,7 +40,11 @@ export function OreLinesTable({
         <tbody>
           {lines.map((l) => (
             <tr key={l.typeId}>
-              <td className="py-0.5 pr-2 font-sans">{names.ore(l.typeId)}</td>
+              <td className="py-0.5 pr-2 font-sans">
+                {l.typeId === OTHER_ORE_TYPE_ID
+                  ? t('corpTaxBook.moons.sections.otherOre')
+                  : names.ore(l.typeId)}
+              </td>
               <td className="py-0.5 text-right">{formatCount(l.quantity)}</td>
               <td className="py-0.5 text-right">{isk(l.value)}</td>
               <td className="py-0.5 text-right">{isk(l.tax)}</td>

@@ -53,7 +53,7 @@ type Open =
   | { kind: 'writeOff'; item: Extract<NeedsYouItem, { kind: 'leaver' }>; miner: MinerRow }
   | null;
 
-/** #4056 step 3's "Needs you": the few things only an officer can answer, now a panel of the Overview (#5247). */
+/** "Needs you": the few things only an officer can answer, a panel of the Overview. */
 export function NeedsYouQueue() {
   const { t } = useTranslation();
   const ctx = useBook();
