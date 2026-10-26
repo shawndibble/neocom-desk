@@ -37,7 +37,12 @@ vi.mock('./requestStore', () => ({
   },
 }));
 
-import { BOARD_MAX_AGE_MS, clearBoardCache, loadBoard } from './boardCache';
+import {
+  BOARD_MAX_AGE_MS,
+  REQUEST_DELTA_MARGIN_MS,
+  clearBoardCache,
+  loadBoard,
+} from './boardCache';
 
 const request = (id: string, createdAt: number, lastActivityAt = createdAt): CommunityRequest => ({
   id,
@@ -87,6 +92,7 @@ describe('loadBoard', () => {
   });
 
   it('merges a delta read from the watermark when the stamp moved', async () => {
+    store.whole = [request('a', 100), request('b', 200, 300 + REQUEST_DELTA_MARGIN_MS)];
     await loadBoard(1, 'c1', 0);
     store.calls = [];
     store.version = { stamp: 2, reset: 0 };

@@ -18,6 +18,12 @@ import {
   loadRequestsActiveSince,
 } from './requestStore';
 
+/**
+ * A callable stamps `lastActivityAt` when it starts, not when it commits, so a retried one can land
+ * behind a newer mark. The Request delta reads this far back from the mark (a re-read is a no-op).
+ */
+export const REQUEST_DELTA_MARGIN_MS = 60 * 1000;
+
 /** Backstop for a deletion made without a stamp (an older callable, a failed stamp write). */
 export const BOARD_MAX_AGE_MS = 15 * 60 * 1000;
 
@@ -92,7 +98,11 @@ export async function loadBoard(
     }
     try {
       const [changedRequests, changedPledges] = await Promise.all([
-        loadRequestsActiveSince(characterId, communityId, requestMark(held.requests)),
+        loadRequestsActiveSince(
+          characterId,
+          communityId,
+          Math.max(0, requestMark(held.requests) - REQUEST_DELTA_MARGIN_MS)
+        ),
         loadCommunityPledgesSince(characterId, communityId, pledgeMark(held.pledges)),
       ]);
       const requests = new Map(held.requests);

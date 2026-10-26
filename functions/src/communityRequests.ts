@@ -38,7 +38,7 @@ export const PLEDGES_COLLECTION = 'pledges';
  * server timestamps. Every write to a Community's Requests or Pledges sets `stamp`; one that deletes a Request or
  * a Pledge also sets `reset`, so a reader holding a cached board knows a delta cannot show the
  * deletion and re-reads it whole. Members read it under firestore.rules and Pledgers write it
- * beside their Pledge (see src/features/communities/boardVersion.ts).
+ * beside their Pledge (see bumpBoardVersion in src/features/communities/requestStore.ts).
  */
 export const BOARD_VERSION_COLLECTION = 'boardVersion';
 export const BOARD_VERSION_DOC = 'current';

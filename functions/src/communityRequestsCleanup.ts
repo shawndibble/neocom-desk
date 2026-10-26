@@ -93,12 +93,14 @@ export async function sweepRequests(
         try {
           await db.recursiveDelete(fresh.ref);
           result.deleted += 1;
-          await boardVersionRef(db, candidate.ref.path.split('/')[1]).set(boardVersionBump(true), {
-            merge: true,
-          });
         } catch {
           result.failed += 1;
+          continue;
         }
+        // The delete stands even if the stamp fails; a cached board then ages out on its own.
+        await boardVersionRef(db, candidate.ref.path.split('/')[1])
+          .set(boardVersionBump(true), { merge: true })
+          .catch(() => undefined);
       }
     }
   }
