@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import { isConnectionLive, type SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -74,8 +75,11 @@ export function AutoAssignmentBar({
             <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
               {t('miningTax.surveyConnections.title')}
             </span>
-            <span className="min-w-0 flex-1 truncate text-text-dim" title={detail}>
-              {detail}
+            {/* Cut short on a phone: the full line is a tap away. */}
+            <span className="min-w-0 flex-1 truncate text-text-dim">
+              <HintText content={detail} onlyWhenTruncated>
+                {detail}
+              </HintText>
             </span>
             <Button size="sm" className="shrink-0" onClick={() => stop(c)}>
               {t('survey.moonTax.stop')}
