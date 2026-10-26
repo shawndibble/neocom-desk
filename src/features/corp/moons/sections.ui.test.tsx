@@ -50,6 +50,24 @@ describe('Miner page', () => {
       expect(screen.getByText(title)).toBeInTheDocument();
   });
 
+  it("opens the Statement panel from a payment's Credited to link and from an Earlier day", async () => {
+    renderBook(<MinerDetail id={VARRO_ID} />);
+    const payments = screen.getByRole('table', { name: 'Payments' });
+    await userEvent.click(
+      within(payments).getAllByRole('button', { name: /^Open the .* Statement$/ })[0]
+    );
+    const panel = await screen.findByRole('dialog');
+    expect(within(panel).getByText('Remaining')).toBeInTheDocument();
+    expect(within(panel).queryByRole('link', { name: 'Open Miner page' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const earlier = screen.getByRole('table', { name: 'Earlier days' });
+    await userEvent.click(
+      within(earlier).getAllByRole('button', { name: /^Open the .* Statement$/ })[0]
+    );
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
   it('keeps the characters panel reachable from the header', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     await userEvent.click(screen.getByRole('button', { name: '2 characters' }));

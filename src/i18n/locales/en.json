@@ -15883,6 +15883,8 @@
         "correctionCharge": "Charge by {{name}}",
         "correctsDay": "Next Statement, for {{date}}",
         "billedOn": "On the {{period}} Statement, for {{date}}",
+        "openStatement": "Open the {{period}} Statement",
+        "moreStatements": "+{{count}} more",
         "markNotTaxNone": "No payment to mark",
         "markNotTaxTarget": "Payment of {{date}}, {{amount}}"
       },

@@ -80,9 +80,12 @@ function CopyVerifyLink({ statementId }: { statementId: string }) {
 export function StatementPanel({
   statementId,
   onClose,
+  showMinerLink = true,
 }: {
   statementId: string;
   onClose: () => void;
+  /** False on the Miner's own page, where the link would lead back to it. */
+  showMinerLink?: boolean;
 }) {
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
@@ -153,9 +156,11 @@ export function StatementPanel({
         <StatementPayments payments={detail.payments} />
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {canEdit && <CopyVerifyLink statementId={statement.id} />}
-          <Link to={minerPath(statement.minerId)} className={textActionClassName()}>
-            {t(k('openMiner'))}
-          </Link>
+          {showMinerLink && (
+            <Link to={minerPath(statement.minerId)} className={textActionClassName()}>
+              {t(k('openMiner'))}
+            </Link>
+          )}
         </p>
       </div>
     </SlideOver>
