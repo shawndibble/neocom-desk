@@ -11,6 +11,7 @@
 // only to that device's token. Rows are built from device-local preferences,
 // so one device's Projection says nothing about what another device wants.
 
+import { createHash } from 'node:crypto';
 import {
   FieldValue,
   type DocumentReference,
@@ -40,6 +41,14 @@ export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
  * legacy (deviceId-less) rows to sweep — see `writeDeviceRegistration`.
  */
 export const PER_DEVICE_MARKER = 'perDeviceProjections';
+
+/**
+ * Registration-doc map (characterId → hash) of the rows each Character's last
+ * fully committed upload carried. An upload whose rows hash the same is
+ * already stored, so it reads no `projections` docs at all (issue #5238).
+ * Not in `REGISTRATION_FIELDS`: it is written only after every batch commits.
+ */
+export const PROJECTION_HASHES_FIELD = 'projectionHashes';
 
 /** Firestore's cap on writes in one batch. */
 const MAX_BATCH_OPS = 500;
@@ -135,13 +144,24 @@ function sameRow(a: object, b: object): boolean {
   return Object.keys(left).length === keys.length && keys.every((k) => left[k] === right[k]);
 }
 
+/** Order-independent digest of one Character's uploaded rows. */
+function hashRows(rows: CharacterProjection['rows']): string {
+  const canonical = [...rows]
+    .sort((a, b) =>
+      a.occurrenceKey < b.occurrenceKey ? -1 : a.occurrenceKey > b.occurrenceKey ? 1 : 0
+    )
+    .map((r) => [r.eventId, r.occurrenceKey, r.fireAt, r.title, r.body, r.eveType ?? null]);
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
 /**
  * Write one device's registration and sync its Projection, per Character:
  *
  * - this device's unfired rows for that Character are diffed against the
  *   upload: only new or changed rows are written, only rows no longer present
  *   are deleted, identical rows are untouched — other devices' rows and every
- *   fired row are left alone;
+ *   fired row are left alone; a Character whose rows hash the same as its last
+ *   committed upload (`PROJECTION_HASHES_FIELD`) is not read or diffed at all;
  * - this device's unfired rows for a Character it held last time but no
  *   longer does are deleted (roster drift);
  * - on a device's first per-device upload, each held Character's legacy
@@ -188,6 +208,8 @@ export async function writeDeviceRegistration(
         return value === undefined ? [] : [[String(id), value]];
       })
     );
+  const previousHashes = mapField<string>(previous?.[PROJECTION_HASHES_FIELD]);
+  const hashes: Record<string, string> = {};
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
   // Once per Character per device: on the device's first per-device upload,
   // and again for any Character it adds later, which may still carry another
@@ -256,6 +278,11 @@ export async function writeDeviceRegistration(
 
   await Promise.all([
     ...write.projections.map(async ({ characterId, rows }) => {
+      const hash = hashRows(rows);
+      hashes[String(characterId)] = hash;
+      // Same rows as the last committed upload and no legacy sweep due: every
+      // row is already stored, so skip the reads.
+      if (!sweepLegacy(characterId) && previousHashes[String(characterId)] === hash) return;
       const own = await ownUnfired(characterId);
       const legacy = sweepLegacy(characterId) ? await legacyUnfired(characterId) : [];
       const existing = new Map(own.map((doc) => [doc.id, doc.data()]));
@@ -296,7 +323,12 @@ export async function writeDeviceRegistration(
     }),
   ]);
 
-  await registrationRef.update({ [PER_DEVICE_MARKER]: true });
+  // A held Character this upload did not carry (an older client) keeps its hash.
+  for (const id of write.characterIds) {
+    const kept = previousHashes[String(id)];
+    if (!(String(id) in hashes) && kept !== undefined) hashes[String(id)] = kept;
+  }
+  await registrationRef.update({ [PER_DEVICE_MARKER]: true, [PROJECTION_HASHES_FIELD]: hashes });
 }
 
 interface Registration {

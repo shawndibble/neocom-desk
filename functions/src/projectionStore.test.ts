@@ -242,6 +242,47 @@ describe('writeDeviceRegistration', () => {
     expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
   });
 
+  it('reads no projection docs for a repeat upload with no changes (issue #5238)', async () => {
+    const db = new FakeFirestore();
+    const rows = [row('industryJobComplete'), row('skillTrainingComplete')];
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+    db.queryGets = [];
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [...rows].reverse() }]);
+
+    expect(db.queryGets).toEqual([]);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+  });
+
+  it('diffs again once an upload adds, changes or removes a row', async () => {
+    const db = new FakeFirestore();
+    const a = row('industryJobComplete');
+    const b = row('skillTrainingComplete');
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a, b] }]);
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a, b, row('eveNotification')] }]);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(3);
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a, { ...b, title: 'new' }] }]);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+    expect(db.get('projections', projectionDocId('A', b.occurrenceKey))?.title).toBe('new');
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a] }]);
+    expect(unfiredRowsOf(db, 'A')).toEqual([projectionDocId('A', a.occurrenceKey)]);
+  });
+
+  it('does not record the hash when a batch failed, so the retry still writes', async () => {
+    const db = new FakeFirestore();
+    const rows = [row('industryJobComplete')];
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    db.failCommits = 1;
+    await expect(upload(db, 'A', [{ characterId: CHAR, rows }])).rejects.toThrow();
+
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(1);
+  });
+
   it('writes only changed and added rows and deletes only removed ones', async () => {
     const db = new FakeFirestore();
     const same = row('industryJobComplete');
