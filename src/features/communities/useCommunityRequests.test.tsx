@@ -5,6 +5,9 @@ const store = vi.hoisted(() => ({
   loadRequests: vi.fn(),
   loadCommunityPledges: vi.fn(),
   loadPledges: vi.fn(),
+  loadBoardVersion: vi.fn(),
+  loadRequestsActiveSince: vi.fn(),
+  loadCommunityPledgesSince: vi.fn(),
 }));
 vi.mock('./requestStore', () => store);
 
@@ -15,6 +18,8 @@ const request = { id: 'r1' };
 beforeEach(() => {
   vi.resetAllMocks();
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  // No version: these tests read the whole board each time (the cache has its own tests).
+  store.loadBoardVersion.mockResolvedValue(null);
   store.loadRequests.mockResolvedValue([request]);
   store.loadCommunityPledges.mockResolvedValue(new Map());
 });

@@ -4,7 +4,8 @@ import {
   type PledgesByRequest,
   type RequestPledge,
 } from '@/engine/communities/requests';
-import { loadCommunityPledges, loadPledges, loadRequests } from './requestStore';
+import { loadBoard } from './boardCache';
+import { loadPledges } from './requestStore';
 
 const NO_PLEDGES: PledgesByRequest = new Map();
 
@@ -27,16 +28,8 @@ export function useCommunityRequests(characterId: number, communityId: string, e
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    // Together, not one after the other. A failed Pledge read must not hide the
-    // board, nor pass for "no Pledges".
-    Promise.all([
-      loadRequests(characterId, communityId),
-      loadCommunityPledges(characterId, communityId).catch((err) => {
-        console.warn('Community Pledges could not be read', err);
-        return null;
-      }),
-    ]).then(
-      ([loaded, found]) => {
+    loadBoard(characterId, communityId).then(
+      ({ requests: loaded, pledges: found }) => {
         if (cancelled) return;
         setRequests(loaded);
         const board = `${characterId}:${communityId}`;
