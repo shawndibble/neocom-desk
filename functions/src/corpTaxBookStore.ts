@@ -688,6 +688,7 @@ async function planMiner(
 async function recordedOutside(c: EditCtx, characterId: number): Promise<boolean> {
   const rows = col(c, OBSERVED).where('characterId', '==', characterId);
   try {
+    // `!=` skips a row with no recordedCorporationId; the sync always writes one.
     const hit = await c.tx.get(rows.where('recordedCorporationId', '!=', c.corporationId).limit(1));
     return !hit.empty;
   } catch (e) {

@@ -183,7 +183,7 @@ export async function readFeederRows(
     .get();
   const rows = scan.docs.map((d) => d.data() as ObservedRow);
   try {
-    await backfill(db, mirror, feeder, rows);
+    await backfill(db, book, mirror, feeder, rows);
   } catch (e) {
     // The next read tries again; this one already has its rows.
     console.error('feeder rollup not backfilled', e instanceof Error ? e.message : e);
@@ -193,6 +193,7 @@ export async function readFeederRows(
 
 async function backfill(
   db: Firestore,
+  book: DocumentReference,
   mirror: FirebaseFirestore.CollectionReference,
   feeder: number,
   rows: readonly ObservedRow[]
@@ -207,16 +208,37 @@ async function backfill(
     const part = ids.slice(i, i + BACKFILL_CHUNK);
     await db.runTransaction(async (tx) => {
       const snaps = await tx.getAll(...part.map((id) => mirror.doc(id)));
+      // The scan is older than this transaction: a row may have left the feeder since, and its
+      // line was deleted from the mirror, so a missing line is only added back if the stored
+      // row still belongs to the feeder (and the line takes that row's current value).
+      const current = new Map<string, ObservedRow>();
+      const wanted = part.flatMap((id) => byDoc.get(id) ?? []);
+      const stored = await tx.getAll(
+        ...wanted.map((r) =>
+          book
+            .collection(OBSERVED_COLLECTION)
+            .doc(`${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`)
+        )
+      );
+      stored.forEach((d) => {
+        if (d.exists && d.get('sourceCorporationId') === feeder) {
+          current.set(d.id, d.data() as ObservedRow);
+        }
+      });
       snaps.forEach((snap, n) => {
-        const mine = byDoc.get(part[n]) ?? [];
+        const mine = (byDoc.get(part[n]) ?? []).flatMap((r) => {
+          const row = current.get(`${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`);
+          return row ? [row] : [];
+        });
         const add = missingLines(snap.get('lines') as Record<string, unknown> | undefined, mine);
-        if (Object.keys(add).length === 0 && snap.exists) return;
+        if (Object.keys(add).length === 0) return;
+        const first = byDoc.get(part[n])![0];
         tx.set(
           snap.ref,
           {
             feederCorporationId: feeder,
-            structureId: mine[0].structureId,
-            date: mine[0].date,
+            structureId: first.structureId,
+            date: first.date,
             lines: add,
           },
           { merge: true }

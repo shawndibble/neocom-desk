@@ -849,6 +849,12 @@
           "queryScope": "COLLECTION_GROUP"
         }
       ]
+    },
+    {
+      "collectionGroup": "feederObserved",
+      "fieldPath": "lines",
+      "ttl": false,
+      "indexes": []
     }
   ]
 }
