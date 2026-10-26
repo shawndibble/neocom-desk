@@ -41,6 +41,7 @@ import {
 import { useRowStartPlan } from './rowStartPlan';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { MarketWideDayRow, MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideScan } from './useMarketWideScan';
 import { MarketWideShowMore } from './MarketWideShowMore';
@@ -66,8 +67,19 @@ interface MarketWideOpportunitiesPanelProps {
   modifiers: CharacterModifiers;
   /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
   activeCharacterId: number | null;
-  /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
-  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  /**
+   * Resolves true once it has opened the new plan (see `StartPlanButton`).
+   * `research` is the ME/TE the row was priced at: the plan starts there, so
+   * its figures are the row's.
+   */
+  onStartPlan: (
+    entry: BlueprintCatalogEntry,
+    research?: { me: number; te: number }
+  ) => Promise<boolean>;
+  /** The active Character's blueprints and the assumed ME/TE: what rows are priced at. */
+  ownedBlueprints: readonly CharacterBlueprint[];
+  assumedMe: number;
+  assumedTe: number;
   /**
    * The pilot owns blueprints, so Ranked builds is the panel they came for and
    * this one starts folded to its header. Their own choice wins once made.
@@ -86,6 +98,9 @@ export function MarketWideOpportunitiesPanel({
   modifiers,
   activeCharacterId,
   onStartPlan,
+  ownedBlueprints,
+  assumedMe,
+  assumedTe,
   startFolded = false,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
@@ -102,6 +117,10 @@ export function MarketWideOpportunitiesPanel({
   const characterNames = useCharacterNames();
   const characterIds = useMemo(() => [...characterNames.keys()], [characterNames]);
   const { filter, setFilter } = useMarketWideFilter();
+  const research = useMemo(
+    () => ({ owned: ownedBlueprints, assumedMe, assumedTe }),
+    [ownedBlueprints, assumedMe, assumedTe]
+  );
   const {
     rows,
     loading,
@@ -122,6 +141,7 @@ export function MarketWideOpportunitiesPanel({
     modifiers,
     standing,
     characterIds,
+    research,
     filter,
     setFilter,
     online,
@@ -151,7 +171,7 @@ export function MarketWideOpportunitiesPanel({
 
   const startPlanFor = (row: MarketWideResultRow) => {
     const entry = catalog?.byProductTypeID.get(row.productTypeID);
-    return entry ? onStartPlan(entry) : Promise.resolve(false);
+    return entry ? onStartPlan(entry, { me: row.me, te: row.te }) : Promise.resolve(false);
   };
 
   const startPlanFromRow = useRowStartPlan(startPlanFor);

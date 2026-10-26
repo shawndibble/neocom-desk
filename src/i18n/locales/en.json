@@ -3781,7 +3781,7 @@
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
     "marketOpportunitiesTitle": "What's profitable",
-    "marketOpportunitiesLiquidityTooltip": "Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category. A sell price far above what the item actually trades for is treated as a troll order and replaced by that average.",
+    "marketOpportunitiesLiquidityTooltip": "Only products you can actually build are scanned: the blueprint is one your characters own, or one you can buy from the NPC market, a public contract, or an LP store you hold points with. Of those, only products with enough sell-order value at the hub to matter count, and only the top few per Market Group category. A sell price far above what the item actually trades for is treated as a troll order and replaced by that average. Each row is priced at the ME/TE a plan opened from it starts at: your owned copy's, else your assumed ME/TE. Sub-builds are folded into the product, so a plan can still differ slightly.",
     "marketOpportunitiesRunScan": "Scan",
     "marketOpportunitiesScanning": "Scanning…",
     "marketOpportunitiesEmptyTitle": "Nothing scanned yet",

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
 import { formatDuration } from '@/lib/duration';
@@ -116,7 +117,8 @@ const catalog = {
 function renderPanel(
   actions = fakeItemActions(),
   initialEntries = ['/'],
-  onStartPlan: () => Promise<boolean> = () => Promise.resolve(false),
+  onStartPlan: ComponentProps<typeof MarketWideOpportunitiesPanel>['onStartPlan'] = () =>
+    Promise.resolve(false),
   extra: {
     catalog?: BlueprintCatalog;
     startFolded?: boolean;
@@ -137,6 +139,9 @@ function renderPanel(
           modifiers={{} as CharacterModifiers}
           activeCharacterId={null}
           onStartPlan={onStartPlan}
+          ownedBlueprints={[]}
+          assumedMe={0}
+          assumedTe={0}
           startFolded={extra.startFolded}
         />,
         actions
@@ -173,6 +178,15 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     expect(beta).toHaveAttribute('tabindex', '0');
     fireEvent.click(screen.getByText('Widget Beta'));
     expect(onStartPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the plan at the ME/TE the row was priced at', () => {
+    hookState.rows = [row(200, 'Widget Beta', { me: 10, te: 20 })];
+    const onStartPlan = vi.fn(() => Promise.resolve(false));
+    renderPanel(fakeItemActions(), ['/'], onStartPlan);
+    fireEvent.click(screen.getByText('Widget Beta'));
+    expect(onStartPlan).toHaveBeenCalledWith(expect.anything(), { me: 10, te: 20 });
+    hookState.rows = null;
   });
 
   it('carries the same row menu as Ranked builds, Price history included', async () => {

@@ -24,6 +24,7 @@ import type { MarketWideTreeEntry } from '@/sde/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { brokerFee, salesTax } from './fees';
 import { jobFee } from './jobCost';
+import { materialModifier } from './materials';
 import {
   rankOpportunities,
   type OrderDepthThresholds,
@@ -130,22 +131,32 @@ export interface MarketWideCandidate {
    * multi-tier product's sub-jobs.
    */
   blueprintSkills?: readonly BlueprintSkillRequirement[];
+  /**
+   * The ME/TE this candidate is priced at (issue #5232): the one a plan opened
+   * from its row starts at — the owned copy's, else the assumed value. Absent
+   * reads as 0.
+   */
+  me?: number;
+  te?: number;
 }
 
 export interface MarketWideRow extends RankedOpportunity {
   productTypeID: number;
   /** profit ÷ revenue × 100, on the same net profit `iskPerHour` uses; null when revenue is 0 (unknown, never 0%). */
   marginPct: number | null;
-  /** The whole flattened tree's skill-adjusted job time at TE 0 — the duration `iskPerHour` divides by, not a wall-clock promise. */
+  /** The whole flattened tree's skill- and TE-adjusted job time — the duration `iskPerHour` divides by, not a wall-clock promise. */
   seconds: number;
   /** Net profit per unit sold (profit ÷ `outputQuantity`) — ISK/day's per-unit margin. */
   unitMargin: number;
   /** Units one build yields. */
   outputQuantity: number;
+  /** The ME/TE the row is priced at, seeded into the plan a click opens. */
+  me: number;
+  te: number;
 }
 
 /**
- * Prices every candidate from its flattened tree, at ME 0, against a
+ * Prices every candidate from its flattened tree, at its own ME/TE, against a
  * materials price map — no `computeBuildPlan` call, per the ticket's
  * "precomputed, not resolved live" requirement. A candidate with any
  * unpriced material is excluded rather than shown at a guessed cost, the
@@ -176,9 +187,15 @@ export function computeMarketWideRows(
     outputQuantity: number;
     buildCost: number;
     sellDepthIsk: number;
+    me: number;
+    te: number;
   }[] = [];
   for (const candidate of candidates) {
     const { tree } = candidate;
+    const me = candidate.me ?? 0;
+    const te = candidate.te ?? 0;
+    // Fractional like the tree's own quantities: no per-job rounding on a flattened tree.
+    const materialModifierAtMe = materialModifier(me, NPC_STATION_CONTEXT);
     let materialCost = 0;
     let eiv = 0;
     let allPriced = true;
@@ -188,7 +205,8 @@ export function computeMarketWideRows(
         allPriced = false;
         break;
       }
-      materialCost += price * material.quantity;
+      materialCost += price * material.quantity * materialModifierAtMe;
+      // The estimated item value is ME-independent, so it stays on base quantities.
       eiv += material.quantity * (adjustedPrices[material.typeID] ?? 0);
     }
     if (!allPriced || tree.time <= 0) continue;
@@ -205,13 +223,13 @@ export function computeMarketWideRows(
       standing?.corpStanding
     );
     const profit = revenue - tax - broker - buildCost;
-    // TE0, 1 run: tree.time is already the per-candidate total (not per-run),
-    // and this scan has no owned plan to seed a non-zero TE assumption from
+    // 1 run: tree.time is already the per-candidate total (not per-run). The TE
+    // is the top blueprint's, applied to the whole tree like `blueprintSkills`
     // (docs/context/decisions/20260909-090113-assumed-te-seeds-a-plan-not-its-sub.md).
     const seconds = jobDurationSeconds(
       tree.time,
       1,
-      0,
+      te,
       modifiers,
       NPC_STATION_CONTEXT,
       candidate.blueprintSkills
@@ -227,13 +245,17 @@ export function computeMarketWideRows(
       outputQuantity: tree.outputQuantity,
       buildCost,
       sellDepthIsk: candidate.sellDepthIsk,
+      me,
+      te,
     });
   }
 
   const ranked = rankOpportunities(priced, thresholds);
   const byId = new Map(priced.map((p) => [p.id, p]));
   return ranked.map((r) => {
-    const { productTypeID, marginPct, seconds, unitMargin, outputQuantity } = byId.get(r.id)!;
-    return { ...r, productTypeID, marginPct, seconds, unitMargin, outputQuantity };
+    const { productTypeID, marginPct, seconds, unitMargin, outputQuantity, me, te } = byId.get(
+      r.id
+    )!;
+    return { ...r, productTypeID, marginPct, seconds, unitMargin, outputQuantity, me, te };
   });
 }
