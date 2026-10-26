@@ -109,7 +109,7 @@ describe('ExportBookSection', () => {
     await userEvent.click(button());
     const done = await screen.findByRole('status');
     expect(readBookData).toHaveBeenCalledWith(ME, CORP);
-    expect(readAudit).toHaveBeenCalledWith(ME, CORP, null);
+    expect(readAudit).toHaveBeenCalledWith(ME, CORP, 2000);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
     // 2 mining lines + 17 settings rows + 1 log entry.
     expect(done).toHaveTextContent(

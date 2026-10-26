@@ -1167,4 +1167,6 @@ export interface CorpBookObservedMetaRecord {
   checkedAt: number;
   fullAt: number;
   watermark: number | null;
+  /** The book's `createdAt` when read; another one means the book was recreated. */
+  bookCreatedAt?: number;
 }
