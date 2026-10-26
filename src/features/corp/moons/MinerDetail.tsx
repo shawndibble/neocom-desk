@@ -1,5 +1,6 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -7,27 +8,43 @@ import {
   Checkbox,
   DataTable,
   EmptyState,
+  FilterChip,
+  HeaderMoreMenu,
+  InfoTooltip,
+  MenuItem,
   PageHeader,
-  Panel,
-  StatChip,
-  StatChips,
   textActionClassName,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import {
+  activityFeed,
+  daysByPhase,
+  minerMoons,
+  paymentLedger,
+  type ActivityKind,
+  type LedgerRow,
+  type MinerMoon,
+} from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
+import type { Adjustment } from '@/engine/corpTaxBook/statements';
 import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
-import { AuditFeed } from './AuditFeed';
+import { AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
+import { extractionPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
-import { MinerCorrections } from './MinerCorrections';
+import { CorrectionsMenu } from './MinerCorrections';
+import { OreLinesTable } from './OreLinesTable';
+import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { useMinerReminder } from './statementMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
@@ -39,17 +56,26 @@ const STATUS_TONE: Record<DayStatus, string> = {
   'written-off': 'text-text-dim line-through decoration-text-faint',
 };
 
-type Payment = NonNullable<ReturnType<typeof minerDetail>>['payments'][number];
+type Detail = NonNullable<ReturnType<typeof minerDetail>>;
+type Payment = Detail['payments'][number];
+type PaymentRow = LedgerRow<Payment, Adjustment>;
 
-/** A Miner's page (#4056 step 4): days, payments, dismissals, mail and activity. */
+/**
+ * A Miner's page (#4056 step 4, sections #5247): the owed figure and its facts first, then one
+ * scroll of Next Statement, Still accruing, Earlier days, Payments (corrections are a kind of
+ * row in it), Moons and Activity (mail, dismissals and the audit log behind filter chips).
+ * No inner tabs; each section carries its count and pages its newest ten rows.
+ */
 export function MinerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const ctx = useBook();
-  const { view, names, edit, canEdit, corporationId } = ctx;
+  const { view, names, edit, canEdit, corporationId, data } = ctx;
+  const phone = useIsPhone();
   const detail = minerDetail(view, id);
   const audit = useBookAudit();
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [filter, setFilter] = useState<'all' | ActivityKind>('all');
   const [dialog, setDialog] = useState<
     | { kind: 'record' }
     | { kind: 'dismiss' }
@@ -76,6 +102,32 @@ export function MinerDetail({ id }: { id: string }) {
       }),
     [audit.entries, id, statementIds, paymentIds]
   );
+  const phases = useMemo(() => daysByPhase(detail?.days ?? []), [detail]);
+  const moons = useMemo(() => minerMoons(view, id), [view, id]);
+  const ledger = useMemo(
+    () =>
+      paymentLedger(
+        detail?.payments ?? [],
+        data.adjustments.filter((a) => a.minerId === id)
+      ),
+    [detail, data.adjustments, id]
+  );
+  const feed = useMemo(
+    () =>
+      activityFeed({
+        mail: queue
+          .filter((m) => statementIds.has(m.statementId))
+          .map((m) => ({ id: m.id, at: m.createdAt, mail: m })),
+        dismissed: (detail?.dismissals ?? []).map((d) => ({
+          id: d.id,
+          at: Date.parse(d.at),
+          dismissal: d,
+        })),
+        audit: minerAudit,
+      }),
+    [queue, statementIds, detail, minerAudit]
+  );
+  const shownFeed = feed.filter((f) => filter === 'all' || f.kind === filter);
 
   if (!detail) {
     return (
@@ -96,12 +148,15 @@ export function MinerDetail({ id }: { id: string }) {
     detail.toleranceWriteOffs.reduce((s, w) => s + w.amount, 0) +
     detail.officerWriteOffs.reduce((s, w) => s + w.amount, 0);
   const lateTotal = detail.lateWriteOffs.reduce((s, w) => s + w.tax, 0);
+  const paidTotal = detail.payments.reduce((s, p) => s + p.credited, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
+  const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
+  const noun = (key: string) => t(`corpTaxBook.moons.sections.nouns.${key}`);
 
-  const dayColumns: DataTableColumn<DayRow>[] = [
-    ...(canEdit
+  const dayColumns = (withSelect: boolean, withStatus: boolean): DataTableColumn<DayRow>[] => [
+    ...(withSelect && canEdit
       ? [
           {
             id: 'select',
@@ -135,19 +190,13 @@ export function MinerDetail({ id }: { id: string }) {
     {
       id: 'where',
       header: t('corpTaxBook.moons.cols.refinery'),
-      render: (d) => {
-        const refinery = names.refinery(d.structureId);
-        // Structure names usually already carry their moon ("Jita IV - Moon 2 - ...").
-        const moon = d.moonId === undefined ? '' : names.moon(d.moonId);
-        return (
-          <span className="block min-w-0">
-            {refinery}
-            {moon !== '' && !refinery.includes(moon) && (
-              <span className="block text-xs text-text-dim">{moon}</span>
-            )}
-          </span>
-        );
-      },
+      render: (d) => (
+        <PlaceCell
+          refinery={names.refinery(d.structureId)}
+          moon={d.moonId === undefined ? undefined : names.moon(d.moonId)}
+          to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
+        />
+      ),
     },
     {
       id: 'character',
@@ -182,31 +231,88 @@ export function MinerDetail({ id }: { id: string }) {
       render: (d) => isk(d.tax),
       sortValue: (d) => d.tax,
     },
-    {
-      id: 'status',
-      header: t('corpTaxBook.moons.cols.status'),
-      render: (d) => (
-        <span className={cx('text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
-          {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
-        </span>
-      ),
-    },
+    ...(withStatus
+      ? [
+          {
+            id: 'status',
+            header: t('corpTaxBook.moons.cols.status'),
+            render: (d: DayRow) => (
+              <span className={cx('text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
+                {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+              </span>
+            ),
+          } satisfies DataTableColumn<DayRow>,
+        ]
+      : []),
   ];
 
-  const paymentColumns: DataTableColumn<Payment>[] = [
-    { id: 'at', header: t('corpTaxBook.moons.cols.when'), render: (p) => shortDateTime(p.at) },
+  const dismissSelected =
+    canEdit && selected.size > 0 ? (
+      <Button size="sm" onClick={() => setDialog({ kind: 'dismiss' })}>
+        {t('corpTaxBook.moons.miner.dismissSelected', { count: selected.size })}
+      </Button>
+    ) : undefined;
+
+  const daysSection = (
+    title: string,
+    key: 'nextStatement' | 'stillAccruing' | 'earlier',
+    hint: string,
+    opts: { select: boolean; status: boolean; startOpen: boolean }
+  ) => (
+    <BookSection
+      title={title}
+      noun={noun('days')}
+      rows={phases[key]}
+      meta={<span className="text-xs text-text-dim">{hint}</span>}
+      actions={opts.select ? dismissSelected : undefined}
+      phone={phone}
+      startOpen={opts.startOpen}
+      summary={t('corpTaxBook.moons.miner.daysSummary', {
+        count: phases[key].length,
+        tax: isk(sumTax(phases[key])),
+      })}
+    >
+      {(shown) => (
+        <DataTable
+          label={title}
+          columns={dayColumns(opts.select, opts.status)}
+          rows={[...shown]}
+          rowKey={(d) => d.key}
+          density="compact"
+          stackLayout="dense"
+        />
+      )}
+    </BookSection>
+  );
+
+  const paymentColumns: DataTableColumn<PaymentRow>[] = [
+    {
+      id: 'at',
+      header: t('corpTaxBook.moons.cols.when'),
+      render: (r) => shortDateTime(r.at),
+    },
     {
       id: 'from',
       header: t('corpTaxBook.moons.cols.from'),
       primary: true,
-      render: (p) => (
-        <span>
-          {names.character(p.characterId)}
-          <span className="block text-xs text-text-dim">
-            {t(`corpTaxBook.moons.payment.${p.source}`)}
+      render: (r) =>
+        r.kind === 'payment' ? (
+          <span>
+            {names.character(r.payment.characterId)}
+            <span className="block text-xs text-text-dim">
+              {t(`corpTaxBook.moons.payment.${r.payment.source}`)}
+            </span>
           </span>
-        </span>
-      ),
+        ) : (
+          <span>
+            {r.correction.reason}
+            <span className="block text-xs text-text-dim">
+              {t('corpTaxBook.moons.payment.correction', {
+                name: names.character(r.correction.by),
+              })}
+            </span>
+          </span>
+        ),
     },
     {
       id: 'amount',
@@ -214,15 +320,26 @@ export function MinerDetail({ id }: { id: string }) {
       align: 'right',
       className: 'tabular-nums',
       cardCorner: true,
-      render: (p) => <span className="text-isk-pos">+{isk(p.amount)}</span>,
+      render: (r) =>
+        r.kind === 'payment' ? (
+          <span className="text-isk-pos">+{isk(r.payment.amount)}</span>
+        ) : (
+          <span className={r.correction.amount < 0 ? 'text-isk-pos' : undefined}>
+            {isk(r.correction.amount)}
+          </span>
+        ),
     },
     {
       id: 'credited',
       header: t('corpTaxBook.moons.cols.creditedTo'),
-      render: (p) =>
-        p.notTaxAmount ? (
+      render: (r) =>
+        r.kind === 'correction' ? (
+          <span className="text-xs text-text-dim">
+            {t('corpTaxBook.moons.payment.correctsDay', { date: shortDate(r.correction.date) })}
+          </span>
+        ) : r.payment.notTaxAmount ? (
           <span className="text-xs text-warning">
-            {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(p.notTaxAmount) })}
+            {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(r.payment.notTaxAmount) })}
           </span>
         ) : (
           <span className="text-xs text-text-dim">
@@ -236,22 +353,91 @@ export function MinerDetail({ id }: { id: string }) {
             id: 'actions',
             header: '',
             align: 'right',
-            render: (p: Payment) => (
-              <button
-                type="button"
-                className={textActionClassName('shrink-0')}
-                onClick={() => setDialog({ kind: 'notTax', payment: p })}
-              >
-                {t('corpTaxBook.moons.payment.markNotTax')}
-              </button>
-            ),
-          } satisfies DataTableColumn<Payment>,
+            render: (r: PaymentRow) =>
+              r.kind === 'payment' ? (
+                <button
+                  type="button"
+                  className={textActionClassName('shrink-0')}
+                  onClick={() => setDialog({ kind: 'notTax', payment: r.payment })}
+                >
+                  {t('corpTaxBook.moons.payment.markNotTax')}
+                </button>
+              ) : null,
+          } satisfies DataTableColumn<PaymentRow>,
         ]
       : []),
   ];
 
-  const miningMail = queue.filter((m) => statementIds.has(m.statementId));
-  const active = detail.dismissals;
+  const moonColumns: DataTableColumn<MinerMoon>[] = [
+    {
+      id: 'moon',
+      header: t('corpTaxBook.moons.cols.moon'),
+      primary: true,
+      render: (m) => (
+        <PlaceCell
+          refinery={names.refinery(m.structureId)}
+          moon={m.moonId === undefined ? undefined : names.moon(m.moonId)}
+        />
+      ),
+      sortValue: (m) => (m.moonId === undefined ? '' : names.moon(m.moonId)),
+    },
+    {
+      id: 'days',
+      header: t('corpTaxBook.moons.cols.days'),
+      align: 'right',
+      className: 'tabular-nums',
+      render: (m) => m.days,
+      sortValue: (m) => m.days,
+    },
+    {
+      id: 'last',
+      header: t('corpTaxBook.moons.cols.lastDay'),
+      render: (m) => shortDate(m.lastDate),
+      sortValue: (m) => m.lastDate,
+    },
+    {
+      id: 'tax',
+      header: t('corpTaxBook.moons.cols.tax'),
+      align: 'right',
+      className: 'tabular-nums',
+      cardCorner: true,
+      render: (m) => isk(m.tax),
+      sortValue: (m) => m.tax,
+    },
+  ];
+
+  const headerActions = canEdit ? (
+    <span className="flex items-center gap-1">
+      <Button onClick={() => setDialog({ kind: 'record' })}>
+        {t('corpTaxBook.moons.miner.record')}
+      </Button>
+      {reminder.block ? (
+        <Tooltip content={reminder.block}>
+          <Button variant="ghost" aria-disabled="true">
+            {t('corpTaxBook.moons.miner.remind')}
+          </Button>
+        </Tooltip>
+      ) : (
+        <Button variant="ghost" onClick={() => void reminder.send()}>
+          {t('corpTaxBook.moons.miner.remind')}
+        </Button>
+      )}
+      {row.standing === 'guest' && !closedAt ? (
+        <HeaderMoreMenu>
+          <MenuItem onSelect={() => setDialog({ kind: 'dismissAll' })}>
+            {t('corpTaxBook.moons.miner.dismissAll')}
+          </MenuItem>
+          <MenuItem onSelect={() => setDialog({ kind: 'close' })}>
+            {t('corpTaxBook.moons.miner.closeAccount')}
+          </MenuItem>
+        </HeaderMoreMenu>
+      ) : (
+        <Button variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
+          {t('corpTaxBook.moons.miner.dismissAll')}
+        </Button>
+      )}
+    </span>
+  ) : undefined;
 
   return (
     <div className="space-y-4">
@@ -261,39 +447,10 @@ export function MinerDetail({ id }: { id: string }) {
         meta={
           <span className="flex items-center gap-2 text-xs text-text-dim">
             <StandingWord standing={row.standing} />
-            {row.characterIds.length > 1 && (
-              <span>{row.characterIds.map(names.character).join(', ')}</span>
-            )}
+            <MinerCharacters miner={row} />
           </span>
         }
-        actions={
-          canEdit ? (
-            <span className="flex items-center gap-1">
-              <Button size="sm" onClick={() => setDialog({ kind: 'record' })}>
-                {t('corpTaxBook.moons.miner.record')}
-              </Button>
-              {reminder.block ? (
-                <Tooltip content={reminder.block}>
-                  <Button size="sm" variant="ghost" aria-disabled="true">
-                    {t('corpTaxBook.moons.miner.remind')}
-                  </Button>
-                </Tooltip>
-              ) : (
-                <Button size="sm" variant="ghost" onClick={() => void reminder.send()}>
-                  {t('corpTaxBook.moons.miner.remind')}
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
-                {t('corpTaxBook.moons.miner.dismissAll')}
-              </Button>
-              {row.standing === 'guest' && !closedAt && (
-                <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'close' })}>
-                  {t('corpTaxBook.moons.miner.closeAccount')}
-                </Button>
-              )}
-            </span>
-          ) : undefined
-        }
+        actions={headerActions}
       />
       {notice && (
         <p role="status" className="text-xs text-text-dim">
@@ -305,142 +462,225 @@ export function MinerDetail({ id }: { id: string }) {
           {t('corpTaxBook.moons.miner.closedNote', { date: shortDate(closedAt.slice(0, 10)) })}
         </p>
       )}
-      <StatChips>
-        <StatChip
-          label={t('corpTaxBook.moons.chips.owed')}
-          value={isk(row.owed)}
-          tone={row.owed ? 'danger' : 'default'}
-          emphasis
-        />
-        <StatChip
-          label={t('corpTaxBook.moons.cols.overdue')}
-          value={
-            row.overdueDays === null
-              ? '—'
-              : t('corpTaxBook.moons.overdueDays', { count: row.overdueDays })
-          }
-          tone={row.overdueDays === null ? 'default' : 'danger'}
-        />
-        <StatChip
-          label={t('corpTaxBook.moons.chips.unbilled')}
-          value={isk(row.unbilled)}
-          tooltip={t('corpTaxBook.moons.miner.unbilledTip', { pending: isk(row.pending) })}
-          tooltipGlyph="info"
-        />
-        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(row.credit)} />
-        <StatChip
-          label={t('corpTaxBook.moons.miner.writtenOff')}
-          value={t('corpTaxBook.moons.miner.writtenOffValue', {
-            tolerance: isk(toleranceTotal),
-            count: detail.lateWriteOffs.length,
-          })}
-          tooltip={t('corpTaxBook.moons.miner.writtenOffTip', { late: isk(lateTotal) })}
-          tooltipGlyph="info"
-        />
-      </StatChips>
-      <Panel
-        title={t('corpTaxBook.moons.miner.days')}
-        meta={
-          <span className="text-xs text-text-dim">
-            {t('corpTaxBook.moons.miner.daysHint', {
-              date: view.billableThrough ? shortDate(view.billableThrough) : '—',
-            })}
-          </span>
+      <EntityHeader
+        label={t('corpTaxBook.moons.chips.owed')}
+        value={isk(row.owed)}
+        tone={row.owed ? 'danger' : undefined}
+        note={
+          row.overdueDays === null
+            ? undefined
+            : t('corpTaxBook.moons.miner.overdueNote', { count: row.overdueDays })
         }
-        padded={false}
-        actions={
-          canEdit && selected.size > 0 ? (
-            <Button size="sm" onClick={() => setDialog({ kind: 'dismiss' })}>
-              {t('corpTaxBook.moons.miner.dismissSelected', { count: selected.size })}
-            </Button>
-          ) : undefined
-        }
-      >
-        <DataTable
-          label={t('corpTaxBook.moons.miner.days')}
-          columns={dayColumns}
-          rows={detail.days}
-          rowKey={(d) => d.key}
-          density="compact"
-          stackLayout="dense"
-        />
-      </Panel>
-      <MinerCorrections miner={row} days={detail.days} statements={detail.statements} />
-      <Panel
+        facts={[
+          { label: t('corpTaxBook.moons.miner.paid'), value: isk(paidTotal) },
+          { label: t('corpTaxBook.moons.chips.credit'), value: isk(row.credit) },
+          {
+            label: t('corpTaxBook.moons.chips.unbilled'),
+            value: (
+              <span className="inline-flex items-center gap-1">
+                {isk(row.unbilled)}
+                <InfoTooltip
+                  label={t('corpTaxBook.moons.chips.unbilled')}
+                  content={t('corpTaxBook.moons.miner.unbilledTip', { pending: isk(row.pending) })}
+                  glyph="info"
+                />
+              </span>
+            ),
+          },
+          { label: t('corpTaxBook.moons.chips.pending'), value: isk(row.pending) },
+          {
+            label: t('corpTaxBook.moons.miner.writtenOff'),
+            value: (
+              <span className="inline-flex items-center gap-1">
+                {t('corpTaxBook.moons.miner.writtenOffValue', {
+                  tolerance: isk(toleranceTotal),
+                  count: detail.lateWriteOffs.length,
+                })}
+                <InfoTooltip
+                  label={t('corpTaxBook.moons.miner.writtenOff')}
+                  content={t('corpTaxBook.moons.miner.writtenOffTip', { late: isk(lateTotal) })}
+                  glyph="info"
+                />
+              </span>
+            ),
+          },
+        ]}
+      />
+      {daysSection(
+        t('corpTaxBook.moons.sections.nextStatement'),
+        'nextStatement',
+        t('corpTaxBook.moons.miner.daysHint', {
+          date: view.billableThrough ? shortDate(view.billableThrough) : '—',
+        }),
+        { select: true, status: false, startOpen: true }
+      )}
+      {daysSection(
+        t('corpTaxBook.moons.sections.stillAccruing'),
+        'stillAccruing',
+        t('corpTaxBook.moons.miner.accruingHint'),
+        { select: true, status: false, startOpen: false }
+      )}
+      {daysSection(
+        t('corpTaxBook.moons.sections.earlierDays'),
+        'earlier',
+        t('corpTaxBook.moons.miner.earlierHint'),
+        { select: false, status: true, startOpen: false }
+      )}
+      <BookSection
         title={t('corpTaxBook.moons.miner.payments')}
+        noun={noun('payments')}
+        rows={ledger}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
         }
-        padded={false}
+        actions={<CorrectionsMenu miner={row} days={detail.days} statements={detail.statements} />}
+        phone={phone}
+        summary={t('corpTaxBook.moons.miner.paymentsSummary', {
+          count: ledger.length,
+          amount: isk(paidTotal),
+        })}
       >
-        <DataTable
-          label={t('corpTaxBook.moons.miner.payments')}
-          columns={paymentColumns}
-          rows={detail.payments}
-          rowKey={(p) => p.id}
-          density="compact"
-        />
-        <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
-          {t('corpTaxBook.moons.miner.sum', {
-            billed: isk(detail.statements.reduce((s, x) => s + x.amount, 0)),
-            written: isk(toleranceTotal),
-            owed: isk(row.owed),
-          })}
-        </p>
-      </Panel>
-      <MinerCharacters miner={row} />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Panel title={t('corpTaxBook.moons.miner.dismissals')}>
-          {active.length === 0 ? (
-            <p className="text-sm text-text-dim">{t('corpTaxBook.moons.miner.noDismissals')}</p>
-          ) : (
-            active.map((d) => (
-              <div key={d.id} className="flex items-start justify-between gap-3 text-sm">
-                <p>
-                  {t(`corpTaxBook.moons.miner.scope.${d.scope}`)}
-                  <span className="block text-xs text-text-dim">
-                    {names.character(d.by)}, {shortDate(d.at)} · “{d.reason}”
-                    {d.reversed && ` · ${t('corpTaxBook.moons.miner.reversed')}`}
-                  </span>
-                </p>
-                {canEdit && !d.reversed && (
-                  <button
-                    type="button"
-                    className={textActionClassName('shrink-0')}
-                    onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
-                  >
-                    {t('corpTaxBook.moons.miner.reverse')}
-                  </button>
-                )}
-              </div>
-            ))
-          )}
-        </Panel>
-        <Panel title={t('corpTaxBook.moons.miner.mail')}>
-          {miningMail.length === 0 ? (
-            <p className="text-sm text-text-dim">{t('corpTaxBook.moons.miner.noMail')}</p>
-          ) : (
-            <ul className="space-y-1 text-sm">
-              {miningMail.map((m) => (
-                <li key={m.id} className="flex justify-between gap-3">
-                  <span>{m.subject}</span>
-                  <span className="text-text-dim">
-                    {t(`corpTaxBook.mailQueue.status.${m.status}`, { defaultValue: m.status })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
-      <Panel
+        {(shown) => (
+          <>
+            <DataTable
+              label={t('corpTaxBook.moons.miner.payments')}
+              columns={paymentColumns}
+              rows={[...shown]}
+              rowKey={(r) => `${r.kind}-${r.id}`}
+              density="compact"
+              stackLayout="dense"
+            />
+            <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
+              {t('corpTaxBook.moons.miner.sum', {
+                billed: isk(detail.statements.reduce((s, x) => s + x.amount, 0)),
+                written: isk(toleranceTotal),
+                owed: isk(row.owed),
+              })}
+            </p>
+          </>
+        )}
+      </BookSection>
+      <BookSection
+        title={t('corpTaxBook.moons.miner.moons')}
+        noun={noun('moons')}
+        rows={moons}
+        meta={
+          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.moonsHint')}</span>
+        }
+        phone={phone}
+        startOpen={false}
+        summary={moons
+          .map((m) =>
+            m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId)
+          )
+          .join(' · ')}
+      >
+        {(shown) => (
+          <DataTable
+            label={t('corpTaxBook.moons.miner.moons')}
+            columns={moonColumns}
+            rows={[...shown]}
+            rowKey={(m) => m.key}
+            expandableRow={{
+              leadingIcon: true,
+              renderDetail: (m) => (
+                <OreLinesTable
+                  lines={m.lines}
+                  label={t('corpTaxBook.moons.miner.oreAt', {
+                    moon:
+                      m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId),
+                  })}
+                  foot={
+                    m.extractionId !== undefined && (
+                      <Link to={extractionPath(m.extractionId)} className={entityLinkClassName()}>
+                        {t('corpTaxBook.moons.miner.openMoon')}
+                      </Link>
+                    )
+                  }
+                />
+              ),
+            }}
+            density="compact"
+            stackLayout="dense"
+          />
+        )}
+      </BookSection>
+      <BookSection
         title={t('corpTaxBook.moons.miner.activity')}
+        noun={noun('activity')}
+        rows={shownFeed}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.activityHint')}</span>
         }
+        actions={
+          <span className="flex flex-wrap items-center gap-1">
+            {(['all', 'mail', 'dismissed', 'audit'] as const).map((f) => (
+              <FilterChip
+                key={f}
+                label={t(`corpTaxBook.moons.miner.filter.${f}`)}
+                selected={filter === f}
+                onToggle={() => setFilter(f)}
+                count={f === 'all' ? feed.length : feed.filter((x) => x.kind === f).length}
+              />
+            ))}
+          </span>
+        }
+        phone={phone}
+        startOpen={false}
+        summary={t('corpTaxBook.moons.miner.activitySummary', { count: feed.length })}
       >
-        <AuditFeed entries={minerAudit} />
-      </Panel>
+        {(shown) => (
+          <ul className="divide-y divide-line px-3 text-sm">
+            {shown.map((f) => {
+              if (f.kind === 'audit') return <AuditLine key={`a-${f.id}`} entry={f.item} />;
+              if (f.kind === 'mail') {
+                const m = f.item.mail;
+                return (
+                  <li
+                    key={`m-${f.id}`}
+                    className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5"
+                  >
+                    <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">
+                      {shortDateTime(new Date(f.at).toISOString())}
+                    </span>
+                    <span className="min-w-0 flex-1">{m.subject}</span>
+                    <span className="text-text-dim">
+                      {t(`corpTaxBook.mailQueue.status.${m.status}`, { defaultValue: m.status })}
+                    </span>
+                  </li>
+                );
+              }
+              const d = f.item.dismissal;
+              return (
+                <li
+                  key={`d-${f.id}`}
+                  className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5"
+                >
+                  <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">
+                    {shortDateTime(d.at)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {t(`corpTaxBook.moons.miner.scope.${d.scope}`)}
+                    <span className="block text-xs text-text-dim">
+                      {names.character(d.by)} · “{d.reason}”
+                      {d.reversed && ` · ${t('corpTaxBook.moons.miner.reversed')}`}
+                    </span>
+                  </span>
+                  {canEdit && !d.reversed && (
+                    <button
+                      type="button"
+                      className={textActionClassName('shrink-0')}
+                      onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
+                    >
+                      {t('corpTaxBook.moons.miner.reverse')}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </BookSection>
 
       {dialog?.kind === 'record' && (
         <RecordPaymentDialog

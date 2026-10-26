@@ -223,25 +223,23 @@ export function paymentLedger<
 
 export type ActivityKind = 'mail' | 'dismissed' | 'audit';
 
-export interface ActivityItem<T> {
-  kind: ActivityKind;
+export interface ActivityItem<K extends ActivityKind, T> {
+  kind: K;
   id: string;
   /** Epoch ms. */
   at: number;
   item: T;
 }
 
+type Timed = { id: string; at: number };
+
 /** A Miner's Activity: queued mail, dismissals and the audit log in one feed, newest first. */
-export function activityFeed<
-  M extends { id: string; at: number },
-  D extends { id: string; at: number },
-  A extends { id: string; at: number },
->(sources: {
+export function activityFeed<M extends Timed, D extends Timed, A extends Timed>(sources: {
   mail: readonly M[];
   dismissed: readonly D[];
   audit: readonly A[];
-}): (ActivityItem<M> | ActivityItem<D> | ActivityItem<A>)[] {
-  const rows: (ActivityItem<M> | ActivityItem<D> | ActivityItem<A>)[] = [
+}): (ActivityItem<'mail', M> | ActivityItem<'dismissed', D> | ActivityItem<'audit', A>)[] {
+  const rows = [
     ...sources.mail.map((item) => ({ kind: 'mail' as const, id: item.id, at: item.at, item })),
     ...sources.dismissed.map((item) => ({
       kind: 'dismissed' as const,

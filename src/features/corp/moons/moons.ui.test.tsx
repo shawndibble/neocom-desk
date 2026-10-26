@@ -135,18 +135,28 @@ describe('MinersTab', () => {
     expect(screen.getByText(/1 non-member hidden · .* owed/)).toBeInTheDocument();
   });
 
-  it('the row ⋮ offers the actions the Miner page holds; Send reminder says why it is inert', async () => {
+  it('the row ⋮ holds Record payment, Dismiss tax and Mark not tax; the last says why it is inert', async () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
     const menu = await screen.findByRole('menu');
-    for (const name of ['Record payment…', 'Dismiss tax…', 'Show info']) {
+    for (const name of ['Record payment…', 'Dismiss tax…']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
-    // No Statement issued in this book: the item stays, inert.
-    expect(within(menu).getByRole('menuitem', { name: 'Send reminder' })).toHaveAttribute(
+    // No payment in this book: the item stays, inert.
+    expect(within(menu).getByRole('menuitem', { name: 'Mark not tax…' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
+    expect(within(menu).queryByRole('menuitem', { name: 'Send reminder' })).not.toBeInTheDocument();
+  });
+
+  it('a row opens in place to its Statement days with one Open page link; the click does not navigate', async () => {
+    renderBook(<MinersTab />);
+    expect(screen.queryByRole('link', { name: 'Open page' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Pilot 1'));
+    const link = await screen.findByRole('link', { name: 'Open page' });
+    expect(link).toHaveAttribute('href', '/corp/moons/miners/solo%3A1');
+    expect(screen.getByText(/Next Statement · 1/)).toBeInTheDocument();
   });
 });
 

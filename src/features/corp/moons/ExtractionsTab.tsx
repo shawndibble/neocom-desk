@@ -11,6 +11,7 @@ import {
   useOpenAfterMenu,
   type DataTableColumn,
 } from '@/components/ui';
+import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
@@ -67,12 +68,17 @@ export function ExtractionsTab() {
       id: 'moon',
       header: t('corpTaxBook.moons.cols.moon'),
       primary: true,
-      render: (row) => (
-        <span className="block min-w-0">
-          <span className="text-accent">{names.refinery(row.structureId)}</span>
-          <span className="block text-xs text-text-dim">{names.moon(row.moonId)}</span>
-        </span>
-      ),
+      render: (row) => {
+        const place = splitPlace(names.refinery(row.structureId), names.moon(row.moonId));
+        return (
+          <span className="block min-w-0">
+            <span className="text-accent">{place.moon ?? place.station}</span>
+            {place.moon !== undefined && (
+              <span className="block text-xs text-text-dim">{place.station}</span>
+            )}
+          </span>
+        );
+      },
       sortValue: (row) => names.refinery(row.structureId),
     },
     {

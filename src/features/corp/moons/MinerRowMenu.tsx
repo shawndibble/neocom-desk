@@ -1,57 +1,42 @@
 /**
- * The Miners table's row menu (right-click, touch-and-hold, ⋮): the actions the
- * Miner's page header carries, reachable from the row. Open miner page is the
- * row click, so it is not repeated here. Officers only: without edit rights the
- * row has Show info alone, which is not worth a menu (DESIGN.md §6c).
+ * The Miners table's row menu (right-click, touch-and-hold, ⋮): Record payment, Dismiss tax
+ * and Mark not tax, the three actions a Miner's row earns beyond opening it (#5247). Open page
+ * is the opened row's link, so it is not repeated here; Send reminder lives on the Miner's
+ * page header. Officers only: without edit rights the row has no actions, so no menu.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import { EntityShowInfoMenuItem } from '../corpRowMenus';
 import { useBook } from './useBook';
-import { useMinerReminder } from './statementMailing';
-
-/** "Send reminder": the same mail the Miner's page queues; inert with its reason when it cannot go. */
-function RemindMenuItem({
-  minerId,
-  onNotice,
-}: {
-  minerId: string;
-  onNotice: (text: string) => void;
-}) {
-  const { t } = useTranslation();
-  const { block, send } = useMinerReminder(minerId, onNotice);
-  const label = t('corpTaxBook.moons.miner.remind');
-  return block ? (
-    <DisabledMenuItem reason={block}>{label}</DisabledMenuItem>
-  ) : (
-    <MenuItem onSelect={() => void send()}>{label}</MenuItem>
-  );
-}
 
 export function MinerRowMenu({
   miner,
   onRecord,
   onDismiss,
-  onNotice,
+  onNotTax,
   onCloseAutoFocus,
   onOpenChange,
   children,
 }: {
   miner: MinerRow;
-  /** Both open their dialog after the menu closes (`useOpenAfterMenu`'s `run`, bound by the caller). */
+  /** Each opens its dialog after the menu closes (`useOpenAfterMenu`'s `run`, bound by the caller). */
   onRecord: (miner: MinerRow) => void;
   onDismiss: (miner: MinerRow) => void;
-  onNotice: (text: string) => void;
+  /** Given the payment to mark: the Miner's latest one that still has tax in it. */
+  onNotTax: (miner: MinerRow, paymentId: string) => void;
   onCloseAutoFocus: (event: Event) => void;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }) {
   const { t } = useTranslation();
-  const { names, canEdit } = useBook();
+  const { view, names, canEdit } = useBook();
   if (!canEdit) return children;
   const name = names.character(miner.mainCharacterId);
+  const payment = view.internals.byMiner
+    .get(miner.id)
+    ?.payments.filter((p) => p.amount - (p.notTaxAmount ?? 0) > 0)
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
   return (
     <RowActionsMenu
       name={name}
@@ -62,11 +47,18 @@ export function MinerRowMenu({
           <MenuItem onSelect={() => onRecord(miner)}>
             {t('corpTaxBook.moons.miner.record')}
           </MenuItem>
-          <RemindMenuItem minerId={miner.id} onNotice={onNotice} />
           <MenuItem onSelect={() => onDismiss(miner)}>
             {t('corpTaxBook.moons.miner.dismissAll')}
           </MenuItem>
-          <EntityShowInfoMenuItem entity={{ kind: 'character', id: miner.mainCharacterId }} />
+          {payment ? (
+            <MenuItem onSelect={() => onNotTax(miner, payment.id)}>
+              {t('corpTaxBook.moons.payment.markNotTaxMenu')}
+            </MenuItem>
+          ) : (
+            <DisabledMenuItem reason={t('corpTaxBook.moons.payment.markNotTaxNone')}>
+              {t('corpTaxBook.moons.payment.markNotTaxMenu')}
+            </DisabledMenuItem>
+          )}
         </>
       }
     >

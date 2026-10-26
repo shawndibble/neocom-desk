@@ -48,6 +48,7 @@ import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
 import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
 import { MinerDetail } from '@/features/corp/moons/MinerDetail';
 import { MinersTab } from '@/features/corp/moons/MinersTab';
+import { OverviewTab } from '@/features/corp/moons/OverviewTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
@@ -157,6 +158,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             </p>
           )}
           <BookHealthStrip sync={sync} />
+          {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
           {tab === 'statements' && <StatementsTab />}

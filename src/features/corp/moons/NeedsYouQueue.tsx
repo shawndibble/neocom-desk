@@ -1,8 +1,7 @@
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Panel } from '@/components/ui';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import { cx } from '@/lib/cx';
 import { useBook } from './useBook';
@@ -28,20 +27,20 @@ function QueueCard({
   actions: ReactNode;
 }) {
   return (
-    <div
-      className={cx(
-        'space-y-2 rounded-xs border bg-panel p-3',
-        tone === 'danger'
-          ? 'border-danger/50'
-          : tone === 'warning'
-            ? 'border-warning/50'
-            : 'border-line'
-      )}
-    >
-      <p className="text-sm font-semibold">{title}</p>
-      <p className="text-xs text-text-dim">{body}</p>
-      <div className="flex flex-wrap gap-2">{actions}</div>
-    </div>
+    <li className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5">
+      <span
+        aria-hidden="true"
+        className={cx(
+          'mt-1 h-8 w-0.5 shrink-0',
+          tone === 'danger' ? 'bg-danger' : tone === 'warning' ? 'bg-warning' : 'bg-line'
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="block text-xs text-text-dim">{body}</span>
+      </span>
+      <span className="flex shrink-0 flex-wrap items-center gap-2">{actions}</span>
+    </li>
   );
 }
 
@@ -54,7 +53,7 @@ type Open =
   | { kind: 'writeOff'; item: Extract<NeedsYouItem, { kind: 'leaver' }>; miner: MinerRow }
   | null;
 
-/** #4056 step 3's "Needs you": the few things only an officer can answer, above the Miners table. */
+/** #4056 step 3's "Needs you": the few things only an officer can answer, now a panel of the Overview (#5247). */
 export function NeedsYouQueue() {
   const { t } = useTranslation();
   const ctx = useBook();
@@ -63,7 +62,6 @@ export function NeedsYouQueue() {
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const close = () => setOpen(null);
-  if (view.needsYou.length === 0) return null;
   const minerOf = (id: string) => view.miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
 
@@ -90,16 +88,19 @@ export function NeedsYouQueue() {
   };
 
   return (
-    <div className="space-y-2">
-      <p className={eyebrowClassName}>
-        {t('corpTaxBook.moons.needs.title', { count: view.needsYou.length })}
-      </p>
+    <Panel
+      title={t('corpTaxBook.moons.needs.title', { count: view.needsYou.length })}
+      padded={false}
+    >
       {notice && (
-        <p role="status" className="text-xs text-text-dim">
+        <p role="status" className="px-3 py-2 text-xs text-text-dim">
           {notice}
         </p>
       )}
-      <div className="grid gap-2 md:grid-cols-2">
+      {view.needsYou.length === 0 && (
+        <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
+      )}
+      <ul className="divide-y divide-line">
         {view.needsYou.map((item) => {
           switch (item.kind) {
             case 'declaration': {
@@ -234,7 +235,7 @@ export function NeedsYouQueue() {
             }
           }
         })}
-      </div>
+      </ul>
       {open?.kind === 'confirm' && (
         <RecordPaymentDialog
           open
@@ -334,6 +335,6 @@ export function NeedsYouQueue() {
           }}
         />
       )}
-    </div>
+    </Panel>
   );
 }

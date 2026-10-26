@@ -1,8 +1,7 @@
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatCount } from '@/lib/formatCount';
-import { useState } from 'react';
-import { caretColumn } from './caretColumn';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -14,24 +13,33 @@ import {
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { minersOnMoon, splitPlace, type MinerOnMoon } from '@/engine/corpTaxBook/bookSections';
 import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookView';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { isk, shortDateTime } from './moonsFormat';
-import { minerPath } from './moonsPaths';
+import { extractionPath as extractionLink, minerPath } from './moonsPaths';
 import { Crumb, Fact, MinedBar, OreLine, StateWord } from './moonsParts';
+import { OreLinesTable } from './OreLinesTable';
+import { BookSection, EntityHeader } from './sectionParts';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
-/** A moon's page (#4056 step 2): this extraction, who mined it, earlier cycles. */
+/**
+ * A moon's page (#4056 step 2, sections #5247): this extraction's header, then one scroll of
+ * who mined it (a row opens in place to that Miner's ore lines) and earlier cycles.
+ */
 export function MoonDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
-  const navigate = useNavigate();
+  const phone = useIsPhone();
   const [dismissing, setDismissing] = useState(false);
   const [linking, setLinking] = useState(false);
   const detail = extractionDetail(view, id);
+  const miners = useMemo(() => minersOnMoon(view, id), [view, id]);
   if (!detail) {
     return (
       <div className="space-y-4">
@@ -41,16 +49,21 @@ export function MoonDetail({ id }: { id: string }) {
     );
   }
   const { row } = detail;
-  const minerColumns: DataTableColumn<(typeof detail.miners)[number]>[] = [
+  const place = splitPlace(names.refinery(row.structureId), names.moon(row.moonId));
+  const mined = miners.reduce((s, m) => s + m.value, 0);
+  const left =
+    row.estimatedValue !== null && row.minedPct !== null
+      ? Math.round(row.estimatedValue * (1 - row.minedPct / 100))
+      : null;
+  const minerName = (m: MinerOnMoon) =>
+    names.character(view.miners.find((x) => x.id === m.minerId)?.mainCharacterId ?? 0);
+  const minerColumns: DataTableColumn<MinerOnMoon>[] = [
     {
       id: 'miner',
       header: t('corpTaxBook.moons.cols.miner'),
       primary: true,
-      render: (m) => (
-        <span className="text-accent">
-          {names.character(view.miners.find((x) => x.id === m.minerId)?.mainCharacterId ?? 0)}
-        </span>
-      ),
+      render: (m) => minerName(m),
+      sortValue: (m) => minerName(m),
     },
     {
       id: 'units',
@@ -58,6 +71,7 @@ export function MoonDetail({ id }: { id: string }) {
       align: 'right',
       className: 'tabular-nums',
       render: (m) => formatCount(m.units),
+      sortValue: (m) => m.units,
     },
     {
       id: 'value',
@@ -65,6 +79,7 @@ export function MoonDetail({ id }: { id: string }) {
       align: 'right',
       className: 'tabular-nums',
       render: (m) => isk(m.value),
+      sortValue: (m) => m.value,
     },
     {
       id: 'tax',
@@ -73,14 +88,18 @@ export function MoonDetail({ id }: { id: string }) {
       className: 'tabular-nums',
       cardCorner: true,
       render: (m) => isk(m.tax),
+      sortValue: (m) => m.tax,
     },
-    caretColumn<(typeof detail.miners)[number]>(),
   ];
   const cycleColumns: DataTableColumn<ExtractionRow>[] = [
     {
       id: 'fractured',
       header: t('corpTaxBook.moons.cols.fractured'),
-      render: (r) => (r.fracturedAt ? shortDateTime(r.fracturedAt) : '—'),
+      render: (r) => (
+        <Link to={extractionLink(r.id)} className={entityLinkClassName()}>
+          {r.fracturedAt ? shortDateTime(r.fracturedAt) : shortDateTime(r.chunkArrivalAt)}
+        </Link>
+      ),
     },
     {
       id: 'state',
@@ -106,6 +125,7 @@ export function MoonDetail({ id }: { id: string }) {
       header: t('corpTaxBook.moons.cols.taxRecorded'),
       align: 'right',
       className: 'tabular-nums',
+      cardCorner: true,
       render: (r) => isk(r.tax),
     },
     {
@@ -120,28 +140,53 @@ export function MoonDetail({ id }: { id: string }) {
     <div className="space-y-4">
       <Crumb to="/corp/moons/extractions" label={t('corpTaxBook.moons.tabs.extractions')} />
       <PageHeader
-        title={names.refinery(row.structureId)}
-        meta={<span className="text-xs text-text-dim">{names.moon(row.moonId)}</span>}
-      />
-      <Panel
-        title={t('corpTaxBook.moons.moon.thisExtraction')}
-        meta={<StateWord state={row.state} />}
+        title={place.moon ?? place.station}
+        meta={
+          <span className="flex items-center gap-2 text-xs text-text-dim">
+            <StateWord state={row.state} />
+            {place.moon !== undefined && place.station}
+          </span>
+        }
         actions={
           canEdit ? (
             row.tax > 0 ? (
-              <Button size="sm" onClick={() => setDismissing(true)}>
+              <Button onClick={() => setDismissing(true)}>
                 {t('corpTaxBook.moons.moon.dismiss')}
               </Button>
             ) : (
               <Tooltip content={t('corpTaxBook.moons.moon.dismissNone')}>
-                <Button size="sm" aria-disabled="true">
-                  {t('corpTaxBook.moons.moon.dismiss')}
-                </Button>
+                <Button aria-disabled="true">{t('corpTaxBook.moons.moon.dismiss')}</Button>
               </Tooltip>
             )
           ) : undefined
         }
-      >
+      />
+      <EntityHeader
+        label={t('corpTaxBook.moons.moon.taxSoFar')}
+        value={isk(row.tax)}
+        note={<OreLine row={row} {...(canEdit ? { onLink: () => setLinking(true) } : {})} />}
+        facts={[
+          {
+            label: t('corpTaxBook.moons.cols.mined'),
+            value: row.minedPct === null ? '—' : `${isk(mined)} · ${row.minedPct}%`,
+          },
+          {
+            label: t('corpTaxBook.moons.moon.leftToMine'),
+            value: left === null ? '—' : `${isk(left)} · ${100 - (row.minedPct ?? 0)}%`,
+          },
+          {
+            label: t('corpTaxBook.moons.moon.fractured'),
+            value: row.fracturedAt ? shortDateTime(row.fracturedAt) : '—',
+          },
+          {
+            label: t('corpTaxBook.moons.moon.fieldGone'),
+            value: row.expiresAt
+              ? t('corpTaxBook.moons.moon.about', { at: shortDateTime(row.expiresAt) })
+              : '—',
+          },
+        ]}
+      />
+      <Panel title={t('corpTaxBook.moons.moon.thisExtraction')}>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
           <Fact label={t('corpTaxBook.moons.moon.started')} value={shortDateTime(row.startedAt)} />
           <Fact
@@ -149,18 +194,13 @@ export function MoonDetail({ id }: { id: string }) {
             value={shortDateTime(row.chunkArrivalAt)}
           />
           <Fact
-            label={t('corpTaxBook.moons.moon.fractured')}
-            value={row.fracturedAt ? shortDateTime(row.fracturedAt) : '—'}
+            label={t('corpTaxBook.moons.cols.estValue')}
+            value={row.estimatedValue ? isk(row.estimatedValue) : '—'}
           />
           <Fact
-            label={t('corpTaxBook.moons.moon.fieldGone')}
-            value={
-              row.expiresAt
-                ? t('corpTaxBook.moons.moon.about', { at: shortDateTime(row.expiresAt) })
-                : '—'
-            }
+            label={t('corpTaxBook.moons.cols.mined')}
+            value={<MinedBar pct={row.minedPct} label={names.refinery(row.structureId)} />}
           />
-          <Fact label={t('corpTaxBook.moons.cols.ore')} value={<OreLine row={row} />} />
           <Fact
             label={t('corpTaxBook.moons.moon.oreFrom')}
             value={
@@ -188,48 +228,66 @@ export function MoonDetail({ id }: { id: string }) {
               </span>
             }
           />
-          <Fact
-            label={t('corpTaxBook.moons.cols.estValue')}
-            value={row.estimatedValue ? isk(row.estimatedValue) : '—'}
-          />
-          <Fact
-            label={t('corpTaxBook.moons.cols.mined')}
-            value={<MinedBar pct={row.minedPct} label={names.refinery(row.structureId)} />}
-          />
         </dl>
       </Panel>
-      <Panel title={t('corpTaxBook.moons.moon.whoMined')} padded={false}>
-        {detail.miners.length === 0 ? (
-          <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.moon.nobody')}</p>
-        ) : (
+      <BookSection
+        title={t('corpTaxBook.moons.moon.whoMined')}
+        noun={t('corpTaxBook.moons.sections.nouns.miners')}
+        rows={miners}
+        meta={
+          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.moon.minersHint')}</span>
+        }
+        phone={phone}
+        summary={t('corpTaxBook.moons.moon.minersSummary', {
+          count: miners.length,
+          tax: isk(row.tax),
+        })}
+      >
+        {(shown) => (
           <DataTable
             label={t('corpTaxBook.moons.moon.whoMined')}
             columns={minerColumns}
-            rows={detail.miners}
+            rows={[...shown]}
             rowKey={(m) => m.minerId}
-            onRowClick={(m) => navigate(minerPath(m.minerId))}
-            rowClassName={() => 'group'}
+            expandableRow={{
+              leadingIcon: true,
+              renderDetail: (m) => (
+                <OreLinesTable
+                  lines={m.lines}
+                  label={t('corpTaxBook.moons.moon.oreOf', { name: minerName(m) })}
+                  foot={
+                    <Link to={minerPath(m.minerId)} className={entityLinkClassName()}>
+                      {t('corpTaxBook.moons.moon.openMiner')}
+                    </Link>
+                  }
+                />
+              ),
+            }}
+            density="compact"
+            stackLayout="dense"
           />
         )}
-      </Panel>
-      <Panel
+      </BookSection>
+      <BookSection
         title={t('corpTaxBook.moons.moon.past')}
+        noun={t('corpTaxBook.moons.sections.nouns.cycles')}
+        rows={detail.past}
         meta={<span className="text-xs text-text-dim">{t('corpTaxBook.moons.moon.pastHint')}</span>}
-        padded={false}
+        phone={phone}
+        startOpen={false}
+        summary={t('corpTaxBook.moons.moon.pastSummary', { count: detail.past.length })}
       >
-        {detail.past.length === 0 ? (
-          <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.moon.noPast')}</p>
-        ) : (
+        {(shown) => (
           <DataTable
             label={t('corpTaxBook.moons.moon.past')}
             columns={cycleColumns}
-            rows={detail.past}
+            rows={[...shown]}
             rowKey={(r) => r.id}
             density="compact"
             stackColumns={2}
           />
         )}
-      </Panel>
+      </BookSection>
       {linking && <LinkSurveyDialog open onClose={() => setLinking(false)} extractionId={row.id} />}
       <ReasonDialog
         open={dismissing}

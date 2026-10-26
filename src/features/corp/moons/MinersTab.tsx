@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -15,13 +14,11 @@ import { minerDetail, type BookView, type MinerRow } from '@/engine/corpTaxBook/
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
-import { caretColumn } from './caretColumn';
 import { isk, shortDate } from './moonsFormat';
-import { minerPath } from './moonsPaths';
 import { OverdueWord, StandingWord } from './moonsParts';
-import { NeedsYouQueue } from './NeedsYouQueue';
+import { MinerExpandedRow } from './MinerExpandedRow';
 import { MinerRowMenu } from './MinerRowMenu';
-import { ReasonDialog, RecordPaymentDialog } from './BookDialogs';
+import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 
 const PARAMS = {
   q: textParam(),
@@ -35,20 +32,19 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 export function MinersTab() {
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
-  const [dialog, setDialog] = useState<{ kind: 'record' | 'dismiss'; miner: MinerRow } | null>(
-    null
-  );
-  const [notice, setNotice] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<
+    | { kind: 'record' | 'dismiss'; miner: MinerRow }
+    | { kind: 'notTax'; miner: MinerRow; paymentId: string }
+    | null
+  >(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
-  const navigate = useNavigate();
   const rowContextMenu = useCallback(
     (m: MinerRow, tr: ReactElement) => (
       <MinerRowMenu
         miner={m}
         onRecord={(miner) => run(() => setDialog({ kind: 'record', miner }))}
         onDismiss={(miner) => run(() => setDialog({ kind: 'dismiss', miner }))}
-        onNotice={setNotice}
-        onOpenChange={(open) => open && setNotice(null)}
+        onNotTax={(miner, paymentId) => run(() => setDialog({ kind: 'notTax', miner, paymentId }))}
         onCloseAutoFocus={onCloseAutoFocus}
       >
         {tr}
@@ -92,7 +88,7 @@ export function MinersTab() {
       primary: true,
       render: (m) => (
         <span className="block min-w-0">
-          <span className="text-accent">{nameOf(m)}</span>
+          <span className="font-semibold">{nameOf(m)}</span>
           {m.characterIds.length > 1 && (
             <span className="block text-xs text-text-dim">
               {t('corpTaxBook.moons.moreCharacters', { count: m.characterIds.length - 1 })}
@@ -147,7 +143,6 @@ export function MinersTab() {
       render: (m) => (m.lastPaidAt ? shortDate(m.lastPaidAt) : '—'),
       sortValue: (m) => m.lastPaidAt ?? '',
     },
-    caretColumn<MinerRow>(() => canEdit),
   ];
 
   return (
@@ -169,12 +164,6 @@ export function MinersTab() {
         <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(view.totals.unbilled)} />
         <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(view.totals.credit)} />
       </StatChips>
-      <NeedsYouQueue />
-      {notice && (
-        <p role="status" className="text-xs text-text-dim">
-          {notice}
-        </p>
-      )}
       {view.donationsBeforeBook > 0 && (
         <p className="text-xs text-text-dim">
           {t('corpTaxBook.moons.beforeBook.donations', { count: view.donationsBeforeBook })}
@@ -208,7 +197,10 @@ export function MinersTab() {
             columns={columns}
             rows={rows}
             rowKey={(m) => m.id}
-            onRowClick={(m) => navigate(minerPath(m.id))}
+            expandableRow={{
+              renderDetail: (m) => <MinerExpandedRow miner={m} />,
+              leadingIcon: true,
+            }}
             rowClassName={() => 'group'}
             rowContextMenu={rowContextMenu}
             rowMoreActions={canEdit}
@@ -244,6 +236,20 @@ export function MinersTab() {
           statementId={openStatementId(view, dialog.miner.id)}
         />
       )}
+      {dialog?.kind === 'notTax' &&
+        (() => {
+          const payment = view.internals.byMiner
+            .get(dialog.miner.id)
+            ?.payments.find((p) => p.id === dialog.paymentId);
+          return payment ? (
+            <MarkNotTaxDialog
+              open
+              onClose={() => setDialog(null)}
+              payment={payment}
+              fromName={names.character(payment.characterId)}
+            />
+          ) : null;
+        })()}
       {dialog?.kind === 'dismiss' && (
         <ReasonDialog
           open

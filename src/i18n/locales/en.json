@@ -15818,6 +15818,7 @@
         "dismiss": "Dismiss"
       },
       "tabs": {
+        "overview": "Overview",
         "extractions": "Extractions",
         "miners": "Miners",
         "statements": "Statements",
@@ -15857,8 +15858,8 @@
       "dayStatus": {
         "paid": "Paid",
         "on-statement": "On a Statement",
-        "unbilled": "Not on a Statement yet",
-        "not-billable": "Not Billable yet",
+        "unbilled": "Next Statement",
+        "not-billable": "Still accruing",
         "dismissed": "Dismissed",
         "written-off": "Written off"
       },
@@ -15877,7 +15878,11 @@
         "manual": "Recorded by hand",
         "markNotTax": "Mark not tax…",
         "markedNotTax": "{{amount}} marked not tax",
-        "oldestFirst": "Oldest debt first"
+        "oldestFirst": "Oldest debt first",
+        "correction": "Correction by {{name}}",
+        "correctsDay": "Next Statement, for {{date}}",
+        "markNotTaxMenu": "Mark not tax…",
+        "markNotTaxNone": "No payment to mark"
       },
       "cols": {
         "moon": "Refinery",
@@ -15897,7 +15902,7 @@
         "inCorp": "In corp",
         "owed": "Owed",
         "overdue": "Overdue",
-        "unbilled": "Not on a Statement yet",
+        "unbilled": "Next Statement",
         "credit": "Credit",
         "lastPaid": "Last paid",
         "day": "Day",
@@ -15912,7 +15917,9 @@
         "billed": "Billed",
         "paid": "Paid",
         "outstanding": "Outstanding",
-        "issued": "Issued"
+        "issued": "Issued",
+        "days": "Days",
+        "lastDay": "Last day"
       },
       "beforeBook": {
         "donations_one": "Before the book: {{count}} donation dated before the start date is not counted",
@@ -15925,8 +15932,9 @@
         "overdue": "Overdue",
         "overdueValue_one": "{{amount}} · {{count}} Miner",
         "overdueValue_other": "{{amount}} · {{count}} Miners",
-        "unbilled": "Not on a Statement yet",
-        "credit": "Credit held"
+        "unbilled": "Next Statement",
+        "credit": "Credit held",
+        "pending": "Still accruing"
       },
       "timeline": {
         "title": "Timeline",
@@ -15977,7 +15985,16 @@
         "pastHint": "Earlier cycles, not this one",
         "noPast": "No earlier cycle is on record for this moon.",
         "dismissTitle": "Dismiss this extraction's tax?",
-        "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed."
+        "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed.",
+        "leftToMine": "Left to mine",
+        "minersHint": "Tax so far, not billed yet; a row opens to the ore",
+        "minersSummary_one": "{{count}} Miner · {{tax}}",
+        "minersSummary_other": "{{count}} Miners · {{tax}}",
+        "openMiner": "Open miner",
+        "oreOf": "Ore mined by {{name}}",
+        "pastSummary_one": "{{count}} earlier cycle",
+        "pastSummary_other": "{{count}} earlier cycles",
+        "taxSoFar": "Tax so far"
       },
       "miners": {
         "search": "Search Miners or characters…",
@@ -15988,7 +16005,15 @@
         "nonMembersHidden_one": "{{count}} non-member hidden · {{amount}} owed",
         "nonMembersHidden_other": "{{count}} non-members hidden · {{amount}} owed",
         "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
-        "hidden_other": "{{count}} other Miners owe nothing and have no credit."
+        "hidden_other": "{{count}} other Miners owe nothing and have no credit.",
+        "accruing": "{{amount}} still accruing",
+        "lastPayments": "Last payments",
+        "moreDays_one": "and {{count}} more day",
+        "moreDays_other": "and {{count}} more days",
+        "moreMoons_one": "and {{count}} more moon",
+        "moreMoons_other": "and {{count}} more moons",
+        "openPage": "Open page",
+        "owedLine": "Owed {{owed}} · Next Statement {{next}}"
       },
       "needs": {
         "title_one": "Needs you · {{count}}",
@@ -16027,7 +16052,8 @@
           "stopped": "This Miner stopped reminders and has had their one.",
           "queued": "A reminder for this Statement is already queued.",
           "missingLink": "This Statement has no verify link yet, so no mail can go."
-        }
+        },
+        "none": "Nothing needs you."
       },
       "miner": {
         "notFound": "This Miner is not in the book",
@@ -16059,11 +16085,32 @@
         "noMail": "No mail has been queued for this Miner.",
         "activity": "Activity",
         "activityHint": "Audit log for this Miner, newest first",
-        "unbilledTip": "Billable days not on a Statement yet. {{pending}} more is not Billable yet.",
+        "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is still accruing.",
         "writtenOff": "Written off",
         "writtenOffValue_one": "{{tolerance}} + {{count}} line",
         "writtenOffValue_other": "{{tolerance}} + {{count}} lines",
-        "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged."
+        "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged.",
+        "accruingHint": "Not Billable yet: these owe nothing until their day is Billable",
+        "earlierHint": "On a Statement, paid, dismissed or written off",
+        "daysSummary_one": "{{count}} day · {{tax}}",
+        "daysSummary_other": "{{count}} days · {{tax}}",
+        "moons": "Moons",
+        "moonsHint": "A row opens to the ore mined there",
+        "openMoon": "Open moon",
+        "oreAt": "Ore mined at {{moon}}",
+        "overdueNote_one": "Overdue {{count}} day",
+        "overdueNote_other": "Overdue {{count}} days",
+        "paid": "Paid",
+        "paymentsSummary_one": "{{count}} entry · {{amount}} credited",
+        "paymentsSummary_other": "{{count}} entries · {{amount}} credited",
+        "activitySummary_one": "{{count}} entry",
+        "activitySummary_other": "{{count}} entries",
+        "filter": {
+          "all": "All",
+          "mail": "Mail",
+          "dismissed": "Dismissed",
+          "audit": "Audit"
+        }
       },
       "activity": {
         "button": "Activity",
@@ -16568,7 +16615,9 @@
         "confirm_one": "Group {{count}} Miner",
         "confirm_other": "Group {{count}} Miners",
         "effect": "Their days, Statements and payments are billed as one Miner from now on.",
-        "pendingEffect": "A character outside the corporation is not linked until that player confirms it."
+        "pendingEffect": "A character outside the corporation is not linked until that player confirms it.",
+        "count_one": "{{count}} character",
+        "count_other": "{{count}} characters"
       },
       "corrections": {
         "title": "Corrections",
@@ -16607,7 +16656,8 @@
           "confirm": "Rebill",
           "effect": "Never reaches a paid Statement.",
           "director": "Rebilling a corporation member needs a Director."
-        }
+        },
+        "menu": "Corrections"
       },
       "dialogs": {
         "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
@@ -16864,6 +16914,38 @@
       "unverified": {
         "title": "Couldn't verify your corp role",
         "hint": "Try again or log in again."
+      },
+      "overview": {
+        "schedule": "Moons",
+        "fractured": "Fractured",
+        "ready": "Ready",
+        "none": "None",
+        "pops_one": "Pops in the next {{count}} day",
+        "pops_other": "Pops in the next {{count}} days",
+        "fieldGoneIn": "Field gone in {{in}}",
+        "fieldGoneUnknown": "Field gone date unknown",
+        "readySince": "Ready since {{date}}",
+        "popsIn": "Pops in {{in}}",
+        "billableThrough": "Billable through"
+      },
+      "sections": {
+        "nextStatement": "Next Statement",
+        "stillAccruing": "Still accruing",
+        "earlierDays": "Earlier days",
+        "show": "Show {{title}}",
+        "hide": "Hide {{title}}",
+        "none": "No {{noun}}.",
+        "loadOlder": "Load older {{noun}} ({{count}} more)",
+        "end": "That is every {{noun}} there is.",
+        "total": "Total",
+        "nouns": {
+          "days": "days",
+          "payments": "entries",
+          "moons": "moons",
+          "activity": "entries",
+          "miners": "Miners",
+          "cycles": "cycles"
+        }
       }
     },
     "export": {
