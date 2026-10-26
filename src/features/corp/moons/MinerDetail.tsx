@@ -287,7 +287,10 @@ export function MinerDetail({ id }: { id: string }) {
           {withStatus && (
             <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
               {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
-              {statementOf(d.statementId) && <> · {statementLink(statementOf(d.statementId)!)}</>}
+              {(() => {
+                const st = statementOf(d.statementId);
+                return st && <> · {statementLink(st)}</>;
+              })()}
             </span>
           )}
         </span>
