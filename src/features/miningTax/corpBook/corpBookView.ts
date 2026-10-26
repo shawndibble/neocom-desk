@@ -30,8 +30,6 @@ export interface CorpBookViewBook {
   payee: PayeeRecord;
   /** The earliest day whose corp record is still pending, when any is. */
   pendingFrom?: string;
-  /** The latest donation sent and not credited yet. */
-  inFlightAt?: string;
 }
 
 export interface CorpClaim {
@@ -124,7 +122,6 @@ export function buildCorpBookView(
       )
       .map(([key]) => key.split(':')[1])
       .sort();
-    const inFlight = books.find((b) => b.corporationId === loadedBook.corporationId)!.inFlight;
     const ownRate = overlay.rows.find((r) => r.corporationId === loadedBook.corporationId)?.taxPct;
     const firstChar = loadedBook.characterIds[0];
     return {
@@ -140,14 +137,6 @@ export function buildCorpBookView(
         loadedBook.hubId
       ),
       ...(pendingDates[0] !== undefined ? { pendingFrom: pendingDates[0] } : {}),
-      ...(inFlight.length > 0
-        ? {
-            inFlightAt: inFlight
-              .map((d) => d.at)
-              .sort()
-              .at(-1),
-          }
-        : {}),
     };
   });
   const claims: CorpClaim[] = ready.flatMap((book) =>

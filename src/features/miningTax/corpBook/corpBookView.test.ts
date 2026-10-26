@@ -120,7 +120,6 @@ describe('buildCorpBookView', () => {
       payeeName
     )!;
     expect(view.overlay.rows[0].state).toBe('paid');
-    expect(view.books[0].inFlightAt).toBe('2026-10-18T13:10:00Z');
   });
 
   it("lists the member's own Unmatched donations to claim", () => {

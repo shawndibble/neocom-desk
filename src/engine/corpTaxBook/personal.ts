@@ -343,7 +343,11 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
   // Payments credit each Miner's Statements, oldest first (D5/D15).
   const settlement: Prepared['settlement'] = new Map();
   let credit = 0;
-  const minerIds = new Set(book.statements.map((s) => s.minerId));
+  // A Miner with payments and no Statement yet still has them, as credit.
+  const minerIds = new Set([
+    ...book.statements.map((s) => s.minerId),
+    ...book.payments.map((p) => p.minerId),
+  ]);
   for (const minerId of minerIds) {
     const statements = book.statements.filter((s) => s.minerId === minerId);
     const credits = dismissalCredits(statements, book.dismissals, charges);
@@ -798,13 +802,15 @@ export function overlayCorpBooks(input: {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
     }
-    // Donations sent and not yet credited pay the oldest Billed days: the
-    // member's side is done, and a corp that disagrees bills them again.
-    const inFlightTotal = p.book.inFlight.reduce((sum, d) => sum + d.amount, 0);
+    // Donations sent and not yet credited, and credit the book holds for no
+    // Statement yet, pay the oldest Billed days: the member's side is done,
+    // and a corp that disagrees bills them again. Counting the credit keeps a
+    // day Paid once the book credits the donation that paid it.
+    const paidAhead = p.book.inFlight.reduce((sum, d) => sum + d.amount, p.credit);
     const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
     for (const id of coverInFlight(
       open.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
-      inFlightTotal
+      paidAhead
     )) {
       const row = open.find((r) => r.id === id);
       if (row) {
