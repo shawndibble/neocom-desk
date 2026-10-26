@@ -850,6 +850,67 @@ export interface PeriodRow {
   paid: number;
   outstanding: number;
   issuedAt: string | null;
+  /** Statements on the period (one per miner), and how many of them were mailed at least once. */
+  statements: number;
+  mailed: number;
+  /** The earliest due date among its unsettled Statements; null when none is unsettled. */
+  dueAt: string | null;
+}
+
+/** What the book recorded about a Statement's mail; `stopped` wins over the sent count. */
+export interface StatementMail {
+  kind: 'sent' | 'not-mailed' | 'stopped';
+  count: number;
+}
+
+/** One miner's Statement on a period page. */
+export interface PeriodStatementRow {
+  statement: Statement;
+  billed: number;
+  paid: number;
+  outstanding: number;
+  settled: boolean;
+  overdue: boolean;
+  /** When it goes (or went) overdue; null once settled. */
+  dueAt: string | null;
+  mail: StatementMail;
+}
+
+function statementStanding(view: BookView, s: Statement): PeriodStatementRow {
+  const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
+  const settled = settlement?.settled ?? false;
+  const status = settled
+    ? undefined
+    : overdueStatus({
+        issuedAt: s.issuedAt,
+        settled: false,
+        now: view.input.now,
+        declarations: view.input.declarations.filter((d) => d.statementId === s.id),
+        overdueDays: view.input.overdueDays,
+      });
+  const count = s.mailsSent ?? 0;
+  return {
+    statement: s,
+    billed: s.amount,
+    paid: settlement?.credited ?? 0,
+    outstanding: settlement && !settled ? settlement.remaining : 0,
+    settled,
+    overdue: status?.state === 'overdue',
+    dueAt: status?.overdueAt ?? null,
+    mail: {
+      kind: s.remindersStopped ? 'stopped' : count > 0 ? 'sent' : 'not-mailed',
+      count,
+    },
+  };
+}
+
+/** The Statements of one issued period, one per miner; undefined when the period has none. */
+export function periodStatements(
+  view: BookView,
+  periodStart: string
+): PeriodStatementRow[] | undefined {
+  const statements = view.input.statements.filter((s) => s.periodStart === periodStart);
+  return statements.length === 0 ? undefined : statements.map((s) => statementStanding(view, s));
 }
 
 /**
@@ -901,27 +962,11 @@ export function periodRows(view: BookView): PeriodRow[] {
   }
   const rows: PeriodRow[] = [];
   for (const [start, statements] of byStart) {
-    let paid = 0;
-    let outstanding = 0;
-    let overdue = false;
-    let unmailed = false;
-    for (const s of statements) {
-      const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
-      if (
-        !settlement?.settled &&
-        overdueStatus({
-          issuedAt: s.issuedAt,
-          settled: false,
-          now: view.input.now,
-          declarations: view.input.declarations.filter((d) => d.statementId === s.id),
-          overdueDays: view.input.overdueDays,
-        }).state === 'overdue'
-      )
-        overdue = true;
-      if ((s.mailsSent ?? 0) === 0) unmailed = true;
-      paid += settlement?.credited ?? 0;
-      outstanding += settlement && !settlement.settled ? settlement.remaining : 0;
-    }
+    const standing = statements.map((s) => statementStanding(view, s));
+    const paid = standing.reduce((sum, x) => sum + x.paid, 0);
+    const outstanding = standing.reduce((sum, x) => sum + x.outstanding, 0);
+    const overdue = standing.some((x) => x.overdue);
+    const unmailed = standing.some((x) => x.mail.count === 0);
     rows.push({
       start,
       end: statements[0].periodEnd,
@@ -931,6 +976,13 @@ export function periodRows(view: BookView): PeriodRow[] {
       paid,
       outstanding,
       issuedAt: statements.map((s) => s.issuedAt).sort()[0],
+      statements: statements.length,
+      mailed: standing.filter((x) => x.mail.count > 0).length,
+      dueAt:
+        standing
+          .map((x) => x.dueAt)
+          .filter((d): d is string => d !== null)
+          .sort()[0] ?? null,
     });
   }
   const ready = nextRunPeriod(view);
@@ -972,6 +1024,9 @@ export function periodRows(view: BookView): PeriodRow[] {
       paid: 0,
       outstanding: 0,
       issuedAt: null,
+      statements: 0,
+      mailed: 0,
+      dueAt: null,
     });
   };
   // Every period with unbilled days, not only the next one; a Statement still
