@@ -69,16 +69,8 @@ export async function saveObservedCopy(
   });
 }
 
-/** Marks the held copy confirmed current as of `meta`, without touching its rows. */
-export async function touchObservedCopy(
-  characterId: number,
-  corporationId: number,
-  meta: ObservedCopyMeta
-): Promise<void> {
-  await db.corpBookObservedMeta.put(metaRecord(characterId, corporationId, meta));
-}
-
-async function dropOtherBooks(characterId: number, corporationId: number): Promise<void> {
+/** Drops every copy but this book's (a Character or corporation switch). */
+export async function dropOtherBooks(characterId: number, corporationId: number): Promise<void> {
   const others = (await db.corpBookObservedMeta.toArray()).filter(
     (m) => m.characterId !== characterId || m.corporationId !== corporationId
   );

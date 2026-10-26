@@ -47,6 +47,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
 import { readObservedRows } from './observedRead';
+import { forgetObservedCopy } from './observedStore';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -238,7 +239,11 @@ async function openBook(characterId: number, corporationId: number) {
   await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
   const snap = await getDoc(doc(db, 'corps', String(corporationId)));
-  if (!snap.exists()) return null;
+  if (!snap.exists()) {
+    // A deleted book takes its rows with it; a re-created one must not inherit ghosts.
+    await forgetObservedCopy(characterId, corporationId).catch(() => {});
+    return null;
+  }
   const data = snap.data();
   const versions = bookVersionsOf(data);
   const key = `${characterId}:${corporationId}`;

@@ -16,7 +16,12 @@ import {
   type ObservedCopyMeta,
   type StoredObserved,
 } from './observedDelta';
-import { forgetObservedCopy, readObservedCopy, saveObservedCopy } from './observedStore';
+import {
+  dropOtherBooks,
+  forgetObservedCopy,
+  readObservedCopy,
+  saveObservedCopy,
+} from './observedStore';
 
 const isDenied = (error: unknown) =>
   String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied');
@@ -56,6 +61,7 @@ export async function readObservedRows(
     return forgetOnDenied(error);
   }
   const col = collection(db, 'corps', String(corporationId), 'observed');
+  await quietly(() => dropOtherBooks(characterId, corporationId));
   const held = await quietly(() => readObservedCopy(characterId, corporationId));
   const plan = planObservedRead(held?.meta, version, now);
 

@@ -7,7 +7,8 @@
  * so a date field cannot name "new or changed"; the server stamps each write
  * (`updatedAt`, corpTaxBookVersionKeys.ts) and the watermark is the newest
  * stamp held. Rows are never deleted by the app, so a delta cannot miss a
- * removal; the daily full read bounds anything else (a write by a server
+ * removal (only deleting the whole book removes them, which wipes the copy on
+ * the next open that finds it gone); the daily full read bounds anything else (a write by a server
  * from before the stamp, a clock oddity).
  */
 import { BOOK_CACHE_MAX_AGE_MS } from './bookCache';
@@ -36,14 +37,16 @@ export function planObservedRead(
   version: string | undefined,
   now: number
 ): ObservedPlan {
-  if (!held || held.watermark === null || now - held.fullAt > OBSERVED_FULL_REFRESH_MS)
-    return { kind: 'full' };
+  // A clock that ran backwards makes a mark untrustworthy: read everything.
+  if (!held || held.fullAt > now || held.checkedAt > now) return { kind: 'full' };
+  if (now - held.fullAt > OBSERVED_FULL_REFRESH_MS) return { kind: 'full' };
   if (
     version !== undefined &&
     held.version === version &&
     now - held.checkedAt <= BOOK_CACHE_MAX_AGE_MS
   )
     return { kind: 'cached' };
+  if (held.watermark === null) return { kind: 'full' };
   // A stamp from a clock ahead of this one must not skip rows written since.
   return { kind: 'delta', since: Math.min(held.watermark, now) - OBSERVED_OVERLAP_MS };
 }

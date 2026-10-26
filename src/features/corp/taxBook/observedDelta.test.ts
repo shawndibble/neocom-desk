@@ -43,6 +43,15 @@ describe('planObservedRead', () => {
     expect(planObservedRead(meta({ version: undefined }), undefined, NOW).kind).toBe('delta');
   });
 
+  it('serves a matching stamp from a copy with no watermark (an empty or legacy book)', () => {
+    expect(planObservedRead(meta({ watermark: null }), 'v1', NOW)).toEqual({ kind: 'cached' });
+  });
+
+  it('reads everything when a mark is from the future', () => {
+    expect(planObservedRead(meta({ fullAt: NOW + 1 }), 'v1', NOW)).toEqual({ kind: 'full' });
+    expect(planObservedRead(meta({ checkedAt: NOW + 1 }), 'v1', NOW)).toEqual({ kind: 'full' });
+  });
+
   it('reads everything when the copy has no watermark to read a delta by', () => {
     expect(planObservedRead(meta({ watermark: null }), 'v2', NOW)).toEqual({ kind: 'full' });
   });
