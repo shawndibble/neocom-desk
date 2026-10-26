@@ -191,7 +191,7 @@ describe('ORE hulls', () => {
 
   // Fails when CCP adds an ORE hull: pin its type id above.
   it('files every ORE hull in the Ship Tree under industrial or transport', () => {
-    const ORE = 500014;
+    const ORE = 500014; // ORE faction id
     const tree = read<{ ships: { typeID: number; name: string; factionID: number }[] }>(
       'shipTree.json'
     );
