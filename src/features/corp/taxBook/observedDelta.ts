@@ -7,16 +7,15 @@
  * so a date field cannot name "new or changed"; the server stamps each write
  * (`updatedAt`, corpTaxBookVersionKeys.ts) and the watermark is the newest
  * stamp held. Rows are never deleted by the app, so a delta cannot miss a
- * removal (only deleting the whole book removes them, which wipes the copy on
- * the next open that finds it gone); the daily full read bounds anything else (a write by a server
- * from before the stamp, a clock oddity).
+ * removal. Deleting the whole book removes them: a device that finds the book
+ * gone wipes its copy, and one that finds a book with another `createdAt` (deleted
+ * and turned on again while it was away) reads everything. There is no timed full
+ * read: the server stamped every old row once (corpTaxBookObservedBackfill.ts).
  */
 import { BOOK_CACHE_MAX_AGE_MS } from './bookCache';
 
 /** Reread this much before the watermark: concurrent writes commit out of stamp order. */
 export const OBSERVED_OVERLAP_MS = 10 * 60_000;
-/** The whole collection is read again at least this often. */
-export const OBSERVED_FULL_REFRESH_MS = 24 * 60 * 60 * 1000;
 
 /** What a device remembers about its copy of one book's `observed`. */
 export interface ObservedCopyMeta {
@@ -28,6 +27,8 @@ export interface ObservedCopyMeta {
   fullAt: number;
   /** The newest `updatedAt` held, ms; null while no held row is stamped. */
   watermark: number | null;
+  /** The book's `createdAt` when read; a different one means the book was deleted and turned on again. */
+  bookCreatedAt?: number;
 }
 
 export type ObservedPlan = { kind: 'cached' } | { kind: 'delta'; since: number } | { kind: 'full' };
@@ -35,11 +36,13 @@ export type ObservedPlan = { kind: 'cached' } | { kind: 'delta'; since: number }
 export function planObservedRead(
   held: ObservedCopyMeta | undefined,
   version: string | undefined,
-  now: number
+  now: number,
+  bookCreatedAt?: number
 ): ObservedPlan {
   // A clock that ran backwards makes a mark untrustworthy: read everything.
   if (!held || held.fullAt > now || held.checkedAt > now) return { kind: 'full' };
-  if (now - held.fullAt > OBSERVED_FULL_REFRESH_MS) return { kind: 'full' };
+  // A recreated book shares nothing with the copy, whatever its stamps say.
+  if (bookCreatedAt !== undefined && held.bookCreatedAt !== bookCreatedAt) return { kind: 'full' };
   if (
     version !== undefined &&
     held.version === version &&

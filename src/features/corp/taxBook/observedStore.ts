@@ -34,6 +34,7 @@ export async function readObservedCopy(
       checkedAt: meta.checkedAt,
       fullAt: meta.fullAt,
       watermark: meta.watermark,
+      ...(meta.bookCreatedAt !== undefined ? { bookCreatedAt: meta.bookCreatedAt } : {}),
     },
     rows: rows.map((r) => ({ id: r.id, row: r.row, updatedMs: r.updatedMs })),
   };

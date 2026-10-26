@@ -284,7 +284,16 @@ async function openBook(characterId: number, corporationId: number) {
   const observed = (): Promise<ObservedRow[]> =>
     part(
       'observed',
-      () => readObservedRows(db, characterId, corporationId, versions?.collections.observed, paid),
+      () =>
+        readObservedRows(
+          db,
+          characterId,
+          corporationId,
+          versions?.collections.observed,
+          paid,
+          Date.now(),
+          typeof data.createdAt === 'number' ? data.createdAt : undefined
+        ),
       undefined,
       false // its own Dexie copy (ADR 0031)
     );
@@ -614,19 +623,15 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
-/** The newest entries of the immutable audit log, newest first; `count` null reads it whole. */
+/** The newest entries of the immutable audit log, newest first. Always limited: the log only grows. */
 export async function readAudit(
   characterId: number,
   corporationId: number,
-  count: number | null = 100
+  count = 100
 ): Promise<AuditEntry[]> {
   await ensureSignedIn(characterId);
   const log = collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'audit');
-  const snap = await getDocs(
-    count === null
-      ? query(log, orderBy('at', 'desc'))
-      : query(log, orderBy('at', 'desc'), limitTo(count))
-  );
+  const snap = await getDocs(query(log, orderBy('at', 'desc'), limitTo(count)));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
 }
 

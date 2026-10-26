@@ -13,13 +13,16 @@ import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { bookExportSheets } from './bookExport';
 import { useBook } from './useBook';
 
+/** The newest audit entries the export carries; the log is never read whole. */
+const EXPORT_AUDIT_LIMIT = 2000;
+
 function useExportBook(): () => Promise<WorkbookDownload> {
   const { t } = useTranslation();
   const { characterId, corporationId, names } = useBook();
   return useCallback(async () => {
     const [data, audit, rebills, declinedAutoGroup, ticker] = await Promise.all([
       readBookData(characterId, corporationId),
-      readAudit(characterId, corporationId, null),
+      readAudit(characterId, corporationId, EXPORT_AUDIT_LIMIT),
       readRebills(characterId, corporationId),
       readDeclinedAutoGroup(characterId, corporationId),
       corpTickerOrId(corporationId),

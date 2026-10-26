@@ -33,7 +33,7 @@ vi.mock('firebase/firestore/lite', () => ({
 
 import { db } from '@/db';
 import { readObservedRows } from './observedRead';
-import { OBSERVED_FULL_REFRESH_MS, OBSERVED_OVERLAP_MS } from './observedDelta';
+import { OBSERVED_OVERLAP_MS } from './observedDelta';
 import { forgetObservedCopy } from './observedStore';
 
 const CORP = 98000001;
@@ -44,8 +44,9 @@ const open = (
   version: string | undefined,
   now: number,
   character = 7,
-  gate: Promise<unknown> = ok
-) => readObservedRows({} as never, character, CORP, version, gate, now);
+  gate: Promise<unknown> = ok,
+  bookCreatedAt?: number
+) => readObservedRows({} as never, character, CORP, version, gate, now, bookCreatedAt);
 const put = (id: string, quantity: number, updatedMs?: number) =>
   store.docs.set(`${PATH}/${id}`, {
     quantity,
@@ -105,16 +106,30 @@ describe('readObservedRows', () => {
     expect(store.reads).toEqual([{ path: PATH, since: undefined }]);
   });
 
-  it('reads the whole collection again after a day', async () => {
+  it('reads only the delta a long time later, not the whole collection', async () => {
     put('a', 1, T0);
     await open('v1', T0);
-    put('z', 5);
+    put('z', 5, T0 + 5);
     store.reads.length = 0;
 
-    const rows = await open('v1', T0 + OBSERVED_FULL_REFRESH_MS + 1);
+    const rows = await open('v2', T0 + 30 * 24 * 60 * 60 * 1000);
+
+    expect(store.reads).toHaveLength(1);
+    expect(store.reads[0].since).toBeDefined();
+    expect(rows).toHaveLength(2);
+  });
+
+  it('reads the whole collection when the book was recreated while away', async () => {
+    put('a', 1, T0);
+    await open('v1', T0, 7, ok, 100);
+    store.docs.clear();
+    put('n', 9, T0 + 5);
+    store.reads.length = 0;
+
+    const rows = await open('v1', T0 + 10, 7, ok, 200);
 
     expect(store.reads).toEqual([{ path: PATH, since: undefined }]);
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(1);
   });
 
   it('wipes the copy and rethrows when the officer probe is refused', async () => {

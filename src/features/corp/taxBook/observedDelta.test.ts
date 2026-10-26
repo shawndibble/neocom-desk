@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  OBSERVED_FULL_REFRESH_MS,
   OBSERVED_OVERLAP_MS,
   applyObservedDelta,
   millisOf,
@@ -56,9 +55,20 @@ describe('planObservedRead', () => {
     expect(planObservedRead(meta({ watermark: null }), 'v2', NOW)).toEqual({ kind: 'full' });
   });
 
-  it('reads everything again once the last full read is a day old, even on a matching stamp', () => {
-    const old = meta({ fullAt: NOW - OBSERVED_FULL_REFRESH_MS - 1 });
-    expect(planObservedRead(old, 'v1', NOW)).toEqual({ kind: 'full' });
+  it('never reads everything just because the last full read is old', () => {
+    const old = meta({ fullAt: NOW - 90 * 24 * 60 * 60 * 1000 });
+    expect(planObservedRead(old, 'v1', NOW)).toEqual({ kind: 'cached' });
+    expect(planObservedRead(old, 'v2', NOW).kind).toBe('delta');
+  });
+
+  it('reads everything when the book was recreated, whatever its stamps say', () => {
+    const held = meta({ bookCreatedAt: 100 });
+    expect(planObservedRead(held, 'v1', NOW, 200)).toEqual({ kind: 'full' });
+    expect(planObservedRead(held, 'v1', NOW, 100)).toEqual({ kind: 'cached' });
+  });
+
+  it('reads everything once when a copy from before the book identity is held', () => {
+    expect(planObservedRead(meta(), 'v1', NOW, 100)).toEqual({ kind: 'full' });
   });
 
   it('clamps a watermark the clock would put in the future', () => {
