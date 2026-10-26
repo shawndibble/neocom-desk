@@ -155,7 +155,7 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
         />
       </Panel>
       {openId && statements.some((r) => r.statement.id === openId) && (
-        <StatementPanel statementId={openId} onClose={() => setParams({})} />
+        <StatementPanel key={openId} statementId={openId} onClose={() => setParams({})} />
       )}
     </div>
   );

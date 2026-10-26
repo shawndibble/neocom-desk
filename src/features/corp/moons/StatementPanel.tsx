@@ -7,7 +7,8 @@ import { StatementLines, StatementPayments } from '@/features/corpTaxBook/Statem
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
 import { useBook } from './useBook';
-import { isk, periodLabel, shortDate } from './moonsFormat';
+import { shortDate } from '@/features/corpTaxBook/statementFormat';
+import { isk, periodLabel } from './moonsFormat';
 import { DueWord } from './moonsParts';
 import { minerPath } from './moonsPaths';
 
