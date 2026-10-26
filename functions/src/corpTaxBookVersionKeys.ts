@@ -54,6 +54,8 @@ export const VERSIONED_COLLECTIONS = [
   'meta',
   // Server-built running totals per Miner (#5255, ADR 0032); shadow mode, no client reads yet.
   'minerTotals',
+  // Server-built per-pull moon docs (#5256, ADR 0032); shadow mode, no client reads yet.
+  'moonDocs',
   // The member side (issue #5050) caches it too.
   'feederCoverage',
 ] as const;

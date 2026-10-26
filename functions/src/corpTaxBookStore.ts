@@ -94,6 +94,7 @@ import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBoo
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
+import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import {
   fail,
   requireLiveRoles,
@@ -486,11 +487,14 @@ export async function mergeObservedInto(
   corporationId: number,
   incoming: readonly ObservedRow[],
   /** Extractions the same sync is about to write, so a row placed by them is stamped now. */
-  extractions: readonly MirrorExtraction[] = []
+  extractions: readonly MirrorExtraction[] = [],
+  /** Collects the pulls whose rows changed; a caller that passes it refreshes their moon docs itself. */
+  touched?: Set<string>
 ): Promise<number> {
   // Each row carries the Extraction covering its day (ADR 0032): a merge replaces the whole row, so it must stamp.
   const rows = stampRows(incoming, await loadStampContext(deps.db, corporationId, extractions));
   let observedChanged = 0;
+  const pulls = touched ?? new Set<string>();
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
     const col = sub(deps.db, corporationId, OBSERVED);
@@ -501,6 +505,7 @@ export async function mergeObservedInto(
       const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
       const { changed } = mergeObservedRows(existing, chunk);
       const last = new Map(changed.map((r) => [observedRowKey(r), r]));
+      for (const r of last.values()) if (r.extractionId !== undefined) pulls.add(r.extractionId);
       for (const row of last.values()) {
         // `updatedAt` is what an officer's client reads a delta by (bookDeltaCache.ts):
         // `cachedAt` is the ESI response's time, not this write's.
@@ -520,6 +525,7 @@ export async function mergeObservedInto(
     });
   }
   await writeBilledByPointers(deps, corporationId, rows);
+  if (touched === undefined) await refreshMoonDocs(deps.db, corporationId, pulls);
   return observedChanged;
 }
 
@@ -570,11 +576,13 @@ export async function syncBookAs(
     );
   }
 
+  const touchedPulls = new Set<string>();
   const observedChanged = await mergeObservedInto(
     deps,
     input.corporationId,
     input.observed,
-    input.extractions
+    input.extractions,
+    touchedPulls
   );
   // Old rows carry no `updatedAt`, which a client's delta read needs (#5243). Best effort.
   await backfillObservedUpdatedAt(deps.db, input.corporationId, deps.now).catch((e) =>
@@ -654,6 +662,10 @@ export async function syncBookAs(
     );
   });
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
+  // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
+  for (const x of input.extractions)
+    touchedPulls.add(`${x.structureId}_${Date.parse(x.extractionStartTime)}`);
+  await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
@@ -1544,6 +1556,35 @@ export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, a
 }
 
 /** An edit once the caller is established; the scheduled sync passes `via` (ADR 0025). */
+/** The pulls an edit changed the moon docs of; an expiry change rebuilds every pull. */
+async function refreshMoonDocsAfterEdit(
+  db: Firestore,
+  corporationId: number,
+  action: EditAction
+): Promise<void> {
+  try {
+    if (action.action === 'linkSurvey') {
+      await refreshMoonDocs(db, corporationId, [action.extractionId]);
+    } else if (action.action === 'issueStatement') {
+      const days = (parseStatement(action.statement).lines as unknown as Data[]).flatMap((l) =>
+        typeof l.structureId === 'number' && typeof l.date === 'string'
+          ? [{ structureId: l.structureId, date: l.date }]
+          : []
+      );
+      await refreshMoonDocs(db, corporationId, await pullsOfDays(db, corporationId, days));
+    } else if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
+      const snap = await sub(db, corporationId, EXTRACTIONS).get();
+      await refreshMoonDocs(
+        db,
+        corporationId,
+        snap.docs.map((d) => d.id)
+      );
+    }
+  } catch (e) {
+    console.error('moon docs refresh failed', e instanceof Error ? e.message : e);
+  }
+}
+
 export async function editBookAs(
   deps: BookDeps,
   access: OfficerAccess,
@@ -1570,6 +1611,8 @@ export async function editBookAs(
   });
   // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
   await refreshAfterEvent(deps.db, call.corporationId, editScope(action));
+  // Statements freeze a pull's tax, and a survey link or expiry changes its doc (ADR 0032). Best effort.
+  await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
     await restampStructures(
