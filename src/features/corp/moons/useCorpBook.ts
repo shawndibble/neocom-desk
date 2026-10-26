@@ -47,6 +47,7 @@ import {
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
+import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
 
@@ -144,6 +145,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       try {
         const verdict = await verifyOfficer(characterId, corporationId);
         if (cancelled) return;
+        // An officer record that no longer lets this Character view takes the local rows with it (ADR 0031).
+        if (!verdict.canView) await forgetObservedCopy(characterId, corporationId).catch(() => {});
         if (!verdict.bookActive) {
           setFetched({ status: 'off', verdict });
           return;
@@ -185,6 +188,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       } catch (error) {
         if (cancelled) return;
         const code = (error as { code?: string }).code ?? '';
+        if (code.endsWith('unauthenticated') || code.endsWith('permission-denied'))
+          await forgetObservedCopy(characterId, corporationId).catch(() => {});
         setFetched(
           code.endsWith('unauthenticated')
             ? { status: 'denied', unverified: true }

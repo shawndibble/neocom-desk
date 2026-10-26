@@ -1126,3 +1126,28 @@ export interface DynamicItemRecord {
   /** Epoch ms of the fetch. */
   savedAt: number;
 }
+
+/**
+ * One row of an officer's copy of a Corp Tax Book's `observed` (ADR 0031).
+ * Officer-only data: wiped with the Character and whenever the officer check
+ * or the rules refuse. `row` is the stored `ObservedRow`.
+ */
+export interface CorpBookObservedRecord {
+  characterId: number;
+  corporationId: number;
+  /** The Firestore document id (the row's obsId). */
+  id: string;
+  row: unknown;
+  /** The server's `updatedAt` in ms; null for a row from before it was stamped. */
+  updatedMs: number | null;
+}
+
+/** What a device remembers about one `CorpBookObservedRecord` set; see `features/corp/taxBook/observedDelta.ts`. */
+export interface CorpBookObservedMetaRecord {
+  characterId: number;
+  corporationId: number;
+  version: string | undefined;
+  checkedAt: number;
+  fullAt: number;
+  watermark: number | null;
+}

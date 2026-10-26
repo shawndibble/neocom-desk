@@ -84,6 +84,7 @@ import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
+import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import {
   fail,
   requireLiveRoles,
@@ -486,7 +487,13 @@ export async function mergeObservedInto(
       const { changed } = mergeObservedRows(existing, chunk);
       const last = new Map(changed.map((r) => [observedRowKey(r), r]));
       for (const row of last.values()) {
-        tx.set(col.doc(obsId(row)), { ...row, uid: `char:${row.characterId}` });
+        // `updatedAt` is what an officer's client reads a delta by (bookDeltaCache.ts):
+        // `cachedAt` is the ESI response's time, not this write's.
+        tx.set(col.doc(obsId(row)), {
+          ...row,
+          uid: `char:${row.characterId}`,
+          [OBSERVED_UPDATED_AT_FIELD]: FieldValue.serverTimestamp(),
+        });
       }
       // The feeder mirror moves with the rows (corpTaxBookFeederRollup.ts).
       writeRollupChanges(

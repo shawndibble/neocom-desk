@@ -26,7 +26,9 @@ vi.mock('firebase/firestore/lite', () => ({
       .map(([path, data]) => ({ id: path.slice(prefix.length), data: () => data }));
     return { docs };
   },
-  query: vi.fn(),
+  query: (ref: { path: string }) => ref,
+  where: vi.fn(),
+  Timestamp: { fromMillis: (ms: number) => ({ toMillis: () => ms }) },
   orderBy: vi.fn(),
   limit: vi.fn(),
 }));
@@ -34,6 +36,7 @@ vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
 vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
+import { db } from '@/db';
 import { clearBookCache } from './bookCache';
 import { readBookData, readBookState } from './bookClient';
 
@@ -65,8 +68,10 @@ function stamped(overrides: Record<string, string> = {}): Data {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   clearBookCache();
+  await db.corpBookObserved.clear();
+  await db.corpBookObservedMeta.clear();
   store.docs.clear();
   store.reads.length = 0;
   store.denied.clear();
@@ -89,6 +94,23 @@ describe('readBookData over the version marker', () => {
     expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`]);
     expect(again).toEqual(first);
     expect(again?.feeders?.[0]?.payouts).toEqual([{ amount: 1, id: 'p1' }]);
+  });
+
+  it('after a reload, serves the Dexie copy of an unchanged stamp with no collection read', async () => {
+    store.docs.set(`${BOOK}/observed/o1`, {
+      date: '2026-10-02',
+      typeId: 1,
+      characterId: 1,
+      updatedAt: { toMillis: () => 5 },
+    });
+    const first = await readBookData(7, CORP);
+    clearBookCache();
+    store.reads.length = 0;
+
+    const again = await readBookData(7, CORP);
+
+    expect(store.reads).not.toContain(`${BOOK}/observed`);
+    expect(again?.observed).toEqual(first?.observed);
   });
 
   it('re-reads only the collection an edit restamped', async () => {

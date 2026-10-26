@@ -70,3 +70,11 @@ export function bookPathOf(
   if (parts[0] !== 'corps' || parts.length < 2 || parts[1] === '') return undefined;
   return { corporationId: parts[1], collection: parts.length >= 3 ? parts[2] : null };
 }
+
+/**
+ * Field on each `corps/{id}/observed/{rowId}`: a server timestamp set by every
+ * merge that writes the row, so a client holding a copy reads only the rows
+ * written since (src/features/corp/taxBook/observedDelta.ts). Rows from before
+ * it lack the field; a client never trusts a delta over a copy it has no mark for.
+ */
+export const OBSERVED_UPDATED_AT_FIELD = 'updatedAt';

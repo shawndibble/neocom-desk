@@ -273,11 +273,15 @@ suite('Corp Tax Book callables (emulator)', () => {
       const id = '50_45490_2026-10-17_1000';
       const read = async () => (await book().collection('observed').doc(id).get()).data();
       expect(await read()).toMatchObject({ quantity: 100, uid: 'char:50' });
+      // Stamped on every write, so a client can read a delta by it.
+      const stampedAt = (await read())?.updatedAt;
+      expect(stampedAt?.toMillis()).toEqual(expect.any(Number));
       await sync(ACCOUNTANT, { observed: [row(500, '2026-10-18T09:00:00Z')] });
       expect((await read())?.quantity).toBe(100);
       const result = await sync(ACCOUNTANT, { observed: [row(300, '2026-10-18T11:30:00Z')] });
       expect(result.observedChanged).toBe(1);
       expect((await read())?.quantity).toBe(300);
+      expect((await read())?.updatedAt.toMillis()).toBeGreaterThanOrEqual(stampedAt.toMillis());
       expect((await book().get()).get('lastSync')).toMatchObject({ byCharacterId: ACCOUNTANT });
     });
 
