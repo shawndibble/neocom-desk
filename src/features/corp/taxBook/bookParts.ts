@@ -17,6 +17,8 @@ export type BookPart = (typeof ALL_BOOK_PARTS)[number];
 
 export type BookPartSet = ReadonlySet<BookPart>;
 
+export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
+
 /** What a page asks for: a tab id, or a detail page below it. */
 export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner';
 

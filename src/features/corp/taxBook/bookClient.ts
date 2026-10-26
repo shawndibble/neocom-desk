@@ -47,7 +47,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
 import { bookPartStore } from './bookPartStore';
-import { ALL_BOOK_PARTS, mergeBookParts, type BookPartSet } from './bookParts';
+import { ALL_BOOK_PART_SET, mergeBookParts, type BookPart, type BookPartSet } from './bookParts';
 import { readObservedRows } from './observedRead';
 import { forgetObservedCopy } from './observedStore';
 import { callRouted } from '@/sync/routedCallable';
@@ -511,7 +511,7 @@ const feederPayouts = (characterId: number, book: number, feeder: number) =>
 export async function readBookData(
   characterId: number,
   corporationId: number,
-  parts: BookPartSet = new Set(ALL_BOOK_PARTS)
+  parts: BookPartSet = ALL_BOOK_PART_SET
 ): Promise<BookData | null> {
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
@@ -519,7 +519,7 @@ export async function readBookData(
   const { list, part, read } = book;
   const meta = (id: string) =>
     getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id));
-  const slice = <T>(name: 'core' | 'ledger' | 'answers', readSlice: () => Promise<T>, empty: T) =>
+  const slice = <T>(name: BookPart, readSlice: () => Promise<T>, empty: T) =>
     parts.has(name) ? readSlice() : Promise.resolve(empty);
   const none: never[] = [];
   const [
@@ -600,8 +600,8 @@ export async function readBookData(
 /** `extra`'s slices laid over `held`; everything else, and the settings, is `extra`'s fresher copy. */
 export function mergeBookData(held: BookData, extra: BookData): BookData {
   const parts = mergeBookParts(held.parts, extra.parts);
-  const fresh = (name: 'core' | 'ledger' | 'answers') => extra.parts?.has(name) ?? true;
-  const pick = <T>(name: 'core' | 'ledger' | 'answers', fromHeld: T, fromExtra: T) =>
+  const fresh = (name: BookPart) => extra.parts?.has(name) ?? true;
+  const pick = <T>(name: BookPart, fromHeld: T, fromExtra: T) =>
     fresh(name) ? fromExtra : fromHeld;
   return {
     settings: extra.settings,

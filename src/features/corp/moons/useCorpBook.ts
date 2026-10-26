@@ -48,7 +48,7 @@ import {
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
-import { ALL_BOOK_PARTS, missingBookParts, type BookPartSet } from '../taxBook/bookParts';
+import { ALL_BOOK_PART_SET, missingBookParts, type BookPartSet } from '../taxBook/bookParts';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
@@ -120,14 +120,34 @@ function utcNow() {
   return new Date().toISOString();
 }
 
-const ALL_PARTS: BookPartSet = new Set(ALL_BOOK_PARTS);
+/** A refused read ends the page's book: a lost role wipes the local rows (ADR 0031). */
+async function failedFetch(
+  error: unknown,
+  characterId: number,
+  corporationId: number
+): Promise<Fetched> {
+  const code = (error as { code?: string }).code ?? '';
+  if (code.endsWith('unauthenticated') || code.endsWith('permission-denied'))
+    await forgetObservedCopy(characterId, corporationId).catch(() => {});
+  return code.endsWith('unauthenticated')
+    ? { status: 'denied', unverified: true }
+    : code.endsWith('permission-denied')
+      ? { status: 'denied', message: (error as Error).message }
+      : {
+          status: 'failed',
+          message: code || (error instanceof Error ? error.message : String(error)),
+        };
+}
 
 /**
  * `wanted` is what the open page joins (`bookPartsFor`); default the whole book. Only those
  * slices are read, and a page that wants more reads just the slices it adds. Until they
  * are in, the state is `loading`.
  */
-export function useCorpBook(sync: CorpTaxBookSync, wanted: BookPartSet = ALL_PARTS): CorpBook {
+export function useCorpBook(
+  sync: CorpTaxBookSync,
+  wanted: BookPartSet = ALL_BOOK_PART_SET
+): CorpBook {
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
@@ -208,19 +228,7 @@ export function useCorpBook(sync: CorpTaxBookSync, wanted: BookPartSet = ALL_PAR
         });
       } catch (error) {
         if (cancelled) return;
-        const code = (error as { code?: string }).code ?? '';
-        if (code.endsWith('unauthenticated') || code.endsWith('permission-denied'))
-          await forgetObservedCopy(characterId, corporationId).catch(() => {});
-        setFetched(
-          code.endsWith('unauthenticated')
-            ? { status: 'denied', unverified: true }
-            : code.endsWith('permission-denied')
-              ? { status: 'denied', message: (error as Error).message }
-              : {
-                  status: 'failed',
-                  message: code || (error instanceof Error ? error.message : String(error)),
-                }
-        );
+        setFetched(await failedFetch(error, characterId, corporationId));
       }
     })();
     return () => {
@@ -238,16 +246,18 @@ export function useCorpBook(sync: CorpTaxBookSync, wanted: BookPartSet = ALL_PAR
       (extra) => {
         if (cancelled || !extra) return;
         setFetched((prev) =>
-          prev.status === 'loaded' ? { ...prev, data: mergeBookData(prev.data, extra) } : prev
+          prev.status === 'loaded'
+            ? // The prices were built for the settings this page opened with: keep both.
+              {
+                ...prev,
+                data: { ...mergeBookData(prev.data, extra), settings: prev.data.settings },
+              }
+            : prev
         );
       },
-      (error) => {
-        if (cancelled) return;
-        const code = (error as { code?: string }).code ?? '';
-        setFetched({
-          status: 'failed',
-          message: code || (error instanceof Error ? error.message : String(error)),
-        });
+      async (error) => {
+        const next = await failedFetch(error, characterId, corporationId);
+        if (!cancelled) setFetched(next);
       }
     );
     return () => {
