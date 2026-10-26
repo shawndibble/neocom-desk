@@ -36,10 +36,11 @@ const TYPES: Record<number, [string, number, number]> = {
   17: ['Atron', 25, SHIP],
   18: ['Capsule', 29, SHIP],
   19: ['Unmapped hull', 9999, SHIP], // a damage hull no size is pinned for
+  89240: ['Pioneer', 420, SHIP], // ORE mining destroyer
 };
 const infoOf = (typeId: number): DscanTypeInfo | undefined => {
   const t = TYPES[typeId];
-  return t === undefined ? undefined : { groupId: t[1], categoryId: t[2] };
+  return t === undefined ? undefined : { typeId, groupId: t[1], categoryId: t[2] };
 };
 const nameOf = (typeId: number) => TYPES[typeId]?.[0] ?? `#${typeId}`;
 const rows = (typeId: number, n: number, km = 10): DscanRow[] =>
@@ -258,5 +259,16 @@ describe('buildDangerRead: tripwires, pattern, role bar', () => {
 
   it('counts total ships, leaving out capsules', () => {
     expect(read([rows(1, 2), rows(18, 5)]).totalShips).toBe(2);
+  });
+});
+
+describe('ORE mining hulls', () => {
+  it('are no threat, though a Destroyer is a damage group', () => {
+    const read = buildDangerRead(rows(89240, 12), infoOf, nameOf, {
+      ownShipGroupId: 25,
+      previous: null,
+    });
+    expect(read?.counts.kill).toBe(0);
+    expect(read?.level).toBe('clear');
   });
 });
