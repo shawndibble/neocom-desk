@@ -32,6 +32,23 @@ import { COLLECTION_VERSIONS_FIELD } from './corpTaxBookVersionKeys.js';
  */
 export const QUIET_DOC = 'scheduledQuiet';
 
+/**
+ * How far back a quiet run reads extractions, by `chunkArrivalTime`. What a quiet run
+ * uses them for (naming the moon a ledger row mined: the ESI ledger holds 30 days, and a
+ * chunk is minable for at most 96 h after it arrives; merging the ESI extractions over
+ * the stored ones) never reaches a chunk older than that. The old ones are the
+ * book's growth, and re-reading them every 6 h bought nothing.
+ */
+export const QUIET_EXTRACTION_WINDOW_MS = 60 * 24 * 3_600_000;
+
+/** The cut-off a marker written by a run starting at `at` fixes for as long as it vouches (< QUIET_MAX_AGE_MS). */
+export const extractionsSinceOf = (at: number): string =>
+  new Date(at - QUIET_EXTRACTION_WINDOW_MS).toISOString();
+
+/** Whether a stored extraction falls in the window a marker fixed: the same test as the quiet read's query. */
+export const inExtractionWindow = (x: { chunkArrivalTime?: unknown }, since: string): boolean =>
+  typeof x.chunkArrivalTime === 'string' && x.chunkArrivalTime >= since;
+
 /** A marker older than this is ignored: at least one full run a day, whatever the stamps say. */
 export const QUIET_MAX_AGE_MS = 24 * 3_600_000;
 
@@ -57,8 +74,10 @@ export interface QuietMarker {
   journalThrough: Record<string, number>;
   /** Every Character the quiet run knew: one new to it could match an Unmatched donation. */
   known: number[];
-  /** The extractions it read, which dismissal credits rest on (`fingerprintOf`). */
+  /** The extractions it read, which dismissal credits rest on (`fingerprintOf`), from `extractionsSince` on. */
   extractions: string;
+  /** The `chunkArrivalTime` cut-off its extractions fingerprint, and later quiet reads, use (`extractionsSinceOf`). */
+  extractionsSince: string;
   /** The Statements it held as paid (`fingerprintOf`), which settling rests on. */
   paid: string;
 }
@@ -91,6 +110,7 @@ export function readQuietMarker(raw: unknown): QuietMarker | null {
     m.journalThrough === null ||
     !numbers(m.known) ||
     typeof m.extractions !== 'string' ||
+    typeof m.extractionsSince !== 'string' ||
     typeof m.paid !== 'string'
   ) {
     return null;

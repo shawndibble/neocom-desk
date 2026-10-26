@@ -692,6 +692,24 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
         expect(await marker()).toBeUndefined();
       });
 
+      it('leaves extractions older than the marker window unread: a quiet run does not see them', async () => {
+        await quietBook();
+        const before = await marker();
+        // Written with no stamp, and too old to matter: a quiet run that read it would see
+        // the extractions fingerprint move and fall back to a full run, clearing this marker.
+        await book().collection('extractions').doc('old').set({
+          id: 'old',
+          structureId: 1,
+          moonId: 7,
+          extractionStartTime: '2025-01-01T00:00:00.000Z',
+          chunkArrivalTime: '2025-01-05T00:00:00.000Z',
+          naturalDecayTime: '2025-01-08T00:00:00.000Z',
+        });
+        now += 6 * H;
+        expect((await run()).synced).toBe(1);
+        expect(await marker()).toEqual(before);
+      });
+
       it('reads in full when ESI brings a new donation, and clears the marker', async () => {
         await quietBook();
         (esiState.journal as { data: unknown[] }).data.push({
