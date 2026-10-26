@@ -1,12 +1,17 @@
 import { useState } from 'react';
+import { intParam } from '@/lib/urlState';
+import { useUrlParam } from '@/lib/useUrlState';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import type { MarketWideResearch } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { MARKET_WIDE_PAGE_SIZE } from './marketWidePage';
 import { sameMembers, type MarketWideFilterState } from './marketWideFilter';
+
+const SHOWN_LIMIT_CODEC = intParam(MARKET_WIDE_PAGE_SIZE, { min: MARKET_WIDE_PAGE_SIZE });
 
 interface UseMarketWideScanArgs {
   hub: TradeHub;
@@ -15,6 +20,7 @@ interface UseMarketWideScanArgs {
   modifiers: CharacterModifiers;
   standing?: ResolvedStandings;
   characterIds: number[];
+  research: MarketWideResearch;
   filter: MarketWideFilterState;
   setFilter: (next: MarketWideFilterState) => void;
   online: boolean;
@@ -34,6 +40,7 @@ export function useMarketWideScan({
   modifiers,
   standing,
   characterIds,
+  research,
   filter,
   setFilter,
   online,
@@ -46,11 +53,16 @@ export function useMarketWideScan({
     modifiers,
     standing,
     characterIds,
+    research,
+    filters: filter,
   });
   const { hasRun, loading, run } = scanState;
   // A tier, category or source change re-scans (they apply before the top-N
   // cut); the build-cost cap only narrows the rows already ranked.
-  const [shownLimit, setShownLimit] = useState(MARKET_WIDE_PAGE_SIZE);
+  // In the URL (ADR 0015), so Back from a plan lands on the rows the pilot had paged to.
+  const [shownLimit, writeShownLimit] = useUrlParam('marketWide.shown', SHOWN_LIMIT_CODEC);
+  const setShownLimit = (next: number | ((limit: number) => number)) =>
+    writeShownLimit(typeof next === 'function' ? next(shownLimit) : next);
   // `null` until the pilot opens or folds it: then the default (folded once they own blueprints) holds.
   const [expandedChoice, setExpandedChoice] = useState<boolean | null>(null);
   const expanded = expandedChoice ?? !startFolded;

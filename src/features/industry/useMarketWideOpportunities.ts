@@ -4,7 +4,7 @@
  * mount: the ticket calls out that a market-wide sweep must never run just
  * because the tab was visited.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { BlueprintSource } from '@/engine/industry/blueprintObtainability';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import {
@@ -19,9 +19,11 @@ import { loadBlueprintSourceSets } from './blueprintSourceSets';
 import { loadMarketWideProductFacts } from './marketWideProductFacts';
 import {
   runMarketWideScan,
+  type MarketWideResearch,
   type MarketWideResultRow,
   type MarketWideScanOptions,
 } from './marketWideOpportunities';
+import { marketWideScanKey, readMarketWideScan, writeMarketWideScan } from './marketWideScanCache';
 
 export interface UseMarketWideOpportunitiesArgs {
   hub: TradeHub;
@@ -33,7 +35,15 @@ export interface UseMarketWideOpportunitiesArgs {
   standing?: ResolvedStandings;
   /** Every Character on the account — whose blueprints, contracts and LP decide what the pilot can build. */
   characterIds: readonly number[];
-  options?: Omit<MarketWideScanOptions, 'include'>;
+  /** The ME/TE rows are priced at, and so the one a plan opened from a row starts at (issue #5232). */
+  research: MarketWideResearch;
+  /**
+   * The filters the scan being shown ran with. A scan cached under these (and
+   * the other inputs) and still fresh is shown without fetching; any other
+   * is never shown as current.
+   */
+  filters: MarketWideFilters;
+  options?: Omit<MarketWideScanOptions, 'include' | 'research'>;
 }
 
 export interface UseMarketWideOpportunitiesResult {
@@ -54,6 +64,21 @@ export interface UseMarketWideOpportunitiesResult {
   run: (filters: MarketWideFilters) => void;
 }
 
+interface ScanState extends Omit<UseMarketWideOpportunitiesResult, 'run'> {
+  /** The inputs the rows were scanned at; null before any scan. */
+  key: string | null;
+}
+
+const NEVER_RUN: ScanState = {
+  key: null,
+  rows: [],
+  loading: false,
+  hasRun: false,
+  error: false,
+  fetchedAt: null,
+  unavailableSources: [],
+};
+
 export function useMarketWideOpportunities({
   hub,
   trees,
@@ -61,23 +86,36 @@ export function useMarketWideOpportunities({
   modifiers,
   standing,
   characterIds,
+  research,
+  filters,
   options,
 }: UseMarketWideOpportunitiesArgs): UseMarketWideOpportunitiesResult {
-  const [state, setState] = useState<{
-    rows: MarketWideResultRow[];
-    loading: boolean;
-    hasRun: boolean;
-    error: boolean;
-    fetchedAt: Date | null;
-    unavailableSources: BlueprintSource[];
-  }>({
-    rows: [],
-    loading: false,
-    hasRun: false,
-    error: false,
-    fetchedAt: null,
-    unavailableSources: [],
-  });
+  const [state, setState] = useState<ScanState>(NEVER_RUN);
+
+  const keyFor = useCallback(
+    (scanFilters: MarketWideFilters) =>
+      marketWideScanKey({
+        hubId: hub.id,
+        tiers: scanFilters.tiers,
+        categories: scanFilters.categories,
+        sources: scanFilters.sources,
+        characterIds,
+        assumedMe: research.assumedMe,
+        assumedTe: research.assumedTe,
+        research: research.owned.map((copy) => ({
+          blueprintTypeID: copy.type_id,
+          me: copy.material_efficiency,
+          te: copy.time_efficiency,
+        })),
+        modifiers,
+        standing,
+      }),
+    [hub.id, characterIds, research, modifiers, standing]
+  );
+  const key = useMemo(() => keyFor(filters), [keyFor, filters]);
+  // A scan this session ran, at these inputs, and the prices still hold.
+  // Memoised on the key: reading the clock per render would let rows expire mid-view.
+  const cached = useMemo(() => readMarketWideScan(key), [key]);
 
   // Guards against a stale scan's result landing after a newer one started
   // (e.g. the pilot hits "Scan" twice in a row).
@@ -87,6 +125,7 @@ export function useMarketWideOpportunities({
     (filters: MarketWideFilters) => {
       if (!trees || !catalog) return;
       const token = ++runToken.current;
+      const scanKey = keyFor(filters);
       setState((prev) => ({ ...prev, loading: true, error: false }));
       const blueprints = Object.entries(trees).map(([productTypeID, tree]) => ({
         blueprintTypeID: tree.blueprintTypeID,
@@ -109,25 +148,33 @@ export function useMarketWideOpportunities({
           catalog,
           modifiers,
           sets,
-          { ...options, include: include.then((check) => check ?? (() => true)) },
+          { ...options, research, include: include.then((check) => check ?? (() => true)) },
           standing
         ),
         sources,
       ])
         .then(([rows, loaded]) => {
           if (runToken.current !== token) return;
+          const fetchedAt = Date.now();
+          writeMarketWideScan(scanKey, {
+            rows,
+            fetchedAt,
+            unavailableSources: loaded.unavailable,
+          });
           setState({
+            key: scanKey,
             rows,
             loading: false,
             hasRun: true,
             error: false,
-            fetchedAt: new Date(),
+            fetchedAt: new Date(fetchedAt),
             unavailableSources: loaded.unavailable,
           });
         })
         .catch(() => {
           if (runToken.current !== token) return;
           setState({
+            key: scanKey,
             rows: [],
             loading: false,
             hasRun: true,
@@ -137,8 +184,25 @@ export function useMarketWideOpportunities({
           });
         });
     },
-    [hub, trees, catalog, modifiers, options, standing, characterIds]
+    [hub, trees, catalog, modifiers, options, standing, characterIds, research, keyFor]
   );
 
-  return { ...state, run };
+  // The scan in flight, or the one that ran at exactly these inputs, wins;
+  // else a fresh cached one; else nothing has run at these inputs.
+  const shown: ScanState =
+    state.loading || state.key === key
+      ? state
+      : cached
+        ? {
+            key,
+            rows: cached.rows,
+            loading: false,
+            hasRun: true,
+            error: false,
+            fetchedAt: new Date(cached.fetchedAt),
+            unavailableSources: cached.unavailableSources,
+          }
+        : NEVER_RUN;
+  const { rows, loading, hasRun, error, fetchedAt, unavailableSources } = shown;
+  return { rows, loading, hasRun, error, fetchedAt, unavailableSources, run };
 }

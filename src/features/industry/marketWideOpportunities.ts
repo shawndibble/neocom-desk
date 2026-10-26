@@ -31,7 +31,10 @@ import {
   type BlueprintSource,
   type BlueprintSourceSets,
 } from '@/engine/industry/blueprintObtainability';
+import { clampMe, TE_MAX } from '@/engine/industry/efficiency';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import { findOwnedBlueprint } from './data';
 import { loadMarketSnapshot } from './marketData';
 import {
   computeMarketWideRows,
@@ -56,7 +59,30 @@ export const DEFAULT_TOP_N_PER_MARKET_GROUP = 5;
 /** Whether the pilot's filters keep a product, given how its blueprint is obtained. */
 export type MarketWideInclude = (productTypeID: number, source: BlueprintSource) => boolean;
 
+/** What decides the ME/TE a row is priced at: the same inputs a plan opened from it starts from. */
+export interface MarketWideResearch {
+  /** The active Character's owned blueprints — an owned copy's research beats the assumption. */
+  owned: readonly CharacterBlueprint[];
+  assumedMe: number;
+  assumedTe: number;
+}
+
+/** The ME/TE a plan for `blueprintTypeID` starts at (`newBuildPlan`'s precedence): owned copy, else assumed. */
+export function researchFor(
+  blueprintTypeID: number,
+  research: MarketWideResearch
+): { me: number; te: number } {
+  const copy = findOwnedBlueprint(research.owned, blueprintTypeID);
+  const te = copy?.time_efficiency ?? research.assumedTe;
+  return {
+    me: clampMe(copy?.material_efficiency ?? research.assumedMe),
+    te: Math.min(Math.max(te, 0), TE_MAX),
+  };
+}
+
 export interface MarketWideScanOptions {
+  /** Prices each row at the ME/TE a plan opened from it would use. Absent: ME/TE 0. */
+  research?: MarketWideResearch;
   liquidityFloorIsk?: number;
   topNPerMarketGroup?: number;
   /**
@@ -189,6 +215,7 @@ export async function runMarketWideScan(
       sellPrice: candidate.sellPrice!,
       sellDepthIsk: candidate.sellPrice! * candidate.sellVolume!,
       blueprintSkills: catalog.byBlueprintTypeID.get(tree.blueprintTypeID)?.blueprint.skills,
+      ...(options.research ? researchFor(tree.blueprintTypeID, options.research) : {}),
     };
   });
 

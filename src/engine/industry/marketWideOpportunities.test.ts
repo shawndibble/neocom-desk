@@ -79,6 +79,43 @@ describe('computeMarketWideRows', () => {
     ]);
   });
 
+  it('prices a candidate at its own ME/TE and carries them on the row (issue #5232)', () => {
+    const prices = new Map([
+      [50, 10],
+      [51, 20],
+    ]);
+    const base = { productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 };
+    const [plain] = computeMarketWideRows([base], prices, noFee);
+    const [researched] = computeMarketWideRows([{ ...base, me: 10, te: 20 }], prices, noFee);
+    // ME 10 takes 10% off the 200 ISK of materials; TE 20 takes 20% off the 3600 s.
+    expect(researched!.buildCost).toBeCloseTo(180, 6);
+    expect(researched!.seconds).toBeCloseTo(2880, 6);
+    expect(researched!.me).toBe(10);
+    expect(researched!.te).toBe(20);
+    expect(plain).toEqual(expect.objectContaining({ me: 0, te: 0, buildCost: 200, seconds: 3600 }));
+    // profit = 1000 - 75 tax - 100 broker - 180 = 645, over 0.8 h.
+    expect(researched!.iskPerHour).toBeCloseTo(645 / 0.8, 6);
+  });
+
+  it('keeps the job fee on base quantities: ME does not change the estimated item value', () => {
+    const feeTree = { ...tree, materials: [{ typeID: 60, quantity: 10 }] };
+    const args = [
+      new Map([[60, 50]]),
+      { ...noFee, adjustedPrices: { 60: 10_000 }, systemCostIndex: 0.05 },
+    ] as const;
+    const [plain] = computeMarketWideRows(
+      [{ productTypeID: 2, tree: feeTree, sellPrice: 2000, sellDepthIsk: 5_000_000 }],
+      ...args
+    );
+    const [researched] = computeMarketWideRows(
+      [{ productTypeID: 2, tree: feeTree, sellPrice: 2000, sellDepthIsk: 5_000_000, me: 10 }],
+      ...args
+    );
+    // 9250 job fee either way; materials 500 -> 450.
+    expect(plain!.buildCost).toBe(9750);
+    expect(researched!.buildCost).toBeCloseTo(9700, 6);
+  });
+
   it('includes the job installation fee via adjusted prices and the system cost index', () => {
     const feeTree = {
       blueprintTypeID: 901,
