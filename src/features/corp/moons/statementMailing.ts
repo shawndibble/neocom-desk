@@ -11,6 +11,7 @@ import type { Statement } from '@/engine/corpTaxBook/statements';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useEntityName } from '@/features/character/useEntityName';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { reminderAllowed } from '@/engine/corpTaxBook/mailQueue';
 import type { StatementToMail } from '@/features/corpTaxBook/mailQueue';
 import { addDays, periodLabel, refineryPlaceholder } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
@@ -81,26 +82,44 @@ export function oldestOpenStatement(view: BookContextValue['view'], minerId: str
  * "Send reminder" for one Miner, as the Miner's page and the Miners row menu both offer it:
  * `block` is why it cannot be sent (null when it can) and `send` queues the mail for the Miner's
  * oldest unsettled Statement (named in the notice), then reports the outcome through `onNotice` and reloads the book.
+ * With `statementId` (a Statement row) it targets that Statement instead, blocked once it is
+ * settled or its one officer reminder is sent (D27).
  */
-export function useMinerReminder(minerId: string, onNotice: (text: string) => void) {
+export function useMinerReminder(
+  minerId: string,
+  onNotice: (text: string) => void,
+  statementId?: string
+) {
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, corporationId, characterId } = ctx;
   const corporationName = useCorporationName();
   const detail = minerDetail(view, minerId);
-  const openStatement = oldestOpenStatement(view, minerId);
+  const settledOf = (id: string) =>
+    view.internals.byMiner.get(minerId)?.allocation.byStatement.get(id)?.settled === true;
+  const openStatement = statementId
+    ? detail?.statements.find((s) => s.id === statementId)
+    : oldestOpenStatement(view, minerId);
   const block = !openStatement
     ? t(
         detail && detail.row.owed > 0
           ? 'corpTaxBook.moons.miner.remindNone'
           : 'corpTaxBook.moons.miner.remindNothingOwed'
       )
-    : corporationName === null
-      ? t('corpTaxBook.moons.run.loadingCorporation')
-      : null;
+    : statementId && settledOf(openStatement.id)
+      ? t('corpTaxBook.moons.statementPeriod.alreadyPaid')
+      : statementId &&
+          !reminderAllowed({
+            remindersStopped: openStatement.remindersStopped === true,
+            manualRemindersSent: openStatement.manualRemindersSent ?? 0,
+          })
+        ? t('corpTaxBook.moons.statementPeriod.reminderCap')
+        : corporationName === null
+          ? t('corpTaxBook.moons.run.loadingCorporation')
+          : null;
 
   const send = async () => {
-    if (!detail || !openStatement || corporationName === null) return;
+    if (block || !detail || !openStatement || corporationName === null) return;
     const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
     const result = await enqueueReminder({
       corporationId,

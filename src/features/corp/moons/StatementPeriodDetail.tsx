@@ -1,3 +1,4 @@
+import { useCallback, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -7,6 +8,7 @@ import {
   StatChip,
   StatChips,
   Tooltip,
+  useOpenAfterMenu,
   type DataTableColumn,
 } from '@/components/ui';
 import {
@@ -15,10 +17,13 @@ import {
   type PeriodStatementRow,
 } from '@/engine/corpTaxBook/bookView';
 import { tabPath } from '@/lib/pageTabs';
+import { RecordPaymentDialog } from './BookDialogs';
+import { StatementRowMenu } from './StatementRowMenu';
 import { useBook } from './useBook';
 import { MOONS_TABS } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { Crumb, DueWord } from './moonsParts';
+import { useCards } from './sectionHelpers';
 
 const STATEMENTS_PATH = tabPath(MOONS_TABS, 'statements');
 
@@ -46,7 +51,29 @@ function MailWord({ mail }: { mail: PeriodStatementRow['mail'] }) {
 /** An issued period's page (#5285): its totals, then one Statement per Miner. */
 export function StatementPeriodDetail({ periodStart }: { periodStart: string }) {
   const { t } = useTranslation();
-  const { view, names } = useBook();
+  const { view, names, canEdit } = useBook();
+  const [recording, setRecording] = useState<PeriodStatementRow | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { run, onCloseAutoFocus } = useOpenAfterMenu();
+  const [tableRef, cards] = useCards();
+  const minerOf = (r: PeriodStatementRow) => view.miners.find((m) => m.id === r.statement.minerId);
+  const rowContextMenu = useCallback(
+    (r: PeriodStatementRow, tr: ReactElement) => {
+      const miner = view.miners.find((m) => m.id === r.statement.minerId);
+      return (
+        <StatementRowMenu
+          row={r}
+          minerName={miner ? names.character(miner.mainCharacterId) : r.statement.minerId}
+          onRecord={(row) => run(() => setRecording(row))}
+          onNotice={setNotice}
+          onCloseAutoFocus={onCloseAutoFocus}
+        >
+          {tr}
+        </StatementRowMenu>
+      );
+    },
+    [view, names, run, onCloseAutoFocus]
+  );
   const statements = periodStatements(view, periodStart);
   const period = periodRows(view).find((r) => r.start === periodStart && r.statements > 0);
   if (!statements || !period) {
@@ -136,18 +163,38 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
           emphasis
         />
       </StatChips>
+      {notice && (
+        <p role="status" className="text-xs text-text-dim">
+          {notice}
+        </p>
+      )}
       <Panel padded={false}>
-        <DataTable
-          label={t('corpTaxBook.moons.tabs.statements')}
-          columns={columns}
-          rows={statements}
-          rowKey={(r) => r.statement.id}
-          density="compact"
-          defaultSort={{ columnId: 'outstanding', direction: 'desc' }}
-          mobileSort
-          stackColumns={2}
-        />
+        <div ref={tableRef} className="@container overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.tabs.statements')}
+            columns={columns}
+            rows={statements}
+            rowKey={(r) => r.statement.id}
+            density="compact"
+            rowContextMenu={rowContextMenu}
+            rowMoreActions={canEdit}
+            defaultSort={{ columnId: 'outstanding', direction: 'desc' }}
+            mobileSort
+            stacked={cards}
+            stackColumns={2}
+          />
+        </div>
       </Panel>
+      {recording && minerOf(recording) && (
+        <RecordPaymentDialog
+          open
+          onClose={() => setRecording(null)}
+          miner={minerOf(recording)!}
+          minerName={names.character(minerOf(recording)!.mainCharacterId)}
+          defaultAmount={recording.outstanding}
+          statementId={recording.statement.id}
+        />
+      )}
     </div>
   );
 }

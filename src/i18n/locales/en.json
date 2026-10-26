@@ -16246,6 +16246,8 @@
         "stopped": "Stopped",
         "stoppedTip_one": "This Miner stopped reminders. {{count}} mail sent.",
         "stoppedTip_other": "This Miner stopped reminders. {{count}} mails sent.",
+        "alreadyPaid": "Statement already paid",
+        "reminderCap": "One reminder already sent",
         "dueLate_one": "{{date}} · {{count}} day late",
         "dueLate_other": "{{date}} · {{count}} days late"
       },

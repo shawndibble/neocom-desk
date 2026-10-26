@@ -13,6 +13,7 @@ import {
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { StatementPeriodDetail } from './StatementPeriodDetail';
+import { enqueueReminder } from '@/features/corpTaxBook/mailQueue';
 import { StatementsTab } from './StatementsTab';
 import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
 
@@ -79,7 +80,7 @@ function PeriodRoute() {
   return <StatementPeriodDetail periodStart={useParams().start ?? ''} />;
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, opts: { settleFirst?: boolean } = {}) {
   const first = buildBookView(input());
   const plan = planStatementRun(first, nextRunPeriod(first)!);
   const [a, b] = plan.lines.map((l) => ({
@@ -90,8 +91,23 @@ function renderAt(path: string) {
     input({
       statements: [
         { ...a, mailsSent: 2 } as typeof a,
-        { ...b, mailsSent: 1, remindersStopped: true } as typeof b,
+        { ...b, mailsSent: 1, remindersStopped: true, manualRemindersSent: 1 } as typeof b,
       ],
+      ...(opts.settleFirst
+        ? {
+            payments: [
+              {
+                id: 'p1',
+                minerId: a.minerId,
+                characterId: 1,
+                amount: a.amount,
+                at: '2026-09-02T00:00:00Z',
+                source: 'manual' as const,
+                statementId: a.id,
+              },
+            ],
+          }
+        : {}),
     })
   );
   render(
@@ -155,5 +171,52 @@ describe('Statements drill-down (#5285)', () => {
   it('a period without Statements says so', () => {
     renderAt('/corp/moons/statements/2020-01-01');
     expect(screen.getByText('No Statements were issued for this period.')).toBeInTheDocument();
+  });
+
+  describe('row actions (#5287)', () => {
+    async function openMenu(name: string) {
+      const table = screen.getByRole('table', { name: 'Statements' });
+      const row = within(table).getByText(name).closest('tr')!;
+      await userEvent.click(within(row).getByRole('button', { name: /actions/i }));
+    }
+
+    it("Send reminder targets that row's Statement", async () => {
+      vi.mocked(enqueueReminder).mockResolvedValue({ ok: true } as never);
+      renderAt('/corp/moons/statements/2026-08-01');
+      await openMenu('Pilot 1');
+      await userEvent.click(await screen.findByRole('menuitem', { name: /Send reminder/ }));
+      expect(enqueueReminder).toHaveBeenCalledTimes(1);
+      const arg = vi.mocked(enqueueReminder).mock.calls[0]![0];
+      expect(arg.statement.recipientId).toBe(1);
+    });
+
+    it('Send reminder is disabled with the reason once the one reminder is sent', async () => {
+      vi.mocked(enqueueReminder).mockClear();
+      renderAt('/corp/moons/statements/2026-08-01');
+      await openMenu('Pilot 2');
+      const item = await screen.findByRole('menuitem', { name: /Send reminder/ });
+      expect(item).toHaveAttribute('aria-disabled', 'true');
+      expect(item).toHaveTextContent('One reminder already sent');
+      await userEvent.click(item);
+      expect(enqueueReminder).not.toHaveBeenCalled();
+    });
+
+    it('Send reminder is disabled on a settled Statement; Record payment stays with a hint', async () => {
+      renderAt('/corp/moons/statements/2026-08-01', { settleFirst: true });
+      await openMenu('Pilot 1');
+      const remind = await screen.findByRole('menuitem', { name: /Send reminder/ });
+      expect(remind).toHaveAttribute('aria-disabled', 'true');
+      expect(remind).toHaveTextContent('Statement already paid');
+      const record = screen.getByRole('menuitem', { name: /Record payment/ });
+      expect(record).not.toHaveAttribute('aria-disabled', 'true');
+      expect(record).toHaveTextContent('Statement already paid');
+    });
+
+    it('Record payment opens the dialog for that Statement', async () => {
+      renderAt('/corp/moons/statements/2026-08-01');
+      await openMenu('Pilot 1');
+      await userEvent.click(await screen.findByRole('menuitem', { name: /Record payment/ }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
   });
 });
