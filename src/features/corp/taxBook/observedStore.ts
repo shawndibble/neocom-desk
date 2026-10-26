@@ -9,6 +9,13 @@ import { db } from '@/db';
 import type { CorpBookObservedMetaRecord, CorpBookObservedRecord } from '@/db';
 import type { ObservedCopyMeta, StoredObserved } from './observedDelta';
 
+/**
+ * Counts wipes that are not a book switch. A part read that was in flight when
+ * one landed must not save its copy back (bookPartStore.ts).
+ */
+let wipeEpoch = 0;
+export const currentWipeEpoch = () => wipeEpoch;
+
 const tables = () => [db.corpBookObserved, db.corpBookObservedMeta, db.corpBookParts];
 
 export async function readObservedCopy(
@@ -72,16 +79,17 @@ export async function saveObservedCopy(
 
 /** Drops every copy but this book's (a Character or corporation switch). */
 export async function dropOtherBooks(characterId: number, corporationId: number): Promise<void> {
+  // Keys only: a part's data can be as large as the book.
   const held = [
-    ...(await db.corpBookObservedMeta.toArray()),
-    ...(await db.corpBookParts.toArray()),
+    ...(await db.corpBookObservedMeta.toCollection().primaryKeys()),
+    ...(await db.corpBookParts.toCollection().primaryKeys()),
   ];
   const others = new Map(
     held
-      .filter((m) => m.characterId !== characterId || m.corporationId !== corporationId)
-      .map((m) => [`${m.characterId}:${m.corporationId}`, m] as const)
+      .filter(([c, corp]) => c !== characterId || corp !== corporationId)
+      .map(([c, corp]) => [`${c}:${corp}`, [c, corp] as const] as const)
   );
-  for (const m of others.values()) await forgetBook(m.characterId, m.corporationId);
+  for (const [c, corp] of others.values()) await forgetBook(c, corp);
 }
 
 async function forgetBook(characterId: number, corporationId: number): Promise<void> {
@@ -98,11 +106,13 @@ async function forgetBook(characterId: number, corporationId: number): Promise<v
 
 /** Drops this Character's copy of one book, every part of it (the officer check or the rules refused). */
 export function forgetObservedCopy(characterId: number, corporationId: number): Promise<void> {
+  wipeEpoch++;
   return db.transaction('rw', tables(), () => forgetBook(characterId, corporationId));
 }
 
 /** Drops every copy this Character holds. Call inside a transaction that includes these tables. */
 export async function clearObservedCopies(characterId: number): Promise<void> {
+  wipeEpoch++;
   await db.corpBookObserved.where('characterId').equals(characterId).delete();
   await db.corpBookObservedMeta.where('characterId').equals(characterId).delete();
   await db.corpBookParts.where('characterId').equals(characterId).delete();

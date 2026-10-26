@@ -87,7 +87,10 @@ export async function cachedPart<T>(
 ): Promise<T> {
   const version = versions?.collections[collection];
   const fresh = (c: Copy | undefined): c is Copy =>
-    version !== undefined && c?.version === version && now - c.at <= BOOK_CACHE_MAX_AGE_MS;
+    version !== undefined &&
+    c?.version === version &&
+    c.at <= now && // a clock set back must not keep a copy alive
+    now - c.at <= BOOK_CACHE_MAX_AGE_MS;
   let held = copies.get(key)?.get(slot);
   if (!fresh(held) && version !== undefined && store) {
     held = await store.load(slot).catch(() => undefined);

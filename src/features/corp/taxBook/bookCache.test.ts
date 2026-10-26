@@ -159,6 +159,15 @@ describe('cachedPart', () => {
       expect(held.miners).toBeUndefined();
     });
 
+    it('does not trust a copy stamped in the future (clock set back)', async () => {
+      const { store } = memoryStore({
+        miners: { version: 'm1', at: T0 + 48 * 3600_000, data: ['old'] },
+      });
+      const read = vi.fn(async () => ['new']);
+      await cachedPart(KEY, 'miners', versions, read, { now: T0, store });
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+
     it('still reads when the store fails', async () => {
       const store: PartStore = {
         load: async () => Promise.reject(new Error('dexie')),

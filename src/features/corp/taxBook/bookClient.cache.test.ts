@@ -160,6 +160,17 @@ describe('readBookData over the version marker', () => {
     expect(await db.corpBookObserved.count()).toBe(0);
   });
 
+  it('does not save a part read that a wipe overtook', async () => {
+    const { forgetObservedCopy } = await import('./observedStore');
+    const first = readBookData(7, CORP);
+    // The book is open (its stores made) once meta/paid is requested.
+    await vi.waitFor(() => expect(store.reads).toContain(`${BOOK}/meta/paid`));
+    await forgetObservedCopy(7, CORP);
+    await first;
+
+    expect(await db.corpBookParts.count()).toBe(0);
+  });
+
   it('wipes the parts of a book that is gone', async () => {
     await readBookData(7, CORP);
     store.docs.delete(BOOK);
