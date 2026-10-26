@@ -17,6 +17,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  Timestamp,
   where,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
@@ -138,6 +139,74 @@ export async function loadRequestsSince(
     .map((entry) => readRequest(entry.id, entry.data()))
     .filter((request): request is CommunityRequest => request !== null)
     .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * The board's version stamp (issue #5244): `communities/{id}/boardVersion/current`, one read. `stamp`
+ * moves on every write to a Request or Pledge, `reset` only on one that deletes (a delta cannot show
+ * a deletion). A board with no stamp yet reads 0 / 0. Null under a backend override: no cache there.
+ */
+export async function loadBoardVersion(
+  characterId: number,
+  communityId: string
+): Promise<{ stamp: number; reset: number } | null> {
+  if (communityBackendOverride()?.loadItemRequests) return null;
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDoc(
+      doc(getSyncFirestore(characterId), 'communities', communityId, 'boardVersion', 'current')
+    );
+  });
+  const data = snap.exists() ? snap.data() : {};
+  const millis = (value: unknown) =>
+    (value as { toMillis?: () => number } | undefined)?.toMillis?.() ?? 0;
+  return { stamp: millis(data.stamp), reset: millis(data.reset) };
+}
+
+/**
+ * Sets the board's version stamp after a Pledge write (the callables set it for Requests), and
+ * `reset` too when the write deleted a Pledge. Best effort: the Pledge is already saved, and a
+ * missed stamp only leaves other devices on their cached board until it ages out.
+ */
+export async function bumpBoardVersion(
+  characterId: number,
+  communityId: string,
+  deleted: boolean
+): Promise<void> {
+  try {
+    await underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      await setDoc(
+        doc(getSyncFirestore(characterId), 'communities', communityId, 'boardVersion', 'current'),
+        deleted
+          ? { stamp: serverTimestamp(), reset: serverTimestamp() }
+          : { stamp: serverTimestamp() },
+        { merge: true }
+      );
+    });
+  } catch (err) {
+    console.warn('Community board version could not be stamped', err);
+  }
+}
+
+/** The Requests whose `lastActivityAt` is at or after `since` (epoch ms): the delta over a cached board. */
+export async function loadRequestsActiveSince(
+  characterId: number,
+  communityId: string,
+  since: number
+): Promise<CommunityRequest[]> {
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      query(
+        collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests'),
+        where('lastActivityAt', '>=', since)
+      )
+    );
+  });
+  return snap.docs
+    .map((entry) => readRequest(entry.id, entry.data()))
+    .filter((request): request is CommunityRequest => request !== null);
 }
 
 /**
@@ -346,6 +415,36 @@ export async function loadCommunityPledges(
 }
 
 /**
+ * The Pledges in a Community written at or after `since` (epoch ms), by Request id: the delta over a
+ * cached board. A collection-group query on `communityId` and `updatedAt` (a composite index in
+ * firestore.indexes.json); callers fall back to the whole read when it is not deployed.
+ */
+export async function loadCommunityPledgesSince(
+  characterId: number,
+  communityId: string,
+  since: number
+): Promise<Map<string, RequestPledge[]>> {
+  const found = new Map<string, RequestPledge[]>();
+  const snap = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return getDocs(
+      query(
+        collectionGroup(getSyncFirestore(characterId), 'pledges'),
+        where('communityId', '==', communityId),
+        where('updatedAt', '>=', Timestamp.fromMillis(since))
+      )
+    );
+  });
+  for (const entry of snap.docs) {
+    const requestId = entry.ref.parent.parent?.id;
+    const pledge = readPledge(entry.id, entry.data());
+    if (!requestId || !pledge) continue;
+    found.set(requestId, [...(found.get(requestId) ?? []), pledge]);
+  }
+  return found;
+}
+
+/**
  * This Character's own Pledges in a Community, by Request id: the delivery sweep needs nothing
  * else. One collection-group query on `communityId` and `ownerHash` (every Pledge carries both,
  * the rules bind them), so it costs what the Character has pledged, not the whole Community.
@@ -440,9 +539,11 @@ export async function updateMyPledge(
     override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return underFirebaseSession(() =>
+  const written = await underFirebaseSession(() =>
     writeMyPledge(characterId, communityId, requestId, uid, change)
   );
+  await bumpBoardVersion(characterId, communityId, written === null);
+  return written;
 }
 
 async function writeMyPledge(
@@ -517,7 +618,7 @@ export async function saveMyQuote(
     override.saveQuote(communityId, requestId, quote);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return underFirebaseSession(async () => {
+  const saved = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     const ref = doc(
       getSyncFirestore(characterId),
@@ -543,6 +644,8 @@ export async function saveMyQuote(
     });
     return readPledge(uid, (await getDoc(ref)).data() ?? {});
   });
+  await bumpBoardVersion(characterId, communityId, quote === null);
+  return saved;
 }
 
 /**
@@ -598,4 +701,5 @@ export async function saveQuoteLinks(
       });
     });
   });
+  await bumpBoardVersion(characterId, communityId, false);
 }

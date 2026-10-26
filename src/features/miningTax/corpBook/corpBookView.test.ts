@@ -100,7 +100,7 @@ describe('buildCorpBookView', () => {
     expect(view.books[0].left).toBe(true);
   });
 
-  it('turns a donation in the wallet the book does not hold into Sent, waiting', () => {
+  it('counts a donation in the wallet the book does not hold yet as paid', () => {
     const view = buildCorpBookView(
       input({
         made: [
@@ -119,8 +119,7 @@ describe('buildCorpBookView', () => {
       }),
       payeeName
     )!;
-    expect(view.overlay.rows[0].state).toBe('sent-waiting');
-    expect(view.books[0].inFlightAt).toBe('2026-10-18T13:10:00Z');
+    expect(view.overlay.rows[0].state).toBe('paid');
   });
 
   it("lists the member's own Unmatched donations to claim", () => {

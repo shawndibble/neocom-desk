@@ -67,7 +67,7 @@ export function CorpRowDetailModal({
       : 'miningTax.detail.breakdown.raw'
   );
   const owed = view.taxOwed ?? 0;
-  const owing = view.state === 'billed' || view.state === 'sent-waiting';
+  const owing = view.state === 'billed';
   const scope = t(`miningTax.corpBook.rateScope.${view.rateScope}`);
   const synced = book?.summary.lastSyncedAt;
   const personal = view.personalOreLines;
@@ -178,13 +178,15 @@ export function CorpRowDetailModal({
 
           <p className="rounded-xs border border-line p-2 text-xs text-text-dim">
             {hint(corp)}{' '}
-            {(view.state === 'billed' || view.state === 'sent-waiting' || view.state === 'paid') &&
-              (view.statementId
-                ? t('miningTax.corpBook.detail.onStatement', { corp: corp.corpName })
-                : t('miningTax.corpBook.detail.decides', {
-                    corp: corp.corpName,
-                    ago: synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : '—',
-                  }))}{' '}
+            {/* A day paid before any Statement bills it (a donation sent ahead) has nothing pending to explain. */}
+            {view.statementId
+              ? (view.state === 'billed' || view.state === 'paid') &&
+                t('miningTax.corpBook.detail.onStatement', { corp: corp.corpName })
+              : view.state === 'billed' &&
+                t('miningTax.corpBook.detail.decides', {
+                  corp: corp.corpName,
+                  ago: synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : '—',
+                })}{' '}
             {t('miningTax.corpBook.detail.terms', {
               hub: hub.name,
               form,

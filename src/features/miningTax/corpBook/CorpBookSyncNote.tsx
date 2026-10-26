@@ -17,8 +17,9 @@ function shortDate(date: string, language: string): string {
 /**
  * D12's "Safe to pay" wording under the corp's balance card: until a sync after
  * the grace period the corp's record is not final ("Safe to pay once <Corp>
- * syncs (last synced 2d ago)"), then "Safe to pay — 12 Jul is closed". Also the
- * donation in flight, credit on the next Statement, and a leaver's note.
+ * syncs (last synced 2d ago)"), then "Safe to pay — 12 Jul is closed". Also
+ * credit on the next Statement and a leaver's note. A donation still waiting
+ * for the corp to credit it is left unsaid: that is the corp's side to handle.
  */
 export function CorpBookSyncNote({
   book,
@@ -39,7 +40,7 @@ export function CorpBookSyncNote({
   const ago = synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : null;
   const closedThrough = summary.closedThrough;
   const hasWords = owedNow > 0 || book.pendingFrom !== undefined || book.left || summary.credit > 0;
-  if (!hasWords && summary.inFlightAmount <= 0) return null;
+  if (!hasWords) return null;
 
   const safe =
     owedNow > 0 || book.pendingFrom !== undefined
@@ -69,14 +70,6 @@ export function CorpBookSyncNote({
             date: shortDate(book.pendingFrom, i18n.language),
             time: closesAt.toISOString().slice(11, 16),
             closeDate: shortDate(closesAt.toISOString().slice(0, 10), i18n.language),
-            corp: corpName,
-          })}
-        </span>
-      )}
-      {summary.inFlightAmount > 0 && (
-        <span className="text-warning">
-          {t('miningTax.corpBook.sync.inFlight', {
-            amount: formatIsk(summary.inFlightAmount, 0),
             corp: corpName,
           })}
         </span>

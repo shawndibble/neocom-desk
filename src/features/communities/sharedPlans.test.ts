@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const setDoc = vi.fn();
 const deleteDoc = vi.fn();
 const getDocs = vi.fn();
+const limits: number[] = [];
 
 vi.mock('firebase/firestore/lite', () => ({
   collection: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
@@ -12,6 +13,10 @@ vi.mock('firebase/firestore/lite', () => ({
   }),
   query: (target: unknown) => target,
   where: () => ({}),
+  limit: (n: number) => {
+    limits.push(n);
+    return {};
+  },
   getDocs: (...args: unknown[]) => getDocs(...args),
   setDoc: (...args: unknown[]) => setDoc(...args),
   deleteDoc: (...args: unknown[]) => deleteDoc(...args),
@@ -22,7 +27,13 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: async () => 'char:1' }));
 vi.mock('./communityStore', () => ({ listCommunityIds: async () => ['c1'] }));
 
 import { db } from '@/db';
-import { loadCommunityPlans, loadMySharedPlans, sharePlan, syncSharedPlans } from './sharedPlans';
+import {
+  COMMUNITY_PLANS_CAP,
+  loadCommunityPlans,
+  loadMySharedPlans,
+  sharePlan,
+  syncSharedPlans,
+} from './sharedPlans';
 
 const plan = (over: Record<string, unknown> = {}) => ({
   id: 'p1',
@@ -100,7 +111,9 @@ describe('loading', () => {
         }),
       ],
     });
+    limits.length = 0;
     const plans = await loadCommunityPlans(1, 'c1');
+    expect(limits).toEqual([COMMUNITY_PLANS_CAP]);
     expect(plans).toHaveLength(1);
     expect(plans[0]).toMatchObject({
       planId: 'a',

@@ -67,6 +67,21 @@ export function clearBookCache(): void {
   copies.clear();
 }
 
+/** Drops every slot this tab holds under `key`. */
+export const forgetMemoryCopies = (key: string): void => void copies.delete(key);
+
+/** This tab's copy of one slot, for a part that plans its own read (member delta, #5243). */
+export const memoryCopy = (key: string, slot: string): Copy | undefined =>
+  copies.get(key)?.get(slot);
+
+export function setMemoryCopy(key: string, slot: string, copy: Copy | undefined): void {
+  if (!copy) copies.get(key)?.delete(slot);
+  else {
+    if (!copies.has(key)) copies.set(key, new Map());
+    copies.get(key)!.set(slot, copy);
+  }
+}
+
 /**
  * One part of a book, guarded by the stamp of `collection`: the copy when that
  * stamp still matches and the copy is young enough, otherwise `read()`, kept

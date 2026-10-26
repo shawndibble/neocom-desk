@@ -49,7 +49,8 @@ export async function readObservedRows(
   version: string | undefined,
   /** The officer-only probe: its failure means the rules refuse this Character. */
   gate: Promise<unknown>,
-  now = Date.now()
+  now = Date.now(),
+  bookCreatedAt?: number
 ): Promise<ObservedRow[]> {
   const forgetOnDenied = async (error: unknown): Promise<never> => {
     if (isDenied(error)) await quietly(() => forgetObservedCopy(characterId, corporationId));
@@ -63,7 +64,7 @@ export async function readObservedRows(
   const col = collection(db, 'corps', String(corporationId), 'observed');
   await quietly(() => dropOtherBooks(characterId, corporationId));
   const held = await quietly(() => readObservedCopy(characterId, corporationId));
-  const plan = planObservedRead(held?.meta, version, now);
+  const plan = planObservedRead(held?.meta, version, now, bookCreatedAt);
 
   if (plan.kind === 'cached' && held) return held.rows.map((r) => r.row as ObservedRow);
 
@@ -89,6 +90,7 @@ export async function readObservedRows(
         checkedAt: now,
         fullAt: now,
         watermark: applyObservedDelta([], rows, null).watermark,
+        ...(bookCreatedAt !== undefined ? { bookCreatedAt } : {}),
       };
       await quietly(() => saveObservedCopy(characterId, corporationId, rows, meta, true));
     }

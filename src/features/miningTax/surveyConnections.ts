@@ -6,8 +6,9 @@
  * `engine/miningTax/surveyConnection.ts`).
  *
  * Kept as one synced setting, so a second device keeps assigning the same
- * moon: a list of at most a handful of short-lived records, pruned on every
- * write, needs no collection of its own (and no Firestore rules change).
+ * moon: a list of short-lived records (one, since only one Auto Assignment
+ * runs at a time), pruned on every write, needs no collection of its own (and
+ * no Firestore rules change).
  *
  * Runs from the Tax tab's load (`snapshot.ts`) and from the Survey while it
  * is open (`useSurveyConnection`), so ore is assigned whichever the pilot is
@@ -18,7 +19,7 @@ import {
   isConnectionLive,
   parseSurveyConnections,
   planSurveyAutoAssign,
-  upsertSurveyConnection,
+  updateSurveyConnection,
   type SurveyConnection,
 } from '@/engine/miningTax/surveyConnection';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
@@ -41,10 +42,21 @@ export const useSurveyConnections = createSyncedSetting<SurveyConnection[]>({
   parse: parseSurveyConnections,
 });
 
-/** The stored list, read before any write: a write before hydration would replace it with `[]`. */
-async function current(): Promise<ReturnType<typeof useSurveyConnections.getState>> {
-  if (!useSurveyConnections.getState().hydrated) await useSurveyConnections.getState().hydrate();
-  return useSurveyConnections.getState();
+/**
+ * The stored list, read before any write: a write before hydration would
+ * replace it with `[]`. Read from Dexie, not the store, which another tab's
+ * write reaches only on the next sync: a tab still showing a replaced
+ * connection must not write it back over the one running now.
+ */
+async function current(): Promise<{
+  value: SurveyConnection[];
+  setValue: (value: SurveyConnection[]) => Promise<void>;
+}> {
+  const state = useSurveyConnections.getState();
+  if (!state.hydrated) await state.hydrate();
+  const row = await db.settings.get(SYNCED_SURVEY_CONNECTIONS_KEY);
+  const { value, setValue } = useSurveyConnections.getState();
+  return { value: row === undefined ? value : (parseSurveyConnections(row.value) ?? []), setValue };
 }
 
 async function liveConnections(nowMs: number): Promise<SurveyConnection[]> {
@@ -68,9 +80,41 @@ export async function surveyMoonOreTypeIds(oreNames: readonly string[]): Promise
     .sort((a, b) => a - b);
 }
 
-export async function saveSurveyConnection(connection: SurveyConnection): Promise<void> {
+/**
+ * Starts `connection` as the only one: one Auto Assignment runs at a time, on
+ * any Character, so Assign Taxes stops whichever was running. Resolves to the
+ * live connections it replaced, for Undo (`restoreSurveyConnections`).
+ */
+export async function startSurveyConnection(
+  connection: SurveyConnection
+): Promise<SurveyConnection[]> {
   const { value, setValue } = await current();
-  await setValue(upsertSurveyConnection(value, connection, Date.now()));
+  const replaced = value.filter((c) => isConnectionLive(c, Date.now()));
+  await setValue([connection]);
+  return replaced;
+}
+
+/** Saves a running connection as its Survey moves on; does nothing once it was stopped or replaced. */
+export async function refreshSurveyConnection(connection: SurveyConnection): Promise<void> {
+  const { value, setValue } = await current();
+  await setValue(updateSurveyConnection(value, connection, Date.now()));
+}
+
+const sameStart = (a: SurveyConnection, b: SurveyConnection) =>
+  a.surveyId === b.surveyId && a.characterId === b.characterId && a.connectedAt === b.connectedAt;
+
+/**
+ * Puts the connections back as they were, for Undo of `startSurveyConnection`
+ * (`started`; null puts them back unconditionally). Does nothing once
+ * `started` is no longer running: Undo never stops one started since.
+ */
+export async function restoreSurveyConnections(
+  connections: readonly SurveyConnection[],
+  started: SurveyConnection | null
+): Promise<void> {
+  const { value, setValue } = await current();
+  if (started !== null && !value.some((c) => sameStart(c, started))) return;
+  await setValue([...connections]);
 }
 
 export async function removeSurveyConnection(surveyId: string, characterId: number): Promise<void> {

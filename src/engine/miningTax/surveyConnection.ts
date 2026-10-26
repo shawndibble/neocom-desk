@@ -6,12 +6,12 @@
  * unassigned ore line of the Survey's moon ore types, in the Survey's system,
  * is assigned to that Payee at that rate as it reaches the Mining Ledger.
  *
- * The ledger has days, systems and ore types, never moons, so this never
- * guesses: an entry holding ore no live connection covers (another moon's
- * ore), or ore two live connections both claim while both are being mined, is
- * left for the pilot to assign. Two moons in one system are still told apart
- * by time, because only the one being mined is live (or the one still in its
- * grace period when no other is).
+ * Only one connection runs at a time (scope decision "one Auto Assignment at
+ * a time"): Assign Taxes on another Survey replaces it. The ledger has days,
+ * systems and ore types, never moons, so this never guesses: an entry holding
+ * ore no live connection covers (another moon's ore) is left for the pilot to
+ * assign. Lists synced before that rule can still hold two; ore both claim
+ * while both are being mined stays unassigned too.
  *
  * Pure: the caller loads entries and Assignments and writes what this plans.
  */
@@ -99,13 +99,20 @@ export function isConnectionLive(connection: SurveyConnection, nowMs: number): b
 const sameConnection = (a: SurveyConnection, b: SurveyConnection) =>
   a.surveyId === b.surveyId && a.characterId === b.characterId;
 
-/** Saves `next` over the same Survey's connection for the same Character, dropping any no longer live. */
-export function upsertSurveyConnection(
+/**
+ * Saves `next` over the same Survey's connection for the same Character,
+ * dropping any no longer live. Adds nothing when that connection is gone:
+ * a Survey left open after a Stop, or after another Survey replaced it,
+ * must not bring it back.
+ */
+export function updateSurveyConnection(
   list: readonly SurveyConnection[],
   next: SurveyConnection,
   nowMs: number
 ): SurveyConnection[] {
-  return [...list.filter((c) => !sameConnection(c, next) && isConnectionLive(c, nowMs)), next];
+  return list
+    .filter((c) => isConnectionLive(c, nowMs))
+    .map((c) => (sameConnection(c, next) ? next : c));
 }
 
 function isConnection(value: unknown): value is SurveyConnection {
@@ -172,32 +179,6 @@ function ownerOf(
   if (claimants.length === 1) return claimants[0];
   const mining = claimants.filter((c) => nowMs <= c.untilMs);
   return mining.length === 1 ? mining[0] : undefined;
-}
-
-/**
- * Another live connection this one shares ore with that nobody owns: same
- * Character and system, a shared ore type, and `ownerOf` finds no single owner,
- * so `planSurveyAutoAssign` leaves that ore for the pilot to assign.
- */
-export function findOreClash(
-  connection: SurveyConnection,
-  connections: readonly SurveyConnection[],
-  nowMs: number
-): SurveyConnection | undefined {
-  if (connection.systemId === null) return undefined;
-  const sameField = connections.filter(
-    (c) =>
-      c.characterId === connection.characterId &&
-      c.systemId === connection.systemId &&
-      isConnectionLive(c, nowMs)
-  );
-  for (const typeId of connection.typeIds) {
-    const claimants = sameField.filter((c) => c.typeIds.includes(typeId));
-    if (claimants.length > 1 && ownerOf(claimants, nowMs) === undefined) {
-      return claimants.find((c) => c !== connection && c.surveyId !== connection.surveyId);
-    }
-  }
-  return undefined;
 }
 
 /**

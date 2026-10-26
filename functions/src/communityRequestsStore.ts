@@ -23,6 +23,8 @@ import {
   decideExtend,
   sameLineSlots,
   PLEDGES_COLLECTION,
+  boardVersionBump,
+  boardVersionRef,
   type EditRequestInput,
   decidePost,
   decideSetClosed,
@@ -152,6 +154,7 @@ export async function postRequest(
         ? standingFields(input.standing)
         : { expiresAt: now + REQUEST_LIFETIME_MS }),
     });
+    tx.set(boardVersionRef(db, input.communityId), boardVersionBump(), { merge: true });
   });
   return { requestId: ref.id };
 }
@@ -204,6 +207,7 @@ export async function editRequest(
       ...(input.notify ? { notify: input.notify } : {}),
       lastActivityAt: now,
     });
+    tx.set(boardVersionRef(db, input.communityId), boardVersionBump(), { merge: true });
   });
 }
 
@@ -237,6 +241,7 @@ export async function extendRequest(
     if (decision !== 'ok') failRequestDecision(decision);
     const expiresAt = nextExpiry(now, Number(snap.get('expiresAt') ?? 0));
     tx.update(ref, { expiresAt, lastActivityAt: now });
+    tx.set(boardVersionRef(db, communityId), boardVersionBump(), { merge: true });
     return { expiresAt };
   });
 }
@@ -279,6 +284,7 @@ export async function setRequestClosed(
         ...(snap.get('standing') === true ? {} : { expiresAt: now + REQUEST_LIFETIME_MS }),
       });
     }
+    tx.set(boardVersionRef(db, communityId), boardVersionBump(), { merge: true });
   });
 }
 

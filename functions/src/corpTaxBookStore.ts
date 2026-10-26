@@ -16,6 +16,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { backfillObservedUpdatedAt } from './corpTaxBookObservedBackfill.js';
 import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
 import {
   ACCESS_TTL_MS,
@@ -556,6 +557,10 @@ export async function syncBookAs(
   }
 
   const observedChanged = await mergeObservedInto(deps, input.corporationId, input.observed);
+  // Old rows carry no `updatedAt`, which a client's delta read needs (#5243). Best effort.
+  await backfillObservedUpdatedAt(deps.db, input.corporationId, deps.now).catch((e) =>
+    console.error('observed backfill failed', e instanceof Error ? e.message : e)
+  );
 
   const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
   for (const x of input.extractions) {

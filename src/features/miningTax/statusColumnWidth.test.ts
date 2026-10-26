@@ -17,7 +17,6 @@ describe('statusColumnWidthClass', () => {
   });
 
   it('fits the long corp-book pills, which print on one line', () => {
-    expect(statusColumnWidthClass(pills('Sent, waiting'))).toBe('sm:w-36');
     expect(statusColumnWidthClass(pills('Dismissed by corp'))).toBe('sm:w-44');
     expect(statusColumnWidthClass(pills('Pending corp record'))).toBe('sm:w-48');
   });

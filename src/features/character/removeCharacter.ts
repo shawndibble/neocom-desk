@@ -10,6 +10,7 @@
 // a Character they still hold — there is no signal to detect it from, so it
 // needs its own explicit entry point.
 
+import { clearBookCache } from '@/features/corp/taxBook/bookCache';
 import { clearObservedCopies } from '@/features/corp/taxBook/observedStore';
 import { clearWalletArchive } from '@/features/character/walletArchive';
 import { deleteCommunitySnapshots } from '@/features/communities/communityCache';
@@ -149,6 +150,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await clearWalletArchive(characterId);
       // Officer-only rows (ADR 0031) leave with the Character.
       await clearObservedCopies(characterId);
+      // This tab's own copies of those books, which a matching stamp would otherwise still serve.
+      clearBookCache();
       // Orphaned feed rows are invisible in the UI (both the bell panel and the
       // other-character counts skip ids with no Character) but `refreshAppBadge`
       // counts the whole table — leaving an app-icon count nothing can dismiss.

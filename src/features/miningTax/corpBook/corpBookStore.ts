@@ -35,6 +35,8 @@ import { getDocUnlessKnownMissing, NOT_FOUND_TTL_MS } from '@/sync/notFoundCache
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
 import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
 import { bookVersionsOf, cachedPart } from '@/features/corp/taxBook/bookCache';
+import { forgetMemberParts, memberPartStore } from './memberPartStore';
+import { readMemberObserved } from './memberObservedRead';
 
 type Data = Record<string, unknown>;
 
@@ -46,7 +48,7 @@ export interface ClaimablePayment {
   at: string;
 }
 
-/** What the book holds of a donation, for telling "sent, waiting" from "credited". */
+/** What the book holds of a donation, for telling one it holds from one it does not hold yet. */
 export interface HeldPayment {
   characterId: number;
   amount: number;
@@ -482,8 +484,13 @@ async function readOneBook(
     () => getDoc(doc(fs, 'corps', String(corporationId)))
   );
   const settings = readBookSettings(corporationId, bookDoc);
-  if (!settings) return null;
+  if (!settings) {
+    // The book is gone or hidden from members: keep none of its lines on this device.
+    for (const characterId of characterIds) await forgetMemberParts(characterId, corporationId);
+    return null;
+  }
   const versions = bookVersionsOf(bookDoc);
+  const bookCreatedAt = typeof bookDoc?.createdAt === 'number' ? bookDoc.createdAt : undefined;
 
   const rows: ObservedRow[] = [];
   const payments: TaxPayment[] = [];
@@ -500,16 +507,22 @@ async function readOneBook(
     const memberFs = getSyncFirestore(characterId);
     // Its own key: a member's copy holds only its own lines, never an officer's whole book.
     const key = `member:${characterId}:${corporationId}`;
+    const store = memberPartStore(characterId, corporationId);
     const part = (name: string, field: 'uid' | 'uids'): Promise<Docs> =>
-      cachedPart(key, name, versions, async () =>
-        docsOf(
-          await getDocs(
-            query(
-              collection(memberFs, root, name),
-              field === 'uid' ? where('uid', '==', uid) : where('uids', 'array-contains', uid)
+      cachedPart(
+        key,
+        name,
+        versions,
+        async () =>
+          docsOf(
+            await getDocs(
+              query(
+                collection(memberFs, root, name),
+                field === 'uid' ? where('uid', '==', uid) : where('uids', 'array-contains', uid)
+              )
             )
-          )
-        )
+          ),
+        { store }
       );
     // Readable by a Character the book bills; any one of them will do. Cached only
     // while this load's pointer names the book; with no pointer read, live as before.
@@ -518,7 +531,7 @@ async function readOneBook(
     const billing = feeders === null ? billedHere(characterId) : 'not-billed';
     const coverageRead: Promise<Docs | null> =
       billing === 'billed'
-        ? orNone(cachedPart(key, 'feederCoverage', versions, readCoverage))
+        ? orNone(cachedPart(key, 'feederCoverage', versions, readCoverage, { store }))
         : billing === 'unknown'
           ? orNone(readCoverage())
           : Promise.resolve(null);
@@ -532,7 +545,15 @@ async function readOneBook(
       writeOffDocs,
       coverageDocs,
     ] = await Promise.all([
-      part('observed', 'uid'),
+      readMemberObserved({
+        db: memberFs,
+        key,
+        root,
+        uid,
+        version: versions?.collections.observed,
+        store,
+        bookCreatedAt,
+      }),
       part('payments', 'uid'),
       part('dismissals', 'uids'),
       part('statements', 'uids'),

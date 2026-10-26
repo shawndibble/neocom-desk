@@ -34,6 +34,7 @@ export async function readObservedCopy(
       checkedAt: meta.checkedAt,
       fullAt: meta.fullAt,
       watermark: meta.watermark,
+      ...(meta.bookCreatedAt !== undefined ? { bookCreatedAt: meta.bookCreatedAt } : {}),
     },
     rows: rows.map((r) => ({ id: r.id, row: r.row, updatedMs: r.updatedMs })),
   };
@@ -82,7 +83,10 @@ export async function dropOtherBooks(characterId: number, corporationId: number)
   // Keys only: a part's data can be as large as the book.
   const held = [
     ...(await db.corpBookObservedMeta.toCollection().primaryKeys()),
-    ...(await db.corpBookParts.toCollection().primaryKeys()),
+    // A member's own lines (memberPartStore.ts) are not an officer's book: they stay.
+    ...(await db.corpBookParts.toCollection().primaryKeys()).filter(
+      ([, , slot]) => !slot.startsWith('member:')
+    ),
   ];
   const others = new Map(
     held

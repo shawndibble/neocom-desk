@@ -229,8 +229,7 @@ Only when a tracked Character's corp has an active Corp Tax Book (a `get` of `co
 
 - **Pending corp record**: the day is not Billable (day end + grace, then an officer sync) or has no rate. A relabel of the unassigned row; the member's own allocation applies and nothing is owed to the corp.
 - **Billed**: Billable. The book decides quantity, price and rate for exactly what it observed; an issued Statement's lines are that decision, frozen. The row is owed to the virtual "<Corp> (Corp Tax Book)" Payee (display-only, never in Dexie, never offered to Assign) and takes its ore from the member's unassigned ore.
-- **Sent, waiting for the corp**: a `player_donation` in the member's wallet journal to the corp that the book does not hold yet (matched by sender, amount and time) covers the oldest Billed days.
-- **Paid**: the Statement's settlement (`allocatePayments`); a part payment lands on the oldest days.
+- **Paid**: the Statement's settlement (`allocatePayments`); a part payment lands on the oldest days. A `player_donation` in the member's wallet journal to the corp that the book does not hold yet (matched by sender, amount and time) also pays the oldest Billed days, as does credit the book holds for no Statement yet (so a day stays Paid once the book credits the donation that paid it): the member's side is done, and a corp that disagrees bills them again.
 - **Conflict**: ore the member gave another Payee that the book also observed. Visible, not owed; resolves to the corp 14 days after the day closed.
 - **Unattributed**: free ore no book claims on a closed day; owed to no one. Several books in one system on one day split the entry by observed quantity.
 - **Dismissed by corp**: shown with the officer's reason; owes nothing.
@@ -285,7 +284,7 @@ Route `/corp/moons`, tab "Moons" in the Corp sub-nav (`docs/features/corp.md`). 
 
 ### Members: the Tax tab
 
-Already covered above ("Corp Tax Book in the Tax tab"): the tab shows a corp member's days as Pending corp record, Billed, Sent (waiting for the corp), Paid, Conflict, Unattributed or Dismissed by corp, only when the member's corp has a book (D24); no book or any read failure leaves the tab exactly as before. Added here:
+Already covered above ("Corp Tax Book in the Tax tab"): the tab shows a corp member's days as Pending corp record, Billed, Paid, Conflict, Unattributed or Dismissed by corp, only when the member's corp has a book (D24); no book or any read failure leaves the tab exactly as before. Added here:
 
 - **Safe to pay** reads "Safe to pay once <Corp> syncs (last synced 2d ago)" until a sync after the grace period, then "Safe to pay — 12 Jul is closed". A Billed day never changes after it is on a Statement.
 - **Unmatched donation.** A donation from a character the book does not know, with no pay code, credits no one. It shows in the attention strip with **Claim**, which runs `claimCorpTaxBookPaymentCallable`: it checks that the donation came from the signed-in Character, credits the Miner that Character is grouped into, and is audited as `claimPayment`. Someone else's donation answers exactly like a missing one. A donation carrying a Statement's pay code is credited to that Miner from any character without revealing any grouping.

@@ -47,6 +47,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
 import { bookPartStore } from './bookPartStore';
+import { ALL_BOOK_PART_SET, mergeBookParts, type BookPart, type BookPartSet } from './bookParts';
 import { readObservedRows } from './observedRead';
 import { forgetObservedCopy } from './observedStore';
 import { callRouted } from '@/sync/routedCallable';
@@ -284,7 +285,16 @@ async function openBook(characterId: number, corporationId: number) {
   const observed = (): Promise<ObservedRow[]> =>
     part(
       'observed',
-      () => readObservedRows(db, characterId, corporationId, versions?.collections.observed, paid),
+      () =>
+        readObservedRows(
+          db,
+          characterId,
+          corporationId,
+          versions?.collections.observed,
+          paid,
+          Date.now(),
+          typeof data.createdAt === 'number' ? data.createdAt : undefined
+        ),
       undefined,
       false // its own Dexie copy (ADR 0031)
     );
@@ -480,6 +490,8 @@ export interface BookData {
   groupingAnswers?: GroupingAnswer[];
   /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
+  /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
+  parts?: BookPartSet;
 }
 
 const feederPayouts = (characterId: number, book: number, feeder: number) =>
@@ -492,9 +504,14 @@ const feederPayouts = (characterId: number, book: number, feeder: number) =>
     'payouts'
   );
 
+/**
+ * `parts` limits the read to those slices (bookParts.ts); the others come back
+ * empty, and `parts` on the result says which were read. Default: the whole book.
+ */
 export async function readBookData(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  parts: BookPartSet = ALL_BOOK_PART_SET
 ): Promise<BookData | null> {
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
@@ -502,52 +519,61 @@ export async function readBookData(
   const { list, part, read } = book;
   const meta = (id: string) =>
     getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id));
+  const slice = <T>(name: BookPart, readSlice: () => Promise<T>, empty: T) =>
+    parts.has(name) ? readSlice() : Promise.resolve(empty);
+  const none: never[] = [];
   const [
-    miners,
-    statements,
-    payments,
-    dismissals,
-    extractions,
+    [miners, statements, extractions, observed, scheduled, feederRows],
+    [payments, dismissals, declarations, adjustments, writeOffs],
+    answers,
     paidStatementIds,
-    observed,
-    declarations,
-    adjustments,
-    [answers, scheduled],
-    feederRows,
-    writeOffs,
   ] = await Promise.all([
-    list<Miner>('miners'),
-    list<Statement>('statements'),
-    list<SettlePayment>('payments'),
-    list<Dismissal>('dismissals'),
-    list<SyncExtraction>('extractions'),
+    slice(
+      'core',
+      () =>
+        Promise.all([
+          list<Miner>('miners'),
+          list<Statement>('statements'),
+          list<SyncExtraction>('extractions'),
+          book.observed(),
+          part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
+          // One stamp covers a feeder's record and its payouts: both live under `feeders`.
+          part(
+            'feeders',
+            async () =>
+              Promise.all(
+                (await read<FeederDoc>('feeders')).map(async (f) =>
+                  bookFeederFrom(
+                    f,
+                    (
+                      await getDocs(feederPayouts(characterId, corporationId, f.corporationId))
+                    ).docs.map((d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow)
+                  )
+                )
+              ),
+            'feeders:rows'
+          ),
+        ] as const),
+      [none, none, none, none, undefined, none] as const
+    ),
+    slice(
+      'ledger',
+      () =>
+        Promise.all([
+          list<SettlePayment>('payments'),
+          list<Dismissal>('dismissals'),
+          list<BookDeclaration>('declarations'),
+          list<Adjustment>('adjustments'),
+          list<RecordedWriteOff>('writeOffs'),
+        ] as const),
+      [none, none, none, none, none] as const
+    ),
+    slice(
+      'answers',
+      () => part('meta', async () => (await meta('groupingAnswers')).data(), 'meta:answers'),
+      undefined
+    ),
     book.paidStatementIds(),
-    book.observed(),
-    list<BookDeclaration>('declarations'),
-    list<Adjustment>('adjustments'),
-    part(
-      'meta',
-      async () =>
-        (await Promise.all([meta('groupingAnswers'), meta('scheduledSync')])).map((d) => d.data()),
-      'meta:answersAndSchedule'
-    ),
-    // One stamp covers a feeder's record and its payouts: both live under `feeders`.
-    part(
-      'feeders',
-      async () =>
-        Promise.all(
-          (await read<FeederDoc>('feeders')).map(async (f) =>
-            bookFeederFrom(
-              f,
-              (await getDocs(feederPayouts(characterId, corporationId, f.corporationId))).docs.map(
-                (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
-              )
-            )
-          )
-        ),
-      'feeders:rows'
-    ),
-    list<RecordedWriteOff>('writeOffs'),
   ]);
   return {
     settings,
@@ -567,6 +593,34 @@ export async function readBookData(
     feeders: feederRows,
     groupingAnswers: groupingAnswersFrom(answers),
     scheduledSync: scheduledSyncFrom(scheduled),
+    parts,
+  };
+}
+
+/** `extra`'s slices laid over `held`; everything else, and the settings, is `extra`'s fresher copy. */
+export function mergeBookData(held: BookData, extra: BookData): BookData {
+  const parts = mergeBookParts(held.parts, extra.parts);
+  const fresh = (name: BookPart) => extra.parts?.has(name) ?? true;
+  const pick = <T>(name: BookPart, fromHeld: T, fromExtra: T) =>
+    fresh(name) ? fromExtra : fromHeld;
+  return {
+    settings: extra.settings,
+    state: {
+      ...extra.state,
+      miners: pick('core', held.state.miners, extra.state.miners),
+      statements: pick('core', held.state.statements, extra.state.statements),
+      extractions: pick('core', held.state.extractions, extra.state.extractions),
+      payments: pick('ledger', held.state.payments, extra.state.payments),
+      dismissals: pick('ledger', held.state.dismissals, extra.state.dismissals),
+      writeOffs: pick('ledger', held.state.writeOffs, extra.state.writeOffs),
+    },
+    observed: pick('core', held.observed, extra.observed),
+    feeders: pick('core', held.feeders, extra.feeders),
+    scheduledSync: pick('core', held.scheduledSync, extra.scheduledSync),
+    declarations: pick('ledger', held.declarations, extra.declarations),
+    adjustments: pick('ledger', held.adjustments, extra.adjustments),
+    groupingAnswers: pick('answers', held.groupingAnswers, extra.groupingAnswers),
+    parts,
   };
 }
 
@@ -614,19 +668,15 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
-/** The newest entries of the immutable audit log, newest first; `count` null reads it whole. */
+/** The newest entries of the immutable audit log, newest first. Always limited: the log only grows. */
 export async function readAudit(
   characterId: number,
   corporationId: number,
-  count: number | null = 100
+  count = 100
 ): Promise<AuditEntry[]> {
   await ensureSignedIn(characterId);
   const log = collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'audit');
-  const snap = await getDocs(
-    count === null
-      ? query(log, orderBy('at', 'desc'))
-      : query(log, orderBy('at', 'desc'), limitTo(count))
-  );
+  const snap = await getDocs(query(log, orderBy('at', 'desc'), limitTo(count)));
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
 }
 

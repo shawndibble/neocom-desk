@@ -38,7 +38,7 @@ vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
 import { db } from '@/db';
 import { clearBookCache } from './bookCache';
-import { readBookData, readBookState, readRebills } from './bookClient';
+import { mergeBookData, readBookData, readBookState, readRebills } from './bookClient';
 
 const CORP = 98000001;
 const BOOK = `corps/${CORP}`;
@@ -147,6 +147,40 @@ describe('readBookData over the version marker', () => {
     await readBookData(7, CORP);
 
     expect(store.reads).toContain(`${BOOK}/miners`);
+  });
+
+  it('reads only the core for a core-only plan, and never the ledger or the answers', async () => {
+    const data = await readBookData(7, CORP, new Set(['core']));
+
+    const read = new Set(store.reads);
+    for (const c of ['miners', 'statements', 'extractions', 'observed', 'feeders'])
+      expect(read).toContain(`${BOOK}/${c}`);
+    for (const c of ['payments', 'dismissals', 'declarations', 'adjustments', 'writeOffs'])
+      expect(read).not.toContain(`${BOOK}/${c}`);
+    expect(read).not.toContain(`${BOOK}/meta/groupingAnswers`);
+    expect(read).toContain(`${BOOK}/meta/paid`);
+    expect(data?.parts).toEqual(new Set(['core']));
+    expect(data?.state.paidStatementIds).toEqual(new Set(['s0']));
+    expect(data?.state.statements).toHaveLength(1);
+    expect(data?.state.payments).toEqual([]);
+  });
+
+  it('a later tab reads only the slice it adds, and the merge keeps the core', async () => {
+    const core = await readBookData(7, CORP, new Set(['core']));
+    store.reads.length = 0;
+    store.docs.set(`${BOOK}/payments/p1`, { id: 'p1' });
+    store.docs.set(BOOK, stamped({ payments: 'payments-2' }));
+
+    const ledger = await readBookData(7, CORP, new Set(['ledger']));
+    const merged = mergeBookData(core!, ledger!);
+
+    expect(store.reads).not.toContain(`${BOOK}/miners`);
+    expect(store.reads).not.toContain(`${BOOK}/observed`);
+    expect(store.reads).toContain(`${BOOK}/payments`);
+    expect(merged.parts).toEqual(new Set(['core', 'ledger']));
+    expect(merged.state.miners).toEqual(core?.state.miners);
+    expect(merged.observed).toEqual(core?.observed);
+    expect(merged.state.payments).toHaveLength(1);
   });
 
   it('wipes every held part when the rules refuse the Character', async () => {

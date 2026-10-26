@@ -19,6 +19,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  limit,
   query,
   serverTimestamp,
   setDoc,
@@ -41,6 +42,8 @@ import { listCommunityIds } from './communityStore';
 import { markPlansShared } from './shareSelection';
 
 const MAX_NAME_LENGTH = 200;
+/** Most shared plans one Community read takes. */
+export const COMMUNITY_PLANS_CAP = 1000;
 
 type PlanToShare = Pick<SkillPlanRecord, 'id' | 'name' | 'entries' | 'updatedAt'>;
 
@@ -125,7 +128,7 @@ export async function loadCommunityPlans(
   const standIn = communityBackendOverride()?.loadPlans;
   if (standIn) return standIn(communityId);
   await ensureSignedIn(characterId);
-  const snap = await getDocs(plansOf(characterId, communityId));
+  const snap = await getDocs(query(plansOf(characterId, communityId), limit(COMMUNITY_PLANS_CAP)));
   const plans: SharedPlan[] = [];
   for (const entry of snap.docs) {
     const parsed = parseSharedPlanId(entry.id);

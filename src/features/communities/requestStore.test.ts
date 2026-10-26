@@ -16,6 +16,8 @@ const fire = vi.hoisted(() => ({
   beforeRetry: null as null | (() => void),
   /** The next getDocs fails as a query whose index is not deployed does. */
   missingIndex: false,
+  stamps: [] as Record<string, unknown>[],
+  stampFails: false,
 }));
 
 vi.mock('firebase/firestore/lite', () => ({
@@ -49,6 +51,10 @@ vi.mock('firebase/firestore/lite', () => ({
     return { exists: () => fire.stored !== null, data: () => fire.stored ?? undefined };
   },
   serverTimestamp: () => 'SERVER_TIME',
+  setDoc: async (_ref: unknown, data: Record<string, unknown>) => {
+    if (fire.stampFails) throw new Error('denied');
+    fire.stamps.push(data);
+  },
   runTransaction: async (
     _db: unknown,
     run: (tx: {
@@ -119,6 +125,8 @@ beforeEach(() => {
   fire.reads = [];
   fire.byPath = {};
   fire.missingIndex = false;
+  fire.stamps = [];
+  fire.stampFails = false;
   session.current = 0;
   session.log = [];
 });
@@ -169,7 +177,24 @@ describe('the Firebase session', () => {
     const read = loadRequests(2, 'c1');
     await Promise.all([write, read]);
     expect(fire.reads).toEqual(['write as 1', 'read as 2']);
-    expect(session.log).toEqual(['signin 1', 'signin 2']);
+    // The board stamp is written after the Pledge, in its own session.
+    expect(session.log).toEqual(['signin 1', 'signin 2', 'signin 1']);
+  });
+});
+
+describe('the board version stamp', () => {
+  it('is set after a Pledge write, and carries a reset only when the Pledge is withdrawn', async () => {
+    fire.stored = { lines: { 0: { quantity: 100, delivered: 0, contractIds: [] } } };
+    await updateMyPledge(1, 'c1', 'r1', (lines) => lines);
+    expect(fire.stamps).toEqual([{ stamp: 'SERVER_TIME' }]);
+    await updateMyPledge(1, 'c1', 'r1', () => ({}));
+    expect(fire.stamps.at(-1)).toEqual({ stamp: 'SERVER_TIME', reset: 'SERVER_TIME' });
+  });
+
+  it('does not fail a saved Pledge when the stamp cannot be written', async () => {
+    fire.stored = { lines: { 0: { quantity: 100, delivered: 0, contractIds: [] } } };
+    fire.stampFails = true;
+    await expect(updateMyPledge(1, 'c1', 'r1', (lines) => lines)).resolves.not.toBeNull();
   });
 });
 

@@ -13,6 +13,8 @@ import {
   EXPIRED_RETENTION_MS,
   PLEDGES_COLLECTION,
   REQUESTS_COLLECTION,
+  boardVersionBump,
+  boardVersionRef,
   decideRequestSweep,
 } from './communityRequests.js';
 import { communityRef, requireAdmin } from './communitiesStore.js';
@@ -93,7 +95,12 @@ export async function sweepRequests(
           result.deleted += 1;
         } catch {
           result.failed += 1;
+          continue;
         }
+        // The delete stands even if the stamp fails; a cached board then ages out on its own.
+        await boardVersionRef(db, candidate.ref.path.split('/')[1])
+          .set(boardVersionBump(true), { merge: true })
+          .catch(() => undefined);
       }
     }
   }
@@ -111,6 +118,7 @@ export async function removeRequest(
   await db.recursiveDelete(
     communityRef(db, communityId).collection(REQUESTS_COLLECTION).doc(requestId)
   );
+  await boardVersionRef(db, communityId).set(boardVersionBump(true), { merge: true });
 }
 
 /** The admin removes one Member's Pledge on a Request; the Request and the other Pledges stay. */
@@ -128,4 +136,5 @@ export async function removePledge(
     .collection(PLEDGES_COLLECTION)
     .doc(pledgeUid)
     .delete();
+  await boardVersionRef(db, communityId).set(boardVersionBump(true), { merge: true });
 }

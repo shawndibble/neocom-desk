@@ -20,7 +20,6 @@ const book = (over: Partial<CorpBookViewBook['summary']> = {}, rest = {}): CorpB
       credit: 0,
       hubId: 'jita',
       oreForm: 'compressed',
-      inFlightAmount: 0,
       ...over,
     },
     ...rest,
@@ -58,18 +57,10 @@ describe('CorpBookSyncNote', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the donation in flight and credit for the next Statement', () => {
-    render(
-      <CorpBookSyncNote
-        book={book({ inFlightAmount: 523_146, credit: 1_000_000 })}
-        owedNow={1}
-        now={NOW}
-      />
-    );
-    expect(
-      screen.getByText('523,146 ISK sent, waiting for Brass Meridian Logistics to credit it.')
-    ).toBeInTheDocument();
+  it('shows credit for the next Statement, and never a donation waiting to be credited', () => {
+    render(<CorpBookSyncNote book={book({ credit: 1_000_000 })} owedNow={1} now={NOW} />);
     expect(screen.getByText(/1,000,000 ISK credit/)).toBeInTheDocument();
+    expect(screen.queryByText(/waiting for .* to credit it/)).toBeNull();
   });
 
   it('says nothing when there is nothing to say', () => {
