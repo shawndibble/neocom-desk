@@ -26,6 +26,7 @@ import {
   TextInput,
   Toast,
   NeedsConnection,
+  SplitButtonChevron,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
@@ -361,14 +362,7 @@ export function Characters() {
               </NeedsConnection>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    className="rounded-l-none border-l-accent-contrast/30 px-1!"
-                    aria-label={t('characters.addMenuLabel')}
-                  >
-                    <Icon.Expanded aria-hidden="true" />
-                  </Button>
+                  <SplitButtonChevron label={t('characters.addMenuLabel')} />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onSelect={() => setCustomizingPermissions(true)}>
