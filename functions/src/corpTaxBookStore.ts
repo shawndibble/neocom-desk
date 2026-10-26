@@ -16,6 +16,12 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import {
+  loadStampContext,
+  restampStructures,
+  stampBook,
+  stampRows,
+} from './corpTaxBookExtractionStamp.js';
 import { backfillObservedUpdatedAt } from './corpTaxBookObservedBackfill.js';
 import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
 import {
@@ -459,6 +465,8 @@ export async function reclaimBook(deps: BookDeps, caller: Caller, call: BookCall
 // --- Sync ------------------------------------------------------------------
 
 const CHUNK = 200;
+/** The Extraction fields that decide which days its window covers. */
+const WINDOW_FIELDS = ['chunkArrivalTime', 'naturalDecayTime', 'laserFiredAt', 'cancelledAt'];
 const obsId = (r: ObservedRow) => `${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`;
 
 export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput) {
@@ -474,8 +482,12 @@ export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput)
 export async function mergeObservedInto(
   deps: BookDeps,
   corporationId: number,
-  rows: readonly ObservedRow[]
+  incoming: readonly ObservedRow[],
+  /** Extractions the same sync is about to write, so a row placed by them is stamped now. */
+  extractions: readonly MirrorExtraction[] = []
 ): Promise<number> {
+  // Each row carries the Extraction covering its day (ADR 0032): a merge replaces the whole row, so it must stamp.
+  const rows = stampRows(incoming, await loadStampContext(deps.db, corporationId, extractions));
   let observedChanged = 0;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
@@ -556,19 +568,35 @@ export async function syncBookAs(
     );
   }
 
-  const observedChanged = await mergeObservedInto(deps, input.corporationId, input.observed);
+  const observedChanged = await mergeObservedInto(
+    deps,
+    input.corporationId,
+    input.observed,
+    input.extractions
+  );
   // Old rows carry no `updatedAt`, which a client's delta read needs (#5243). Best effort.
   await backfillObservedUpdatedAt(deps.db, input.corporationId, deps.now).catch((e) =>
     console.error('observed backfill failed', e instanceof Error ? e.message : e)
   );
 
   const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
+  const corrected = new Set<number>();
   for (const x of input.extractions) {
     const id = `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
     const fields: Data = { ...x, id };
     for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
+    const held = (await extractions.doc(id).get()).data();
+    if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
+      corrected.add(x.structureId);
     await extractions.doc(id).set(fields, { merge: true });
   }
+  // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort, like the pass below.
+  await restampStructures(deps.db, input.corporationId, [...corrected]).catch((e) =>
+    console.error('extraction restamp failed', e instanceof Error ? e.message : e)
+  );
+  await stampBook(deps.db, input.corporationId, deps.now).catch((e) =>
+    console.error('extraction stamp backfill failed', e instanceof Error ? e.message : e)
+  );
 
   const payments = sub(deps.db, input.corporationId, PAYMENTS);
   let donationsAdded = 0;

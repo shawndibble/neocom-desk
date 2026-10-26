@@ -501,6 +501,31 @@ export function placeObservedRows(
   });
 }
 
+/** Engine `stampExtractionIds`: the pull covering each unstamped row's day, per-structure expiry. */
+export function stampExtractionIds(
+  rows: readonly ObservedRow[],
+  extractions: readonly MirrorExtraction[],
+  expiryHours: Readonly<Record<string, number>> = {}
+): ObservedRow[] {
+  return rows.map((row) => {
+    if (row.extractionId !== undefined) return row;
+    const id = moonOnDay(extractions, expiryHours, row.structureId, row.date).extractionId;
+    return id === undefined ? row : { ...row, extractionId: id };
+  });
+}
+
+/** Engine `restampPlan`: the rows whose stamp the current Extractions no longer give. */
+export function restampPlan(
+  rows: readonly ObservedRow[],
+  extractions: readonly MirrorExtraction[],
+  expiryHours: Readonly<Record<string, number>> = {}
+): { row: ObservedRow; extractionId: string | undefined }[] {
+  return rows.flatMap((row) => {
+    const id = moonOnDay(extractions, expiryHours, row.structureId, row.date).extractionId;
+    return id === row.extractionId ? [] : [{ row, extractionId: id }];
+  });
+}
+
 // --- Settlement -----------------------------------------------------------
 
 export interface SettleStatement {

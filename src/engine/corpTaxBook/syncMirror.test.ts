@@ -13,6 +13,8 @@ import {
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  restampPlan,
+  stampExtractionIds,
   type MoonNotification,
   type SyncExtraction,
 } from './sync';
@@ -297,6 +299,39 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
         placeObservedRows(rows, extractions, systems)
       );
     });
+  });
+
+  it('stamps and re-stamps extractionIds the same way', () => {
+    const pull = {
+      structureId: 1000,
+      moonId: 40,
+      extractionStartTime: '2026-10-10T12:00:00.000Z',
+      chunkArrivalTime: '2026-10-16T12:00:00.000Z',
+      naturalDecayTime: '2026-10-16T15:00:00.000Z',
+    };
+    const cancelled = { ...pull, cancelledAt: '2026-10-16T13:00:00.000Z' };
+    const fired = { ...pull, laserFiredAt: '2026-10-17T12:00:00.000Z' };
+    const rows = ['2026-10-15', '2026-10-16', '2026-10-18', '2026-10-19', '2026-10-20'].map(
+      (date, i) => ({
+        structureId: 1000,
+        characterId: 5,
+        recordedCorporationId: 1,
+        typeId: 2,
+        date,
+        quantity: 3,
+        cachedAt: '2026-10-18T00:00:00Z',
+        ...(i === 1 ? { extractionId: '1000_1' } : {}),
+      })
+    );
+    const expiries: Record<string, number>[] = [{}, { '1000': 96 }, { '1000': 24 }];
+    for (const hours of expiries) {
+      for (const xs of [[pull], [cancelled], [fired], []]) {
+        expect(mirror.stampExtractionIds(rows, xs, hours)).toEqual(
+          stampExtractionIds(rows, xs, hours)
+        );
+        expect(mirror.restampPlan(rows, xs, hours)).toEqual(restampPlan(rows, xs, hours));
+      }
+    }
   });
 
   it('plans the same settlements', () => {
