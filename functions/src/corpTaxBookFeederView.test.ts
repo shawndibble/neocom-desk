@@ -182,14 +182,12 @@ describe('buildFeederView', () => {
     expect(s.refineryCount).toBe(1);
     expect(s.schemaVersion).toBe(1);
     expect(v.days.map((d) => d.date)).toEqual(['2026-10-12', '2026-10-13']);
-    expect(v.days[0]).toMatchObject({
-      billable: true,
-      pct: 10,
-      dueIsk: 150,
-      valueIsk: 1500,
+    // The moon owner sees ore and quantity only: no value, rate or due (#5261).
+    expect(v.days[0]).toEqual({
+      date: '2026-10-12',
       lines: [
-        { characterId: 900, structureId: 77, volume: 10, valueIsk: 1000 },
-        { characterId: 901, structureId: 77, volume: 5, valueIsk: 500 },
+        { characterId: 900, structureId: 77, typeId: 18, volume: 10, quantity: 10 },
+        { characterId: 901, structureId: 77, typeId: 18, volume: 5, quantity: 5 },
       ],
     });
     expect(v.payouts).toEqual([
@@ -210,10 +208,7 @@ describe('buildFeederView', () => {
         ]),
       })
     );
-    expect(v.days.map((d) => [d.date, d.billable, d.dueIsk])).toEqual([
-      ['2026-10-11', true, 10],
-      ['2026-10-12', false, 0],
-    ]);
+    expect(v.days.map((d) => d.date)).toEqual(['2026-10-11', '2026-10-12']);
     expect(v.summary.accruedIsk).toBe(10);
     expect(v.summary.minedValueIsk).toBe(200);
     expect(v.summary.staleSince).toBe(lastRead + 1);
@@ -268,7 +263,6 @@ describe('buildFeederView', () => {
       accruedIsk: 0,
       balanceKind: 'even',
     });
-    expect(v.days[0].pct).toBeNull();
   });
 
   it('lets the agreed rate win over a later request', () => {

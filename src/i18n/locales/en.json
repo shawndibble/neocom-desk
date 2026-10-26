@@ -16403,7 +16403,7 @@
           "character": "Character",
           "refinery": "Refinery",
           "volume": "Units",
-          "value": "Value"
+          "ore": "Ore"
         }
       },
       "autoSync": {
