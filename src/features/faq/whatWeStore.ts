@@ -88,6 +88,7 @@ export const COMMUNITY_COLLECTION_FAQ_ITEM = {
   requests: 'membership',
   mailInvites: 'membership',
   itemRequests: 'requests',
+  boardVersion: 'requests',
   fleetPayouts: 'payouts',
   shares: 'payouts',
   pledges: 'pledges',
