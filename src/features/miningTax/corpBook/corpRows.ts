@@ -55,7 +55,6 @@ export function corpPayee(
 
 const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> = {
   billed: 'outstanding',
-  'sent-waiting': 'outstanding',
   // Visible and not owed: it needs a decision, but not the member's money.
   conflict: 'needs-review',
   paid: 'paid',
