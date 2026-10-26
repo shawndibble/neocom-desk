@@ -26,6 +26,7 @@ export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip, TooltipProvider } from './Tooltip';
 export { IconButton } from './IconButton';
+export { SplitButtonChevron } from './SplitButtonChevron';
 export { textActionClassName } from './textActionClassName';
 export { plainTextActionClassName } from './plainTextActionClassName';
 export { entityLinkClassName } from './entityLinkClassName';
