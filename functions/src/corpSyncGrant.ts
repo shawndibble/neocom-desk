@@ -40,7 +40,7 @@ import { tryRebuildFeederView } from './corpTaxBookFeederView.js';
 import {
   FeederStorm,
   READABLE_FEEDER_STATUSES,
-  feedersToRead,
+  readableFeeders,
   outcomeOf,
   readFeederLedger,
   recordFeederRead,
@@ -90,6 +90,12 @@ export interface CorpSyncGrantDoc {
    * its refineries' names and systems (#4654). Absent on grants from before: never looked up.
    */
   readsStructures?: boolean;
+  /**
+   * Book grants: when the scheduled run next syncs this book (ms). The run queries `<= now`, so a
+   * book synced within `SYNC_REST_MS` is not read at all. Feeder grants never carry it (the feeder
+   * pass reads them). A book grant from before it is backfilled as due.
+   */
+  nextSyncAt?: number;
 }
 
 /** `corps/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
@@ -229,6 +235,7 @@ export async function saveCorpSyncGrant(
     ),
     clientId: claims.clientId,
     enabledAt: now,
+    nextSyncAt: now,
   };
   const previous = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, input.corporationId);
@@ -458,15 +465,14 @@ export async function runScheduledCorpSyncs(
     budgetStopped: false,
     feeders: { read: 0, stale: 0, skipped: 0, disconnected: 0 },
   };
-  const snap = await deps.db.collection(CORP_SYNC_GRANTS_COLLECTION).get();
-  summary.grants = snap.size;
-  for (const doc of snap.docs) {
+  const due = await dueGrants(deps);
+  summary.grants = due.length;
+  for (const grant of due) {
     if (summary.budgetStopped || esi.budgetLow()) {
       summary.budgetStopped = true;
       summary.skipped += 1;
       continue;
     }
-    const grant = doc.data() as CorpSyncGrantDoc;
     // A feeder grant is not a book: the feeder pass below reads it.
     if (grant.kind === 'feeder') {
       summary.grants -= 1;
@@ -474,8 +480,10 @@ export async function runScheduledCorpSyncs(
     }
     try {
       const result = await runOne(deps, esi, grant);
-      if (result.kind === 'synced') summary.synced += 1;
-      else if (result.kind === 'stopped') summary.stopped += 1;
+      if (result.kind === 'synced') {
+        summary.synced += 1;
+        await deferNextSync(deps, grant);
+      } else if (result.kind === 'stopped') summary.stopped += 1;
       else {
         summary.skipped += 1;
         if (result.reason === 'esi-budget') summary.budgetStopped = true;
@@ -491,6 +499,49 @@ export async function runScheduledCorpSyncs(
   }
   if (!summary.budgetStopped) await runFeederSyncs(deps, esi, summary, feederOptions);
   return summary;
+}
+
+/** A synced book rests this long; under the 6-hourly schedule, so a late run never skips a slot. */
+export const SYNC_REST_MS = 5 * 3_600_000;
+
+/** One doc, set once the `nextSyncAt` backfill has covered every book grant from before it. */
+const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';
+
+/**
+ * Book grants whose `nextSyncAt` has come: a range query, so a run's reads scale with the due
+ * grants, not with every grant. A grant from before the field cannot match a range, so the first
+ * run scans once and marks each as due, then records that it did.
+ */
+async function dueGrants(deps: CorpSyncDeps): Promise<CorpSyncGrantDoc[]> {
+  const marker = deps.db.doc(GRANT_BACKFILL_DOC);
+  if (!(await marker.get()).exists) {
+    const all = await deps.db.collection(CORP_SYNC_GRANTS_COLLECTION).get();
+    const writer = deps.db.batch();
+    let missing = 0;
+    for (const doc of all.docs) {
+      const held = doc.data() as CorpSyncGrantDoc;
+      if (held.kind === 'feeder' || held.nextSyncAt !== undefined) continue;
+      writer.update(doc.ref, { nextSyncAt: 0 });
+      missing += 1;
+    }
+    if (missing > 0) await writer.commit();
+    await marker.set({ doneAt: deps.now(), backfilled: missing });
+  }
+  const snap = await deps.db
+    .collection(CORP_SYNC_GRANTS_COLLECTION)
+    .where('nextSyncAt', '<=', deps.now())
+    .get();
+  return snap.docs.map((d) => d.data() as CorpSyncGrantDoc);
+}
+
+/** Rest a synced book until its next slot. A revoke or re-grant meanwhile is left as it is. */
+async function deferNextSync(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promise<void> {
+  const ref = grantRef(deps.db, grant.corporationId);
+  await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (!held || held.enabledAt !== grant.enabledAt) return;
+    tx.update(ref, { nextSyncAt: deps.now() + SYNC_REST_MS });
+  });
 }
 
 // --- The feeder pass (#4509) ---------------------------------------------------
@@ -510,14 +561,16 @@ async function runFeederSyncs(
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const storm = new FeederStorm();
   let first = true;
-  for (const { feederCorporationId, collectorCorporationId } of await feedersToRead(
-    deps.db,
-    FEEDER_OF_COLLECTION
-  )) {
+  for (const {
+    feederCorporationId,
+    collectorCorporationId,
+    record: queried,
+  } of await readableFeeders(deps.db, FEEDER_OF_COLLECTION, deps.log)) {
     try {
-      const record = (
-        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
-      ).data() as FeederRecord | undefined;
+      const record =
+        queried ??
+        ((await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()).data() as
+          FeederRecord | undefined);
       if (!record || !READABLE_FEEDER_STATUSES.includes(record.status)) continue;
       if (!first) await sleep(options.gapMs ?? FEEDER_GAP_MS);
       first = false;
