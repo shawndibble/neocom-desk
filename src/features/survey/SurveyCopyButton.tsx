@@ -57,7 +57,7 @@ export function SurveyCopyButton({
             variant="primary"
             size="sm"
             aria-label={t('survey.moreCopy')}
-            className="rounded-l-none border-l border-l-accent-contrast/30 px-2"
+            className="rounded-l-none border-l border-l-accent-contrast/30 px-2!"
           >
             <Expanded aria-hidden />
           </Button>
