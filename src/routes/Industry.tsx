@@ -309,7 +309,9 @@ export function Industry() {
     async (
       entry: BlueprintCatalogEntry,
       seed: BuildPlanSeed | null = null,
-      blueprintPrice: number | null = null
+      blueprintPrice: number | null = null,
+      // Market-Wide's row research: the plan starts at the ME/TE the row was priced at.
+      research: { me: number; te: number } | null = null
     ): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
@@ -325,6 +327,7 @@ export function Industry() {
         {
           assumedMe,
           assumedTe,
+          ...(research ? { me: research.me, te: research.te } : {}),
           ...(seed
             ? {
                 me: seed.me,
@@ -693,7 +696,10 @@ export function Industry() {
     );
   }
 
-  async function handleStartPlan(entry: BlueprintCatalogEntry): Promise<boolean> {
+  async function handleStartPlan(
+    entry: BlueprintCatalogEntry,
+    research?: { me: number; te: number }
+  ): Promise<boolean> {
     // Distinct from the plain search-box create: picking a scan result or an
     // owned Opportunities row is an explicit "go build this" choice, same as
     // opening a `?product=` deep link, so it opens the new plan's own page
@@ -701,7 +707,7 @@ export function Industry() {
     if (startingPlanRef.current) return false;
     startingPlanRef.current = true;
     try {
-      const id = await createPlan(entry);
+      const id = await createPlan(entry, null, null, research ?? null);
       if (id) {
         navigate(`/industry/plans/${id}`);
         return true;
@@ -736,13 +742,16 @@ export function Industry() {
       modifiers={modifiers}
       activeCharacterId={activeCharacterId}
       onStartPlan={handleStartPlan}
+      ownedBlueprints={ownedBlueprints}
+      assumedMe={assumedMe}
+      assumedTe={assumedTe}
     />
   );
   // Waits on the pricing-settings hydration gate (issue #2054): not mounting
   // the panel until `assumedMe` has hydrated is enough to stop its first pass
   // from pricing every candidate at the default, without threading a readiness
-  // flag into `useOpportunities` itself. Market-Wide Build Opportunities reads
-  // no pricing input, so it renders regardless.
+  // flag into `useOpportunities` itself. Market-Wide Build Opportunities mounts
+  // regardless: it prices nothing until the pilot scans.
   const ownedRankingPanel = !catalog ? null : !pricingInputs.hydrated ? (
     <div key="owned-ranking" className="flex justify-center py-16">
       <Spinner label={t('common.loading')} />

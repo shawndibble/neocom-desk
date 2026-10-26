@@ -156,3 +156,25 @@ export function wakeCutoffMs(
   }
   return cutoff;
 }
+
+/** An idle grant (nobody live wants anything it covers) is looked at again after this many runs. */
+export const IDLE_RECHECK_RUNS = 12;
+
+/** Once a day, on this run of the day (`floor(now / POLL_RUN_MS) % RUNS_PER_DAY`), every active grant is listed. */
+export const RUNS_PER_DAY = 96;
+export const FULL_LISTING_RUN = 12;
+
+/** True on the one run a day that lists every active grant, to find any with no `nextPollAt`. */
+export function isFullListingRun(nowMs: number): boolean {
+  return Math.floor(nowMs / POLL_RUN_MS) % RUNS_PER_DAY === FULL_LISTING_RUN;
+}
+
+/**
+ * When an idle grant is listed again (issue #5236): `IDLE_RECHECK_RUNS` on, rounded
+ * up to an hourly slot. Only an idle grant is deferred: a write costs about three
+ * reads, so deferring a grant by an hour or less would save nothing.
+ */
+export function idleRecheckAtMs(nowMs: number): number {
+  const wake = Math.floor(nowMs / POLL_RUN_MS) + IDLE_RECHECK_RUNS;
+  return Math.ceil(wake / SLEEPING_POLL_EVERY_RUNS) * SLEEPING_POLL_EVERY_RUNS * POLL_RUN_MS;
+}

@@ -236,6 +236,18 @@ describe('SplitDialog — the same Payee at a second rate', () => {
   });
 });
 
+describe('SplitDialog — typing a quantity', () => {
+  it('keeps every digit typed past the first grouping mark', async () => {
+    const big = { ...assignment, oreLines: [{ typeId: ZEOLITES, quantity: 100_000 }] };
+    renderDialog({ assignment: big });
+
+    const input = screen.getByRole('textbox', { name: /Zeolites/ });
+    await userEvent.type(input, '54930');
+
+    expect(input).toHaveValue('54,930');
+  });
+});
+
 describe('SplitDialog — dismissal', () => {
   it('ignores a backdrop click, so a half-made split is not lost', () => {
     const onClose = vi.fn();

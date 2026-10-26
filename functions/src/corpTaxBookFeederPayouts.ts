@@ -16,6 +16,7 @@ import {
   type FeederTargetCall,
 } from './corpTaxBook.js';
 import {
+  PAYOUT_LINK_WINDOW_DAYS,
   buildRecordedPayout,
   outgoingDonationsFromJournal,
   payoutToMerge,
@@ -46,6 +47,72 @@ export const PAYOUTS = 'payouts';
  * the same moment would both commit; writing this one field makes them conflict instead.
  */
 const PAYOUTS_WRITTEN_AT = 'payoutsWrittenAt';
+
+/**
+ * What the moon owner has been paid, kept on its record and moved by the same transaction that
+ * writes a payout (#5242): `count` and `amount` of every row not marked "not a payout". A record
+ * without it (written before this field) is totalled once from its payouts, by the first write.
+ */
+const PAYOUT_TOTALS = 'payoutTotals';
+
+export interface PayoutTotals {
+  count: number;
+  amount: number;
+}
+
+export const totalPayouts = (
+  rows: readonly { amount: number; notAPayout?: boolean }[]
+): PayoutTotals =>
+  rows.reduce<PayoutTotals>(
+    (t, p) => (p.notAPayout ? t : { count: t.count + 1, amount: t.amount + p.amount }),
+    {
+      count: 0,
+      amount: 0,
+    }
+  );
+
+function storedTotals(feeder: FirebaseFirestore.DocumentSnapshot): PayoutTotals | undefined {
+  const t = feeder.get(PAYOUT_TOTALS) as Partial<PayoutTotals> | undefined;
+  return typeof t?.count === 'number' && typeof t.amount === 'number'
+    ? { count: t.count, amount: t.amount }
+    : undefined;
+}
+
+/** `date` moved by `days` (UTC calendar days), as YYYY-MM-DD. */
+function shiftDate(date: string, days: number): string {
+  const d = new Date(`${date.slice(0, 10)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The earliest payout day that can still link to a journal entry on `days` (engine
+ * `PAYOUT_LINK_WINDOW_DAYS`): a payout's own journal ref is on its day or inside the same window,
+ * so nothing older can attach, merge or already hold one of these entries.
+ */
+const payoutFloor = (days: readonly string[]): string =>
+  days.length === 0 ? '' : shiftDate([...days].sort()[0]!, -PAYOUT_LINK_WINDOW_DAYS);
+
+type Tx = FirebaseFirestore.Transaction;
+
+/**
+ * Inside a transaction: the payouts a write must look at (only those on or after `floor` when the
+ * record already keeps its totals, all of them when it does not), and the exact totals to move.
+ */
+async function readForWrite(
+  tx: Tx,
+  feeder: FirebaseFirestore.DocumentSnapshot,
+  col: FirebaseFirestore.CollectionReference,
+  floor: string
+): Promise<{ stored: StoredPayout[]; totals: PayoutTotals; backfill: boolean }> {
+  const totals = storedTotals(feeder);
+  if (totals) {
+    const slice = await tx.get(col.where('date', '>=', floor));
+    return { stored: slice.docs.map(storedPayout), totals, backfill: false };
+  }
+  const stored = (await tx.get(col)).docs.map(storedPayout);
+  return { stored, totals: totalPayouts(stored), backfill: true };
+}
 
 // --- Input -----------------------------------------------------------------
 
@@ -130,12 +197,19 @@ export async function recordFeederPayout(
   const col = payoutsOf(deps, input.corporationId, input.feederCorporationId);
   const fresh = col.doc();
   const id = await deps.db.runTransaction(async (tx) => {
-    if (!(await tx.get(feeder)).exists) fail('not-found', 'No such moon owner', 'no-feeder');
-    const stored = (await tx.get(col)).docs.map(storedPayout);
+    const feederSnap = await tx.get(feeder);
+    if (!feederSnap.exists) fail('not-found', 'No such moon owner', 'no-feeder');
+    const { stored, totals } = await readForWrite(tx, feederSnap, col, payoutFloor([input.date]));
     const merge = payoutToMerge(stored, input);
     if (merge) tx.update(col.doc(merge), { confirmedAt: deps.now() });
     else tx.create(fresh, payout);
-    tx.update(feeder, { [PAYOUTS_WRITTEN_AT]: deps.now() });
+    // A merge confirms a row already counted; a new row adds one.
+    tx.update(feeder, {
+      [PAYOUTS_WRITTEN_AT]: deps.now(),
+      [PAYOUT_TOTALS]: merge
+        ? totals
+        : { count: totals.count + 1, amount: totals.amount + payout.amount },
+    });
     appendAudit(
       tx,
       deps,
@@ -163,10 +237,28 @@ export async function markFeederPayout(
   input: MarkPayoutInput
 ): Promise<{ ok: true }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = payoutsOf(deps, input.corporationId, input.feederCorporationId).doc(input.payoutId);
+  const feeder = feederRef(deps.db, input.corporationId, input.feederCorporationId);
+  const col = payoutsOf(deps, input.corporationId, input.feederCorporationId);
+  const ref = col.doc(input.payoutId);
   await deps.db.runTransaction(async (tx) => {
-    if (!(await tx.get(ref)).exists) fail('not-found', 'No such payment', 'no-payout');
+    const [row, feederSnap] = await Promise.all([tx.get(ref), tx.get(feeder)]);
+    if (!row.exists) fail('not-found', 'No such payment', 'no-payout');
+    const was = row.get('notAPayout') === true;
+    const amount = Number(row.get('amount'));
+    const known = storedTotals(feederSnap);
+    // +1 when the row starts counting, -1 when it stops, 0 when the mark did not change.
+    const step = was === input.notAPayout ? 0 : input.notAPayout ? -1 : 1;
+    // No stored totals yet: total every payout as it will stand once this one is marked.
+    const totals = known
+      ? { count: known.count + step, amount: known.amount + step * amount }
+      : totalPayouts(
+          (await tx.get(col)).docs.map((d) => ({
+            amount: Number(d.get('amount')),
+            notAPayout: d.id === ref.id ? input.notAPayout : d.get('notAPayout') === true,
+          }))
+        );
     tx.update(ref, { notAPayout: input.notAPayout });
+    if (feederSnap.exists) tx.update(feeder, { [PAYOUT_TOTALS]: totals });
     appendAudit(
       tx,
       deps,
@@ -215,11 +307,13 @@ export async function planFeederPayouts(
     return ids.some((id) => id !== undefined && recipients.has(id)) ? [{ rec, corporationId }] : [];
   });
   if (candidates.length === 0) return [];
+  // Only payouts near a journal entry's day can attach to it or already hold its ref.
+  const floor = payoutFloor(outgoing.map((d) => d.at));
   const owners = await Promise.all(
     candidates.map(async ({ rec, corporationId }) => {
-      const payouts = (await payoutsOf(deps, collector, corporationId).get()).docs.map(
-        storedPayout
-      );
+      const payouts = (
+        await payoutsOf(deps, collector, corporationId).where('date', '>=', floor).get()
+      ).docs.map(storedPayout);
       return {
         corporationId,
         ...(rec.payee ? { payee: rec.payee } : {}),
@@ -268,20 +362,35 @@ export async function applyFeederPayoutPlan(
   const col = payoutsOf(deps, collector, corporationId);
   const createRefs = new Set(plan.createRefs);
   const written = await deps.db.runTransaction(async (tx) => {
-    if (!(await tx.get(feeder)).exists) return { attached: 0, recorded: 0 };
-    const stored = (await tx.get(col)).docs.map(storedPayout);
+    const feederSnap = await tx.get(feeder);
+    if (!feederSnap.exists) return { attached: 0, recorded: 0 };
+    const { stored, totals, backfill } = await readForWrite(
+      tx,
+      feederSnap,
+      col,
+      payoutFloor(plan.outgoing.map((d) => d.at))
+    );
     const [fresh] = reconcileBookOutgoing({
       owners: [{ ...plan.owner, payouts: stored }],
       outgoing: plan.outgoing,
     });
     const attach = fresh?.attach ?? [];
     const create = (fresh?.create ?? []).filter((c) => createRefs.has(c.payout.journalRef!));
-    if (attach.length + create.length === 0) return { attached: 0, recorded: 0 };
+    if (attach.length + create.length === 0) {
+      if (backfill) tx.update(feeder, { [PAYOUT_TOTALS]: totals });
+      return { attached: 0, recorded: 0 };
+    }
     for (const a of attach) {
       tx.update(col.doc(a.id), { status: 'matched', journalRef: a.journalRef });
     }
     for (const c of create) tx.create(col.doc(c.id), c.payout);
-    tx.update(feeder, { [PAYOUTS_WRITTEN_AT]: deps.now() });
+    tx.update(feeder, {
+      [PAYOUTS_WRITTEN_AT]: deps.now(),
+      [PAYOUT_TOTALS]: {
+        count: totals.count + create.length,
+        amount: totals.amount + create.reduce((sum, c) => sum + c.payout.amount, 0),
+      },
+    });
     appendAudit(tx, deps, collector, actor, 'feederPayoutsReconciled', {
       feederCorporationId: corporationId,
       attached: attach.map((a) => a.journalRef),

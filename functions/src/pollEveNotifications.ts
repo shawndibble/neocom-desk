@@ -16,6 +16,7 @@ import { NO_ORIGIN_SYSTEM } from './pollNearby.js';
 import {
   deviceCadence,
   liveDevices,
+  idleRecheckAtMs,
   planGrant,
   wakeCutoffMs,
   type GrantPlan,
@@ -57,8 +58,14 @@ export type RefreshOutcome =
   | { kind: 'skip' };
 
 export interface PollerStore {
-  /** Every `active` grant (the listing already reads each in full). */
-  listActive(): Promise<ListedGrant[]>;
+  /**
+   * The `active` grants due at `nowMs` (issue #5236): `nextPollAt <= nowMs`, plus,
+   * on the daily full-listing run, any with no `nextPollAt` at all. The listing
+   * already reads each in full.
+   */
+  listDue(nowMs: number): Promise<ListedGrant[]>;
+  /** Do not list the grant again before `atMs`; dropped if the grant was replaced since (guarded like `patch`). */
+  deferNextPoll(characterId: number, guard: string, atMs: number): Promise<void>;
   /**
    * Refresh the Character's token at SSO and write the rotated one back
    * transactionally. `grant.encryptedRefreshToken` is the stored blob after
@@ -180,6 +187,10 @@ interface PlannedGrant {
   grant: AlertGrantDoc;
   devices: PollDevice[];
   plan: GrantPlan;
+  /** The stored token blob the deferral is guarded on; `pollOne` moves it when SSO rotates the token. */
+  guard: string;
+  /** Where to push `nextPollAt` once the grant is handled; null to list it again next run. */
+  deferTo: number | null;
 }
 
 export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary> {
@@ -197,7 +208,7 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
   };
   const locations = new Map<number, number>();
 
-  const listed = await deps.store.listActive();
+  const listed = await deps.store.listDue(startedAt);
   stats.set('grantsListed', listed.length);
   const devicesByCharacter =
     listed.length > 0
@@ -217,11 +228,14 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
       if (cadence === 'dormant') dormantDevices.add(d.deviceId);
     }
     const plan = planGrant(grant, devices, startedAt);
-    if (plan.action === 'backoff') {
-      stats.add('grantsSkippedDeviceBackoff');
-      continue;
-    }
-    queue.push({ characterId, grant, devices, plan });
+    queue.push({
+      characterId,
+      grant,
+      devices,
+      plan,
+      guard: grant.encryptedRefreshToken,
+      deferTo: plan.action === 'idle' ? idleRecheckAtMs(startedAt) : null,
+    });
     if (plan.action === 'poll' && plan.call.nearby) {
       // Every live device counts, asleep or not: the origin handed to a Character
       // whose location is skipped must only stand where no list it reads has an entry.
@@ -239,10 +253,16 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
   const worker = async (): Promise<void> => {
     for (let item = queue.shift(); item !== undefined; item = queue.shift()) {
       try {
+        if (item.plan.action === 'backoff') {
+          stats.add('grantsSkippedDeviceBackoff');
+          await defer(ctx, item);
+          continue;
+        }
         if (item.plan.action === 'idle') {
           // No refresh and no ESI call: only the once-off write that makes waking safe.
           stats.add('grantsSkippedIdle');
           await markIdle(ctx, item);
+          await defer(ctx, item);
           continue;
         }
         // Skip, never retry: the error budget is shared by every user of the client id.
@@ -252,6 +272,7 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
           continue;
         }
         await pollOne(ctx, item);
+        await defer(ctx, item);
       } catch (err) {
         summary.skipped++;
         stats.add('grantsSkippedError');
@@ -281,6 +302,19 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
   return summary;
 }
 
+/** Stop listing the grant until its next turn (issue #5236). A failure only means it is listed again next run. */
+async function defer(ctx: RunContext, item: PlannedGrant): Promise<void> {
+  if (item.deferTo === null) return;
+  try {
+    await ctx.deps.store.deferNextPoll(item.characterId, item.guard, item.deferTo);
+  } catch (err) {
+    ctx.deps.log('Alerts poll could not defer a Character', {
+      characterId: item.characterId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
+}
+
 /** An idle grant's state: notifications marked idle, the mail mark forgotten. One write, once. */
 async function markIdle(ctx: RunContext, item: PlannedGrant): Promise<void> {
   const { grant, characterId } = item;
@@ -302,6 +336,7 @@ async function pollOne(ctx: RunContext, item: PlannedGrant): Promise<void> {
 
   stats.add('grantsRefreshed');
   const refreshed = await store.refresh(characterId);
+  if (refreshed.kind !== 'ok') item.deferTo = null;
   if (refreshed.kind === 'revoked') {
     summary.revoked++;
     deps.log('Alerts Grant revoked at SSO', { characterId });
@@ -313,6 +348,7 @@ async function pollOne(ctx: RunContext, item: PlannedGrant): Promise<void> {
     return;
   }
   const { accessToken, grant } = refreshed;
+  item.guard = grant.encryptedRefreshToken;
 
   // A 420/429 may have landed while this worker was refreshing: don't add to it.
   if (summary.budgetStopped) {

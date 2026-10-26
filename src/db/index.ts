@@ -5,6 +5,7 @@ import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
 import type {
   CorpBookObservedMetaRecord,
   CorpBookObservedRecord,
+  CorpBookPartRecord,
   AnsiblexGateRecord,
   ArchiveKind,
   BuildPlanRecord,
@@ -73,6 +74,7 @@ export const db = new Dexie('neocom') as Dexie & {
   corpMailQueue: EntityTable<MailQueueItem, 'id'>;
   corpBookObserved: Dexie.Table<CorpBookObservedRecord, [number, number, string]>;
   corpBookObservedMeta: Dexie.Table<CorpBookObservedMetaRecord, [number, number]>;
+  corpBookParts: Dexie.Table<CorpBookPartRecord, [number, number, string]>;
 };
 
 /**
@@ -294,4 +296,11 @@ db.version(27).stores({
 db.version(28).stores({
   corpBookObserved: '[characterId+corporationId+id], [characterId+corporationId], characterId',
   corpBookObservedMeta: '[characterId+corporationId], characterId',
+});
+
+// Adds the officer's copy of the rest of a Corp Tax Book (miners, statements,
+// payments, ...) under each part's version stamp (#5243). Device-local, never
+// synced, officer-only: wiped with the `observed` copy.
+db.version(29).stores({
+  corpBookParts: '[characterId+corporationId+slot], [characterId+corporationId], characterId',
 });

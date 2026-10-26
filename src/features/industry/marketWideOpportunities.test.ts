@@ -4,7 +4,8 @@ import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { BlueprintSourceSets } from '@/engine/industry/blueprintObtainability';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
-import { runMarketWideScan } from './marketWideOpportunities';
+import type { CharacterBlueprint } from '@/esi/endpoints';
+import { researchFor, runMarketWideScan } from './marketWideOpportunities';
 
 vi.mock('@/market/prices', () => ({
   getHubPrices: vi.fn(),
@@ -211,5 +212,37 @@ describe('runMarketWideScan', () => {
       { topNPerMarketGroup: 1 }
     );
     expect(rows.map((row) => row.productTypeID)).toEqual([PRODUCT]);
+  });
+});
+
+describe('researchFor', () => {
+  const copy = (type_id: number, runs: number, me: number, te: number) =>
+    ({
+      type_id,
+      runs,
+      material_efficiency: me,
+      time_efficiency: te,
+    }) as CharacterBlueprint;
+  const assumed = { assumedMe: 3, assumedTe: 4 };
+
+  it('uses the assumed ME/TE for a blueprint the Character does not own', () => {
+    expect(researchFor(10, { owned: [], ...assumed })).toEqual({ me: 3, te: 4 });
+  });
+
+  it('prefers the owned copy’s research, even when it is 0/0', () => {
+    expect(researchFor(10, { owned: [copy(10, -1, 10, 20)], ...assumed })).toEqual({
+      me: 10,
+      te: 20,
+    });
+    expect(researchFor(10, { owned: [copy(10, -1, 0, 0)], ...assumed })).toEqual({ me: 0, te: 0 });
+  });
+
+  it('reads the same copy a plan would: the original, else the best-ME copy', () => {
+    const owned = [copy(10, 5, 9, 18), copy(10, 3, 4, 8)];
+    expect(researchFor(10, { owned, ...assumed })).toEqual({ me: 9, te: 18 });
+    expect(researchFor(10, { owned: [...owned, copy(10, -1, 1, 2)], ...assumed })).toEqual({
+      me: 1,
+      te: 2,
+    });
   });
 });

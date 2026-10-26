@@ -34,7 +34,6 @@ import {
 } from '@/components/ui/controlStyles';
 import { formatMarketIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
-import { SetDestinationButton } from './SetDestinationButton';
 import { PlaceJumpsLink } from '@/features/route/JumpsLink';
 import { formatCount } from '@/lib/formatCount';
 
@@ -95,9 +94,8 @@ export interface HubComparisonLineProps {
   inRangeBestBuy: number | null;
   /** Jumps from the Current System to the hub; `null` for a region, or unknown. */
   jumps: number | null;
-  /** The hub station, for Set destination; `null` in Region mode. */
+  /** The hub station, so the jump count links to its route; `null` in Region mode. */
   stationId: number | null;
-  stationName: string | null;
   /** Clears the Jump Range, so the book reads the header's scope again. */
   onView: () => void;
 }
@@ -114,7 +112,6 @@ export function HubComparisonLine({
   inRangeBestBuy,
   jumps,
   stationId,
-  stationName,
   onView,
 }: HubComparisonLineProps) {
   const { t } = useTranslation();
@@ -126,9 +123,9 @@ export function HubComparisonLine({
   return (
     <section
       aria-label={t('market.hubCompare.label', { place: placeName })}
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 border border-line bg-panel px-3 py-2 text-xs max-sm:flex-col max-sm:items-start"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border border-line bg-panel px-3 py-2 text-xs max-sm:flex-col max-sm:items-start"
     >
-      <p className="m-0 flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+      <p className="m-0 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         {summary.bestSell !== null && (
           <span className="whitespace-nowrap">
             <span className="font-semibold">
@@ -158,26 +155,21 @@ export function HubComparisonLine({
             )}
           </span>
         )}
-        {jumps !== null && (
-          <span className="text-text-dim">
-            {stationId === null ? (
-              t('market.hubCompare.jumps', { count: jumps })
-            ) : (
-              <PlaceJumpsLink locationId={stationId}>
-                {t('market.hubCompare.jumps', { count: jumps })}
-              </PlaceJumpsLink>
-            )}
-          </span>
-        )}
       </p>
-      <span className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={onView}>
-          {t('market.hubCompare.view', { place: placeName })}
-        </Button>
-        {stationId !== null && (
-          <SetDestinationButton locationId={stationId} placeName={stationName ?? placeName} />
-        )}
-      </span>
+      {jumps !== null && (
+        <span className="text-text-dim">
+          {stationId === null ? (
+            t('market.hubCompare.jumps', { count: jumps })
+          ) : (
+            <PlaceJumpsLink locationId={stationId}>
+              {t('market.hubCompare.jumps', { count: jumps })}
+            </PlaceJumpsLink>
+          )}
+        </span>
+      )}
+      <Button size="sm" onClick={onView}>
+        {t('market.hubCompare.view', { place: placeName })}
+      </Button>
     </section>
   );
 }

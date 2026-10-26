@@ -5,8 +5,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  SplitButtonChevron,
 } from '@/components/ui';
-import { CopyToClipboard, Expanded } from '@/components/ui/icons';
+import { CopyToClipboard } from '@/components/ui/icons';
 
 /** What the button last copied and how it went, for the label it flashes. */
 export type CopyOutcome = { what: 'chat' | 'link'; result: 'copied' | 'failed' } | null;
@@ -53,14 +54,7 @@ export function SurveyCopyButton({
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="primary"
-            size="sm"
-            aria-label={t('survey.moreCopy')}
-            className="rounded-l-none border-l border-l-accent-contrast/30 px-2"
-          >
-            <Expanded aria-hidden />
-          </Button>
+          <SplitButtonChevron size="sm" label={t('survey.moreCopy')} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-44">
           <DropdownMenuItem onSelect={onConfigure}>{t('survey.configureChat')}</DropdownMenuItem>

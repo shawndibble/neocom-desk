@@ -5,7 +5,7 @@
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { SsoRefreshError } from './alertGrant.js';
 import { decryptRefreshToken } from './alertGrantCrypto.js';
@@ -14,6 +14,7 @@ import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
   CORP_SYNC_GRANTS_COLLECTION,
   CORP_SYNC_SCOPES,
+  SYNC_REST_MS,
   deleteCorpSyncGrantsHeldBy,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
@@ -692,6 +693,24 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
         expect(await marker()).toBeUndefined();
       });
 
+      it('leaves extractions older than the marker window unread: a quiet run does not see them', async () => {
+        await quietBook();
+        const before = await marker();
+        // Written with no stamp, and too old to matter: a quiet run that read it would see
+        // the extractions fingerprint move and fall back to a full run, clearing this marker.
+        await book().collection('extractions').doc('old').set({
+          id: 'old',
+          structureId: 1,
+          moonId: 7,
+          extractionStartTime: '2025-01-01T00:00:00.000Z',
+          chunkArrivalTime: '2025-01-05T00:00:00.000Z',
+          naturalDecayTime: '2025-01-08T00:00:00.000Z',
+        });
+        now += 6 * H;
+        expect((await run()).synced).toBe(1);
+        expect(await marker()).toEqual(before);
+      });
+
       it('reads in full when ESI brings a new donation, and clears the marker', async () => {
         await quietBook();
         (esiState.journal as { data: unknown[] }).data.push({
@@ -876,6 +895,68 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
       expect(summary).toMatchObject({ budgetStopped: true, stopped: 0 });
       expect(await grantDoc()).toBeDefined();
+    });
+
+    describe('which grants a run reads', () => {
+      const H = 3_600_000;
+      const raw = () => db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(CORP));
+
+      it('rests a synced book, and reads it again once the rest is over', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
+        expect((await grantDoc())?.nextSyncAt).toBe(now + SYNC_REST_MS);
+
+        esiState.calls.length = 0;
+        now += H;
+        expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
+          grants: 0,
+          synced: 0,
+        });
+        expect(esiState.calls).toEqual([]);
+
+        now += SYNC_REST_MS;
+        expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
+          grants: 1,
+          synced: 1,
+        });
+      });
+
+      it('keeps a skipped book due, so the next run retries it', async () => {
+        await optIn(ACCOUNTANT);
+        esiState.observers = { kind: 'unavailable' };
+        now = T0 + 6 * H;
+        expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).skipped).toBe(1);
+        expect((await grantDoc())?.nextSyncAt).toBe(T0);
+      });
+
+      it('backfills a grant from before the field as due, once', async () => {
+        await optIn(ACCOUNTANT);
+        await raw().update({ nextSyncAt: FieldValue.delete() });
+        now = T0 + 6 * H;
+        expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
+          grants: 1,
+          synced: 1,
+        });
+        expect((await grantDoc())?.nextSyncAt).toBe(now + SYNC_REST_MS);
+        expect((await db.doc('corpTaxBookSyncGrantMeta/nextSyncAtBackfill').get()).exists).toBe(
+          true
+        );
+      });
+
+      it('never reads a feeder grant as a book', async () => {
+        await raw().set({
+          corporationId: CORP,
+          characterId: 99,
+          characterName: 'Feeder',
+          encryptedRefreshToken: 'x',
+          clientId: 'client-1',
+          enabledAt: T0,
+          kind: 'feeder',
+        });
+        const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(summary).toMatchObject({ grants: 0, synced: 0, skipped: 0 });
+      });
     });
   });
 });

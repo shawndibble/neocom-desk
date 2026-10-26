@@ -94,11 +94,14 @@ async function writeRefineryLabel(
   if (known.empty) fail('not-found', 'Not one of this moon owner’s refineries', 'unknown-refinery');
   const ref = feederRef(deps.db, collector, feeder);
   const field = new FieldPath('refineryLabels', String(input.structureId));
-  const viewRefinery = feederViewRef(deps.db, collector, feeder)
-    .collection(FEEDER_VIEW_REFINERIES)
-    .doc(String(input.structureId));
+  const view = feederViewRef(deps.db, collector, feeder);
+  const viewRefinery = view.collection(FEEDER_VIEW_REFINERIES).doc(String(input.structureId));
   await deps.db.runTransaction(async (tx) => {
-    const [recSnap, viewSnap] = await Promise.all([tx.get(ref), tx.get(viewRefinery)]);
+    const [recSnap, viewSnap, summarySnap] = await Promise.all([
+      tx.get(ref),
+      tx.get(viewRefinery),
+      tx.get(view),
+    ]);
     const rec = recSnap.data() as FeederRecord | undefined;
     if (!rec) fail('not-found', 'No such moon owner', 'no-feeder');
     if (ENDED.includes(rec.status)) {
@@ -117,6 +120,8 @@ async function writeRefineryLabel(
     // Absent until the view's first build, which then reads the label off the record.
     if (viewSnap.exists) {
       tx.update(viewRefinery, { label: doc?.label ?? null, labelSetAt: doc?.setAt ?? null });
+      // The client's stamp: it re-reads the view only when `builtAt` moves (#5241).
+      if (summarySnap.exists) tx.update(view, { builtAt: deps.now() });
     }
     appendAudit(tx, deps, collector, actor, 'refineryLabelSet', {
       feederCorporationId: feeder,
@@ -224,16 +229,20 @@ export async function learnRefinerySystems(
     if (typeof feeder !== 'number' || typeof row.get('solarSystemId') === 'number') continue;
     const ref = feederRef(deps.db, input.corporationId, feeder);
     const field = new FieldPath('refinerySystems', id);
-    const viewRefinery = feederViewRef(deps.db, input.corporationId, feeder)
-      .collection(FEEDER_VIEW_REFINERIES)
-      .doc(id);
+    const view = feederViewRef(deps.db, input.corporationId, feeder);
+    const viewRefinery = view.collection(FEEDER_VIEW_REFINERIES).doc(id);
     await deps.db.runTransaction(async (tx) => {
-      const [recSnap, viewSnap] = await Promise.all([tx.get(ref), tx.get(viewRefinery)]);
+      const [recSnap, viewSnap, summarySnap] = await Promise.all([
+        tx.get(ref),
+        tx.get(viewRefinery),
+        tx.get(view),
+      ]);
       if (!recSnap.exists || recSnap.get(field) !== undefined) return;
       tx.update(ref, field, system);
       // Absent until the view's first build, which then reads it off the record.
       if (viewSnap.exists && typeof viewSnap.get('solarSystemId') !== 'number') {
         tx.update(viewRefinery, { solarSystemId: system });
+        if (summarySnap.exists) tx.update(view, { builtAt: deps.now() });
       }
       appendAudit(
         tx,

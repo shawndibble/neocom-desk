@@ -63,6 +63,8 @@ export interface FeederViewSummary {
    * to grant again; absent on a view built before it existed.
    */
   refineryNamesGranted?: boolean;
+  /** Server-side digest of the view; unused here, `builtAt` is the stamp. */
+  contentHash?: string;
 }
 
 export interface FeederViewLine {
@@ -210,7 +212,17 @@ export async function dismissFeederHistory(
   });
 }
 
-/** Reads the view under the viewer's access record. `null` when the server has not built it. */
+/** The last view read per feeder, with the summary stamp it was read at (#5241). */
+const viewCache = new Map<string, { stamp: number; view: FeederView }>();
+
+/** Forget cached views: for tests and a sign-out. */
+export const clearFeederViewCache = (): void => viewCache.clear();
+
+/**
+ * Reads the view under the viewer's access record. `null` when the server has not built it.
+ * The summary is always read; days, refineries and payouts are re-read only when its
+ * `builtAt` stamp moved since the last read.
+ */
 export async function readFeederView(
   characterId: number,
   collectorCorporationId: number,
@@ -222,8 +234,15 @@ export async function readFeederView(
     String(collectorCorporationId),
     'feederViews',
   ] as const;
-  const summary = await getDoc(doc(...base, String(feederCorporationId)));
-  if (!summary.exists()) return null;
+  const summarySnap = await getDoc(doc(...base, String(feederCorporationId)));
+  const key = `${characterId}:${collectorCorporationId}:${feederCorporationId}`;
+  if (!summarySnap.exists()) {
+    viewCache.delete(key);
+    return null;
+  }
+  const summary = summarySnap.data() as FeederViewSummary;
+  const cached = viewCache.get(key);
+  if (cached && cached.stamp === summary.builtAt) return { ...cached.view, summary };
   const sub = async <T>(name: string): Promise<T[]> =>
     (await getDocs(collection(...base, String(feederCorporationId), name))).docs.map(
       (d) => d.data() as T
@@ -233,7 +252,9 @@ export async function readFeederView(
     sub<FeederViewRefinery>('refineries'),
     sub<FeederViewPayout>('payouts'),
   ]);
-  return { summary: summary.data() as FeederViewSummary, days, refineries, payouts };
+  const view = { summary, days, refineries, payouts };
+  viewCache.set(key, { stamp: summary.builtAt, view });
+  return view;
 }
 
 /** Access, then the view: one call for the page. */

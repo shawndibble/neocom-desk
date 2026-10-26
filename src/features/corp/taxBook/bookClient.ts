@@ -46,6 +46,7 @@ import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corp
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
+import { bookPartStore } from './bookPartStore';
 import { readObservedRows } from './observedRead';
 import { forgetObservedCopy } from './observedStore';
 import { callRouted } from '@/sync/routedCallable';
@@ -251,12 +252,26 @@ async function openBook(characterId: number, corporationId: number) {
   // officer-only, so the rules still decide each open. Every part waits on it,
   // so no copy is handed out to a Character the rules now refuse.
   const paid = getDoc(doc(db, 'corps', String(corporationId), 'meta', 'paid'));
+  // A refusal here means the rules no longer let this Character in: nothing of the book stays on the device.
+  paid.catch(async (error) => {
+    if (String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied'))
+      await forgetObservedCopy(characterId, corporationId).catch(() => {});
+  });
+  const store = bookPartStore(characterId, corporationId);
   const paidStatementIds = async () =>
     new Set(((await paid).data()?.ids as string[] | undefined) ?? []);
-  const part = async <T>(collectionName: string, readPart: () => Promise<T>, slot?: string) => {
+  const part = async <T>(
+    collectionName: string,
+    readPart: () => Promise<T>,
+    slot?: string,
+    persist = true
+  ) => {
     const [, value] = await Promise.all([
       paid,
-      cachedPart(key, collectionName, versions, readPart, slot ? { slot } : {}),
+      cachedPart(key, collectionName, versions, readPart, {
+        ...(slot ? { slot } : {}),
+        ...(persist ? { store } : {}),
+      }),
     ]);
     return value;
   };
@@ -267,10 +282,13 @@ async function openBook(characterId: number, corporationId: number) {
   const list = <T>(name: string): Promise<T[]> => part(name, () => read<T>(name));
   // `observed` is the book's biggest part: a delta over this device's Dexie copy (observedRead.ts).
   const observed = (): Promise<ObservedRow[]> =>
-    part('observed', () =>
-      readObservedRows(db, characterId, corporationId, versions?.collections.observed, paid)
+    part(
+      'observed',
+      () => readObservedRows(db, characterId, corporationId, versions?.collections.observed, paid),
+      undefined,
+      false // its own Dexie copy (ADR 0031)
     );
-  return { data, part, read, list, observed, paidStatementIds };
+  return { db, data, part, read, list, observed, paidStatementIds };
 }
 
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
@@ -574,11 +592,15 @@ export interface Rebill {
 
 /** Every rebill in the book, for the export. Officer-only. */
 export async function readRebills(characterId: number, corporationId: number): Promise<Rebill[]> {
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'rebills')
+  const book = await openBook(characterId, corporationId);
+  if (!book) return [];
+  const { db } = book;
+  return book.part('rebills', async () =>
+    (await getDocs(collection(db, 'corps', String(corporationId), 'rebills'))).docs.map((d) => ({
+      ...(d.data() as Omit<Rebill, 'id'>),
+      id: d.id,
+    }))
   );
-  return snap.docs.map((d) => ({ ...(d.data() as Omit<Rebill, 'id'>), id: d.id }));
 }
 
 /** One audit-log entry (D7): who did what, when. */

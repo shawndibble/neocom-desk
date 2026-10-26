@@ -30,6 +30,8 @@ class FakeFirestore {
   /** Batched set/delete ops committed, to prove what a call actually wrote. */
   batchWrites = 0;
   batchDeletes = 0;
+  /** `get()` calls on a collection query (not a single doc), by `where` field names. */
+  queryGets: string[] = [];
 
   private store(name: string): Map<string, Data> {
     let s = this.collections.get(name);
@@ -93,14 +95,40 @@ class FakeFirestore {
     };
   }
 
-  private query(name: string, filters: [string, Op, unknown][], max = Infinity) {
+  private query(
+    name: string,
+    filters: [string, Op, unknown][],
+    max = Infinity,
+    orderField?: string,
+    after?: { id: string; value: unknown }
+  ) {
     return {
       doc: (id: string) => this.ref(name, id),
       where: (field: string, op: Op, value: unknown) =>
-        this.query(name, [...filters, [field, op, value]], max),
-      limit: (n: number) => this.query(name, filters, n),
+        this.query(name, [...filters, [field, op, value]], max, orderField, after),
+      limit: (n: number) => this.query(name, filters, n, orderField, after),
+      orderBy: (field: string) => this.query(name, filters, max, field, after),
+      startAfter: (snap: { id: string; data: () => Data | undefined }) =>
+        this.query(name, filters, max, orderField, {
+          id: snap.id,
+          value: orderField ? snap.data()?.[orderField] : undefined,
+        }),
       get: async () => {
-        const docs = [...this.store(name).entries()]
+        this.queryGets.push(name);
+        const sorted = [...this.store(name).entries()];
+        if (orderField) {
+          sorted.sort(
+            ([ia, a], [ib, b]) =>
+              (a[orderField] as number) - (b[orderField] as number) || ia.localeCompare(ib)
+          );
+        }
+        const docs = sorted
+          .filter(([id, data]) => {
+            if (!after || !orderField) return true;
+            const v = data[orderField] as number;
+            const av = after.value as number;
+            return v > av || (v === av && id > after.id);
+          })
           .filter(([, data]) =>
             filters.every(([field, op, value]) => {
               if (!(field in data)) return false;
@@ -212,6 +240,47 @@ describe('writeDeviceRegistration', () => {
     expect(db.batchWrites).toBe(0);
     expect(db.batchDeletes).toBe(0);
     expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+  });
+
+  it('reads no projection docs for a repeat upload with no changes (issue #5238)', async () => {
+    const db = new FakeFirestore();
+    const rows = [row('industryJobComplete'), row('skillTrainingComplete')];
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+    db.queryGets = [];
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [...rows].reverse() }]);
+
+    expect(db.queryGets).toEqual([]);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+  });
+
+  it('diffs again once an upload adds, changes or removes a row', async () => {
+    const db = new FakeFirestore();
+    const a = row('industryJobComplete');
+    const b = row('skillTrainingComplete');
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a, b] }]);
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a, b, row('eveNotification')] }]);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(3);
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a, { ...b, title: 'new' }] }]);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+    expect(db.get('projections', projectionDocId('A', b.occurrenceKey))?.title).toBe('new');
+
+    await upload(db, 'A', [{ characterId: CHAR, rows: [a] }]);
+    expect(unfiredRowsOf(db, 'A')).toEqual([projectionDocId('A', a.occurrenceKey)]);
+  });
+
+  it('does not record the hash when a batch failed, so the retry still writes', async () => {
+    const db = new FakeFirestore();
+    const rows = [row('industryJobComplete')];
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    db.failCommits = 1;
+    await expect(upload(db, 'A', [{ characterId: CHAR, rows }])).rejects.toThrow();
+
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(1);
   });
 
   it('writes only changed and added rows and deletes only removed ones', async () => {
@@ -662,6 +731,91 @@ describe('dispatchDueProjections query boundaries', () => {
       expect(db.get('projections', id) === undefined).toBe(isPastRetention(NOW, later));
     }
   );
+});
+
+describe('dispatchDueProjections paging and lookups', () => {
+  function seedLegacy(db: FakeFirestore, key: string, fireAt: number, characterId = CHAR): void {
+    db.seed('projections', key, {
+      ...row('industryJobComplete', fireAt),
+      occurrenceKey: key,
+      characterId,
+      fired: false,
+      firedAt: null,
+    });
+  }
+
+  it('reads due rows a page at a time, oldest first, until the backlog is clear', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    for (let i = 0; i < 5; i += 1) seedLegacy(db, `k${i}`, NOW - 10_000 + i);
+
+    db.queryGets = [];
+    await dispatchDueProjections(asFirestore(db), messaging, NOW, () => {}, { pageSize: 2 });
+
+    expect(messaging.sent).toHaveLength(5);
+    // 2 + 2 + 1: the short last page ends the run.
+    expect(db.queryGets.filter((n) => n === 'projections')).toHaveLength(3);
+  });
+
+  it('stops after maxPasses and leaves the rest of the backlog for the next tick', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    for (let i = 0; i < 5; i += 1) seedLegacy(db, `k${i}`, NOW - 10_000 + i);
+
+    db.queryGets = [];
+    await dispatchDueProjections(asFirestore(db), messaging, NOW, () => {}, {
+      pageSize: 2,
+      maxPasses: 2,
+    });
+
+    expect(messaging.sent).toHaveLength(4);
+    expect(db.get('projections', 'k4')?.fired).toBe(false);
+  });
+
+  it('does not re-read a row left unfired by a transient send failure', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    messaging.failures.set('token-A', 'messaging/internal-error');
+    for (let i = 0; i < 3; i += 1) seedLegacy(db, `k${i}`, NOW - 10_000 + i);
+
+    db.queryGets = [];
+    await dispatchDueProjections(asFirestore(db), messaging, NOW, () => {}, { pageSize: 2 });
+
+    expect(db.queryGets.filter((n) => n === 'projections')).toHaveLength(2);
+    expect(db.get('projections', 'k0')?.fired).toBe(false);
+  });
+
+  it('looks up the devices holding a Character once per run, not once per legacy row', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    for (let i = 0; i < 4; i += 1) seedLegacy(db, `k${i}`, NOW - 10_000 + i);
+    seedLegacy(db, 'other', NOW - 5_000, 2);
+
+    db.queryGets = [];
+    await dispatchDueProjections(asFirestore(db), messaging, NOW);
+
+    expect(messaging.sent).toHaveLength(4);
+    // One due query + one holder lookup per distinct Character (1 and 2).
+    expect(db.queryGets.filter((n) => n === 'deviceRegistrations')).toHaveLength(2);
+  });
+
+  it('stops sending to a device that FCM reported dead within the same run', async () => {
+    const db = new FakeFirestore();
+    const messaging = new FakeMessaging();
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    messaging.failures.set('token-A', 'messaging/registration-token-not-registered');
+    for (let i = 0; i < 3; i += 1) seedLegacy(db, `k${i}`, NOW - 10_000 + i);
+
+    db.queryGets = [];
+    await dispatchDueProjections(asFirestore(db), messaging, NOW, () => {}, { pageSize: 1 });
+
+    expect(db.ids('deviceRegistrations')).toEqual([]);
+    expect(messaging.sent).toHaveLength(0);
+  });
 });
 
 describe('purgeFiredProjections', () => {

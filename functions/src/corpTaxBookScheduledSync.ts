@@ -45,7 +45,9 @@ import {
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
   QUIET_DOC,
+  extractionsSinceOf,
   fingerprintOf,
+  inExtractionWindow,
   journalThroughOf,
   quietAfterReads,
   quietAtStart,
@@ -167,12 +169,19 @@ async function readActiveBook(db: Firestore, corporationId: number): Promise<Boo
 }
 
 /**
- * A quiet run's state: the book doc, the extractions and the paid ids, and none
- * of the collections the quiet marker vouches for (they stay empty: nothing on
- * the quiet path reads them).
+ * A quiet run's state: the book doc, the extractions from the marker's cut-off on and
+ * the paid ids, and none of the collections the quiet marker vouches for (they stay
+ * empty: nothing on the quiet path reads them).
  */
-async function readQuietBookState(snap: BookSnap, paid: BookSnap): Promise<AdminBookState> {
-  const extractions = await snap.ref.collection(EXTRACTIONS).get();
+async function readQuietBookState(
+  snap: BookSnap,
+  paid: BookSnap,
+  extractionsSince: string
+): Promise<AdminBookState> {
+  const extractions = await snap.ref
+    .collection(EXTRACTIONS)
+    .where('chunkArrivalTime', '>=', extractionsSince)
+    .get();
   return {
     ...bookDocState(snap),
     miners: [],
@@ -283,7 +292,7 @@ export async function runBookSync(
       : null;
   let quiet = vouching !== null;
   let before = vouching
-    ? await readQuietBookState(head, paid)
+    ? await readQuietBookState(head, paid, vouching.extractionsSince)
     : await readBookStateFrom(head, paid);
 
   // --- ESI reads (nothing is written until all of them are in) -------------
@@ -507,6 +516,7 @@ export async function runBookSync(
   // it, so the next runs can skip that read while nothing changes; any other full run clears
   // an older marker. Best effort: without a marker the next run just reads in full.
   if (!quiet) {
+    const extractionsSince = extractionsSinceOf(startedAt);
     const next: QuietMarker | null =
       donationsRead &&
       fresh.length === 0 &&
@@ -522,7 +532,10 @@ export async function runBookSync(
             divisions: before.divisions,
             journalThrough: journalThroughOf(donations),
             known: [...known].sort((x, y) => x - y),
-            extractions: fingerprintOf(before.extractions),
+            extractions: fingerprintOf(
+              before.extractions.filter((x) => inExtractionWindow(x, extractionsSince))
+            ),
+            extractionsSince,
             paid: fingerprintOf(before.paidStatementIds),
           }
         : null;

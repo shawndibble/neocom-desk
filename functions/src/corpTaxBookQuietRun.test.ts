@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   QUIET_COLLECTIONS,
+  QUIET_EXTRACTION_WINDOW_MS,
   QUIET_MAX_AGE_MS,
+  extractionsSinceOf,
   fingerprintOf,
+  inExtractionWindow,
   journalThroughOf,
   quietAfterReads,
   quietAtStart,
@@ -23,6 +26,7 @@ const marker = (over: Partial<QuietMarker> = {}): QuietMarker => ({
   journalThrough: { '1': 100 },
   known: [50, 51],
   extractions: 'x',
+  extractionsSince: '2026-08-25T00:00:00.000Z',
   paid: 'p',
   ...over,
 });
@@ -50,6 +54,25 @@ describe('readQuietMarker', () => {
     expect(readQuietMarker({ ...marker(), known: ['50'] })).toBeNull();
     expect(readQuietMarker({ ...marker(), extractions: undefined })).toBeNull();
     expect(readQuietMarker({ ...marker(), paid: 1 })).toBeNull();
+  });
+
+  it('refuses a marker from before the extraction window, so one full run writes a new one', () => {
+    expect(readQuietMarker({ ...marker(), extractionsSince: undefined })).toBeNull();
+  });
+});
+
+describe('extraction window', () => {
+  it('starts 60 days before the run that fixes it', () => {
+    expect(extractionsSinceOf(T)).toBe(new Date(T - QUIET_EXTRACTION_WINDOW_MS).toISOString());
+    expect(extractionsSinceOf(T)).toBe('2026-08-25T00:00:00.000Z');
+  });
+
+  it('keeps a chunk arriving at or after the cut-off and drops an older or undated one', () => {
+    const since = extractionsSinceOf(T);
+    expect(inExtractionWindow({ chunkArrivalTime: since }, since)).toBe(true);
+    expect(inExtractionWindow({ chunkArrivalTime: '2026-10-20T00:00:00.000Z' }, since)).toBe(true);
+    expect(inExtractionWindow({ chunkArrivalTime: '2026-08-24T23:59:59.999Z' }, since)).toBe(false);
+    expect(inExtractionWindow({}, since)).toBe(false);
   });
 });
 

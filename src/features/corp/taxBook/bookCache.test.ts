@@ -5,6 +5,8 @@ import {
   cachedPart,
   clearBookCache,
   type BookVersions,
+  type Copy,
+  type PartStore,
 } from './bookCache';
 
 const KEY = '7:98000001';
@@ -108,5 +110,73 @@ describe('cachedPart', () => {
     const read = vi.fn(async () => ['m']);
     expect(await cachedPart(KEY, 'miners', versions, read, { now: T0 })).toEqual(['m']);
     expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  describe('with a persistent store', () => {
+    const memoryStore = (held: Record<string, Copy> = {}) => {
+      const store: PartStore = {
+        load: vi.fn(async (slot) => held[slot]),
+        save: vi.fn(async (slot, copy) => void (held[slot] = copy)),
+        forget: vi.fn(async (slot) => void delete held[slot]),
+      };
+      return { store, held };
+    };
+    const versions = v({ miners: 'm1' });
+
+    it('serves a stored copy of a matching stamp with no read', async () => {
+      const { store } = memoryStore({ miners: { version: 'm1', at: T0, data: ['kept'] } });
+      const read = vi.fn(async () => ['fresh']);
+      expect(await cachedPart(KEY, 'miners', versions, read, { now: T0 + 1, store })).toEqual([
+        'kept',
+      ]);
+      expect(read).not.toHaveBeenCalled();
+    });
+
+    it('reads and stores when the stored stamp differs', async () => {
+      const { store, held } = memoryStore({ miners: { version: 'm0', at: T0, data: ['old'] } });
+      const got = await cachedPart(KEY, 'miners', versions, async () => ['new'], {
+        now: T0 + 1,
+        store,
+      });
+      expect(got).toEqual(['new']);
+      expect(held.miners).toEqual({ version: 'm1', at: T0 + 1, data: ['new'] });
+    });
+
+    it('reads when the stored copy is over the max age', async () => {
+      const { store } = memoryStore({ miners: { version: 'm1', at: T0, data: ['old'] } });
+      const read = vi.fn(async () => ['new']);
+      await cachedPart(KEY, 'miners', versions, read, {
+        now: T0 + BOOK_CACHE_MAX_AGE_MS + 1,
+        store,
+      });
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+
+    it('never trusts a stored copy without a stamp, and drops it', async () => {
+      const { store, held } = memoryStore({ miners: { version: 'm1', at: T0, data: ['old'] } });
+      await cachedPart(KEY, 'miners', v({}), async () => ['new'], { now: T0, store });
+      expect(store.load).not.toHaveBeenCalled();
+      expect(held.miners).toBeUndefined();
+    });
+
+    it('does not trust a copy stamped in the future (clock set back)', async () => {
+      const { store } = memoryStore({
+        miners: { version: 'm1', at: T0 + 48 * 3600_000, data: ['old'] },
+      });
+      const read = vi.fn(async () => ['new']);
+      await cachedPart(KEY, 'miners', versions, read, { now: T0, store });
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+
+    it('still reads when the store fails', async () => {
+      const store: PartStore = {
+        load: async () => Promise.reject(new Error('dexie')),
+        save: async () => Promise.reject(new Error('dexie')),
+        forget: async () => Promise.reject(new Error('dexie')),
+      };
+      expect(
+        await cachedPart(KEY, 'miners', versions, async () => ['x'], { now: T0, store })
+      ).toEqual(['x']);
+    });
   });
 });

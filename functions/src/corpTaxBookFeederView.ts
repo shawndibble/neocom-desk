@@ -12,6 +12,7 @@
 // request, leave and dismissal (and later payouts and agreed rates: call
 // `rebuildFeederView` / `tryRebuildFeederView` from those writers).
 
+import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
 import { FEEDER_VIEWS, utcDate } from './corpTaxBook.js';
@@ -132,6 +133,11 @@ export interface FeederViewSummary {
    * grant again; absent on a view built before it existed.
    */
   refineryNamesGranted?: boolean;
+  /**
+   * Hash of everything else the view holds, `builtAt` aside. A rebuild that hashes the same skips
+   * every write; absent on a view built before it existed (#5241).
+   */
+  contentHash?: string;
 }
 
 export interface FeederViewDayLine {
@@ -484,6 +490,20 @@ export function buildFeederView(input: FeederViewInput): FeederView {
   };
 }
 
+/** What the view holds, as one digest: equal digests mean a rebuild would write nothing new. */
+export function feederViewHash(view: FeederView): string {
+  const summary: Partial<FeederViewSummary> = { ...view.summary };
+  delete summary.builtAt;
+  delete summary.contentHash;
+  return createHash('sha256')
+    .update(
+      JSON.stringify([summary, view.days, view.refineries, view.payouts], (_k, v: unknown) =>
+        v === undefined ? null : v
+      )
+    )
+    .digest('hex');
+}
+
 // --- Rebuild -----------------------------------------------------------------
 
 const PRICE_READ_CONCURRENCY = 16;
@@ -592,6 +612,10 @@ export async function rebuildFeederView(
   });
 
   const ref = feederViewRef(deps.db, collector, feeder);
+  // Nothing changed: the summary is the only read, and nothing is written, so its `builtAt`
+  // (the client's stamp) stays put.
+  const contentHash = feederViewHash(view);
+  if ((await ref.get()).get('contentHash') === contentHash) return true;
   const toDocs = <T extends object>(items: T[], id: (item: T) => string) =>
     new Map(items.map((item) => [id(item), item]));
   // Three disjoint collections; the summary goes last, once all of them hold. allSettled: no
@@ -615,7 +639,7 @@ export async function rebuildFeederView(
   ]);
   const failed = synced.find((s) => s.status === 'rejected');
   if (failed) throw failed.reason;
-  await ref.set(view.summary);
+  await ref.set({ ...view.summary, contentHash });
   return true;
 }
 
