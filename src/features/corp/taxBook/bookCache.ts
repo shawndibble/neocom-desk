@@ -11,8 +11,8 @@
  * exactly what it wrote. The stamp is read *before* the part, so a write that
  * lands in between is in the copy and still moves the stamp past it.
  *
- * In memory, per tab: nothing officer-only outlives the page, and a Character
- * switch or removal needs no cleanup. Nothing is trusted without a stamp —
+ * In memory, per tab: nothing officer-only outlives the page except `observed`,
+ * whose copy persists in Dexie (observedRead.ts, ADR 0031). Nothing is trusted without a stamp —
  * the client can ship before the functions that write it — and no copy is
  * served past {@link BOOK_CACHE_MAX_AGE_MS}, which bounds the cost of a stamp
  * the server failed to write.

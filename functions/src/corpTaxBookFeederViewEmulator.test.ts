@@ -34,7 +34,8 @@ import {
   setOwnRefineryLabel,
   setRefineryLabel,
 } from './corpTaxBookRefineryLabels.js';
-import { turnOnBook, type BookDeps } from './corpTaxBookStore.js';
+import { mergeObservedInto, turnOnBook, type BookDeps } from './corpTaxBookStore.js';
+import { rebuildFeederView } from './corpTaxBookFeederView.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const COLLECTOR = 98000001;
@@ -226,6 +227,58 @@ suite('moon owner view', () => {
     const days = await viewRef().collection('days').get();
     expect(days.docs.map((d) => d.id)).toEqual(['2026-10-18']);
     expect(JSON.stringify(days.docs.map((d) => d.data()))).not.toMatch(/minerRate|margin/);
+  });
+
+  describe('feeder rollup', () => {
+    const mirror = () => collectorBook().collection('feederObserved');
+    const ROW = {
+      structureId: 4001,
+      characterId: 900,
+      recordedCorporationId: 3,
+      typeId: 45490,
+      date: '2026-10-18',
+      quantity: 100,
+      cachedAt: new Date(T0).toISOString(),
+      sourceCorporationId: FEEDER,
+    };
+    const stable = async () => {
+      const rest = { ...((await summary()) as FeederViewSummary), builtAt: 0 };
+      return rest;
+    };
+    const status = () => getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector);
+
+    it('a backfilled read and a mirror read build the same view and status', async () => {
+      await save(await newInvite(), 6);
+      const first = await stable();
+      const firstStatus = await status();
+      expect((await mirror().doc(`ready_${FEEDER}`).get()).exists).toBe(true);
+
+      // Back to a feeder from before the mirror: no documents, no marker.
+      await db.recursiveDelete(mirror());
+      expect((await mirror().get()).empty).toBe(true);
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect(await stable()).toEqual(first);
+      expect(await status()).toEqual(firstStatus);
+      expect((await mirror().doc(`ready_${FEEDER}`).get()).exists).toBe(true);
+
+      // Now served from the mirror alone.
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect(await stable()).toEqual(first);
+    });
+
+    it('follows a row that grows and one that leaves the feeder', async () => {
+      await save(await newInvite(), 6);
+      await mergeObservedInto(bookDeps(), COLLECTOR, [{ ...ROW, quantity: 150 }]);
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect((await summary())?.minedVolume).toBe(150);
+
+      // The book's own sync later records the same row without a feeder.
+      const own: Partial<typeof ROW> = { ...ROW, quantity: 200 };
+      delete own.sourceCorporationId;
+      await mergeObservedInto(bookDeps(), COLLECTOR, [own as typeof ROW]);
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect((await summary())?.minedVolume).toBe(0);
+    });
   });
 
   it('writes no view for a refused first pull', async () => {

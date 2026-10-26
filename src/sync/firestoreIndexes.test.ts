@@ -131,6 +131,8 @@ describe('firestore.indexes.json field overrides', () => {
       'pledges',
       // A guest's pending Miner groupings are found across books (#4210).
       'miners',
+      // The feeder mirror's packed lines would index every nested key (corpTaxBookFeederRollup.ts).
+      'feederObserved',
       // Scheduled sweeps query across every parent instead of once per parent (#5049).
       ...SWEEP_GROUP_FIELDS.map(([group]) => group),
     ]);
