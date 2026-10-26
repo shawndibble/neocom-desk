@@ -715,6 +715,23 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // The board's version stamp (issue #5244): one doc a Member reads to learn whether the
+      // Requests and Pledges changed since their cached copy. Callables and Pledgers set `stamp`
+      // (and `reset` when they delete a Request or Pledge) to the server time; it carries nothing
+      // else, so a Member writing it can at worst make others re-read the board.
+      match /boardVersion/{stampDoc} {
+        allow get: if isMember();
+        allow create, update: if isMember()
+          && stampDoc == 'current'
+          && request.resource.data.keys().hasOnly(['stamp', 'reset'])
+          && request.resource.data.stamp == request.time
+          && (!('reset' in request.resource.data)
+            || request.resource.data.reset == request.time
+            || (resource != null && 'reset' in resource.data
+              && request.resource.data.reset == resource.data.reset));
+        allow delete: if false;
+      }
+
       // Requests (issue #3807, ADR 0021): a Member's ask for items, read by the
       // whole Community. Created, extended, closed and reopened only through
       // the callables (the open-Requests and lines caps can't be counted here),

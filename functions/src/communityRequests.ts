@@ -6,6 +6,7 @@
 // cannot be counted by rules; the decisions live here, with no Firestore, so
 // they are unit testable. The admin-SDK half is communityRequestsStore.ts.
 
+import { FieldValue, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
   BUYBACK_GROUP_KEYS,
@@ -31,6 +32,29 @@ import {
 export const REQUESTS_COLLECTION = 'itemRequests';
 /** One Member's Pledges on a Request live in `{request}/pledges/{uid}` (issue #3808, written by the Member under firestore.rules; this side only deletes them on leave). */
 export const PLEDGES_COLLECTION = 'pledges';
+
+/**
+ * The board's version stamp (issue #5244): `communities/{id}/boardVersion/current`, `{ stamp, reset? }`
+ * server timestamps. Every write to a Community's Requests or Pledges sets `stamp`; one that deletes a Request or
+ * a Pledge also sets `reset`, so a reader holding a cached board knows a delta cannot show the
+ * deletion and re-reads it whole. Members read it under firestore.rules and Pledgers write it
+ * beside their Pledge (see src/features/communities/boardVersion.ts).
+ */
+export const BOARD_VERSION_COLLECTION = 'boardVersion';
+export const BOARD_VERSION_DOC = 'current';
+
+export const boardVersionRef = (db: Firestore, communityId: string): DocumentReference =>
+  db
+    .collection('communities')
+    .doc(communityId)
+    .collection(BOARD_VERSION_COLLECTION)
+    .doc(BOARD_VERSION_DOC);
+
+/** The merge payload for the stamp: `reset` too when the write deleted something. */
+export const boardVersionBump = (deleted = false) => {
+  const at = FieldValue.serverTimestamp();
+  return deleted ? { stamp: at, reset: at } : { stamp: at };
+};
 
 /** Open (not closed, not expired) Requests one Member may hold in one Community. */
 export const MAX_OPEN_REQUESTS_PER_MEMBER = 10;

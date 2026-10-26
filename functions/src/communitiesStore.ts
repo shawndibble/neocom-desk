@@ -35,6 +35,8 @@ import {
 } from './communities.js';
 import {
   PLEDGES_COLLECTION,
+  boardVersionBump,
+  boardVersionRef,
   REQUESTS_COLLECTION as ITEM_REQUESTS_COLLECTION,
 } from './communityRequests.js';
 
@@ -448,6 +450,8 @@ export async function deleteMemberShares(
   ];
   await writer.close();
   await Promise.all(deletes);
+  // Their Requests and Pledges are gone: a cached board must re-read, not merge a delta.
+  await boardVersionRef(db, communityId).set(boardVersionBump(true), { merge: true });
 }
 
 /**
