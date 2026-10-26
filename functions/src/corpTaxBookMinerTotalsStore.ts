@@ -12,6 +12,7 @@ import {
   type Scope,
   type TotalsPlan,
 } from './corpTaxBookMinerTotals.js';
+import { reconcileMoonDocs } from './corpTaxBookMoonDocsStore.js';
 
 type Data = Record<string, unknown>;
 
@@ -213,6 +214,7 @@ export interface VerifyOutcome {
   checked: number;
   mismatches: number;
   overlaps: number;
+  moonDocMismatches: number;
 }
 
 /**
@@ -226,19 +228,30 @@ export async function verifyMinerTotals(
 ): Promise<VerifyOutcome> {
   const { plan, records } = await reconcileMinerTotals(db, corporationId, 'all');
   const overlaps = overlappingPulls(records.extractions, records.expiryHours);
+  // The per-pull moon docs (#5256) are verified and repaired in the same pass; a failure here never fails the miner check.
+  const moonPlan = await reconcileMoonDocs(db, corporationId, 'all').catch((e) => {
+    console.error('moon docs verify failed', e instanceof Error ? e.message : e);
+    return undefined;
+  });
+  const moonMismatches = moonPlan?.mismatches ?? [];
   const at = now();
   const health = sub(db, corporationId, 'meta').doc(HEALTH_DOC);
   await health.set({
     checkedAt: at,
-    status: plan.mismatches.length === 0 && overlaps.length === 0 ? 'ok' : 'attention',
+    status:
+      plan.mismatches.length === 0 && overlaps.length === 0 && moonMismatches.length === 0
+        ? 'ok'
+        : 'attention',
     checked: plan.checked,
     mismatchCount: plan.mismatches.length,
     mismatches: plan.mismatches.slice(0, MAX_LISTED),
     overlapCount: overlaps.length,
     overlaps: overlaps.slice(0, MAX_LISTED),
-    ...(plan.mismatches.length > 0 ? { lastMismatchAt: at } : {}),
+    moonDocMismatchCount: moonMismatches.length,
+    moonDocMismatches: moonMismatches.slice(0, MAX_LISTED),
+    ...(plan.mismatches.length > 0 || moonMismatches.length > 0 ? { lastMismatchAt: at } : {}),
   });
-  if (plan.mismatches.length > 0 || overlaps.length > 0) {
+  if (plan.mismatches.length > 0 || overlaps.length > 0 || moonMismatches.length > 0) {
     await sub(db, corporationId, 'audit')
       .doc(`${String(at).padStart(15, '0')}~minertotals`)
       .create({
@@ -253,6 +266,8 @@ export async function verifyMinerTotals(
           mismatchCount: plan.mismatches.length,
           overlaps: overlaps.slice(0, MAX_LISTED),
           overlapCount: overlaps.length,
+          moonDocMismatches: moonMismatches.slice(0, MAX_LISTED),
+          moonDocMismatchCount: moonMismatches.length,
         },
       })
       .catch((e) => console.error('miner totals audit failed', e instanceof Error ? e.message : e));
@@ -262,7 +277,12 @@ export async function verifyMinerTotals(
       overlaps: overlaps.length,
     });
   }
-  return { checked: plan.checked, mismatches: plan.mismatches.length, overlaps: overlaps.length };
+  return {
+    checked: plan.checked,
+    mismatches: plan.mismatches.length,
+    overlaps: overlaps.length,
+    moonDocMismatches: moonMismatches.length,
+  };
 }
 
 /** Verifies every active book, one after another, stopping at `budgetMs`. */
