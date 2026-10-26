@@ -55,7 +55,7 @@ export interface ItemContextMenuProps {
    * Build Plan and PI (Corp assets, DESIGN.md §6c restraint).
    */
   holdingsOnly?: boolean;
-  /** Leaves out "Set stock target…" where the page already edits the Stock Target in place (Assets › Targets). */
+  /** Leaves out "Set stock target" where the page already edits the Stock Target in place (Assets › Targets). */
   hideStockTarget?: boolean;
   /** Leaves out "Build Plan" where the page is already a Build Plan (Industry › Plans detail). */
   hideBuildPlan?: boolean;

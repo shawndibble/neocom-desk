@@ -57,7 +57,7 @@ export function MinerRowMenu({
           {payment ? (
             <MenuItem onSelect={() => onNotTax(miner, payment.id)}>
               <span>
-                {t('corpTaxBook.moons.payment.markNotTaxMenu')}
+                {t('corpTaxBook.moons.payment.markNotTax')}
                 {/* The item acts on the latest payment with tax in it: say which, in view. */}
                 <span className="block text-xs text-text-dim">
                   {t('corpTaxBook.moons.payment.markNotTaxTarget', {
@@ -69,7 +69,7 @@ export function MinerRowMenu({
             </MenuItem>
           ) : (
             <DisabledMenuItem reason={t('corpTaxBook.moons.payment.markNotTaxNone')}>
-              {t('corpTaxBook.moons.payment.markNotTaxMenu')}
+              {t('corpTaxBook.moons.payment.markNotTax')}
             </DisabledMenuItem>
           )}
         </>

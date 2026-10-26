@@ -50,7 +50,7 @@ function Harness({
               )
             }
           >
-            Delete…
+            Delete
           </DropdownMenuItem>
           <DropdownMenuItem>Duplicate</DropdownMenuItem>
         </DropdownMenuContent>
@@ -67,7 +67,7 @@ async function chooseDelete(props: Parameters<typeof Harness>[0] = {}) {
   render(<Harness {...props} />);
   const trigger = screen.getByRole('button', { name: 'Actions' });
   await user.click(trigger);
-  await user.click(screen.getByRole('menuitem', { name: 'Delete…' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
   return { user, trigger };
 }
 
@@ -120,7 +120,7 @@ describe('useOpenAfterMenu', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     await user.click(trigger);
-    await user.click(screen.getByRole('menuitem', { name: 'Delete…' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
     expect(onCallerCloseAutoFocus).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('dialog', { name: 'Delete plan' })).toBeInTheDocument();
   });

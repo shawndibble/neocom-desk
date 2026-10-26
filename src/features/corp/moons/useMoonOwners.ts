@@ -17,7 +17,7 @@ export function useMoonOwnersInput(): MoonOwnersInput {
       rates: settings.rates,
       entries: view.input.entries,
       feeders: data.feeders ?? [],
-      // The moon owner's page's prices (#4621), so the tab, Pay… and that page owe one figure.
+      // The moon owner's page's prices (#4621), so the tab, Pay and that page owe one figure.
       pricesOn: view.input.moonOwnerPricesOn ?? ((date) => view.input.pricesOn(date).prices),
     }),
     [view, settings, data.feeders, corporationId]

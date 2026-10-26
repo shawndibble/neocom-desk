@@ -165,7 +165,7 @@ export function useMilestones({
     if (next !== milestones) void onUpdate({ milestones: [...(next ?? [])] });
   }, [milestones, fitNeeds, trainedLevels, scheduled, onUpdate]);
 
-  /** EntryList's row menu "Add milestone…": opens the naming modal anchored to that row. */
+  /** EntryList's row menu "Add milestone": opens the naming modal anchored to that row. */
   const handleAddMilestone = useCallback((skillTypeID: number, level: number) => {
     setMilestoneModal({ mode: 'add', skillTypeID, level });
   }, []);

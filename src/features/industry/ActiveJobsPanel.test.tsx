@@ -25,7 +25,7 @@ const TYPES: TypeMap = {
 };
 
 // Blueprint 100 -> product 200 ("Widget Alpha" builds "Widget Beta"), for the
-// "Log production…" job-row action's create-a-plan path (issue #1787), which
+// "Log production" job-row action's create-a-plan path (issue #1787), which
 // resolves an unmatched job's blueprint through `loadBlueprintCatalog`.
 const BLUEPRINTS: BlueprintMap = {
   '100': {
@@ -813,7 +813,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     };
   }
 
-  /** Captures the router's current location so a test can assert where "Log production…" navigated. */
+  /** Captures the router's current location so a test can assert where "Log production" navigated. */
   function LocationProbe({
     onLocation,
   }: {
@@ -855,16 +855,16 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     useCharacterFilterPicks.setState({ value: {}, hydrated: false });
   });
 
-  it('shows a "Log production…" button for a done manufacturing job with a product', async () => {
+  it('shows a "Log production" button for a done manufacturing job with a product', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
     renderPanel(() => {});
 
     await expandJobs();
 
-    expect(await screen.findByRole('button', { name: 'Log production…' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Log production' })).toBeInTheDocument();
   });
 
-  it('omits "Log production…" for a still-running job', async () => {
+  it('omits "Log production" for a still-running job', async () => {
     server.use(
       http.get(jobsUrl(), () =>
         HttpResponse.json([
@@ -877,10 +877,10 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     await expandJobs();
     await screen.findByText('Widget Alpha');
 
-    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production' })).not.toBeInTheDocument();
   });
 
-  it('omits "Log production…" for a done job with no product (research/copying/invention)', async () => {
+  it('omits "Log production" for a done job with no product (research/copying/invention)', async () => {
     server.use(
       http.get(jobsUrl(), () =>
         HttpResponse.json([doneJob({ activity_id: 8, product_type_id: undefined })])
@@ -891,7 +891,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     await expandJobs();
     await screen.findByText('Widget Alpha');
 
-    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production' })).not.toBeInTheDocument();
   });
 
   it('navigates straight to the single matching plan, seeded with the job’s runs and cost', async () => {
@@ -904,7 +904,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-1'));
     expect(location?.state).toEqual({
@@ -920,7 +920,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     expect(await screen.findByText('No Build Plan for Widget Beta')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create Build Plan' }));
@@ -947,7 +947,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     expect(await screen.findByText('Log production against which plan?')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Plan B'));
@@ -1007,7 +1007,7 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     });
 
     await expandJobs();
-    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
     // Flush every pending React update (including router transitions): with
@@ -1701,7 +1701,7 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
     renderPanel();
     await openHistory();
 
-    const button = await screen.findByRole('button', { name: 'Log production…' });
+    const button = await screen.findByRole('button', { name: 'Log production' });
     expect(button.closest('tr')).toHaveClass('bg-warning/10');
     expect(screen.queryByText('Logged')).not.toBeInTheDocument();
   });
@@ -1738,7 +1738,7 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
       'href',
       '/industry/plans/plan-1'
     );
-    expect(screen.queryByRole('button', { name: 'Log production…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Log production' })).not.toBeInTheDocument();
     expect(screen.queryByText(/delivered, not logged/)).not.toBeInTheDocument();
   });
 

@@ -137,7 +137,9 @@ export function MinersTab() {
       align: 'right',
       className: 'tabular-nums',
       phoneHidden: true,
-      render: (m) => (m.credit ? <span className="text-isk-pos">{isk(m.credit)}</span> : '—'),
+      // isk() rounds: a sub-ISK remainder is no credit, not a green 0.
+      render: (m) =>
+        Math.round(m.credit) > 0 ? <span className="text-isk-pos">{isk(m.credit)}</span> : '—',
     },
     {
       id: 'paid',

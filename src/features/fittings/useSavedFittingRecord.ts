@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { db } from '@/db';
 
 /**
- * The record the open Fitting was saved from (for the "Save as new…" prefill),
+ * The record the open Fitting was saved from (for the "Save as new" prefill),
  * plus whether the URL's share code has drifted from it, which tells Compare
  * there are unsaved edits against it.
  */

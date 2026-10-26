@@ -54,7 +54,7 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
 
   const open = (id: string) => navigate(`${STOCK_PATH}/${encodeURIComponent(id)}`);
   const save = (next: StockList[]) => void setLists(next);
-  // "Set stock target…" elsewhere defaults to the market last opened here.
+  // "Set stock target" elsewhere defaults to the market last opened here.
   // An alert names its market by station or structure (`?market=`): list ids are not numbers.
   const marketParam = searchParams.get(MARKET_PARAM);
   const list =

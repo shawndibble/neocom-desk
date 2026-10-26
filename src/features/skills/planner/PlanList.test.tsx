@@ -33,7 +33,7 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
       />
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Titan pilot' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(screen.getByText(/delete "titan pilot"/i)).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
       />
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Beta' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     expect(screen.getByText(/delete "beta"/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith('2');
@@ -235,7 +235,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     const user = userEvent.setup();
     render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Alpha'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Beta/ })).toHaveFocus());
   });
@@ -244,7 +244,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     const user = userEvent.setup();
     render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Beta'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Alpha/ })).toHaveFocus());
   });
@@ -261,7 +261,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
       </>
     );
     await user.click(moreOf('Alpha'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Plans' })).toHaveFocus());
   });
@@ -270,7 +270,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     const user = userEvent.setup();
     render(<Harness initial={[plan('1', 'Alpha')]} />);
     await user.click(moreOf('Alpha'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
   });
@@ -279,7 +279,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     const user = userEvent.setup();
     render(<Harness initial={[plan('1', 'Alpha')]} />);
     await user.click(moreOf('Alpha'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Copy to character…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy to character' }));
     await user.click(screen.getByRole('button', { name: 'Other Pilot' }));
     await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
   });

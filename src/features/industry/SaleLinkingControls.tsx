@@ -51,7 +51,7 @@ export function SoldSplitButton({
   onSold: () => void;
   onWatch: () => void;
   onManual: () => void;
-  /** "Mark as lost…" — books a Run Loss (issue #2851). */
+  /** "Mark as lost" — books a Run Loss (issue #2851). */
   onLost: () => void;
   /** The run's existing loss records; each gets an Edit/Remove item. */
   losses?: readonly ProductionLossRecord[];
@@ -67,7 +67,7 @@ export function SoldSplitButton({
     <div className="flex items-center gap-1.5 sm:justify-end">
       <div className="flex">
         <Button size="sm" className="rounded-r-none" onClick={onSold}>
-          {t('industry.soldButton')}…
+          {t('industry.soldButton')}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

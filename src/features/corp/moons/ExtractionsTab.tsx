@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
+  EmptyState,
   MenuItem,
   Panel,
   RowActionsMenu,
@@ -13,11 +14,13 @@ import {
 } from '@/components/ui';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
+import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
-import { ExtractionTimeline } from './ExtractionTimeline';
+import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline';
+import { DEFAULT_STATES } from './extractionStates';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
 import { MinedBar, OreLine, StateWord } from './moonsParts';
@@ -25,6 +28,13 @@ import { MinedBar, OreLine, StateWord } from './moonsParts';
 export function ExtractionsTab() {
   const { t } = useTranslation();
   const { view, names, canEdit, edit } = useBook();
+  const [states, setStates] = useState<ReadonlySet<ExtractionState>>(DEFAULT_STATES);
+  const toggleState = (state: ExtractionState) =>
+    setStates((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(state)) next.add(state);
+      return next;
+    });
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [dismissing, setDismissing] = useState<ExtractionRow | null>(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
@@ -58,7 +68,7 @@ export function ExtractionsTab() {
     [canEdit, names, run, onCloseAutoFocus, t]
   );
   const rows = view.extractions;
-  const count = (state: ExtractionRow['state']) => rows.filter((r) => r.state === state).length;
+  const listed = rows.filter((r) => states.has(r.state));
   const inChunks = rows
     .filter((r) => r.state !== 'expired' && r.state !== 'cancelled')
     .reduce((sum, r) => sum + (r.estimatedValue ?? 0), 0);
@@ -126,20 +136,6 @@ export function ExtractionsTab() {
     <div className="space-y-4">
       <StatChips>
         <StatChip
-          label={t('corpTaxBook.moons.state.ready')}
-          value={String(count('ready'))}
-          tone="success"
-        />
-        <StatChip
-          label={t('corpTaxBook.moons.state.fractured')}
-          value={String(count('fractured'))}
-          tone="warning"
-        />
-        <StatChip
-          label={t('corpTaxBook.moons.state.extracting')}
-          value={String(count('extracting'))}
-        />
-        <StatChip
           label={t('corpTaxBook.moons.chips.inChunks')}
           value={isk(inChunks)}
           emphasis
@@ -147,24 +143,29 @@ export function ExtractionsTab() {
           tooltipGlyph="info"
         />
       </StatChips>
-      <ExtractionTimeline rows={rows} />
+      <ExtractionStateFilter rows={rows} states={states} onToggle={toggleState} />
+      <ExtractionTimeline rows={rows} states={states} />
       <Panel title={t('corpTaxBook.moons.tabs.extractions')} padded={false}>
-        <div className="overflow-x-auto">
-          <DataTable
-            label={t('corpTaxBook.moons.tabs.extractions')}
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => row.id}
-            onRowClick={(row) => navigate(extractionPath(row.id))}
-            rowClassName={() => 'group'}
-            rowContextMenu={rowContextMenu}
-            rowMoreActions={canEdit}
-            defaultSort={{ columnId: 'when', direction: 'desc' }}
-            mobileSort
-            stackColumns={2}
-            stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
-          />
-        </div>
+        {listed.length === 0 ? (
+          <EmptyState title={t('corpTaxBook.moons.extractionsNoneShown')} />
+        ) : (
+          <div className="overflow-x-auto">
+            <DataTable
+              label={t('corpTaxBook.moons.tabs.extractions')}
+              columns={columns}
+              rows={listed}
+              rowKey={(row) => row.id}
+              onRowClick={(row) => navigate(extractionPath(row.id))}
+              rowClassName={() => 'group'}
+              rowContextMenu={rowContextMenu}
+              rowMoreActions={canEdit}
+              defaultSort={{ columnId: 'when', direction: 'desc' }}
+              mobileSort
+              stackColumns={2}
+              stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: listed.length })}
+            />
+          </div>
+        )}
       </Panel>
       {dismissing && (
         <ReasonDialog

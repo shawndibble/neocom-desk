@@ -127,7 +127,7 @@ describe('action layout', () => {
     const close = within(header).getByRole('button', { name: 'Close and keep draft' });
     expect(title.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(header).queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
-    const discard = within(footer).getByRole('button', { name: 'Discard draft…' });
+    const discard = within(footer).getByRole('button', { name: 'Discard draft' });
     const send = within(footer).getByRole('button', { name: 'Send' });
     expect(discard.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(footer).queryByRole('button', { name: /^Close/ })).not.toBeInTheDocument();
@@ -258,7 +258,7 @@ describe('draft', () => {
   it('Discard asks first, then clears', async () => {
     const { user, onClose } = setup();
     await user.type(await screen.findByLabelText('Subject'), 'x');
-    await user.click(screen.getByRole('button', { name: 'Discard draft…' }));
+    await user.click(screen.getByRole('button', { name: 'Discard draft' }));
     expect(await screen.findByText('Discard this draft?')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Discard' }));
     await waitFor(() => expect(onClose).toHaveBeenCalledWith('discarded'));

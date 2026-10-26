@@ -57,7 +57,7 @@ export function MoonOwnersTable({
   /** Epoch ms the ages are read at. */
   now: number;
   onOpen: (row: MoonOwnerRow) => void;
-  /** Pay… on a row that is owed. Absent for a viewer who may not record payments. */
+  /** Pay on a row that is owed. Absent for a viewer who may not record payments. */
   onPay?: (row: MoonOwnerRow) => void;
 }) {
   const { t } = useTranslation();

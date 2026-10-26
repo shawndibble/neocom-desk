@@ -51,7 +51,7 @@ describe('PlanListPane: new plan from a Certified Plan (#2392)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'More ways to start a plan' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'From a Certified Plan…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From a Certified Plan' }));
     await user.click(await screen.findByRole('radio', { name: /Manufacturer/ }));
     await user.click(screen.getByRole('button', { name: 'Create plan' }));
 

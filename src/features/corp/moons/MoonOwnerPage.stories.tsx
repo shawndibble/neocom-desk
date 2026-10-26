@@ -96,7 +96,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Active, with a rate they asked for that the book overrode; an officer who may edit sees Pay…, Set rate…, Settled otherwise… and Remove from this book…. */
+/** @summary Active, with a rate they asked for that the book overrode; an officer who may edit sees Pay, Set rate, Settled otherwise and Remove from this book. */
 export const Active: Story = {};
 
 /** @summary The moon owner named a player as its payee: shown read-only with Open in EVE. */
@@ -107,7 +107,7 @@ export const PaidToAPlayer: Story = {
   },
 };
 
-/** @summary The moon owner changed who gets paid (#4653): the strip with Dismiss, and Change… on the "Paid to" line. */
+/** @summary The moon owner changed who gets paid (#4653): the strip with Dismiss, and Change on the "Paid to" line. */
 export const PayeeChangedByMoonOwner: Story = {
   args: {
     detail: { ...detail, payee: { kind: 'character', id: 77 } },

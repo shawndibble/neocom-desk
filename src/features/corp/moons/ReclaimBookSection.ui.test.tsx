@@ -47,7 +47,7 @@ function renderSection(verdict: Partial<OfficerVerdict>, onSettingsClose?: () =>
   return { reload };
 }
 
-const openButton = () => screen.queryByRole('button', { name: 'Reclaim the book…' });
+const openButton = () => screen.queryByRole('button', { name: 'Reclaim the book' });
 
 beforeEach(() => {
   reclaimBook.mockReset().mockResolvedValue({ officersRevoked: 3 });
@@ -71,7 +71,7 @@ describe('ReclaimBookSection', () => {
     const { reload } = renderSection({ isCeo: true });
     await userEvent.click(openButton()!);
     expect(screen.getByText(/Every other officer loses access/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Reclaim the book' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reclaim the book' }).at(-1)!);
     expect(reclaimBook).toHaveBeenCalledWith(ME, CORP);
     expect(reload).toHaveBeenCalled();
     // The toast's live region announces it (its visible copy is aria-hidden).
@@ -107,7 +107,7 @@ describe('ReclaimBookSection', () => {
     );
     renderSection({ isCeo: true });
     await userEvent.click(openButton()!);
-    await userEvent.click(screen.getByRole('button', { name: 'Reclaim the book' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reclaim the book' }).at(-1)!);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This corporation has no active Corp Tax Book.'
     );
@@ -117,7 +117,7 @@ describe('ReclaimBookSection', () => {
     reclaimBook.mockRejectedValue(new Error('raw server text'));
     renderSection({ isCeo: true });
     await userEvent.click(openButton()!);
-    await userEvent.click(screen.getByRole('button', { name: 'Reclaim the book' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reclaim the book' }).at(-1)!);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'That did not go through. Try again.'
     );

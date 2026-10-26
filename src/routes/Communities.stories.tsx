@@ -255,7 +255,7 @@ export const RequestsPanelAsRequester: Story = {
   play: openRequest('Ishtar Blueprint'),
 };
 
-/** @summary A Request opened by the admin: each Pledger with Remove…, and Remove request…. */
+/** @summary A Request opened by the admin: each Pledger with Remove, and Remove request. */
 export const RequestsPanelAsAdmin: Story = {
   ...RequestsBoard,
   play: openRequest('Reactive Metals'),

@@ -63,7 +63,7 @@ export function ChangeChargeItems({
   );
 }
 
-/** "Load into all compatible" and "Load into…" for a charge, from cargo or not. */
+/** "Load into all compatible" and "Load into" for a charge, from cargo or not. */
 export function ChargeLoadItems({
   actions,
   typeId,

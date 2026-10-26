@@ -1,5 +1,5 @@
 /**
- * "Compare with…": adds a Fitting to an empty compare slot. The same list as
+ * "Compare with": adds a Fitting to an empty compare slot. The same list as
  * the Start screen (minus starting from a hull, and the rows' menus), with
  * Import in place, in a mode that hands back the chosen Fitting Share Code
  * code instead of opening it.

@@ -96,7 +96,7 @@ afterEach(() => {
 });
 
 describe('Doctrine Fits in SRP settings', () => {
-  it('lists the corp fits, one Delete… per row', async () => {
+  it('lists the corp fits, one Delete per row', async () => {
     setup();
     const table = await screen.findByRole('table', { name: 'Doctrine Fits' });
     expect(within(table).getByText('Thorax - brawl')).toBeTruthy();
@@ -123,7 +123,7 @@ describe('Doctrine Fits in SRP settings', () => {
       unresolved: [{ line: 4, text: 'Not A Real Module', reason: 'x', kind: 'unknown-item' }],
     });
     setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Paste EFT…' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Paste EFT' }));
     await userEvent.click(await screen.findByLabelText('EFT text'));
     await userEvent.paste('[Thorax, Pasted]');
     expect(await screen.findByText('1 line not recognised')).toBeTruthy();
@@ -137,7 +137,7 @@ describe('Doctrine Fits in SRP settings', () => {
   it('says so when pasted text has no ship, and does not add', async () => {
     eft.mockResolvedValue({ ok: false, unresolved: [] });
     setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Paste EFT…' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Paste EFT' }));
     await userEvent.type(await screen.findByLabelText('EFT text'), 'hello');
     expect(await screen.findByText(/No ship found/)).toBeTruthy();
     expect(
@@ -147,7 +147,7 @@ describe('Doctrine Fits in SRP settings', () => {
 
   it('deletes a fit after a confirm', async () => {
     setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete Vexor - kite…' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Vexor - kite' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Delete Doctrine Fit' }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith('b'));
     await waitFor(() => expect(screen.queryByText('Vexor - kite')).toBeNull());

@@ -50,8 +50,8 @@ describe('TaxRowMenu', () => {
     fireEvent.contextMenu(screen.getByTestId('row'));
     const items = await screen.findAllByRole('menuitem');
     expect(items[0]).toHaveTextContent('View details');
-    expect(items[1]).toHaveTextContent('Settle up…');
-    expect(screen.getByRole('menuitem', { name: 'Unassign…' })).toBeInTheDocument();
+    expect(items[1]).toHaveTextContent('Settle up');
+    expect(screen.getByRole('menuitem', { name: 'Unassign' })).toBeInTheDocument();
   });
 
   it('runs the picked action on its row after the menu closes', async () => {

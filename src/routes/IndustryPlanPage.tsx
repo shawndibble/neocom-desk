@@ -48,10 +48,10 @@ export function IndustryPlanPage() {
     blueprintsNeedsReauth,
   } = workspace;
 
-  // Active Jobs' "Log production…" row action (issue #1787) navigates here
+  // Active Jobs' "Log production" row action (issue #1787) navigates here
   // with the job's runs/cost in navigation state, for `BuildPlanDetail` to
   // prefill Log Production with. Re-derived every render (not captured once)
-  // so a second "Log production…" click that lands on this same route still
+  // so a second "Log production" click that lands on this same route still
   // carries a fresh seed — `location.key` (passed alongside, below) is what
   // tells `BuildPlanDetail` it's actually new.
   const pendingLogProduction =

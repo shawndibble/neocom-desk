@@ -153,7 +153,7 @@ function claimColumns(): DataTableColumn<Claim>[] {
                 className="min-h-11 w-full whitespace-nowrap"
                 onClick={(e) => e.stopPropagation()}
               >
-                Re-file…
+                Re-file
               </Button>
             ) : (
               <p className="text-xs text-text-dim">Re-filed once, final.</p>
@@ -211,7 +211,7 @@ export function ClaimDetailSheet({ claim }: { claim: Claim }) {
       footer={
         canRefile(claim) ? (
           <Button variant="primary" className="min-h-11 w-full">
-            Re-file…
+            Re-file
           </Button>
         ) : undefined
       }

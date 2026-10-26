@@ -57,7 +57,7 @@ function MyShareCell({
 /**
  * The Payouts tab body (issue #4779): the Fleet Payouts the viewer opened as
  * boss (all progress) or is listed on (their own Share only), newest first.
- * A row opens its side panel; New payout… opens the compose dialog.
+ * A row opens its side panel; New payout opens the compose dialog.
  */
 export function FleetPayoutsTab({
   characterId,

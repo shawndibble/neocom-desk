@@ -1,5 +1,5 @@
 /**
- * "Stock targets…" on the Corp assets page: every stock target the pilot has
+ * "Stock targets" on the Corp assets page: every stock target the pilot has
  * set for one corporation, with the means to add a target for any item (found
  * by name, even one the corporation owns none of), change one, or remove one.
  * Edits save at once, as they do in the Target cell. The item search is the

@@ -311,7 +311,7 @@ const claimColumns: DataTableColumn<Claim>[] = [
     render: (c) =>
       c.state === 'Rejected' && !c.refiled ? (
         <Button variant="ghost" size="sm" className="whitespace-nowrap">
-          Re-file…
+          Re-file
         </Button>
       ) : null,
   },

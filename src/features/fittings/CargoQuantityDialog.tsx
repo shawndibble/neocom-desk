@@ -1,5 +1,5 @@
 /**
- * A cargo item's "Change quantity…": how many of it the hold carries, 0
+ * A cargo item's "Change quantity": how many of it the hold carries, 0
  * taking it out. Mounted per item opened, so the field starts at that
  * item's own count.
  */

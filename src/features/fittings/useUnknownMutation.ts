@@ -30,7 +30,7 @@ export function useUnknownMutation(items: readonly MutableItem[]): UnknownMutati
 
 /**
  * What the flag's tooltip says: what is missing, then — in the editor, for an
- * item with a "Mutate…" (`fixable`) — where to set it.
+ * item with a "Mutate" (`fixable`) — where to set it.
  */
 export function useUnknownMutationTip(
   status: UnknownMutationStatus | null,

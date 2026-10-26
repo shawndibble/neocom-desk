@@ -177,7 +177,7 @@ describe('summarizeAlertsNeeds', () => {
         [2, new Set([MAIL])],
       ]),
     });
-    // Both still need a sign-in (an off row keeps its own Log in…)…
+    // Both still need a sign-in (an off row keeps its own Log in)…
     expect(needs.map((need) => need.needsWalk)).toEqual([true, true]);
     // …but only the one that is on counts.
     expect(summarizeAlertsNeeds(needs)).toEqual({

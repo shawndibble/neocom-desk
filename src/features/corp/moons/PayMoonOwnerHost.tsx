@@ -5,7 +5,7 @@ import { useBook } from './useBook';
 import { useMoonOwnersInput } from './useMoonOwners';
 
 /**
- * Pay… for one moon owner (or "Add a payment…" by hand), wired to the book:
+ * Pay for one moon owner (or "Add a payment" by hand), wired to the book:
  * the table row and the moon owner page both open this, so both record through
  * the same callable and read the same balance.
  */

@@ -243,8 +243,6 @@ Look for:
 - **Casing drift.** Title Case buttons on one page and sentence case on the
   next. Panel titles are uppercase by the primitive; a title uppercased by
   hand in the string is drift.
-- **Ellipsis drift.** A dialog-opening action with "…" on one page and
-  without on another.
 - **Hardcoded strings** bypassing i18next (CLAUDE.md).
 - **Duplicate keys.** Two `en.json` keys with the same English value for the
   same action. The fix shares one key. The one-liner prints ~300 pairs, and

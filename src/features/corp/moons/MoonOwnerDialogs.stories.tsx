@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { RemoveMoonOwnerDialog } from './MoonOwnerDialogs';
 
-/** @summary "Remove from this book…": who is mailed, what is kept, and the 24-hour wait. */
+/** @summary "Remove from this book": who is mailed, what is kept, and the 24-hour wait. */
 const meta = {
   title: 'corp/RemoveMoonOwnerDialog',
   component: RemoveMoonOwnerDialog,

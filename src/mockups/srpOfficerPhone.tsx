@@ -90,7 +90,7 @@ export function phonePendingColumns(selectedIds: string[]): DataTableColumn<SrpC
             <Button variant="success" aria-disabled={row.amount === null}>
               Approve
             </Button>
-            <Button>Reject…</Button>
+            <Button>Reject</Button>
           </ButtonPair>
         </span>
       ),

@@ -127,7 +127,7 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
   // is what stays put.
   await addCaldariCruiserToNewPlan(page);
   await page.getByRole('button', { name: 'Import' }).click();
-  await page.getByRole('menuitem', { name: 'From text or file…' }).click();
+  await page.getByRole('menuitem', { name: 'From text or file' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import plan' });
   await dialog
     .getByLabel(/paste an eft fit or a skill plan/i)

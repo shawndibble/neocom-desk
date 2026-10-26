@@ -133,7 +133,7 @@ export function planAlertsWalk(
 /**
  * Whether to nag about this Character's sign-in: only one that is on (holds a
  * grant) and is missing something. Off is the player's choice, so an off
- * Character is never counted; its own row still offers Log in….
+ * Character is never counted; its own row still offers Log in.
  */
 export function nagsForSignIn(need: CharacterAlertsNeed): boolean {
   return need.needsWalk && need.held.length > 0;

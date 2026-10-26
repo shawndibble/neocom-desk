@@ -10,7 +10,7 @@ interface SaveAsNewDialogProps {
   onConfirm: (name: string) => void;
 }
 
-/** "Save as new…": names the copy of the open Fitting. */
+/** "Save as new": names the copy of the open Fitting. */
 export function SaveAsNewDialog({
   open,
   onClose,
