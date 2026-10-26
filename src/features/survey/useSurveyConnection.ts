@@ -213,7 +213,7 @@ export function useSurveyConnection({
     const structureLabel = structureFromLocation(survey.locationName);
     const connectedAt = Date.now();
     // Only one runs at a time: whichever was running stops, and Undo brings it back.
-    const replaced = await startSurveyConnection({
+    const started: SurveyConnection = {
       surveyId: survey.id,
       characterId,
       payeeId: payee.id,
@@ -225,7 +225,8 @@ export function useSurveyConnection({
       ...connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }, connectedAt),
       expiresAt: survey.expiresAt,
       connectedAt,
-    });
+    };
+    const replaced = await startSurveyConnection(started);
     setNow(connectedAt);
     const created = await autoAssignFromSurveys().catch((): MiningTaxAssignmentRecord[] => []);
 
@@ -248,7 +249,7 @@ export function useSurveyConnection({
           const undone = await unassign(assigned);
           if (!undone.ok) throw undone.cause;
         }
-        await restoreSurveyConnections(replaced);
+        await restoreSurveyConnections(replaced, started);
         if (known === undefined) {
           const removed = await deletePayee(payee);
           if (!removed.ok) throw removed.cause;

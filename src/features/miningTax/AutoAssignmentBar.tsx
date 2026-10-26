@@ -11,15 +11,13 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { isConnectionLive, type SurveyConnection } from '@/engine/miningTax/surveyConnection';
-import { cx } from '@/lib/cx';
 import { eveWhen } from '@/lib/eveTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { systemLabel } from './names';
 import { removeSurveyConnection, useSurveyConnections } from './surveyConnections';
 
-export function SurveyConnectionsPanel({
+export function AutoAssignmentBar({
   characterIds,
   characterNames,
   systemNames,
@@ -72,7 +70,8 @@ export function SurveyConnectionsPanel({
             aria-label={t('miningTax.surveyConnections.title')}
             className="flex min-h-9 items-center gap-2 rounded-xs border border-accent/60 bg-accent/10 px-2.5 py-1 text-xs md:min-h-0"
           >
-            <span className={cx(eyebrowClassName, 'shrink-0 text-accent')}>
+            {/* The eyebrow's type in accent, not its dim colour: the bar's one tone, as warning is the attention strip's. */}
+            <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
               {t('miningTax.surveyConnections.title')}
             </span>
             <span className="min-w-0 flex-1 truncate text-text-dim" title={detail}>

@@ -112,7 +112,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
-import { SurveyConnectionsPanel } from '@/features/miningTax/SurveyConnectionsPanel';
+import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
@@ -1142,7 +1142,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
             <AttentionStrip items={attentionItems} />
 
-            <SurveyConnectionsPanel
+            <AutoAssignmentBar
               characterIds={characterIds}
               characterNames={characterNames}
               systemNames={systemNames}

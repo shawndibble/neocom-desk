@@ -81,14 +81,23 @@ describe('startSurveyConnection', () => {
   it('stops every other connection, on any Character, and resolves to what it replaced', async () => {
     const mine = connection({ surveyId: 'a', untilMs: Date.now() + 3_600_000 });
     const alt = connection({ surveyId: 'b', characterId: 2, untilMs: Date.now() + 3_600_000 });
-    await restoreSurveyConnections([mine, alt]);
+    await restoreSurveyConnections([mine, alt], null);
     const next = connection({ surveyId: 'c' });
 
     expect(await startSurveyConnection(next)).toEqual([mine, alt]);
     expect(useSurveyConnections.getState().value).toEqual([next]);
 
-    await restoreSurveyConnections([mine, alt]);
+    await restoreSurveyConnections([mine, alt], next);
     expect(useSurveyConnections.getState().value).toEqual([mine, alt]);
+  });
+
+  it('Undo leaves alone a connection started since', async () => {
+    const first = connection({ surveyId: 'a', untilMs: Date.now() + 3_600_000 });
+    const replaced = await startSurveyConnection(first);
+    const later = { ...first, surveyId: 'b', connectedAt: first.connectedAt + 1 };
+    await startSurveyConnection(later);
+    await restoreSurveyConnections(replaced, first);
+    expect(useSurveyConnections.getState().value).toEqual([later]);
   });
 });
 
@@ -102,6 +111,15 @@ describe('refreshSurveyConnection', () => {
 
     await startSurveyConnection({ ...running, surveyId: 'other' });
     await refreshSurveyConnection(moved);
+    expect(useSurveyConnections.getState().value.map((c) => c.surveyId)).toEqual(['other']);
+  });
+
+  it('reads what is stored, so a tab still holding a replaced connection cannot write it back', async () => {
+    const running = connection({ untilMs: Date.now() + 3_600_000 });
+    await startSurveyConnection({ ...running, surveyId: 'other' });
+    // Another tab's view of the list, from before 'other' replaced it.
+    useSurveyConnections.setState({ value: [running] });
+    await refreshSurveyConnection({ ...running, untilMs: running.untilMs + 60_000 });
     expect(useSurveyConnections.getState().value.map((c) => c.surveyId)).toEqual(['other']);
   });
 });

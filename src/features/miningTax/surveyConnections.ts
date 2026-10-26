@@ -42,10 +42,21 @@ export const useSurveyConnections = createSyncedSetting<SurveyConnection[]>({
   parse: parseSurveyConnections,
 });
 
-/** The stored list, read before any write: a write before hydration would replace it with `[]`. */
-async function current(): Promise<ReturnType<typeof useSurveyConnections.getState>> {
-  if (!useSurveyConnections.getState().hydrated) await useSurveyConnections.getState().hydrate();
-  return useSurveyConnections.getState();
+/**
+ * The stored list, read before any write: a write before hydration would
+ * replace it with `[]`. Read from Dexie, not the store, which another tab's
+ * write reaches only on the next sync: a tab still showing a replaced
+ * connection must not write it back over the one running now.
+ */
+async function current(): Promise<{
+  value: SurveyConnection[];
+  setValue: (value: SurveyConnection[]) => Promise<void>;
+}> {
+  const state = useSurveyConnections.getState();
+  if (!state.hydrated) await state.hydrate();
+  const row = await db.settings.get(SYNCED_SURVEY_CONNECTIONS_KEY);
+  const { value, setValue } = useSurveyConnections.getState();
+  return { value: row === undefined ? value : (parseSurveyConnections(row.value) ?? []), setValue };
 }
 
 async function liveConnections(nowMs: number): Promise<SurveyConnection[]> {
@@ -89,11 +100,21 @@ export async function refreshSurveyConnection(connection: SurveyConnection): Pro
   await setValue(updateSurveyConnection(value, connection, Date.now()));
 }
 
-/** Puts the connections back as they were, for Undo of `startSurveyConnection`. */
+const sameStart = (a: SurveyConnection, b: SurveyConnection) =>
+  a.surveyId === b.surveyId && a.characterId === b.characterId && a.connectedAt === b.connectedAt;
+
+/**
+ * Puts the connections back as they were, for Undo of `startSurveyConnection`
+ * (`started`; null puts them back unconditionally). Does nothing once
+ * `started` is no longer running: Undo never stops one started since.
+ */
 export async function restoreSurveyConnections(
-  connections: readonly SurveyConnection[]
+  connections: readonly SurveyConnection[],
+  started: SurveyConnection | null
 ): Promise<void> {
-  await (await current()).setValue([...connections]);
+  const { value, setValue } = await current();
+  if (started !== null && !value.some((c) => sameStart(c, started))) return;
+  await setValue([...connections]);
 }
 
 export async function removeSurveyConnection(surveyId: string, characterId: number): Promise<void> {

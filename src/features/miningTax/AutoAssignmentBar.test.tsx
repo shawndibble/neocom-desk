@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@/i18n';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
-import { SurveyConnectionsPanel } from './SurveyConnectionsPanel';
+import { AutoAssignmentBar } from './AutoAssignmentBar';
 import { useSurveyConnections } from './surveyConnections';
 
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), setSyncedSetting: vi.fn() }));
@@ -28,7 +28,7 @@ function connection(overrides: Partial<SurveyConnection> = {}): SurveyConnection
 
 function renderPanel() {
   return render(
-    <SurveyConnectionsPanel
+    <AutoAssignmentBar
       characterIds={[1]}
       characterNames={new Map([[1, 'Pilot']])}
       systemNames={new Map([[30000142, 'Jita']])}
@@ -37,7 +37,7 @@ function renderPanel() {
   );
 }
 
-describe('SurveyConnectionsPanel', () => {
+describe('AutoAssignmentBar', () => {
   beforeEach(() => {
     useSurveyConnections.setState({ hydrated: true });
   });
@@ -65,7 +65,7 @@ describe('SurveyConnectionsPanel', () => {
   it('names the Character only when more than one is tracked', () => {
     useSurveyConnections.setState({ value: [connection()] });
     render(
-      <SurveyConnectionsPanel
+      <AutoAssignmentBar
         characterIds={[1, 2]}
         characterNames={new Map([[1, 'Pilot']])}
         systemNames={new Map([[30000142, 'Jita']])}

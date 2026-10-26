@@ -9,7 +9,8 @@
  * (`useSurveyConnection`, issue #4684): the Payee is added if need be, ore
  * already mined there is assigned, and ore mined until the Survey's ETA is
  * assigned as it reaches the ledger, so the pilot never assigns it by hand.
- * Stop takes its place while connected; the Mining Tax tab is always beside it.
+ * Stop takes its place while connected; the Mining Tax tab is always beside it
+ * (for a logged-in viewer: logged out there is no Tax tab).
  *
  * The fields start blank for each survey (only what the survey itself stored
  * comes back), so a tax is shown only when the pilot sets it.
@@ -117,7 +118,7 @@ function useManageTaxes(
 
 /**
  * Assign Taxes (`children`) until the Survey is connected, then Stop in its
- * place; the Mining Tax tab always at the far right (`taxLink`). Below, what a
+ * place; the Mining Tax tab at the far right unless `taxLink` is off. Below, what a
  * connected Survey is doing, plus its Undo toast.
  */
 function MoonConnectionSlot({
