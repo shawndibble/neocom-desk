@@ -21,7 +21,6 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { growthMoves, planSplit } from '@/engine/miningTax/split';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import { unmaskNumber } from '@/lib/numberMask';
 import { split } from './ledgerActions';
 import { ratesForPayee } from './payeeRates';
 import { labelSuggestions } from './assignmentLabel';
@@ -289,8 +288,14 @@ export function SplitDialog({
                       inputMode="numeric"
                       value={moved === 0 ? '' : formatCount(moved)}
                       placeholder="0"
+                      // Whole units only: every non-digit is a grouping mark from the mask, so
+                      // `5,4930` is 54,930 — the locale parser would read it as 5.493.
                       onChange={(e) =>
-                        setMove(line.typeId, unmaskNumber(e.target.value) ?? 0, line.quantity)
+                        setMove(
+                          line.typeId,
+                          Number(e.target.value.replace(/\D/g, '')),
+                          line.quantity
+                        )
                       }
                       className={cx('w-28 text-right', moved > 0 && 'border-accent')}
                     />
