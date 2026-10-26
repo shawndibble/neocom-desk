@@ -86,7 +86,7 @@ export function FittingSaveButton({
           <Button
             variant="primary"
             aria-label={t('fittings.header.moreSave')}
-            className="rounded-l-none border-l border-l-accent-contrast/30 px-2"
+            className="rounded-l-none border-l border-l-accent-contrast/30 px-2!"
           >
             <Expanded aria-hidden />
           </Button>
