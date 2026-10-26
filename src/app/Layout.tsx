@@ -376,7 +376,9 @@ export const Layout = memo(function Layout() {
           {/* Only where the rail shows: below `md` there is nothing to skip. */}
           {isDesktop && <SkipLink />}
           {/* Desktop left rail */}
-          <aside className="sticky top-0 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
+          {/* z-30: above anything in the page (a column sliding out from behind it, like
+              Improve's), below the overlays (z-40 and up). */}
+          <aside className="sticky top-0 z-30 hidden h-screen w-52 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
             <div className="flex items-center gap-2 border-b border-line px-3 py-3">
               {/* Logo and wordmark navigate together, as one unit: a site name
               that goes home beside an inert logo is the odd half-measure.

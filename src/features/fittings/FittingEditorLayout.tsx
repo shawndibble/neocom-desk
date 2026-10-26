@@ -20,6 +20,8 @@ interface FittingEditorLayoutProps {
   statsSections: ReactNode;
   /** Improve holds the left column on a narrower desktop: one column, the stats above the editor (`leftColumn`). */
   statsFirst?: boolean;
+  /** Improve, open on desktop: a column left of the editor and stats, where the docked browser sits. */
+  improveColumn?: ReactNode;
 }
 
 /**
@@ -39,6 +41,7 @@ export function FittingEditorLayout({
   editor,
   statsSections,
   statsFirst = false,
+  improveColumn,
 }: FittingEditorLayoutProps) {
   const { t } = useTranslation();
   // Below desktop the Ring, the List and the stats are one set of tabs.
@@ -78,37 +81,39 @@ export function FittingEditorLayout({
             </TabPanel>
           </div>
         ) : (
-          <div className={editorGridClass(addMode, view, addOpen || statsFirst)}>
-            {addMode === 'docked' && (
-              <Panel
-                title={addTitle}
-                className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto"
+          <ImproveBeside column={improveColumn}>
+            <div className={editorGridClass(addMode, view, addOpen || statsFirst)}>
+              {addMode === 'docked' && (
+                <Panel
+                  title={addTitle}
+                  className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto"
+                >
+                  {addPanel}
+                </Panel>
+              )}
+              {/* Ring | List as the app's own tabs over the column they switch. */}
+              <div
+                data-testid="fitting-editor-column"
+                {...{ [RING_ROOM_ATTR]: '' }}
+                className={`${editorColumnClass(view, addMode, addOpen || statsFirst)}${statsFirst ? ' order-last' : ''}`}
               >
-                {addPanel}
-              </Panel>
-            )}
-            {/* Ring | List as the app's own tabs over the column they switch. */}
-            <div
-              data-testid="fitting-editor-column"
-              {...{ [RING_ROOM_ATTR]: '' }}
-              className={`${editorColumnClass(view, addMode, addOpen || statsFirst)}${statsFirst ? ' order-last' : ''}`}
-            >
-              <Tabs
-                tabsId={viewTabsId}
-                tabs={[
-                  { id: 'ring', label: t('fittings.view.ring') },
-                  { id: 'list', label: t('fittings.view.list') },
-                ]}
-                value={view}
-                onChange={(id) => onViewChange(id as FittingView)}
-                label={t('fittings.view.label')}
-              />
-              <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
-                {editor}
-              </TabPanel>
+                <Tabs
+                  tabsId={viewTabsId}
+                  tabs={[
+                    { id: 'ring', label: t('fittings.view.ring') },
+                    { id: 'list', label: t('fittings.view.list') },
+                  ]}
+                  value={view}
+                  onChange={(id) => onViewChange(id as FittingView)}
+                  label={t('fittings.view.label')}
+                />
+                <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
+                  {editor}
+                </TabPanel>
+              </div>
+              {statsSections}
             </div>
-            {statsSections}
-          </div>
+          </ImproveBeside>
         ))}
       {addMode === 'sheet' && (
         <Modal open={addOpen} onClose={onCloseAdd} placement="sheet" title={addTitle}>
@@ -128,5 +133,20 @@ export function FittingEditorLayout({
         </SlideOver>
       )}
     </>
+  );
+}
+
+/**
+ * With Improve open, its column sits left of the editor grid, in the page's own
+ * flow like the docked browser: it never covers the nav or the page header.
+ */
+function ImproveBeside({ column, children }: { column?: ReactNode; children: ReactNode }) {
+  // The same element either way, so opening or closing Improve never remounts the
+  // editor beside it (and loses its state): only the wrapper's display changes.
+  return (
+    <div className={column ? 'grid grid-cols-[24rem_minmax(0,1fr)] items-start gap-3' : 'contents'}>
+      {column}
+      {children}
+    </div>
   );
 }

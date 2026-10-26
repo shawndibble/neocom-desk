@@ -1334,11 +1334,12 @@
   }
 
   /*
-   * Slides a left-edge panel in from behind the nav as it opens (the Fitting editor's
-   * Improve column). Reduced motion gets none (DESIGN.md §6c).
+   * Slides a column out from behind the nav as it opens (the Fitting editor's
+   * Improve column): its whole width, under the nav rail, which sits above the
+   * page (Layout's z-30). Reduced motion gets none (DESIGN.md §6c).
    */
   .slide-in-left {
-    animation: slide-in-left 200ms ease-out both;
+    animation: slide-in-left 220ms ease-out both;
   }
 
   @keyframes slide-in-left {

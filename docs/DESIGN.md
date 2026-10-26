@@ -1406,7 +1406,7 @@ is clutter, and clutter hides the actions that matter.
   - a grabber and swipe-down to dismiss
   - tap the scrim, the close button, Back or Escape to close
   - `env(safe-area-inset-bottom)` under the footer
-  - an action bar at the foot is the `Modal` `footer`, never a sticky div. One named exception: Improve's selection summary and Apply bar is a `sticky bottom-0` strip inside the panel body, because it is built from the panel's own tick state and the same body fills the desktop `SlideOver` (which has no footer slot) and this sheet
+  - an action bar at the foot is the `Modal` `footer`, never a sticky div. Improve's selection and Apply bar is built from the panel's own tick state, so the panel portals it into the container's foot: this sheet's `footer`, or on desktop the foot of its in-page column (a `Panel` beside the editor, sliding out from behind the nav rail)
 
 ### States and motion
 

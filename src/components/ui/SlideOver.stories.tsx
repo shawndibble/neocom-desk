@@ -30,19 +30,3 @@ export const Left: Story = { args: { side: 'left' } };
 
 /** @summary `wide`: a panel holding a table, up to 64rem wide. */
 export const Wide: Story = { args: { wide: true, title: 'Cargo' } };
-
-/** @summary `footer`: an action bar pinned below the scrolling body (Improve's Apply), never a sticky div in the body. */
-export const WithFooter: Story = {
-  args: {
-    side: 'left',
-    title: 'Improve',
-    footer: (
-      <div className="flex items-center justify-between text-xs text-text-dim">
-        <span>Checked 63 swaps in 1.0 s</span>
-        <button type="button" className="text-accent">
-          Apply
-        </button>
-      </div>
-    ),
-  },
-};

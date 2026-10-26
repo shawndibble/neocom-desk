@@ -31,11 +31,6 @@ interface SlideOverProps {
   closeOnBack?: boolean;
   /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
   returnFocusFallback?: () => HTMLElement | null;
-  /**
-   * @summary Action bar at the panel's foot (Apply), pinned below the scrolling body, as `Modal`'s.
-   * Never a sticky div inside `children`.
-   */
-  footer?: ReactNode;
 }
 
 const SIDE_CLASS = {
@@ -70,7 +65,6 @@ export function SlideOver({
   maxWidthClassName,
   closeOnBack = true,
   returnFocusFallback,
-  footer,
 }: SlideOverProps) {
   const { t } = useTranslation();
   // Back closes it, like every other overlay (§6c).
@@ -140,9 +134,6 @@ export function SlideOver({
           <div className={cx('min-h-0 flex-1 overflow-y-auto', !flush && 'p-3')}>
             <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
           </div>
-          {footer != null && typeof footer !== 'boolean' && footer !== '' && (
-            <div className="shrink-0 border-t border-line bg-panel px-3 py-2">{footer}</div>
-          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
