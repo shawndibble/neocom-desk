@@ -289,6 +289,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "observed",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "characterId",
           "order": "ASCENDING"
         },
