@@ -83,15 +83,17 @@ export function firestorePollerStore(
       if (isFullListingRun(nowMs)) {
         const snap = await grants.where('status', '==', 'active').get();
         stats?.add('firestoreReads', Math.max(1, snap.docs.length));
+        const stamps: Promise<unknown>[] = [];
         for (const d of snap.docs) {
           const next = (d.data() as AlertGrantDoc).nextPollAt;
           if (typeof next === 'number' && next > nowMs) continue;
           take(d);
           if (typeof next !== 'number') {
-            await d.ref.update({ nextPollAt: 0 });
+            stamps.push(d.ref.update({ nextPollAt: 0 }));
             stats?.add('firestoreWrites');
           }
         }
+        await Promise.all(stamps);
         return active;
       }
       const due = grants
@@ -109,9 +111,8 @@ export function firestorePollerStore(
       }
     },
 
-    async deferNextPoll(characterId, atMs) {
-      await ref(characterId).update({ nextPollAt: atMs });
-      stats?.add('firestoreWrites');
+    async deferNextPoll(characterId, guard, atMs) {
+      await guardedUpdate(characterId, guard, { nextPollAt: atMs });
     },
 
     // SSO rotates the token, so the SSO call must not run inside a retryable

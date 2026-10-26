@@ -204,13 +204,16 @@ describe('firestorePollerStore', () => {
     expect(f.docs.get('1')!.nextPollAt).toBe(0);
   });
 
-  it('defers a grant by writing only its nextPollAt', async () => {
+  it('defers a grant by writing only its nextPollAt, guarded on the token', async () => {
     const f = fakeDb({ 1: grant(1) });
     const store = firestorePollerStore(f.db, { key: () => KEY, refresh: vi.fn() });
-    await store.deferNextPoll(1, NOW + 5);
+    const blob = f.docs.get('1')!.encryptedRefreshToken;
+    await store.deferNextPoll(1, 'replaced-blob', NOW + 5);
+    expect(f.docs.get('1')!.nextPollAt).toBe(0);
+    await store.deferNextPoll(1, blob, NOW + 5);
     expect(f.docs.get('1')).toEqual({
       ...grant(1),
-      encryptedRefreshToken: expect.any(String),
+      encryptedRefreshToken: blob,
       nextPollAt: NOW + 5,
     });
     expect((await store.listDue(NOW)).map((l) => l.characterId)).toEqual([]);

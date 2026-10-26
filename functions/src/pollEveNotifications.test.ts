@@ -654,24 +654,23 @@ describe('pollEveNotifications: skipping idle grants and stale devices (issue #5
     const s = setup({ grants: { 1: grant() }, devices: [nothingOn], now });
     await pollEveNotifications(s.deps);
     expect(s.store.listDue).toHaveBeenCalledWith(OFF_SLOT);
-    const [id, at] = s.store.deferNextPoll.mock.calls[0] as unknown as [number, number];
-    expect(id).toBe(1);
+    const [id, guard, at] = s.store.deferNextPoll.mock.calls[0] as unknown as [
+      number,
+      string,
+      number,
+    ];
+    expect([id, guard]).toEqual([1, 'blob']);
     expect(at).toBeGreaterThan(OFF_SLOT + 15 * 60_000);
     expect((at / (15 * 60_000)) % 4).toBe(0);
   });
 
-  it('writes no deferral for a grant that is due again next run', async () => {
-    const s = setup({ devices: [phone], now });
-    await pollEveNotifications(s.deps);
-    expect(s.store.deferNextPoll).not.toHaveBeenCalled();
-  });
-
-  it('defers a slow-cadence grant off its hourly turn without refreshing it', async () => {
+  it('writes no deferral for a grant that is polled or on a slow cadence', async () => {
     const stale: PollDevice = { ...phone, updatedAtMs: OFF_SLOT - 20 * DAY };
-    const s = setup({ devices: [stale], now });
-    await pollEveNotifications(s.deps);
-    expect(s.store.refresh).not.toHaveBeenCalled();
-    expect(s.store.deferNextPoll).toHaveBeenCalledWith(1, SLOT + 4 * 15 * 60_000);
+    for (const devices of [[phone], [stale]]) {
+      const s = setup({ devices, now });
+      await pollEveNotifications(s.deps);
+      expect(s.store.deferNextPoll).not.toHaveBeenCalled();
+    }
   });
 
   it('a failed deferral only logs: the grant is listed again next run', async () => {

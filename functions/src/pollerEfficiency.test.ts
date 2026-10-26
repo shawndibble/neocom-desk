@@ -8,7 +8,8 @@ import {
   IDLE_RECHECK_RUNS,
   isFullListingRun,
   liveDevices,
-  nextPollAtMs,
+  idleRecheckAtMs,
+  SLEEPING_POLL_EVERY_RUNS,
   planGrant,
   wakeCutoffMs,
 } from './pollerEfficiency.js';
@@ -156,29 +157,14 @@ describe('wakeCutoffMs', () => {
   });
 });
 
-describe('nextPollAtMs', () => {
-  const grant = { seenTypes: ['T'] };
-  const wants = { eveTypes: ['T'] };
-  const stale = { ...wants, updatedAtMs: OFF_RUN - FRESH_DEVICE_MS - 1 };
-
-  it('is the next run for a fresh wanting device', () => {
-    expect(nextPollAtMs(grant, [wants], OFF_RUN)).toBe(
-      OFF_RUN - (OFF_RUN % POLL_RUN_MS) + POLL_RUN_MS
-    );
-  });
-
-  it('is the next hourly slot for a slow-cadence device', () => {
-    const next = nextPollAtMs(grant, [stale], OFF_RUN);
-    expect(next).toBeGreaterThan(OFF_RUN);
-    expect((next / POLL_RUN_MS) % 4).toBe(0);
-    expect(next - OFF_RUN).toBeLessThanOrEqual(4 * POLL_RUN_MS);
-  });
-
-  it('waits IDLE_RECHECK_RUNS, on an hourly slot, when nobody wants anything', () => {
-    const next = nextPollAtMs(grant, [{ eveTypes: [] }], OFF_RUN);
-    expect((next / POLL_RUN_MS) % 4).toBe(0);
+describe('idleRecheckAtMs', () => {
+  it('waits IDLE_RECHECK_RUNS, on an hourly slot', () => {
+    const next = idleRecheckAtMs(OFF_RUN);
+    expect((next / POLL_RUN_MS) % SLEEPING_POLL_EVERY_RUNS).toBe(0);
     expect(next - OFF_RUN).toBeGreaterThanOrEqual((IDLE_RECHECK_RUNS - 1) * POLL_RUN_MS);
-    expect(next - OFF_RUN).toBeLessThanOrEqual((IDLE_RECHECK_RUNS + 3) * POLL_RUN_MS);
+    expect(next - OFF_RUN).toBeLessThanOrEqual(
+      (IDLE_RECHECK_RUNS + SLEEPING_POLL_EVERY_RUNS - 1) * POLL_RUN_MS
+    );
   });
 });
 

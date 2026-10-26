@@ -170,25 +170,11 @@ export function isFullListingRun(nowMs: number): boolean {
 }
 
 /**
- * When a grant should next be listed (issue #5236), given what this run knows
- * of it. Run-slot aligned, so a slow-cadence device's hourly turn
- * (`deviceCadence`) is never missed by a few seconds of jitter. An idle grant
- * waits `IDLE_RECHECK_RUNS`, rounded up to an hourly slot. Otherwise the first
- * of the next few runs at which the plan would poll.
+ * When an idle grant is listed again (issue #5236): `IDLE_RECHECK_RUNS` on, rounded
+ * up to an hourly slot. Only an idle grant is deferred: a write costs about three
+ * reads, so deferring a grant by an hour or less would save nothing.
  */
-export function nextPollAtMs(
-  grant: Pick<AlertGrantDoc, 'scopes' | 'seenTypes'>,
-  devices: readonly WantingDevice[],
-  nowMs: number
-): number {
-  const slot = Math.floor(nowMs / POLL_RUN_MS);
-  if (planGrant(grant, devices, nowMs).action === 'idle') {
-    const wake = slot + IDLE_RECHECK_RUNS;
-    return Math.ceil(wake / SLEEPING_POLL_EVERY_RUNS) * SLEEPING_POLL_EVERY_RUNS * POLL_RUN_MS;
-  }
-  for (let k = 1; k < SLEEPING_POLL_EVERY_RUNS; k++) {
-    const at = (slot + k) * POLL_RUN_MS;
-    if (planGrant(grant, devices, at).action === 'poll') return at;
-  }
-  return (slot + SLEEPING_POLL_EVERY_RUNS) * POLL_RUN_MS;
+export function idleRecheckAtMs(nowMs: number): number {
+  const wake = Math.floor(nowMs / POLL_RUN_MS) + IDLE_RECHECK_RUNS;
+  return Math.ceil(wake / SLEEPING_POLL_EVERY_RUNS) * SLEEPING_POLL_EVERY_RUNS * POLL_RUN_MS;
 }

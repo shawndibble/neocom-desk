@@ -16,9 +16,8 @@ import { NO_ORIGIN_SYSTEM } from './pollNearby.js';
 import {
   deviceCadence,
   liveDevices,
-  nextPollAtMs,
+  idleRecheckAtMs,
   planGrant,
-  POLL_RUN_MS,
   wakeCutoffMs,
   type GrantPlan,
 } from './pollerEfficiency.js';
@@ -65,8 +64,8 @@ export interface PollerStore {
    * already reads each in full.
    */
   listDue(nowMs: number): Promise<ListedGrant[]>;
-  /** Do not list the grant again before `atMs`. Best effort: a re-grant resets it to due. */
-  deferNextPoll(characterId: number, atMs: number): Promise<void>;
+  /** Do not list the grant again before `atMs`; dropped if the grant was replaced since (guarded like `patch`). */
+  deferNextPoll(characterId: number, guard: string, atMs: number): Promise<void>;
   /**
    * Refresh the Character's token at SSO and write the rotated one back
    * transactionally. `grant.encryptedRefreshToken` is the stored blob after
@@ -188,7 +187,9 @@ interface PlannedGrant {
   grant: AlertGrantDoc;
   devices: PollDevice[];
   plan: GrantPlan;
-  /** Where to push `nextPollAt` once the grant is handled; null when it is due again next run. */
+  /** The stored token blob the deferral is guarded on; `pollOne` moves it when SSO rotates the token. */
+  guard: string;
+  /** Where to push `nextPollAt` once the grant is handled; null to list it again next run. */
   deferTo: number | null;
 }
 
@@ -227,11 +228,14 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
       if (cadence === 'dormant') dormantDevices.add(d.deviceId);
     }
     const plan = planGrant(grant, devices, startedAt);
-    // Due again at the next run needs no write: it is still listed. Later does.
-    const nextPollAt = nextPollAtMs(grant, devices, startedAt);
-    const deferTo =
-      nextPollAt > (Math.floor(startedAt / POLL_RUN_MS) + 1) * POLL_RUN_MS ? nextPollAt : null;
-    queue.push({ characterId, grant, devices, plan, deferTo });
+    queue.push({
+      characterId,
+      grant,
+      devices,
+      plan,
+      guard: grant.encryptedRefreshToken,
+      deferTo: plan.action === 'idle' ? idleRecheckAtMs(startedAt) : null,
+    });
     if (plan.action === 'poll' && plan.call.nearby) {
       // Every live device counts, asleep or not: the origin handed to a Character
       // whose location is skipped must only stand where no list it reads has an entry.
@@ -302,7 +306,7 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
 async function defer(ctx: RunContext, item: PlannedGrant): Promise<void> {
   if (item.deferTo === null) return;
   try {
-    await ctx.deps.store.deferNextPoll(item.characterId, item.deferTo);
+    await ctx.deps.store.deferNextPoll(item.characterId, item.guard, item.deferTo);
   } catch (err) {
     ctx.deps.log('Alerts poll could not defer a Character', {
       characterId: item.characterId,
@@ -332,6 +336,7 @@ async function pollOne(ctx: RunContext, item: PlannedGrant): Promise<void> {
 
   stats.add('grantsRefreshed');
   const refreshed = await store.refresh(characterId);
+  if (refreshed.kind !== 'ok') item.deferTo = null;
   if (refreshed.kind === 'revoked') {
     summary.revoked++;
     deps.log('Alerts Grant revoked at SSO', { characterId });
@@ -343,6 +348,7 @@ async function pollOne(ctx: RunContext, item: PlannedGrant): Promise<void> {
     return;
   }
   const { accessToken, grant } = refreshed;
+  item.guard = grant.encryptedRefreshToken;
 
   // A 420/429 may have landed while this worker was refreshing: don't add to it.
   if (summary.budgetStopped) {
