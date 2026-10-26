@@ -30,6 +30,8 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
   'srpOfficers',
   'srpDoctrines',
   'srpThrottle',
+  // A server-side mirror of `observed` (corpTaxBookFeederRollup.ts); no client reads it.
+  'feederObserved',
 ]);
 
 /**

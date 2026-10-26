@@ -14,7 +14,7 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
-import { FEEDER_VIEWS, OBSERVED, utcDate } from './corpTaxBook.js';
+import { FEEDER_VIEWS, utcDate } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
   accrueValuedDays,
@@ -35,6 +35,7 @@ import {
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
 import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
+import { readFeederRows } from './corpTaxBookFeederRollup.js';
 import { bookRef, feederRef, type BookDeps, type OpenPricesReader } from './corpTaxBookStore.js';
 
 // --- Stored shapes -----------------------------------------------------------
@@ -541,16 +542,12 @@ export async function rebuildFeederView(
 ): Promise<boolean> {
   const book = bookRef(deps.db, collector);
   const recordRef = feederRef(deps.db, collector, feeder);
-  const [bookSnap, recordSnap, observed, payoutSnap] = await Promise.all([
+  const [bookSnap, recordSnap, rows, payoutSnap] = await Promise.all([
     book.get(),
     recordRef.get(),
-    book
-      .collection(OBSERVED)
-      .where('sourceCorporationId', '==', feeder)
-      // Every row: what is owed sums every covered day, so a capped (unordered) read would
-      // drop an arbitrary slice of them and understate it.
-      .select('structureId', 'characterId', 'typeId', 'date', 'quantity', 'solarSystemId')
-      .get(),
+    // Every row, from the feeder's day-and-refinery mirror: what is owed sums every covered
+    // day, so a capped (unordered) read would drop an arbitrary slice and understate it.
+    readFeederRows(deps.db, book, feeder),
     recordRef.collection(FEEDER_VIEW_PAYOUTS).get(),
   ]);
   const record = recordSnap.data() as FeederRecord | undefined;
@@ -562,7 +559,6 @@ export async function rebuildFeederView(
   const hubId = bookSnap.get('hubId');
   const graceHours = Number(bookSnap.get('graceHours') ?? BOOK_DEFAULTS.graceHours);
   const name = bookSnap.get('corporationName');
-  const rows = observed.docs.map((d) => d.data() as FeederViewRow);
 
   const pricedTypes = new Set<number>();
   for (const r of rows) {
