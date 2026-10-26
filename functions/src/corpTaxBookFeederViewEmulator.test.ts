@@ -281,6 +281,17 @@ suite('moon owner view', () => {
     });
   });
 
+  it('skips every write when a rebuild changes nothing (#5241)', async () => {
+    await save(await newInvite(), 6);
+    const first = await summary();
+    expect(first?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    const day = viewRef().collection('days').doc('2026-10-18');
+    const dayBefore = (await day.get()).updateTime;
+    await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+    expect(await summary()).toEqual(first);
+    expect((await day.get()).updateTime).toEqual(dayBefore);
+  });
+
   it('writes no view for a refused first pull', async () => {
     ledger = 'forbidden';
     await reason(save(await newInvite(), 6));

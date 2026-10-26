@@ -5,6 +5,7 @@ import {
   buildFeederView,
   deriveModeChanges,
   deriveOwnerRateHistory,
+  feederViewHash,
   hubStationId,
   parseOpenPriceDays,
   priceKey,
@@ -487,5 +488,34 @@ describe('memberCoverageOf (#4622)', () => {
     expect(memberCoverageOf({ coveragePeriods: [{ from: '2026-10-01' }] })).toEqual({
       coveragePeriods: [{ from: '2026-10-01' }],
     });
+  });
+});
+
+describe('feederViewHash (#5241)', () => {
+  const hashOf = (over: Partial<FeederViewInput> = {}) =>
+    feederViewHash(buildFeederView(input({ rows: [row('2026-10-12', 100)], ...over })));
+
+  it('ignores when the view was built', () => {
+    expect(hashOf({ now: NOW })).toBe(hashOf({ now: NOW + 1000 }));
+  });
+
+  it('moves when a day, a payout or the summary changes', () => {
+    const base = hashOf();
+    expect(hashOf({ rows: [row('2026-10-12', 101)] })).not.toBe(base);
+    expect(
+      hashOf({
+        payouts: [
+          {
+            id: 'p1',
+            date: '2026-10-15',
+            amount: 5,
+            method: 'donation',
+            status: 'recorded',
+            notAPayout: false,
+          },
+        ],
+      })
+    ).not.toBe(base);
+    expect(hashOf({ record: record({ agreedRatePct: 12 }) })).not.toBe(base);
   });
 });
