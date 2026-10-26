@@ -23,7 +23,10 @@ const sub = (db: Firestore, corporationId: number, name: string) =>
 /** Firestore's `in` operator takes at most 30 values. */
 const IN_LIMIT = 30;
 
-const withId = (d: { id: string; data: () => Data }): Data => ({ ...d.data(), id: d.id });
+const withId = (d: { id: string; data: () => Data | undefined }): Data => ({
+  ...d.data(),
+  id: d.id,
+});
 
 /** The book-wide records every Miner's totals read: small collections, one read each. */
 async function loadRules(db: Firestore, corporationId: number) {
