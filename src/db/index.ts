@@ -3,6 +3,8 @@ import { emitUpgradeBlocked } from './blockedSignal';
 import { esiCacheMetaMiddleware } from './esiCacheMeta';
 import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
 import type {
+  CorpBookObservedMetaRecord,
+  CorpBookObservedRecord,
   AnsiblexGateRecord,
   ArchiveKind,
   BuildPlanRecord,
@@ -69,6 +71,8 @@ export const db = new Dexie('neocom') as Dexie & {
   ansiblexGates: EntityTable<AnsiblexGateRecord, 'id'>;
   dynamicItems: EntityTable<DynamicItemRecord, 'itemId'>;
   corpMailQueue: EntityTable<MailQueueItem, 'id'>;
+  corpBookObserved: Dexie.Table<CorpBookObservedRecord, [number, number, string]>;
+  corpBookObservedMeta: Dexie.Table<CorpBookObservedMetaRecord, [number, number]>;
 };
 
 /**
@@ -282,4 +286,12 @@ db.version(26).stores({
 // (decision 20261019-091155). Device-local only, so nothing to clean up in sync.
 db.version(27).stores({
   jitaPriceSnapshots: null,
+});
+
+// Adds the officer's copy of a Corp Tax Book's `observed` rows and its read marks
+// (ADR 0031), so a reopen reads only what changed. Device-local, never synced,
+// officer-only: wiped with the Character (features/character/removeCharacter.ts).
+db.version(28).stores({
+  corpBookObserved: '[characterId+corporationId+id], [characterId+corporationId], characterId',
+  corpBookObservedMeta: '[characterId+corporationId], characterId',
 });

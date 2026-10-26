@@ -46,6 +46,7 @@ import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corp
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { bookVersionsOf, cachedPart } from './bookCache';
+import { readObservedRows } from './observedRead';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -259,7 +260,12 @@ async function openBook(characterId: number, corporationId: number) {
       (d) => d.data() as T
     );
   const list = <T>(name: string): Promise<T[]> => part(name, () => read<T>(name));
-  return { data, part, read, list, paidStatementIds };
+  // `observed` is the book's biggest part: a delta over this device's Dexie copy (observedRead.ts).
+  const observed = (): Promise<ObservedRow[]> =>
+    part('observed', () =>
+      readObservedRows(db, characterId, corporationId, versions?.collections.observed, paid)
+    );
+  return { data, part, read, list, observed, paidStatementIds };
 }
 
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
@@ -493,7 +499,7 @@ export async function readBookData(
     list<Dismissal>('dismissals'),
     list<SyncExtraction>('extractions'),
     book.paidStatementIds(),
-    list<ObservedRow>('observed'),
+    book.observed(),
     list<BookDeclaration>('declarations'),
     list<Adjustment>('adjustments'),
     part(

@@ -191,6 +191,33 @@ beforeEach(async () => {
 });
 
 describe('removeCharacter', () => {
+  it('wipes the Character’s officer-only Corp Tax Book copy and no other Character’s', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    for (const characterId of [1, 2]) {
+      await db.corpBookObserved.add({
+        characterId,
+        corporationId: 9,
+        id: 'a',
+        row: {},
+        updatedMs: 1,
+      });
+      await db.corpBookObservedMeta.add({
+        characterId,
+        corporationId: 9,
+        version: 'v',
+        checkedAt: 1,
+        fullAt: 1,
+        watermark: 1,
+      });
+    }
+
+    await removeCharacter(1);
+
+    expect((await db.corpBookObserved.toArray()).map((r) => r.characterId)).toEqual([2]);
+    expect((await db.corpBookObservedMeta.toArray()).map((r) => r.characterId)).toEqual([2]);
+  });
+
   it('deletes the Character’s Firebase app and session when sync is configured', async () => {
     syncStatus.configured = true;
     try {

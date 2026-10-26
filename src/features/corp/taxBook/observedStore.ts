@@ -1,0 +1,105 @@
+/**
+ * This device's Dexie copy of an officer's Corp Tax Book `observed` rows
+ * (ADR 0031). Officer-only data at rest, so: keyed by Character + corporation,
+ * one book at a time (opening another drops the rest), and forgotten the moment
+ * the officer check or the rules refuse and on Character removal.
+ */
+import { db } from '@/db';
+import type { CorpBookObservedMetaRecord, CorpBookObservedRecord } from '@/db';
+import type { ObservedCopyMeta, StoredObserved } from './observedDelta';
+
+const tables = () => [db.corpBookObserved, db.corpBookObservedMeta];
+
+export async function readObservedCopy(
+  characterId: number,
+  corporationId: number
+): Promise<{ meta: ObservedCopyMeta; rows: StoredObserved<unknown>[] } | undefined> {
+  const meta = await db.corpBookObservedMeta.get([characterId, corporationId]);
+  if (!meta) return undefined;
+  const rows = await db.corpBookObserved
+    .where('[characterId+corporationId]')
+    .equals([characterId, corporationId])
+    .toArray();
+  return {
+    meta: {
+      version: meta.version,
+      checkedAt: meta.checkedAt,
+      fullAt: meta.fullAt,
+      watermark: meta.watermark,
+    },
+    rows: rows.map((r) => ({ id: r.id, row: r.row, updatedMs: r.updatedMs })),
+  };
+}
+
+const metaRecord = (
+  characterId: number,
+  corporationId: number,
+  meta: ObservedCopyMeta
+): CorpBookObservedMetaRecord => ({ characterId, corporationId, ...meta });
+
+/**
+ * Keeps the copy: `replace` swaps every row (a full read), otherwise `rows`
+ * join or overwrite what is held (a delta). Any other book's copy is dropped,
+ * in the same transaction.
+ */
+export async function saveObservedCopy(
+  characterId: number,
+  corporationId: number,
+  rows: readonly StoredObserved<unknown>[],
+  meta: ObservedCopyMeta,
+  replace: boolean
+): Promise<void> {
+  await db.transaction('rw', tables(), async () => {
+    await dropOtherBooks(characterId, corporationId);
+    if (replace) {
+      await db.corpBookObserved
+        .where('[characterId+corporationId]')
+        .equals([characterId, corporationId])
+        .delete();
+    }
+    const records: CorpBookObservedRecord[] = rows.map((r) => ({
+      characterId,
+      corporationId,
+      id: r.id,
+      row: r.row,
+      updatedMs: r.updatedMs,
+    }));
+    await db.corpBookObserved.bulkPut(records);
+    await db.corpBookObservedMeta.put(metaRecord(characterId, corporationId, meta));
+  });
+}
+
+/** Marks the held copy confirmed current as of `meta`, without touching its rows. */
+export async function touchObservedCopy(
+  characterId: number,
+  corporationId: number,
+  meta: ObservedCopyMeta
+): Promise<void> {
+  await db.corpBookObservedMeta.put(metaRecord(characterId, corporationId, meta));
+}
+
+async function dropOtherBooks(characterId: number, corporationId: number): Promise<void> {
+  const others = (await db.corpBookObservedMeta.toArray()).filter(
+    (m) => m.characterId !== characterId || m.corporationId !== corporationId
+  );
+  for (const m of others) await forgetBook(m.characterId, m.corporationId);
+}
+
+async function forgetBook(characterId: number, corporationId: number): Promise<void> {
+  await db.corpBookObserved
+    .where('[characterId+corporationId]')
+    .equals([characterId, corporationId])
+    .delete();
+  await db.corpBookObservedMeta.delete([characterId, corporationId]);
+}
+
+/** Drops this Character's copy of one book (the officer check or the rules refused). */
+export function forgetObservedCopy(characterId: number, corporationId: number): Promise<void> {
+  return db.transaction('rw', tables(), () => forgetBook(characterId, corporationId));
+}
+
+/** Drops every copy this Character holds. Call inside a transaction that includes these tables. */
+export async function clearObservedCopies(characterId: number): Promise<void> {
+  await db.corpBookObserved.where('characterId').equals(characterId).delete();
+  await db.corpBookObservedMeta.where('characterId').equals(characterId).delete();
+}
