@@ -661,7 +661,7 @@ describe('overlayCorpBooks', () => {
     expect(out.labels.get(`${ME}:2026-10-17:${SYSTEM}`)?.state).toBe('pending');
   });
 
-  it('turns the oldest Billed days into Sent, waiting while a donation is in flight', () => {
+  it('marks the oldest Billed days Paid, owing nothing, once the member sent a donation for them', () => {
     const observed = ['2026-10-15', '2026-10-16', '2026-10-17'].map((date) => ({
       characterId: ME,
       recordedCorporationId: CORP,
@@ -677,11 +677,11 @@ describe('overlayCorpBooks', () => {
     const out = overlay(entries, [
       book({ observed, inFlight: [{ amount: 222_000, at: '2026-10-18T13:10:00Z' }] }),
     ]);
-    const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
+    const byDate = Object.fromEntries(out.rows.map((r) => [r.date, [r.state, r.taxOwed]]));
     expect(byDate).toEqual({
-      '2026-10-15': 'sent-waiting',
-      '2026-10-16': 'billed',
-      '2026-10-17': 'billed',
+      '2026-10-15': ['paid', 0],
+      '2026-10-16': ['billed', 222_000],
+      '2026-10-17': ['billed', 222_000],
     });
   });
 

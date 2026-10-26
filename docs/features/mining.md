@@ -229,8 +229,7 @@ Only when a tracked Character's corp has an active Corp Tax Book (a `get` of `co
 
 - **Pending corp record**: the day is not Billable (day end + grace, then an officer sync) or has no rate. A relabel of the unassigned row; the member's own allocation applies and nothing is owed to the corp.
 - **Billed**: Billable. The book decides quantity, price and rate for exactly what it observed; an issued Statement's lines are that decision, frozen. The row is owed to the virtual "<Corp> (Corp Tax Book)" Payee (display-only, never in Dexie, never offered to Assign) and takes its ore from the member's unassigned ore.
-- **Sent, waiting for the corp**: a `player_donation` in the member's wallet journal to the corp that the book does not hold yet (matched by sender, amount and time) covers the oldest Billed days.
-- **Paid**: the Statement's settlement (`allocatePayments`); a part payment lands on the oldest days.
+- **Paid**: the Statement's settlement (`allocatePayments`); a part payment lands on the oldest days. A `player_donation` in the member's wallet journal to the corp that the book does not hold yet (matched by sender, amount and time) also pays the oldest Billed days: the member's side is done, and a corp that disagrees bills them again.
 - **Conflict**: ore the member gave another Payee that the book also observed. Visible, not owed; resolves to the corp 14 days after the day closed.
 - **Unattributed**: free ore no book claims on a closed day; owed to no one. Several books in one system on one day split the entry by observed quantity.
 - **Dismissed by corp**: shown with the officer's reason; owes nothing.

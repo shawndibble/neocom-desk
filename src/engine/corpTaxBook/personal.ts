@@ -48,7 +48,7 @@ import {
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 
-export type BookRowState = 'billed' | 'sent-waiting' | 'conflict' | 'dismissed' | 'waived' | 'paid';
+export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
 export type BookLabelState = 'pending' | 'unattributed';
 
@@ -798,7 +798,8 @@ export function overlayCorpBooks(input: {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
     }
-    // Donations sent and not yet credited cover the oldest Billed days.
+    // Donations sent and not yet credited pay the oldest Billed days: the
+    // member's side is done, and a corp that disagrees bills them again.
     const inFlightTotal = p.book.inFlight.reduce((sum, d) => sum + d.amount, 0);
     const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
     for (const id of coverInFlight(
@@ -806,7 +807,10 @@ export function overlayCorpBooks(input: {
       inFlightTotal
     )) {
       const row = open.find((r) => r.id === id);
-      if (row) row.state = 'sent-waiting';
+      if (row) {
+        row.state = 'paid';
+        row.taxOwed = 0;
+      }
     }
   }
 
@@ -971,7 +975,7 @@ const SAME_TRANSFER_MS = 10 * 60_000;
 
 /**
  * Donations the member sent to the corp (their own journal) that the book does
- * not hold yet — "Sent, waiting for the corp". The corp's journal ids differ
+ * not hold yet; the days they cover read as paid. The corp's journal ids differ
  * from the member's, so a held payment is recognised by sender, amount and time.
  */
 export function inFlightDonations(

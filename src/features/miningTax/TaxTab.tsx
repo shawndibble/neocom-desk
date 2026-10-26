@@ -126,7 +126,6 @@ import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import {
   useCorpStateHint,
-  useCorpPillText,
   useCorpStateLabel,
 } from '@/features/miningTax/corpBook/useCorpStateText';
 import {
@@ -352,7 +351,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     security: data?.systemSecurity ?? NO_SECURITY,
   });
   const corpStateLabel = useCorpStateLabel();
-  const corpPillText = useCorpPillText();
   const corpStateHint = useCorpStateHint();
   const allDisplayRows = useMemo(
     () =>
@@ -797,11 +795,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     () =>
       statusColumnWidthClass(
         visibleRows.map((dr) => ({
-          text: dr.corp ? corpPillText(dr.corp) : statusLabel(t, dr.status),
+          text: dr.corp ? corpStateLabel(dr.corp) : statusLabel(t, dr.status),
           marked: dr.corp?.kind === 'row' && Boolean(dr.corp.view.overlap),
         }))
       ),
-    [visibleRows, corpPillText, t]
+    [visibleRows, corpStateLabel, t]
   );
 
   const { baseColumns, openColumns, historyColumns } = useTaxColumns({
@@ -1039,7 +1037,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         ? t('miningTax.linkPaymentOnePayeeHint')
         : null;
 
-  /** What a book's rows owe the member right now (Billed and Sent, waiting). */
+  /** What a book's rows owe the member right now (its Billed days). */
   const corpOwedNow = useCallback(
     (corporationId: number) =>
       characterFiltered
