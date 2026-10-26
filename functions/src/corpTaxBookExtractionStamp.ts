@@ -9,7 +9,7 @@
 // the field. A stamp write leaves `updatedAt` alone, so no officer's device re-reads a row for it.
 // Both use the structure's own expiry, like the read-time placement (`placeOfFactory`).
 
-import type { Firestore } from 'firebase-admin/firestore';
+import type { DocumentReference, Firestore, Timestamp } from 'firebase-admin/firestore';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import type { MirrorExtraction, ObservedRow } from './corpTaxBookEngine.js';
 import { restampPlan, stampExtractionIds } from './corpTaxBookSyncEngine.js';
@@ -36,7 +36,11 @@ export async function loadStampContext(
   const byId = new Map<string, MirrorExtraction>();
   const key = (x: MirrorExtraction) => `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
   for (const d of stored.docs) byId.set(d.id, d.data() as MirrorExtraction);
-  for (const x of incoming) byId.set(key(x), { ...byId.get(key(x)), ...x });
+  for (const x of incoming) {
+    // As the write does: an absent field keeps what is stored.
+    const set = Object.fromEntries(Object.entries(x).filter(([, v]) => v !== undefined));
+    byId.set(key(x), { ...byId.get(key(x)), ...set } as MirrorExtraction);
+  }
   return {
     extractions: [...byId.values()],
     expiryHours: (snap.data()?.structureExpiryHours as Record<string, number> | undefined) ?? {},
@@ -46,6 +50,42 @@ export async function loadStampContext(
 /** Rows with their Extraction stamp, for the merge. */
 export function stampRows(rows: readonly ObservedRow[], ctx: StampContext): ObservedRow[] {
   return stampExtractionIds(rows, ctx.extractions, ctx.expiryHours);
+}
+
+const FAILED_PRECONDITION = 9;
+
+/**
+ * Writes stamps with the row's read time as a precondition, so a merge's fresher write is never
+ * overwritten by a stale stamp. A page that fails on one changed row retries row by row, skipping
+ * the changed ones: the merge stamped those itself. Returns how many it wrote.
+ */
+async function commitStamps(
+  db: Firestore,
+  writes: readonly {
+    doc: { ref: DocumentReference; updateTime?: Timestamp };
+    extractionId: string | FieldValue;
+  }[]
+): Promise<number> {
+  if (writes.length === 0) return 0;
+  const batch = db.batch();
+  for (const { doc, extractionId } of writes)
+    batch.update(doc.ref, { extractionId }, { lastUpdateTime: doc.updateTime! });
+  try {
+    await batch.commit();
+    return writes.length;
+  } catch (e) {
+    if ((e as { code?: number }).code !== FAILED_PRECONDITION) throw e;
+  }
+  let written = 0;
+  for (const { doc, extractionId } of writes) {
+    try {
+      await doc.ref.update({ extractionId }, { lastUpdateTime: doc.updateTime! });
+      written += 1;
+    } catch (e) {
+      if ((e as { code?: number }).code !== FAILED_PRECONDITION) throw e;
+    }
+  }
+  return written;
 }
 
 /**
@@ -73,8 +113,7 @@ export async function stampBook(
     if (last !== undefined) q = q.startAfter(last);
     const page = await q.get();
     if (page.empty) break;
-    const batch = db.batch();
-    let pending = 0;
+    const writes: { doc: (typeof page.docs)[number]; extractionId: string }[] = [];
     for (const doc of page.docs) {
       if (doc.get('extractionId') !== undefined) continue;
       const row = { structureId: doc.get('structureId'), date: doc.get('date') } as ObservedRow;
@@ -83,16 +122,9 @@ export async function stampBook(
         unassigned += 1;
         continue;
       }
-      // The precondition keeps a merge's fresh write: a row changed since this page was read fails the batch, and the next sync retries.
-      batch.update(
-        doc.ref,
-        { extractionId: stamped.extractionId },
-        { lastUpdateTime: doc.updateTime }
-      );
-      pending += 1;
+      writes.push({ doc, extractionId: stamped.extractionId });
     }
-    if (pending > 0) await batch.commit();
-    written += pending;
+    written += await commitStamps(db, writes);
     last = page.docs[page.docs.length - 1].id;
     if (page.size < PAGE) break;
   }
@@ -116,22 +148,14 @@ export async function restampStructures(
   let changed = 0;
   for (const structureId of new Set(structureIds)) {
     const snap = await observed.where('structureId', '==', structureId).get();
-    const rows = snap.docs.map((d) => ({ id: d.id, row: d.data() as ObservedRow }));
-    const plan = restampPlan(
-      rows.map((r) => r.row),
-      ctx.extractions,
-      ctx.expiryHours
-    );
-    const idOf = new Map(rows.map((r) => [r.row, r.id]));
-    for (let i = 0; i < plan.length; i += PAGE) {
-      const batch = db.batch();
-      for (const { row, extractionId } of plan.slice(i, i + PAGE))
-        batch.update(observed.doc(idOf.get(row)!), {
-          extractionId: extractionId ?? FieldValue.delete(),
-        });
-      await batch.commit();
-    }
-    changed += plan.length;
+    const docOf = new Map(snap.docs.map((d) => [d.data() as ObservedRow, d]));
+    const plan = restampPlan([...docOf.keys()], ctx.extractions, ctx.expiryHours);
+    const writes = plan.map(({ row, extractionId }) => ({
+      doc: docOf.get(row)!,
+      extractionId: extractionId ?? FieldValue.delete(),
+    }));
+    for (let i = 0; i < writes.length; i += PAGE)
+      changed += await commitStamps(db, writes.slice(i, i + PAGE));
   }
   return changed;
 }

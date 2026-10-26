@@ -1546,7 +1546,7 @@ export async function editBookAs(
   via?: string
 ) {
   const ref = bookRef(deps.db, call.corporationId);
-  return deps.db.runTransaction(async (tx) => {
+  const result = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.get('active') !== true)
       fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
@@ -1562,6 +1562,15 @@ export async function editBookAs(
     appendAudit(tx, deps, call.corporationId, actorOf(access, via), action.action, outcome.detail);
     return outcome.result ?? {};
   });
+  // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
+  if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
+    await restampStructures(
+      deps.db,
+      call.corporationId,
+      Object.keys(action.patch.structureExpiryHours).map(Number)
+    ).catch((e) => console.error('expiry restamp failed', e instanceof Error ? e.message : e));
+  }
+  return result;
 }
 
 /**

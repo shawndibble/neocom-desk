@@ -155,6 +155,15 @@ describe('restampStructures', () => {
   });
 });
 
+describe('loadStampContext', () => {
+  it('keeps a stored laser time when the incoming Extraction leaves it undefined', async () => {
+    const fired = { ...PULL, laserFiredAt: '2026-10-17T12:00:00.000Z' };
+    const { db } = fakeDb({}, [fired]);
+    const ctx = await loadStampContext(db, 1, [{ ...PULL, laserFiredAt: undefined }]);
+    expect(ctx.extractions[0]?.laserFiredAt).toBe('2026-10-17T12:00:00.000Z');
+  });
+});
+
 describe('stampRows', () => {
   it('stamps with the stored Extractions plus the ones the same sync writes', async () => {
     const { db } = fakeDb({}, []);
