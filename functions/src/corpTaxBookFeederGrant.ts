@@ -29,7 +29,6 @@ import {
   FEEDER_INVITES_COLLECTION,
   FEEDER_OF_COLLECTION,
   FEEDER_PREVIOUS_COLLECTION,
-  OBSERVED,
   REMOVAL_LINKS_COLLECTION,
   pctField,
   utcDate,
@@ -55,6 +54,7 @@ import {
   ownBookFloor,
   type BookDeps,
 } from './corpTaxBookStore.js';
+import { readFeederRows } from './corpTaxBookFeederRollup.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
   requireLiveRoles,
@@ -853,20 +853,13 @@ export async function getFeederStatus(
   const ctx = await authorizeFeederCaller(deps, caller, input, 'read');
   if (!ctx) return notFeeding(deps, caller, input);
   const { record: rec, collectorCorporationId: collector } = ctx;
-  const [book, observed, previous] = await Promise.all([
+  const [book, rows, previous] = await Promise.all([
     bookRef(deps.db, collector).get(),
-    bookRef(deps.db, collector)
-      .collection(OBSERVED)
-      .where('sourceCorporationId', '==', input.corporationId)
-      // Every row: a capped read with no order is an arbitrary slice, not the newest one.
-      .select('structureId', 'date', 'quantity')
-      .get(),
+    // Every row, from the mirror: a capped read with no order is an arbitrary slice.
+    readFeederRows(deps.db, bookRef(deps.db, collector), input.corporationId),
     readPrevious(deps.db, input.corporationId),
   ]);
   const name = book.get('corporationName');
-  const rows = observed.docs.map(
-    (d) => d.data() as { structureId: number; date: string; quantity: number }
-  );
   const effective = rec.agreedRatePct ?? rec.requestedRatePct ?? null;
   const last = rec.lastSyncResult;
   return {

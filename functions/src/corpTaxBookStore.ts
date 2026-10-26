@@ -82,6 +82,8 @@ import {
 } from './corpTaxBookEngine.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
+import { isMissingIndex } from './indexedSweep.js';
+import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import {
   fail,
@@ -493,6 +495,12 @@ export async function mergeObservedInto(
           [OBSERVED_UPDATED_AT_FIELD]: FieldValue.serverTimestamp(),
         });
       }
+      // The feeder mirror moves with the rows (corpTaxBookFeederRollup.ts).
+      writeRollupChanges(
+        tx,
+        sub(deps.db, corporationId, FEEDER_OBSERVED),
+        rollupChanges([...last.values()], new Map(existing.map((r) => [observedRowKey(r), r])))
+      );
       return last.size;
     });
   }
@@ -674,13 +682,68 @@ async function planMiner(
   const confirmed = new Set<number>((mine?.confirmedCharacterIds as number[] | undefined) ?? []);
   const outsiders = new Set<number>();
   for (const characterId of action.characterIds) {
-    const rows = await c.tx.get(
-      col(c, OBSERVED).where('characterId', '==', characterId).select('recordedCorporationId')
-    );
-    if (rows.docs.some((d) => d.get('recordedCorporationId') !== c.corporationId))
-      outsiders.add(characterId);
+    if (await recordedOutside(c, characterId)) outsiders.add(characterId);
   }
   return { pending: [...outsiders].filter((x) => !confirmed.has(x)), confirmed };
+}
+
+/**
+ * Existence checks on a character's observed rows. Each asks Firestore for one row instead of
+ * reading all of them; a query whose composite index is not deployed yet (see
+ * firestore.indexes.json) reads the character's rows as it always did.
+ */
+async function recordedOutside(c: EditCtx, characterId: number): Promise<boolean> {
+  const rows = col(c, OBSERVED).where('characterId', '==', characterId);
+  try {
+    // `!=` skips a row with no recordedCorporationId; the sync always writes one.
+    const hit = await c.tx.get(rows.where('recordedCorporationId', '!=', c.corporationId).limit(1));
+    return !hit.empty;
+  } catch (e) {
+    if (!isMissingIndex(e)) throw e;
+    const all = await c.tx.get(rows.select('recordedCorporationId'));
+    return all.docs.some((d) => d.get('recordedCorporationId') !== c.corporationId);
+  }
+}
+
+async function recordedHereSince(
+  c: EditCtx,
+  characterId: number,
+  fromDate: string
+): Promise<boolean> {
+  const rows = col(c, OBSERVED).where('characterId', '==', characterId);
+  try {
+    const hit = await c.tx.get(
+      rows
+        .where('recordedCorporationId', '==', c.corporationId)
+        .where('date', '>=', fromDate)
+        .limit(1)
+    );
+    return !hit.empty;
+  } catch (e) {
+    if (!isMissingIndex(e)) throw e;
+    const all = await c.tx.get(rows.select('recordedCorporationId', 'date'));
+    return all.docs.some(
+      (d) => d.get('date') >= fromDate && d.get('recordedCorporationId') === c.corporationId
+    );
+  }
+}
+
+/** The corporation recorded on the character's latest day (the first row of that day by id). */
+async function latestRecordedCorp(c: EditCtx, characterId: number): Promise<unknown> {
+  const rows = col(c, OBSERVED).where('characterId', '==', characterId);
+  let days: QueryDocumentSnapshot[];
+  try {
+    const top = await c.tx.get(rows.orderBy('date', 'desc').limit(1));
+    if (top.empty) return undefined;
+    // A character can change corporation mid-day: every row of that day, in id order.
+    days = (await c.tx.get(rows.where('date', '==', top.docs[0].get('date')))).docs;
+  } catch (e) {
+    if (!isMissingIndex(e)) throw e;
+    const all = (await c.tx.get(rows.select('recordedCorporationId', 'date'))).docs;
+    const newest = all.reduce((m, d) => (d.get('date') > m ? d.get('date') : m), '');
+    days = all.filter((d) => d.get('date') === newest);
+  }
+  return days[0]?.get('recordedCorporationId');
 }
 
 function writeMiner(
@@ -1162,19 +1225,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // A rebill that touches a corp member's days needs a Director (D22).
       let touchesMember = false;
       for (const characterId of minerCharacters(action.minerId, minerDoc.data())) {
-        const rows = await tx.get(
-          col(c, OBSERVED)
-            .where('characterId', '==', characterId)
-            .select('recordedCorporationId', 'date')
-        );
-        if (
-          rows.docs.some(
-            (d) =>
-              d.get('date') >= action.fromDate && d.get('recordedCorporationId') === c.corporationId
-          )
-        ) {
-          touchesMember = true;
-        }
+        if (await recordedHereSince(c, characterId, action.fromDate)) touchesMember = true;
       }
       if (touchesMember && !c.access.isDirector) {
         throw new HttpsError('permission-denied', 'Rebilling a member needs a Director', {
@@ -1349,15 +1400,8 @@ async function closeAccount(
 
   // A guest, by the ore's recorded corporation on each character's latest day.
   for (const characterId of characterIds) {
-    const rows = await tx.get(
-      col(c, OBSERVED)
-        .where('characterId', '==', characterId)
-        .select('recordedCorporationId', 'date')
-    );
-    const latest = rows.docs
-      .map((d) => ({ date: d.get('date') as string, corp: d.get('recordedCorporationId') }))
-      .sort((a, b) => b.date.localeCompare(a.date))[0];
-    if (latest?.corp === c.corporationId)
+    const latest = await latestRecordedCorp(c, characterId);
+    if (latest === c.corporationId)
       fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
   }
 
