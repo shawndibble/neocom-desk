@@ -25,7 +25,6 @@ describe('HubComparisonLine', () => {
         inRangeBestBuy={2_600}
         jumps={13}
         stationId={null}
-        stationName={null}
         onView={vi.fn()}
       />
     );
@@ -47,7 +46,6 @@ describe('HubComparisonLine', () => {
         inRangeBestBuy={null}
         jumps={null}
         stationId={null}
-        stationName={null}
         onView={onView}
       />
     );
@@ -64,7 +62,6 @@ describe('HubComparisonLine', () => {
         inRangeBestBuy={null}
         jumps={13}
         stationId={null}
-        stationName={null}
         onView={vi.fn()}
       />
     );
@@ -77,7 +74,6 @@ describe('HubComparisonLine', () => {
         inRangeBestBuy={null}
         jumps={13}
         stationId={null}
-        stationName={null}
         onView={vi.fn()}
       />
     );
