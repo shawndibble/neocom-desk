@@ -16,27 +16,10 @@ import {
 } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { focusRingClassName } from '@/components/ui/controlStyles';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { cx } from '@/lib/cx';
 import { tapTargetClassName, useCards } from './sectionHelpers';
 import { usePaged } from './usePaged';
-
-/** A link to another entity page from outside a table (a moon in a list, a Miner in a header): a bordered accent link. In a table row it is plain `entityLinkClassName` text. */
-export function EntityChip({ to, children }: { to: string; children: ReactNode }) {
-  return (
-    <Link
-      to={to}
-      className={cx(
-        'inline-flex max-w-full items-center rounded-xs border border-line px-1.5 py-0.5 text-xs text-accent',
-        'hover:underline focus-visible:underline',
-        focusRingClassName
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
 
 /**
  * Where a day or a moon happened: the moon once (a link when it has a page), then only the
@@ -46,11 +29,14 @@ export function PlaceCell({
   refinery,
   moon,
   to,
+  accent = false,
 }: {
   refinery: string;
   moon: string | undefined;
   /** The moon's page, when it has one. */
   to?: string;
+  /** Moon in the accent colour without a link: the row it sits in is the link. */
+  accent?: boolean;
 }) {
   const place = splitPlace(refinery, moon);
   return (
@@ -67,7 +53,7 @@ export function PlaceCell({
               {place.moon}
             </Link>
           ) : (
-            <span className="whitespace-nowrap">{place.moon}</span>
+            <span className={cx('whitespace-nowrap', accent && 'text-accent')}>{place.moon}</span>
           )}
           <span className="block text-xs text-text-dim">{place.station}</span>
         </>
