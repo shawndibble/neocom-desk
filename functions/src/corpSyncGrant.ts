@@ -473,16 +473,17 @@ export async function runScheduledCorpSyncs(
       summary.skipped += 1;
       continue;
     }
-    // A feeder grant is not a book: the feeder pass below reads it.
-    if (grant.kind === 'feeder') {
-      summary.grants -= 1;
-      continue;
-    }
     try {
       const result = await runOne(deps, esi, grant);
       if (result.kind === 'synced') {
         summary.synced += 1;
-        await deferNextSync(deps, grant);
+        // Failing to rest it only means it syncs again next run.
+        await deferNextSync(deps, grant).catch((err) =>
+          deps.log('Could not rest a synced book grant', {
+            corporationId: grant.corporationId,
+            error: err instanceof Error ? err.name : 'unknown',
+          })
+        );
       } else if (result.kind === 'stopped') summary.stopped += 1;
       else {
         summary.skipped += 1;
@@ -504,27 +505,34 @@ export async function runScheduledCorpSyncs(
 /** A synced book rests this long; under the 6-hourly schedule, so a late run never skips a slot. */
 export const SYNC_REST_MS = 5 * 3_600_000;
 
-/** One doc, set once the `nextSyncAt` backfill has covered every book grant from before it. */
+/** One doc: when the last `nextSyncAt` backfill scan ran. */
 const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';
+
+/** Rescan this often: a grant saved by not-yet-redeployed code has no `nextSyncAt` and would never match. */
+const GRANT_BACKFILL_EVERY_MS = 7 * 24 * 3_600_000;
 
 /**
  * Book grants whose `nextSyncAt` has come: a range query, so a run's reads scale with the due
- * grants, not with every grant. A grant from before the field cannot match a range, so the first
- * run scans once and marks each as due, then records that it did.
+ * grants, not with every grant. A grant without the field cannot match a range, so a scan marks
+ * each as due, on the first run and then weekly.
  */
 async function dueGrants(deps: CorpSyncDeps): Promise<CorpSyncGrantDoc[]> {
   const marker = deps.db.doc(GRANT_BACKFILL_DOC);
-  if (!(await marker.get()).exists) {
+  const last = (await marker.get()).get('doneAt');
+  if (typeof last !== 'number' || deps.now() - last >= GRANT_BACKFILL_EVERY_MS) {
     const all = await deps.db.collection(CORP_SYNC_GRANTS_COLLECTION).get();
-    const writer = deps.db.batch();
     let missing = 0;
     for (const doc of all.docs) {
       const held = doc.data() as CorpSyncGrantDoc;
       if (held.kind === 'feeder' || held.nextSyncAt !== undefined) continue;
-      writer.update(doc.ref, { nextSyncAt: 0 });
-      missing += 1;
+      try {
+        await doc.ref.update({ nextSyncAt: 0 });
+        missing += 1;
+      } catch (err) {
+        // Revoked since the scan: nothing to mark.
+        if ((err as { code?: unknown }).code !== 5) throw err;
+      }
     }
-    if (missing > 0) await writer.commit();
     await marker.set({ doneAt: deps.now(), backfilled: missing });
   }
   const snap = await deps.db
