@@ -21,7 +21,7 @@ function MiniList({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
       <p className={eyebrowClassName}>{title}</p>
-      <ul className="mt-1 space-y-0.5 text-sm">{children}</ul>
+      <ul className="mt-1 space-y-0.5 text-xs">{children}</ul>
     </div>
   );
 }
@@ -99,13 +99,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
           {moons.length === 0 && <li className="text-text-dim">—</li>}
         </MiniList>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-sm">
-        <span className="text-xs text-text-dim tabular-nums">
-          {t('corpTaxBook.moons.miners.owedLine', {
-            owed: isk(miner.owed),
-            next: isk(miner.unbilled),
-          })}
-        </span>
+      <div className="flex justify-end border-t border-line pt-3 text-xs">
         <Link
           to={minerPath(miner.id)}
           className={entityLinkClassName(`shrink-0 whitespace-nowrap ${tapTargetClassName}`)}

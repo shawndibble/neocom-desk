@@ -16011,8 +16011,7 @@
         "moreDays_other": "and {{count}} more days",
         "moreMoons_one": "and {{count}} more moon",
         "moreMoons_other": "and {{count}} more moons",
-        "openPage": "Open page",
-        "owedLine": "Owed {{owed}} · Next Statement {{next}}"
+        "openPage": "Open page"
       },
       "needs": {
         "title_one": "Needs you · {{count}}",
@@ -16068,12 +16067,11 @@
         "selectDay": "Select {{date}}",
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
-        "daysHint": "Newest first · Billable through {{date}}",
+        "daysHint": "Newest first",
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
-        "noDismissals": "Nothing has been dismissed.",
         "reversed": "reversed",
         "reverse": "Reverse",
         "activity": "Activity",
@@ -16200,7 +16198,6 @@
       "run": {
         "title": "{{period}} Statements",
         "titleNone": "Statements",
-        "billableThrough": "Billable through {{date}}",
         "nothing": "Nothing to send: every Billable day is on a Statement, or the period has not closed yet.",
         "check": "Check",
         "send": "Send",

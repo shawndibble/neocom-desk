@@ -12,7 +12,6 @@ import {
   useOpenAfterMenu,
   type DataTableColumn,
 } from '@/components/ui';
-import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
 import { useBook } from './useBook';
@@ -23,6 +22,7 @@ import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline'
 import { DEFAULT_STATES } from './extractionStates';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
+import { PlaceCell } from './sectionParts';
 import { MinedBar, OreLine, StateWord } from './moonsParts';
 
 export function ExtractionsTab() {
@@ -78,17 +78,13 @@ export function ExtractionsTab() {
       id: 'moon',
       header: t('corpTaxBook.moons.cols.moon'),
       primary: true,
-      render: (row) => {
-        const place = splitPlace(names.refinery(row.structureId), names.moon(row.moonId));
-        return (
-          <span className="block min-w-0">
-            <span className="text-accent">{place.moon ?? place.station}</span>
-            {place.moon !== undefined && (
-              <span className="block text-xs text-text-dim">{place.station}</span>
-            )}
-          </span>
-        );
-      },
+      render: (row) => (
+        <PlaceCell
+          refinery={names.refinery(row.structureId)}
+          moon={names.moon(row.moonId)}
+          accent
+        />
+      ),
       sortValue: (row) => names.refinery(row.structureId),
     },
     {
