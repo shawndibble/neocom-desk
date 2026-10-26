@@ -14,12 +14,16 @@ import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { StatementPeriodDetail } from './StatementPeriodDetail';
 import { StatementsTab } from './StatementsTab';
-import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
+import { writeToClipboard } from '@/lib/clipboard';
+import { readVerifyTokens, type BookSettings, type OfficerVerdict } from '../taxBook/bookClient';
 
 vi.mock('../taxBook/bookClient', () => ({
   editBook: vi.fn(),
   readAudit: vi.fn().mockResolvedValue([]),
+  readVerifyTokens: vi.fn(),
+  verifyUrl: (origin: string, token: string) => `${origin}/corp-tax-book/verify/${token}`,
 }));
+vi.mock('@/lib/clipboard', () => ({ writeToClipboard: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/features/corpTaxBook/mailQueue', () => ({
   enqueueStatements: vi.fn(),
   enqueueReminder: vi.fn(),
@@ -79,7 +83,7 @@ function PeriodRoute() {
   return <StatementPeriodDetail periodStart={useParams().start ?? ''} />;
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, canView = false) {
   const first = buildBookView(input());
   const plan = planStatementRun(first, nextRunPeriod(first)!);
   const [a, b] = plan.lines.map((l) => ({
@@ -111,7 +115,7 @@ function renderAt(path: string) {
           },
           settings: { minimumStatement: 0 } as BookSettings,
           data: {} as never,
-          verdict,
+          verdict: canView ? { ...verdict, canEdit: false } : verdict,
           reload: vi.fn(),
         }}
       >
@@ -155,5 +159,53 @@ describe('Statements drill-down (#5285)', () => {
   it('a period without Statements says so', () => {
     renderAt('/corp/moons/statements/2020-01-01');
     expect(screen.getByText('No Statements were issued for this period.')).toBeInTheDocument();
+  });
+});
+
+describe('Statement panel (#5286)', () => {
+  const openFirst = async (path = '/corp/moons/statements/2026-08-01', viewOnly = false) => {
+    renderAt(path, viewOnly);
+    const table = screen.getByRole('table', { name: 'Statements' });
+    await userEvent.click(within(table).getByText('Pilot 1'));
+    return screen.findByRole('dialog');
+  };
+
+  it('a row click opens the panel with the Statement figures, lines and mail state', async () => {
+    const panel = await openFirst();
+    expect(within(panel).getByText('Remaining')).toBeInTheDocument();
+    expect(within(panel).getAllByText('Billed')).toHaveLength(2);
+    expect(within(panel).getByText('Sent 2 times')).toBeInTheDocument();
+    expect(within(panel).getByRole('list', { name: 'Statement lines' })).toBeInTheDocument();
+    expect(within(panel).getByText(/No payments have been credited/)).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'Open Miner page' })).toBeInTheDocument();
+  });
+
+  it('never offers Stop reminders or the verify page to an officer', async () => {
+    const panel = await openFirst();
+    expect(within(panel).queryByText(/Stop reminders/)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Open verify page/)).not.toBeInTheDocument();
+  });
+
+  it('reads the verify token only when Copy verify link is pressed', async () => {
+    vi.mocked(readVerifyTokens)
+      .mockClear()
+      .mockResolvedValue(new Map([['x', 'tok']]));
+    const panel = await openFirst();
+    expect(readVerifyTokens).not.toHaveBeenCalled();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Copy verify link' }));
+    expect(readVerifyTokens).toHaveBeenCalledTimes(1);
+    const id = vi.mocked(readVerifyTokens).mock.calls[0][2][0];
+    vi.mocked(readVerifyTokens).mockResolvedValue(new Map([[id, 'tok']]));
+    await userEvent.click(within(panel).getByRole('button', { name: 'Copy verify link' }));
+    expect(writeToClipboard).toHaveBeenCalledWith(
+      expect.stringMatching(/\/corp-tax-book\/verify\/tok$/)
+    );
+    expect(await within(panel).findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('a view-only officer gets no Copy verify link', async () => {
+    const panel = await openFirst('/corp/moons/statements/2026-08-01', true);
+    expect(within(panel).queryByRole('button', { name: 'Copy verify link' })).toBeNull();
+    expect(within(panel).getByRole('link', { name: 'Open Miner page' })).toBeInTheDocument();
   });
 });

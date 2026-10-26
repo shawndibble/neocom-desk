@@ -30,7 +30,7 @@ import {
   type ExtractionState,
   type LearnedChunkRate,
 } from './extraction';
-import { overdueStatus, type Declaration } from './overdue';
+import { overdueStatus, type Declaration, type OverdueState } from './overdue';
 import {
   draftStatement,
   frozenDayRate,
@@ -867,6 +867,10 @@ export interface PeriodStatementRow {
   overdue: boolean;
   /** When it goes (or went) overdue; null once settled. */
   dueAt: string | null;
+  /** Where its Overdue clock stands; a declaration pauses it. */
+  state: OverdueState;
+  /** While paused: when the pause ends on its own. */
+  pausedUntil?: string;
   mail: StatementMail;
 }
 
@@ -891,6 +895,8 @@ function statementStanding(view: BookView, s: Statement): PeriodStatementRow {
     settled,
     overdue: status?.state === 'overdue',
     dueAt: status?.overdueAt ?? null,
+    state: status?.state ?? 'settled',
+    ...(status?.pausedUntil ? { pausedUntil: status.pausedUntil } : {}),
     mail: {
       kind: s.remindersStopped ? 'stopped' : count > 0 ? 'sent' : 'not-mailed',
       count,
@@ -905,6 +911,42 @@ export function periodStatements(
 ): PeriodStatementRow[] | undefined {
   const statements = view.input.statements.filter((s) => s.periodStart === periodStart);
   return statements.length === 0 ? undefined : statements.map((s) => statementStanding(view, s));
+}
+
+/** One Statement's panel (#5286): its standing plus every payment credited to it. */
+export interface StatementDetail extends PeriodStatementRow {
+  /** Payments, dismissals and officer write-offs credited to it. */
+  credited: number;
+  /** What officer write-offs forgave of it (part of `credited`). */
+  forgiven: number;
+  /** The shortfall the tolerance wrote off. */
+  writtenOff: number;
+  remaining: number;
+  /** The part of each Tax Payment that went to this Statement, oldest first. */
+  payments: { id: string; amount: number; at: string; source: 'donation' | 'manual' }[];
+}
+
+/** One Statement with its figures and payments; undefined when the book holds no such Statement. */
+export function statementDetail(view: BookView, statementId: string): StatementDetail | undefined {
+  const statement = view.input.statements.find((s) => s.id === statementId);
+  if (!statement) return undefined;
+  const miner = view.internals.byMiner.get(statement.minerId);
+  const settlement = miner?.allocation.byStatement.get(statement.id);
+  const payments = (miner?.allocation.paymentCredits ?? [])
+    .filter((c) => c.statementId === statement.id)
+    .flatMap((c) => {
+      const p = miner?.payments.find((x) => x.id === c.paymentId);
+      return p ? [{ id: p.id, amount: c.amount, at: p.at, source: p.source }] : [];
+    })
+    .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+  return {
+    ...statementStanding(view, statement),
+    credited: settlement?.credited ?? 0,
+    forgiven: settlement?.forgiven ?? 0,
+    writtenOff: settlement?.writtenOff ?? 0,
+    remaining: settlement?.remaining ?? statement.amount,
+    payments,
+  };
 }
 
 /**
