@@ -91,7 +91,7 @@ function shiftDate(date: string, days: number): string {
  * so nothing older can attach, merge or already hold one of these entries.
  */
 const payoutFloor = (days: readonly string[]): string =>
-  shiftDate([...days].sort()[0]!, -PAYOUT_LINK_WINDOW_DAYS);
+  days.length === 0 ? '' : shiftDate([...days].sort()[0]!, -PAYOUT_LINK_WINDOW_DAYS);
 
 type Tx = FirebaseFirestore.Transaction;
 
@@ -246,13 +246,11 @@ export async function markFeederPayout(
     const was = row.get('notAPayout') === true;
     const amount = Number(row.get('amount'));
     const known = storedTotals(feederSnap);
+    // +1 when the row starts counting, -1 when it stops, 0 when the mark did not change.
+    const step = was === input.notAPayout ? 0 : input.notAPayout ? -1 : 1;
     // No stored totals yet: total every payout as it will stand once this one is marked.
     const totals = known
-      ? {
-          count: known.count + (was === input.notAPayout ? 0 : input.notAPayout ? -1 : 1),
-          amount:
-            known.amount + (was === input.notAPayout ? 0 : input.notAPayout ? -amount : amount),
-        }
+      ? { count: known.count + step, amount: known.amount + step * amount }
       : totalPayouts(
           (await tx.get(col)).docs.map((d) => ({
             amount: Number(d.get('amount')),
