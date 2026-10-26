@@ -75,6 +75,8 @@ export interface FeederRecord {
   /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
   removalLinkId?: string;
   mode: 'normal' | 'settled-otherwise';
+  /** What the moon owner has been paid: payouts not marked "not a payout" (#5242). Absent until a payout write totals it. */
+  payoutTotals?: { count: number; amount: number };
   note?: string;
   /** The Character (the signed-in player) who handed over the mining grant; the holder may be their alt. */
   grantedBy?: number;

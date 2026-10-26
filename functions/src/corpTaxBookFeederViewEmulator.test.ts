@@ -3,7 +3,7 @@
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -23,6 +23,7 @@ import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import type { FeederViewSummary } from './corpTaxBookFeederView.js';
 import {
   applyFeederPayoutPlan,
+  markFeederPayout,
   planFeederPayouts,
   reconcileFeederPayoutsCall,
   recordFeederPayout,
@@ -909,5 +910,78 @@ suite('moon owner payouts (emulator)', () => {
     const rows = await payouts();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ amount: 5_000_000, status: 'matched', journalRef: 502 });
+  });
+
+  describe('payout totals on the moon owner record (#5242)', () => {
+    const totals = async () => (await feederRecord())?.payoutTotals;
+    const record = (amount: number, date = '2026-10-18', method: 'donation' | 'other' = 'other') =>
+      recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+        ...officer,
+        feederCorporationId: FEEDER,
+        amount,
+        date,
+        method,
+      });
+
+    it('adds a recorded payout, and a journal row the sync records', async () => {
+      await record(1_000_000);
+      expect(await totals()).toEqual({ count: 1, amount: 1_000_000 });
+      journalRows = [giveIsk(503, 4_000_000)];
+      await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+      expect(await totals()).toEqual({ count: 2, amount: 5_000_000 });
+    });
+
+    it('does not count a journal row twice when it confirms an officer record', async () => {
+      await record(5_000_000, '2026-10-18', 'donation');
+      journalRows = [giveIsk(504, 5_000_000)];
+      await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+      expect(await totals()).toEqual({ count: 1, amount: 5_000_000 });
+    });
+
+    it('takes a payout out when it is marked "not a payout", and back in when unmarked', async () => {
+      await record(1_000_000);
+      await record(2_000_000, '2026-10-19');
+      const first = (await payouts()).find((p) => 'amount' in p && p.amount === 1_000_000);
+      const mark = (notAPayout: boolean) =>
+        markFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+          ...officer,
+          feederCorporationId: FEEDER,
+          payoutId: first!.id,
+          notAPayout,
+        });
+      await mark(true);
+      expect(await totals()).toEqual({ count: 1, amount: 2_000_000 });
+      await mark(true);
+      expect(await totals()).toEqual({ count: 1, amount: 2_000_000 });
+      await mark(false);
+      expect(await totals()).toEqual({ count: 2, amount: 3_000_000 });
+    });
+
+    it('a record with no stored totals is totalled from its payouts by the next write', async () => {
+      await record(1_000_000);
+      await collectorBook()
+        .collection('feeders')
+        .doc(String(FEEDER))
+        .update({ payoutTotals: FieldValue.delete() });
+      expect(await totals()).toBeUndefined();
+      await record(2_000_000, '2026-09-01');
+      expect(await totals()).toEqual({ count: 2, amount: 3_000_000 });
+    });
+
+    it('planning still finds a payout inside the link window, and attaches to it', async () => {
+      await recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+        ...officer,
+        feederCorporationId: FEEDER,
+        amount: 5_000_000,
+        date: '2026-10-16',
+        method: 'donation',
+      });
+      journalRows = [giveIsk(505, 5_000_000)];
+      expect(await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer)).toEqual({
+        attached: 1,
+        recorded: 0,
+      });
+      expect(await totals()).toEqual({ count: 1, amount: 5_000_000 });
+    });
   });
 });
