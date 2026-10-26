@@ -187,7 +187,6 @@ export interface BookSummary {
   credit: number;
   hubId: string;
   oreForm: 'compressed' | 'raw';
-  inFlightAmount: number;
 }
 
 export interface PersonalOverlay {
@@ -866,7 +865,6 @@ export function overlayCorpBooks(input: {
       credit: p.credit,
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
-      inFlightAmount: p.book.inFlight.reduce((sum, d) => sum + d.amount, 0),
     };
   });
 
