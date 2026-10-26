@@ -1142,6 +1142,23 @@ export interface CorpBookObservedRecord {
   updatedMs: number | null;
 }
 
+/**
+ * One part of an officer's Corp Tax Book (miners, statements, payments, ...) kept
+ * on this device under its version stamp (#5243, ADR 0031 extended). Officer-only,
+ * wiped by the same paths as `CorpBookObservedRecord`.
+ */
+export interface CorpBookPartRecord {
+  characterId: number;
+  corporationId: number;
+  /** The cache slot, e.g. `miners` or `feeders:rows`. */
+  slot: string;
+  /** The collection's version stamp the data was read under. */
+  version: string;
+  /** When it was read, ms. */
+  at: number;
+  data: unknown;
+}
+
 /** What a device remembers about one `CorpBookObservedRecord` set; see `features/corp/taxBook/observedDelta.ts`. */
 export interface CorpBookObservedMetaRecord {
   characterId: number;

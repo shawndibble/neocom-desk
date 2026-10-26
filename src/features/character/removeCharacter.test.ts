@@ -210,12 +210,21 @@ describe('removeCharacter', () => {
         fullAt: 1,
         watermark: 1,
       });
+      await db.corpBookParts.add({
+        characterId,
+        corporationId: 9,
+        slot: 'miners',
+        version: 'v',
+        at: 1,
+        data: [],
+      });
     }
 
     await removeCharacter(1);
 
     expect((await db.corpBookObserved.toArray()).map((r) => r.characterId)).toEqual([2]);
     expect((await db.corpBookObservedMeta.toArray()).map((r) => r.characterId)).toEqual([2]);
+    expect((await db.corpBookParts.toArray()).map((r) => r.characterId)).toEqual([2]);
   });
 
   it('deletes the Character’s Firebase app and session when sync is configured', async () => {

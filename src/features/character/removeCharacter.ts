@@ -130,6 +130,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.corpMailQueue,
       db.corpBookObserved,
       db.corpBookObservedMeta,
+      db.corpBookParts,
       db.notificationFeed,
       db.settings,
     ],

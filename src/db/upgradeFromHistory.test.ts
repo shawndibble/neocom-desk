@@ -61,6 +61,12 @@ const HISTORY: [number, Record<string, string | null>][] = [
       corpBookObservedMeta: '[characterId+corporationId], characterId',
     },
   ],
+  [
+    29,
+    {
+      corpBookParts: '[characterId+corporationId+slot], [characterId+corporationId], characterId',
+    },
+  ],
 ];
 
 /** The complete schema at `version`: every delta up to it, drops removed. */
