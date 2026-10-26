@@ -7064,11 +7064,10 @@
     "reauthAction": "Log in again with EVE Online",
     "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
     "surveyConnections": {
-      "title": "Auto-assigning moon tax",
+      "title": "Auto Assignment",
       "line": "{{name}} at {{pct}}%",
       "noLocation": "Waiting for the survey to have a location",
       "until": "until {{time}}",
-      "overlap": "Shares ore with the survey for {{name}}. Ore both claim stays unassigned for you to assign.",
       "stopFailed": "Couldn't stop that. Try again."
     },
     "emptyTitle": "No mining ledger entries match this filter",
@@ -7188,8 +7187,6 @@
       "state": {
         "pending": "Pending corp record",
         "billed": "Billed",
-        "sentWaiting": "Sent, waiting for the corp",
-        "sentWaitingShort": "Sent, waiting",
         "conflict": "Conflict",
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
@@ -7198,19 +7195,17 @@
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
         "billed": "{{corp}}'s Corp Tax Book decides this day.",
-        "sentWaiting": "You sent this to {{corp}}. It shows as paid once the corp's book credits it.",
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
-        "paid": "Credited by {{corp}}'s book."
+        "paid": "Paid to {{corp}}."
       },
       "sync": {
         "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
-        "inFlight": "{{amount}} ISK sent, waiting for {{corp}} to credit it.",
         "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
         "left": "You left {{corp}}. Its book still shows your lines and what you owe."
       },

@@ -71,13 +71,22 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/miners/m1`), { uids: ['char:2'], characterIds: [2] });
     await setDoc(doc(db, `${CORP}/audit/e1`), { action: 'sync' });
     await setDoc(doc(db, `${CORP}/extractions/x1`), { moonId: 1 });
+    await setDoc(doc(db, `${CORP}/minerTotals/m1`), { minerId: 'm1', billed: 1 });
+    await setDoc(doc(db, `${CORP}/moonDocs/x1`), { extractionId: 'x1', minerCount: 1 });
     await setDoc(doc(db, `${CORP}/meta/paid`), { ids: ['s1'] });
     await setDoc(doc(db, `${CORP}/meta/scheduledSync`), { status: 'active', characterId: 1 });
     await setDoc(doc(db, 'corpTaxBookTokens/tok'), { corporationId: 98000001 });
   });
 });
 
-const OFFICER_ONLY = ['audit/e1', 'extractions/x1', 'meta/paid', 'meta/scheduledSync'];
+const OFFICER_ONLY = [
+  'audit/e1',
+  'extractions/x1',
+  'minerTotals/m1',
+  'moonDocs/x1',
+  'meta/paid',
+  'meta/scheduledSync',
+];
 const OWN_LINE_PATHS = ['observed/a', 'payments/p1', 'statements/s1', 'dismissals/d1', 'miners/m1'];
 
 describe('corps (Tax Book) rules', () => {
@@ -171,6 +180,10 @@ describe('corps (Tax Book) rules', () => {
     await assertFails(setDoc(doc(db, `${CORP}/officers/char:1`), officer({ expiresAt: NOW * 2 })));
     await assertFails(updateDoc(doc(db, CORP), { rates: [] }));
     await assertFails(setDoc(doc(db, `${CORP}/meta/paid`), { ids: [] }));
+    await assertFails(setDoc(doc(db, `${CORP}/minerTotals/m1`), { billed: 0 }));
+    await assertFails(deleteDoc(doc(db, `${CORP}/minerTotals/m1`)));
+    await assertFails(setDoc(doc(db, `${CORP}/moonDocs/x1`), { minerCount: 0 }));
+    await assertFails(deleteDoc(doc(db, `${CORP}/moonDocs/x1`)));
     await assertFails(getDoc(doc(db, 'corpTaxBookTokens/tok')));
     const own = characterAuth(env, 2, 'h2').firestore();
     await assertFails(updateDoc(doc(own, `${CORP}/observed/a`), { quantity: 0 }));

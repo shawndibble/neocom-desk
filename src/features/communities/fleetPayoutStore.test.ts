@@ -4,11 +4,21 @@ const fire = vi.hoisted(() => ({
   docs: [] as { id: string; data: Record<string, unknown> }[],
   paths: [] as string[],
   wheres: [] as unknown[][],
+  orders: [] as unknown[][],
+  limits: [] as number[],
 }));
 vi.mock('firebase/firestore/lite', () => ({
   collection: (_db: unknown, ...path: string[]) => ({ path: path.join('/') }),
   where: (...args: unknown[]) => {
     fire.wheres.push(args);
+    return {};
+  },
+  orderBy: (...args: unknown[]) => {
+    fire.orders.push(args);
+    return {};
+  },
+  limit: (n: number) => {
+    fire.limits.push(n);
     return {};
   },
   query: (q: { path: string }) => q,
@@ -24,6 +34,7 @@ vi.mock('./communityStore', () => comm);
 
 import {
   createFleetPayout,
+  FLEET_PAYOUTS_CAP,
   loadFleetPayouts,
   loadFleetShares,
   loadMyFleetShare,
@@ -56,6 +67,15 @@ describe('loadFleetPayouts', () => {
     const out = await loadFleetPayouts(1, 'c1');
     expect(fire.paths).toEqual(['communities/c1/fleetPayouts']);
     expect(out.map((p) => p.id)).toEqual(['new', 'old']);
+  });
+
+  it('asks only for the newest FLEET_PAYOUTS_CAP', async () => {
+    fire.docs = [];
+    fire.orders.length = 0;
+    fire.limits.length = 0;
+    await loadFleetPayouts(1, 'c1');
+    expect(fire.orders).toEqual([['createdAt', 'desc']]);
+    expect(fire.limits).toEqual([FLEET_PAYOUTS_CAP]);
   });
 });
 

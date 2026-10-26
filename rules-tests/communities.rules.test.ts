@@ -1248,3 +1248,42 @@ describe('Fleet Payouts', () => {
     }
   });
 });
+
+describe('Board version stamp (issue #5244)', () => {
+  const STAMP = `${C}/boardVersion/current`;
+
+  it('is read by a Member and no one else', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), STAMP), { stamp: 1 }));
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(member, STAMP)));
+    const outsider = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(outsider, STAMP)));
+  });
+
+  it('lets a Member set the server time, with a reset only beside a delete', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(setDoc(doc(member, STAMP), { stamp: serverTimestamp() }, { merge: true }));
+    await assertSucceeds(
+      setDoc(
+        doc(member, STAMP),
+        { stamp: serverTimestamp(), reset: serverTimestamp() },
+        { merge: true }
+      )
+    );
+    // A later stamp-only write keeps the stored reset.
+    await assertSucceeds(setDoc(doc(member, STAMP), { stamp: serverTimestamp() }, { merge: true }));
+  });
+
+  it('refuses a made-up time, another field, another doc, an outsider and a delete', async () => {
+    const member = characterAuth(env, 2, 'hash-2').firestore();
+    await assertFails(setDoc(doc(member, STAMP), { stamp: 5 }, { merge: true }));
+    await assertFails(
+      setDoc(doc(member, STAMP), { stamp: serverTimestamp(), note: 'x' }, { merge: true })
+    );
+    await assertFails(setDoc(doc(member, `${C}/boardVersion/other`), { stamp: serverTimestamp() }));
+    const outsider = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(setDoc(doc(outsider, STAMP), { stamp: serverTimestamp() }));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), STAMP), { stamp: 1 }));
+    await assertFails(deleteDoc(doc(member, STAMP)));
+  });
+});

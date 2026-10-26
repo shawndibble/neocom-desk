@@ -13,7 +13,7 @@
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +35,7 @@ import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { bookPartsFor } from '@/features/corp/taxBook/bookParts';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
 import { AuditFeed } from '@/features/corp/moons/AuditFeed';
 import { useAuditSubject } from '@/features/corp/moons/useAuditSubject';
@@ -194,7 +195,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
 function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const { t } = useTranslation();
   const sync = useCorpTaxBook();
-  const book = useCorpBook(sync);
+  const { pathname } = useLocation();
+  const [tab] = usePageTab(MOONS_TABS);
+  const wanted = useMemo(
+    () => bookPartsFor(tab, moonsDetail(pathname)?.kind ?? null),
+    [tab, pathname]
+  );
+  const book = useCorpBook(sync, wanted);
   const { state } = book;
   // The rail and the page title list Moons' tabs only once a book mode is chosen.
   const unchosen = state.status === 'off';

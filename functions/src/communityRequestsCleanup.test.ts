@@ -269,6 +269,34 @@ const community = {
   [`${C}/itemRequests/r1/pledges/char:4`]: { lines: {} },
 };
 
+const STAMP = `${C}/boardVersion/current`;
+
+describe('the board version stamp', () => {
+  it('is reset by the sweep, an admin removal and a leave, for a cached board cannot show a delete', async () => {
+    const swept = fakeDb({ [`${C}`]: {}, [`${C}/itemRequests/a`]: request({ expiresAt: 1 }) });
+    await sweepRequests(swept.db, NOW);
+    expect(swept.docs.get(STAMP)).toHaveProperty('reset');
+
+    const removed = fakeDb(community);
+    await removeRequest(removed.db, admin, 'c1', 'r1');
+    expect(removed.docs.get(STAMP)).toHaveProperty('reset');
+
+    const unpledged = fakeDb(community);
+    await removePledge(unpledged.db, admin, 'c1', 'r1', 'char:3');
+    expect(unpledged.docs.get(STAMP)).toHaveProperty('reset');
+
+    const left = fakeDb(community);
+    await deleteMemberShares(left.db, 'c1', 'char:2');
+    expect(left.docs.get(STAMP)).toHaveProperty('reset');
+  });
+
+  it('is left alone when the caller is refused', async () => {
+    const f = fakeDb(community);
+    await expect(removeRequest(f.db, member, 'c1', 'r1')).rejects.toBeDefined();
+    expect(f.docs.has(STAMP)).toBe(false);
+  });
+});
+
 describe('admin removal', () => {
   it('lets the Community admin remove a Request with all its Pledges', async () => {
     const f = fakeDb(community);

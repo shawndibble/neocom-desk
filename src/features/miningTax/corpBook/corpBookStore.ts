@@ -48,7 +48,7 @@ export interface ClaimablePayment {
   at: string;
 }
 
-/** What the book holds of a donation, for telling "sent, waiting" from "credited". */
+/** What the book holds of a donation, for telling one it holds from one it does not hold yet. */
 export interface HeldPayment {
   characterId: number;
   amount: number;

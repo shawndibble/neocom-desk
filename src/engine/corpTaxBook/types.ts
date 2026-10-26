@@ -35,6 +35,11 @@ export interface ObservedRow {
   /** The moon the refinery was drilling that day, when known — for per-moon rates. */
   moonId?: number;
   /**
+   * The Extraction (`{structureId}_{startTimeMs}`) whose fracture-to-expiry window covers
+   * this row's day. Server-stamped on write and backfilled; omitted when no pull covers it.
+   */
+  extractionId?: string;
+  /**
    * The feeder corporation whose refinery recorded the row. Absent means the
    * book's own corporation, so every existing book reads as before.
    */
