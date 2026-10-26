@@ -6,8 +6,10 @@ import {
   bestRange,
   graphMaxRange,
   graphMaxSpeed,
+  isMobileDrone,
   missileApplication,
   rawDps,
+  sustainedInputs,
   turretDamageMultiplier,
   turretHitChance,
   type AppliedDpsInputs,
@@ -209,6 +211,30 @@ describe('appliedDps fighters', () => {
   });
 });
 
+describe('appliedDps area weapons', () => {
+  const area: Extract<AppliedWeapon, { kind: 'area' }> = { kind: 'area', dps: 80, range: 7500 };
+
+  it('applies at full inside range, whatever the target does, and nothing past it', () => {
+    const fast = { signatureRadius: 35, velocity: 3000 };
+    expect(appliedDps(inputs([area]), fast, 7500)).toBeCloseTo(80, 6);
+    expect(appliedDps(inputs([area]), fast, 7501)).toBe(0);
+  });
+
+  it('counts in raw DPS and stretches the range axis', () => {
+    expect(rawDps(inputs([area, missile]))).toBe(180);
+    // 7.5 km x1.1 = 8.25 -> 10 km
+    expect(graphMaxRange([inputs([area])])).toBe(10000);
+  });
+});
+
+describe('isMobileDrone', () => {
+  it('reads a sentry’s near-zero speed as not mobile', () => {
+    expect(isMobileDrone(1.25e-5)).toBe(false);
+    expect(isMobileDrone(0)).toBe(false);
+    expect(isMobileDrone(5040)).toBe(true);
+  });
+});
+
 describe('graphs', () => {
   const fit = inputs([turret, missile]);
 
@@ -249,5 +275,17 @@ describe('graphs', () => {
   it('runs the speed axis to at least 1000 m/s, or twice the target speed rounded to 500', () => {
     expect(graphMaxSpeed({ signatureRadius: 125, velocity: 200 })).toBe(1000);
     expect(graphMaxSpeed({ signatureRadius: 35, velocity: 2600 })).toBe(5500);
+  });
+});
+
+describe('sustainedInputs', () => {
+  it('scales a reloading weapon’s DPS by its share and leaves the rest alone', () => {
+    const inputs: AppliedDpsInputs = {
+      weapons: [{ ...missile, reloadDuty: 0.5 }, turret],
+      droneControlRange: 20000,
+    };
+    const { weapons } = sustainedInputs(inputs);
+    expect(weapons.map((w) => w.dps)).toEqual([50, 100]);
+    expect(inputs.weapons[0].dps).toBe(100);
   });
 });

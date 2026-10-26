@@ -49,6 +49,26 @@ describe('valueMiningYield', () => {
     expect(result.pricedAll).toBe(true);
   });
 
+  it("refines at the pilot's facility yield and takes its tax off the refined value", () => {
+    const lines: OreLine[] = [{ typeId: VELDSPAR, quantity: 200 }];
+    const reprocessing = new Map<number, YieldReprocessingEntry | undefined>([
+      [VELDSPAR, { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] }],
+    ]);
+
+    const result = valueMiningYield(
+      lines,
+      new Map([[VELDSPAR, 5]]),
+      reprocessing,
+      NO_SKILLS,
+      { 34: 3 },
+      { refining: { stationRate: 0.6, taxRate: 0.1 } }
+    );
+
+    // 2 batches x floor(400 x 2 x 0.6) = 480 Tritanium x 3 ISK = 1,440, less 10% tax
+    expect(result.refineValue).toBeCloseTo(1440 * 0.9, 6);
+    expect(result.efficiency).toBeCloseTo(0.6, 6);
+  });
+
   it('marks the entry Partial when a line has no mined-date raw price', () => {
     const lines: OreLine[] = [{ typeId: VELDSPAR, quantity: 100 }];
     const result = valueMiningYield(lines, new Map(), new Map(), NO_SKILLS, {});

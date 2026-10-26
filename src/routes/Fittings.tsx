@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
@@ -51,7 +51,9 @@ import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
 import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
-import { THREE_COLUMN_QUERY, addModeFor } from '@/features/fittings/fittingLayout';
+import { RuleBreakFlags } from '@/features/fittings/ruleBreakFlags';
+import { useFittingRuleBreaks } from '@/features/fittings/useFittingRuleBreaks';
+import { THREE_COLUMN_QUERY, addModeFor, leftColumn } from '@/features/fittings/fittingLayout';
 import { useFittingPasteLoad } from '@/features/fittings/useFittingPasteLoad';
 import { useSavedFittingRecord } from '@/features/fittings/useSavedFittingRecord';
 import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
@@ -101,7 +103,7 @@ function FittingsPage() {
   }, []);
   const workspace = useFittingWorkspace();
   const catalogue = useFittingCatalogue();
-  const context = useFittingContext(workspace.profile, catalogue);
+  const context = useFittingContext(workspace.profile, catalogue, workspace.chargeBasis);
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
@@ -149,6 +151,12 @@ function FittingsPage() {
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpoints = useFittingHardpoints(workspace.fitting);
+  const ruleBreaks = useFittingRuleBreaks(
+    workspace.fitting,
+    workspace.currentStats,
+    catalogue,
+    hardpoints.kindOf
+  );
   const saved = useSavedFittingRecord(workspace.savedId);
   const { savedRecord } = saved;
   useFittingPasteLoad(workspace.loadFromInput);
@@ -402,7 +410,6 @@ function FittingsPage() {
     fitting,
     catalogue,
     targetProfiles,
-    isPhone,
     edit,
     characterId: activeCharacterId,
     charges,
@@ -410,10 +417,17 @@ function FittingsPage() {
     moduleResults,
     openMakeItFit: makeItFit.open,
   });
-  const itemActionsWithImprove = useMemo(
-    () => (itemActions === null ? null : { ...itemActions, openImprove: improve.open }),
-    [itemActions, improve.open]
-  );
+  // Improve and the Add browser share the left of the page: the last one opened wins.
+  const { docked: improveDocked, close: closeImprove } = improve;
+  const opened = useRef({ add: addOpen, improve: improveDocked });
+  useEffect(() => {
+    const was = opened.current;
+    opened.current = { add: addOpen, improve: improveDocked };
+    if (addOpen && improveDocked) {
+      if (!was.add) closeImprove();
+      else if (!was.improve) setAddOpen(false);
+    }
+  }, [addOpen, improveDocked, closeImprove]);
   const overlay = useOverlayFitting({
     characterId: activeCharacterId,
     profile: workspace.profile,
@@ -497,7 +511,7 @@ function FittingsPage() {
       overlay={overlay}
       onOpenMakeItFit={makeItFit.open}
       preview={improve.preview}
-      onImprove={improve.open}
+      ruleBreaks={ruleBreaks.lines}
     />
   );
 
@@ -505,7 +519,13 @@ function FittingsPage() {
   // and whether this is a saved Fitting.
   const hullName = typeName(fitting.shipTypeId);
   // The open slide-out takes 26rem off the page, too little for the one-row header.
-  const headerCompact = addMode === 'sheet' || (addMode === 'slideOut' && addOpen);
+  const {
+    addMode: layoutAddMode,
+    addOpen: layoutAddOpen,
+    pushed,
+    statsFirst,
+  } = leftColumn(addMode, addOpen, improve.docked);
+  const headerCompact = addMode === 'sheet' || pushed;
   const subtitle = [
     hullName !== fitting.name ? hullName : null,
     workspace.savedId !== null ? t('fittings.header.savedInMyFittings') : null,
@@ -518,124 +538,128 @@ function FittingsPage() {
     // every Ring slot stays a drop target. (It can't get out of the way
     // mid-drag instead: moving or hiding a drag's source element cancels it.)
     <ItemActionsProvider page={pageItemActions}>
-      <FittingItemActionsProvider value={itemActionsWithImprove}>
-        {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
+      <FittingItemActionsProvider value={itemActions}>
+        <RuleBreakFlags.Provider value={ruleBreaks.flagged}>
+          {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
         panel (scope decision `20261016-171349`). */}
-        <div
-          className={`mx-auto max-w-[120rem] space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}
-        >
-          <FittingEditorHeader
-            workspace={workspace}
-            fitting={fitting}
-            stats={stats}
-            characterId={activeCharacterId}
-            subtitle={subtitle}
-            hullName={hullName}
-            compact={headerCompact}
-            alpha={alpha}
-            share={editorShare}
-            saved={saved}
-            onLibrary={openLibrary}
-            onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
-            onImprove={improve.open}
-          />
-          {workspace.tooLargeToShare && (
-            <p role="alert" className="text-xs text-warning">
-              {t('fittings.load.tooLargeToShare')} {t('fittings.load.tooLargeToShareDraft')}
-            </p>
-          )}
-          {/* Only a Load that opened a Fitting describes this one; a failed Load's
+          {/* Pushed (the Add slide-out): from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
+          <div className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'}`}>
+            <FittingEditorHeader
+              workspace={workspace}
+              fitting={fitting}
+              stats={stats}
+              characterId={activeCharacterId}
+              subtitle={subtitle}
+              hullName={hullName}
+              compact={headerCompact}
+              alpha={alpha}
+              share={editorShare}
+              saved={saved}
+              onLibrary={openLibrary}
+              onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
+              onImprove={improve.open}
+            />
+            {workspace.tooLargeToShare && (
+              <p role="alert" className="text-xs text-warning">
+                {t('fittings.load.tooLargeToShare')} {t('fittings.load.tooLargeToShareDraft')}
+              </p>
+            )}
+            {/* Only a Load that opened a Fitting describes this one; a failed Load's
           warnings stay with the Load card that reported them. */}
-          {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
-          <LiveStatus data-testid="fitting-added-status" announceKey={added.n}>
-            {added.message}
-          </LiveStatus>
-          {/* What the last charge load did: "loaded 3 of 4, cargo ran out". */}
-          <p role="status" className="text-xs text-text-dim empty:hidden">
-            {charges.message}
-          </p>
+            {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
+            <LiveStatus data-testid="fitting-added-status" announceKey={added.n}>
+              {added.message}
+            </LiveStatus>
+            {/* What the last charge load did: "loaded 3 of 4, cargo ran out". */}
+            <p role="status" className="text-xs text-text-dim empty:hidden">
+              {charges.message}
+            </p>
 
-          <FittingEditorLayout
-            addMode={addMode}
-            addOpen={addOpen}
-            addTitle={addTitle}
-            addPanel={addPanel}
-            onCloseAdd={closeAdd}
-            viewHydrated={viewHydrated}
-            view={view}
-            onViewChange={(next) => void setView(next)}
-            editor={editor}
-            statsSections={statsSections}
-          />
-          {makeItFit.dialog}
-          {improve.drawer}
-          <FittingLibraryDialogs
-            library={library}
-            onClose={closeLibrary}
-            workspace={workspace}
-            catalogue={catalogue}
-            characterId={activeCharacterId}
-            inGameKey={inGameFittingsKey}
-            isPhone={isPhone}
-            onStartHull={startHull}
-          />
-          <FittingModuleDialog
-            module={openModule}
-            moduleIndex={openModuleIndex}
-            fallbackSlot={moduleSlot?.slot ?? 'high'}
-            onClose={() => setModuleSlot(null)}
-            placement={isPhone ? 'sheet' : 'wide'}
-            result={moduleResults?.[openModuleIndex] ?? null}
-            cantUse={
-              openModule ? (gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false) : false
-            }
-            fitting={fitting}
-            catalogue={catalogue}
-            context={context}
-            edit={edit}
-            variationRows={variationRows}
-            onSwapVariation={swapVariation}
-            variationsOpen={variationsOpen}
-            onToggleVariations={() => setVariationsOpen((open) => !open)}
-            mutationOpen={mutationOpen}
-            onToggleMutation={() => setMutationOpen((open) => !open)}
-            canMutate={openModule ? (itemActions?.canMutate(openModule.typeId) ?? false) : false}
-            affectedOpen={affectedOpen}
-            onToggleAffected={() => setAffectedOpen((open) => !open)}
-            explainModule={workspace.explainModule}
-            typeName={typeName}
-            characterId={activeCharacterId}
-          />
-          {isPhone && (
-            <FittingRackSheet
-              rack={rackSheet}
-              onClose={() => setRackSheet(null)}
+            <FittingEditorLayout
+              addMode={layoutAddMode}
+              addOpen={layoutAddOpen}
+              addTitle={addTitle}
+              addPanel={addPanel}
+              onCloseAdd={closeAdd}
+              viewHydrated={viewHydrated}
+              view={view}
+              onViewChange={(next) => void setView(next)}
+              editor={editor}
+              statsSections={statsSections}
+              statsFirst={statsFirst}
+              improveColumn={improve.column}
+            />
+            {makeItFit.dialog}
+            {improve.drawer}
+            <FittingLibraryDialogs
+              library={library}
+              onClose={closeLibrary}
+              workspace={workspace}
+              catalogue={catalogue}
+              characterId={activeCharacterId}
+              inGameKey={inGameFittingsKey}
+              isPhone={isPhone}
+              onStartHull={startHull}
+            />
+            <FittingModuleDialog
+              module={openModule}
+              moduleIndex={openModuleIndex}
+              fallbackSlot={moduleSlot?.slot ?? 'high'}
+              onClose={() => setModuleSlot(null)}
+              placement={isPhone ? 'sheet' : 'wide'}
+              result={moduleResults?.[openModuleIndex] ?? null}
+              cantUse={
+                openModule ? (gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false) : false
+              }
               fitting={fitting}
               catalogue={catalogue}
               context={context}
               edit={edit}
-              stats={stats}
-              moduleResults={moduleResults}
-              target={target}
-              onSelectTarget={selectTargetFromSheet}
-              unusableModuleKeys={gaps?.unusableModuleKeys}
+              variationRows={variationRows}
+              onSwapVariation={swapVariation}
+              variationsOpen={variationsOpen}
+              onToggleVariations={() => setVariationsOpen((open) => !open)}
+              mutationOpen={mutationOpen}
+              onToggleMutation={() => setMutationOpen((open) => !open)}
+              canMutate={openModule ? (itemActions?.canMutate(openModule.typeId) ?? false) : false}
+              affectedOpen={affectedOpen}
+              onToggleAffected={() => setAffectedOpen((open) => !open)}
+              explainModule={workspace.explainModule}
+              typeName={typeName}
+              characterId={activeCharacterId}
             />
-          )}
-          {cargoQuantityFor !== null && (
-            <CargoQuantityDialog
-              name={catalogueTypeName(catalogue, cargoQuantityFor)}
-              quantity={
-                cargoGroups(fitting).find((item) => item.typeId === cargoQuantityFor)?.quantity ?? 1
-              }
-              onClose={() => setCargoQuantityFor(null)}
-              onConfirm={(quantity) => {
-                const typeId = cargoQuantityFor;
-                edit((f) => setCargoQuantity(f, typeId, quantity));
-                setCargoQuantityFor(null);
-              }}
-            />
-          )}
-        </div>
+            {isPhone && (
+              <FittingRackSheet
+                rack={rackSheet}
+                onClose={() => setRackSheet(null)}
+                fitting={fitting}
+                catalogue={catalogue}
+                context={context}
+                edit={edit}
+                stats={stats}
+                moduleResults={moduleResults}
+                target={target}
+                onSelectTarget={selectTargetFromSheet}
+                unusableModuleKeys={gaps?.unusableModuleKeys}
+              />
+            )}
+            {cargoQuantityFor !== null && (
+              <CargoQuantityDialog
+                name={catalogueTypeName(catalogue, cargoQuantityFor)}
+                quantity={
+                  cargoGroups(fitting).find((item) => item.typeId === cargoQuantityFor)?.quantity ??
+                  1
+                }
+                onClose={() => setCargoQuantityFor(null)}
+                onConfirm={(quantity) => {
+                  const typeId = cargoQuantityFor;
+                  edit((f) => setCargoQuantity(f, typeId, quantity));
+                  setCargoQuantityFor(null);
+                }}
+              />
+            )}
+          </div>
+        </RuleBreakFlags.Provider>
       </FittingItemActionsProvider>
     </ItemActionsProvider>
   );

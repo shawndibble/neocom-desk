@@ -2,6 +2,7 @@ import { failureAnnotation } from '@/observability/reportFailure';
 import { REMOTE_COLLECTIONS } from './syncedCollections';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
+import { confirmOwnership, ensureSignedIn } from './syncAuth';
 import {
   db,
   type BuildPlanRecord,
@@ -138,6 +139,7 @@ vi.mock('./syncMarker', async (importOriginal) => ({
 
 vi.mock('./syncAuth', () => ({
   ensureSignedIn: vi.fn(async (characterId: number) => `char:${characterId}`),
+  confirmOwnership: vi.fn(async () => true),
   uidForCharacter: (characterId: number) => `char:${characterId}`,
 }));
 
@@ -726,10 +728,100 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     }
   });
 
+  it("signs in checking the session carries the Character's ownerHash", async () => {
+    await triggerSync(1);
+    expect(ensureSignedIn).toHaveBeenCalledWith(1, HASH);
+  });
+
   it('ignores remote docs written under a different ownerHash', async () => {
     seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale', ownerHash: 'previous-owner' })]);
     await triggerSync(1);
     expect(await db.skillPlans.get('stale')).toBeUndefined();
+  });
+
+  describe("a previous owner's doc at an id this owner writes", () => {
+    // The rules' `update` needs the stored doc's ownerHash to match; the pull
+    // never sees such a doc, so the write lands on it as an update and is refused.
+    // The double's two-argument write, as the module mock defines it.
+    const write = vi.mocked(setDoc).getMockImplementation() as unknown as (
+      ref: unknown,
+      data: unknown
+    ) => Promise<void>;
+    beforeEach(() => {
+      vi.mocked(setDoc).mockImplementation(async (ref: unknown, data: unknown) => {
+        const { col, id } = ref as unknown as FakeRef;
+        const stored = remoteStore.get(col.path)?.get(id);
+        if (stored && 'ownerHash' in stored && stored.ownerHash !== (data as DocData).ownerHash) {
+          throw Object.assign(new Error('Missing or insufficient permissions.'), {
+            code: 'permission-denied',
+          });
+        }
+        return write(ref, data);
+      });
+    });
+    afterEach(() => {
+      vi.mocked(setDoc).mockImplementation(write as never);
+    });
+
+    it('replaces a synced setting the previous owner left', async () => {
+      seedRemote(SETTINGS_PATH, [
+        { key: 'sync.tradeHub', value: 'amarr', updatedAt: 1, ownerHash: 'previous-owner' },
+      ]);
+      await seedLocalSetting('sync.tradeHub', 'jita');
+      await triggerSync(1);
+      expect(getSyncStatus(1).state).toBe('idle');
+      expect(remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub')).toMatchObject({
+        value: 'jita',
+        ownerHash: HASH,
+      });
+    });
+
+    it('replaces a station pin the previous owner left', async () => {
+      seedRemote(STATION_PINS_PATH, [remoteStationPinDoc({ ownerHash: 'previous-owner' })]);
+      await db.stationPins.put(stationPin());
+      await triggerSync(1);
+      expect(getSyncStatus(1).state).toBe('idle');
+      expect(remoteStore.get(STATION_PINS_PATH)?.get('1:60003760')).toMatchObject({
+        ownerHash: HASH,
+      });
+    });
+
+    it('replaces a feed occurrence the previous owner left', async () => {
+      seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ ownerHash: 'previous-owner' })]);
+      await db.notificationFeed.put(feedRow());
+      await triggerSync(1);
+      expect(getSyncStatus(1).state).toBe('idle');
+      expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')).toMatchObject({
+        ownerHash: HASH,
+      });
+    });
+
+    it('leaves the doc alone when this device cannot prove it owns the Character', async () => {
+      // A previous owner's device: its Firebase session outlives the revoked EVE grant.
+      vi.mocked(confirmOwnership).mockResolvedValueOnce(false);
+      seedRemote(SETTINGS_PATH, [
+        { key: 'sync.tradeHub', value: 'amarr', updatedAt: 1, ownerHash: 'previous-owner' },
+      ]);
+      await seedLocalSetting('sync.tradeHub', 'jita');
+      await triggerSync(1).catch(() => undefined);
+      expect(getSyncStatus(1).state).toBe('error');
+      expect(deleteDoc).not.toHaveBeenCalled();
+      expect(remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub')).toMatchObject({
+        value: 'amarr',
+      });
+    });
+
+    it('proves ownership at most once a pass', async () => {
+      seedRemote(SETTINGS_PATH, [
+        { key: 'sync.tradeHub', value: 'amarr', updatedAt: 1, ownerHash: 'previous-owner' },
+      ]);
+      seedRemote(STATION_PINS_PATH, [remoteStationPinDoc({ ownerHash: 'previous-owner' })]);
+      await seedLocalSetting('sync.tradeHub', 'jita');
+      await db.stationPins.put(stationPin());
+      await triggerSync(1);
+      expect(confirmOwnership).toHaveBeenCalledTimes(1);
+      expect(confirmOwnership).toHaveBeenCalledWith(1, HASH);
+    });
   });
 });
 

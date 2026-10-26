@@ -42,6 +42,20 @@ describe('corpMoveAssets', () => {
     expect(out).toMatchObject([{ location_id: STRUCTURE, location_type: 'other' }]);
   });
 
+  it('keeps a structure office whatever location type ESI tags it with', () => {
+    const out = corpMoveAssets([
+      input({
+        itemId: 9000,
+        typeId: 27,
+        locationId: STRUCTURE,
+        locationType: 'item',
+        locationFlag: 'OfficeFolder',
+      }),
+      input({ itemId: 1 }),
+    ]);
+    expect(out).toMatchObject([{ location_id: STRUCTURE, location_type: 'other' }]);
+  });
+
   it('keeps an assembled ship so it can be flown out', () => {
     const out = corpMoveAssets([
       officeAt(9000, JITA, 'station'),

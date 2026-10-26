@@ -5,6 +5,7 @@
  */
 import { chargeScore, quickPicks, type ChargeChoice } from './chargeChoice';
 import type { ModuleAt } from './fittingEdit';
+import { isFiring } from './stats';
 import type { Fitting } from './types';
 
 /** One weapon group as the Charge Picker lists it (`WeaponChargeGroup`'s share). */
@@ -35,12 +36,11 @@ const kindOf = (group: ChargeGroup): Exclude<UnloadedKind, 'weapon'> =>
   group.choices.every((c) => c.falloff === 0) ? 'launcher' : 'turret';
 
 function emptyModulesOf(fitting: Fitting, group: ChargeGroup): ModuleAt[] {
-  // Offline guns aren't firing, so the stats panel doesn't count them either.
+  // A gun that is only online isn't firing, so the stats panel doesn't count it either.
   if (!group.isWeapon || group.choices.length === 0) return [];
   return fitting.modules
     .filter(
-      (m) =>
-        m.typeId === group.moduleTypeId && m.chargeTypeId === undefined && m.state !== 'offline'
+      (m) => m.typeId === group.moduleTypeId && m.chargeTypeId === undefined && isFiring(m.state)
     )
     .map(({ slot, slotIndex }) => ({ slot, slotIndex }));
 }
@@ -88,4 +88,28 @@ export function loadBestCharges(
     if (top) steps.push({ chargeTypeId: top.typeId, fromCargo: false, at });
   }
   return steps;
+}
+
+/**
+ * `fitting` scored as if `steps` (made for `planned`) were loaded: each empty
+ * module still of the type it was planned as takes its charge. A swapped-out
+ * weapon, or one already loaded, is left alone. Cargo is not drawn down —
+ * this is for ranking swaps, not for editing the Fitting.
+ */
+export function assumeCharges(
+  fitting: Fitting,
+  planned: Fitting,
+  steps: readonly ChargeLoadStep[]
+): Fitting {
+  if (steps.length === 0) return fitting;
+  const modules = fitting.modules.map((m) => {
+    if (m.chargeTypeId !== undefined) return m;
+    const step = steps.find((s) =>
+      s.at.some((a) => a.slot === m.slot && a.slotIndex === m.slotIndex)
+    );
+    if (!step) return m;
+    const was = planned.modules.find((p) => p.slot === m.slot && p.slotIndex === m.slotIndex);
+    return was?.typeId === m.typeId ? { ...m, chargeTypeId: step.chargeTypeId } : m;
+  });
+  return { ...fitting, modules };
 }

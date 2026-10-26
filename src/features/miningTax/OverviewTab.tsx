@@ -11,7 +11,16 @@
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,6 +42,7 @@ import {
   CachedNotice,
 } from '@/components/ui';
 import { onReconnect } from '@/stores/network';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -143,10 +153,12 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   // unlike basis/buyback-rate — which only rescale already-loaded rows — it
   // must be part of the load closure. `useRouteSnapshot` only re-runs it on
   // an epoch bump, so toggling the switch also calls `refresh()` below.
+  const { setup: refiningSetup } = useRefiningSetup();
+  const { stationRate, taxRate } = refiningSetup;
   const loadSnapshot = useCallback(
     async (): Promise<MiningYieldSnapshot> =>
-      loadMiningYieldSnapshot(showRefining, await readCompressedOre()),
-    [showRefining]
+      loadMiningYieldSnapshot(showRefining, await readCompressedOre(), { stationRate, taxRate }),
+    [showRefining, stationRate, taxRate]
   );
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
@@ -154,6 +166,14 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
     { cacheKey: 'miningYieldOverview' }
   );
   useRefreshOnOreFormChange(refresh);
+  // The load closure carries the pilot's Refining Setup, which only a refresh re-reads.
+  const seenSetup = useRef(`${stationRate}/${taxRate}`);
+  useEffect(() => {
+    const now = `${stationRate}/${taxRate}`;
+    if (seenSetup.current === now) return;
+    seenSetup.current = now;
+    refresh();
+  }, [stationRate, taxRate, refresh]);
 
   const [characterFilter, setCharacterFilter] = useUrlParam(
     'overview.character',

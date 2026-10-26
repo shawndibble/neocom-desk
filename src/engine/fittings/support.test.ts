@@ -220,6 +220,24 @@ describe('extractSupport', () => {
     );
   });
 
+  it('reads a scripted point range from attribute 103 and a burst jammer range from 142', () => {
+    const support = extract([
+      module(3, { [A.warpScrambleStrength]: 100, [A.warpScrambleRange]: 37500 }),
+      module(4, {
+        [A.ecmGravimetric]: 3,
+        [A.ecmLadar]: 3,
+        [A.ecmMagnetometric]: 3,
+        [A.ecmRadar]: 3,
+        [A.ecmBurstRange]: 15000,
+      }),
+    ]);
+    expect(support.rows.map((r) => [r.kind, r.optimal])).toEqual([
+      ['warpDisruption', 37500],
+      ['ecm', 15000],
+    ]);
+    expect(support.rows[0]!.amount).toBe(100);
+  });
+
   it('leaves a friendly remote tracking computer or sensor booster out', () => {
     const support = extract([
       module(3608, {

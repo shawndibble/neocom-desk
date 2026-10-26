@@ -812,6 +812,22 @@ describe('Settings — Notifications (issue #170)', () => {
     );
   });
 
+  it('says when the push setup last failed, so a Retry that fails again visibly does something', async () => {
+    const user = userEvent.setup();
+    stubNotification('granted');
+    usePushFailure.setState({ value: { reason: 'server-rejected', at: 1 }, hydrated: true });
+    vi.mocked(enableWebPush).mockImplementationOnce(async () => {
+      await usePushFailure
+        .getState()
+        .setValue({ reason: 'server-rejected', at: new Date(2026, 9, 25, 14, 21).getTime() });
+      return { support: 'supported', permission: 'granted' };
+    });
+    render(<App />);
+    await notificationsPanel();
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText(/Last tried at 0?2:21/)).toBeInTheDocument();
+  });
+
   it('shows no push failure row when nothing failed', async () => {
     stubNotification('granted');
     render(<App />);

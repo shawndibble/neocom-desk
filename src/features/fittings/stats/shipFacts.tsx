@@ -33,8 +33,8 @@ export function DroneFacts({ stats }: FactsProps) {
           value: figure(
             (s) =>
               t('fittings.stats.unit.bandwidth', {
-                used: fmt0(s.droneBandwidthUsed),
-                total: fmt0(s.droneBandwidthTotal),
+                used: fmt1(s.droneBandwidthUsed),
+                total: fmt1(s.droneBandwidthTotal),
               }),
             undefined,
             ['droneBandwidthUsed', 'droneBandwidthTotal']

@@ -4,7 +4,8 @@ import { Disclosure } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatMarketIsk } from '@/lib/isk';
 import { JumpsAwayText } from '@/features/assets/assetBrowserRows';
-import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
+import { formatPercent } from '@/features/refining/formatPercent';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import {
   appliedRefiningImplantPct,
   refiningImplantApplies,
@@ -47,7 +48,12 @@ export function OrderExitsSection({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
+  const { setup: refiningSetup } = useRefiningSetup();
+  const exits = orderExits({
+    row,
+    competitors: deep?.competitors,
+    reprocessing: reprocessing && { ...reprocessing, refining: refiningSetup },
+  });
   // Named only when it moved the number: never on scrap (f4b5a3f5).
   const refineImplantPct = reprocessing
     ? appliedRefiningImplantPct(reprocessing.modifiers, reprocessing.entry.specialisationSkillID)
@@ -164,7 +170,8 @@ export function OrderExitsSection({
                       */}
               <p className="text-text-dim">
                 {t('market.orders.exitReprocessAssumption', {
-                  rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
+                  rate: formatPercent(refiningSetup.stationRate, false),
+                  tax: formatPercent(refiningSetup.taxRate, false),
                 })}
               </p>
               {refineImplantPct > 0 && (

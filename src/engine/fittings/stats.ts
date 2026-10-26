@@ -11,6 +11,7 @@ import {
   type LayerDefense,
   type LocalRepair,
   type OffenseStats,
+  type SpoolFigures,
   type OverheatedStats,
   type WeaponRange,
   type WeaponRow,
@@ -25,17 +26,19 @@ import {
   CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
-  boosterReloadShortfall,
   capacitorBudget,
   capacitorStatusAtDrain,
+  loadAdjustment,
+  magazineOf,
   reloadDuty,
   sustainedRepair,
+  weaponReloadDuty,
   type CapacitorBudget,
   type CapacitorUser,
-  type Magazine,
   type RepairLayer,
   type Repairer,
 } from './tank';
+import { isMobileDrone } from './appliedDps';
 import { droneSpeed, weaponRange } from './appliedWeapons';
 import type { CapBoosterFigures } from './capBoosterChoice';
 
@@ -55,6 +58,7 @@ interface ItemCalculationResult {
 interface CalculatedItem {
   type_id: number;
   slot: { type: string };
+  charge?: unknown;
 }
 
 function readAttribute(attributes: AttributeMap, attributeId: number): number {
@@ -113,10 +117,11 @@ function capacitorStatus(shipAttributes: AttributeMap): CapacitorStatus {
 
 /**
  * The capacitor headline. The engine's own stable level / time to empty
- * counts a cap booster at one charge a cycle with no reload, so a fit it
- * holds up can read "stable" beside a negative Delta. Where a cap booster
- * loses injection to its reloads, the headline is worked out from the same
- * reload-averaged drain as the Delta instead (`capacitorStatusAtDrain`), so
+ * counts a cap booster at one charge a cycle with no reload, and a nosferatu
+ * as income, so a fit it holds up can read "stable" beside a negative Delta.
+ * Where a cap booster loses injection to its reloads, an ancillary repairer
+ * draws less for its own, or a nosferatu runs, the headline is worked out
+ * from the same drain as the Delta instead (`capacitorStatusAtDrain`), so
  * the two agree; every other fit keeps the engine's per-cycle figure.
  */
 function reloadAwareCapacitorStatus(
@@ -128,7 +133,7 @@ function reloadAwareCapacitorStatus(
     attributes: result.attributes,
     state: result.state ?? 'offline',
   }));
-  if (boosterReloadShortfall(capacitorUsers(items, results)) <= 0) {
+  if (Math.abs(loadAdjustment(capacitorUsers(items, results))) < 1e-9) {
     return capacitorStatus(shipAttributes);
   }
   const budget = extractCapacitorBudget(items, results, shipAttributes);
@@ -277,6 +282,7 @@ export function extractFittingStats(
   itemResults: readonly ItemCalculationResult[]
 ): Omit<
   FittingStats,
+  | 'ruleBreaks'
   | 'calibrationUsed'
   | 'droneBandwidthUsed'
   | 'maxActiveDrones'
@@ -418,9 +424,15 @@ export interface OffenseItem {
   quantity: number;
   isDrone: boolean;
   isFighter?: boolean;
+  /**
+   * Whether a charge this module can load deals damage. `false` (a probe
+   * launcher) keeps an empty one out of `chargelessWeaponCount`; absent
+   * counts as damaging.
+   */
+  chargeDamages?: boolean;
 }
 
-function isFiring(state: FittingItemState): boolean {
+export function isFiring(state: FittingItemState): boolean {
   return state === 'active' || state === 'overload';
 }
 
@@ -431,25 +443,11 @@ function isFiring(state: FittingItemState): boolean {
  * take a charge too, but run without one. Combine with
  * `chargeTypeId === undefined` to mean "this weapon is empty".
  */
-function needsChargeToFire(attributes: AttributeMap): boolean {
+export function needsChargeToFire(attributes: AttributeMap): boolean {
   return (
     chargeGroupIds(attributes).length > 0 &&
     readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.rateOfFire) > 0
   );
-}
-
-/**
- * The share of a long fight a weapon spends firing rather than reloading.
- * Only a module that uses charges per shot (`chargeRate`: projectiles,
- * hybrids, missiles) runs its magazine dry; a laser carries no `chargeRate`
- * — its crystal is never used up per shot (the pinned engine, 2026-09-29) —
- * and drones and fighters never reload, so all of those fire the whole time.
- * A weapon's cycle is its rate of fire: a launcher carries no `cycleTime`.
- */
-function weaponReloadDuty(attributes: AttributeMap, neverReloads: boolean): number {
-  const read = (id: number) => readAttribute(attributes, id);
-  if (neverReloads || read(ITEM_DOGMA_ATTRIBUTE.chargeRate) <= 0) return 1;
-  return reloadDuty(magazineOf(read, ITEM_DOGMA_ATTRIBUTE.rateOfFire));
 }
 
 function damageFigures(
@@ -467,15 +465,34 @@ function damageFigures(
 }
 
 /**
+ * A spool weapon's first-cycle DPS and its time to full bonus, from the
+ * engine's own attributes: `damagePerSecond` is fully spooled, the volley never
+ * is, and the bonus grows by a fixed step each rate-of-fire cycle up to a cap.
+ */
+function spoolFigures(attributes: AttributeMap, quantity: number): SpoolFigures | null {
+  const read = (id: number) => readAttribute(attributes, id);
+  const perCycle = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusPerCycle);
+  const cycleSeconds = read(ITEM_DOGMA_ATTRIBUTE.rateOfFire) / 1000;
+  const max = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax);
+  if (perCycle <= 0 || max <= 0 || cycleSeconds <= 0) return null;
+  // Single-precision attributes: 2.1/0.07 must not tip a whole cycle count up.
+  const cycles = Math.ceil(max / perCycle - 1e-6);
+  return {
+    unspooledDps: (read(ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity) / cycleSeconds,
+    secondsToFull: cycles * cycleSeconds,
+  };
+}
+
+/**
  * The row's reach: a module's or a sentry's. A drone that flies to its
  * target, or a fighter, fights wherever it's sent — its own optimal says
  * nothing about where the ship can fight from.
  */
 function offenseRange(item: OffenseItem, result: ModuleCalculationResult): { range?: WeaponRange } {
   if (item.isFighter) return {};
-  if (item.isDrone && droneSpeed(result.attributes) > 0) return {};
+  if (item.isDrone && isMobileDrone(droneSpeed(result.attributes))) return {};
   const range = weaponRange(result.attributes, result.charge?.attributes);
-  // A charge the engine reads no flight for (a Vorton pack) reaches nowhere shown.
+  // A charge the engine reads no flight for reaches nowhere shown.
   return range && range.optimal > 0 ? { range } : {};
 }
 
@@ -521,6 +538,7 @@ export function extractOffense(
       if (
         !item.isDrone &&
         item.chargeTypeId === undefined &&
+        item.chargeDamages !== false &&
         needsChargeToFire(result.attributes)
       ) {
         chargelessWeaponCount += 1;
@@ -551,11 +569,22 @@ export function extractOffense(
     row.dps += figures.dps;
     row.sustainedDps += figures.sustainedDps;
     row.volley += figures.volley;
+    const spool = spoolFigures(result.attributes, item.quantity);
+    if (spool) {
+      row.spool = {
+        unspooledDps: (row.spool?.unspooledDps ?? 0) + spool.unspooledDps,
+        secondsToFull: Math.max(row.spool?.secondsToFull ?? 0, spool.secondsToFull),
+      };
+    }
     if (heated && row.overheated) {
       const heatedFigures = damageFigures(heated.attributes, item.quantity, item.isDrone);
       row.overheated.dps += heatedFigures.dps;
       row.overheated.sustainedDps += heatedFigures.sustainedDps;
       row.overheated.volley += heatedFigures.volley;
+      const heatedSpool = spoolFigures(heated.attributes, item.quantity);
+      if (heatedSpool) {
+        row.overheated.unspooledDps = (row.overheated.unspooledDps ?? 0) + heatedSpool.unspooledDps;
+      }
     }
   });
 
@@ -605,35 +634,21 @@ function runningModules<I extends CalculatedItem, R extends RunningResult>(
 }
 
 /**
- * A loaded module's magazine: the charges the engine says it holds, over
- * what one cycle uses, and its reload. The same for an ancillary repairer,
- * a cap booster and a weapon — whose cycle is its rate of fire.
+ * Every running module's capacitor use, a cap booster's with its magazine and
+ * a loaded repairer's with the magazine its draw averages over.
  */
-function magazineOf(
-  read: (id: number) => number,
-  cycleAttribute: number = ITEM_DOGMA_ATTRIBUTE.cycleTime
-): Magazine {
-  const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
-  return {
-    // The engine's figures are single-precision: a blaster's 160 rounds come
-    // back as 159.9999976, which a bare floor would cut to 159.
-    cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-4),
-    cycleSeconds: read(cycleAttribute) / 1000,
-    reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
-  };
-}
-
-/** Every running module's capacitor use, a cap booster's with its magazine. */
 function capacitorUsers(
   items: readonly CalculatedItem[],
   results: readonly RunningResult[]
 ): CapacitorUser[] {
-  return runningModules(items, results).map(({ result }) => {
+  return runningModules(items, results).map(({ item, result }) => {
     const read = (id: number) => readAttribute(result.attributes, id);
     const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+    const repairs = REPAIR_LAYERS.some((layer) => read(REPAIR_RATE_ATTRIBUTE[layer]) > 0);
     return {
       capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
       ...(injectionPerCharge > 0 ? { injectionPerCharge, magazine: magazineOf(read) } : {}),
+      ...(repairs && item.charge !== undefined ? { ancillary: magazineOf(read) } : {}),
     };
   });
 }
@@ -750,10 +765,11 @@ export function extractTank(
 
   const { sustained, capFraction } = sustainedRepair(repairers, {
     peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
-    // The engine's load nets cap boosters in at their no-reload rate.
+    // The engine's load nets cap boosters in at their no-reload rate, ancillary
+    // repairers at their draw with no reload, and nosferatu as income.
     peakLoad:
       readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad) +
-      boosterReloadShortfall(capacitorUsers(items, results)),
+      loadAdjustment(capacitorUsers(items, results)),
   });
   const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
   const passiveEffective = readAttribute(

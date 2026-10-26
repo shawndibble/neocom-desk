@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  allocateOreToNeeds,
-  planCoverage,
-  resolveRefiningRate,
-  valueOreExits,
-  type OreStack,
-} from './oreDecision';
+import { allocateOreToNeeds, planCoverage, valueOreExits, type OreStack } from './oreDecision';
 
 const TRIT = 34;
 const PYER = 35;
@@ -80,15 +74,6 @@ describe('planCoverage', () => {
   });
 });
 
-describe('resolveRefiningRate', () => {
-  it('is the NPC base rate unless a structure rate is typed', () => {
-    expect(resolveRefiningRate({ facility: 'npc' })).toBe(0.5);
-    expect(resolveRefiningRate({ facility: 'structure', typedRate: 0.54 })).toBe(0.54);
-    expect(resolveRefiningRate({ facility: 'structure' })).toBe(0.5);
-    expect(resolveRefiningRate({ facility: 'npc', typedRate: 0.54 })).toBe(0.5);
-  });
-});
-
 describe('valueOreExits', () => {
   it('values both exits net of the same sales tax and keeps the portion remainder', () => {
     const r = valueOreExits({
@@ -100,6 +85,17 @@ describe('valueOreExits', () => {
     expect(r.refineThenSell).toBeCloseTo(43 * 200 * 5 * 0.9);
     expect(r.unitsLeftOver).toBe(50);
     expect(r.pricedAll).toBe(true);
+  });
+
+  it("takes the facility's reprocessing tax off the refined side only", () => {
+    const r = valueOreExits({
+      stack: { ...veldspar, units: 4_350 },
+      mineralPrices: { [TRIT]: 5 },
+      salesTaxPct: 10,
+      reprocessingTaxRate: 0.05,
+    });
+    expect(r.sellRaw).toBeCloseTo(4_350 * 10 * 0.9);
+    expect(r.refineThenSell).toBeCloseTo(43 * 200 * 5 * 0.95 * 0.9);
   });
 
   it('flags a missing mineral price as partial rather than free', () => {

@@ -204,6 +204,12 @@
 // so it syncs. See features/assets/oreDecision/refiningFacility.ts. Set to 0
 // rather than unset. No `legacyKey`: new.
 //
+// sync.reprocessingTaxRate: the facility's reprocessing tax as a fraction of the
+// refined value, the second half of the pilot's Refining Setup beside
+// sync.oreRefiningStructureRate (the Facility Yield). Player-entered, so it
+// syncs. 0 means no tax. See features/refining/useRefiningSetup.ts. Set to 0
+// rather than unset. No `legacyKey`: new.
+//
 // sync.navHidden: the pages and views the pilot hid from the rail and the More
 // sheet — a list of nav paths, one for the whole account for the same reason
 // as the Overview's hidden cards below: "I don't do PI" is about the pilot.
@@ -359,6 +365,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.podKillThreshold',
+  'sync.reprocessingTaxRate',
   'sync.routeHoleHubs',
   'sync.routeHoleMinLife',
   'sync.routeHoleShipSize',

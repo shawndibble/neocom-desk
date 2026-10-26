@@ -7,6 +7,7 @@
  * are applied together as one unsaved edit.
  */
 import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -25,6 +26,7 @@ import {
   Spinner,
   Caret,
   StatChange,
+  StatChangeList,
   TypeIcon,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
@@ -33,6 +35,7 @@ import { commandOf } from '@/engine/fittings/improveCommand';
 import { hullRoleOf, roleUnlocks } from '@/engine/fittings/improveRole';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
+import { OwnedCostLine, OwnedStockControl, type ImproveOwnedSettings } from './ImproveOwnedStock';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
@@ -57,6 +60,7 @@ import {
   type RejectedOption,
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
+import { crystalParts } from '@/engine/fittings/improveMining';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
@@ -91,12 +95,12 @@ const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
 const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
 
-/** The furthest a turret's optimal or a missile's range reaches, in km. */
+/** The furthest a turret's optimal, a missile's or area weapon's range reaches, in km. */
 const reachKm = (s: FittingStats) =>
   Math.max(
     0,
     ...s.applied.weapons.map((w) =>
-      w.kind === 'turret' ? w.optimal : w.kind === 'missile' ? w.range : 0
+      w.kind === 'turret' ? w.optimal : w.kind === 'missile' || w.kind === 'area' ? w.range : 0
     )
   ) / 1000;
 
@@ -104,6 +108,8 @@ const reachKm = (s: FittingStats) =>
 interface Lead {
   node: ReactNode;
   keys: string[];
+  /** When the figure is a plain stat change, so a row of several lines them up as a list. */
+  change?: { key: StatChangeKey; before: number; after: number };
 }
 
 /** How many figures Best overall's lead line shows: the two that moved the score most. */
@@ -149,6 +155,8 @@ export interface ImproveSettings {
   /** Carry more: the hold scored. */
   hold: ImproveHold;
   onHoldChange: (hold: ImproveHold) => void;
+  /** Planning: count what the pilot owns; absent when no Character has the assets scope. */
+  owned?: ImproveOwnedSettings;
 }
 
 interface Props {
@@ -162,6 +170,8 @@ interface Props {
   onFixFirst: (resource: Resource) => void;
   /** Weapons holding no charge, which damage goals can't score; null or absent: none. */
   unloaded?: UnloadedWeapons | null;
+  /** Loads Mine more's best crystal into the miners that hold none of the ore's; absent when it cannot. */
+  onLoadBestCrystal?: () => void;
   /** Loads the best charge into each empty weapon group; absent when none can be loaded. */
   onLoadBestCharge?: () => void;
   /** Train and Implants, which cost the fit nothing and sit above the swaps; none for an over-budget fit. */
@@ -175,6 +185,8 @@ interface Props {
    * pointer or keyboard focus, would change; null when nothing is previewed.
    */
   onPreview?: (delta: FittingStatsDelta | null) => void;
+  /** The drawer's footer, where the selection and Apply bar goes; absent: it sticks to the list's bottom. */
+  footerTarget?: HTMLElement | null;
 }
 
 /** The guardrail a rejected swap broke; a budget or cap says by how much. */
@@ -216,11 +228,13 @@ export function ImprovePanel({
   settings,
   onFixFirst,
   unloaded,
+  onLoadBestCrystal,
   onLoadBestCharge,
   freeSections,
   fitting,
   target,
   onPreview,
+  footerTarget,
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
@@ -297,45 +311,55 @@ export function ImprovePanel({
     const changes = diffFittingStats(own, option.after)
       .changes.filter((change) => !omit.includes(change.key))
       .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
-    const shown: ReactNode[] = changes
-      .slice(0, all ? undefined : CHANGES_SHOWN)
-      .map((change) => <StatChange key={change.key} change={change} />);
+    if (changes.length === 0) return t('fittings.variations.noChanges');
+    // One stat per row, so a long list reads down instead of running on as a sentence.
+    const shown = changes.slice(0, all ? undefined : CHANGES_SHOWN);
     const rest = changes.length - shown.length;
-    if (rest > 0) {
-      const label = t('fittings.makeItFit.otherStats', { count: rest });
-      shown.push(
-        onOpen ? (
-          <button key="rest" type="button" className={textActionClassName()} onClick={onOpen}>
-            {label}
-          </button>
-        ) : (
-          label
-        )
-      );
-    }
-    if (shown.length === 0) return t('fittings.variations.noChanges');
-    return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
+    const label = rest > 0 ? t('fittings.makeItFit.otherStats', { count: rest }) : null;
+    return (
+      <>
+        <StatChangeList changes={shown} />
+        {label !== null &&
+          (onOpen ? (
+            <button type="button" className={textActionClassName()} onClick={onOpen}>
+              {label}
+            </button>
+          ) : (
+            <span className="block">{label}</span>
+          ))}
+      </>
+    );
   }
 
-  /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
+  /** Each stat the swap makes worse, with its before → after, so the loss has a size: one per row. */
   function lostLine(option: ImproveOption): ReactNode {
-    return option.lost.flatMap(({ kind, change }, i): ReactNode[] => {
-      const node =
-        kind === 'stat' ? (
-          <StatChange key={change.key} change={change} />
-        ) : (
-          <span key={change.key}>
-            {t(`fittings.whatToTrain.role.${change.key}`, {
-              before: change.before,
-              after: change.after,
-            })}
-          </span>
-        );
-      return i === 0 ? [node] : [', ', node];
-    });
+    const stats = option.lost.flatMap((lost) => (lost.kind === 'stat' ? [lost.change] : []));
+    return (
+      <>
+        {stats.length > 0 && <StatChangeList changes={stats} />}
+        {option.lost.map((lost) =>
+          lost.kind === 'stat' ? null : (
+            <span key={lost.change.key} className="block">
+              {t(`fittings.whatToTrain.role.${lost.change.key}`, {
+                before: lost.change.before,
+                after: lost.change.after,
+              })}
+            </span>
+          )
+        )}
+      </>
+    );
   }
 
   function isk(option: ImproveOption) {
+    const stock = state.status === 'done' ? state.owned?.stock : undefined;
+    if (counting && stock && option.iskDelta !== null) {
+      // Units the fit already uses are covered by the stock first.
+      const toId = option.candidate.toTypeId;
+      const own = Math.max(0, (stock.owned.get(toId) ?? 0) - (stock.fitCounts.get(toId) ?? 0));
+      if (own > 0)
+        return <OwnedCostLine need={option.candidate.at.length} own={own} isk={option.iskDelta} />;
+    }
     if (option.iskDelta === null)
       return <span className="text-text-dim">{t('fittings.improve.noPrice')}</span>;
     return option.iskDelta < 0 ? (
@@ -351,10 +375,7 @@ export function ImprovePanel({
 
   /** Mine more: the ore the row is scored with, and the m³/s it gives. */
   function oreLine(option: ImproveOption | RejectedOption, own: FittingStats) {
-    const family = settings.oreFamily;
     return t('fittings.improve.oreLine', {
-      ores: (CRYSTAL_FAMILY_ORES[family] ?? []).join(', '),
-      family,
       before: m3sFormat(own.mining.perSecond),
       after: m3sFormat(option.after.mining.perSecond),
     });
@@ -436,19 +457,15 @@ export function ImprovePanel({
     const stat = (key: StatChangeKey, before: number, after: number): Lead => ({
       node: <StatChange key={key} change={{ key, before, after }} />,
       keys: [key],
+      change: { key, before, after },
     });
     const text = (key: string, line: string | null): Lead | null =>
       line === null ? null : { node: <span key={key}>{line}</span>, keys: [] };
     const dps = (): Lead => {
       const [was, now] = [damageOf(own, target), damageOf(option.after, target)];
-      // A damage figure is labelled for what it is: applied to the Target Profile, the fit's own sustained DPS, or that plus its drones and fighters.
+      // A damage figure is labelled for what it is: applied to the Target Profile, or the fit's listed sustained DPS.
       if (target && own.applied.weapons.length > 0) return stat('appliedDps', was, now);
-      const shipOnly = (s: FittingStats) => damageOf(s, undefined) === s.offense.sustainedDps;
-      return stat(
-        shipOnly(own) && shipOnly(option.after) ? 'sustainedDps' : 'sustainedDamage',
-        was,
-        now
-      );
+      return stat('sustainedDps', was, now);
     };
     const tank = () => stat('ehp', own.ehp, option.after.ehp);
     const role = (metric: RoleMetric): Lead | null => {
@@ -526,7 +543,22 @@ export function ImprovePanel({
         return leads.length === 0
           ? null
           : {
-              node: leads.flatMap((lead, i) => (i === 0 ? [lead.node] : [', ', lead.node])),
+              // A line each, like the change rows below them: the plain stat
+              // changes as one list, any worded figure on its own line after.
+              node: (
+                <>
+                  <StatChangeList
+                    changes={leads.flatMap((lead) => (lead.change ? [lead.change] : []))}
+                  />
+                  {leads
+                    .filter((lead) => !lead.change)
+                    .map((lead) => (
+                      <span key={lead.keys.join() || String(lead.node)} className="block">
+                        {lead.node}
+                      </span>
+                    ))}
+                </>
+              ),
               keys: leads.flatMap((lead) => lead.keys),
             };
       }
@@ -626,7 +658,8 @@ export function ImprovePanel({
             </span>
             {option.lost.length > 0 && (
               <span className="text-warning block text-xs">
-                {t('fittings.improve.givesUp')} {lostLine(option)}
+                <span className="block">{t('fittings.improve.givesUp')}</span>
+                {lostLine(option)}
               </span>
             )}
             <span className="block text-xs">{isk(option)}</span>
@@ -686,7 +719,15 @@ export function ImprovePanel({
     );
   }
 
-  const bestFound = state.status === 'done' ? bestFoundLine(state.result, state.before) : null;
+  // Mine more's rows compare on the best crystals; "Now" is the fit as it is.
+  const bestFound =
+    state.status === 'done' ? bestFoundLine(state.result, state.fitAsIs ?? state.before) : null;
+  const crystalBasis = state.status === 'done' ? state.crystals : undefined;
+  const unloadedCrystals = crystalBasis?.unloaded ?? null;
+  const unloadedNow = state.status === 'done' ? (state.fitAsIs?.mining.perSecond ?? 0) : 0;
+  const unloadedBest = state.status === 'done' ? state.before.mining.perSecond : 0;
+  // Said only when "Now" and the rows are on different crystals.
+  const basisDiffers = crystalBasis !== undefined && unloadedNow !== unloadedBest;
   const chosen = useMemo(() => [...ticked.values()], [ticked]);
 
   // The rows were each scored alone: one recalculation of the ticked set checks them together.
@@ -723,6 +764,7 @@ export function ImprovePanel({
           mode: settings.mode,
           spendCap: settings.spendCap,
           fitTotal: state.fitTotal,
+          ...(state.owned ? { stock: state.owned.stock, priceOf: state.owned.priceOf } : {}),
           target,
         })
       : null;
@@ -819,6 +861,8 @@ export function ImprovePanel({
     (id === goal || roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id));
   const relevantGoals = IMPROVE_GOALS.filter(isRelevant);
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
+  // Planning counts owned stock while the switch is on and the Character may read assets.
+  const counting = settings.mode === 'buy' && Boolean(settings.owned?.on);
   const settingsSummary = [
     t(`fittings.improve.reach.${settings.reach}`),
     t(`fittings.improve.mode.${settings.mode}`),
@@ -827,6 +871,9 @@ export function ImprovePanel({
       : t(`fittings.improve.summaryCap.${settings.mode}`, {
           cap: formatIskCompact(settings.spendCap),
         }),
+    ...(counting && settings.owned
+      ? [t('fittings.improve.owned.summary', { place: settings.owned.placeLabel })]
+      : []),
   ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
     if (goal === id) return;
@@ -935,15 +982,15 @@ export function ImprovePanel({
       <div>
         <button
           type="button"
-          className={textActionClassName('w-full justify-between gap-2')}
+          className={textActionClassName('flex-wrap gap-x-1 text-left')}
           aria-expanded={settingsOpen}
           aria-controls={settingsId}
           onClick={() => setSettingsOpen((open) => !open)}
         >
           <span>{t('fittings.improve.settingsLabel')}</span>
-          <span className="text-text-dim flex items-center gap-1 normal-case tracking-normal">
+          <Caret expanded={settingsOpen} />
+          <span className="text-text-dim basis-full text-xs normal-case tracking-normal">
             {settingsSummary}
-            <Caret expanded={settingsOpen} />
           </span>
         </button>
         <Collapse open={settingsOpen} id={settingsId} className="pt-2">
@@ -978,8 +1025,20 @@ export function ImprovePanel({
               onChange={settings.onModeChange}
               fill
             />
+            {settings.mode === 'buy' && settings.owned && (
+              <OwnedStockControl
+                owned={settings.owned}
+                noneHere={state.status === 'done' && state.owned?.anyOwned === false}
+              />
+            )}
             <label className="block space-y-1 text-sm">
-              <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
+              <span>
+                {t(
+                  counting
+                    ? 'fittings.improve.cap.buyOwned'
+                    : `fittings.improve.cap.${settings.mode}`
+                )}
+              </span>
               <IskInput
                 value={settings.spendCap === null ? '' : String(settings.spendCap)}
                 onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
@@ -1053,6 +1112,25 @@ export function ImprovePanel({
         </div>
       )}
 
+      {unloadedCrystals && (
+        <div className="space-y-2">
+          <p role="status" className="text-warning text-sm">
+            {t('fittings.improve.unloadedCrystals', {
+              count: unloadedCrystals.count,
+              family: settings.oreFamily,
+              now: m3sFormat(unloadedNow),
+              crystal: t('fittings.improve.crystalType', crystalParts(crystalBasis?.bestKey ?? '')),
+              best: m3sFormat(unloadedBest),
+            })}
+          </p>
+          {onLoadBestCrystal && (
+            <Button size="sm" onClick={onLoadBestCrystal}>
+              {t('fittings.improve.loadBestCrystal')}
+            </Button>
+          )}
+        </div>
+      )}
+
       {state.status === 'searching' && (
         <div className="space-y-2">
           <p className="text-text-dim flex items-center gap-2 text-sm">
@@ -1103,17 +1181,25 @@ export function ImprovePanel({
 
       {state.status === 'done' && state.sides && (
         <p className="text-sm" data-testid="improve-sides">
-          {(['shield', 'armor'] as const)
-            .map((side) => {
-              const score = bestScore(state.sides![side]);
-              return t('fittings.improve.sideResult', {
-                side: t(`fittings.improve.defense.${side}`),
+          {[
+            ...(['shield', 'armor'] as const).map((side) => ({
+              label: t(`fittings.improve.defense.${side}`),
+              score: bestScore(state.sides![side]),
+            })),
+            // Neutral rows (Damage Control, hull) help either side; shown only when there are some.
+            ...(state.neutral && bestScore(state.neutral) !== null
+              ? [{ label: t('fittings.improve.defense.either'), score: bestScore(state.neutral) }]
+              : []),
+          ]
+            .map(({ label, score }) =>
+              t('fittings.improve.sideResult', {
+                side: label,
                 result:
                   score === null
                     ? t('fittings.improve.sideNone')
                     : t('fittings.improve.sideGain', { percent: Math.round(score * 100) }),
-              });
-            })
+              })
+            )
             .join(' · ')}
         </p>
       )}
@@ -1175,6 +1261,14 @@ export function ImprovePanel({
               <p className="text-sm" data-testid="improve-best-found">
                 <span className="text-text-dim">{t('fittings.improve.bestFound')} </span>
                 <span className="font-medium">{bestFound}</span>
+                {basisDiffers && (
+                  <span className="text-text-dim">
+                    {' '}
+                    {t('fittings.improve.bestCrystals', {
+                      ores: (CRYSTAL_FAMILY_ORES[settings.oreFamily] ?? []).join(', '),
+                    })}
+                  </span>
+                )}
               </p>
             )}
             {state.result.stopped && (
@@ -1202,7 +1296,7 @@ export function ImprovePanel({
                 {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
-            <div className="bg-panel border-line sticky bottom-0 space-y-2 border-t pt-2">
+            <ImproveFooter target={footerTarget}>
               {chosen.length > 0 && checkable && (
                 <div className="space-y-1 text-sm" data-testid="improve-selection">
                   {summary ? (
@@ -1212,8 +1306,15 @@ export function ImprovePanel({
                         {' · '}
                         {settings.mode === 'buy' && summary.total !== null ? (
                           <>
-                            {t('fittings.improve.selection.total')}{' '}
+                            {t(
+                              counting
+                                ? 'fittings.improve.selection.stillToBuy'
+                                : 'fittings.improve.selection.total'
+                            )}{' '}
                             <IskAmount value={summary.total} />
+                            {counting &&
+                              settings.spendCap !== null &&
+                              ` ${t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(settings.spendCap) })}`}
                           </>
                         ) : (
                           <>
@@ -1225,7 +1326,8 @@ export function ImprovePanel({
                         )}
                         {summary.unpriced > 0 &&
                           ` + ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
-                        {' · '}
+                      </p>
+                      <p>
                         {t('fittings.improve.selection.dps', {
                           before: m3sFormat(summary.dps.before),
                           after: m3sFormat(summary.dps.after),
@@ -1281,9 +1383,23 @@ export function ImprovePanel({
                     : t('fittings.improve.applyCount', { count: chosen.length })}
                 </Button>
               </div>
-            </div>
+            </ImproveFooter>
           </div>
         ))}
     </div>
+  );
+}
+
+/**
+ * The selection and Apply bar. In the drawer it goes to the container's own
+ * footer (`target`), below the scrolling list, so no row ever scrolls under it;
+ * on its own (tests, a page with no footer) it sticks to the bottom of the list.
+ */
+function ImproveFooter({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
+  const bar = <div className="space-y-2">{children}</div>;
+  return target ? (
+    createPortal(bar, target)
+  ) : (
+    <div className="bg-panel border-line sticky bottom-0 border-t pt-2">{bar}</div>
   );
 }

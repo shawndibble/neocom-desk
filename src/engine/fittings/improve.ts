@@ -23,6 +23,7 @@ import {
   type DefenseSide,
   type Job,
 } from './improveGroups';
+import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
 import {
   overageOf,
@@ -244,7 +245,7 @@ const canAlign = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navi
 /** Fitted guns and launchers, loaded or not: an empty one is the unloaded-weapons notice's to explain. */
 const hasShipWeapons = (s: FittingStats) =>
   s.offense.chargelessWeaponCount > 0 ||
-  s.applied.weapons.some((w) => w.kind === 'turret' || w.kind === 'missile');
+  s.applied.weapons.some((w) => w.kind === 'turret' || w.kind === 'missile' || w.kind === 'area');
 
 /** Whether the fit can score `goal`, and why not: the drawer shows a disabled chip with the reason. */
 export function goalAvailability(
@@ -280,13 +281,14 @@ export function goalAvailability(
 }
 
 /**
- * Sustained applied DPS against the Target Profile (fighters included), or
- * the listed sustained DPS of guns, drones and fighters when there is no
- * profile or no firing weapon to apply.
+ * Sustained applied DPS against the Target Profile (reload included, fighters
+ * included), or the fit's listed sustained DPS when there is no profile or no
+ * firing weapon to apply. `offense` already holds a row for every drone and
+ * fighter, so nothing is added to it.
  */
 export function damageOf(s: FittingStats, target: TargetProfile | undefined): number {
   if (target && s.applied.weapons.length > 0) return peakAppliedDps(s, target);
-  return s.offense.sustainedDps + s.droneDps + s.fighters.dps;
+  return s.offense.sustainedDps;
 }
 
 function relative(before: number, after: number): number {
@@ -358,10 +360,11 @@ function scoreOf(
         : commandOf(after).strength * 1e6 + commandOf(after).compression / 1000;
     case 'ewar': {
       const [was, now] = [ewarOf(before), ewarOf(after)];
-      return meanGain([
-        [was.strength, now.strength],
-        [was.range, now.range],
-      ]);
+      // Each kind against its own baseline; a kind the swap drops counts as lost.
+      const kinds = Object.entries(was.byKind).map(
+        ([kind, strength]) => [strength, now.byKind[kind as keyof typeof now.byKind] ?? 0] as const
+      );
+      return meanGain([...kinds, [was.range, now.range]]);
     }
   }
 }
@@ -587,12 +590,63 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
   });
 }
 
+/**
+ * What the pilot holds and what the open fit already needs, by type id, for
+ * Planning's "Count what I own": an owned unit costs nothing to buy.
+ */
+export interface OwnedStock {
+  owned: ReadonlyMap<number, number>;
+  /** Units of each type the open fit uses now (`fittingItemCounts`). */
+  fitCounts: ReadonlyMap<number, number>;
+}
+
+/** Units of each type a candidate (its pair too) adds to the fit, negative for what it removes. */
+export function candidateTypeChanges(candidate: ImproveCandidate): Map<number, number> {
+  const changes = new Map<number, number>();
+  const bump = (typeId: number, by: number) => changes.set(typeId, (changes.get(typeId) ?? 0) + by);
+  for (let c: ImproveCandidate | undefined = candidate; c; c = c.pairedWith) {
+    bump(c.toTypeId, c.at.length);
+    if (c.fromTypeId !== null) bump(c.fromTypeId, -c.at.length);
+  }
+  return changes;
+}
+
+/** Units still to buy of `need` with `owned` in hand. */
+const missingOf = (need: number, owned: number) => Math.max(0, need - owned);
+
+/**
+ * How much the still-to-buy price moves when `changes` are made: each type is
+ * priced for the units `owned` does not cover. Null when a changed type has no price.
+ */
+export function stillToBuyDelta(
+  changes: ReadonlyMap<number, number>,
+  priceOf: (typeId: number) => number | null,
+  { owned, fitCounts }: OwnedStock
+): number | null {
+  let delta = 0;
+  for (const [typeId, by] of changes) {
+    if (by === 0) continue;
+    const price = priceOf(typeId);
+    if (price === null) return null;
+    const have = owned.get(typeId) ?? 0;
+    const need = fitCounts.get(typeId) ?? 0;
+    delta += price * (missingOf(need + by, have) - missingOf(need, have));
+  }
+  return delta;
+}
+
 /** Hub sell price of every part, per the mode (`ImproveOption.iskDelta`). */
 function iskDeltaOf(
   candidate: ImproveCandidate,
   priceOf: (typeId: number) => number | null,
-  mode: ImproveMode
+  mode: ImproveMode,
+  stock?: OwnedStock
 ): { isk: number | null; destroysRigs: boolean } {
+  if (mode === 'buy' && stock)
+    return {
+      isk: stillToBuyDelta(candidateTypeChanges(candidate), priceOf, stock),
+      destroysRigs: false,
+    };
   const to = priceOf(candidate.toTypeId);
   const from = candidate.fromTypeId === null ? 0 : priceOf(candidate.fromTypeId);
   const isRig = candidate.at[0].slot === 'rig';
@@ -641,6 +695,26 @@ export function onlySide(
   };
 }
 
+/**
+ * The result cut to the options on neither side (Damage Control, hull, resist-all
+ * modules): the "Either" figure of the Defense Choice summary.
+ */
+export function onlyNeutral(
+  result: ImproveResult,
+  groupOf: (typeId: number) => number | undefined
+): ImproveResult {
+  const keep = (option: ImproveOption) => {
+    const group = groupOf(option.candidate.toTypeId);
+    return group === undefined || sideOf(group) === null;
+  };
+  return {
+    ...result,
+    noDownside: result.noDownside.filter(keep),
+    tradeOffs: result.tradeOffs.filter(keep),
+    rejected: result.rejected.filter(keep),
+  };
+}
+
 export interface FindImprovementsParams {
   fitting: Fitting;
   /** The open Fitting's own stats, under the same conditions as `stats`. */
@@ -658,8 +732,10 @@ export interface FindImprovementsParams {
   mode?: ImproveMode;
   /** Planning: the total fit price may not pass it. Refitting: the extra spend may not. Null: no limit. */
   spendCap?: number | null;
-  /** What the fit costs now, for Planning's total budget. */
+  /** What the fit costs now, for Planning's total budget; still to buy when `stock` is given. */
   fitTotal?: number | null;
+  /** Planning: what the pilot owns; owned units cost nothing, so the cost and the budget count only what is still to buy. */
+  stock?: OwnedStock;
   /** After each candidate: how many are done, of how many. */
   onProgress?: (checked: number, total: number) => void;
   /** Cancel: nothing comes back. */
@@ -686,6 +762,7 @@ export async function findImprovements({
   mode = 'buy',
   spendCap = null,
   fitTotal = null,
+  stock,
   onProgress,
   isCancelled,
   shouldStop,
@@ -700,7 +777,9 @@ export async function findImprovements({
 
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
   function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats) {
-    const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
+    // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
+    if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return;
+    const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode, stock);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
     const option: ImproveOption = {

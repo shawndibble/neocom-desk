@@ -17,10 +17,13 @@ import {
 } from './dogmaEngineLoader';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import type { PlanEntry } from '@/engine/types';
+import { loadTypes } from '@/sde/loadSde';
 import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import type { SlotOf } from '@/engine/fittings/implantFinder';
+import { loadImplantMarketEntries } from './implantSlotLookup';
 import {
   extractCapacitorBudget,
   extractCapBoosterFigures,
@@ -32,6 +35,8 @@ import {
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
+  isFiring,
+  needsChargeToFire,
   type OffenseItem,
 } from '@/engine/fittings/stats';
 import {
@@ -53,6 +58,7 @@ import {
   type Fitting,
   type FittingSlotKind,
   type FittingStats,
+  type RuleBreak,
   type PilotProfile,
   type DamageProfile,
   type ProjectedEffects,
@@ -70,9 +76,11 @@ export { warmDogmaEngineAssets, type DogmaAssetProgress };
 let enginePromise: Promise<DogmaEngine> | null = null;
 /** Loaded with the engine, for `fittingToDogmaFit`'s mutation check; null when the data wouldn't load. */
 let readyMutaplasmids: MutaplasmidLookup | null = null;
+/** Loaded with the engine: each implant's own slot, for `fittingToDogmaFit`; null when it wouldn't load. */
+let readySlotOf: SlotOf | null = null;
 
 function toDogmaFit(fitting: Fitting, profile: PilotProfile, damageProfile?: DamageProfile) {
-  return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids);
+  return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids, readySlotOf);
 }
 
 /** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
@@ -129,7 +137,7 @@ export function loadDogmaEngine(
         for (const listener of [...progressListeners]) listener(lastProgress);
       };
 
-      const [wasmBytes, sdeBytes, mutaplasmids] = await Promise.all([
+      const [wasmBytes, sdeBytes, mutaplasmids, slotOf] = await Promise.all([
         fetchWithProgress(WASM_URL, (loaded, total) => {
           wasmLoaded = loaded;
           wasmTotal = total;
@@ -141,11 +149,15 @@ export function loadDogmaEngine(
           report();
         }),
         loadMutaplasmidLookup().catch(() => null),
+        loadImplantMarketEntries()
+          .then((entries) => entries.slotOf)
+          .catch(() => null),
       ]);
 
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
       readyMutaplasmids = mutaplasmids;
+      readySlotOf = slotOf;
       readyEngine = dogmaEngine;
       progressListeners.clear();
       setDogmaEngineStatus('ready');
@@ -292,6 +304,126 @@ function overloadHeatable(
   };
 }
 
+/** Whether any charge in `groupIds` deals damage, per sorted group-id key; a type's charges never change. */
+const chargeDamageByGroups = new Map<string, boolean>();
+
+async function chargesDealDamage(
+  shipTypeId: number,
+  module: { slot: FittingSlotKind; typeId: number },
+  groupIds: readonly number[]
+): Promise<boolean> {
+  const key = [...groupIds].sort((a, b) => a - b).join(',');
+  const known = chargeDamageByGroups.get(key);
+  if (known !== undefined) return known;
+  let types;
+  try {
+    types = await loadTypes();
+  } catch {
+    // Unknown: count the module, as before, rather than hide a real warning.
+    return true;
+  }
+  const groups = new Set(groupIds);
+  let damages = false;
+  for (const [id, info] of Object.entries(types)) {
+    if (!groups.has(info.groupID)) continue;
+    const { items } = calculate({
+      ship: { type_id: shipTypeId },
+      items: [
+        {
+          type_id: module.typeId,
+          slot: { type: module.slot, index: 0 },
+          state: 'online',
+          charge: { type_id: Number(id) },
+        },
+      ],
+    });
+    const charge = items[0]?.charge?.attributes;
+    // The engine gave no charge back: can't call it harmless, and don't cache the guess.
+    if (!charge) return true;
+    if (chargeDamageSplit(charge) !== null) {
+      damages = true;
+      break;
+    }
+  }
+  chargeDamageByGroups.set(key, damages);
+  return damages;
+}
+
+/**
+ * The type ids of fitted, firing modules that take charges, fire only with
+ * one, sit empty, and have no charge that deals damage: an empty probe
+ * launcher is not an unloaded weapon.
+ */
+async function modulesWithHarmlessCharges(
+  fitting: Fitting,
+  calculation: ReturnType<typeof calculate>
+): Promise<Set<number>> {
+  const harmless = new Set<number>();
+  const checked = new Set<number>();
+  for (const [index, module] of fitting.modules.entries()) {
+    const result = calculation.items[index];
+    if (!result || module.chargeTypeId !== undefined || checked.has(module.typeId)) continue;
+    if (!isFiring(module.state)) continue;
+    if (!needsChargeToFire(result.attributes)) continue;
+    checked.add(module.typeId);
+    const { chargeGroupIds } = extractModuleResult(result);
+    if (!(await chargesDealDamage(fitting.shipTypeId, module, chargeGroupIds)))
+      harmless.add(module.typeId);
+  }
+  return harmless;
+}
+
+/**
+ * The engine's violations as the rule breaks a fit reports: everything but
+ * skills (the Skill Plan owns those) and resources (CPU, powergrid and
+ * calibration have their own figures). An item-level break names the type
+ * fitted at its index (`dogmaFit.items`); the ship-level ones carry no type.
+ */
+export function ruleBreaksOf(
+  dogmaFit: Fit,
+  violations: readonly Violation[] | undefined
+): RuleBreak[] {
+  const breaks: RuleBreak[] = [];
+  for (const { target, rule } of violations ?? []) {
+    switch (rule.type) {
+      case 'skill':
+      case 'resource':
+        break;
+      case 'max_group':
+        breaks.push({
+          kind: 'max_group',
+          groupId: rule.group_id,
+          limit: rule.limit,
+          used: rule.used,
+          allowed: rule.allowed,
+        });
+        break;
+      case 'max_type':
+        breaks.push({
+          kind: 'max_type',
+          typeId: rule.type_id,
+          used: rule.used,
+          allowed: rule.allowed,
+        });
+        break;
+      case 'slots':
+        breaks.push({
+          kind: 'slots',
+          slot: rule.slot,
+          used: rule.used,
+          available: rule.available,
+        });
+        break;
+      default:
+        breaks.push({
+          kind: rule.type,
+          typeId: target.type === 'ship' ? null : (dogmaFit.items[target.index]?.type_id ?? null),
+        });
+    }
+  }
+  return breaks;
+}
+
 /**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
@@ -316,7 +448,9 @@ export async function computeFittingStats(
     withWeather(toDogmaFit(fitting, profile, damageProfile), weatherTypeId),
     incoming
   );
-  const calculation = calculate(dogmaFit);
+  const calculation = calculate(dogmaFit, { validate: true });
+  const ruleBreaks = ruleBreaksOf(dogmaFit, calculation.violations);
+  const harmlessCharges = await modulesWithHarmlessCharges(fitting, calculation);
 
   // Overheated values come from the engine itself (its overload state), not
   // a multiplier applied here: the same fit again with every active module
@@ -335,9 +469,25 @@ export async function computeFittingStats(
   // what the pilot set, not the what-if.
   const allOverheated = overheatAll && heatedCalculation !== null;
   if (allOverheated) {
-    const unheated = statsFrom(fitting, dogmaFit, calculation, calculation, null);
+    const unheated = statsFrom(
+      fitting,
+      dogmaFit,
+      calculation,
+      calculation,
+      null,
+      harmlessCharges,
+      ruleBreaks
+    );
     return {
-      ...statsFrom(fitting, dogmaFit, calculation, heatedCalculation, null),
+      ...statsFrom(
+        fitting,
+        dogmaFit,
+        calculation,
+        heatedCalculation,
+        null,
+        harmlessCharges,
+        ruleBreaks
+      ),
       allOverheated: true,
       unheated: { ...unheated, allOverheated: false, unheated: null },
     };
@@ -348,7 +498,9 @@ export async function computeFittingStats(
       dogmaFit,
       calculation,
       calculation,
-      withOverheated ? heatedCalculation : null
+      withOverheated ? heatedCalculation : null,
+      harmlessCharges,
+      ruleBreaks
     ),
     allOverheated: false,
     unheated: null,
@@ -365,7 +517,10 @@ function statsFrom(
   dogmaFit: Fit,
   calculation: ReturnType<typeof calculate>,
   shown: ReturnType<typeof calculate>,
-  beside: ReturnType<typeof calculate> | null
+  beside: ReturnType<typeof calculate> | null,
+  /** Module type ids none of whose charges deal damage (probe launchers). */
+  harmlessCharges: ReadonlySet<number>,
+  ruleBreaks: RuleBreak[]
 ): Omit<FittingStats, 'allOverheated' | 'unheated'> {
   const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
 
@@ -398,6 +553,7 @@ function statsFrom(
       chargeTypeId: module.chargeTypeId,
       quantity: 1,
       isDrone: false,
+      chargeDamages: !harmlessCharges.has(module.typeId),
     })),
     ...fitting.drones.map((drone) => ({
       typeId: drone.typeId,
@@ -420,6 +576,7 @@ function statsFrom(
 
   return {
     ...baseStats,
+    ruleBreaks,
     targeting: { ...baseStats.targeting, maxLockedTargets: lockedTargets.effective },
     ...extractDroneLimits(dogmaFit.items, shown.items, shown.character.attributes),
     calibrationUsed,
@@ -771,6 +928,17 @@ function chargesMissingSkills(
   return missing;
 }
 
+/**
+ * What a charge is worked out under beyond the Fitting: the pilot the stats
+ * run under, the Damage Profile, and the weather and projected effects.
+ * Without one, the pilot's own profile and the engine's defaults.
+ */
+export interface ChargeBasis {
+  pilot: PilotProfile;
+  damageProfile?: DamageProfile;
+  options: Pick<StatsOptions, 'weatherTypeId' | 'incoming'>;
+}
+
 /** One charge's figures for a weapon group, from the Fitting calculated with it loaded. */
 export interface ChargeEngineStats extends Pick<
   ChargeChoice,
@@ -784,7 +952,8 @@ export interface ChargeEngineStats extends Pick<
  * of `chargeTypeIds`, the whole Fitting calculated once with that charge in
  * every module of `moduleTypeId` and those modules active — so the hull,
  * skills, implants and damage mods all count, as they do on the loaded
- * charge. A cap booster's charge also gets its capacitor figures, and a
+ * charge, under `basis` (the stats' own pilot, Damage Profile, weather and
+ * projected effects) when given. A cap booster's charge also gets its capacitor figures, and a
  * mining crystal its yield and residue, off the
  * same calculation. One `calculate` per charge (no overheated pass): the Charges tab
  * pays this only while it is open, memoized by its caller.
@@ -793,7 +962,8 @@ function compareCharges(
   fitting: Fitting,
   profile: PilotProfile,
   moduleTypeId: number,
-  chargeTypeIds: readonly number[]
+  chargeTypeIds: readonly number[],
+  basis?: ChargeBasis
 ): ChargeEngineStats[] {
   const indices = fitting.modules.flatMap((module, index) =>
     module.typeId === moduleTypeId ? [index] : []
@@ -814,7 +984,15 @@ function compareCharges(
       ),
     };
     // `fittingToDogmaFit` puts the modules first, so module i is items[i].
-    const dogmaFit = toDogmaFit(trial, profile);
+    const dogmaFit = basis
+      ? withIncoming(
+          withWeather(
+            toDogmaFit(trial, basis.pilot, basis.damageProfile),
+            basis.options.weatherTypeId
+          ),
+          basis.options.incoming
+        )
+      : toDogmaFit(trial, profile);
     const { items, ship } = calculate(dogmaFit);
     const cap = extractCapBoosterFigures(dogmaFit.items, ship.attributes, items, indices);
     const mining = extractCrystalFigures(dogmaFit.items, items, indices);

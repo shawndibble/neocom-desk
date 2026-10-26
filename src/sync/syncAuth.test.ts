@@ -3,6 +3,7 @@ import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import {
+  confirmOwnership,
   ensureAnySession,
   ensureSignedIn,
   removeCharacterSession,
@@ -24,7 +25,11 @@ vi.mock('@/auth/session', () => ({
 
 interface FakeAuth {
   id: number;
-  currentUser: { uid: string; getIdToken?: () => Promise<string> } | null;
+  currentUser: {
+    uid: string;
+    getIdToken?: () => Promise<string>;
+    getIdTokenResult?: () => Promise<{ claims: Record<string, unknown> }>;
+  } | null;
   authStateReady?: () => Promise<void>;
 }
 /** One Auth per Character, like the named apps in `firebaseApp.ts`. */
@@ -124,6 +129,30 @@ describe('ensureSignedIn', () => {
     fakeAuthFor(1).currentUser = { uid: 'char:1', getIdToken };
     await ensureSignedIn(1);
     expect(getIdToken).toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it('mints again when the session carries a previous ownerHash', async () => {
+    // Developer claims survive every ID-token refresh, so a session minted
+    // before a transfer would fail every hash-guarded write for good.
+    fakeAuthFor(1).currentUser = {
+      uid: 'char:1',
+      getIdTokenResult: async () => ({ claims: { ownerHash: 'old' } }),
+    };
+    await expect(ensureSignedIn(1, 'h')).resolves.toBe('char:1');
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a minted session under another ownerHash than the caller read', async () => {
+    await expect(ensureSignedIn(1, 'stale')).rejects.toThrow(/changed owner/);
+  });
+
+  it('keeps a session whose ownerHash claim is current', async () => {
+    fakeAuthFor(1).currentUser = {
+      uid: 'char:1',
+      getIdTokenResult: async () => ({ claims: { ownerHash: 'h' } }),
+    };
+    await ensureSignedIn(1, 'h');
     expect(mint).not.toHaveBeenCalled();
   });
 
@@ -232,5 +261,19 @@ describe('removing sessions', () => {
       (disposeCharacterApp.mock.calls as unknown as number[][]).map((c) => c[0]).sort()
     ).toEqual([1, 2, 3]);
     expect(signOut).toHaveBeenCalledWith(legacyAuth);
+  });
+});
+
+describe('confirmOwnership', () => {
+  it('mints afresh even over a live session, and confirms a matching ownerHash', async () => {
+    fakeAuthFor(1).currentUser = { uid: 'char:1' };
+    await expect(confirmOwnership(1, 'h')).resolves.toBe(true);
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses another ownerHash, and a mint that fails (revoked EVE grant)', async () => {
+    await expect(confirmOwnership(1, 'other')).resolves.toBe(false);
+    vi.mocked(getValidAccessToken).mockRejectedValue(new Error('invalid_grant'));
+    await expect(confirmOwnership(1, 'h')).resolves.toBe(false);
   });
 });

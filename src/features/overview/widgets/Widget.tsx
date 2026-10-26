@@ -338,6 +338,7 @@ function WidgetFrame({
   const keys = widgetKeys(kind, widget.show);
   const title = widget.title ?? t(keys.titleKey);
   const endpoints = endpointsOf(widget.kind, widget);
+  const grantTarget = view.grantCharacterId ?? characterId;
 
   let body;
   if (state === 'loading') {
@@ -345,10 +346,11 @@ function WidgetFrame({
   } else if (state === 'needsPermission') {
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
-        {characterId !== null && endpoints.length > 0 ? (
+        {grantTarget !== null && endpoints.length > 0 ? (
           <GrantBanner
             variant="ghost"
-            characterId={characterId}
+            characterId={grantTarget}
+            characterName={view.grantCharacterName}
             endpoints={endpoints}
             title={t('overview.widgets.needsPermission')}
             hint={t('overview.widgets.needsPermissionHint', { title })}
@@ -427,23 +429,24 @@ function WidgetFrame({
   }
 
   // A lapsed grant over saved data: the figures stay, with a small note to log in again.
-  if (reauthNote && characterId !== null && endpoints.length > 0) {
+  if (reauthNote && grantTarget !== null && endpoints.length > 0) {
     body = (
       <>
         {body}
-        <ReauthCachedNote className="px-3 pb-3" characterId={characterId} endpoints={endpoints} />
+        <ReauthCachedNote className="px-3 pb-3" characterId={grantTarget} endpoints={endpoints} />
       </>
     );
   }
 
-  if (state === 'ok' && view.grantEndpoints !== undefined && characterId !== null) {
+  if (state === 'ok' && view.grantEndpoints !== undefined && grantTarget !== null) {
     body = (
       <>
         {body}
         <div className="px-3 pb-3">
           <GrantBanner
             variant="ghost"
-            characterId={characterId}
+            characterId={grantTarget}
+            characterName={view.grantCharacterName}
             endpoints={view.grantEndpoints}
             title={t('overview.widgets.needsPermission')}
             hint={t('overview.widgets.needsPermissionHint', { title })}

@@ -15,6 +15,33 @@ export function addModeFor(threeColumns: boolean, isDesktop: boolean): AddMode {
 }
 
 /**
+ * Who holds the page's left column, and whether the page is pushed aside for it.
+ * Improve open on desktop (`improveDocked`) takes the column: a column in the page
+ * itself (`FittingEditorLayout`'s `improveColumn`), so nothing is pushed. The docked
+ * browser steps aside (laid out as a shut slide-out) and an Add slide-out stays
+ * shut, so the stats stay in view while rows are ticked. On three columns' width
+ * the stats keep their place beside the editor; narrower, there is no room for
+ * both beside the column, so the stats go above the editor (`statsFirst`): they
+ * are what Improve changes. Below desktop the stats are a tab of their own and
+ * Improve a sheet. Otherwise the Add slide-out pushes the page as before.
+ */
+export function leftColumn(
+  addMode: AddMode,
+  addOpen: boolean,
+  improveDocked: boolean
+): { addMode: AddMode; addOpen: boolean; pushed: boolean; statsFirst: boolean } {
+  if (improveDocked && addMode !== 'sheet') {
+    return {
+      addMode: 'slideOut',
+      addOpen: false,
+      pushed: false,
+      statsFirst: addMode === 'slideOut',
+    };
+  }
+  return { addMode, addOpen, pushed: addOpen && addMode === 'slideOut', statsFirst: false };
+}
+
+/**
  * Docked: browser | Ring | stats. Otherwise the editor beside the
  * stats when wide, but stacked while the slide-out has pushed the
  * page aside, so the editor keeps the width rather than the stats.

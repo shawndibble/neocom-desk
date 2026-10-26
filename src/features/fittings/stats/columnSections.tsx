@@ -109,6 +109,7 @@ export function damageSections({
           applied={stats.applied}
           unheatedApplied={stats.unheated?.applied ?? null}
           chargelessWeaponCount={stats.offense.chargelessWeaponCount}
+          hasSpoolWeapons={stats.offense.weapons.some((row) => row.spool)}
           targetProfiles={targetProfiles}
           overlay={overlay}
         />

@@ -1,7 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import { textActionClassName } from '@/components/ui/textActionClassName';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import type {
   Fitting,
@@ -98,8 +97,8 @@ interface FittingStatsSectionsProps {
   moduleResults?: FittingModuleResult[] | null;
   /** A change to preview in place (`current → after`), from Improve's ticked or hovered rows; absent or null: none. */
   preview?: FittingStatsDelta | null;
-  /** Opens Improve from the header; absent where the Fitting cannot be edited. */
-  onImprove?: () => void;
+  /** One sentence per fitting rule the fit breaks; empty or absent for a legal fit. */
+  ruleBreaks?: readonly string[];
 }
 
 /**
@@ -131,7 +130,7 @@ export function FittingStatsSections({
   whatToTrain,
   yourCharacters,
   showDrones = true,
-  onImprove,
+  ruleBreaks = [],
   fitting = null,
   moduleResults = null,
   preview = null,
@@ -245,11 +244,6 @@ export function FittingStatsSections({
           >
             {situationValue}
           </StatsScopeTrigger>
-          {onImprove && (
-            <button type="button" className={textActionClassName('ml-auto')} onClick={onImprove}>
-              {t('fittings.improve.menuItem')}
-            </button>
-          )}
         </div>
         {statsError && (
           <div
@@ -277,6 +271,20 @@ export function FittingStatsSections({
           <p className="border-b border-line px-3 py-2 text-xs text-warning">
             {t('fittings.stats.skillsUnknown')}
           </p>
+        )}
+
+        {ruleBreaks.length > 0 && (
+          <div
+            data-testid="rule-breaks"
+            className="space-y-1 border-b border-line px-3 py-2 text-xs"
+          >
+            <ul className="space-y-0.5 text-warning">
+              {ruleBreaks.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="text-text-dim">{t('fittings.ruleBreak.statsCountAll')}</p>
+          </div>
         )}
 
         {group('damageTank', [...damage, ...tank])}

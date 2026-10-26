@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ChargeChoice } from './chargeChoice';
-import { loadBestCharges, unloadedWeapons, type ChargeGroup } from './improveCharges';
+import {
+  assumeCharges,
+  loadBestCharges,
+  unloadedWeapons,
+  type ChargeGroup,
+} from './improveCharges';
 import type { Fitting, FittingModule } from './types';
 
 const module = (slotIndex: number, typeId: number, chargeTypeId?: number): FittingModule => ({
@@ -64,6 +69,16 @@ describe('unloadedWeapons', () => {
     ).toBeNull();
   });
 
+  it('skips online modules and counts overloaded ones', () => {
+    const online = { ...module(0, 500), state: 'online' as const };
+    expect(unloadedWeapons(fit([online]), [launchers([choice(900)])])).toBeNull();
+    const overloaded = { ...module(0, 500), state: 'overload' as const };
+    expect(unloadedWeapons(fit([overloaded]), [launchers([choice(900)])])).toEqual({
+      count: 1,
+      kind: 'launcher',
+    });
+  });
+
   it('skips offline modules and groups with no charges to choose from', () => {
     const offline = { ...module(0, 500), state: 'offline' as const };
     expect(unloadedWeapons(fit([offline]), [launchers([choice(900)])])).toBeNull();
@@ -120,5 +135,37 @@ describe('loadBestCharges', () => {
   it('plans nothing when no charge is usable', () => {
     const f = fit([module(0, 500)]);
     expect(loadBestCharges(f, [launchers([choice(901, { skillMissing: true })])])).toEqual([]);
+  });
+});
+
+describe('assumeCharges', () => {
+  const steps = [
+    {
+      chargeTypeId: 901,
+      fromCargo: false,
+      at: [
+        { slot: 'high' as const, slotIndex: 0 },
+        { slot: 'high' as const, slotIndex: 1 },
+      ],
+    },
+  ];
+
+  it('loads the steps into empty modules still of the type the plan was made for', () => {
+    const base = fit([module(0, 500), module(1, 500)]);
+    const swapped = fit([module(0, 500), module(1, 777)]);
+    const out = assumeCharges(swapped, base, steps);
+    expect(out.modules.map((m) => m.chargeTypeId)).toEqual([901, undefined]);
+  });
+
+  it('leaves a module that already holds a charge', () => {
+    const base = fit([module(0, 500), module(1, 500)]);
+    const loaded = fit([module(0, 500, 900), module(1, 500)]);
+    const out = assumeCharges(loaded, base, steps);
+    expect(out.modules.map((m) => m.chargeTypeId)).toEqual([900, 901]);
+  });
+
+  it('returns the same fitting for no steps', () => {
+    const f = fit([module(0, 500)]);
+    expect(assumeCharges(f, f, [])).toBe(f);
   });
 });

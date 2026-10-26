@@ -18,6 +18,7 @@ import {
   IMPROVE_REACHES,
   improveCandidates,
   type DefenseChoice,
+  onlyNeutral,
   onlySide,
   type ImproveCandidate,
   type ImproveGoal,
@@ -26,6 +27,7 @@ import {
   type ImproveReach,
   type ImproveResult,
   type ModulePool,
+  type OwnedStock,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import {
@@ -40,7 +42,10 @@ import {
   crystalKeyOf,
   crystalsOfFamily,
   loadCrystals,
+  minerWithoutCrystal,
+  unloadedMiners,
 } from '@/engine/fittings/improveMining';
+import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
@@ -53,6 +58,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
+import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import { loadFittingPrice } from './fittingPrice';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
@@ -156,6 +162,13 @@ export const useImproveHold = createLocalSetting<ImproveHold>({
       : DEFAULT_IMPROVE_HOLD,
 });
 
+/** Planning counts what the pilot owns as already bought; on by default, remembered on this device. */
+export const useImproveCountOwned = createLocalSetting<boolean>({
+  key: 'fittingsImproveCountOwned',
+  defaultValue: true,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : true),
+});
+
 const parseCap = (raw: unknown) =>
   typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
 
@@ -203,6 +216,8 @@ export interface ImproveConfig {
   oreFamily: string;
   /** Carry more: the hold scored. */
   hold: ImproveHold;
+  /** Planning: what the pilot owns at the picked place, counted as already bought; null counts nothing. */
+  owned: ReadonlyMap<number, number> | null;
 }
 
 /** After this long a search offers "Show best so far". */
@@ -221,11 +236,19 @@ export type ImproveState =
       status: 'done';
       result: ImproveResult;
       before: FittingStats;
-      /** What the fit costs now at the hub, for the selection summary; null when not loaded. */
+      /** What the fit costs now at the hub, for the selection summary; null when not loaded. Still to buy when `owned` is counted. */
       fitTotal: number | null;
+      /** Planning with owned stock counted: the stock, the hub prices, and whether any candidate is owned at all. */
+      owned?: { stock: OwnedStock; priceOf: (typeId: number) => number | null; anyOwned: boolean };
       elapsedMs: number;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
+      /** With `sides`: the options on neither side (Damage Control, hull), shown as "Either". */
+      neutral?: ImproveResult;
+      /** Mine more: the fit as it is, whose yield is the real "Now"; `before` is scored with the best crystals. */
+      fitAsIs?: FittingStats;
+      /** Mine more: the best crystal's key, and the miners that hold none of the ore's crystals. */
+      crystals?: { bestKey: string; unloaded: { count: number; steps: ChargeLoadStep[] } | null };
     };
 
 export interface ImproveSearch {
@@ -288,6 +311,13 @@ function searchCandidates(
   });
 }
 
+/** Mine more's ore plan: what each miner loads, the best crystal's key, and which crystals each miner type takes. */
+interface CrystalPlan {
+  crystalFor: (moduleTypeId: number) => number | null;
+  bestKey: string;
+  crystalsOf: (moduleTypeId: number) => number[];
+}
+
 /**
  * Mine more's ore: which crystal each miner type loads, for `family`. The
  * crystal letter and tech level that mine the most on the open Fitting is
@@ -300,7 +330,7 @@ async function crystalPlan(
   family: string,
   own: FittingStats,
   signal: AbortSignal
-): Promise<((moduleTypeId: number) => number | null) | null> {
+): Promise<CrystalPlan | null> {
   const nameOf = (typeId: number) => catalogue.types[String(typeId)]?.name;
   const known = new Map<number, number[]>();
   const crystalsFor = (typeId: number): number[] => {
@@ -335,7 +365,21 @@ async function crystalPlan(
     const { after } = await variants.compare(loadCrystals(variants.fitting, forKey(key)), signal);
     return after.mining.perSecond;
   });
-  return best === null ? null : forKey(best);
+  return best === null
+    ? null
+    : { crystalFor: forKey(best), bestKey: best, crystalsOf: crystalsFor };
+}
+
+/** What the fit costs to buy once `owned` units are in hand; a type with no price adds nothing, as the Price section's total. */
+function stillToBuyTotal(
+  counts: ReadonlyMap<number, number>,
+  owned: ReadonlyMap<number, number>,
+  priceOf: (typeId: number) => number | null
+): number {
+  let total = 0;
+  for (const [typeId, need] of counts)
+    total += (priceOf(typeId) ?? 0) * Math.max(0, need - (owned.get(typeId) ?? 0));
+  return total;
 }
 
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
@@ -351,22 +395,28 @@ function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   return [...ids];
 }
 
+const NO_CHARGES: readonly ChargeLoadStep[] = [];
+
 export function useImprove(
   variants: VariantEvaluator | null,
   catalogue: FittingCatalogue | null,
   goal: ImproveGoal,
   target: TargetProfile | undefined,
   enabled: boolean,
-  config: ImproveConfig
+  config: ImproveConfig,
+  chargePlan: readonly ChargeLoadStep[] = NO_CHARGES
 ): ImproveSearch {
   const hubId = useMarketHub((state) => state.value);
+  // The plan is a new array each render; the search reruns only when its content changes.
+  const chargePlanKey = JSON.stringify(chargePlan);
   const [state, setState] = useState<ImproveState>({ status: 'idle' });
   const [before, setBefore] = useState<FittingStats | null>(null);
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
-  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
+  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold, owned } =
+    config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -424,7 +474,17 @@ export function useImprove(
             variants,
             catalogue,
             searched,
-            { reach, mode, spendCap, defense: side, includeRigs, includeOfficer, oreFamily, hold },
+            {
+              reach,
+              mode,
+              spendCap,
+              defense: side,
+              includeRigs,
+              includeOfficer,
+              oreFamily,
+              hold,
+              owned,
+            },
             own.slotCounts
           ),
         }));
@@ -434,15 +494,21 @@ export function useImprove(
         );
         const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
         const typeIds = candidateTypeIds(sets.flatMap((set) => set.candidates));
+        // Planning counts what the pilot owns as already bought.
+        const fitCounts = mode === 'buy' && owned ? fittingItemCounts(variants.fitting) : null;
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
-          // The Price section's own total, for Planning's budget.
+          // The Price section's own total, for Planning's budget; less what is owned when counted.
           mode === 'buy'
-            ? loadFittingPrice(variants.fitting, hub)
-                .then((price) => price.totals.sell)
-                .catch(() => null)
+            ? (fitCounts && owned
+                ? getHubPrices(hub, [...fitCounts.keys()]).then((prices) =>
+                    stillToBuyTotal(fitCounts, owned, (id) => prices.get(id)?.sellMin ?? null)
+                  )
+                : loadFittingPrice(variants.fitting, hub).then((price) => price.totals.sell)
+              ).catch(() => null)
             : Promise.resolve(null),
         ]);
+        const stock: OwnedStock | undefined = fitCounts && owned ? { owned, fitCounts } : undefined;
         if (cancelled) return;
         // A cap that cannot be checked is not silently waived.
         if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
@@ -453,25 +519,27 @@ export function useImprove(
         }
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
         let scoredBefore = own;
-        let load = (fitting: Fitting) => fitting;
-        let plan: ((moduleTypeId: number) => number | null) | null = null;
+        // Empty guns and launchers are scored loaded with the best charge, so an unarmed-looking fit isn't stripped of support.
+        const charges = JSON.parse(chargePlanKey) as ChargeLoadStep[];
+        let load = (fitting: Fitting) => assumeCharges(fitting, variants.fitting, charges);
+        let plan: CrystalPlan | null = null;
         if (searched === 'mining') {
           plan = await crystalPlan(variants, catalogue, oreFamily, own, controller.signal);
           if (cancelled) return;
-          const crystalFor = plan;
+          const crystalFor = plan?.crystalFor;
           if (crystalFor) {
-            load = (fitting) => loadCrystals(fitting, crystalFor);
+            load = (fitting) =>
+              loadCrystals(assumeCharges(fitting, variants.fitting, charges), crystalFor);
             scoredBefore = (await variants.compare(load(variants.fitting), controller.signal))
               .after;
           }
         }
+        if (searched !== 'mining' && charges.length > 0)
+          scoredBefore = (await variants.compare(load(variants.fitting), controller.signal)).after;
         const stats = async (fitting: Fitting) => {
           const { after } = await variants.compare(load(fitting), controller.signal);
           // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
-          if (
-            plan &&
-            after.mining.rows.some((row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId))
-          )
+          if (plan && minerWithoutCrystal(after.mining.rows, plan.crystalFor))
             throw new Error('A miner takes no crystal of this ore');
           return after;
         };
@@ -490,6 +558,7 @@ export function useImprove(
             mode,
             spendCap,
             fitTotal,
+            ...(stock ? { stock } : {}),
             onProgress: (checked) => {
               if (!cancelled)
                 setState((current) =>
@@ -532,9 +601,27 @@ export function useImprove(
           status: 'done',
           result: { ...listed, checked },
           before: scoredBefore,
+          ...(plan
+            ? {
+                fitAsIs: own,
+                crystals: {
+                  bestKey: plan.bestKey,
+                  unloaded: unloadedMiners(variants.fitting, plan.crystalsOf, plan.crystalFor),
+                },
+              }
+            : {}),
           fitTotal,
+          ...(stock
+            ? {
+                owned: {
+                  stock,
+                  priceOf: (typeId: number) => priceMap?.get(typeId)?.sellMin ?? null,
+                  anyOwned: typeIds.some((id) => (stock.owned.get(id) ?? 0) > 0),
+                },
+              }
+            : {}),
           elapsedMs: performance.now() - started,
-          ...(sideResults ? { sides: sideResults } : {}),
+          ...(sideResults ? { sides: sideResults, neutral: onlyNeutral(results[0], groupOf) } : {}),
         });
       } catch {
         if (!cancelled) setState({ status: 'failed' });
@@ -564,6 +651,8 @@ export function useImprove(
     includeOfficer,
     oreFamily,
     hold,
+    owned,
+    chargePlanKey,
   ]);
 
   const cancel = useCallback(() => cancelRef.current(), []);

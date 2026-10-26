@@ -32,8 +32,8 @@ interface FittingStatsColumnProps {
   onOpenMakeItFit: (resource: FitResource) => void;
   /** Improve's ticked or hovered rows, to show in place as `current → after`. */
   preview?: FittingStatsDelta | null;
-  /** Opens Improve from the column's header. */
-  onImprove?: () => void;
+  /** The fit's rule breaks as sentences. */
+  ruleBreaks?: readonly string[];
 }
 
 /**
@@ -55,7 +55,7 @@ export function FittingStatsColumn({
   overlay,
   onOpenMakeItFit,
   preview,
-  onImprove,
+  ruleBreaks,
 }: FittingStatsColumnProps) {
   const { t } = useTranslation();
   // What the stats column's Pilot and Situation panels hold beyond its own sections.
@@ -83,7 +83,7 @@ export function FittingStatsColumn({
         fitting={fitting}
         moduleResults={moduleResults}
         preview={preview}
-        onImprove={onImprove}
+        ruleBreaks={ruleBreaks}
         whatToTrain={
           <FittingWhatToTrainPanel
             evaluator={workspace.skillGains}

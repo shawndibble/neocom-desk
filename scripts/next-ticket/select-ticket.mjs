@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { run, gh, ghJson, log, printResult, sleepSync } from './lib.mjs';
+import { blockedByRefs } from '../lib/blockedBy.mjs';
 
 const args = process.argv.slice(2).filter((a) => a !== '--dry-run');
 const dryRun = process.argv.includes('--dry-run');
@@ -71,14 +72,6 @@ function slugify(title) {
     .slice(0, 50);
 }
 
-function blockedByRefs(body) {
-  const m = /## Blocked by\s*\n([\s\S]*?)(\n## |$)/i.exec(body || '');
-  if (!m) return [];
-  const section = m[1].trim();
-  if (!section || /^none\b/i.test(section)) return [];
-  return [...section.matchAll(/#(\d+)/g)].map((mm) => Number(mm[1]));
-}
-
 function isUnblocked(issue) {
   if (issue.assignees && issue.assignees.length > 0) return false;
   if ((issue.labels || []).some((l) => l.name === 'in-progress')) return false;
@@ -101,8 +94,8 @@ if (!acquireLock()) {
   process.exit(0);
 }
 
-let picked = null;
-try {
+/** Pick (and, unless a dry run, claim) under the lock. Never exits the process: the caller releases the lock. */
+function selectUnderLock() {
   const currentUser = ghJson(['api', 'user']).login;
   const issues = ghJson([
     'issue',
@@ -117,38 +110,21 @@ try {
 
   const isOwnTicket = (issue) => issue.author?.login === currentUser;
 
+  let picked = null;
   if (override) {
     const issue = issues.find((i) => i.number === override);
-    if (!issue) {
-      printResult({ status: 'override-unavailable', reason: 'not-found' });
-      process.exit(0);
-    }
-    if (!isOwnTicket(issue)) {
-      printResult({ status: 'override-unavailable', reason: 'not-own-ticket' });
-      process.exit(0);
-    }
+    if (!issue) return { status: 'override-unavailable', reason: 'not-found' };
+    if (!isOwnTicket(issue)) return { status: 'override-unavailable', reason: 'not-own-ticket' };
     if (issue.assignees?.length > 0 || issue.labels.some((l) => l.name === 'in-progress')) {
-      printResult({ status: 'override-unavailable', reason: 'assigned-or-in-progress' });
-      process.exit(0);
+      return { status: 'override-unavailable', reason: 'assigned-or-in-progress' };
     }
-    if (!isUnblocked(issue)) {
-      printResult({ status: 'override-unavailable', reason: 'blocked' });
-      process.exit(0);
-    }
+    if (!isUnblocked(issue)) return { status: 'override-unavailable', reason: 'blocked' };
     picked = issue;
   } else {
-    for (const issue of issues) {
-      if (isOwnTicket(issue) && isUnblocked(issue)) {
-        picked = issue;
-        break;
-      }
-    }
+    picked = issues.find((issue) => isOwnTicket(issue) && isUnblocked(issue)) ?? null;
   }
 
-  if (!picked) {
-    printResult({ status: 'no-ticket' });
-    process.exit(0);
-  }
+  if (!picked) return { status: 'no-ticket' };
 
   if (!dryRun) {
     gh([
@@ -163,13 +139,18 @@ try {
   } else {
     log(`dry-run: would claim #${picked.number}`);
   }
+  return {
+    status: dryRun ? 'would-claim' : 'claimed',
+    number: picked.number,
+    title: picked.title,
+    slug: slugify(picked.title),
+  };
+}
+
+let result;
+try {
+  result = selectUnderLock();
 } finally {
   releaseLock();
 }
-
-printResult({
-  status: dryRun ? 'would-claim' : 'claimed',
-  number: picked.number,
-  title: picked.title,
-  slug: slugify(picked.title),
-});
+printResult(result);

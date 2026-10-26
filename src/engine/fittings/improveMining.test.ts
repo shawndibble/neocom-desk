@@ -5,7 +5,15 @@ import {
   improveCandidates,
   type ImproveCandidate,
 } from './improve';
-import { bestCrystalKey, crystalKeyOf, crystalsOfFamily, loadCrystals } from './improveMining';
+import {
+  bestCrystalKey,
+  crystalKeyOf,
+  crystalParts,
+  crystalsOfFamily,
+  loadCrystals,
+  minerWithoutCrystal,
+  unloadedMiners,
+} from './improveMining';
 import { buildVariationIndex } from '../market/variations';
 import type { Fitting, FittingStats } from './types';
 import { baseFittingStats } from './__fixtures__/fittingStats';
@@ -110,6 +118,75 @@ describe('bestCrystalKey', () => {
     const yields: Record<string, number> = { A1: 10, A2: 14, B2: 12 };
     expect(await bestCrystalKey(['A1', 'A2', 'B2'], async (key) => yields[key]!)).toBe('A2');
     expect(await bestCrystalKey([], async () => 1)).toBeNull();
+  });
+});
+
+describe('unloadedMiners', () => {
+  const crystalsOf = (typeId: number) => (typeId === 1 ? [11, 12] : []);
+  const crystalFor = (typeId: number) => (typeId === 1 ? 12 : null);
+  const module = (slotIndex: number, typeId: number, extra: object = {}) => ({
+    slot: 'high',
+    slotIndex,
+    typeId,
+    state: 'active',
+    ...extra,
+  });
+
+  it("counts active miners with no crystal, or another ore's, and steps to load the plan's crystal", () => {
+    const fitting = {
+      modules: [
+        module(0, 1),
+        module(1, 1, { chargeTypeId: 99 }),
+        module(2, 1, { chargeTypeId: 11 }),
+        module(3, 1, { state: 'online' }),
+        module(4, 7),
+      ],
+    } as unknown as Fitting;
+    expect(unloadedMiners(fitting, crystalsOf, crystalFor)).toEqual({
+      count: 2,
+      steps: [
+        {
+          chargeTypeId: 12,
+          fromCargo: false,
+          at: [
+            { slot: 'high', slotIndex: 0 },
+            { slot: 'high', slotIndex: 1 },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('is null when every miner holds a crystal of the ore', () => {
+    const fitting = { modules: [module(0, 1, { chargeTypeId: 12 })] } as unknown as Fitting;
+    expect(unloadedMiners(fitting, crystalsOf, crystalFor)).toBeNull();
+  });
+});
+
+describe('minerWithoutCrystal', () => {
+  const plan = (typeId: number) => (typeId === 1 ? 12 : null);
+
+  it('flags a crystal miner that does not hold the plan crystal', () => {
+    expect(minerWithoutCrystal([{ typeId: 1, isDrone: false, chargeTypeId: 11 }], plan)).toBe(true);
+  });
+
+  it('lets a miner that takes no crystal pass, though its charge is undefined and the plan says null', () => {
+    const rows = [
+      { typeId: 1, isDrone: false, chargeTypeId: 12 },
+      { typeId: 2, isDrone: false, chargeTypeId: undefined },
+    ];
+    expect(minerWithoutCrystal(rows, plan)).toBe(false);
+  });
+
+  it('ignores drones', () => {
+    expect(minerWithoutCrystal([{ typeId: 3, isDrone: true, chargeTypeId: 5 }], plan)).toBe(false);
+  });
+});
+
+describe('crystalParts', () => {
+  it('reads a crystal key as its letter and tier', () => {
+    expect(crystalParts('B2')).toEqual({ letter: 'B', tier: 'II' });
+    expect(crystalParts('A1')).toEqual({ letter: 'A', tier: 'I' });
   });
 });
 

@@ -3,6 +3,7 @@ import { changeVerdict, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { StatChange as StatChangeValue } from '@/engine/fittings/variationDelta';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatSeconds } from '@/lib/duration';
+import { cx } from '@/lib/cx';
 
 interface StatChangeProps {
   change: StatChangeValue;
@@ -28,18 +29,10 @@ function formatAt(digits: number, value: number): string {
 const VALUE = '\u0000';
 
 const TONE = { better: 'text-success', worse: 'text-danger', neutral: 'text-text' } as const;
+type Verdict = keyof typeof TONE;
 
-/**
- * One fit stat changing: the stat's name, then `before → after`. The before
- * value is dim; the arrow and the after value are `success` when the change is
- * better, `danger` when worse and plain when the stat is neutral (it only
- * moves with the hull). Colour is never the only cue: both numbers are printed,
- * and the screen-reader name adds "better" or "worse". Rounds at the stats
- * panel's `STAT_DIGITS`. Money is not a stat: ISK keeps `IskDelta`.
- *
- * @summary A fit stat's before → after, green when better, red when worse.
- */
-export function StatChange({ change, className, bare = false }: StatChangeProps) {
+/** A change's printed parts: the stat's name around the value (`lead` … `trail`), the two values, the verdict and the spoken name. */
+function useStatChangeParts(change: StatChangeValue) {
   const { t } = useTranslation();
   const verdict = changeVerdict(change);
   const isCapacitor = change.key === 'capacitor';
@@ -60,18 +53,84 @@ export function StatChange({ change, className, bare = false }: StatChangeProps)
   const [lead = '', trail = ''] = named(VALUE).split(VALUE);
   const spoken = t('fittings.statChange.spoken', { before, after });
   const verdictWord = verdict === 'neutral' ? '' : `, ${t(`fittings.statChange.${verdict}`)}`;
+  return { lead, trail, before, after, verdict, spokenName: `${named(spoken)}${verdictWord}` };
+}
+
+function Values({ before, after, verdict }: { before: string; after: string; verdict: Verdict }) {
+  return (
+    <>
+      <span className="text-text-dim">{before}</span>
+      <span className={TONE[verdict]} data-verdict={verdict}>
+        {' → '}
+        {after}
+      </span>
+    </>
+  );
+}
+
+/**
+ * One fit stat changing: the stat's name, then `before → after`. The before
+ * value is dim; the arrow and the after value are `success` when the change is
+ * better, `danger` when worse and plain when the stat is neutral (it only
+ * moves with the hull). Colour is never the only cue: both numbers are printed,
+ * and the screen-reader name adds "better" or "worse". Rounds at the stats
+ * panel's `STAT_DIGITS`. Money is not a stat: ISK keeps `IskDelta`.
+ *
+ * @summary A fit stat's before → after, green when better, red when worse.
+ */
+export function StatChange({ change, className, bare = false }: StatChangeProps) {
+  const { lead, trail, before, after, verdict, spokenName } = useStatChangeParts(change);
   return (
     <span className={className}>
-      <span className="sr-only">{`${named(spoken)}${verdictWord}`}</span>
+      <span className="sr-only">{spokenName}</span>
       <span aria-hidden="true">
         {!bare && lead}
-        <span className="text-text-dim">{before}</span>
-        <span className={TONE[verdict]} data-verdict={verdict}>
-          {' → '}
-          {after}
-        </span>
+        <Values before={before} after={after} verdict={verdict} />
         {!bare && trail}
       </span>
+    </span>
+  );
+}
+
+function StatChangeRow({ change, last }: { change: StatChangeValue; last: boolean }) {
+  const { lead, trail, before, after, verdict, spokenName } = useStatChangeParts(change);
+  return (
+    // A real box sharing the list's columns (`subgrid`), not `contents`, which
+    // older WebKit strips of its role.
+    <span role="listitem" className="col-span-2 grid grid-cols-subgrid">
+      {/* A pause between rows, so a neutral change does not run into the next. */}
+      <span className="sr-only">{last ? spokenName : `${spokenName};`}</span>
+      <span aria-hidden="true" className="min-w-0">
+        {lead.trim()}
+      </span>
+      <span aria-hidden="true" className="min-w-0 tabular-nums">
+        <Values before={before} after={after} verdict={verdict} />
+        {trail}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Several fit stats changing, one per row: the stat's name in one column, its
+ * `before → after` and unit in the next, so a long list reads down instead of
+ * running on as a sentence. Tones and spoken names as `StatChange`.
+ *
+ * @summary Fit stat changes as a two-column list.
+ */
+export function StatChangeList({
+  changes,
+  className,
+}: {
+  changes: readonly StatChangeValue[];
+  /** Layout and type only. */
+  className?: string;
+}) {
+  return (
+    <span role="list" className={cx('grid grid-cols-[auto_minmax(0,1fr)] gap-x-3', className)}>
+      {changes.map((change, i) => (
+        <StatChangeRow key={change.key} change={change} last={i === changes.length - 1} />
+      ))}
     </span>
   );
 }

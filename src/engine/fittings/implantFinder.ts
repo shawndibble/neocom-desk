@@ -5,7 +5,12 @@
  * least ISK. The engine runs and price fetches live in
  * `features/fittings/useImplantFinder.ts`.
  */
-import { appliedDpsVsRange, graphMaxRange, type AppliedWeapon } from './appliedDps';
+import {
+  appliedDpsVsRange,
+  graphMaxRange,
+  sustainedInputs,
+  type AppliedWeapon,
+} from './appliedDps';
 import type { TargetProfile } from './targetProfile';
 import { withBoosters } from './boosterSideEffects';
 import type { FittingImplantSet, FittingStats } from './types';
@@ -240,7 +245,7 @@ export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDi
   | { kind: 'more' | 'less'; read: (stats: FittingStats, context: GoalContext) => number }
 );
 
-/** Peak applied DPS against `target` at any range — so an implant or booster that only improves application or reach still counts. */
+/** Peak sustained applied DPS (reload included) against `target` at any range — so an implant or booster that only improves application or reach still counts. */
 const peakCache = new WeakMap<FittingStats, Map<TargetProfile, number>>();
 
 export function peakAppliedDps(stats: FittingStats, target: TargetProfile | undefined): number {
@@ -251,7 +256,8 @@ export function peakAppliedDps(stats: FittingStats, target: TargetProfile | unde
   let peak = byTarget.get(target);
   if (peak === undefined) {
     const maxRange = graphMaxRange([stats.applied]);
-    peak = Math.max(0, ...appliedDpsVsRange(stats.applied, target, maxRange, 30).map((p) => p.dps));
+    const sustained = sustainedInputs(stats.applied);
+    peak = Math.max(0, ...appliedDpsVsRange(sustained, target, maxRange, 30).map((p) => p.dps));
     byTarget.set(target, peak);
   }
   return peak;
@@ -267,7 +273,8 @@ function longestWeaponReach(stats: FittingStats): number {
   let reach = 0;
   for (const weapon of stats.applied.weapons) {
     if (weapon.kind === 'turret') reach = Math.max(reach, weapon.optimal + weapon.falloff);
-    else if (weapon.kind === 'missile') reach = Math.max(reach, weapon.range);
+    else if (weapon.kind === 'missile' || weapon.kind === 'area')
+      reach = Math.max(reach, weapon.range);
   }
   return reach;
 }

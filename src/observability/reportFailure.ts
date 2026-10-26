@@ -35,6 +35,14 @@ export function isNetworkFailure(error: unknown): boolean {
   if (error instanceof DOMException && error.name === 'AbortError') return true;
   const { code, status } = (error ?? {}) as { code?: unknown; status?: unknown };
   if (typeof code === 'string' && NETWORK_CODES.has(code.replace(/^[a-z]+\//, ''))) return true;
+  // Firestore Lite's own wrap of a fetch that threw (no response at all): the
+  // missing status maps to `unknown`, the missing statusText to "undefined".
+  if (
+    code === 'unknown' &&
+    error instanceof Error &&
+    error.message === 'Request failed with error: undefined'
+  )
+    return true;
   return status === 0;
 }
 

@@ -322,7 +322,7 @@ function weaponResult(
   maxState: 'active' | 'overload' = 'overload'
 ) {
   return {
-    attributes: new Map([
+    attributes: new Map<number, { value: number }>([
       [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: dps }],
       [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: volley }],
     ]),
@@ -352,6 +352,26 @@ describe('extractOffense', () => {
     expect(offense.weapons[1].volley).toBeCloseTo(480, 6);
     expect(offense.dps).toBeCloseTo(173.6, 6);
     expect(offense.volley).toBeCloseTo(784, 6);
+  });
+
+  it('gives a spool weapon its unspooled DPS and time to full spool, and a plain weapon neither', () => {
+    const spooler = (dps: number, volley: number) => {
+      const result = weaponResult(dps, volley);
+      result.attributes.set(ITEM_DOGMA_ATTRIBUTE.rateOfFire, { value: 4000 });
+      result.attributes.set(ITEM_DOGMA_ATTRIBUTE.spoolBonusPerCycle, { value: 0.1 });
+      result.attributes.set(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax, { value: 2 });
+      return result;
+    };
+    const offense = extractOffense(
+      [BLASTER, BLASTER, { ...BLASTER, typeId: 47918 }],
+      [weaponResult(26.8, 152), weaponResult(26.8, 152), spooler(30, 40)],
+      null
+    );
+
+    expect(offense.weapons[0].spool).toBeUndefined();
+    expect(offense.weapons[1].spool?.unspooledDps).toBeCloseTo(10, 6);
+    // 2 / 0.1 = 20 cycles of 4 s.
+    expect(offense.weapons[1].spool?.secondsToFull).toBeCloseTo(80, 6);
   });
 
   it('keeps the same weapon with a different charge on its own row', () => {
@@ -572,6 +592,16 @@ describe('extractOffense', () => {
 
     expect(offense.weapons).toEqual([]);
     expect(offense.chargelessWeaponCount).toBe(1);
+  });
+
+  it('does not count an empty active launcher none of whose charges deal damage', () => {
+    const offense = extractOffense(
+      [{ ...BLASTER, chargeTypeId: undefined, chargeDamages: false }],
+      [chargeSlotResult('active')],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
   });
 
   it('does not count a charge-taking slot that is simply not active as chargeless', () => {
@@ -965,6 +995,38 @@ describe('extractCapacitorBudget', () => {
     expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
   });
 
+  it('averages a loaded ancillary armor repairer’s draw over its reload', () => {
+    // Medium AAR: eight 9 s cycles of paste, then a 60 s reload — duty 72/132.
+    const aar = running(
+      33076,
+      {
+        capacitorPeakLoad: 30,
+        armorRepairRate: 78,
+        chargeAmount: 32,
+        chargeRate: 4,
+        cycleTime: 9000,
+        reloadTime: 60000,
+      },
+      { chargeTypeId: 32014 }
+    );
+    const budget = extractCapacitorBudget([aar.item], [aar.result], attrs({}));
+    expect(budget.drain).toBeCloseTo((30 * 72) / 132, 6);
+  });
+
+  it('leaves a nosferatu out of the delta', () => {
+    const modules = [
+      running(1, { capacitorPeakLoad: 20 }),
+      running(3, { capacitorPeakLoad: -7.2 }),
+    ];
+    const budget = extractCapacitorBudget(
+      modules.map((m) => m.item),
+      modules.map((m) => m.result),
+      attrs({ capacitorPeakRecharge: 30 })
+    );
+    expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
+    expect(budget.delta).toBeCloseTo(10, 6);
+  });
+
   it('leaves drones, cargo and implants out', () => {
     const drone = {
       item: { type_id: 9, slot: { type: 'drone_bay' } },
@@ -1087,6 +1149,32 @@ describe('extractTank', () => {
     // Shield EHP/HP is 2: burst 80 + passive 10; sustained 40 + 10.
     expect(tank.burstEffective).toBeCloseTo(90, 6);
     expect(tank.sustainedEffective).toBeCloseTo(50, 6);
+  });
+
+  it('feeds a capacitor-using ancillary repairer the reload-averaged draw when sustaining it', () => {
+    const aar = running(
+      33101,
+      {
+        armorRepairRate: 78,
+        capacitorPeakLoad: 30,
+        chargeAmount: 32,
+        chargeRate: 4,
+        cycleTime: 9000,
+        reloadTime: 60000,
+        chargedArmorDamageMultiplier: 3,
+      },
+      { chargeTypeId: 28668 }
+    );
+    const tank = extractTank(
+      [aar.item],
+      [aar.result],
+      attrs({ armorRepairRate: 78, capacitorPeakRecharge: 10, capacitorPeakLoad: 30 }),
+      layers
+    );
+    const duty = 72 / 132;
+    // 10 GJ/s of recharge against an averaged 30 × duty draw, not the full 30.
+    expect(tank.capFraction).toBeCloseTo(10 / (30 * duty), 6);
+    expect(tank.sustained.armor).toBeCloseTo(78 * duty * tank.capFraction, 6);
   });
 
   it('counts remote repair received (projected onto the ship) as sustained, drawing none of its capacitor', () => {

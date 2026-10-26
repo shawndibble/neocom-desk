@@ -31,6 +31,7 @@ import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fitt
 import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
+import { goalAvailability } from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 
@@ -68,10 +69,20 @@ const WARRIOR_II = 2488;
 const RIFTER = 587;
 const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
+// Looked up by exact name in `public/data/types.json`, 2026-10-25.
+const VEDMAK = 47270;
+const HEAVY_ENTROPIC_DISINTEGRATOR_II = 47918;
+const VOID_M = 12789;
+const BUZZARD = 11192;
+const CORE_PROBE_LAUNCHER_I = 17938;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
 // Looked up by exact name in `public/data/types.json`, 2026-09-29.
 const OMEN = 2006;
+// Looked up by exact name in `public/data/types.json`, 2026-10-25.
+const LIGHT_MISSILE_LAUNCHER_II = 2404;
+const VENTURE = 32880;
+const MINER_I = 483;
 const HEAVY_PULSE_LASER_II = 3520;
 const MULTIFREQUENCY_M = 254;
 const SCORCH_M = 12818;
@@ -507,6 +518,41 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     }
   });
 
+  it("carries a spool weapon's unspooled DPS and time to full spool beside its spooled DPS", () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Vedmak',
+      shipTypeId: VEDMAK,
+      modules: [0, 1].map((slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId: HEAVY_ENTROPIC_DISINTEGRATOR_II,
+        state: 'active' as const,
+        chargeTypeId: VOID_M,
+      })),
+      drones: [],
+      cargo: [],
+    };
+    const calculation = calculate(
+      fittingToDogmaFit(fitting, buildAllVProfile([...SUPPORT_SKILL_IDS, 3436, 3442]))
+    );
+    const offense = extractOffense(
+      fitting.modules.map((module) => ({
+        typeId: module.typeId,
+        chargeTypeId: module.chargeTypeId,
+        quantity: 1,
+        isDrone: false,
+      })),
+      calculation.items,
+      null
+    );
+    const [row] = offense.weapons;
+    // The engine's DPS is fully spooled: the first cycle's, times 1 + the
+    // 2.125 maximum bonus. Both modules' unspooled figures sum.
+    expect(row.spool?.unspooledDps).toBeCloseTo(row.dps / 3.125, 6);
+    // 2.125 / 0.07 a cycle = 31 cycles of 3.96 s.
+    expect(row.spool?.secondsToFull).toBeCloseTo(31 * 3.96, 6);
+  });
+
   it('measures EHP against a damage profile and adapts a Reactive Armor Hardener to it', () => {
     const fitting: Fitting = {
       name: 'Integration Test RAH Rifter',
@@ -586,7 +632,8 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     // The Medium Energy Nosferatu II's 36 GJ every 5 s.
     expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
-    expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall, 6);
+    // The engine's delta counts the nosferatu as income; ours does not.
+    expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall - budget.nosferatuGain, 6);
 
     // The remote armor repairer repairs someone else: the local tank has no armor.
     expect(tank.burst.armor).toBe(0);
@@ -662,6 +709,51 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
         [0]
       )
     ).toBeNull();
+  });
+
+  it("works a charge's capacitor out under the stats' own basis: Electrical weather halves the recharge", () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal guide basis',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 1, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 2, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        {
+          slot: 'medium',
+          slotIndex: 3,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const pilot = buildAllVProfile(SUPPORT_SKILL_IDS);
+    const ELECTRICAL_1 = 47381;
+    const under = engine.compareCharges(
+      fitting,
+      pilot,
+      MEDIUM_CAPACITOR_BOOSTER_II,
+      [NAVY_CAP_BOOSTER_400],
+      { pilot, options: { weatherTypeId: ELECTRICAL_1 } }
+    )[0]!;
+    const clear = engine.compareCharges(fitting, pilot, MEDIUM_CAPACITOR_BOOSTER_II, [
+      NAVY_CAP_BOOSTER_400,
+    ])[0]!;
+
+    // The stats headline: the same fit in the same weather.
+    const weathered = withWeather(fittingToDogmaFit(fitting, pilot), ELECTRICAL_1);
+    const calculation = calculate(weathered);
+    const stats = extractFittingStats(
+      weathered.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+    expect(under.cap!.capacitor).toEqual(stats.capacitor);
+    // Without the weather the guide answered for a different capacitor.
+    expect(under.cap!.capacitor).not.toEqual(clear.cap!.capacitor);
   });
 
   it('averages a Navy Cap Booster 400 over its reload: 26.1 GJ/s, not 33.3', () => {
@@ -939,6 +1031,33 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(launcher.chargelessWeaponCount).toBe(1);
   });
 
+  it('counts an empty missile launcher, not an empty probe launcher, as an unloaded weapon', async () => {
+    // `computeFittingStats` reads the SDE's type list to tell which charges deal damage.
+    const types = await readFile(new URL('../../../public/data/types.json', import.meta.url));
+    const realFetch = fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+      String(input).includes('types.json') ? new Response(new Uint8Array(types)) : realFetch(input)
+    );
+    const empty = (shipTypeId: number, typeId: number): Fitting => ({
+      name: 'Integration Test empty charge-taker',
+      shipTypeId,
+      modules: [{ slot: 'high', slotIndex: 0, typeId, state: 'active' }],
+      drones: [],
+      cargo: [],
+    });
+    const profile = buildAllVProfile(SUPPORT_SKILL_IDS);
+
+    const buzzard = await computeFittingStats(empty(BUZZARD, CORE_PROBE_LAUNCHER_I), profile);
+    expect(buzzard.offense.chargelessWeaponCount).toBe(0);
+    expect(goalAvailability('reach', buzzard)).toEqual({
+      available: false,
+      reason: 'noGunsOrLaunchers',
+    });
+
+    const caracal = await computeFittingStats(empty(CARACAL, HEAVY_MISSILE_LAUNCHER_II), profile);
+    expect(caracal.offense.chargelessWeaponCount).toBe(1);
+  });
+
   it('mines more with a crystal loaded, and counts launched mining drones', () => {
     const hulk = (modules: Fitting['modules'], drones: Fitting['drones'] = []): Fitting => ({
       name: 'Hulk',
@@ -1213,6 +1332,57 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(thanatos.holds.fleetHangar).toBeGreaterThan(0);
     expect(thanatos.jumpDrive?.rangeLightYears).toBeGreaterThan(0);
     expect(thanatos.jumpDrive?.fuelPerLightYear).toBeGreaterThan(0);
+  });
+
+  it('reports the fitting rules a fit breaks: two Damage Controls, hardpoints, a Venture past its turrets', async () => {
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const rifter = (modules: Fitting['modules']): Fitting => ({
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules,
+      drones: [],
+      cargo: [],
+    });
+    const lows = [0, 1].map((slotIndex) => ({
+      slot: 'low' as const,
+      slotIndex,
+      typeId: DAMAGE_CONTROL_II,
+      state: 'online' as const,
+    }));
+    const doubled = await computeFittingStats(rifter(lows), profile);
+    expect(doubled.ruleBreaks).toContainEqual(
+      expect.objectContaining({ kind: 'max_group', groupId: 60, used: 2, allowed: 1 })
+    );
+    const single = await computeFittingStats(rifter(lows.slice(0, 1)), profile);
+    expect(single.ruleBreaks).toEqual([]);
+
+    const launchers = [0, 1, 2].map((slotIndex) => ({
+      slot: 'high' as const,
+      slotIndex,
+      typeId: LIGHT_MISSILE_LAUNCHER_II,
+      state: 'online' as const,
+    }));
+    const overLaunched = await computeFittingStats(rifter(launchers), profile);
+    expect(overLaunched.ruleBreaks).toContainEqual(
+      expect.objectContaining({ kind: 'slots', slot: 'launcher' })
+    );
+
+    const venture = (count: number): Fitting => ({
+      name: 'Venture',
+      shipTypeId: VENTURE,
+      modules: Array.from({ length: count }, (_, slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId: MINER_I,
+        state: 'online' as const,
+      })),
+      drones: [],
+      cargo: [],
+    });
+    expect((await computeFittingStats(venture(2), profile)).ruleBreaks).toEqual([]);
+    expect((await computeFittingStats(venture(3), profile)).ruleBreaks).toContainEqual(
+      expect.objectContaining({ kind: 'slots', slot: 'turret' })
+    );
   });
 
   it('names what affects a module: its skills, the hull, a damage mod (penalised) and its charge', () => {
@@ -1522,6 +1692,8 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       {
         kind: 'missile',
         dps: expect.closeTo(13.07, 2),
+        // The launcher's magazine, then its reload: the share it spends firing.
+        reloadDuty: expect.closeTo(0.9785, 3),
         range: expect.closeTo(4730 * 6.5, 0),
         explosionRadius: expect.closeTo(140, 3),
         explosionVelocity: expect.closeTo(85, 3),
@@ -1738,5 +1910,40 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
     const counts = engine.hullSlotCounts(29990, new Map());
     expect(counts.high + counts.medium + counts.low).toBe(0);
     expect(counts.subsystem).toBeGreaterThan(0);
+  });
+});
+
+describe('Tech 3 cruiser subsystems (real WASM + real pinned SDE)', () => {
+  // Looked up by exact name in `public/data/types.json`, 2026-10-25.
+  const TENGU = 29984;
+  const TENGU_SUBSYSTEMS = [45625, 45590, 45603, 45614];
+
+  it('gives a Tengu with all four subsystems its slots and hardpoints, with no slot rule broken', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Tengu',
+      shipTypeId: TENGU,
+      modules: TENGU_SUBSYSTEMS.map((typeId, slotIndex) => ({
+        slot: 'subsystem' as const,
+        slotIndex,
+        typeId,
+        state: 'online' as const,
+      })),
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+
+    const calculation = calculate(dogmaFit, { validate: true });
+    const stats = extractFittingStats(
+      dogmaFit.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.slotCounts.high).toBeGreaterThan(0);
+    expect(stats.slotCounts.medium).toBeGreaterThan(0);
+    expect(stats.slotCounts.low).toBeGreaterThan(0);
+    const slotBreaks = (calculation.violations ?? []).filter((v) => v.rule.type === 'slots');
+    expect(slotBreaks).toEqual([]);
   });
 });

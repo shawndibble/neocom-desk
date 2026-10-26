@@ -34,6 +34,7 @@ no app server. Two kinds of data:
   (`features/fittings/workbenchFits.ts`). The sync's checkpoint is the R2 object
   `workbench-fits-state/state.json`, not Firestore.
 
+- GitHub starts `schedule:` runs hours late, so the 15 min lawless job is also fired by a Cloudflare Cron Trigger Worker calling `workflow_dispatch` (`workers/public-data-dispatch`, README there; issues #5113, #5215). The workflow's own `schedule:` stays as the fallback.
 - A daily GitHub Actions job (`.github/workflows/public-data-market-open-prices.yml`, `functions/src/publicDataMarketOpenPrices.ts`) folds EVE Ref's last market-order
   snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
   per type, every Trade Hub _station_'s highest buy and lowest sell for the day

@@ -19,6 +19,8 @@ export interface TackleFigures {
 export interface EwarFigures {
   strength: number;
   range: number;
+  /** Strength per kind: jam strength and damp, disruptor or painter % are unlike units, so Improve scores each against its own baseline. */
+  byKind: Partial<Record<SupportKind, number>>;
 }
 
 /** The kinds Stronger EWAR scores; webs and warp disruption are Hold tighter's. */
@@ -46,10 +48,13 @@ export function tackleOf(s: FittingStats): TackleFigures {
 export function ewarOf(s: FittingStats): EwarFigures {
   const rows = s.support.rows.filter((row) => EWAR_KINDS.has(row.kind));
   const modules = rows.reduce((sum, row) => sum + row.count, 0);
-  if (modules === 0) return { strength: 0, range: 0 };
+  if (modules === 0) return { strength: 0, range: 0, byKind: {} };
+  // A row's amount is one module's strength (not in SUMMED), so scale by count.
+  const byKind: EwarFigures['byKind'] = {};
+  for (const row of rows) byKind[row.kind] = (byKind[row.kind] ?? 0) + row.amount * row.count;
   return {
-    // A row's amount is one module's strength (not in SUMMED), so scale by count.
     strength: rows.reduce((sum, row) => sum + row.amount * row.count, 0),
+    byKind,
     range: rows.reduce((sum, row) => sum + (row.optimal + row.falloff) * row.count, 0) / modules,
   };
 }

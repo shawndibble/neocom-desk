@@ -27,6 +27,9 @@ vi.mock('@eveshipfit/dogma-engine', () => ({
 vi.mock('@/features/abyssal/mutaplasmidData', () => ({
   loadMutaplasmidLookup: () => Promise.reject(new Error('not in these tests')),
 }));
+vi.mock('./implantSlotLookup', () => ({
+  loadImplantMarketEntries: () => Promise.reject(new Error('not in these tests')),
+}));
 
 function fakeResponse(bytes: Uint8Array, contentLength?: number): Response {
   return new Response(new Blob([bytes.buffer as ArrayBuffer]), {

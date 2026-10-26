@@ -278,7 +278,49 @@ export interface LockedTargets {
   effective: number;
 }
 
+/** Rules that count a thing against a limit: the fit breaks them by `used` passing the limit. */
+export type CountedRuleBreak =
+  | {
+      kind: 'max_group';
+      groupId: number;
+      /** Whether the limit counts fitted, online or active modules. */
+      limit: 'fitted' | 'online' | 'active';
+      used: number;
+      allowed: number;
+    }
+  | { kind: 'max_type'; typeId: number; used: number; allowed: number }
+  | {
+      kind: 'slots';
+      /** A rack or a hardpoint kind (`turret`, `launcher`). */
+      slot: string;
+      used: number;
+      available: number;
+    };
+
+/** Rules an item breaks on its own: the wrong slot, a rig of the wrong size, a charge that does not fit. */
+export interface ItemRuleBreak {
+  kind:
+    | 'wrong_slot'
+    | 'slot_taken'
+    | 'wrong_slot_index'
+    | 'subsystem_taken'
+    | 'rig_size'
+    | 'ship_restricted'
+    | 'capital_item'
+    | 'structure_item'
+    | 'ship_item'
+    | 'charge_group'
+    | 'charge_size';
+  /** The fitted item (the module, for a charge) that breaks it; null when the rule names the ship. */
+  typeId: number | null;
+}
+
+/** A fitting rule the fit breaks, other than a missing skill or a resource overage. */
+export type RuleBreak = CountedRuleBreak | ItemRuleBreak;
+
 export interface FittingStats {
+  /** The fitting rules the fit breaks (not skills, not CPU/powergrid/calibration, which have their own figures). */
+  ruleBreaks: RuleBreak[];
   cpuUsed: number;
   cpuTotal: number;
   powergridUsed: number;
@@ -370,6 +412,16 @@ export interface WeaponRow {
   overheated: DamageFigures | null;
   /** Absent for a fighter, or a drone that flies to its target. */
   range?: WeaponRange;
+  /** Only a spool weapon (a Precursor disintegrator): its `dps` is fully spooled. */
+  spool?: SpoolFigures;
+}
+
+/** What a weapon whose damage grows every cycle does before it has spooled. */
+export interface SpoolFigures {
+  /** The row's DPS on its first cycle, summed over its modules. */
+  unspooledDps: number;
+  /** Until the slowest module in the row reaches its full bonus. */
+  secondsToFull: number;
 }
 
 /** How far one weapon reaches, metres. A missile has no falloff: 0. */
@@ -387,6 +439,8 @@ export interface DamageFigures {
    */
   sustainedDps: number;
   volley: number;
+  /** A spool weapon's first-cycle DPS at these figures (heated, under overheat). */
+  unspooledDps?: number;
 }
 
 export interface OffenseStats {
@@ -688,6 +742,12 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   // an online (not firing) launcher still reports its volley.
   damagePerSecond: -12,
   damageVolley: -21,
+  // "Damage Multiplier Bonus Per Cycle" and "Maximum Damage Multiplier Bonus"
+  // (public/data/market/attributes.json); ratios, on a spool weapon only. A live
+  // run of the pinned engine (2026-10-25) on a Heavy Entropic Disintegrator II:
+  // 0.07 and 2.125, with `damagePerSecond` fully spooled (unspooled x 3.125).
+  spoolBonusPerCycle: 2733,
+  spoolBonusMax: 2734,
   // "resistanceShiftAmount" — only the Reactive Armor Hardener family carries
   // it (6 on a RAH, absent on a Damage Control II; live run of the pinned
   // engine, 2026-09-24). Marks the module whose own armor resonances

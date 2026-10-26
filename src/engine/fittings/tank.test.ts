@@ -3,6 +3,7 @@ import {
   boosterReloadShortfall,
   capacitorBudget,
   capacitorStatusAtDrain,
+  loadAdjustment,
   reloadDuty,
   sustainedRepair,
   type CapacitorUser,
@@ -32,15 +33,35 @@ describe('capacitorBudget', () => {
     { capPerSecond: 9.375 },
   ];
 
-  it('splits the peak load into drain, booster injection and nosferatu gain, and the delta', () => {
+  it('splits the peak load into drain, booster injection and nosferatu take, and the delta', () => {
     const budget = capacitorBudget(users, 35.84);
 
     expect(budget.peakRecharge).toBeCloseTo(35.84, 6);
     expect(budget.drain).toBeCloseTo(29.375, 6);
     expect(budget.boosterInjection).toBeCloseTo(33.333, 3);
     expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
-    // Recharge + booster + nos − drain.
-    expect(budget.delta).toBeCloseTo(35.84 + 33.333 + 7.2 - 29.375, 3);
+    // Recharge + booster − drain: a nosferatu needs a cap-rich target, so it is shown, not counted.
+    expect(budget.delta).toBeCloseTo(35.84 + 33.333 - 29.375, 3);
+  });
+
+  it('averages an ancillary repairer’s draw over its reload', () => {
+    // Medium AAR: eight 9 s cycles of paste, then a 60 s reload — 72 of every 132 s.
+    const ancillary = { cycles: 8, cycleSeconds: 9, reloadSeconds: 60 };
+    const budget = capacitorBudget([{ capPerSecond: 40 }, { capPerSecond: 30, ancillary }], 50);
+    expect(budget.drain).toBeCloseTo(40 + (30 * 72) / 132, 6);
+    expect(budget.delta).toBeCloseTo(50 - 40 - (30 * 72) / 132, 6);
+  });
+
+  it('does not let a nosferatu cover the charge interval a cap booster must hold', () => {
+    const budget = capacitorBudget(
+      [
+        { capPerSecond: 60 },
+        { capPerSecond: -7.2 },
+        { capPerSecond: -400 / 12, injectionPerCharge: 400 },
+      ],
+      40
+    );
+    expect(budget.secondsPerBoosterCharge).toBeCloseTo(20, 6);
   });
 
   it('averages a cap booster over its reload, as an ancillary repairer is', () => {
@@ -129,6 +150,26 @@ describe('boosterReloadShortfall', () => {
   });
 });
 
+describe('loadAdjustment', () => {
+  const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+
+  it('turns the engine’s peak load into the budget’s own: reloads averaged, nosferatu not counted', () => {
+    const users: CapacitorUser[] = [
+      { capPerSecond: 20 },
+      { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine },
+      { capPerSecond: -7.2 },
+      { capPerSecond: 30, ancillary: { cycles: 8, cycleSeconds: 9, reloadSeconds: 60 } },
+    ];
+    const engineLoad = 20 - 400 / 12 - 7.2 + 30;
+    const own = capacitorBudget(users, 0);
+    expect(engineLoad + loadAdjustment(users)).toBeCloseTo(own.drain - own.boosterInjection, 6);
+  });
+
+  it('is 0 when nothing reloads and no nosferatu runs', () => {
+    expect(loadAdjustment([{ capPerSecond: 20 }])).toBe(0);
+  });
+});
+
 describe('sustainedRepair', () => {
   const booster: Repairer = { layer: 'shield', rate: 40, capPerSecond: 20 };
   const armorRep: Repairer = { layer: 'armor', rate: 30, capPerSecond: 10 };
@@ -170,6 +211,16 @@ describe('sustainedRepair', () => {
     };
     const result = sustainedRepair([aar], { peakRecharge: 30, peakLoad: 0 });
     expect(result.sustained.armor).toBeCloseTo((78 * 96) / 156, 6);
+  });
+
+  it('spreads a capacitor-using ancillary repairer’s draw over its reload too', () => {
+    // 8 × 9 s of paste, 60 s reload: duty 72/132. Its 30 GJ/s averages to 16.36; 10 GJ/s of recharge is left.
+    const ancillary = { cycles: 8, cycleSeconds: 9, reloadSeconds: 60 };
+    const aar: Repairer = { layer: 'armor', rate: 78, capPerSecond: 30, ancillary };
+    const duty = 72 / 132;
+    const result = sustainedRepair([aar], { peakRecharge: 18, peakLoad: 8 + 30 * duty });
+    expect(result.capFraction).toBeCloseTo(10 / (30 * duty), 6);
+    expect(result.sustained.armor).toBeCloseTo(78 * duty * result.capFraction, 6);
   });
 
   it('treats an ancillary repairer with no whole cycle of charge as never reloading', () => {

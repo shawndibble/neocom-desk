@@ -239,7 +239,7 @@ describe('YieldDetailModal', () => {
     expect(screen.getByText(/Jita sell on 2026-09-08/)).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate \(50.0% yield\)/
+        /Reprocessing and Reprocessing Efficiency skills at your 50% facility yield \(50.0% yield\), less 0% reprocessing tax/
       )
     ).toBeInTheDocument();
     expect(screen.getByText(/no Jita price on this basis/)).toBeInTheDocument();

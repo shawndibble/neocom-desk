@@ -64,7 +64,7 @@ When `/next-ticket` calls `/triage <n>` on a ticket that is **already** `ready-f
 1. Read the issue in full, including comments and any agent brief.
 2. Run the **redundancy check** — is this already implemented on `develop`? If yes: comment (with the disclaimer) pointing to where it lives, apply `wontfix`, close, `gh issue edit <n> --remove-assignee @me`, and tell `/next-ticket` to stop (pick nothing else this run).
 3. Run the **prior-rejection check** against `.out-of-scope/*.md`. On a clear match: comment, apply `wontfix`, close, unassign, stop.
-4. Check the ticket is still coherent against the current codebase (referenced modules/behaviour still exist in some form; `## Blocked by` refs are all closed). If it needs decisions a human must make (grilling territory), comment saying so with the disclaimer, apply `needs-info` or `ready-for-human` as appropriate, `--remove-assignee @me`, and tell `/next-ticket` to stop.
+4. Check the ticket is still coherent against the current codebase (referenced modules/behaviour still exist in some form; every listed blocker in `## Blocked by` is closed — the list items only, per `docs/agents/issue-tracker.md` "Blocking edges"; a parent-idea or design line after the list is not a blocker). If it needs decisions a human must make (grilling territory), comment saying so with the disclaimer, apply `needs-info` or `ready-for-human` as appropriate, `--remove-assignee @me`, and tell `/next-ticket` to stop.
 5. Otherwise: proceed. Optionally post a one-line "revalidated, proceeding to implementation" comment (with the disclaimer).
 
 Never invent answers to grilling questions in this mode. If a human is needed, hand it back.

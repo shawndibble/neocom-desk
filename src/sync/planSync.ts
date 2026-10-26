@@ -46,7 +46,7 @@ import {
 } from './localBookkeeping';
 import { bumpRemoteMarker, canSkipPass, readRemoteMarker } from './syncMarker';
 import { createSyncScheduler, type SyncPriority, type SyncScope } from './syncScheduler';
-import { ensureSignedIn } from './syncAuth';
+import { confirmOwnership, ensureSignedIn } from './syncAuth';
 import { isAllowedSyncedSettingKey } from './syncedSettings';
 import {
   BUILD_PLANS,
@@ -492,11 +492,12 @@ async function syncCharacter(
   // whatever the request named, only a full pass refills them.
   const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
 
-  const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore(characterId);
   const ownerHash = character.ownerHash;
+  const uid = await ensureSignedIn(characterId, ownerHash);
+  const firestore = getSyncFirestore(characterId);
   const now = Date.now();
   let pushed = false;
+  let confirmed: Promise<boolean> | undefined;
   const ctx: SyncContext = {
     firestore,
     uid,
@@ -506,6 +507,7 @@ async function syncCharacter(
     onPush: () => {
       pushed = true;
     },
+    confirmOwner: () => (confirmed ??= confirmOwnership(characterId, ownerHash)),
   };
 
   // The marker as it stood before this pass pulled anything: storing it after

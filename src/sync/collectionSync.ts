@@ -13,6 +13,8 @@ import {
   setDoc,
   where,
   type CollectionReference,
+  type DocumentData,
+  type DocumentReference,
   type Firestore,
 } from 'firebase/firestore/lite';
 import { db, type PlanetRichnessRecord, type StationPinRecord } from '@/db';
@@ -41,6 +43,32 @@ export async function runBounded(writes: (() => Promise<unknown>)[]): Promise<vo
   await mapWithConcurrencyLimit(writes, PUSH_CONCURRENCY, async (write) => {
     await write();
   });
+}
+
+/**
+ * `setDoc` for a doc carrying this owner's `ownerHash`, over whatever a
+ * previous owner left at the same id. Ids derived from a key (a setting, a
+ * station, a feed occurrence) recur across owners, and the pull never shows
+ * the old doc (it reads `ownerHash == current`), so the write is an update the
+ * rules refuse: `hashMatches` reads the stored hash. Delete is uid-only for
+ * exactly this (firestore.rules), so the stale doc is removed and the write
+ * retried once — but only once `ctx.confirmOwner` proves this device is the
+ * current owner; otherwise the refusal stands. Not atomic: a failed retry
+ * leaves the id empty, and the local row pushes it again next pass.
+ */
+export async function setOwnedDoc(
+  ref: DocumentReference,
+  data: DocumentData,
+  ctx: SyncContext
+): Promise<void> {
+  try {
+    await setDoc(ref, data);
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+    if (!(await ctx.confirmOwner?.())) throw error;
+    await deleteDoc(ref);
+    await setDoc(ref, data);
+  }
 }
 
 async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promise<void> {
@@ -98,6 +126,11 @@ export interface SyncContext {
   now: number;
   /** Called after a pass pushes at least one doc, so the driver bumps the change marker. */
   onPush?: () => void;
+  /**
+   * Whether this device provably holds the Character now (`confirmOwnership`),
+   * asked at most once a pass. Without it `setOwnedDoc` never deletes.
+   */
+  confirmOwner?: () => Promise<boolean>;
 }
 
 /**
@@ -233,17 +266,21 @@ export async function syncEditableCollection(
   if (plan.pushUpserts.length > 0 || plan.pushTombstones.length > 0) ctx.onPush?.();
   await runBounded([
     ...plan.pushUpserts.map(
-      (p) => () => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))
+      (p) => () => setOwnedDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash), ctx)
     ),
     ...plan.pushTombstones.map(
       (t) => () =>
-        setDoc(doc(col, t.id), {
-          id: t.id,
-          characterId: ctx.characterId,
-          updatedAt: t.deletedAt,
-          ownerHash: ctx.ownerHash,
-          deleted: true,
-        })
+        setOwnedDoc(
+          doc(col, t.id),
+          {
+            id: t.id,
+            characterId: ctx.characterId,
+            updatedAt: t.deletedAt,
+            ownerHash: ctx.ownerHash,
+            deleted: true,
+          },
+          ctx
+        )
     ),
     ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
   ]);

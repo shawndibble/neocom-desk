@@ -106,7 +106,7 @@ describe('fittingToEft', () => {
     expect(result.unresolved).toEqual([]);
   });
 
-  it('marks an offline module so the parser strips the same suffix it strips on load', () => {
+  it('marks an offline module and loads it back offline', () => {
     const original = fitting({
       modules: [{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'offline' }],
     });
@@ -116,9 +116,7 @@ describe('fittingToEft', () => {
     const result = loadEftFitting(text, typeByName, SLOTS);
     expect(result.hullTypeId).toBe(587);
     if (result.hullTypeId === null) return;
-    // The loader never tracks offline state back (matches in-game import) —
-    // this only proves the suffix doesn't break the module from parsing.
-    expect(result.modules).toEqual([{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }]);
+    expect(result.modules).toEqual([{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'offline' }]);
   });
 
   it("writes mutated items in Pyfa's layout and loads them back with their rolls", () => {
@@ -165,7 +163,7 @@ describe('fittingToEft', () => {
     );
     const result = loadEftFitting(text, typeByName, SLOTS, mutaplasmids);
     if (result.hullTypeId === null) throw new Error('no hull');
-    expect(result.modules).toEqual([{ ...original.modules[0], state: 'active' }]);
+    expect(result.modules).toEqual(original.modules);
     expect(result.drones).toEqual(original.drones);
     expect(result.unresolved).toEqual([]);
   });

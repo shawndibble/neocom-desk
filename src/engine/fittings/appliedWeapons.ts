@@ -12,11 +12,14 @@
  * running) and per single drone on a drone stack.
  */
 import type { AppliedDpsInputs, AppliedWeapon, DamageSplit } from './appliedDps';
+import { weaponReloadDuty } from './tank';
 import type { WeaponRange } from './types';
 
 export const APPLIED_DPS_ATTRIBUTE = {
   dps: -12,
   optimal: 54,
+  /** A smartbomb's blast radius (`empFieldRange`), m. */
+  smartbombRange: 99,
   falloff: 158,
   tracking: 160,
   optimalSigRadius: 620,
@@ -137,6 +140,11 @@ function missileFlightRange(charge: AttributeMap): number {
   );
 }
 
+/** A charge that flies but explodes on no radius (a breacher pod's): metres it flies, else 0. */
+function chargeFlightRange(charge: AttributeMap | undefined): number {
+  return charge && !isMissile(charge) ? missileFlightRange(charge) : 0;
+}
+
 function isMissile(charge: AttributeMap | undefined): charge is AttributeMap {
   return charge !== undefined && read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius) > 0;
 }
@@ -148,9 +156,12 @@ function isMissile(charge: AttributeMap | undefined): charge is AttributeMap {
  */
 export function weaponRange(attributes: AttributeMap, charge?: AttributeMap): WeaponRange | null {
   if (isMissile(charge)) return { optimal: missileFlightRange(charge), falloff: 0 };
-  if (read(attributes, APPLIED_DPS_ATTRIBUTE.tracking) <= 0) return null;
-  const { optimal, falloff } = trackingOf(attributes);
-  return { optimal, falloff };
+  if (read(attributes, APPLIED_DPS_ATTRIBUTE.tracking) > 0) {
+    const { optimal, falloff } = trackingOf(attributes);
+    return { optimal, falloff };
+  }
+  const reach = areaRange(attributes, charge);
+  return reach > 0 ? { optimal: reach, falloff: 0 } : null;
 }
 
 /** A drone's speed, m/s: 0 for a sentry. */
@@ -158,15 +169,30 @@ export function droneSpeed(attributes: AttributeMap): number {
   return read(attributes, APPLIED_DPS_ATTRIBUTE.maxVelocity);
 }
 
+/**
+ * Metres an untracked weapon reaches: a smartbomb's blast, a Vorton's optimal
+ * (the module's own), or a breacher charge's flight, in that order. 0 for anything else.
+ */
+function areaRange(attributes: AttributeMap, charge?: AttributeMap): number {
+  return (
+    read(attributes, APPLIED_DPS_ATTRIBUTE.smartbombRange) ||
+    read(attributes, APPLIED_DPS_ATTRIBUTE.optimal) ||
+    chargeFlightRange(charge)
+  );
+}
+
 function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
   if (result.state !== 'active' && result.state !== 'overload') return null;
   const dps = read(result.attributes, APPLIED_DPS_ATTRIBUTE.dps);
   if (dps <= 0) return null;
   const charge = result.charge?.attributes;
+  const duty = weaponReloadDuty(result.attributes, false);
+  const reload = duty < 1 ? { reloadDuty: duty } : {};
   if (isMissile(charge)) {
     return {
       kind: 'missile',
       dps,
+      ...reload,
       range: missileFlightRange(charge),
       explosionRadius: read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius),
       explosionVelocity: read(charge, APPLIED_DPS_ATTRIBUTE.explosionVelocity),
@@ -175,9 +201,33 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
     };
   }
   if (read(result.attributes, APPLIED_DPS_ATTRIBUTE.tracking) > 0) {
-    return { kind: 'turret', dps, ...trackingOf(result.attributes), ...damageSplit(charge) };
+    return {
+      kind: 'turret',
+      dps,
+      ...reload,
+      ...trackingOf(result.attributes),
+      ...damageSplit(charge),
+    };
   }
-  // Smartbombs, a launcher with nothing loaded, …: nothing to apply.
+  // A Vorton applies like a missile, off its own explosion attributes, out to its optimal.
+  if (isMissile(result.attributes) && read(result.attributes, APPLIED_DPS_ATTRIBUTE.optimal) > 0) {
+    return {
+      kind: 'missile',
+      dps,
+      range: read(result.attributes, APPLIED_DPS_ATTRIBUTE.optimal),
+      explosionRadius: read(result.attributes, APPLIED_DPS_ATTRIBUTE.explosionRadius),
+      explosionVelocity: read(result.attributes, APPLIED_DPS_ATTRIBUTE.explosionVelocity),
+      damageReductionFactor: read(result.attributes, APPLIED_DPS_ATTRIBUTE.damageReductionFactor),
+      ...damageSplit(charge ?? result.attributes),
+    };
+  }
+  // A smartbomb or a breacher pod hits whatever is in range.
+  const range = areaRange(result.attributes, charge);
+  if (range > 0) {
+    const own = damageSplit(charge);
+    return { kind: 'area', dps, range, ...(own.damage ? own : damageSplit(result.attributes)) };
+  }
+  // A launcher with nothing loaded, …: nothing to apply.
   return null;
 }
 

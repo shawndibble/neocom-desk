@@ -2,7 +2,7 @@ import { formatCount } from '@/lib/formatCount';
 import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Disclosure, FilterChip, Modal } from '@/components/ui';
+import { Button, Checkbox, Eyebrow, Modal } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   CUSTOM_HAULER_TYPE_ID,
@@ -18,11 +18,6 @@ import { PlanLine } from './MovePlanLine';
 import { PickupHaulList } from './MovePlanHauls';
 import { HaulerPicker } from './MovePlanHaulerPicker';
 import { MaxIskInput } from './MovePlanMaxIsk';
-import { OwnedMark } from './MovePlanOwnedMark';
-import { ownedFirstOrder } from './ownedHullText';
-
-/** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
-const INLINE_ALTERNATIVES = 3;
 
 /** "Don't remind me again" on the rig warning, ticked once for good. */
 const useSkipRigWarning = createLocalSetting<boolean>({
@@ -150,7 +145,6 @@ export function PlanResult({
   }
   const { totals } = plan;
   const destinationLabel = destinationStation ?? systemName ?? '';
-  const pickups = plan.perCharacter.flatMap((c) => c.pickups);
   const active = plan.active;
   const capacity = active?.hull.capacityM3 ?? 0;
   const haulerName = (hull: { typeId: number; name: string; capacityM3: number }) =>
@@ -158,22 +152,16 @@ export function PlanResult({
       ? t('assets.movePlan.customHold', { volume: formatCubicMetres(hull.capacityM3) })
       : hull.name;
   /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
-  const flown = pickups.flatMap((p) => p.ships);
-  /** Flown hulls by name, in first-seen order, so duplicates read "Badger ×2". */
-  const flownGroups = [
-    ...flown
-      .reduce((groups, s) => {
-        const ship = name(s.typeId);
-        return groups.set(ship, (groups.get(ship) ?? 0) + 1);
-      }, new Map<string, number>())
-      .entries(),
-  ];
+  const flownShips = plan.perCharacter.flatMap((c) =>
+    c.pickups.flatMap((p) =>
+      p.ships.map((ship) => ({ ship, pickupKey: `${c.characterId}:${p.locationId}` }))
+    )
+  );
+  const flown = flownShips.map((f) => f.ship);
   /** Every flown ship is a trip of its own on top of the hauls. */
   const withShips = (hauls: number, tooBig = 0) => hauls + totals.shipsToFly + tooBig;
   /** Packed ships the active hauler cannot carry: flown, so each is a flight. */
   const tooBig = active?.tooBigCount ?? 0;
-  const leavesBehind = (count: number) => t('assets.movePlan.leavesBehind', { count });
-  const alternatives = plan.comparison.filter((o) => o.hull.typeId !== active?.hull.typeId);
 
   return (
     <div className="flex flex-1 flex-col gap-3">
@@ -182,8 +170,8 @@ export function PlanResult({
         {t('assets.movePlan.title')}
       </h3>
       {active ? (
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
-          <div className="row-span-2 min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+          <div className="min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
             {withShips(active.trips, tooBig)}
             <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
               {t('assets.movePlan.tripsLabel', { count: withShips(active.trips, tooBig) })}
@@ -206,16 +194,10 @@ export function PlanResult({
                 .join(' + ')}
             </span>
           </p>
-          {alternatives.length > 0 && (
-            <ul className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-xs text-text-dim">
-              {alternatives.slice(0, INLINE_ALTERNATIVES).map((o) => (
-                <li key={o.hull.typeId}>
-                  <b className="font-semibold text-text">{haulerName(o.hull)}</b>{' '}
-                  {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
-                  {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
-                </li>
-              ))}
-            </ul>
+          {totals.totalM3 > 0 && (
+            <div className="col-span-2 sm:col-span-1 sm:col-start-3 sm:row-start-1">
+              <MaxIskInput value={maxIsk} onChange={onChangeMaxIsk} />
+            </div>
           )}
         </div>
       ) : (
@@ -233,6 +215,7 @@ export function PlanResult({
               </span>
             </div>
           )}
+          {totals.totalM3 > 0 && <MaxIskInput value={maxIsk} onChange={onChangeMaxIsk} />}
           {totals.totalM3 > 0 && (
             <p className="text-text-dim">
               {t(
@@ -247,27 +230,19 @@ export function PlanResult({
         </>
       )}
       {totals.totalM3 > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <HaulerPicker
-            plan={plan}
-            override={haulerOverride}
-            onPick={onPickHauler}
-            ownedFirst={ownedFirst}
-          />
-          {plan.comparison.some((o) => o.hull.owned) && (
-            <FilterChip
-              size="md"
-              label={t('assets.movePlan.ownedFirst')}
-              tooltip={t('assets.movePlan.ownedFirstHint')}
-              selected={ownedFirst}
-              onToggle={() => setOwnedFirst((on) => !on)}
-            />
-          )}
-        </div>
+        <HaulerPicker
+          plan={plan}
+          override={haulerOverride}
+          onPick={onPickHauler}
+          ownedFirst={ownedFirst}
+          onOwnedFirstChange={setOwnedFirst}
+          expanded={compareOpen}
+          onToggleExpanded={onToggleCompare}
+          tripsOf={(o) => withShips(o.trips, o.tooBigCount)}
+        />
       )}
       {totals.totalM3 > 0 && (
         <>
-          <MaxIskInput value={maxIsk} onChange={onChangeMaxIsk} />
           {maxIsk !== null && state.pricesUnavailable && (
             <p className="m-0 text-sm font-semibold text-warning">
               {t('assets.movePlan.pricesUnavailable')}
@@ -279,26 +254,6 @@ export function PlanResult({
             </p>
           )}
         </>
-      )}
-      {alternatives.length > INLINE_ALTERNATIVES && (
-        <Disclosure
-          label={t('assets.movePlan.allHaulers')}
-          expanded={compareOpen}
-          onToggle={onToggleCompare}
-        >
-          <ul className="text-text-dim">
-            {ownedFirstOrder(plan.comparison, ownedFirst).map((o) => (
-              <li key={o.hull.typeId} className="flex items-baseline gap-2">
-                <span className="min-w-0 truncate">
-                  {o.hull.name} ·{' '}
-                  {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
-                  {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
-                </span>
-                <OwnedMark t={t} hull={o.hull} />
-              </li>
-            ))}
-          </ul>
-        </Disclosure>
       )}
       {active && tooBig > 0 && (
         <p className="m-0 text-sm font-semibold text-warning">
@@ -318,163 +273,171 @@ export function PlanResult({
           {t('assets.movePlan.overLimitWarning', { count: active.overLimitCount })}
         </p>
       )}
-      {flownGroups.length > 0 && (
-        <section className="flex flex-col gap-0.5">
-          <p className="m-0 text-sm [overflow-wrap:anywhere]">
-            <b className="font-bold">{t('assets.movePlan.flyingHeading')}:</b>{' '}
-            {flownGroups
-              .map(([ship, count]) =>
-                count > 1 ? t('assets.movePlan.flyingGrouped', { ship, count }) : ship
-              )
-              .join(', ')}
-          </p>
-          <p className="m-0 text-xs text-text-dim">{t('assets.movePlan.flyingHint')}</p>
+      {flown.length > 0 && (
+        <section
+          aria-label={t('assets.movePlan.flyingHeading')}
+          className="rounded-xs border border-line bg-panel-2"
+        >
+          <div className="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">
+            <Eyebrow as="h3">{t('assets.movePlan.flyingHeading')}</Eyebrow>
+            <span className="text-xs text-text-dim tabular-nums">
+              {t('assets.movePlan.shipFlightCount', { count: flown.length })}
+            </span>
+          </div>
+          <div className="overflow-hidden">
+            <ul className="m-0 -mb-px grid list-none grid-cols-1 gap-x-8 px-3 pt-1 sm:grid-cols-2">
+              {flownShips.map(({ ship, pickupKey }) => (
+                <li
+                  key={ship.itemId}
+                  className="flex items-center gap-3 border-b border-line py-1.5"
+                >
+                  <span className="min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]">
+                    {name(ship.typeId)}
+                  </span>
+                  <span className="text-xs font-semibold text-warning">
+                    {t('assets.movePlan.flyIt')}
+                  </span>
+                  {canPack(ship.typeId) && (
+                    <Button
+                      size="sm"
+                      onClick={() => askToPack(ship.itemId, ship.typeId, pickupKey)}
+                    >
+                      {t('assets.movePlan.packInstead')}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       )}
-      <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5">
-        <Stat
-          label={t('assets.movePlan.volume')}
-          value={`${formatCubicMetres(totals.totalM3)} m³`}
-        />
-        <Stat label={t('assets.movePlan.stacks')} value={formatCount(totals.stacks)} />
-        <Stat
-          label={t('assets.movePlan.characters', { count: totals.characters })}
-          value={String(totals.characters)}
-        />
-        <Stat
-          label={t('assets.movePlan.ships', { count: totals.shipsToFly })}
-          value={String(totals.shipsToFly)}
-        />
-      </dl>
-      <Rail>
-        {plan.perCharacter.map((c) => (
-          <PlanCharacter
-            key={c.characterId}
-            count={c.pickups.length}
-            totalM3={c.totalM3}
-            name={c.name}
-          >
-            {c.pickups.map((p) => {
-              const hauled = active?.pickups.find(
-                (h) => h.characterId === c.characterId && h.locationId === p.locationId
-              );
-              return (
-                <RailStop key={p.locationId} hue={hueOf(p.locationId)}>
-                  <section className="rounded-xs border border-line bg-panel-2 px-3 pb-1">
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line pt-2.5 pb-1.5">
-                      <h3
-                        data-pickup-heading={`${c.characterId}:${p.locationId}`}
-                        tabIndex={-1}
-                        className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm focus:outline-none"
-                      >
-                        <span className="min-w-0 flex-1 font-bold max-sm:basis-full [overflow-wrap:anywhere]">
-                          {placeLabel(p.locationId)}
-                        </span>
-                        <span className="font-bold tabular-nums">
-                          {formatCubicMetres(p.totalM3)} m³
-                        </span>
-                      </h3>
-                    </div>
-                    {totals.totalM3 > 0 && capacity > 0 && (
-                      <p className="m-0 pt-1.5 text-xs text-text-dim tabular-nums">
-                        {t(
-                          hauled
-                            ? 'assets.movePlan.shareOfLoadHauls'
-                            : 'assets.movePlan.shareOfLoad',
-                          {
-                            percent: Math.round((p.totalM3 / totals.totalM3) * 100),
-                            count: hauled?.hauls.length ?? 0,
-                          }
-                        )}
-                      </p>
-                    )}
-                    {hauled && <PickupHaulList pickup={hauled} name={name} />}
-                    <ul className="m-0 flex list-none flex-col p-0">
-                      {!hauled &&
-                        p.lines.map((l) => (
+      <div className="flex flex-1 flex-col gap-3 rounded-xs border border-line bg-panel p-3">
+        <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5">
+          <Stat
+            label={t('assets.movePlan.volume')}
+            value={`${formatCubicMetres(totals.totalM3)} m³`}
+          />
+          <Stat label={t('assets.movePlan.stacks')} value={formatCount(totals.stacks)} />
+          {totals.characters > 1 && (
+            <Stat
+              label={t('assets.movePlan.characters', { count: totals.characters })}
+              value={String(totals.characters)}
+            />
+          )}
+          <Stat
+            label={t('assets.movePlan.ships', { count: totals.shipsToFly })}
+            value={String(totals.shipsToFly)}
+          />
+        </dl>
+        <Rail>
+          {plan.perCharacter.map((c) => (
+            <PlanCharacter
+              key={c.characterId}
+              count={c.pickups.length}
+              totalM3={c.totalM3}
+              name={c.name}
+            >
+              {c.pickups.map((p) => {
+                const hauled = active?.pickups.find(
+                  (h) => h.characterId === c.characterId && h.locationId === p.locationId
+                );
+                return (
+                  <RailStop key={p.locationId} hue={hueOf(p.locationId)}>
+                    <section className="rounded-xs border border-line bg-panel-2 px-3 pb-1">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line pt-2.5 pb-1.5">
+                        <h3
+                          data-pickup-heading={`${c.characterId}:${p.locationId}`}
+                          tabIndex={-1}
+                          className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm focus:outline-none"
+                        >
+                          <span className="min-w-0 flex-1 font-bold max-sm:basis-full [overflow-wrap:anywhere]">
+                            {placeLabel(p.locationId)}
+                          </span>
+                          <span className="font-bold tabular-nums">
+                            {formatCubicMetres(p.totalM3)} m³
+                          </span>
+                        </h3>
+                      </div>
+                      {totals.totalM3 > 0 && capacity > 0 && (
+                        <p className="m-0 pt-1.5 text-xs text-text-dim tabular-nums">
+                          {t(
+                            hauled
+                              ? 'assets.movePlan.shareOfLoadHauls'
+                              : 'assets.movePlan.shareOfLoad',
+                            {
+                              percent: Math.round((p.totalM3 / totals.totalM3) * 100),
+                              count: hauled?.hauls.length ?? 0,
+                            }
+                          )}
+                        </p>
+                      )}
+                      {hauled && <PickupHaulList pickup={hauled} name={name} />}
+                      <ul className="m-0 flex list-none flex-col p-0">
+                        {!hauled &&
+                          p.lines.map((l) => (
+                            <PlanLine
+                              key={l.typeId}
+                              name={name(l.typeId)}
+                              qty={`× ${formatCount(l.quantity)}`}
+                              trailing={l.m3 !== null ? `${formatCubicMetres(l.m3)} m³` : null}
+                            />
+                          ))}
+                        {p.unknownVolume.map((u) => (
                           <PlanLine
-                            key={l.typeId}
-                            name={name(l.typeId)}
-                            qty={`× ${formatCount(l.quantity)}`}
-                            trailing={l.m3 !== null ? `${formatCubicMetres(l.m3)} m³` : null}
+                            key={`unknown-${u.typeId}`}
+                            name={name(u.typeId)}
+                            qty={`× ${formatCount(u.quantity)}`}
+                            trailing={t('assets.movePlan.volumeUnknown')}
+                            dim
                           />
                         ))}
-                      {p.unknownVolume.map((u) => (
-                        <PlanLine
-                          key={`unknown-${u.typeId}`}
-                          name={name(u.typeId)}
-                          qty={`× ${formatCount(u.quantity)}`}
-                          trailing={t('assets.movePlan.volumeUnknown')}
-                          dim
-                        />
-                      ))}
-                      {p.packed.map((s) => (
-                        <PlanLine
-                          key={s.itemId}
-                          name={name(s.typeId)}
-                          qty={<span className="text-text-dim">{t('assets.movePlan.packed')}</span>}
-                          trailing={
-                            <Button
-                              size="sm"
-                              aria-label={t('assets.movePlan.flyInsteadAria', {
-                                ship: name(s.typeId),
-                              })}
-                              onClick={() => onUnpackShip(s.itemId)}
-                            >
-                              {t('assets.movePlan.flyInstead')}
-                            </Button>
-                          }
-                        />
-                      ))}
-                      {p.ships.map((s) => (
-                        <PlanLine
-                          key={s.itemId}
-                          name={name(s.typeId)}
-                          qty={
-                            <span className="font-semibold text-warning">
-                              {t('assets.movePlan.flyIt')}
-                            </span>
-                          }
-                          trailing={
-                            canPack(s.typeId) ? (
+                        {p.packed.map((s) => (
+                          <PlanLine
+                            key={s.itemId}
+                            name={name(s.typeId)}
+                            qty={
+                              <span className="text-text-dim">{t('assets.movePlan.packed')}</span>
+                            }
+                            trailing={
                               <Button
                                 size="sm"
-                                onClick={() =>
-                                  askToPack(s.itemId, s.typeId, `${c.characterId}:${p.locationId}`)
-                                }
+                                aria-label={t('assets.movePlan.flyInsteadAria', {
+                                  ship: name(s.typeId),
+                                })}
+                                onClick={() => onUnpackShip(s.itemId)}
                               >
-                                {t('assets.movePlan.packInstead')}
+                                {t('assets.movePlan.flyInstead')}
                               </Button>
-                            ) : null
-                          }
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                </RailStop>
-              );
-            })}
-          </PlanCharacter>
-        ))}
-        {destinationLabel && (
-          <RailStop destination>
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-xs border border-dashed border-accent px-3 py-2.5">
-              <b className="[overflow-wrap:anywhere]">{destinationLabel}</b>
-              <span className="text-text-dim">{t('assets.movePlan.deliverAll')}</span>
-            </div>
-          </RailStop>
-        )}
-      </Rail>
-      {routeFailed && <p className="m-0 text-text-dim">{t('assets.movePlan.routeFailed')}</p>}
-      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
-        <Button variant="ghost" onClick={onBack}>
-          {t('assets.movePlan.back')}
-        </Button>
-        {onShowRoute && (active || totals.shipsToFly > 0) && destinationSystem !== null && (
-          <Button loading={routing} onClick={onShowRoute}>
-            {t('assets.movePlan.showRoute')}
+                            }
+                          />
+                        ))}
+                      </ul>
+                    </section>
+                  </RailStop>
+                );
+              })}
+            </PlanCharacter>
+          ))}
+          {destinationLabel && (
+            <RailStop destination>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-xs border border-dashed border-accent px-3 py-2.5">
+                <b className="[overflow-wrap:anywhere]">{destinationLabel}</b>
+                <span className="text-text-dim">{t('assets.movePlan.deliverAll')}</span>
+              </div>
+            </RailStop>
+          )}
+        </Rail>
+        {routeFailed && <p className="m-0 text-text-dim">{t('assets.movePlan.routeFailed')}</p>}
+        <div className="sticky bottom-0 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+          <Button variant="ghost" onClick={onBack}>
+            {t('assets.movePlan.back')}
           </Button>
-        )}
+          {onShowRoute && (active || totals.shipsToFly > 0) && destinationSystem !== null && (
+            <Button loading={routing} onClick={onShowRoute}>
+              {t('assets.movePlan.showRoute')}
+            </Button>
+          )}
+        </div>
       </div>
       <Modal
         open={asking !== null}

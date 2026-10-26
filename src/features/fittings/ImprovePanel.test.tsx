@@ -10,6 +10,7 @@ import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
+import type { ImproveOwnedSettings } from './ImproveOwnedStock';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
 const before = baseFittingStats();
@@ -125,7 +126,9 @@ describe('ImprovePanel', () => {
       onLoadBestCharge,
     });
     expect(
-      screen.getByText('2 launchers have no missiles loaded, so damage goals ignore them.')
+      screen.getByText(
+        '2 launchers have no missiles loaded, so swaps are scored as if they held the best one.'
+      )
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Load best charge' }));
     expect(onLoadBestCharge).toHaveBeenCalledOnce();
@@ -256,7 +259,7 @@ describe('ImprovePanel', () => {
     const [lead, detail] = row.querySelectorAll('span.block.text-xs');
     expect(lead).toHaveTextContent('Applied DPS');
     expect(lead).not.toHaveTextContent('Sustained DPS');
-    expect(detail).toHaveTextContent('Sustained DPS 90.7 → 128');
+    expect(detail).toHaveTextContent(/Sustained DPS\s*90.7 → 128/);
   });
 
   it("never shows the same stat in a row's lead line and its detail line", () => {
@@ -390,6 +393,15 @@ describe('ImprovePanel', () => {
     expect(screen.queryByRole('group', { name: 'Improve Reach' })).not.toBeInTheDocument();
   });
 
+  it('names the settings toggle with its label and summary, and toggles on click', async () => {
+    renderPanel(search({ status: 'idle' }));
+    const toggle = screen.getByRole('button', { name: /^Search settings.*Upgrade/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
+  });
+
   it('says nothing could be added on a fit with no modules', () => {
     const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
     renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });
@@ -502,6 +514,31 @@ describe('ImprovePanel', () => {
     );
   });
 
+  it('adds an Either figure for neutral rows such as Damage Control, and omits it with none', () => {
+    const state = done({ noDownside: [option(30, {})] });
+    if (state.status !== 'done') throw new Error('state');
+    const empty = { noDownside: [], tradeOffs: [], rejected: [], checked: 2, stopped: false };
+    const withNeutral = { ...empty, noDownside: state.result.noDownside };
+    const sides = { shield: state.result, armor: empty };
+    const view = renderPanel(
+      search({ ...state, sides, neutral: withNeutral }),
+      vi.fn(),
+      vi.fn(),
+      settings({ defense: 'shield' })
+    );
+    expect(screen.getByTestId('improve-sides')).toHaveTextContent(
+      'Shield: up to +10% · Armor: no gain · Either: up to +10%'
+    );
+    view.unmount();
+    renderPanel(
+      search({ ...state, sides, neutral: empty }),
+      vi.fn(),
+      vi.fn(),
+      settings({ defense: 'shield' })
+    );
+    expect(screen.getByTestId('improve-sides')).not.toHaveTextContent('Either');
+  });
+
   it('disables Mine more with its reason on a fit with no miners', async () => {
     renderPanel(search({ status: 'idle' }, before));
     await openMoreGoals();
@@ -509,7 +546,7 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('No miners on this fit')).toBeInTheDocument();
   });
 
-  it('shows the ore on every Mine more row and in the closest swaps, with the m³/s it gives', () => {
+  it('shows the m³/s on every Mine more row and in the closest swaps, without repeating the ore', () => {
     const mining = (perSecond: number) => ({
       rows: [],
       perSecond,
@@ -540,15 +577,61 @@ describe('ImprovePanel', () => {
       own
     );
     renderPanel(noGain, vi.fn(), vi.fn(), settings(), { goal: 'mining' });
-    const lines = screen.getAllByText(/Mines 10 → 12\.5 m³\/s of Veldspar, Scordite/);
+    const lines = screen.getAllByText('Mines 10 → 12.5 m³/s');
     // Two rows plus the best-found header.
     expect(lines).toHaveLength(3);
-    expect(lines[0]).toHaveTextContent('(Simple Asteroid crystals)');
+    // The ore name lives in the Ore picker only: rows don't repeat it.
+    expect(screen.getAllByText(/Veldspar/)).toHaveLength(1);
     cleanup();
     renderPanel(search(done({ rejected: [broke] }, own), own), vi.fn(), vi.fn(), settings(), {
       goal: 'mining',
     });
-    expect(screen.getByText(/Mines 10 → 11 m³\/s of Veldspar/)).toBeInTheDocument();
+    expect(screen.getByText('Mines 10 → 11 m³/s')).toBeInTheDocument();
+  });
+
+  it('warns about miners with no crystal, offers Load best crystal, and keeps Now at the fit as it is', async () => {
+    const mining = (perSecond: number) => ({
+      rows: [],
+      perSecond,
+      perHour: perSecond * 3600,
+      wastePerSecond: 0,
+      wastePct: 0,
+    });
+    const asIs = { ...before, mining: mining(24.7) };
+    const withBest = { ...before, mining: mining(55.6) };
+    const gain = option(10, { mining: mining(57.1) });
+    const onLoadBestCrystal = vi.fn();
+    const state = {
+      ...done({ noDownside: [gain] }, withBest),
+      fitAsIs: asIs,
+      crystals: {
+        bestKey: 'B2',
+        unloaded: { count: 2, steps: [] },
+      },
+    } as ImproveState;
+    render(
+      <ImprovePanel
+        goal="mining"
+        onGoalChange={vi.fn()}
+        search={search(state, withBest)}
+        catalogue={null}
+        onApply={vi.fn()}
+        settings={settings()}
+        onFixFirst={vi.fn()}
+        onLoadBestCrystal={onLoadBestCrystal}
+      />
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      '2 miners have no crystal for Simple Asteroid ore, so they mine 24.7 m³/s; with Type B II, 55.6.'
+    );
+    expect(screen.getByTestId('improve-best-found')).toHaveTextContent(
+      'Now → best found Mines 24.7 → 57.1 m³/s'
+    );
+    expect(screen.getByTestId('improve-best-found')).toHaveTextContent(
+      'Rows use the best crystals for Veldspar'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Load best crystal' }));
+    expect(onLoadBestCrystal).toHaveBeenCalled();
   });
 
   it('reports the ore the pilot picks', async () => {
@@ -832,5 +915,104 @@ describe('ImprovePanel', () => {
       unmount();
       expect(lastDelta(onPreview)).toBeNull();
     });
+  });
+});
+
+describe('ImprovePanel owned stock', () => {
+  const ownedSettings = (patch: Partial<ImproveOwnedSettings> = {}): ImproveOwnedSettings => ({
+    on: true,
+    onChange: vi.fn(),
+    place: 60003760,
+    onPlaceChange: vi.fn(),
+    otherPlaces: [],
+    placeLabel: 'Jita',
+    ...patch,
+  });
+  const withStock = (
+    held: Record<number, number>,
+    result: Partial<ImproveResult>,
+    anyOwned = Object.keys(held).length > 0
+  ): ImproveState => ({
+    ...(done(result) as Extract<ImproveState, { status: 'done' }>),
+    owned: {
+      stock: {
+        owned: new Map(Object.entries(held).map(([k, v]) => [Number(k), v])),
+        fitCounts: new Map(),
+      },
+      priceOf: () => 1000,
+      anyOwned,
+    },
+  });
+
+  it('hides the sentence without the assets scope and in Refitting', async () => {
+    const { unmount } = renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings());
+    await openSettings();
+    expect(screen.queryByText('Count what I own at')).not.toBeInTheDocument();
+    unmount();
+    renderPanel(
+      search({ status: 'idle' }),
+      vi.fn(),
+      vi.fn(),
+      settings({ mode: 'refit', owned: ownedSettings() })
+    );
+    await openSettings();
+    expect(screen.queryByText('Count what I own at')).not.toBeInTheDocument();
+  });
+
+  it('shows the sentence in Planning, names the place in the summary and reports a change', async () => {
+    const owned = ownedSettings();
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings({ owned }));
+    expect(
+      screen.getByRole('button', { name: /^Search settings.*minus owned at Jita/ })
+    ).toBeInTheDocument();
+    await openSettings();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Count what I own at/ }));
+    expect(owned.onChange).toHaveBeenCalledWith(false);
+    expect(screen.getByText('Budget for what is still to buy (ISK)')).toBeInTheDocument();
+  });
+
+  it('renders the three cost lines', () => {
+    const swap = (toTypeId: number, slots: number[]) =>
+      option(
+        toTypeId,
+        { ehp: 1100 },
+        {
+          candidate: {
+            fromTypeId: 1,
+            toTypeId,
+            at: slots.map((slotIndex) => ({ slot: 'low' as const, slotIndex })),
+          },
+        }
+      );
+    renderPanel(
+      search(
+        withStock(
+          { 11: 2, 12: 1 },
+          { noDownside: [swap(11, [0, 1]), swap(12, [2, 3]), swap(13, [4])] }
+        )
+      ),
+      vi.fn(),
+      vi.fn(),
+      settings({ owned: ownedSettings() })
+    );
+    expect(screen.getByText('You own all 2')).toBeInTheDocument();
+    expect(screen.getByText(/nothing to buy/)).toBeInTheDocument();
+    expect(screen.getByText(/You own 1 of 2 · buy 1 for/)).toBeInTheDocument();
+    expect(screen.getByText(/^Costs/)).toBeInTheDocument();
+  });
+
+  it('warns when nothing among the candidates is owned at the place', async () => {
+    renderPanel(
+      search(withStock({}, { noDownside: [option(11, { ehp: 1100 })] })),
+      vi.fn(),
+      vi.fn(),
+      settings({ owned: ownedSettings() })
+    );
+    await openSettings();
+    expect(
+      screen.getByText(
+        'You own none of these modules at Jita. Pick another place, or any location.'
+      )
+    ).toBeInTheDocument();
   });
 });
