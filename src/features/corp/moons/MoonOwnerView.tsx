@@ -122,7 +122,7 @@ function MinedTable({
 }: {
   view: FeederView;
   names: Names;
-  typeName?: TypeNames | undefined;
+  typeName?: TypeNames;
   label: (structureId: number) => string;
   title: string;
 }) {
