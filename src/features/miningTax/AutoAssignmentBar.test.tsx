@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@/i18n';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
-import { SurveyConnectionsPanel } from './SurveyConnectionsPanel';
+import { AutoAssignmentBar } from './AutoAssignmentBar';
 import { useSurveyConnections } from './surveyConnections';
 
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), setSyncedSetting: vi.fn() }));
@@ -28,7 +28,7 @@ function connection(overrides: Partial<SurveyConnection> = {}): SurveyConnection
 
 function renderPanel() {
   return render(
-    <SurveyConnectionsPanel
+    <AutoAssignmentBar
       characterIds={[1]}
       characterNames={new Map([[1, 'Pilot']])}
       systemNames={new Map([[30000142, 'Jita']])}
@@ -37,7 +37,7 @@ function renderPanel() {
   );
 }
 
-describe('SurveyConnectionsPanel', () => {
+describe('AutoAssignmentBar', () => {
   beforeEach(() => {
     useSurveyConnections.setState({ hydrated: true });
   });
@@ -52,22 +52,26 @@ describe('SurveyConnectionsPanel', () => {
     expect(container.textContent).toBe('');
   });
 
-  it('names the payee and system, hides ore, and Stop removes it', async () => {
+  it('is one Auto Assignment row: payee at rate · system · until, then Stop', async () => {
     useSurveyConnections.setState({ value: [connection()] });
     renderPanel();
-    expect(screen.getByText('Moon Corp at 10%')).toBeTruthy();
-    expect(screen.getByText(/Jita/)).toBeTruthy();
+    const bar = screen.getByRole('status', { name: 'Auto Assignment' });
+    expect(bar.textContent).toMatch(/^Auto AssignmentMoon Corp at 10% · Jita · until .+Stop$/);
     expect(screen.queryByText(/Bitumens/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(useSurveyConnections.getState().value).toEqual([]));
   });
 
-  it('warns when two payees claim the same ore in one system', () => {
-    useSurveyConnections.setState({
-      value: [connection(), connection({ surveyId: 's2', payeeId: 'p2', payeeName: 'Other Corp' })],
-    });
-    renderPanel();
-    expect(screen.getByText(/Shares ore with the survey for Other Corp/)).toBeTruthy();
-    expect(screen.getByText(/Shares ore with the survey for Moon Corp/)).toBeTruthy();
+  it('names the Character only when more than one is tracked', () => {
+    useSurveyConnections.setState({ value: [connection()] });
+    render(
+      <AutoAssignmentBar
+        characterIds={[1, 2]}
+        characterNames={new Map([[1, 'Pilot']])}
+        systemNames={new Map([[30000142, 'Jita']])}
+        nowMs={NOW}
+      />
+    );
+    expect(screen.getByRole('status').textContent).toContain(' · Pilot');
   });
 });

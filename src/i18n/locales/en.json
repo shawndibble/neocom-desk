@@ -7064,11 +7064,10 @@
     "reauthAction": "Log in again with EVE Online",
     "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
     "surveyConnections": {
-      "title": "Auto-assigning moon tax",
+      "title": "Auto Assignment",
       "line": "{{name}} at {{pct}}%",
       "noLocation": "Waiting for the survey to have a location",
       "until": "until {{time}}",
-      "overlap": "Shares ore with the survey for {{name}}. Ore both claim stays unassigned for you to assign.",
       "stopFailed": "Couldn't stop that. Try again."
     },
     "emptyTitle": "No mining ledger entries match this filter",
