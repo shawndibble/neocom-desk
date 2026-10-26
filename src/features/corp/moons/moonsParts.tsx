@@ -7,7 +7,9 @@ import { InfoTooltip, ProgressBar, textActionClassName } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { ExtractionRow, MinerStanding } from '@/engine/corpTaxBook/bookView';
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
+import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 
 const STATE_TONE: Record<ExtractionState, string> = {
@@ -126,5 +128,18 @@ export function Fact({ label, value }: { label: string; value: ReactNode }) {
       <dt className={eyebrowClassName}>{label}</dt>
       <dd className="text-sm">{value}</dd>
     </div>
+  );
+}
+
+/** A Statement's due date; once past, the days late, in danger. `now` is the book's clock. */
+export function DueWord({ dueAt, now }: { dueAt: string | null; now: string }) {
+  const { t } = useTranslation();
+  if (dueAt === null) return <span className="text-text-dim">—</span>;
+  const late = Math.floor((Date.parse(now) - Date.parse(dueAt)) / DAY_MS);
+  if (late < 1) return <span className="whitespace-nowrap">{shortDate(dueAt)}</span>;
+  return (
+    <span className="font-semibold whitespace-nowrap text-danger">
+      {t('corpTaxBook.moons.statementPeriod.dueLate', { date: shortDate(dueAt), count: late })}
+    </span>
   );
 }

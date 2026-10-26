@@ -15907,7 +15907,10 @@
         "billed": "Billed",
         "paid": "Paid",
         "outstanding": "Outstanding",
-        "issued": "Issued"
+        "issued": "Issued",
+        "mailed": "Mailed",
+        "due": "Due",
+        "mail": "Mail"
       },
       "beforeBook": {
         "donations_one": "Before the book: {{count}} donation dated before the start date is not counted",
@@ -16177,8 +16180,23 @@
         "chipNote": "Every mail's status is in the progress chip at the top of the page.",
         "again": "Back to Check"
       },
+      "statementPeriod": {
+        "notFound": "No Statements were issued for this period.",
+        "issued": "Issued {{date}}",
+        "miners_one": "{{count}} Miner",
+        "miners_other": "{{count}} Miners",
+        "mailSent": "Sent",
+        "mailSentTimes": "Sent ×{{count}}",
+        "notMailed": "Not mailed",
+        "stopped": "Stopped",
+        "stoppedTip_one": "This Miner stopped reminders. {{count}} mail sent.",
+        "stoppedTip_other": "This Miner stopped reminders. {{count}} mails sent.",
+        "dueLate_one": "{{date}} · {{count}} day late",
+        "dueLate_other": "{{date}} · {{count}} days late"
+      },
       "periods": {
         "title": "All periods",
+        "mailedOf": "{{sent}}/{{total}}",
         "meta": "{{cadence}} · minimum {{minimum}}",
         "writeOffsTolerance_one": "{{tolerance}} left over by {{count}} payment within tolerance, written off.",
         "writeOffsTolerance_other": "{{tolerance}} left over by {{count}} payments within tolerance, written off.",

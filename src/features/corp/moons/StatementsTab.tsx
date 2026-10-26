@@ -1,14 +1,22 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DataTable, InfoTooltip, Panel, type DataTableColumn } from '@/components/ui';
 import { periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
+import { caretColumn } from './caretColumn';
+import { DueWord } from './moonsParts';
+import { statementPeriodPath } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { StatementRun } from './StatementRun';
+
+/** A period with Statements: sent, overdue or paid. Open, ready, closed and rollover rows have none. */
+const isIssued = (r: PeriodRow) => r.statements > 0;
 
 export function StatementsTab() {
   const { t } = useTranslation();
   const { view } = useBook();
+  const navigate = useNavigate();
   const rows = useMemo(() => periodRows(view), [view]);
   const tolerance = [...view.internals.byMiner.values()].flatMap((m) => m.allocation.writeOffs);
   const late = [...view.internals.byMiner.values()].flatMap((m) => m.draft.writtenOff);
@@ -67,10 +75,27 @@ export function StatementsTab() {
       render: (r) => (r.outstanding ? isk(r.outstanding) : '—'),
     },
     {
+      id: 'mailed',
+      header: t('corpTaxBook.moons.cols.mailed'),
+      align: 'right',
+      className: 'tabular-nums',
+      render: (r) =>
+        r.statements
+          ? t('corpTaxBook.moons.periods.mailedOf', { sent: r.mailed, total: r.statements })
+          : '—',
+    },
+    {
+      id: 'due',
+      header: t('corpTaxBook.moons.cols.due'),
+      render: (r) => <DueWord dueAt={r.dueAt} now={view.input.now} />,
+    },
+    {
       id: 'issued',
       header: t('corpTaxBook.moons.cols.issued'),
       render: (r) => (r.issuedAt ? shortDate(r.issuedAt) : '—'),
     },
+    // Only an issued period has Statements to open; the rest carry no caret (hidden = no caret).
+    caretColumn<PeriodRow>((r) => !isIssued(r)),
   ];
 
   return (
@@ -93,6 +118,8 @@ export function StatementsTab() {
           columns={columns}
           rows={rows}
           rowKey={(r) => r.start}
+          onRowClick={(r) => navigate(statementPeriodPath(r.start))}
+          rowClickable={isIssued}
           density="compact"
           stackColumns={2}
         />
