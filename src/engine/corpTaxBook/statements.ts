@@ -111,6 +111,12 @@ export interface Statement {
   amount: number;
   /** What the book recorded about this Statement's mail; absent on a Statement nobody mailed. */
   mailsSent?: number;
+  /** When the book last recorded a mail for it (the doc's `lastMailedAt`). */
+  lastMailedAt?: string;
+  /** The Character who issued it (the doc's `issuedBy`). */
+  issuedBy?: number;
+  /** The Miner's name as the officer's client stored it with the Statement. */
+  minerName?: string;
   /** The Miner chose "Stop reminders" (D27). */
   remindersStopped?: boolean;
   /** Reminders an officer sent by hand; one is allowed after the Miner stopped them. */

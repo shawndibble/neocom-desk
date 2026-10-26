@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -24,6 +25,7 @@ import { MOONS_TABS } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { Crumb, DueWord } from './moonsParts';
 import { useCards } from './sectionHelpers';
+import { StatementPanel } from './StatementPanel';
 
 const STATEMENTS_PATH = tabPath(MOONS_TABS, 'statements');
 
@@ -72,6 +74,8 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
       </StatementRowMenu>
     );
   };
+  const [params, setParams] = useSearchParams();
+  const openId = params.get('statement');
   const statements = periodStatements(view, periodStart);
   const period = periodRows(view).find((r) => r.start === periodStart && r.statements > 0);
   if (!statements || !period) {
@@ -180,9 +184,14 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
             mobileSort
             stacked={cards}
             stackColumns={2}
+            onRowClick={(r) => setParams({ statement: r.statement.id })}
+            selectedRowKey={openId}
           />
         </div>
       </Panel>
+      {openId && statements.some((r) => r.statement.id === openId) && (
+        <StatementPanel key={openId} statementId={openId} onClose={() => setParams({})} />
+      )}
       {recording && recordingMiner && (
         <RecordPaymentDialog
           open

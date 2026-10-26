@@ -8,6 +8,7 @@ import {
   periodRows,
   periodStatements,
   planStatementRun,
+  statementDetail,
   statementForLine,
   type BookViewInput,
 } from './bookView';
@@ -711,6 +712,85 @@ describe('period page rows (#5285)', () => {
       outstanding: 0,
       dueAt: null,
       overdue: false,
+    });
+  });
+});
+
+describe('statementDetail (#5286)', () => {
+  const base = input({
+    entries: [entry(1, '2026-08-10', 10_000)],
+    now: '2026-09-30T00:00:00Z',
+    lastSyncedAt: '2026-09-30T00:00:00Z',
+  });
+  const first = buildBookView(base);
+  const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+  const issued = {
+    ...statementForLine(first, plan, plan.lines[0]),
+    issuedAt: '2026-09-01T00:00:00Z',
+  };
+  const pay = (id: string, amount: number, at: string) => ({
+    id,
+    minerId: issued.minerId,
+    characterId: 1,
+    amount,
+    at,
+    source: 'donation' as const,
+  });
+
+  it('is undefined for an id the book does not hold', () => {
+    expect(
+      statementDetail(buildBookView({ ...base, statements: [issued] }), 'nope')
+    ).toBeUndefined();
+  });
+
+  it('reports billed, credited and remaining that add up, with the payments credited to it', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [issued],
+      payments: [
+        pay('p1', 300_000, '2026-09-02T00:00:00Z'),
+        pay('p2', 100_000, '2026-09-05T00:00:00Z'),
+      ],
+    });
+    const detail = statementDetail(view, issued.id)!;
+    expect(detail).toMatchObject({
+      billed: issued.amount,
+      credited: 400_000,
+      forgiven: 0,
+      writtenOff: 0,
+      remaining: issued.amount - 400_000,
+      state: 'overdue',
+    });
+    expect(detail.payments).toEqual([
+      { id: 'p1', amount: 300_000, at: '2026-09-02T00:00:00Z', source: 'donation' },
+      { id: 'p2', amount: 100_000, at: '2026-09-05T00:00:00Z', source: 'donation' },
+    ]);
+  });
+
+  it('shows only the part of a payment that went to this Statement', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [issued],
+      payments: [pay('p1', issued.amount + 50_000, '2026-09-02T00:00:00Z')],
+    });
+    const detail = statementDetail(view, issued.id)!;
+    expect(detail.payments).toEqual([
+      { id: 'p1', amount: issued.amount, at: '2026-09-02T00:00:00Z', source: 'donation' },
+    ]);
+    expect(detail).toMatchObject({ settled: true, remaining: 0, state: 'settled' });
+  });
+
+  it('reads paused while a declaration holds the Overdue clock', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [issued],
+      declarations: [
+        { id: 'd1', statementId: issued.id, kind: 'contract', at: '2026-09-20T00:00:00Z' },
+      ],
+    });
+    expect(statementDetail(view, issued.id)).toMatchObject({
+      state: 'paused',
+      pausedUntil: '2026-10-04T00:00:00.000Z',
     });
   });
 });
