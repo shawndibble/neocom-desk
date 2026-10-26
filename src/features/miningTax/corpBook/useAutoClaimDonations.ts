@@ -9,7 +9,7 @@ export function claimKeyOf(corporationId: number, paymentId: string): string {
 /**
  * Claims the player's own Unmatched donations as soon as the books load. `view.claims` holds only
  * donations the signed-in player made (the server answers anyone else's like a missing one), so
- * there is nothing for them to confirm. Each is tried once; a failed claim is returned in `failed`
+ * there is nothing for them to confirm. Each is tried once per mount; a failed claim is returned in `failed`
  * so the page can offer a manual retry rather than retrying in a loop.
  */
 export function useAutoClaimDonations(
