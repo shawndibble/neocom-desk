@@ -48,7 +48,7 @@ function setup(opts: {
 }) {
   const grants = opts.grants ?? { 1: grant() };
   const store = {
-    listActive: vi.fn(async () =>
+    listDue: vi.fn<PollerStore['listDue']>(async () =>
       Object.keys(grants).map((id) => ({ characterId: Number(id), grant: grants[Number(id)]! }))
     ),
     refresh: vi.fn(async (id: number): Promise<RefreshOutcome> => {
@@ -61,6 +61,7 @@ function setup(opts: {
     patchMail: vi.fn(async () => {}),
     dropMailScope: vi.fn(async () => {}),
     markIdle: vi.fn(async () => {}),
+    deferNextPoll: vi.fn(async () => {}),
     devicesForMany: vi.fn(
       async (ids: number[]) => new Map(ids.map((id) => [id, opts.devices ?? [phone]]))
     ),
@@ -647,6 +648,40 @@ describe('pollEveNotifications: skipping idle grants and stale devices (issue #5
       clearMail: false,
     });
     expect(summary.skipped).toBe(0);
+  });
+
+  it('lists the grants due at the run start, and defers an idle one past the next run (issue #5236)', async () => {
+    const s = setup({ grants: { 1: grant() }, devices: [nothingOn], now });
+    await pollEveNotifications(s.deps);
+    expect(s.store.listDue).toHaveBeenCalledWith(OFF_SLOT);
+    const [id, guard, at] = s.store.deferNextPoll.mock.calls[0] as unknown as [
+      number,
+      string,
+      number,
+    ];
+    expect([id, guard]).toEqual([1, 'blob']);
+    expect(at).toBeGreaterThan(OFF_SLOT + 15 * 60_000);
+    expect((at / (15 * 60_000)) % 4).toBe(0);
+  });
+
+  it('writes no deferral for a grant that is polled or on a slow cadence', async () => {
+    const stale: PollDevice = { ...phone, updatedAtMs: OFF_SLOT - 20 * DAY };
+    for (const devices of [[phone], [stale]]) {
+      const s = setup({ devices, now });
+      await pollEveNotifications(s.deps);
+      expect(s.store.deferNextPoll).not.toHaveBeenCalled();
+    }
+  });
+
+  it('a failed deferral only logs: the grant is listed again next run', async () => {
+    const s = setup({ devices: [nothingOn], now });
+    s.store.deferNextPoll.mockRejectedValueOnce(new Error('boom'));
+    const summary = await pollEveNotifications(s.deps);
+    expect(summary.skipped).toBe(0);
+    expect(s.deps.log).toHaveBeenCalledWith(
+      'Alerts poll could not defer a Character',
+      expect.anything()
+    );
   });
 
   it('writes nothing more for a grant already marked idle', async () => {

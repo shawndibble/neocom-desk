@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "alertGrants",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nextPollAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "projections",
       "queryScope": "COLLECTION",
       "fields": [
