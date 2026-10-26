@@ -10,6 +10,7 @@
 // a Character they still hold — there is no signal to detect it from, so it
 // needs its own explicit entry point.
 
+import { clearObservedCopies } from '@/features/corp/taxBook/observedStore';
 import { clearWalletArchive } from '@/features/character/walletArchive';
 import { deleteCommunitySnapshots } from '@/features/communities/communityCache';
 import { deleteShareSelections } from '@/features/communities/shareSelection';
@@ -127,6 +128,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.walletTransactionArchive,
       db.walletArchiveCoverage,
       db.corpMailQueue,
+      db.corpBookObserved,
+      db.corpBookObservedMeta,
       db.notificationFeed,
       db.settings,
     ],
@@ -143,6 +146,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       // Mail queued from this Character can no longer be sent.
       await db.corpMailQueue.where('senderCharacterId').equals(characterId).delete();
       await clearWalletArchive(characterId);
+      // Officer-only rows (ADR 0031) leave with the Character.
+      await clearObservedCopies(characterId);
       // Orphaned feed rows are invisible in the UI (both the bell panel and the
       // other-character counts skip ids with no Character) but `refreshAppBadge`
       // counts the whole table — leaving an app-icon count nothing can dismiss.
