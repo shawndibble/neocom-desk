@@ -25,7 +25,7 @@ colliding (one running and one pending run per group; extra pending runs are dro
 
 ## Check it
 
-- Cloudflare dashboard > Workers > `neocom-desk-public-data-dispatch` > Logs:
+- Cloudflare dashboard > Workers > `neocom-desk-public-data-dispatch` > Observability (logs on via `wrangler.toml`):
   invocations every 15 min, no errors.
 - Runs started by it show `workflow_dispatch` as the event:
   `gh run list --workflow public-data-lawless-systems.yml --event workflow_dispatch`

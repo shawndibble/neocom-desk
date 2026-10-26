@@ -2,6 +2,14 @@ name = "neocom-desk-public-data-dispatch"
 main = "index.mjs"
 compatibility_date = "2026-10-01"
 
+# Cron-only Worker: no public URL.
+workers_dev = false
+preview_urls = false
+
 # Keep in step with SCHEDULES in dispatch.mjs.
 [triggers]
 crons = ["*/15 * * * *"]
+
+# Keep invocation logs so a failing cron shows its error in the dashboard.
+[observability]
+enabled = true
