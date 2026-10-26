@@ -1,8 +1,9 @@
 /**
  * The Miners table's row menu (right-click, touch-and-hold, ⋮): Show info for the main
  * character, then Record payment, Dismiss tax and Mark not tax. Open page is the opened row's
- * link, so it is not repeated here; Send reminder lives on the Miner's page header. Mark not tax acts on the latest payment with tax in it, and the item names it. Officers
- * only: without edit rights the row has no actions, so no menu.
+ * link, so it is not repeated here; Send reminder lives on the Miner's page header. Mark not tax
+ * acts on the latest payment with tax in it, and the item names it. Officers only: without edit
+ * rights the row has no actions, so no menu.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';

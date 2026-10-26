@@ -273,6 +273,7 @@ describe('extractionBilling', () => {
       extractionBilling(viewOf([{ status: 'paid' }, { status: 'unbilled' }]), 'x').billed
     ).toBe(false);
     expect(extractionBilling(viewOf([]), 'x').billed).toBe(false);
+    expect(extractionBilling(viewOf([{ status: 'dismissed' }]), 'x').billed).toBe(false);
   });
 });
 

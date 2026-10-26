@@ -8,8 +8,7 @@ import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
 import { isk, shortDate } from './moonsFormat';
 import { extractionPath, minerPath } from './moonsPaths';
-import { tapTargetClassName } from './sectionHelpers';
-import { moonLabel } from './sectionHelpers';
+import { moonLabel, tapTargetClassName } from './sectionHelpers';
 
 const SHOWN = 3;
 

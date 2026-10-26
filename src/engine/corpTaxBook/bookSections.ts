@@ -190,7 +190,9 @@ export function extractionBilling(
   const statementIds = [
     ...new Set(days.flatMap((d) => (d.statementId === undefined ? [] : [d.statementId]))),
   ];
-  return { billed: days.length > 0 && !open, statementIds };
+  // A moon whose days were all dismissed was never billed: one day has to sit on a Statement.
+  const onStatement = days.some((d) => d.status === 'on-statement' || d.status === 'paid');
+  return { billed: onStatement && !open, statementIds };
 }
 
 /**

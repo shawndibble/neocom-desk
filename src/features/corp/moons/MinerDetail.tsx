@@ -43,12 +43,11 @@ import { isk, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFo
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
-import { tapTargetClassName } from './sectionHelpers';
 import { MinerCharacters } from './MinerCharacters';
 import { CorrectionsMenu } from './MinerCorrections';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
-import { moonLabel } from './sectionHelpers';
+import { moonLabel, tapTargetClassName } from './sectionHelpers';
 import { oldestOpenStatement, useMinerReminder } from './statementMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
@@ -183,7 +182,9 @@ export function MinerDetail({ id }: { id: string }) {
       const day = detail.days.find((x) => x.key === d.targetId);
       return day ? shortDate(day.date) : d.targetId;
     }
-    if (d.scope === 'moon') return names.moon(Number(d.targetId));
+    if (d.scope === 'miner') return '';
+    if (d.scope === 'moon')
+      return Number.isFinite(Number(d.targetId)) ? names.moon(Number(d.targetId)) : d.targetId;
     const x = view.extractions.find((e) => e.id === d.targetId);
     return x ? names.moon(x.moonId) : d.targetId;
   };
@@ -472,7 +473,7 @@ export function MinerDetail({ id }: { id: string }) {
       id: 'tax',
       header: t('corpTaxBook.moons.cols.tax'),
       align: 'right',
-      className: 'tabular-nums',
+      className: 'w-36 tabular-nums',
       cardCorner: true,
       render: (m) => isk(m.tax),
       sortValue: (m) => m.tax,

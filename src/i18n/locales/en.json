@@ -15970,7 +15970,6 @@
         "nobody": "Nobody has mined this chunk yet.",
         "past": "Other cycles",
         "pastHint": "Newer and older cycles of this moon",
-        "noPast": "No earlier cycle is on record for this moon.",
         "dismissTitle": "Dismiss this extraction's tax?",
         "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed.",
         "leftToMine": "Left to mine, est.",
@@ -16069,12 +16068,6 @@
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
         "noDismissals": "Nothing has been dismissed.",
-        "scope": {
-          "record": "A day",
-          "miner": "This Miner",
-          "moon": "A moon",
-          "extraction": "An extraction"
-        },
         "reversed": "reversed",
         "reverse": "Reverse",
         "mail": "Mail",

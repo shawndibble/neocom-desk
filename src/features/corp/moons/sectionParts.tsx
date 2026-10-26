@@ -19,7 +19,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { cx } from '@/lib/cx';
-import { useCards } from './sectionHelpers';
+import { tapTargetClassName, useCards } from './sectionHelpers';
 import { usePaged } from './usePaged';
 
 /** A link to another entity page from outside a table (a moon in a list, a Miner in a header): a bordered accent link. In a table row it is plain `entityLinkClassName` text. */
@@ -60,7 +60,10 @@ export function PlaceCell({
       ) : (
         <>
           {to ? (
-            <Link to={to} className={entityLinkClassName('whitespace-nowrap')}>
+            <Link
+              to={to}
+              className={entityLinkClassName(cx('whitespace-nowrap', tapTargetClassName))}
+            >
               {place.moon}
             </Link>
           ) : (
