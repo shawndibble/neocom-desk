@@ -141,9 +141,10 @@ export function FittingEditorLayout({
  * flow like the docked browser: it never covers the nav or the page header.
  */
 function ImproveBeside({ column, children }: { column?: ReactNode; children: ReactNode }) {
-  if (!column) return children;
+  // The same element either way, so opening or closing Improve never remounts the
+  // editor beside it (and loses its state): only the wrapper's display changes.
   return (
-    <div className="grid grid-cols-[24rem_minmax(0,1fr)] items-start gap-3">
+    <div className={column ? 'grid grid-cols-[24rem_minmax(0,1fr)] items-start gap-3' : 'contents'}>
       {column}
       {children}
     </div>

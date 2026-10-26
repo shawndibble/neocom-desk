@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Close } from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useTranslation } from 'react-i18next';
@@ -166,19 +166,24 @@ export function useImproveDrawer({
   // closing gives focus back to what held it (the ⋮ menu's button, which the menu
   // has refocused by then: `useOpenAfterMenu`), as the slide-out used to.
   const columnHeading = useRef<HTMLHeadingElement | null>(null);
+  const columnRef = useFitToViewport(isOpen && asColumn);
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!isOpen || !asColumn) return;
     const active = document.activeElement;
     opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
     columnHeading.current?.focus({ preventScroll: true });
+    const column = columnRef.current;
     return () => {
       const back = opener.current;
       opener.current = null;
-      if (back?.isConnected) back.focus({ preventScroll: true });
+      // Only when focus was in the column (it goes with it): closed by picking an
+      // empty slot, focus is already where the pilot is working.
+      const active = document.activeElement;
+      const lost = active === null || active === document.body || !!column?.contains(active);
+      if (lost && back?.isConnected) back.focus({ preventScroll: true });
     };
-  }, [isOpen, asColumn]);
-  const columnRef = useFitToViewport(isOpen && asColumn);
+  }, [isOpen, asColumn, columnRef]);
   // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
   const { groups: chargeGroups } = useChargeChoices({
     fitting: isOpen ? fitting : null,
@@ -382,6 +387,7 @@ export function useImproveDrawer({
     // takes focus on open), unless a dialog opened from it owns the key.
     <div
       ref={columnRef}
+      // The class height is the fallback; useFitToViewport sets the real one.
       className="slide-in-left sticky top-3 h-[calc(100vh-1.5rem)]"
       onKeyDown={(event) => {
         // Not one a popup inside it already handled (a Select's list, a tooltip: React
@@ -460,7 +466,8 @@ export function useImproveDrawer({
  */
 function useFitToViewport(active: boolean) {
   const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
+  // Before paint, so the first frame already ends at the viewport's bottom.
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!active || !el) return;
     let frame = 0;
@@ -475,10 +482,14 @@ function useFitToViewport(active: boolean) {
     fit();
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
+    // Content above it changing height (a charge note, load warnings) moves its top too.
+    const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+    resized?.observe(document.body);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
+      resized?.disconnect();
     };
   }, [active]);
   return ref;

@@ -69,7 +69,7 @@ describe('leftColumn', () => {
   });
 
   it('on a narrower desktop, Improve puts the stats above the editor beside it', () => {
-    // 26rem gone leaves no room for both side by side; the stats are what Improve changes.
+    // The column leaves no room for both side by side; the stats are what Improve changes.
     expect(leftColumn('slideOut', true, true)).toEqual({
       addMode: 'slideOut',
       addOpen: false,
