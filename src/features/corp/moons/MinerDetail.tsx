@@ -1,6 +1,6 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -30,7 +30,7 @@ import {
   type MinerMoon,
 } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
-import type { Adjustment } from '@/engine/corpTaxBook/statements';
+import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
@@ -48,6 +48,7 @@ import { CorrectionsMenu } from './MinerCorrections';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { moonLabel, tapTargetClassName } from './sectionHelpers';
+import { StatementPanel } from './StatementPanel';
 import { oldestOpenStatement, useMinerReminder } from './statementMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
@@ -75,6 +76,8 @@ export function MinerDetail({ id }: { id: string }) {
   const { view, names, edit, canEdit, corporationId, data } = ctx;
   const phone = useIsPhone();
   const detail = minerDetail(view, id);
+  const [params, setParams] = useSearchParams();
+  const openStatementId = params.get('statement');
   const audit = useBookAudit();
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -190,6 +193,22 @@ export function MinerDetail({ id }: { id: string }) {
   };
   const noun = (key: string) => t(`corpTaxBook.moons.sections.nouns.${key}`);
 
+  /** A Statement's period as a link that opens the shared Statement panel (#5288). */
+  const statementLink = (st: Statement) => (
+    <button
+      type="button"
+      className={entityLinkClassName(cx('whitespace-nowrap', tapTargetClassName))}
+      aria-label={t('corpTaxBook.moons.payment.openStatement', {
+        period: periodLabel(st.periodStart, st.periodEnd),
+      })}
+      onClick={() => setParams({ statement: st.id })}
+    >
+      {periodLabel(st.periodStart, st.periodEnd)}
+    </button>
+  );
+  const statementOf = (statementId: string | undefined) =>
+    statementId === undefined ? undefined : detail.statements.find((x) => x.id === statementId);
+
   // The three day tables share one grid (select, day, moon, character, ore, rate, tax), so a
   // reader's eye keeps its column from one section to the next: Earlier days keeps the select
   // gutter (empty) and says each day's status under its ore instead of in a column of its own.
@@ -268,6 +287,7 @@ export function MinerDetail({ id }: { id: string }) {
           {withStatus && (
             <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
               {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+              {statementOf(d.statementId) && <> · {statementLink(statementOf(d.statementId)!)}</>}
             </span>
           )}
         </span>
@@ -345,6 +365,37 @@ export function MinerDetail({ id }: { id: string }) {
     return st ? periodLabel(st.periodStart, st.periodEnd) : undefined;
   };
 
+  const paymentCredited = (payment: Payment) => {
+    const credited = detail.paymentCredits
+      .filter((c) => c.paymentId === payment.id)
+      .flatMap((c) => statementOf(c.statementId) ?? []);
+    return (
+      <span className="text-xs">
+        {credited.length > 0 ? (
+          <span className="inline-flex flex-wrap items-center gap-x-2">
+            {credited.slice(0, 2).map((st) => (
+              <span key={st.id}>{statementLink(st)}</span>
+            ))}
+            {credited.length > 2 && (
+              <span className="text-text-dim">
+                {t('corpTaxBook.moons.payment.moreStatements', { count: credited.length - 2 })}
+              </span>
+            )}
+          </span>
+        ) : (
+          !payment.notTaxAmount && (
+            <span className="text-text-dim">{t('corpTaxBook.moons.payment.oldestFirst')}</span>
+          )
+        )}
+        {payment.notTaxAmount ? (
+          <span className="block text-warning">
+            {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(payment.notTaxAmount) })}
+          </span>
+        ) : null}
+      </span>
+    );
+  };
+
   const paymentColumns: DataTableColumn<PaymentRow>[] = [
     {
       id: 'at',
@@ -407,14 +458,8 @@ export function MinerDetail({ id }: { id: string }) {
                   date: shortDate(r.correction.date),
                 })}
           </span>
-        ) : r.payment.notTaxAmount ? (
-          <span className="text-xs text-warning">
-            {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(r.payment.notTaxAmount) })}
-          </span>
         ) : (
-          <span className="text-xs text-text-dim">
-            {t('corpTaxBook.moons.payment.oldestFirst')}
-          </span>
+          paymentCredited(r.payment)
         ),
     },
     ...(canEdit
@@ -868,6 +913,14 @@ export function MinerDetail({ id }: { id: string }) {
               amountIsk: row.owed + row.unbilled,
             });
           }}
+        />
+      )}
+      {openStatementId && statementOf(openStatementId) && (
+        <StatementPanel
+          key={openStatementId}
+          statementId={openStatementId}
+          onClose={() => setParams({})}
+          showMinerLink={false}
         />
       )}
       {dialog?.kind === 'close' && (

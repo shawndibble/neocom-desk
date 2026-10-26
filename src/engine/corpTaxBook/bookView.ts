@@ -13,6 +13,7 @@ import {
   isBeforeBook,
   type Allocation,
   type DismissalCredit,
+  type PaymentCredit,
   type RecordedWriteOff,
   type TaxPayment,
 } from './allocation';
@@ -650,6 +651,8 @@ export interface MinerDetail {
   days: DayRow[];
   payments: (TaxPayment & { credited: number })[];
   statements: Statement[];
+  /** Which Statement each payment's money went to (#5288), one entry per payment and Statement. */
+  paymentCredits: PaymentCredit[];
   /** Tolerance write-offs, derived from `allocatePayments` (amounts are not stored). */
   toleranceWriteOffs: { statementId: string; amount: number }[];
   /** Lines recorded after payment, never billed (D22). */
@@ -681,6 +684,7 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
       .map((p) => ({ ...p, credited: p.amount - Math.min(p.notTaxAmount ?? 0, p.amount) }))
       .sort((a, b) => b.at.localeCompare(a.at)),
     statements: [...inner.statements].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
+    paymentCredits: inner.allocation.paymentCredits,
     toleranceWriteOffs: inner.allocation.writeOffs,
     lateWriteOffs: inner.draft.writtenOff.map((w) => ({
       chargeKey: w.chargeKey,
