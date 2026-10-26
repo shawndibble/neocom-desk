@@ -90,14 +90,14 @@ Additive and backward-compatible, because dev and production share one Firebase 
 
 Estimates, not measurements. Today an officer open is thousands of reads.
 
-| Screen | Estimated reads |
-| --- | --- |
-| Miner page | about 1 (miner doc) plus the open days, a page of Statements, payments and dismissals: tens |
-| Moon page | 1 (moon doc) |
-| Overview | about 1 plus the Extractions window (about 10) |
-| Miners tab | 1 (miner list doc) |
-| Moon owners tab | 1 summary per feeder, from `feederViews`, instead of every entry |
-| Member `/mining/tax` | own rows, as today |
+| Screen               | Estimated reads                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| Miner page           | about 1 (miner doc) plus the open days, a page of Statements, payments and dismissals: tens |
+| Moon page            | 1 (moon doc)                                                                                |
+| Overview             | about 1 plus the Extractions window (about 10)                                              |
+| Miners tab           | 1 (miner list doc)                                                                          |
+| Moon owners tab      | 1 summary per feeder, from `feederViews`, instead of every entry                            |
+| Member `/mining/tax` | own rows, as today                                                                          |
 
 ## Consequences
 
