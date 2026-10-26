@@ -7,16 +7,6 @@ import {
   resetActiveWarsCache,
 } from './activeWars';
 
-const syncConfigured = vi.hoisted(() => ({ value: false }));
-const firestoreDoc = vi.hoisted(() => ({ data: undefined as unknown }));
-vi.mock('firebase/firestore/lite', () => ({
-  doc: vi.fn(),
-  getDoc: vi.fn(async () => ({ data: () => firestoreDoc.data })),
-}));
-vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: vi.fn() }));
-vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => {}) }));
-vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncConfigured.value }));
-
 const NOW = Date.UTC(2026, 9, 21, 12);
 const war = {
   id: 1,
@@ -47,7 +37,6 @@ describe('freshActiveWars', () => {
 describe('loadActiveWars', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    syncConfigured.value = false;
     resetActiveWarsCache();
   });
 
@@ -56,56 +45,61 @@ describe('loadActiveWars', () => {
       Response.json({ updatedAt: Date.now(), wars: [war], url })
     );
     vi.stubGlobal('fetch', fetchMock);
-    expect(await loadActiveWars(1)).toEqual([war]);
+    expect(await loadActiveWars()).toEqual([war]);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(ACTIVE_WARS_R2_URL);
   });
 
-  it('reads R2 even when sync is not configured, and again only after the window', async () => {
+  it('reads R2 again only after the window', async () => {
     const fetchMock = vi.fn(async () => Response.json({ updatedAt: Date.now(), wars: [war] }));
     vi.stubGlobal('fetch', fetchMock);
-    await loadActiveWars(1);
-    await loadActiveWars(1);
+    await loadActiveWars();
+    await loadActiveWars();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ['404', () => new Response('', { status: 404 })],
     ['malformed', () => Response.json({ nope: true })],
-  ])('falls through to Firestore when R2 answers %s', async (_name, answer) => {
+  ])('is empty when R2 answers %s', async (_name, answer) => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => answer())
     );
-    // Sync is off, so the Firestore fallback is skipped: no wars, no throw.
-    expect(await loadActiveWars(1)).toEqual([]);
+    expect(await loadActiveWars()).toEqual([]);
   });
 
-  it('falls through when the R2 fetch throws', async () => {
+  it('is empty when the R2 fetch throws', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => Promise.reject(new TypeError('offline')))
     );
-    expect(await loadActiveWars(1)).toEqual([]);
+    expect(await loadActiveWars()).toEqual([]);
   });
 
-  it('reads the Firestore doc when the R2 list is stale', async () => {
-    syncConfigured.value = true;
-    firestoreDoc.data = { updatedAt: Date.now(), wars: [war] };
-    const stale = { updatedAt: Date.now() - ACTIVE_WARS_STALE_AFTER_MS - 1, wars: [] };
+  it('is empty when the R2 list is stale', async () => {
+    const stale = { updatedAt: Date.now() - ACTIVE_WARS_STALE_AFTER_MS - 1, wars: [war] };
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => Response.json(stale))
     );
-    expect(await loadActiveWars(1)).toEqual([war]);
+    expect(await loadActiveWars()).toEqual([]);
   });
 
-  it('reads the Firestore doc when R2 has no list yet and sync is configured', async () => {
-    syncConfigured.value = true;
-    firestoreDoc.data = { updatedAt: Date.now(), wars: [war] };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('', { status: 404 }))
-    );
-    expect(await loadActiveWars(1)).toEqual([war]);
+  it('keeps the last list when a later read fails, and retries on the next call', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ updatedAt: Date.now(), wars: [war] }))
+      .mockResolvedValue(new Response('', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+    try {
+      await loadActiveWars();
+      vi.advanceTimersByTime(60 * 60 * 1000);
+      expect(await loadActiveWars()).toEqual([war]);
+      await loadActiveWars();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

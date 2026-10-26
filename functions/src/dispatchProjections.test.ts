@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isDue,
+  isHourlyTick,
   isStaleUnsent,
   isPastRetention,
   shouldDeleteDeviceToken,
@@ -119,5 +120,30 @@ describe('buildPushData', () => {
 
   it('omits eveType from the FCM data payload when the row has none', () => {
     expect(buildPushData(ROW).eveType).toBeUndefined();
+  });
+});
+
+describe('isHourlyTick', () => {
+  const at = (h: number, m: number, s = 0) => Date.UTC(2026, 9, 26, h, m, s);
+
+  it('is true for the tick at the top of the hour', () => {
+    expect(isHourlyTick(at(13, 0))).toBe(true);
+    expect(isHourlyTick(at(13, 0, 40))).toBe(true);
+  });
+
+  it('is false for the other three ticks of the hour', () => {
+    expect(isHourlyTick(at(13, 15))).toBe(false);
+    expect(isHourlyTick(at(13, 30))).toBe(false);
+    expect(isHourlyTick(at(13, 45))).toBe(false);
+  });
+
+  it('still catches the tick when the scheduler starts it a few minutes late', () => {
+    expect(isHourlyTick(at(13, 14, 59))).toBe(true);
+  });
+
+  it('fires exactly once across a day of 15-minute ticks', () => {
+    let fired = 0;
+    for (let i = 0; i < 96; i++) if (isHourlyTick(at(0, 0) + i * 15 * 60_000)) fired++;
+    expect(fired).toBe(24);
   });
 });
