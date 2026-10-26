@@ -368,12 +368,12 @@ describe('PlanEditor tools pane', () => {
     }
   });
 
-  it('opens the import dialog, titled "Import plan", from Import > From text or file…', async () => {
+  it('opens the import dialog, titled "Import plan", from Import > From text or file', async () => {
     const user = userEvent.setup();
     renderEditor();
 
     await user.click(screen.getByRole('button', { name: 'Import' }));
-    await user.click(screen.getByRole('menuitem', { name: 'From text or file…' }));
+    await user.click(screen.getByRole('menuitem', { name: 'From text or file' }));
 
     expect(await screen.findByRole('dialog', { name: 'Import plan' })).toBeInTheDocument();
   });
@@ -2089,7 +2089,7 @@ describe('removing an entry requires confirmation (#408)', () => {
 
     const more = screen.getByRole('button', { name: /more actions for skill a i/i });
     await user.click(more);
-    await user.click(await screen.findByRole('menuitem', { name: 'Add milestone…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add milestone' }));
     const dialog = screen.getByRole('dialog', { name: 'Name this milestone' });
     await user.type(within(dialog).getByRole('textbox'), 'Fly Loki');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
@@ -2353,7 +2353,7 @@ describe('Plan Milestones (GLOSSARY.md)', () => {
     const { onUpdate } = renderEditor();
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Add milestone…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Add milestone' }));
     const dialog = screen.getByRole('dialog', { name: 'Name this milestone' });
     await user.type(within(dialog).getByRole('textbox'), 'Fly Loki');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
@@ -2376,7 +2376,7 @@ describe('Plan Milestones (GLOSSARY.md)', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Rename…' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const dialog = screen.getByRole('dialog', { name: 'Rename milestone' });
     const input = within(dialog).getByRole('textbox');
     expect(input).toHaveValue('Fly Loki');

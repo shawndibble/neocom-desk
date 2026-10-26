@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import * as Icon from './icons';
@@ -91,6 +92,7 @@ export function Tabs({
   className = '',
   activation = 'automatic',
 }: TabsProps) {
+  const { t } = useTranslation();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // Only consulted in 'manual' mode, where the roving tab stop tracks
@@ -204,6 +206,7 @@ export function Tabs({
             type="button"
             tabIndex={-1}
             aria-hidden="true"
+            aria-label={t(side === 'before' ? 'common.scrollTabsBefore' : 'common.scrollTabsAfter')}
             onClick={() => pageScroll(side)}
             className={cx(tabChevronClassName, side === 'before' ? 'left-0.5' : 'right-0.5')}
           >

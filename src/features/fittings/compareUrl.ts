@@ -38,7 +38,7 @@ export type CompareCodesUpdate =
  * Pass an updater for any change relative to the current slots (add, remove). `BrowserRouter`
  * commits a location change inside a transition, so on a busy main thread (the dogma engine
  * calculating the slot just added) the page can go on rendering the old `?f=` long after the
- * write — and a second "Compare with…" pick built from those rendered codes would replace the
+ * write — and a second "Compare with" pick built from those rendered codes would replace the
  * first pick instead of adding to it. `setSearchParams`' own updater form doesn't help: it too
  * starts from the rendered params. So the latest written list is kept here and updaters build on it.
  */

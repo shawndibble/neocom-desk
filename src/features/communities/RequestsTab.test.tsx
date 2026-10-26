@@ -188,10 +188,10 @@ beforeEach(async () => {
 });
 
 describe('RequestsTab board', () => {
-  it('shows the empty state with New request… when nothing is posted', () => {
+  it('shows the empty state with New request when nothing is posted', () => {
     renderTab([]);
     expect(screen.getByText('No requests yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'New request…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New request' })).toBeInTheDocument();
   });
 
   it('lists open Requests with requester, place, terms and a lines progress figure', () => {
@@ -303,7 +303,7 @@ describe('New request dialog', () => {
   it('posts a pasted list with an edited quantity and the location and terms', async () => {
     const user = userEvent.setup();
     const reload = renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     await user.type(await screen.findByLabelText(/^Location/), 'Efa');
     await user.type(screen.getByLabelText(/^Terms/), '90% JBV');
     await user.click(screen.getByLabelText(/Paste a list/));
@@ -327,7 +327,7 @@ describe('New request dialog', () => {
   it('offers systems and regions for the location and says whether it can be measured', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     const field = await screen.findByLabelText(/^Location/);
     await user.type(field, 'my hangar');
     expect(screen.getByText(/Not a system or region/)).toBeInTheDocument();
@@ -342,7 +342,7 @@ describe('New request dialog', () => {
   it('adds an item by search and offers copy/original on a blueprint line', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     await user.type(await screen.findByRole('searchbox', { name: 'Add an item' }), 'ishtar');
     await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
     expect(screen.getByLabelText('Ishtar Blueprint quantity')).toHaveValue('1');
@@ -356,7 +356,7 @@ describe('New request dialog', () => {
   it('cannot post with no lines or a bad quantity', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     expect(await screen.findByRole('button', { name: 'Post request' })).toBeDisabled();
     await user.click(screen.getByLabelText(/Paste a list/));
     await user.paste('Tritanium 5');
@@ -370,7 +370,7 @@ describe('New request dialog', () => {
     const user = userEvent.setup();
     store.postRequest.mockRejectedValue({ details: { reason: 'too-many-open-requests' } });
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste('Tritanium 5');
     await screen.findByLabelText('Tritanium quantity');
@@ -381,7 +381,7 @@ describe('New request dialog', () => {
   it('refuses to post when a paste goes over the line cap, until enough lines are removed', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste(Array.from({ length: 51 }, (_, i) => `Bulk ${i + 1} 5`).join('\n'));
     expect(await screen.findByText(/1 more than the 50-line limit/)).toBeInTheDocument();
@@ -394,7 +394,7 @@ describe('New request dialog', () => {
   it('adds the same blueprint again as the other kind, so a copy and an original coexist', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     const search = await screen.findByRole('searchbox', { name: 'Add an item' });
     await user.type(search, 'ishtar');
     await user.click(await screen.findByRole('button', { name: 'Ishtar Blueprint' }));
@@ -525,7 +525,7 @@ describe('Message the requester', () => {
     await grant(WINDOW_SCOPE);
     renderTab([request({ ownerUid: 'char:2119000001' })]);
     await user.click(screen.getByText('Tritanium'));
-    const button = await screen.findByRole('button', { name: 'Message Aria Voss…' });
+    const button = await screen.findByRole('button', { name: 'Message Aria Voss' });
     await user.click(button);
     expect(world.newMail).toHaveBeenCalledWith(1, {
       recipientId: 2119000001,
@@ -542,7 +542,7 @@ describe('Message the requester', () => {
     await user.click(screen.getByText('Tritanium'));
     await screen.findByRole('dialog');
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Message Aria Voss…' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Message Aria Voss' })).not.toBeInTheDocument()
     );
     expect(world.newMail).not.toHaveBeenCalled();
   });
@@ -553,7 +553,7 @@ describe('Message the requester', () => {
     world.newMail.mockRejectedValue(new Error('boom'));
     renderTab([request({ ownerUid: 'char:2119000001' })]);
     await user.click(screen.getByText('Tritanium'));
-    await user.click(await screen.findByRole('button', { name: 'Message Aria Voss…' }));
+    await user.click(await screen.findByRole('button', { name: 'Message Aria Voss' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Couldn't open it in EVE/);
   });
 
@@ -772,7 +772,7 @@ describe('Admin removal', () => {
     const reload = renderTab([request({})], vi.fn(), {}, false, true);
     await user.click(screen.getByText('Tritanium'));
     const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
-    await user.click(within(panel).getByRole('button', { name: 'Remove request…' }));
+    await user.click(within(panel).getByRole('button', { name: 'Remove request' }));
     const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
     await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
     await waitFor(() => expect(store.removeRequest).toHaveBeenCalledWith(1, 'c1', 'r1'));
@@ -785,7 +785,7 @@ describe('Admin removal', () => {
     renderTab([request({})], vi.fn(), {}, false, true);
     await user.click(screen.getByText('Tritanium'));
     const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
-    await user.click(within(panel).getByRole('button', { name: 'Remove request…' }));
+    await user.click(within(panel).getByRole('button', { name: 'Remove request' }));
     const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
     await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
     expect(await within(confirm).findByRole('alert')).toBeInTheDocument();
@@ -805,7 +805,7 @@ describe('Telling the requester about a Pledge', () => {
   it('is a pair of checkboxes in compose, app on and mail off to begin with', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     const group = await screen.findByRole('group', { name: 'Tell me when someone Pledges' });
     expect(within(group).getByRole('checkbox', { name: 'In the app' })).toBeChecked();
     expect(within(group).getByRole('checkbox', { name: 'By in-game mail' })).not.toBeChecked();
@@ -816,7 +816,7 @@ describe('Telling the requester about a Pledge', () => {
   it('posts the choice made, both off included', async () => {
     const user = userEvent.setup();
     renderTab([]);
-    await user.click(screen.getByRole('button', { name: 'New request…' }));
+    await user.click(screen.getByRole('button', { name: 'New request' }));
     await user.click(await screen.findByRole('checkbox', { name: 'By in-game mail' }));
     await user.click(screen.getByRole('checkbox', { name: 'In the app' }));
     await user.click(screen.getByLabelText(/Paste a list/));

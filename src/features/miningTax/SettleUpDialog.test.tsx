@@ -240,12 +240,12 @@ describe('SettleUpDialog', () => {
     const onPickFromWallet = vi.fn();
     const { unmount } = renderDialog(THREE_ROWS);
     expect(
-      screen.queryByRole('button', { name: 'Already in my wallet? Pick it…' })
+      screen.queryByRole('button', { name: 'Already in my wallet? Pick it' })
     ).not.toBeInTheDocument();
     unmount();
 
     renderDialog(THREE_ROWS, { onPickFromWallet });
-    await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it' }));
     expect(onPickFromWallet).toHaveBeenCalledOnce();
     expect(onPickFromWallet).toHaveBeenCalledWith(new Set(['a-1', 'a-2', 'a-3']));
   });

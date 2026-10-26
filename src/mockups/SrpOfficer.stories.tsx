@@ -38,10 +38,10 @@ const noop = () => {};
  *   Approved, not yet Paid). Tabs: Pending, Approved (owed), History.
  * - A row click opens the claim detail, so the pilot name is the row handle,
  *   not a link, and the row carries no extra control for it. Per-row Approve and
- *   Reject… stay; ticking rows (only those Approve can still apply to) shows
+ *   Reject stay; ticking rows (only those Approve can still apply to) shows
  *   the count-labelled bulk button. Override lives in the detail and the
  *   dialog, never a row ⋮ (one real action, so no menu). No row-level move buttons.
- * - Reject… and Change amount… end in an ellipsis because each opens a dialog
+ * - Reject and Change amount end in an ellipsis because each opens a dialog
  *   (reason required). Approve and Mark paid act at once; the toast says
  *   whether the result mail went ("Mail sent" / "Mail failed, status still saved").
  * - A claim with no worked-out amount shows an amount field in the row, has no
@@ -131,9 +131,9 @@ function Queue({ toast }: { toast?: boolean }) {
   );
 }
 
-/** @summary Pending tab with three rows ticked: "Approve selected (3)", per-row Approve and Reject…, summary line. */
+/** @summary Pending tab with three rows ticked: "Approve selected (3)", per-row Approve and Reject, summary line. */
 export const Queue1440: Story = { render: () => <Queue /> };
-/** @summary Phone: the Pending queue as labelled cards, bulk bar above, Approve and Reject… on each card. */
+/** @summary Phone: the Pending queue as labelled cards, bulk bar above, Approve and Reject on each card. */
 export const Queue390: Story = { render: () => <Queue />, globals: { viewport: PHONE.viewport } };
 
 /** @summary Toast after a bulk approve: quiet "Mail sent" / "Mail failed, status still saved" line. */
@@ -237,7 +237,7 @@ function Detail({ overridden }: { overridden?: boolean }) {
   );
 }
 
-/** @summary Claim detail (slide-out) of a Pending claim: facts, killmail link, Open in EVE, audit trail, Approve / Reject…. */
+/** @summary Claim detail (slide-out) of a Pending claim: facts, killmail link, Open in EVE, audit trail, Approve / Reject. */
 export const Detail1440: Story = { render: () => <Detail /> };
 /** @summary Phone: the claim detail covering the page. */
 export const Detail390: Story = { render: () => <Detail />, globals: { viewport: PHONE.viewport } };

@@ -74,7 +74,7 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
  * The requester gets Extend 30 days and Close request (Reopen once closed)
  * and no Pledge controls; everyone else also gets Message <requester>…, which
  * opens an in-game mail to them. The Community admin also gets Remove
- * request… and, per Pledger, Remove… on their Pledge (issue #3812), each behind
+ * request… and, per Pledger, Remove on their Pledge (issue #3812), each behind
  * a confirm; the server checks the admin, this only hides the controls.
  */
 export function RequestPanel({

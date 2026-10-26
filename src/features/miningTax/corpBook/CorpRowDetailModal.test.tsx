@@ -91,12 +91,12 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /unassign/i })).not.toBeInTheDocument();
   });
 
-  it('opens the book diff as its own dialog from "Compare with the book…", not inline', async () => {
+  it('opens the book diff as its own dialog from "Compare with the book", not inline', async () => {
     const user = userEvent.setup();
     renderModal();
     expect(screen.getByText('Disputed: quantity and rate differ')).toBeInTheDocument();
     expect(screen.queryByText('You')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Compare with the book…' }));
+    await user.click(screen.getByRole('button', { name: 'Compare with the book' }));
     const diff = await screen.findByRole('dialog', { name: /you and the book/i });
     expect(within(diff).getByText('You')).toBeInTheDocument();
     expect(within(diff).getAllByText('differs').length).toBeGreaterThanOrEqual(2);

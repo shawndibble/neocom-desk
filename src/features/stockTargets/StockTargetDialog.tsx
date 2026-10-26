@@ -1,5 +1,5 @@
 /**
- * The item menu's "Set stock target…": put one item on a market's **Stock
+ * The item menu's "Set stock target": put one item on a market's **Stock
  * List** with how many to keep listed, from wherever the pilot noticed they
  * need it. A market is set up on Market › Stock, where its station is picked;
  * with none yet, the dialog points there.

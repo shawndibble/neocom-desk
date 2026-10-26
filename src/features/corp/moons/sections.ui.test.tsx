@@ -53,7 +53,7 @@ describe('Miner page', () => {
   it('keeps the characters panel reachable from the header', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     await userEvent.click(screen.getByRole('button', { name: '2 characters' }));
-    expect(await screen.findByRole('button', { name: 'Group with…' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Group with' })).toBeInTheDocument();
   });
 
   it('says so, with no chips, when nothing has happened for the Miner', () => {

@@ -61,7 +61,7 @@ export function OverdueWord({ days, paused }: { days: number | null; paused?: bo
   );
 }
 
-/** Ore make-up of a chunk, or D13's fallback. `onLink` adds the "Link a Survey…" action to the unknown case. */
+/** Ore make-up of a chunk, or D13's fallback. `onLink` adds the "Link a Survey" action to the unknown case. */
 export function OreLine({
   row,
   onLink,

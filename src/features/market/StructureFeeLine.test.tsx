@@ -17,7 +17,7 @@ describe('StructureFeeLine', () => {
     render(<StructureFeeLine structureId={1000000000001} gross={2_640_000} accountingLevel={5} />);
     expect(await screen.findByText('Assuming NPC station fees')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set fee…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set fee' }));
     fireEvent.change(await screen.findByLabelText("Owner's broker fee (%)"), {
       target: { value: '2' },
     });

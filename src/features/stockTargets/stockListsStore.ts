@@ -21,7 +21,7 @@ export function newStockListId(): string {
   return crypto.randomUUID();
 }
 
-/** Which market the Stock tab last opened, per device: "Set stock target…" defaults to it. A missing list falls back to the first. */
+/** Which market the Stock tab last opened, per device: "Set stock target" defaults to it. A missing list falls back to the first. */
 export const useSelectedStockList = createLocalSetting<string>({
   key: 'stockTargets.selectedList',
   defaultValue: '',

@@ -32,7 +32,7 @@ describe('SkillOverridesControl', () => {
   it('sets a single skill to a level on top, and clears it again', async () => {
     const user = userEvent.setup();
     render(<SkillOverridesControl />);
-    await user.click(screen.getByRole('button', { name: 'Set levels…' }));
+    await user.click(screen.getByRole('button', { name: 'Set levels' }));
     const dialog = screen.getByRole('dialog');
 
     await user.type(within(dialog).getByRole('searchbox', { name: 'Find a skill' }), 'target');

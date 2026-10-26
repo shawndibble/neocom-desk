@@ -53,7 +53,9 @@ function renderSection(
   return { reload, onDelete };
 }
 
-const openButton = () => screen.queryByRole('button', { name: 'Delete the book…' });
+/** The confirm shares the opener's name; it renders after it. */
+const lastButton = async (name: string) => (await screen.findAllByRole('button', { name })).at(-1)!;
+const openButton = () => screen.queryByRole('button', { name: 'Delete the book' });
 
 beforeEach(() => {
   deleteBook.mockReset().mockResolvedValue(undefined);
@@ -80,7 +82,7 @@ describe('DeleteBookSection', () => {
 
   it('deletes only once the corporation ticker is typed, then reloads', async () => {
     const { reload } = renderSection({ isDirector: true }, ME, true);
-    const confirm = await screen.findByRole('button', { name: 'Delete the book' });
+    const confirm = await lastButton('Delete the book');
     expect(confirm).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox'), 'test');
     await userEvent.click(confirm);
@@ -92,7 +94,7 @@ describe('DeleteBookSection', () => {
     let finish: (value: null) => void = () => {};
     readBookData.mockReturnValue(new Promise((resolve) => (finish = resolve)));
     renderSection({ isDirector: true }, ME, true);
-    const confirm = await screen.findByRole('button', { name: 'Delete the book' });
+    const confirm = await lastButton('Delete the book');
     await userEvent.type(screen.getByRole('textbox'), 'test');
     expect(confirm).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Download the book (.xlsx)' }));

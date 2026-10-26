@@ -63,7 +63,7 @@ describe('ItemContextMenu — Open in EVE', () => {
 describe('ItemContextMenu — Abyssal types', () => {
   const MARKET_ONLY = [
     'Add to Quickbar',
-    'Set price alert…',
+    'Set price alert',
     'View in Market',
     'Open market in EVE',
   ];
@@ -194,7 +194,7 @@ describe('ItemContextMenu — price alert', () => {
   it('opens the alert dialog from the menu item', async () => {
     renderMenu(TRITANIUM, 'Tritanium');
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set price alert…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set price alert' }));
     expect(await screen.findByRole('dialog', { name: 'Price alert: Tritanium' })).toBeTruthy();
   });
 });
@@ -211,13 +211,13 @@ describe('ItemContextMenu — price alert availability', () => {
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
-    const item = await screen.findByRole('menuitem', { name: 'Set price alert…' });
+    const item = await screen.findByRole('menuitem', { name: 'Set price alert' });
     expect(item).toHaveAttribute('aria-disabled', 'true');
   });
 
   // Issue #2162: a `title=` explanation is unreachable on a touch device,
   // which has no hover — the reason must be reachable by a tap instead.
-  it.each([['Add to Quickbar'], ['Set price alert…']])(
+  it.each([['Add to Quickbar'], ['Set price alert']])(
     'reveals the disabled reason on a tap of "%s"',
     async (name) => {
       render(

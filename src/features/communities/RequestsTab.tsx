@@ -72,7 +72,7 @@ const STATUS_ORDER: Record<RequestStatus, number> = {
  * ADR 0021): a board of the Community's Requests with Open, Mine and I can fill
  * (a line for a blueprint this Member shares), a distance limit in jumps from
  * the pilot, a search box and the table; a row opens its side panel. Any
- * Member posts a Request from New request….
+ * Member posts a Request from New request.
  *
  * A filter that cannot work says why instead of doing nothing: I can fill is
  * disabled when the shared blueprints could not be read, and the distance
@@ -102,7 +102,7 @@ export function RequestsTab({
   communityId: string;
   communityName: string;
   myUid: string;
-  /** The viewer administers this Community: the side panel offers Remove request… and Remove… per Pledge. */
+  /** The viewer administers this Community: the side panel offers Remove request and Remove per Pledge. */
   isAdmin: boolean;
   /** Member uid to display name, to name each Pledger in the admin's panel. */
   memberNames: ReadonlyMap<string, string>;

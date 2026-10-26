@@ -67,7 +67,7 @@ function formInsurance(form: LossForm, journal: readonly WalletJournalEntry[]): 
 }
 
 /**
- * Run Loss state (issue #2851): the "Mark as lost…" / "Edit loss…" dialog and
+ * Run Loss state (issue #2851): the "Mark as lost" / "Edit loss" dialog and
  * the remove confirmation, shared by `ProductionRunsPanel` and
  * `ProductionLogPanel` alongside `useSaleLinking`. A loss is its own record
  * (several per run), written straight to Dexie and synced like a sale link.

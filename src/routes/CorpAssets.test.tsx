@@ -475,7 +475,7 @@ describe('stock targets', () => {
   it('opens the Stock targets dialog', async () => {
     const user = userEvent.setup();
     await ledger();
-    await user.click(screen.getByRole('button', { name: 'Stock targets…' }));
+    await user.click(screen.getByRole('button', { name: 'Stock targets' }));
     expect(await screen.findByRole('dialog', { name: 'Stock targets' })).toBeInTheDocument();
   });
 });

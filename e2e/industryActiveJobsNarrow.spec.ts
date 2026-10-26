@@ -142,7 +142,7 @@ test.describe('Active Jobs phone card (#3684)', () => {
     }
 
     // Sorted soonest-first, so locate rows by content rather than index.
-    const logButton = page.getByRole('button', { name: 'Log production…' });
+    const logButton = page.getByRole('button', { name: 'Log production' });
     const doneRow = rows.filter({ has: logButton });
     const runningRow = rows.filter({ hasNot: logButton }).first();
 
@@ -155,7 +155,7 @@ test.describe('Active Jobs phone card (#3684)', () => {
     await expect(runningRow.getByRole('progressbar')).toBeVisible();
     await expect(runningRow.locator('td[data-label="Ends (EVE)"]')).toBeHidden();
 
-    const log = doneRow.getByRole('button', { name: 'Log production…' });
+    const log = doneRow.getByRole('button', { name: 'Log production' });
     await expect(log).toBeVisible();
     expect((await log.boundingBox())!.height).toBeGreaterThanOrEqual(36);
 

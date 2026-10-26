@@ -138,7 +138,7 @@ describe('FleetPayoutsTab', () => {
     store.createFleetPayout.mockResolvedValue({ payoutId: 'new1' });
     store.loadFleetShares.mockResolvedValue([]);
     const onReload = renderTab([]);
-    await userEvent.click(screen.getByRole('button', { name: 'New payout…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New payout' }));
     const dialog = await screen.findByRole('dialog');
     const create = within(dialog).getByRole('button', { name: 'Create payout' });
     expect(create).toBeDisabled();
@@ -184,7 +184,7 @@ describe('FleetPayoutsTab', () => {
       pricesUnreachable: false,
     });
     renderTab([]);
-    await userEvent.click(screen.getByRole('button', { name: 'New payout…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'New payout' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Havens');
     await userEvent.type(within(dialog).getByLabelText(/Paste the fleet list/), 'Aria Voss');

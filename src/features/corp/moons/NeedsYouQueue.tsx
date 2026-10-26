@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, Panel, plainTextActionClassName } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import { cx } from '@/lib/cx';
 import { useBook } from './useBook';
@@ -14,6 +15,9 @@ import {
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { mailTarget, useCorporationName } from './statementMailing';
+
+/** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
+const secondaryActionClassName = plainTextActionClassName('min-h-9 md:min-h-0');
 
 function QueueCard({
   tone,
@@ -41,6 +45,16 @@ function QueueCard({
       </span>
       <span className="flex shrink-0 flex-wrap items-center gap-2 max-sm:pl-3">{actions}</span>
     </li>
+  );
+}
+
+/** A card's headline, a link to the Miner's page whenever the item has a Miner. */
+function MinerTitle({ minerId, children }: { minerId: string | undefined; children: string }) {
+  if (minerId === undefined) return <>{children}</>;
+  return (
+    <Link to={minerPath(minerId)} className={entityLinkClassName('inline-block py-0.5')}>
+      {children}
+    </Link>
   );
 }
 
@@ -114,10 +128,14 @@ export function NeedsYouQueue() {
                 <QueueCard
                   key={`d-${item.declaration.id}`}
                   tone="warning"
-                  title={t('corpTaxBook.moons.needs.declaration.title', {
-                    name: nameOf(item.minerId),
-                    amount: isk(item.owed),
-                  })}
+                  title={
+                    <MinerTitle minerId={item.minerId}>
+                      {t('corpTaxBook.moons.needs.declaration.title', {
+                        name: nameOf(item.minerId),
+                        amount: isk(item.owed),
+                      })}
+                    </MinerTitle>
+                  }
                   body={t('corpTaxBook.moons.needs.declaration.body', {
                     kind: t(`corpTaxBook.moons.needs.declaration.kind.${item.declaration.kind}`),
                     date: shortDate(item.declaration.at),
@@ -128,13 +146,13 @@ export function NeedsYouQueue() {
                         <Button size="sm" onClick={() => setOpen({ kind: 'confirm', item, miner })}>
                           {t('corpTaxBook.moons.needs.declaration.confirm')}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
+                        <button
+                          type="button"
+                          className={secondaryActionClassName}
                           onClick={() => setOpen({ kind: 'reject', item, miner })}
                         >
                           {t('corpTaxBook.moons.needs.declaration.reject')}
-                        </Button>
+                        </button>
                       </>
                     ) : null
                   }
@@ -148,13 +166,13 @@ export function NeedsYouQueue() {
                   key={`o-${item.minerId}`}
                   tone="danger"
                   title={
-                    <Link to={minerPath(item.minerId)} className="hover:underline">
+                    <MinerTitle minerId={item.minerId}>
                       {t('corpTaxBook.moons.needs.overdue.title', {
                         name: nameOf(item.minerId),
                         count: item.days,
                         amount: isk(item.owed),
                       })}
-                    </Link>
+                    </MinerTitle>
                   }
                   body={t('corpTaxBook.moons.needs.overdue.body', {
                     period: statementPeriod(item.statementId),
@@ -169,13 +187,13 @@ export function NeedsYouQueue() {
                         >
                           {t('corpTaxBook.moons.needs.overdue.remind')}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
+                        <button
+                          type="button"
+                          className={secondaryActionClassName}
                           onClick={() => setOpen({ kind: 'dismiss', miner })}
                         >
                           {t('corpTaxBook.moons.needs.overdue.dismiss')}
-                        </Button>
+                        </button>
                       </>
                     ) : null
                   }
@@ -187,10 +205,20 @@ export function NeedsYouQueue() {
                 <QueueCard
                   key={`u-${item.payment.id}`}
                   tone="neutral"
-                  title={t('corpTaxBook.moons.needs.unmatched.title', {
-                    amount: isk(item.payment.amount),
-                    name: names.character(item.payment.characterId),
-                  })}
+                  title={
+                    <MinerTitle
+                      // From the book as it is now: a sender who has since joined a Miner has a page.
+                      minerId={
+                        view.miners.find((m) => m.characterIds.includes(item.payment.characterId))
+                          ?.id
+                      }
+                    >
+                      {t('corpTaxBook.moons.needs.unmatched.title', {
+                        amount: isk(item.payment.amount),
+                        name: names.character(item.payment.characterId),
+                      })}
+                    </MinerTitle>
+                  }
                   body={t(
                     // From the book as it is now: a sender who has since joined a Miner is not a stranger.
                     view.miners.some((m) => m.characterIds.includes(item.payment.characterId))
@@ -207,13 +235,13 @@ export function NeedsYouQueue() {
                         <Button size="sm" onClick={() => setOpen({ kind: 'assign', item })}>
                           {t('corpTaxBook.moons.needs.unmatched.assign')}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
+                        <button
+                          type="button"
+                          className={secondaryActionClassName}
                           onClick={() => setOpen({ kind: 'notTax', item })}
                         >
                           {t('corpTaxBook.moons.needs.unmatched.notTax')}
-                        </Button>
+                        </button>
                       </>
                     ) : null
                   }
@@ -225,10 +253,14 @@ export function NeedsYouQueue() {
                 <QueueCard
                   key={`l-${item.minerId}`}
                   tone="neutral"
-                  title={t('corpTaxBook.moons.needs.leaver.title', {
-                    name: nameOf(item.minerId),
-                    amount: isk(item.owed),
-                  })}
+                  title={
+                    <MinerTitle minerId={item.minerId}>
+                      {t('corpTaxBook.moons.needs.leaver.title', {
+                        name: nameOf(item.minerId),
+                        amount: isk(item.owed),
+                      })}
+                    </MinerTitle>
+                  }
                   body={t('corpTaxBook.moons.needs.leaver.body')}
                   actions={
                     canEdit && item.statementId ? (

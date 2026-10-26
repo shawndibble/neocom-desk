@@ -47,7 +47,7 @@ describe('MutationBadge', () => {
     expect(screen.getByText('Rolls unknown')).toBeInTheDocument();
   });
 
-  it('points an editable module to Mutate…, saying what is missing', async () => {
+  it('points an editable module to Mutate, saying what is missing', async () => {
     render(
       <FittingItemActionsProvider value={fakeItemActions()}>
         <MutationBadge items={[bare]} />
@@ -55,11 +55,11 @@ describe('MutationBadge', () => {
     );
     await userEvent.tab();
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      "What it was mutated from isn't known, so it adds nothing to the stats. Say what made it with Mutate… in its menu."
+      "What it was mutated from isn't known, so it adds nothing to the stats. Say what made it with Mutate in its menu."
     );
   });
 
-  it("flags a drone type when any unit's rolls are unknown, with no Mutate… to point to", async () => {
+  it("flags a drone type when any unit's rolls are unknown, with no Mutate to point to", async () => {
     render(
       <FittingItemActionsProvider value={fakeItemActions()}>
         <MutationBadge items={[rolled, noRolls]} fixable={false} />

@@ -32,7 +32,7 @@ async function openBreakdown(page: Page, size: { width: number; height: number }
   await answerAnyType(page);
   await mockFlatHubPrices(page, { buy: 240_000_000, sell: 250_000_000 });
   await page.setViewportSize(size);
-  await page.getByRole('button', { name: 'Import…', exact: true }).click();
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
   await page.getByLabel('Link or text').fill(EFT);
   await page.getByRole('button', { name: 'Load', exact: true }).click();
   // Below desktop the Ring, the List and the stats are one row of tabs.

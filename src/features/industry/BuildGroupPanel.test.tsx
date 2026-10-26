@@ -355,7 +355,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
     const onAutoBuild = vi.fn().mockResolvedValue(undefined);
     renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onAutoBuild });
 
-    await user.click(screen.getByRole('button', { name: 'Apply…' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
@@ -388,7 +388,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
       catalog: CHAIN_CATALOG,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Apply…' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(

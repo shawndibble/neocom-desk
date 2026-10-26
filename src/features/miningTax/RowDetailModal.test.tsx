@@ -124,7 +124,7 @@ describe('RowDetailModal split', () => {
       } as MiningTaxAssignmentRecord,
       onSplit
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Give new ore to another Payee…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Give new ore to another Payee' }));
     expect(onSplit).toHaveBeenCalledTimes(1);
   });
 });
@@ -233,7 +233,7 @@ describe('RowDetailModal payment', () => {
       assignment: { ...paidAssignment, payment: undefined },
       onLinkTransaction: onLink,
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Link a transaction…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Link a transaction' }));
     expect(onLink).toHaveBeenCalledTimes(1);
   });
 
@@ -266,7 +266,7 @@ describe('RowDetailModal edit', () => {
       onEdit
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: /unlock/i })).not.toBeInTheDocument();
   });
@@ -291,13 +291,13 @@ describe('RowDetailModal owed entry', () => {
     const onSettleUp = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onSettleUp });
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Settle up…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settle up' }));
     expect(onSettleUp).toHaveBeenCalledTimes(1);
   });
 
   it('attaches the More menu to the Edit button, not the title', () => {
     renderModal('outstanding', owed);
-    const edit = screen.getByRole('button', { name: 'Edit…' });
+    const edit = screen.getByRole('button', { name: 'Edit' });
     const more = screen.getByRole('button', { name: 'More actions for this entry' });
     expect(more.parentElement).toBe(edit.parentElement);
     expect(edit.nextElementSibling).toBe(more);
@@ -310,7 +310,7 @@ describe('RowDetailModal owed entry', () => {
     const onUndo = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onUndo });
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Unassign…' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Unassign' }));
     expect(onUndo).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Unassign' }));
     expect(onUndo).toHaveBeenCalledTimes(1);
@@ -357,7 +357,7 @@ describe('RowDetailModal owed entry', () => {
     const onLinkWalletPayment = vi.fn();
     renderModal('outstanding', owed, undefined, undefined, { onLinkWalletPayment });
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a wallet payment…' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Link a wallet payment' }));
     expect(onLinkWalletPayment).toHaveBeenCalledTimes(1);
   });
 });

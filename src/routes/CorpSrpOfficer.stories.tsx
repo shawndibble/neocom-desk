@@ -108,7 +108,7 @@ const openClaim =
 /** @summary The officer queue: five pending claims, one with no worked-out amount, and the activity feed. */
 export const Queue: Story = { decorators: [withQueue('director', 'queue')] };
 
-/** @summary The queue in the phone shell: dense cards, Select all in the list, Approve and Reject… per card. */
+/** @summary The queue in the phone shell: dense cards, Select all in the list, Approve and Reject per card. */
 export const QueuePhone: Story = { ...Queue, globals: phone };
 
 /** @summary Two claims ticked: the bulk Approve (n) button. */
@@ -143,7 +143,7 @@ export const Empty: Story = { decorators: [withQueue('director', 'empty')] };
 /** @summary Nothing waiting, phone shell. */
 export const EmptyPhone: Story = { ...Empty, globals: phone };
 
-/** @summary A pending claim's detail: facts, the Off doctrine diff against the nearest Doctrine Fit, killmail link, audit trail, Reject… and Approve. The Pending queue flags the same claim Off doctrine. */
+/** @summary A pending claim's detail: facts, the Off doctrine diff against the nearest Doctrine Fit, killmail link, audit trail, Reject and Approve. The Pending queue flags the same claim Off doctrine. */
 export const DetailPending: Story = { ...Queue, play: openClaim('Varro Kestane') };
 
 /** @summary A pending claim whose fit matched a Doctrine Fit: the detail names it; the queue row carries no flag. */
@@ -152,7 +152,7 @@ export const DetailOnDoctrine: Story = { ...Queue, play: openClaim('Lysa Kestane
 /** @summary The matched detail on a phone. */
 export const DetailOnDoctrinePhone: Story = { ...DetailOnDoctrine, globals: phone };
 
-/** @summary The detail on a phone: Reject… and Approve pinned at the bottom. */
+/** @summary The detail on a phone: Reject and Approve pinned at the bottom. */
 export const DetailPendingPhone: Story = { ...DetailPending, globals: phone };
 
 /** @summary An approved claim whose amount an officer changed: computed figure, reason and audit trail. */

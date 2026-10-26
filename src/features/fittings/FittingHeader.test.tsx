@@ -71,7 +71,7 @@ describe('FittingHeader on desktop', () => {
     renderHeader({ onImprove });
     const user = userEvent.setup();
     await user.click(trigger());
-    await user.click(await screen.findByRole('menuitem', { name: 'Improve…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Improve' }));
     expect(onImprove).toHaveBeenCalledOnce();
     // The button holds focus as Improve's column renders, so the column can give it back on close.
     await waitFor(() => expect(document.activeElement).toBe(trigger()));
@@ -110,7 +110,7 @@ describe('FittingHeader below desktop', () => {
     expect(
       screen.getByText('By skill caps: an Alpha clone can train every skill this fit needs.')
     ).toBeTruthy();
-    expect(screen.getByRole('menuitem', { name: 'Mastery skills…' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Mastery skills' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Compare' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Copy stats' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Rename fitting' })).toBeTruthy();

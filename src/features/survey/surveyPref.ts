@@ -63,7 +63,7 @@ export const useSurveyPriceHub = createLocalSetting<TradeHub['id']>({
 
 /**
  * What the Survey chat message says and how it is drawn, as chosen in the copy
- * menu's "Configure chat message…". Device-local like the price hub: it is a
+ * menu's "Configure chat message". Device-local like the price hub: it is a
  * taste about the pilot's own channel, not part of any survey.
  */
 export const useSurveyChatOptions = createLocalSetting<SurveyChatOptions>({

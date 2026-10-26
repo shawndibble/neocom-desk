@@ -220,7 +220,7 @@ export const Validation: Story = {
   },
 };
 
-/** @summary Doctrine Fits panel and the Hurricane hull rule with its fit ticked: Add from my Fittings…, Paste EFT…, one Delete… per row. */
+/** @summary Doctrine Fits panel and the Hurricane hull rule with its fit ticked: Add from my Fittings, Paste EFT, one Delete per row. */
 export const DoctrineFits: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
@@ -243,7 +243,7 @@ export const PasteEftUnresolved: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
     const body = within(canvasElement);
-    await userEvent.click(await body.findByRole('button', { name: 'Paste EFT…' }));
+    await userEvent.click(await body.findByRole('button', { name: 'Paste EFT' }));
     const dialog = within(canvasElement.ownerDocument.body);
     await userEvent.click(await dialog.findByLabelText('EFT text'));
     await userEvent.paste(
@@ -261,7 +261,7 @@ export const DeleteDoctrineFit: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
     const body = within(canvasElement);
-    await userEvent.click(await body.findByRole('button', { name: 'Delete Cerberus - shield…' }));
+    await userEvent.click(await body.findByRole('button', { name: 'Delete Cerberus - shield' }));
   },
 };
 

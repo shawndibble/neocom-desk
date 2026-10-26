@@ -113,8 +113,8 @@ function HistoryLines({
 
 /**
  * One moon owner's page: their rate beside the miner rate and margin, rate
- * history, payments, what was mined at their refineries. Set rate… and
- * Settled otherwise… are the officer's; the callers add Pay… and removal.
+ * history, payments, what was mined at their refineries. Set rate and
+ * Settled otherwise are the officer's; the callers add Pay and removal.
  */
 export function MoonOwnerPage({
   detail,
@@ -149,7 +149,7 @@ export function MoonOwnerPage({
   backTo: string;
   /** Who the moon owner is paid as. Either side sets it (#4653). */
   payee?: Payee & { name: string };
-  /** Change… on the "Paid to" line; absent for a viewer who may not edit. */
+  /** Change on the "Paid to" line; absent for a viewer who may not edit. */
   onChangePayee?: () => void;
   /** The strip when the moon owner changed it (#4653). */
   payeeNotice?: ReactNode;
@@ -162,7 +162,7 @@ export function MoonOwnerPage({
   onCancelRemoval?: () => Promise<void>;
   /** The officer sent the notice from EVE: starts the 24 hours. */
   onNoticeSent?: () => Promise<void>;
-  /** Pay… the balance: absent when nothing is owed or the viewer may not record payments. */
+  /** Pay the balance: absent when nothing is owed or the viewer may not record payments. */
   onPay?: () => void;
   /** Add a payment by hand. */
   onAddPayment?: () => void;

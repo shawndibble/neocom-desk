@@ -1,6 +1,6 @@
 /**
  * **Stock Lists** — a market's named set of **Stock Targets** (GLOSSARY.md) —
- * and the pure edits the Stock tab and the "Set stock target…" dialog make to them.
+ * and the pure edits the Stock tab and the "Set stock target" dialog make to them.
  *
  * The stored value is whatever the last device to sync wrote, possibly an
  * older build, so `parseStockLists` keeps every usable list and drops only

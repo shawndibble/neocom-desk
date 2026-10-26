@@ -1,5 +1,5 @@
 /**
- * "Configure chat message…": which rows the Survey's chat message has and how
+ * "Configure chat message": which rows the Survey's chat message has and how
  * its box is drawn, with the message as it would be copied shown above the
  * choices. The heading and the link row are fixed; everything between is the
  * pilot's call, kept in the browser (`useSurveyChatOptions`).

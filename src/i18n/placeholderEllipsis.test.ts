@@ -19,6 +19,17 @@ function collectStrings(node: unknown, path: string, out: [string, string][]) {
   }
 }
 
+/** Not labels that open a dialog: a field prompt, a truncation mark, an inline example. */
+const NOT_DIALOG_LABELS = [
+  'fittings.stats.unknownItemsMore_one',
+  'fittings.stats.unknownItemsMore_other',
+  'fittings.chargePicker.fightingAt',
+  'fittings.implantFinder.searchLabel',
+  'assets.movePlan.customOption',
+  'miningTax.payees.moveToLabel',
+  'corpTaxBook.moons.moonOwners.dialogs.settled.toggle',
+];
+
 const all: [string, string][] = [];
 collectStrings(en, '', all);
 
@@ -36,6 +47,21 @@ describe('en.json ellipsis convention', () => {
     const bad = all
       .filter(([path, value]) => value.endsWith('...') && !EXAMPLE_TEXT.includes(path))
       .map(([path]) => path);
+    expect(bad).toEqual([]);
+  });
+
+  it('puts no trailing "…" on a label that opens a dialog (DESIGN.md §6c)', () => {
+    // What stays: placeholders, "Loading…"-style progress (a leading gerund, or a
+    // key that says so), and the few prompts listed above.
+    const progressKey = /placeholder|loading|pending|checking|resolving|searching|saving|ing$/i;
+    const bad = all
+      .filter(([, value]) => value.endsWith('…'))
+      .filter(([path]) => !NOT_DIALOG_LABELS.includes(path))
+      .filter(
+        ([path, value]) =>
+          !progressKey.test(path.split('.').pop() ?? '') && !/^(Search|[A-Z]\w*ing\b)/.test(value)
+      )
+      .map(([path, value]) => `${path}: ${value}`);
     expect(bad).toEqual([]);
   });
 });

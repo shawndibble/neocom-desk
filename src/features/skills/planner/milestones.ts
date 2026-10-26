@@ -60,7 +60,7 @@ export function normalizeMilestones(raw: readonly PlanMilestone[] | undefined): 
 }
 
 /**
- * "Add milestone…": names a new goal anchored to one entry row's skill/level.
+ * "Add milestone": names a new goal anchored to one entry row's skill/level.
  * An upsert, not a bare append — the UI only ever offers "Add" on a row with
  * none, but replacing whatever already sits at that anchor (rather than
  * appending a second one) keeps that an invariant rather than a UI courtesy.

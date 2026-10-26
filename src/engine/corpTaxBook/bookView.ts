@@ -87,7 +87,7 @@ export interface BookViewInput {
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
    * A moon owner's prices by raw type id (#4621): the server's rule for the moon owner's own
-   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay… and that page owe one figure.
+   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay and that page owe one figure.
    * Absent: `pricesOn`.
    */
   moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;

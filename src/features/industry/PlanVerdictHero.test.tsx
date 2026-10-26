@@ -413,7 +413,7 @@ describe('PlanVerdictHero reaction location warning (issue #2908)', () => {
     renderHero({ locationBlock: block({ systemName: 'Tama', onApply }, onChoose) });
     await userEvent.click(screen.getByRole('button', { name: 'Move reactions to Tama (lowsec)' }));
     expect(onApply).toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Choose location…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Choose location' }));
     expect(onChoose).toHaveBeenCalled();
   });
 

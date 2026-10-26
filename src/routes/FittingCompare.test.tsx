@@ -45,7 +45,7 @@ describe('FittingCompare', () => {
     expect(await screen.findByText('Add a Fitting to start comparing.')).toBeInTheDocument();
   });
 
-  it('moves focus on after Remove takes its column: the next Remove, then Compare with…', async () => {
+  it('moves focus on after Remove takes its column: the next Remove, then Compare with', async () => {
     const user = userEvent.setup();
     renderAt('/ships/fittings/compare?f=bad-one&f=bad-two');
     const [first] = await screen.findAllByRole('button', { name: /^Remove .* from comparison$/ });
@@ -53,7 +53,7 @@ describe('FittingCompare', () => {
     const remaining = await screen.findByRole('button', { name: /^Remove .* from comparison$/ });
     await vi.waitFor(() => expect(remaining).toHaveFocus());
     await user.click(remaining);
-    const add = (await screen.findAllByRole('button', { name: 'Compare with…' }))[0];
+    const add = (await screen.findAllByRole('button', { name: 'Compare with' }))[0];
     await vi.waitFor(() => expect(add).toHaveFocus());
   });
 
@@ -65,7 +65,7 @@ describe('FittingCompare', () => {
 
   it('shows exactly one primary Add Fitting button in the empty state', async () => {
     renderAt('/ships/fittings/compare');
-    const addButtons = await screen.findAllByRole('button', { name: 'Compare with…' });
+    const addButtons = await screen.findAllByRole('button', { name: 'Compare with' });
     expect(addButtons).toHaveLength(2);
     const primaryButtons = addButtons.filter((button) => button.className.includes('bg-accent'));
     expect(primaryButtons).toHaveLength(1);

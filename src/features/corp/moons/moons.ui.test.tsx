@@ -139,13 +139,13 @@ describe('MinersTab', () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
     const menu = await screen.findByRole('menu');
-    for (const name of ['Show info', 'Record payment…', 'Dismiss tax…']) {
+    for (const name of ['Show info', 'Record payment', 'Dismiss tax']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
     // Show info, then the three real actions: nothing else.
     expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
     // No payment in this book: the item stays, inert.
-    expect(within(menu).getByRole('menuitem', { name: 'Mark not tax…' })).toHaveAttribute(
+    expect(within(menu).getByRole('menuitem', { name: 'Mark not tax' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
@@ -163,15 +163,15 @@ describe('MinersTab', () => {
 });
 
 describe('MinersTab row menu dialogs', () => {
-  it('Record payment… and Dismiss tax… open their dialogs from the ⋮', async () => {
+  it('Record payment and Dismiss tax open their dialogs from the ⋮', async () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dismiss tax…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dismiss tax' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });
@@ -180,7 +180,7 @@ describe('Record payment dialog', () => {
   it('asks no reason and records with an amount alone', async () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText(/Reason/)).not.toBeInTheDocument();
     const amount = within(dialog).getByRole('textbox', { name: 'Amount' });

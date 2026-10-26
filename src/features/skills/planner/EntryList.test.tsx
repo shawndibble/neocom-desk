@@ -827,7 +827,7 @@ describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /more actions for skill 1 iv/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Add milestone…' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Add milestone' }));
     expect(added).toEqual([[1, 4]]);
   });
 
@@ -855,7 +855,7 @@ describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
     expect(screen.getByText(formatLocalDate(finish))).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /more actions for skill 1 iv/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Rename…' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
     expect(renamed).toEqual(['m1']);
 
     await user.click(screen.getByRole('button', { name: /more actions for skill 1 iv/i }));

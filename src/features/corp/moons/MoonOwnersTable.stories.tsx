@@ -20,7 +20,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary All five statuses, with Pay… on every row that is owed. */
+/** @summary All five statuses, with Pay on every row that is owed. */
 export const Default: Story = {};
 
 /** @summary One moon owner, healthy. */
@@ -31,5 +31,5 @@ export const Single: Story = {
   },
 };
 
-/** @summary A viewer who may not record payments: no Pay… column. */
+/** @summary A viewer who may not record payments: no Pay column. */
 export const ReadOnly: Story = { args: { onPay: undefined } };
