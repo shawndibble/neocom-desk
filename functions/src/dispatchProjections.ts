@@ -28,6 +28,15 @@ export interface StoredProjectionRow extends ProjectionRowInput {
   deviceId?: string;
 }
 
+/**
+ * Whether this 15-minute `dispatchProjections` tick is the hourly one: the tick whose minute
+ * is under 15, so a late start still counts. Work that must run hourly (corp tax book removal
+ * finalization) rides this tick instead of owning a Cloud Scheduler job.
+ */
+export function isHourlyTick(nowMs: number): boolean {
+  return new Date(nowMs).getUTCMinutes() < 15;
+}
+
 /** A row still unfired more than this long past its `fireAt` is deleted unsent, not sent late (GLOSSARY round 45). */
 export const STALE_UNSENT_MS = 7 * 24 * 3_600_000;
 

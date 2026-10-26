@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  LAWLESS_CORRUPTION_STATE,
-  LAWLESS_HEARTBEAT_MS,
-  lawlessWriteNeeded,
-  parseLawlessSystemIds,
-  sameLawlessSystemIds,
-} from './lawlessSystems.js';
+import { LAWLESS_CORRUPTION_STATE, parseLawlessSystemIds } from './lawlessSystems.js';
 
 // Trimmed from a real response (2026-10-07): a list of campaigns, each with
 // its insurgencies. Only `corruptionState` 5 is lawless; Aivonen and Akidagi
@@ -62,59 +56,5 @@ describe('parseLawlessSystemIds', () => {
     ['insurgencies that is not a list', [{ insurgencies: 'x' }]],
   ])('returns an empty list for %s without throwing', (_label, body) => {
     expect(parseLawlessSystemIds(body)).toEqual([]);
-  });
-});
-
-describe('sameLawlessSystemIds', () => {
-  it('is equal for the same ids', () => {
-    expect(sameLawlessSystemIds([30000001, 30000002], [30000001, 30000002])).toBe(true);
-  });
-
-  it('ignores order', () => {
-    expect(sameLawlessSystemIds([30000002, 30000001], [30000001, 30000002])).toBe(true);
-  });
-
-  it('sees an added system', () => {
-    expect(sameLawlessSystemIds([30000001], [30000001, 30000002])).toBe(false);
-  });
-
-  it('sees a removed system', () => {
-    expect(sameLawlessSystemIds([30000001, 30000002], [30000001])).toBe(false);
-  });
-
-  it('treats two empty lists as equal, and empty vs not as different', () => {
-    expect(sameLawlessSystemIds([], [])).toBe(true);
-    expect(sameLawlessSystemIds([], [30000001])).toBe(false);
-    expect(sameLawlessSystemIds([30000001], [])).toBe(false);
-  });
-
-  it('treats a missing or malformed stored list as different', () => {
-    expect(sameLawlessSystemIds(undefined, [])).toBe(false);
-    expect(sameLawlessSystemIds('30000001', [30000001])).toBe(false);
-    expect(sameLawlessSystemIds(['30000001'], [30000001])).toBe(false);
-  });
-});
-
-describe('lawlessWriteNeeded', () => {
-  const now = 1_800_000_000_000;
-
-  it('skips the write when the list is unchanged and recently confirmed', () => {
-    const stored = { systemIds: [30000002, 30000001], updatedAt: now - 10 * 60 * 1000 };
-    expect(lawlessWriteNeeded(stored, [30000001, 30000002], now)).toBe(false);
-  });
-
-  it('writes when the list changed', () => {
-    const stored = { systemIds: [30000001], updatedAt: now - 60 * 1000 };
-    expect(lawlessWriteNeeded(stored, [30000001, 30000002], now)).toBe(true);
-  });
-
-  it('writes an unchanged list once the heartbeat is due, so the app never ages it out', () => {
-    const stored = { systemIds: [30000001], updatedAt: now - LAWLESS_HEARTBEAT_MS };
-    expect(lawlessWriteNeeded(stored, [30000001], now)).toBe(true);
-  });
-
-  it('writes when nothing is stored or the stored doc is malformed', () => {
-    expect(lawlessWriteNeeded(undefined, [], now)).toBe(true);
-    expect(lawlessWriteNeeded({ systemIds: [] }, [], now)).toBe(true);
   });
 });

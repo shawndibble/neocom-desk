@@ -2,14 +2,13 @@
  * The lawless-systems job for the GitHub Actions runner (`scripts/public-data/lawless-systems.mjs`,
  * `.github/workflows/public-data-lawless-systems.yml`): fetches CCP's insurgency feed and
  * publishes the lawless system ids to R2, where the app reads them with a plain fetch.
- * `syncLawlessSystems` keeps the Firestore doc as the fallback until it is removed.
  */
 import { ESI_USER_AGENT } from './esiNotifications.js';
 import { INSURGENCY_URL, parseLawlessSystemIds } from './lawlessSystems.js';
 import { r2ConfigFromEnv } from './publicDataActiveWars.js';
 import { createR2Put, type R2Put } from './r2Client.js';
 
-/** What the app reads: `{ systemIds, updatedAt }`, the shape of `systemConditions/lawless`. */
+/** What the app reads: `{ systemIds, updatedAt }`, what `src/features/travel/lawlessSystems.ts` reads. */
 export const LAWLESS_SYSTEMS_R2_KEY = 'lawless-systems/systems.json';
 /** Runs are 15 minutes apart: five minutes is the longest a CDN copy is worth keeping. */
 const HEADERS = {

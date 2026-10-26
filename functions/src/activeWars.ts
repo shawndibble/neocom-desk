@@ -1,6 +1,6 @@
 /**
- * The open-wars list for the War banner (`systemConditions/activeWars`), with
- * no I/O in it. ESI cannot list one corporation's wars, so `syncActiveWars`
+ * The open-wars list for the War banner (`active-wars/wars.json` in R2), with
+ * no I/O in it. ESI cannot list one corporation's wars, so the active-wars job
  * keeps every war that is still running and the app picks its own out of the
  * list (`src/engine/wars.ts`, which reads this shape).
  *
@@ -18,8 +18,6 @@
  * Only a war that began before the horizon and never ended is missed, and the
  * Alerts feed still catches a new declaration.
  */
-
-export const ACTIVE_WARS_DOC = 'activeWars';
 
 /** How far back (in war ids, about 26 a day) the sweep looks for a war that is still open. */
 export const ACTIVE_WARS_HORIZON_IDS = 12_000;

@@ -15,7 +15,7 @@ export function useLawlessSystems(): ReadonlySet<number> {
     if (characterId === null) return;
     let cancelled = false;
     const load = () =>
-      void loadLawlessSystems(characterId).then((next) => {
+      void loadLawlessSystems().then((next) => {
         if (!cancelled) setLawless(next.size === 0 ? NONE : next);
       });
     load();
