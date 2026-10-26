@@ -410,7 +410,6 @@ function FittingsPage() {
     fitting,
     catalogue,
     targetProfiles,
-    isPhone,
     edit,
     characterId: activeCharacterId,
     charges,
@@ -543,7 +542,7 @@ function FittingsPage() {
         <RuleBreakFlags.Provider value={ruleBreaks.flagged}>
           {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
         panel (scope decision `20261016-171349`). */}
-          {/* Pushed: from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
+          {/* Pushed (the Add slide-out): from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
           <div className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'}`}>
             <FittingEditorHeader
               workspace={workspace}

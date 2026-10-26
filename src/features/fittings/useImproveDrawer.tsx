@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Close } from '@/components/ui/icons';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useTranslation } from 'react-i18next';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -55,7 +56,6 @@ interface UseImproveDrawerArgs {
   fitting: Fitting | null;
   catalogue: FittingCatalogue | null;
   targetProfiles: TargetProfiles;
-  isPhone: boolean;
   edit: FittingWorkspace['edit'];
   /** The active Character, for Train; null shows no Train section. */
   characterId: number | null;
@@ -78,7 +78,6 @@ export function useImproveDrawer({
   fitting,
   catalogue,
   targetProfiles,
-  isPhone,
   edit,
   characterId,
   charges,
@@ -160,11 +159,26 @@ export function useImproveDrawer({
   useTimedToast(implantApplied, () => setImplantApplied(null));
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
-  // The column's heading takes focus as it opens, so a keyboard user lands in it.
+  // A column beside the editor from desktop up; below it (phone and tablet, where the
+  // stats are a tab of their own) a sheet.
+  const asColumn = useIsDesktop();
+  // The column's heading takes focus as it opens, so a keyboard user lands in it;
+  // closing gives focus back to what held it (the ⋮ menu's button, which the menu
+  // has refocused by then: `useOpenAfterMenu`), as the slide-out used to.
   const columnHeading = useRef<HTMLHeadingElement | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (isOpen && !isPhone) columnHeading.current?.focus({ preventScroll: true });
-  }, [isOpen, isPhone]);
+    if (!isOpen || !asColumn) return;
+    const active = document.activeElement;
+    opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    columnHeading.current?.focus({ preventScroll: true });
+    return () => {
+      const back = opener.current;
+      opener.current = null;
+      if (back?.isConnected) back.focus({ preventScroll: true });
+    };
+  }, [isOpen, asColumn]);
+  const columnRef = useFitToViewport(isOpen && asColumn);
   // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
   const { groups: chargeGroups } = useChargeChoices({
     fitting: isOpen ? fitting : null,
@@ -363,31 +377,42 @@ export function useImproveDrawer({
   // `improveColumn`), where the docked browser sits: never over the nav, and the
   // stats stay in view while rows are ticked. Sticky, a viewport tall, with its own
   // scroll and the selection bar below it.
-  const column = fitting && isOpen && !isPhone && (
-    <Panel
-      title={t('fittings.improve.title')}
-      headingRef={columnHeading}
-      actions={<IconButton icon={<Close />} label={t('common.close')} onClick={close} />}
-      padded={false}
-      fill
-      className="slide-in-left sticky top-3 flex h-[calc(100vh-1.5rem)] flex-col"
+  const column = fitting && isOpen && asColumn && (
+    // Escape closes it, as it did the slide-out, from anywhere in it (its heading
+    // takes focus on open), unless a dialog opened from it owns the key.
+    <div
+      ref={columnRef}
+      className="slide-in-left sticky top-3 h-[calc(100vh-1.5rem)]"
+      onKeyDown={(event) => {
+        // Not one a popup inside it already handled (a Select's list, a tooltip: React
+        // bubbles their portalled keys through here), nor one a dialog owns.
+        if (
+          event.key !== 'Escape' ||
+          event.defaultPrevented ||
+          !event.currentTarget.contains(event.target as Node) ||
+          document.querySelector('dialog[open]')
+        )
+          return;
+        close();
+      }}
     >
-      <div
-        className="min-h-0 flex-1 overflow-y-auto p-3"
-        // Escape closes it, as it did the slide-out, unless a dialog opened from it owns the key.
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && !document.querySelector('dialog[open]')) close();
-        }}
+      <Panel
+        title={t('fittings.improve.title')}
+        headingRef={columnHeading}
+        actions={<IconButton icon={<Close />} label={t('common.close')} onClick={close} />}
+        padded={false}
+        fill
+        className="flex h-full flex-col"
       >
-        {body}
-      </div>
-      {footer && <div className="border-line shrink-0 border-t px-3 py-2">{footer}</div>}
-    </Panel>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">{body}</div>
+        {footer && <div className="border-line shrink-0 border-t px-3 py-2">{footer}</div>}
+      </Panel>
+    </div>
   );
 
   const drawer = fitting && (
     <>
-      {isPhone ? (
+      {!asColumn ? (
         <Modal
           open={isOpen}
           onClose={close}
@@ -422,7 +447,39 @@ export function useImproveDrawer({
     close,
     drawer,
     column: column || null,
-    docked: isOpen && !isPhone,
+    docked: isOpen && asColumn,
     preview: isOpen ? preview : null,
   };
+}
+
+/**
+ * The column is sticky a viewport tall, but at the top of the page it starts below
+ * the editor's header, so a fixed `100vh` height would push its selection bar off
+ * the bottom of the screen until the page scrolled. This keeps it ending at the
+ * viewport's bottom (0.75rem clear) wherever its top is.
+ */
+function useFitToViewport(active: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      const top = Math.max(el.getBoundingClientRect().top, 12);
+      el.style.height = `${window.innerHeight - top - 12}px`;
+    };
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(fit);
+    };
+    fit();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [active]);
+  return ref;
 }

@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   TypeIcon,
+  useOpenAfterMenu,
 } from '@/components/ui';
 import { Expanded, More, Rename } from '@/components/ui/icons';
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
@@ -103,8 +104,11 @@ function CompactFittingHeader({
   share,
   onRename,
   improveItem,
+  onMenuCloseAutoFocus,
 }: {
   improveItem: ReactNode;
+  /** The ⋮ menu's close hook, so an item opened after it closes (Improve) gets focus right. */
+  onMenuCloseAutoFocus: (event: Event) => void;
   share?: EditorShare;
   onRename: () => void;
   fitting: Fitting;
@@ -136,7 +140,11 @@ function CompactFittingHeader({
           <DropdownMenuTrigger asChild>
             <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuContent
+            align="end"
+            className="min-w-56"
+            onCloseAutoFocus={onMenuCloseAutoFocus}
+          >
             <DropdownMenuItem onSelect={onRename}>{t('fittings.header.rename')}</DropdownMenuItem>
             {improveItem}
             <DropdownMenuSeparator />
@@ -254,8 +262,13 @@ export function FittingHeader({
   const compareItem = (
     <DropdownMenuItem onSelect={onCompare}>{t('fittings.compare.entryButton')}</DropdownMenuItem>
   );
+  // Opened once the menu has closed and put focus back on its button, so Improve's
+  // column takes focus from there and gives it back on close.
+  const improveMenu = useOpenAfterMenu();
   const improveItem = onImprove && (
-    <DropdownMenuItem onSelect={onImprove}>{t('fittings.improve.menuItem')}</DropdownMenuItem>
+    <DropdownMenuItem onSelect={() => improveMenu.run(onImprove)}>
+      {t('fittings.improve.menuItem')}
+    </DropdownMenuItem>
   );
   const context = badges && (
     <>
@@ -295,6 +308,7 @@ export function FittingHeader({
           share={share}
           onRename={() => setRenaming(true)}
           improveItem={improveItem}
+          onMenuCloseAutoFocus={improveMenu.onCloseAutoFocus}
         />
         {renameModal}
       </>
@@ -330,7 +344,11 @@ export function FittingHeader({
             <DropdownMenuTrigger asChild>
               <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-48">
+            <DropdownMenuContent
+              align="end"
+              className="min-w-48"
+              onCloseAutoFocus={improveMenu.onCloseAutoFocus}
+            >
               {improveItem}
               {compareItem}
               <DropdownMenuItem

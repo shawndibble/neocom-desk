@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -63,6 +63,18 @@ describe('FittingHeader on desktop', () => {
     await user.click(screen.getByRole('button', { name: 'Fitting actions' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Compare' }));
     expect(onCompare).toHaveBeenCalledOnce();
+  });
+
+  it('opens Improve from the ⋮ menu once the menu has closed and refocused its button', async () => {
+    const trigger = () => screen.getByRole('button', { name: 'Fitting actions' });
+    const onImprove = vi.fn();
+    renderHeader({ onImprove });
+    const user = userEvent.setup();
+    await user.click(trigger());
+    await user.click(await screen.findByRole('menuitem', { name: 'Improve…' }));
+    expect(onImprove).toHaveBeenCalledOnce();
+    // The button holds focus as Improve's column renders, so the column can give it back on close.
+    await waitFor(() => expect(document.activeElement).toBe(trigger()));
   });
 
   it('copies the headline stats from the ⋮ menu and says so', async () => {
