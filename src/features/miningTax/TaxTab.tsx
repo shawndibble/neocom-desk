@@ -118,6 +118,10 @@ import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { claimCorpTaxBookPayment } from '@/features/miningTax/corpBook/corpBookStore';
+import {
+  claimKeyOf,
+  useAutoClaimDonations,
+} from '@/features/miningTax/corpBook/useAutoClaimDonations';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import {
@@ -340,6 +344,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     madePayments,
     reloadKey: data?.fetchedAt?.getTime(),
   });
+  // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
+  const { failed: failedClaims } = useAutoClaimDonations(corpView, reloadCorpBooks);
   // Book rows carry a raw solar system id; resolve it like a personal row's.
   const bookSystems = useBookSystems(corpView, {
     names: data?.systemNames ?? NO_NAMES,
@@ -960,9 +966,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         ),
       });
     }
-    // A donation to a corp's book that it could not match to anyone: only the donor can claim it.
+    // A claim the automatic pass could not make (offline, say): the donor retries it by hand.
     for (const claim of corpView?.claims ?? []) {
-      const claimKey = `${claim.corporationId}:${claim.payment.id}`;
+      const claimKey = claimKeyOf(claim.corporationId, claim.payment.id);
+      if (!failedClaims.has(claimKey)) continue;
       attentionItems.push({
         id: `corp-claim:${claimKey}`,
         tone: 'info',
