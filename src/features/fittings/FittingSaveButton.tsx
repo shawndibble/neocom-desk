@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Tooltip,
+  SplitButtonChevron,
 } from '@/components/ui';
-import { Expanded } from '@/components/ui/icons';
 import { isApplePlatform, modChordDisplayKey } from '@/lib/shortcuts';
 import { useChord } from '@/lib/useChord';
 
@@ -83,13 +83,7 @@ export function FittingSaveButton({
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="primary"
-            aria-label={t('fittings.header.moreSave')}
-            className="rounded-l-none border-l border-l-accent-contrast/30 px-2!"
-          >
-            <Expanded aria-hidden />
-          </Button>
+          <SplitButtonChevron label={t('fittings.header.moreSave')} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
           <DropdownMenuItem disabled={!canSave} onSelect={onSave}>
