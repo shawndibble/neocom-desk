@@ -14,8 +14,13 @@ import {
 import type { DayRow, MinerRow } from '@/engine/corpTaxBook/bookView';
 import { canRebillFrom } from '@/engine/corpTaxBook/statements';
 import { DialogShell, Effect, Label } from './BookDialogs';
-import { isk, shortDate } from './moonsFormat';
+import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
+
+/** The chosen date the way the rest of the book writes it: the browser's date field shows the locale's format. */
+function DateReadback({ date }: { date: string }) {
+  return <span className="block text-xs text-text-dim">{dateWithYear(date)}</span>;
+}
 
 /** A day's rate can be overridden only before it is on a Statement (D31). */
 const canOverrideDay = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
@@ -113,7 +118,11 @@ export function AdjustmentDialog({
       open={open}
       onClose={onClose}
       title={t('corpTaxBook.moons.corrections.adjust.title', { name: minerName })}
-      confirmLabel={t('corpTaxBook.moons.corrections.adjust.confirm', { amount: isk(value || 0) })}
+      confirmLabel={
+        value > 0
+          ? t('corpTaxBook.moons.corrections.adjust.confirm', { amount: isk(value) })
+          : t('corpTaxBook.moons.corrections.adjust.confirmEmpty')
+      }
       canConfirm={value > 0 && date !== '' && reason.trim().length > 0}
       run={async () => {
         await edit({
@@ -147,6 +156,7 @@ export function AdjustmentDialog({
       </Label>
       <Label text={t('corpTaxBook.moons.corrections.adjust.date')}>
         <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        {date !== '' && <DateReadback date={date} />}
       </Label>
       <Label text={t('corpTaxBook.moons.corrections.adjust.label')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
@@ -190,6 +200,7 @@ export function RebillDialog({
       <p className="text-text-dim">{t('corpTaxBook.moons.corrections.rebill.intro')}</p>
       <Label text={t('corpTaxBook.moons.corrections.rebill.from')}>
         <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        {fromDate !== '' && <DateReadback date={fromDate} />}
       </Label>
       {fromDate !== '' && !open_ && (
         <p role="alert" className="text-xs text-danger">

@@ -18,6 +18,7 @@ import { isk, shortDate } from './moonsFormat';
 import { OverdueWord, StandingWord } from './moonsParts';
 import { MinerExpandedRow } from './MinerExpandedRow';
 import { MinerRowMenu } from './MinerRowMenu';
+import { useCards } from './sectionHelpers';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 
 const PARAMS = {
@@ -38,6 +39,7 @@ export function MinersTab() {
     | null
   >(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
+  const [tableRef, cards] = useCards();
   const rowContextMenu = useCallback(
     (m: MinerRow, tr: ReactElement) => (
       <MinerRowMenu
@@ -172,7 +174,7 @@ export function MinersTab() {
       <Panel padded={false}>
         <div className="flex flex-wrap items-center gap-2 p-3">
           <SearchInput
-            className="min-w-40 flex-1"
+            className="min-w-56 flex-1"
             value={params.q}
             onChange={(e) => setParams({ q: e.target.value })}
             placeholder={t('corpTaxBook.moons.miners.search')}
@@ -191,7 +193,7 @@ export function MinersTab() {
             count={counts.guests}
           />
         </div>
-        <div className="@container overflow-x-auto">
+        <div ref={tableRef} className="@container overflow-x-auto">
           <DataTable
             label={t('corpTaxBook.moons.tabs.miners')}
             columns={columns}
@@ -201,6 +203,7 @@ export function MinersTab() {
               renderDetail: (m) => <MinerExpandedRow miner={m} />,
               leadingIcon: true,
             }}
+            stacked={cards}
             rowClassName={() => 'group'}
             rowContextMenu={rowContextMenu}
             rowMoreActions={canEdit}

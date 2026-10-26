@@ -15,6 +15,22 @@ export function shortDate(value: string): string {
   return `${d} ${MONTHS[m - 1]}`;
 }
 
+/** "18 Oct", or "18 Oct 2025" when the year is not `now`'s: a date that could be read as this year's. */
+export function dateWithYear(value: string, now: Date = new Date()): string {
+  const year = Number(value.slice(0, 4));
+  return year === now.getUTCFullYear() ? shortDate(value) : `${shortDate(value)} ${year}`;
+}
+
+/** "18 Oct 14:00 UTC" (EVE time) from an instant, with the year when it is not this one. */
+export function dateTimeUtc(value: string, now: Date = new Date()): string {
+  return `${dateWithYear(value, now)} ${value.slice(11, 16)}\u00a0UTC`;
+}
+
+/** An amount with its direction in the sign, U+2212 for a minus (the book's sums use it too). */
+export function signedIsk(value: number): string {
+  return `${value < 0 ? '\u2212' : '+'}${isk(Math.abs(value))}`;
+}
+
 /** "18 Oct 14:00" from an instant (EVE time is UTC). */
 export function shortDateTime(value: string): string {
   return `${shortDate(value)} ${value.slice(11, 16)}`;
@@ -26,7 +42,9 @@ export function extractionWindowLabel(
   row: { startedAt: string; chunkArrivalAt: string }
 ): string {
   const days = extractionWindowDays(row.startedAt, row.chunkArrivalAt);
-  return `${shortDate(row.startedAt)} - ${shortDate(row.chunkArrivalAt)} (${t('corpTaxBook.moons.windowDays', { count: days })})`;
+  // The days stay on one line: a break inside "(41 days)" leaves the "41" hanging.
+  const span = t('corpTaxBook.moons.windowDays', { count: days }).replace(/ /g, '\u00a0');
+  return `${dateWithYear(row.startedAt)} - ${dateWithYear(row.chunkArrivalAt)} (${span})`;
 }
 
 /** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */

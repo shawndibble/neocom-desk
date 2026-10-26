@@ -27,7 +27,7 @@ import { isk, newId } from './moonsFormat';
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs text-text-dim">{text}</span>
+      <span className="block text-xs text-text-dim">{text}</span>
       {children}
     </label>
   );
@@ -42,8 +42,11 @@ interface ShellProps {
   run: () => Promise<void>;
   /** A destructive confirm (§6c): the confirm button is `danger`, not `primary`. */
   danger?: boolean;
-  /** The "logged under your name" footer note; off where no reason is asked. */
-  showLogged?: boolean;
+  /**
+   * The "logged under your name" footer note: `true` says it is logged with the reason the
+   * dialog asks for, `'plain'` is for a dialog that asks for none, `false` drops the note.
+   */
+  showLogged?: boolean | 'plain';
   children: ReactNode;
 }
 
@@ -104,7 +107,13 @@ export function DialogShell({
           </p>
         )}
         {showLogged && (
-          <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</p>
+          <p className="text-xs text-text-dim">
+            {t(
+              showLogged === 'plain'
+                ? 'corpTaxBook.moons.dialogs.loggedPlain'
+                : 'corpTaxBook.moons.dialogs.logged'
+            )}
+          </p>
         )}
       </div>
     </Modal>
@@ -189,6 +198,7 @@ export function RecordPaymentDialog({
       title={t('corpTaxBook.moons.dialogs.record.title', { name: minerName })}
       confirmLabel={t('corpTaxBook.moons.dialogs.record.confirm', { amount: isk(value || 0) })}
       canConfirm={value > 0}
+      showLogged="plain"
       run={async () => {
         await edit({
           action: 'recordPayment',
@@ -327,6 +337,7 @@ export function AssignDonationDialog({
       title={t('corpTaxBook.moons.dialogs.assign.title')}
       confirmLabel={t('corpTaxBook.moons.dialogs.assign.confirm', { amount: isk(payment.amount) })}
       canConfirm={minerId !== ''}
+      showLogged="plain"
       run={async () => {
         await edit({ action: 'assignPayment', paymentId: payment.id, minerId });
       }}

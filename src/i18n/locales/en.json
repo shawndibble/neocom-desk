@@ -15877,13 +15877,16 @@
         "markedNotTax": "{{amount}} marked not tax",
         "oldestFirst": "Oldest debt first",
         "correction": "Correction by {{name}}",
+        "correctionCredit": "Credit by {{name}}",
+        "correctionCharge": "Charge by {{name}}",
         "correctsDay": "Next Statement, for {{date}}",
         "billedOn": "On the {{period}} Statement, for {{date}}",
         "markNotTaxMenu": "Mark not tax…",
-        "markNotTaxNone": "No payment to mark"
+        "markNotTaxNone": "No payment to mark",
+        "markNotTaxTarget": "Payment of {{date}}, {{amount}}"
       },
       "cols": {
-        "moon": "Refinery",
+        "moon": "Moon",
         "state": "State",
         "when": "When",
         "ore": "Ore",
@@ -15969,20 +15972,24 @@
         },
         "whoMined": "Who mined this chunk",
         "nobody": "Nobody has mined this chunk yet.",
-        "past": "Past extractions",
-        "pastHint": "Earlier cycles, not this one",
-        "noPast": "No earlier cycle is on record for this moon.",
+        "past": "Other cycles",
+        "pastHint": "Newer and older cycles of this moon",
         "dismissTitle": "Dismiss this extraction's tax?",
         "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed.",
-        "leftToMine": "Left to mine",
+        "leftToMine": "Left to mine, est.",
+        "minedEst": "Mined, est.",
         "minersHint": "Tax so far, not billed yet; a row opens to the ore",
+        "minersHintBilled": "Billed on {{period}}; a row opens to the ore",
+        "minersHintBilledMany": "Already billed; a row opens to the ore",
         "minersSummary_one": "{{count}} Miner · {{tax}}",
         "minersSummary_other": "{{count}} Miners · {{tax}}",
         "openMiner": "Open miner",
         "oreOf": "Ore mined by {{name}}",
-        "pastSummary_one": "{{count}} earlier cycle",
-        "pastSummary_other": "{{count}} earlier cycles",
-        "taxSoFar": "Tax so far"
+        "pastSummary_one": "{{count}} other cycle",
+        "pastSummary_other": "{{count}} other cycles",
+        "taxSoFar": "Tax so far",
+        "taxBilled": "Tax",
+        "noOtherCycles": "No other cycles on record for this moon."
       },
       "miners": {
         "search": "Search Miners or characters…",
@@ -16019,7 +16026,8 @@
           "reject": "Reject declaration…"
         },
         "overdue": {
-          "title": "{{name}} · overdue {{days}} days · {{amount}}",
+          "title_one": "{{name}} · overdue {{count}} day · {{amount}}",
+          "title_other": "{{name}} · overdue {{count}} days · {{amount}}",
           "body": "The {{period}} Statement is unpaid past its due date.",
           "remind": "Send reminder",
           "dismiss": "Dismiss…"
@@ -16037,6 +16045,7 @@
           "writeOff": "Write off…"
         },
         "reminderQueued": "Reminder to {{name}} is in the send queue.",
+        "reminderQueuedFor": "Reminder to {{name}} about the {{period}} Statement is in the send queue.",
         "reminderRefused": {
           "stopped": "This Miner stopped reminders and has had their one.",
           "queued": "A reminder for this Statement is already queued.",
@@ -16049,6 +16058,7 @@
         "record": "Record payment…",
         "remind": "Send reminder",
         "remindNone": "No Statement issued yet",
+        "remindNothingOwed": "Nothing owed",
         "dismissAll": "Dismiss tax…",
         "closeAccount": "Close account…",
         "closedNote": "Account closed on {{date}}. Statement mail has stopped; the final Statement and any earlier ones still go out.",
@@ -16059,15 +16069,9 @@
         "daysHint": "Newest first · Billable through {{date}}",
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
-        "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals = {{owed}} owed",
+        "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
         "noDismissals": "Nothing has been dismissed.",
-        "scope": {
-          "record": "A day",
-          "miner": "This Miner",
-          "moon": "A moon",
-          "extraction": "An extraction"
-        },
         "reversed": "reversed",
         "reverse": "Reverse",
         "mail": "Mail",
@@ -16076,15 +16080,32 @@
         "activityHint": "Audit log for this Miner, newest first",
         "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is still accruing.",
         "writtenOff": "Written off",
-        "writtenOffValue_one": "{{tolerance}} + {{count}} line",
-        "writtenOffValue_other": "{{tolerance}} + {{count}} lines",
+        "writtenOffValue_one": "{{tolerance}} · {{count}} line",
+        "writtenOffValue_other": "{{tolerance}} · {{count}} lines",
         "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged.",
-        "accruingHint": "Not Billable yet: these owe nothing until their day is Billable",
+        "accruingHint": "Still accruing: not Billable until the day ends and an officer syncs.",
         "earlierHint": "On a Statement, paid, dismissed or written off",
         "daysSummary_one": "{{count}} day · {{tax}}",
         "daysSummary_other": "{{count}} days · {{tax}}",
         "moons": "Moons",
         "moonsHint": "A row opens to the ore mined there",
+        "moonsSummary_one": "{{count}} moon · {{tax}} tax",
+        "moonsSummary_other": "{{count}} moons · {{tax}} tax",
+        "overduePausedNote": "Overdue paused",
+        "dismissedFor": {
+          "record": "dismissed tax for {{what}}",
+          "miner": "dismissed all of this Miner's tax",
+          "moon": "dismissed tax for {{what}}",
+          "extraction": "dismissed tax for the extraction at {{what}}"
+        },
+        "empty": {
+          "nextStatement": "Nothing is waiting for the next Statement.",
+          "stillAccruing": "Nothing is still accruing.",
+          "earlier": "No earlier days.",
+          "payments": "No payments yet.",
+          "moons": "No moons mined yet.",
+          "activity": "Nothing has happened for this Miner yet."
+        },
         "openMoon": "Open moon",
         "oreAt": "Ore mined at {{moon}}",
         "overdueNote_one": "Overdue {{count}} day",
@@ -16095,6 +16116,7 @@
         "activitySummary_one": "{{count}} entry",
         "activitySummary_other": "{{count}} entries",
         "filter": {
+          "label": "Filter activity",
           "all": "All",
           "mail": "Mail",
           "dismissed": "Dismissed",
@@ -16646,6 +16668,7 @@
           "date": "Day it corrects",
           "label": "Label on the line",
           "confirm": "Add {{amount}}",
+          "confirmEmpty": "Add",
           "effect": "A line dated after the next Statement's last day waits for the one after."
         },
         "rebill": {
@@ -16662,6 +16685,7 @@
       },
       "dialogs": {
         "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
+        "loggedPlain": "Logged under your name. Your role is checked again when you confirm.",
         "reasonShown": "Reason (shown to the Miner)",
         "dismissConfirm": "Dismiss {{amount}}",
         "dismissDays": {
@@ -16692,7 +16716,7 @@
         },
         "dismissMiner": {
           "title": "Dismiss {{name}}'s tax?",
-          "intro": "Everything this Miner has mined so far is waived. It stays on the record as dismissed and can be reversed."
+          "intro": "Everything this Miner owes, and everything waiting for the next Statement, is waived. Days still accruing are not included. It stays on the record as dismissed and can be reversed."
         },
         "record": {
           "title": "Record a payment for {{name}}",
@@ -16936,7 +16960,14 @@
         "hide": "Hide {{title}}",
         "none": "No {{noun}}.",
         "loadOlder": "Load older {{noun}} ({{count}} more)",
-        "end": "That is every {{noun}} there is.",
+        "end": "No older {{noun}}.",
+        "oreLine": "{{amount}} · {{value}} est. · tax {{tax}}",
+        "affix": {
+          "units": " units",
+          "est": " est.",
+          "days": " days",
+          "last": "last "
+        },
         "otherOre": "Other",
         "total": "Total",
         "nouns": {
@@ -16944,7 +16975,7 @@
           "payments": "entries",
           "moons": "moons",
           "activity": "entries",
-          "miners": "Miners",
+          "miners": "miners",
           "cycles": "cycles"
         }
       }

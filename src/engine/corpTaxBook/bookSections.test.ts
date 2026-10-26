@@ -4,6 +4,7 @@ import {
   extractionDetail,
   planStatementRun,
   statementForLine,
+  type BookView,
   type BookViewInput,
   type DayRow,
   type ExtractionRow,
@@ -11,6 +12,8 @@ import {
 import {
   activityFeed,
   daysByPhase,
+  extractionBilling,
+  oldestUnsettled,
   statementAdjustment,
   minerMoons,
   minersOnMoon,
@@ -218,6 +221,71 @@ describe('activityFeed', () => {
       audit: [{ id: 'x', at: 4000 }],
     });
     expect(items.map((i) => i.kind)).toEqual(['dismissed', 'audit', 'mail']);
+  });
+
+  it('counts mail audit rows under the Mail chip', () => {
+    const items = activityFeed({
+      mail: [],
+      dismissed: [],
+      audit: [
+        { id: 'a', at: 2, action: 'recordMail', detail: { mailId: '9' } },
+        { id: 'b', at: 1, action: 'sync', detail: {} },
+      ],
+    });
+    expect(items.map((i) => [i.kind, i.chip])).toEqual([
+      ['audit', 'mail'],
+      ['audit', 'audit'],
+    ]);
+  });
+
+  it('folds the audit row of a queued mail into the queue row', () => {
+    const items = activityFeed({
+      mail: [{ id: 'q', at: 3, mailId: '9' }],
+      dismissed: [],
+      audit: [
+        { id: 'a', at: 4, action: 'recordMail', detail: { mailId: '9' } },
+        { id: 'o', at: 2, action: 'recordMail', detail: { mailId: '8' } },
+      ],
+    });
+    expect(items.map((i) => i.id)).toEqual(['q', 'o']);
+  });
+});
+
+describe('extractionBilling', () => {
+  const viewOf = (days: Partial<DayRow>[]) =>
+    ({
+      internals: {
+        byMiner: new Map([['m', { days: days.map((d) => ({ extractionId: 'x', ...d })) }]]),
+      },
+    }) as unknown as BookView;
+  it('is billed once every day left Next Statement and Still accruing', () => {
+    const billed = extractionBilling(
+      viewOf([
+        { status: 'on-statement', statementId: 's1' },
+        { status: 'paid', statementId: 's1' },
+      ]),
+      'x'
+    );
+    expect(billed).toEqual({ billed: true, statementIds: ['s1'] });
+  });
+  it('is not billed while a day waits, or when there are no days', () => {
+    expect(
+      extractionBilling(viewOf([{ status: 'paid' }, { status: 'unbilled' }]), 'x').billed
+    ).toBe(false);
+    expect(extractionBilling(viewOf([]), 'x').billed).toBe(false);
+    expect(extractionBilling(viewOf([{ status: 'dismissed' }]), 'x').billed).toBe(false);
+  });
+});
+
+describe('oldestUnsettled', () => {
+  it('is the oldest issued Statement that is not settled, whatever the list order', () => {
+    const list = [
+      { id: 'sep', issuedAt: '2026-10-01T00:00:00Z' },
+      { id: 'aug', issuedAt: '2026-09-01T00:00:00Z' },
+      { id: 'jul', issuedAt: '2026-08-01T00:00:00Z' },
+    ];
+    expect(oldestUnsettled(list, (id) => id === 'jul')?.id).toBe('aug');
+    expect(oldestUnsettled(list, () => true)).toBeUndefined();
   });
 });
 

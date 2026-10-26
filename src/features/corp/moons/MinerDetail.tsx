@@ -34,12 +34,12 @@ import type { Adjustment } from '@/engine/corpTaxBook/statements';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
-import { AuditLine } from './AuditFeed';
+import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
-import { isk, periodLabel, shortDate, shortDateTime } from './moonsFormat';
+import { isk, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
@@ -47,11 +47,12 @@ import { MinerCharacters } from './MinerCharacters';
 import { CorrectionsMenu } from './MinerCorrections';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
-import { useMinerReminder } from './statementMailing';
+import { moonLabel, tapTargetClassName } from './sectionHelpers';
+import { oldestOpenStatement, useMinerReminder } from './statementMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
   paid: 'text-success',
-  'on-statement': 'text-danger',
+  'on-statement': 'text-text-dim',
   unbilled: 'text-text',
   'not-billable': 'text-text-dim',
   dismissed: 'text-text-dim line-through decoration-text-faint',
@@ -120,7 +121,12 @@ export function MinerDetail({ id }: { id: string }) {
       activityFeed({
         mail: queue
           .filter((m) => statementIds.has(m.statementId))
-          .map((m) => ({ id: m.id, at: m.createdAt, mail: m })),
+          .map((m) => ({
+            id: m.id,
+            at: m.createdAt,
+            mailId: m.mailId === undefined ? undefined : String(m.mailId),
+            mail: m,
+          })),
         dismissed: (detail?.dismissals ?? []).map((d) => ({
           id: d.id,
           at: Date.parse(d.at),
@@ -143,7 +149,7 @@ export function MinerDetail({ id }: { id: string }) {
     }
     return typeof amount === 'number' ? isk(amount) : null;
   };
-  const shownFeed = feed.filter((f) => filter === 'all' || f.kind === filter);
+  const shownFeed = feed.filter((f) => filter === 'all' || f.chip === filter);
 
   if (!detail) {
     return (
@@ -155,9 +161,7 @@ export function MinerDetail({ id }: { id: string }) {
   }
   const { row } = detail;
   const name = names.character(row.mainCharacterId);
-  const openStatement = detail.statements.find(
-    (s) => !view.internals.byMiner.get(id)?.allocation.byStatement.get(s.id)?.settled
-  );
+  const openStatement = oldestOpenStatement(view, id);
   const closedAt = view.input.miners.find((m) => m.id === id)?.closedAt;
   // Tolerance shortfalls and officer write-offs (#4637) both come off what is owed.
   const toleranceTotal =
@@ -165,21 +169,42 @@ export function MinerDetail({ id }: { id: string }) {
     detail.officerWriteOffs.reduce((s, w) => s + w.amount, 0);
   const lateTotal = detail.lateWriteOffs.reduce((s, w) => s + w.tax, 0);
   const paidTotal = detail.payments.reduce((s, p) => s + p.credited, 0);
+  const billedTotal = detail.statements.reduce((s, x) => s + x.amount, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
   const moonName = (moonId: number | undefined) =>
     moonId === undefined ? undefined : names.moon(moonId);
+  /** What a dismissal waived, in words: the day, the moon or the extraction it was aimed at. */
+  const dismissalWhat = (d: NonNullable<typeof detail>['dismissals'][number]) => {
+    if (d.scope === 'record') {
+      const day = detail.days.find((x) => x.key === d.targetId);
+      return day ? shortDate(day.date) : d.targetId;
+    }
+    if (d.scope === 'miner') return '';
+    if (d.scope === 'moon')
+      return Number.isFinite(Number(d.targetId)) ? names.moon(Number(d.targetId)) : d.targetId;
+    const x = view.extractions.find((e) => e.id === d.targetId);
+    return x ? names.moon(x.moonId) : d.targetId;
+  };
   const noun = (key: string) => t(`corpTaxBook.moons.sections.nouns.${key}`);
 
-  const dayColumns = (withSelect: boolean, withStatus: boolean): DataTableColumn<DayRow>[] => [
-    ...(withSelect && canEdit
+  // The three day tables share one grid (select, day, moon, character, ore, rate, tax), so a
+  // reader's eye keeps its column from one section to the next: Earlier days keeps the select
+  // gutter (empty) and says each day's status under its ore instead of in a column of its own.
+  const dayColumns = (
+    withSelect: boolean,
+    withStatus: boolean,
+    cards: boolean
+  ): DataTableColumn<DayRow>[] => [
+    ...(canEdit && !(cards && !withSelect)
       ? [
           {
             id: 'select',
             header: '',
             className: 'w-8',
+            stackEdge: 'start',
             render: (d: DayRow) =>
               canSelect(d) ? (
                 <label className={touchCheckboxLabelClassName}>
@@ -201,13 +226,16 @@ export function MinerDetail({ id }: { id: string }) {
       : []),
     {
       id: 'date',
+      className: 'w-24',
       header: t('corpTaxBook.moons.cols.day'),
       render: (d) => shortDate(d.date),
       sortValue: (d) => d.date,
     },
     {
       id: 'where',
-      header: t('corpTaxBook.moons.cols.refinery'),
+      className: 'w-60',
+      header: t('corpTaxBook.moons.cols.moon'),
+      primary: true,
       render: (d) => (
         <PlaceCell
           refinery={names.refinery(d.structureId)}
@@ -221,6 +249,7 @@ export function MinerDetail({ id }: { id: string }) {
       ? [
           {
             id: 'character',
+            className: 'w-44',
             header: t('corpTaxBook.moons.cols.character'),
             render: (d: DayRow) => names.character(d.characterId),
           } satisfies DataTableColumn<DayRow>,
@@ -229,10 +258,18 @@ export function MinerDetail({ id }: { id: string }) {
     {
       id: 'ore',
       header: t('corpTaxBook.moons.cols.ore'),
-      primary: true,
+      // On a card the ore is a line of its own: a long list wrapped inside the meta line leaves a dangling dot.
+      stackEdge: 'below',
       render: (d) => (
         <span>
-          {d.oreLines.map((l) => `${names.ore(l.typeId)} × ${formatCount(l.quantity)}`).join(', ')}
+          {d.oreLines
+            .map((l) => `${names.ore(l.typeId)}\u00a0×\u00a0${formatCount(l.quantity)}`)
+            .join(', ')}
+          {withStatus && (
+            <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
+              {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+            </span>
+          )}
         </span>
       ),
     },
@@ -240,33 +277,20 @@ export function MinerDetail({ id }: { id: string }) {
       id: 'rate',
       header: t('corpTaxBook.moons.cols.rate'),
       align: 'right',
-      className: 'tabular-nums',
+      className: 'w-20 tabular-nums',
       render: (d) => `${d.taxPct}%`,
     },
     {
       id: 'tax',
       header: t('corpTaxBook.moons.cols.tax'),
       align: 'right',
-      className: 'tabular-nums',
+      className: 'w-36 tabular-nums',
       cardCorner: true,
       cellClassName: (d) =>
         d.status === 'dismissed' || d.status === 'written-off' ? 'line-through text-text-dim' : '',
       render: (d) => isk(d.tax),
       sortValue: (d) => d.tax,
     },
-    ...(withStatus
-      ? [
-          {
-            id: 'status',
-            header: t('corpTaxBook.moons.cols.status'),
-            render: (d: DayRow) => (
-              <span className={cx('text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
-                {t(`corpTaxBook.moons.dayStatus.${d.status}`)}
-              </span>
-            ),
-          } satisfies DataTableColumn<DayRow>,
-        ]
-      : []),
   ];
 
   const dismissSelected =
@@ -282,12 +306,13 @@ export function MinerDetail({ id }: { id: string }) {
     hint: string,
     opts: { select: boolean; status: boolean; startOpen: boolean }
   ) => {
-    const columns = dayColumns(opts.select, opts.status);
+    const columns = dayColumns(opts.select, opts.status, phone);
     const adjust = key === 'nextStatement' ? statementAdjustment(phases.nextStatement, row) : 0;
     return (
       <BookSection
         title={title}
         noun={noun('days')}
+        empty={t(`corpTaxBook.moons.miner.empty.${key === 'earlier' ? 'earlier' : key}`)}
         rows={phases[key]}
         sortColumns={columns}
         meta={<span className="text-xs text-text-dim">{hint}</span>}
@@ -342,9 +367,12 @@ export function MinerDetail({ id }: { id: string }) {
           <span>
             {r.correction.reason}
             <span className="block text-xs text-text-dim">
-              {t('corpTaxBook.moons.payment.correction', {
-                name: names.character(r.correction.by),
-              })}
+              {t(
+                r.correction.amount < 0
+                  ? 'corpTaxBook.moons.payment.correctionCredit'
+                  : 'corpTaxBook.moons.payment.correctionCharge',
+                { name: names.character(r.correction.by) }
+              )}
             </span>
           </span>
         ),
@@ -359,8 +387,8 @@ export function MinerDetail({ id }: { id: string }) {
         r.kind === 'payment' ? (
           <span className="text-isk-pos">{isk(r.payment.amount)}</span>
         ) : (
-          <span className={r.correction.amount < 0 ? 'text-isk-pos' : undefined}>
-            {isk(r.correction.amount)}
+          <span className={r.correction.amount < 0 ? 'text-isk-pos' : 'text-warning'}>
+            {signedIsk(r.correction.amount)}
           </span>
         ),
     },
@@ -399,7 +427,9 @@ export function MinerDetail({ id }: { id: string }) {
               r.kind === 'payment' ? (
                 <button
                   type="button"
-                  className={entityLinkClassName('shrink-0 whitespace-nowrap')}
+                  className={entityLinkClassName(
+                    cx('shrink-0 whitespace-nowrap', tapTargetClassName)
+                  )}
                   onClick={() => setDialog({ kind: 'notTax', payment: r.payment })}
                 >
                   {t('corpTaxBook.moons.payment.markNotTax')}
@@ -421,19 +451,21 @@ export function MinerDetail({ id }: { id: string }) {
           moon={m.moonId === undefined ? undefined : names.moon(m.moonId)}
         />
       ),
-      sortValue: (m) => (m.moonId === undefined ? '' : names.moon(m.moonId)),
+      sortValue: (m) => moonLabel(names, m),
     },
     {
       id: 'days',
       header: t('corpTaxBook.moons.cols.days'),
       align: 'right',
       className: 'tabular-nums',
+      stackAffix: { after: t('corpTaxBook.moons.sections.affix.days') },
       render: (m) => m.days,
       sortValue: (m) => m.days,
     },
     {
       id: 'last',
       header: t('corpTaxBook.moons.cols.lastDay'),
+      stackAffix: { before: t('corpTaxBook.moons.sections.affix.last') },
       render: (m) => shortDate(m.lastDate),
       sortValue: (m) => m.lastDate,
     },
@@ -441,7 +473,7 @@ export function MinerDetail({ id }: { id: string }) {
       id: 'tax',
       header: t('corpTaxBook.moons.cols.tax'),
       align: 'right',
-      className: 'tabular-nums',
+      className: 'w-36 tabular-nums',
       cardCorner: true,
       render: (m) => isk(m.tax),
       sortValue: (m) => m.tax,
@@ -449,14 +481,17 @@ export function MinerDetail({ id }: { id: string }) {
   ];
 
   const guestOpen = row.standing === 'guest' && !closedAt;
+  // The reason a disabled action is inert, printed under it: a menu item has no tooltip on touch.
   const remindItem = reminder.block ? (
     <DropdownMenuItem
       aria-disabled
-      title={reminder.block}
       onSelect={(event) => event.preventDefault()}
       className="aria-disabled:opacity-50"
     >
-      {t('corpTaxBook.moons.miner.remind')}
+      <span>
+        {t('corpTaxBook.moons.miner.remind')}
+        <span className="block text-xs text-text-dim">{reminder.block}</span>
+      </span>
     </DropdownMenuItem>
   ) : (
     <DropdownMenuItem onSelect={() => void reminder.send()}>
@@ -473,7 +508,8 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.miner.closeAccount')}
     </DropdownMenuItem>
   ) : null;
-  // A phone's header is one row: the primary action and a ⋮ holding the rest.
+  // A phone's header is one row: the primary action and a ⋮ holding the rest. Wider, the first
+  // three buttons never move: Close account, for a guest, is a fourth after them.
   const headerActions = canEdit ? (
     <span className="flex items-center gap-1">
       <Button onClick={() => setDialog({ kind: 'record' })}>
@@ -498,14 +534,12 @@ export function MinerDetail({ id }: { id: string }) {
               {t('corpTaxBook.moons.miner.remind')}
             </Button>
           )}
-          {guestOpen ? (
-            <HeaderMoreMenu>
-              {dismissAllItem}
-              {closeItem}
-            </HeaderMoreMenu>
-          ) : (
-            <Button variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
-              {t('corpTaxBook.moons.miner.dismissAll')}
+          <Button variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
+            {t('corpTaxBook.moons.miner.dismissAll')}
+          </Button>
+          {guestOpen && (
+            <Button variant="ghost" onClick={() => setDialog({ kind: 'close' })}>
+              {t('corpTaxBook.moons.miner.closeAccount')}
             </Button>
           )}
         </>
@@ -541,9 +575,11 @@ export function MinerDetail({ id }: { id: string }) {
         value={isk(row.owed)}
         tone={row.owed ? 'danger' : undefined}
         note={
-          row.overdueDays === null
-            ? undefined
-            : t('corpTaxBook.moons.miner.overdueNote', { count: row.overdueDays })
+          row.overdueDays !== null
+            ? t('corpTaxBook.moons.miner.overdueNote', { count: row.overdueDays })
+            : row.paused
+              ? t('corpTaxBook.moons.miner.overduePausedNote')
+              : undefined
         }
         facts={[
           { label: t('corpTaxBook.moons.miner.paid'), value: isk(paidTotal) },
@@ -562,22 +598,31 @@ export function MinerDetail({ id }: { id: string }) {
             ),
           },
           { label: t('corpTaxBook.moons.chips.pending'), value: isk(row.pending) },
-          {
-            label: t('corpTaxBook.moons.miner.writtenOff'),
-            value: (
-              <span className="inline-flex items-center gap-1">
-                {t('corpTaxBook.moons.miner.writtenOffValue', {
-                  tolerance: isk(toleranceTotal),
-                  count: detail.lateWriteOffs.length,
-                })}
-                <InfoTooltip
-                  label={t('corpTaxBook.moons.miner.writtenOff')}
-                  content={t('corpTaxBook.moons.miner.writtenOffTip', { late: isk(lateTotal) })}
-                  glyph="info"
-                />
-              </span>
-            ),
-          },
+          // Nothing written off, nothing to say: the fact would be a row of zeros.
+          ...(toleranceTotal === 0 && detail.lateWriteOffs.length === 0
+            ? []
+            : [
+                {
+                  label: t('corpTaxBook.moons.miner.writtenOff'),
+                  value: (
+                    <span className="inline-flex items-center gap-1">
+                      {detail.lateWriteOffs.length === 0
+                        ? isk(toleranceTotal)
+                        : t('corpTaxBook.moons.miner.writtenOffValue', {
+                            tolerance: isk(toleranceTotal),
+                            count: detail.lateWriteOffs.length,
+                          })}
+                      <InfoTooltip
+                        label={t('corpTaxBook.moons.miner.writtenOff')}
+                        content={t('corpTaxBook.moons.miner.writtenOffTip', {
+                          late: isk(lateTotal),
+                        })}
+                        glyph="info"
+                      />
+                    </span>
+                  ),
+                },
+              ]),
         ]}
       />
       {daysSection(
@@ -603,6 +648,7 @@ export function MinerDetail({ id }: { id: string }) {
       <BookSection
         title={t('corpTaxBook.moons.miner.payments')}
         noun={noun('payments')}
+        empty={t('corpTaxBook.moons.miner.empty.payments')}
         rows={ledger}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
@@ -614,7 +660,7 @@ export function MinerDetail({ id }: { id: string }) {
           amount: isk(paidTotal),
         })}
       >
-        {(shown) => (
+        {(shown, table) => (
           <>
             <DataTable
               label={t('corpTaxBook.moons.miner.payments')}
@@ -623,11 +669,13 @@ export function MinerDetail({ id }: { id: string }) {
               rowKey={(r) => `${r.kind}-${r.id}`}
               density="compact"
               stackLayout="dense"
+              stacked={table.stacked}
             />
             <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
               {t('corpTaxBook.moons.miner.sum', {
-                billed: isk(detail.statements.reduce((s, x) => s + x.amount, 0)),
+                billed: isk(billedTotal),
                 written: isk(toleranceTotal),
+                settled: isk(billedTotal - toleranceTotal - row.owed),
                 owed: isk(row.owed),
               })}
             </p>
@@ -637,6 +685,7 @@ export function MinerDetail({ id }: { id: string }) {
       <BookSection
         title={t('corpTaxBook.moons.miner.moons')}
         noun={noun('moons')}
+        empty={t('corpTaxBook.moons.miner.empty.moons')}
         rows={moons}
         sortColumns={moonColumns}
         meta={
@@ -644,11 +693,10 @@ export function MinerDetail({ id }: { id: string }) {
         }
         phone={phone}
         startOpen={false}
-        summary={moons
-          .map((m) =>
-            m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId)
-          )
-          .join(' · ')}
+        summary={t('corpTaxBook.moons.miner.moonsSummary', {
+          count: moons.length,
+          tax: isk(moons.reduce((sum, m) => sum + m.tax, 0)),
+        })}
       >
         {(shown, table) => (
           <DataTable
@@ -662,13 +710,13 @@ export function MinerDetail({ id }: { id: string }) {
               renderDetail: (m) => (
                 <OreLinesTable
                   lines={m.lines}
-                  label={t('corpTaxBook.moons.miner.oreAt', {
-                    moon:
-                      m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId),
-                  })}
+                  label={t('corpTaxBook.moons.miner.oreAt', { moon: moonLabel(names, m) })}
                   foot={
                     m.extractionId !== undefined && (
-                      <Link to={extractionPath(m.extractionId)} className={entityLinkClassName()}>
+                      <Link
+                        to={extractionPath(m.extractionId)}
+                        className={entityLinkClassName(tapTargetClassName)}
+                      >
                         {t('corpTaxBook.moons.miner.openMoon')}
                       </Link>
                     )
@@ -684,23 +732,30 @@ export function MinerDetail({ id }: { id: string }) {
       <BookSection
         title={t('corpTaxBook.moons.miner.activity')}
         noun={noun('activity')}
+        empty={t('corpTaxBook.moons.miner.empty.activity')}
         rows={shownFeed}
         count={feed.length}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.activityHint')}</span>
         }
         toolbar={
-          <>
-            {(['all', 'mail', 'dismissed', 'audit'] as const).map((f) => (
-              <FilterChip
-                key={f}
-                label={t(`corpTaxBook.moons.miner.filter.${f}`)}
-                selected={filter === f}
-                onToggle={() => setFilter(f)}
-                count={f === 'all' ? feed.length : feed.filter((x) => x.kind === f).length}
-              />
-            ))}
-          </>
+          feed.length === 0 ? undefined : (
+            <div
+              role="group"
+              aria-label={t('corpTaxBook.moons.miner.filter.label')}
+              className="flex flex-wrap items-center gap-1"
+            >
+              {(['all', 'mail', 'dismissed', 'audit'] as const).map((f) => (
+                <FilterChip
+                  key={f}
+                  label={t(`corpTaxBook.moons.miner.filter.${f}`)}
+                  selected={filter === f}
+                  onToggle={() => setFilter(f)}
+                  count={f === 'all' ? feed.length : feed.filter((x) => x.chip === f).length}
+                />
+              ))}
+            </div>
+          )
         }
         phone={phone}
         startOpen={false}
@@ -716,46 +771,47 @@ export function MinerDetail({ id }: { id: string }) {
               if (f.kind === 'mail') {
                 const m = f.item.mail;
                 return (
-                  <li
+                  <ActivityRow
                     key={`m-${f.id}`}
-                    className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5"
+                    at={new Date(f.at).toISOString()}
+                    aside={
+                      <span className="text-text-dim">
+                        {t(`corpTaxBook.mailQueue.status.${m.status}`, { defaultValue: m.status })}
+                      </span>
+                    }
                   >
-                    <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">
-                      {shortDateTime(new Date(f.at).toISOString())}
-                    </span>
-                    <span className="min-w-0 flex-1">{m.subject}</span>
-                    <span className="text-text-dim">
-                      {t(`corpTaxBook.mailQueue.status.${m.status}`, { defaultValue: m.status })}
-                    </span>
-                  </li>
+                    {m.subject}
+                  </ActivityRow>
                 );
               }
               const d = f.item.dismissal;
               return (
-                <li
+                <ActivityRow
                   key={`d-${f.id}`}
-                  className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5"
+                  at={d.at}
+                  aside={
+                    canEdit && !d.reversed ? (
+                      <button
+                        type="button"
+                        className={entityLinkClassName(
+                          cx('shrink-0 whitespace-nowrap', tapTargetClassName)
+                        )}
+                        onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
+                      >
+                        {t('corpTaxBook.moons.miner.reverse')}
+                      </button>
+                    ) : undefined
+                  }
                 >
-                  <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">
-                    {shortDateTime(d.at)}
+                  <span className="font-semibold">{names.character(d.by)}</span>{' '}
+                  {t(`corpTaxBook.moons.miner.dismissedFor.${d.scope}`, {
+                    what: dismissalWhat(d),
+                  })}
+                  <span className="text-text-dim">
+                    {' '}
+                    · “{d.reason}”{d.reversed && ` · ${t('corpTaxBook.moons.miner.reversed')}`}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    {t(`corpTaxBook.moons.miner.scope.${d.scope}`)}
-                    <span className="block text-xs text-text-dim">
-                      {names.character(d.by)} · “{d.reason}”
-                      {d.reversed && ` · ${t('corpTaxBook.moons.miner.reversed')}`}
-                    </span>
-                  </span>
-                  {canEdit && !d.reversed && (
-                    <button
-                      type="button"
-                      className={entityLinkClassName('shrink-0 whitespace-nowrap')}
-                      onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
-                    >
-                      {t('corpTaxBook.moons.miner.reverse')}
-                    </button>
-                  )}
-                </li>
+                </ActivityRow>
               );
             })}
           </ul>
