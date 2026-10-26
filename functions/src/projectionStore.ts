@@ -331,18 +331,25 @@ export async function dispatchDueProjections(
   db: Firestore,
   messaging: PushSender,
   now: number,
-  logError: (message: string, meta: unknown) => void = () => {}
+  logError: (message: string, meta: unknown) => void = () => {},
+  limits: { pageSize?: number; maxPasses?: number } = {}
 ): Promise<void> {
+  const pageSize = limits.pageSize ?? DISPATCH_PAGE_SIZE;
+  const maxPasses = limits.maxPasses ?? DISPATCH_MAX_PASSES;
   const projections = db.collection(PROJECTIONS_COLLECTION);
   const registrations = db.collection(DEVICE_REGISTRATIONS_COLLECTION);
 
   // Mirrors dispatchProjections.ts's `isDue` (fireAt <= now) as a Firestore
   // query filter — a Firestore `where` can't call that function directly,
   // but the boundary must stay the same one `isDue`'s own tests pin.
-  const dueSnapshot = await projections
+  // Paged oldest-first: a backlog from missed ticks must not be one unbounded
+  // read. A cursor (not a re-query) moves past rows a transient send failure
+  // left unfired, so one stuck row can't be re-read every pass.
+  const dueQuery = projections
     .where('fired', '==', false)
     .where('fireAt', '<=', now)
-    .get();
+    .orderBy('fireAt')
+    .limit(pageSize);
 
   const toRegistration = (doc: DocumentSnapshot): Registration | null => {
     const data = doc.data();
@@ -367,6 +374,24 @@ export async function dispatchDueProjections(
     return pending;
   };
 
+  // Legacy rows (no deviceId) fan out to every device holding the Character;
+  // many rows share one Character, so look each Character up once per run.
+  const byCharacter = new Map<number, Promise<Registration[]>>();
+  const deadDevices = new Set<string>();
+  const holdersOf = (characterId: number): Promise<Registration[]> => {
+    let pending = byCharacter.get(characterId);
+    if (!pending) {
+      pending = registrations
+        .where('characterIds', 'array-contains', characterId)
+        .get()
+        .then((holders) =>
+          holders.docs.map(toRegistration).filter((r): r is Registration => r !== null)
+        );
+      byCharacter.set(characterId, pending);
+    }
+    return pending;
+  };
+
   const sendTo = async (device: Registration, data: Record<string, string>): Promise<boolean> => {
     try {
       await messaging.send({ token: device.fcmToken, data });
@@ -377,6 +402,7 @@ export async function dispatchDueProjections(
       if (shouldDeleteDeviceToken(code, message)) {
         // Later rows this tick then see the device as an orphan.
         byDevice.set(device.id, Promise.resolve(null));
+        deadDevices.add(device.id);
         await device.ref.delete();
       } else {
         logError('Scheduled Push: send failed', {
@@ -388,55 +414,63 @@ export async function dispatchDueProjections(
     }
   };
 
-  await Promise.all(
-    dueSnapshot.docs.map(async (doc) => {
-      const row = doc.data() as StoredProjectionRow;
+  const dispatchRow = async (doc: QueryDocumentSnapshot): Promise<void> => {
+    const row = doc.data() as StoredProjectionRow;
 
-      // Unfired and more than 7 days past fireAt: a device that stopped
-      // checking in. A week-late "your skill finished" is worse than
-      // silence (GLOSSARY round 45) — delete unsent rather than send.
-      if (isStaleUnsent(row, now)) {
+    // Unfired and more than 7 days past fireAt: a device that stopped
+    // checking in. A week-late "your skill finished" is worse than
+    // silence (GLOSSARY round 45) — delete unsent rather than send.
+    if (isStaleUnsent(row, now)) {
+      await doc.ref.delete();
+      return;
+    }
+
+    let targets: Registration[];
+    if (row.deviceId === undefined) {
+      targets = (await holdersOf(row.characterId)).filter((r) => !deadDevices.has(r.id));
+    } else {
+      const device = await registrationOf(row.deviceId);
+      if (!device || !device.characterIds.includes(row.characterId)) {
         await doc.ref.delete();
         return;
       }
+      targets = [device];
+    }
 
-      let targets: Registration[];
-      if (row.deviceId === undefined) {
-        const holders = await registrations
-          .where('characterIds', 'array-contains', row.characterId)
-          .get();
-        targets = holders.docs.map(toRegistration).filter((r): r is Registration => r !== null);
-      } else {
-        const device = await registrationOf(row.deviceId);
-        if (!device || !device.characterIds.includes(row.characterId)) {
-          await doc.ref.delete();
-          return;
-        }
-        targets = [device];
-      }
+    // Quiet time (issue #4566): a device inside its window is skipped, not
+    // queued. The row is marked fired below, so it is never pushed late and
+    // still reaches the Alerts list through the feed sync.
+    const awake = targets.filter((device) => !suppressPush(now, device.quietHours, row.eveType));
+    if (targets.length > 0 && awake.length === 0) {
+      await doc.ref.update({ fired: true, firedAt: now });
+      return;
+    }
 
-      // Quiet time (issue #4566): a device inside its window is skipped, not
-      // queued. The row is marked fired below, so it is never pushed late and
-      // still reaches the Alerts list through the feed sync.
-      const awake = targets.filter((device) => !suppressPush(now, device.quietHours, row.eveType));
-      if (targets.length > 0 && awake.length === 0) {
-        await doc.ref.update({ fired: true, firedAt: now });
-        return;
-      }
+    const data = buildPushData(row);
+    const sent = await Promise.all(awake.map((device) => sendTo(device, data)));
 
-      const data = buildPushData(row);
-      const sent = await Promise.all(awake.map((device) => sendTo(device, data)));
+    // Only mark fired once a device actually received it — every send
+    // failing on a transient error leaves the row unfired so the next
+    // 5-minute tick retries it. The 7-day stale check above is what
+    // eventually gives up, never a silently "delivered" row nobody got.
+    if (sent.some(Boolean)) {
+      await doc.ref.update({ fired: true, firedAt: now });
+    }
+  };
 
-      // Only mark fired once a device actually received it — every send
-      // failing on a transient error leaves the row unfired so the next
-      // 5-minute tick retries it. The 7-day stale check above is what
-      // eventually gives up, never a silently "delivered" row nobody got.
-      if (sent.some(Boolean)) {
-        await doc.ref.update({ fired: true, firedAt: now });
-      }
-    })
-  );
+  let cursor: QueryDocumentSnapshot | undefined;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const page = await (cursor ? dueQuery.startAfter(cursor) : dueQuery).get();
+    await Promise.all(page.docs.map(dispatchRow));
+    if (page.docs.length < pageSize) return;
+    cursor = page.docs[page.docs.length - 1];
+  }
+  // Out of passes: the rest of a backlog waits for the next tick.
 }
+
+/** Due rows read per page, and pages per run (the rest waits for the next tick). */
+export const DISPATCH_PAGE_SIZE = 500;
+export const DISPATCH_MAX_PASSES = 10;
 
 /**
  * Fired rows are kept as the backend's half of the Notification Feed, then
