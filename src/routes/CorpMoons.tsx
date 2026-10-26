@@ -32,7 +32,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
-import { formatAge } from '@/lib/age';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
@@ -93,20 +92,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const detail = moonsDetail(pathname);
-  const status = sync.status;
-  const meta =
-    status.kind === 'never' ? (
-      <span className="text-xs text-text-dim">{t('corpTaxBook.moons.neverSynced')}</span>
-    ) : (
-      <span className="text-xs text-text-dim">
-        {t('corpTaxBook.moons.syncedBy', {
-          age: formatAge(status.ageMs, t),
-          name: status.scheduled
-            ? t('corpTaxBook.moons.scheduledBy', { name: status.byName })
-            : status.byName,
-        })}
-      </span>
-    );
   // A corporation with no refineries of its own has nothing for Extractions to show.
   if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
     return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
@@ -117,7 +102,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         <>
           <PageHeader
             title={t('corp.moons.title')}
-            meta={meta}
             actions={
               <span className="flex items-center gap-1">
                 {tab === 'moon-owners' && canEdit && hasMoonOwners && (

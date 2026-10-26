@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { RowCaret } from '@/components/ui';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { cx } from '@/lib/cx';
+import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { useBook } from './useBook';
 import { shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
@@ -58,6 +59,7 @@ export function ExtractionTimeline({ rows }: { rows: readonly ExtractionRow[] })
           const ready = Date.parse(e.chunkArrivalAt);
           const fracture = e.fracturedAt ? Date.parse(e.fracturedAt) : ready;
           const end = e.expiresAt ? Date.parse(e.expiresAt) : ready;
+          const place = splitPlace(names.refinery(e.structureId), names.moon(e.moonId));
           return (
             <Link
               key={e.id}
@@ -65,8 +67,11 @@ export function ExtractionTimeline({ rows }: { rows: readonly ExtractionRow[] })
               className="group flex flex-col gap-1 rounded-xs py-0.5 hover:bg-panel-2 sm:flex-row sm:items-center sm:gap-0"
             >
               <span className="flex min-w-0 items-baseline gap-1 text-xs sm:w-48 sm:shrink-0">
-                <span className="truncate text-accent group-hover:underline">
-                  {names.refinery(e.structureId)}
+                <span
+                  className="truncate text-accent group-hover:underline"
+                  title={place.moon !== undefined ? place.station : undefined}
+                >
+                  {place.moon ?? place.station}
                 </span>
                 <StateWord state={e.state} />
               </span>

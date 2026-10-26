@@ -118,7 +118,7 @@ export function MinersTab() {
     {
       id: 'overdue',
       header: t('corpTaxBook.moons.cols.overdue'),
-      render: (m) => <OverdueWord days={m.overdueDays} />,
+      render: (m) => <OverdueWord days={m.overdueDays} paused={m.paused} />,
       sortValue: (m) => m.overdueDays ?? -1,
     },
     {

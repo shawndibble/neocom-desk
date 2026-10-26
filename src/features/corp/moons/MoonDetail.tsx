@@ -9,7 +9,6 @@ import {
   EmptyState,
   PageHeader,
   Panel,
-  textActionClassName,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -22,7 +21,7 @@ import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { isk, shortDateTime } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
-import { Crumb, Fact, MinedBar, OreLine, StateWord } from './moonsParts';
+import { Crumb, Fact, OreLine, StateWord } from './moonsParts';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader } from './sectionParts';
 
@@ -67,7 +66,7 @@ export function MoonDetail({ id }: { id: string }) {
     },
     {
       id: 'units',
-      header: t('corpTaxBook.moons.cols.units'),
+      header: t('corpTaxBook.moons.cols.amount'),
       align: 'right',
       className: 'tabular-nums',
       render: (m) => formatCount(m.units),
@@ -75,7 +74,7 @@ export function MoonDetail({ id }: { id: string }) {
     },
     {
       id: 'value',
-      header: t('corpTaxBook.moons.cols.value'),
+      header: t('corpTaxBook.moons.cols.estValue'),
       align: 'right',
       className: 'tabular-nums',
       render: (m) => isk(m.value),
@@ -167,13 +166,18 @@ export function MoonDetail({ id }: { id: string }) {
         note={<OreLine row={row} {...(canEdit ? { onLink: () => setLinking(true) } : {})} />}
         facts={[
           {
-            label: t('corpTaxBook.moons.cols.mined'),
+            label: t('corpTaxBook.moons.cols.minedShort'),
             value: row.minedPct === null ? '—' : `${isk(mined)} · ${row.minedPct}%`,
           },
-          {
-            label: t('corpTaxBook.moons.moon.leftToMine'),
-            value: left === null ? '—' : `${isk(left)} · ${100 - (row.minedPct ?? 0)}%`,
-          },
+          // An expired chunk has no "left": the field is gone, so only what was mined says anything.
+          ...(row.state === 'expired'
+            ? []
+            : [
+                {
+                  label: t('corpTaxBook.moons.moon.leftToMine'),
+                  value: left === null ? '—' : `${isk(left)} · ${100 - (row.minedPct ?? 0)}%`,
+                },
+              ]),
           {
             label: t('corpTaxBook.moons.moon.fractured'),
             value: row.fracturedAt ? shortDateTime(row.fracturedAt) : '—',
@@ -198,10 +202,6 @@ export function MoonDetail({ id }: { id: string }) {
             value={row.estimatedValue ? isk(row.estimatedValue) : '—'}
           />
           <Fact
-            label={t('corpTaxBook.moons.cols.mined')}
-            value={<MinedBar pct={row.minedPct} label={names.refinery(row.structureId)} />}
-          />
-          <Fact
             label={t('corpTaxBook.moons.moon.oreFrom')}
             value={
               <span>
@@ -217,7 +217,7 @@ export function MoonDetail({ id }: { id: string }) {
                 {canEdit && row.oreSource !== 'notification' && (
                   <button
                     type="button"
-                    className={textActionClassName('ml-2')}
+                    className={entityLinkClassName('ml-2')}
                     onClick={() => setLinking(true)}
                   >
                     {row.oreSource === 'survey'

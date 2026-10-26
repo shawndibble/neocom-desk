@@ -4,8 +4,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  DropdownMenuItem,
   IconButton,
-  MenuItem,
   useOpenAfterMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -45,15 +45,15 @@ export function CorrectionsMenu({
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onCloseAutoFocus={onCloseAutoFocus}>
-          <MenuItem onSelect={() => run(() => setDialog('rate'))}>
+          <DropdownMenuItem onSelect={() => run(() => setDialog('rate'))}>
             {t('corpTaxBook.moons.corrections.rate.open')}
-          </MenuItem>
-          <MenuItem onSelect={() => run(() => setDialog('adjust'))}>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => run(() => setDialog('adjust'))}>
             {t('corpTaxBook.moons.corrections.adjust.open')}
-          </MenuItem>
-          <MenuItem onSelect={() => run(() => setDialog('rebill'))}>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => run(() => setDialog('rebill'))}>
             {t('corpTaxBook.moons.corrections.rebill.open')}
-          </MenuItem>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       {dialog === 'rate' && <RateOverrideDialog open onClose={() => setDialog(null)} days={days} />}

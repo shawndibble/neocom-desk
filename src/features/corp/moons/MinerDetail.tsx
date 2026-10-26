@@ -11,9 +11,8 @@ import {
   FilterChip,
   HeaderMoreMenu,
   InfoTooltip,
-  MenuItem,
+  DropdownMenuItem,
   PageHeader,
-  textActionClassName,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -40,7 +39,8 @@ import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
-import { isk, shortDate, shortDateTime } from './moonsFormat';
+import { isk, periodLabel, shortDate, shortDateTime } from './moonsFormat';
+import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
@@ -130,6 +130,19 @@ export function MinerDetail({ id }: { id: string }) {
       }),
     [queue, statementIds, detail, minerAudit]
   );
+  // The Statement (period and amount) or payment amount an entry is about.
+  const auditContext = (e: AuditEntry): string | null => {
+    const { statementId, amount } = e.detail;
+    const st =
+      typeof statementId === 'string'
+        ? detail?.statements.find((x) => x.id === statementId)
+        : undefined;
+    if (st) {
+      const label = periodLabel(st.periodStart, st.periodEnd);
+      return e.action === 'issueStatement' ? `${label} · ${isk(st.amount)}` : label;
+    }
+    return typeof amount === 'number' ? isk(amount) : null;
+  };
   const shownFeed = feed.filter((f) => filter === 'all' || f.kind === filter);
 
   if (!detail) {
@@ -203,11 +216,16 @@ export function MinerDetail({ id }: { id: string }) {
         />
       ),
     },
-    {
-      id: 'character',
-      header: t('corpTaxBook.moons.cols.character'),
-      render: (d) => names.character(d.characterId),
-    },
+    // One character mined every day: a column repeating the page's own name is width for nothing.
+    ...(row.characterIds.length > 1
+      ? [
+          {
+            id: 'character',
+            header: t('corpTaxBook.moons.cols.character'),
+            render: (d: DayRow) => names.character(d.characterId),
+          } satisfies DataTableColumn<DayRow>,
+        ]
+      : []),
     {
       id: 'ore',
       header: t('corpTaxBook.moons.cols.ore'),
@@ -296,6 +314,12 @@ export function MinerDetail({ id }: { id: string }) {
     );
   };
 
+  /** The Statement a correction line was billed on, as its period; undefined while it waits for the next one. */
+  const billedOn = (adjustmentId: string) => {
+    const st = detail.statements.find((x) => x.lines.some((l) => l.adjustmentId === adjustmentId));
+    return st ? periodLabel(st.periodStart, st.periodEnd) : undefined;
+  };
+
   const paymentColumns: DataTableColumn<PaymentRow>[] = [
     {
       id: 'at',
@@ -333,7 +357,7 @@ export function MinerDetail({ id }: { id: string }) {
       cardCorner: true,
       render: (r) =>
         r.kind === 'payment' ? (
-          <span className="text-isk-pos">+{isk(r.payment.amount)}</span>
+          <span className="text-isk-pos">{isk(r.payment.amount)}</span>
         ) : (
           <span className={r.correction.amount < 0 ? 'text-isk-pos' : undefined}>
             {isk(r.correction.amount)}
@@ -346,7 +370,14 @@ export function MinerDetail({ id }: { id: string }) {
       render: (r) =>
         r.kind === 'correction' ? (
           <span className="text-xs text-text-dim">
-            {t('corpTaxBook.moons.payment.correctsDay', { date: shortDate(r.correction.date) })}
+            {billedOn(r.correction.id)
+              ? t('corpTaxBook.moons.payment.billedOn', {
+                  date: shortDate(r.correction.date),
+                  period: billedOn(r.correction.id),
+                })
+              : t('corpTaxBook.moons.payment.correctsDay', {
+                  date: shortDate(r.correction.date),
+                })}
           </span>
         ) : r.payment.notTaxAmount ? (
           <span className="text-xs text-warning">
@@ -368,7 +399,7 @@ export function MinerDetail({ id }: { id: string }) {
               r.kind === 'payment' ? (
                 <button
                   type="button"
-                  className={textActionClassName('shrink-0')}
+                  className={entityLinkClassName('shrink-0 whitespace-nowrap')}
                   onClick={() => setDialog({ kind: 'notTax', payment: r.payment })}
                 >
                   {t('corpTaxBook.moons.payment.markNotTax')}
@@ -417,35 +448,67 @@ export function MinerDetail({ id }: { id: string }) {
     },
   ];
 
+  const guestOpen = row.standing === 'guest' && !closedAt;
+  const remindItem = reminder.block ? (
+    <DropdownMenuItem
+      aria-disabled
+      title={reminder.block}
+      onSelect={(event) => event.preventDefault()}
+      className="aria-disabled:opacity-50"
+    >
+      {t('corpTaxBook.moons.miner.remind')}
+    </DropdownMenuItem>
+  ) : (
+    <DropdownMenuItem onSelect={() => void reminder.send()}>
+      {t('corpTaxBook.moons.miner.remind')}
+    </DropdownMenuItem>
+  );
+  const dismissAllItem = (
+    <DropdownMenuItem onSelect={() => setDialog({ kind: 'dismissAll' })}>
+      {t('corpTaxBook.moons.miner.dismissAll')}
+    </DropdownMenuItem>
+  );
+  const closeItem = guestOpen ? (
+    <DropdownMenuItem onSelect={() => setDialog({ kind: 'close' })}>
+      {t('corpTaxBook.moons.miner.closeAccount')}
+    </DropdownMenuItem>
+  ) : null;
+  // A phone's header is one row: the primary action and a ⋮ holding the rest.
   const headerActions = canEdit ? (
     <span className="flex items-center gap-1">
       <Button onClick={() => setDialog({ kind: 'record' })}>
         {t('corpTaxBook.moons.miner.record')}
       </Button>
-      {reminder.block ? (
-        <Tooltip content={reminder.block}>
-          <Button variant="ghost" aria-disabled="true">
-            {t('corpTaxBook.moons.miner.remind')}
-          </Button>
-        </Tooltip>
-      ) : (
-        <Button variant="ghost" onClick={() => void reminder.send()}>
-          {t('corpTaxBook.moons.miner.remind')}
-        </Button>
-      )}
-      {row.standing === 'guest' && !closedAt ? (
+      {phone ? (
         <HeaderMoreMenu>
-          <MenuItem onSelect={() => setDialog({ kind: 'dismissAll' })}>
-            {t('corpTaxBook.moons.miner.dismissAll')}
-          </MenuItem>
-          <MenuItem onSelect={() => setDialog({ kind: 'close' })}>
-            {t('corpTaxBook.moons.miner.closeAccount')}
-          </MenuItem>
+          {remindItem}
+          {dismissAllItem}
+          {closeItem}
         </HeaderMoreMenu>
       ) : (
-        <Button variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
-          {t('corpTaxBook.moons.miner.dismissAll')}
-        </Button>
+        <>
+          {reminder.block ? (
+            <Tooltip content={reminder.block}>
+              <Button variant="ghost" aria-disabled="true">
+                {t('corpTaxBook.moons.miner.remind')}
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button variant="ghost" onClick={() => void reminder.send()}>
+              {t('corpTaxBook.moons.miner.remind')}
+            </Button>
+          )}
+          {guestOpen ? (
+            <HeaderMoreMenu>
+              {dismissAllItem}
+              {closeItem}
+            </HeaderMoreMenu>
+          ) : (
+            <Button variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
+              {t('corpTaxBook.moons.miner.dismissAll')}
+            </Button>
+          )}
+        </>
       )}
     </span>
   ) : undefined;
@@ -646,7 +709,10 @@ export function MinerDetail({ id }: { id: string }) {
         {(shown) => (
           <ul className="divide-y divide-line px-3 text-sm">
             {shown.map((f) => {
-              if (f.kind === 'audit') return <AuditLine key={`a-${f.id}`} entry={f.item} />;
+              if (f.kind === 'audit')
+                return (
+                  <AuditLine key={`a-${f.id}`} entry={f.item} context={auditContext(f.item)} />
+                );
               if (f.kind === 'mail') {
                 const m = f.item.mail;
                 return (
@@ -683,7 +749,7 @@ export function MinerDetail({ id }: { id: string }) {
                   {canEdit && !d.reversed && (
                     <button
                       type="button"
-                      className={textActionClassName('shrink-0')}
+                      className={entityLinkClassName('shrink-0 whitespace-nowrap')}
                       onClick={() => setDialog({ kind: 'reverse', dismissalId: d.id })}
                     >
                       {t('corpTaxBook.moons.miner.reverse')}

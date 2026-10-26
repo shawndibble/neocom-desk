@@ -62,6 +62,15 @@ describe('Miner page', () => {
   });
 });
 
+describe('Corrections menu', () => {
+  it('opens on the Payments section and lists the three corrections', async () => {
+    renderBook(<MinerDetail id={VARRO_ID} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Corrections' }));
+    expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+  });
+});
+
 describe('Moon page', () => {
   it('a Miner row opens to ore lines with one Open miner link and does not navigate', async () => {
     renderBook(<MoonDetail id={MOON_ID} />);

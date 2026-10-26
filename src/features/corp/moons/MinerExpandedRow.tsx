@@ -40,7 +40,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
   const moonName = (m: MinerMoon) =>
     m.moonId === undefined ? names.refinery(m.structureId) : names.moon(m.moonId);
   return (
-    <div className="sticky left-0 w-[100cqw] max-w-full space-y-3 p-3">
+    <div className="sticky left-0 w-[calc(100cqw-1.5rem)] max-w-full space-y-3 p-3">
       <div className="grid gap-4 @2xl:grid-cols-3">
         <MiniList title={`${t('corpTaxBook.moons.sections.nextStatement')} · ${next.length}`}>
           {next.slice(0, SHOWN).map((d) => (
@@ -74,7 +74,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
               <span className="min-w-0 truncate">
                 {shortDate(p.at)} · {names.character(p.characterId)}
               </span>
-              <span className="text-isk-pos">+{isk(p.amount)}</span>
+              <span className="text-isk-pos">{isk(p.amount)}</span>
             </li>
           ))}
           {payments.length === 0 && <li className="text-text-dim">—</li>}

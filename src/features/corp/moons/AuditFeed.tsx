@@ -13,7 +13,16 @@ function detailLine(entry: AuditEntry, t: TFunction): string {
 }
 
 /** One audit entry as a line: when, who, what, and the reason (or a reclaim's revoked count) when it had one. */
-export function AuditLine({ entry: a, subject }: { entry: AuditEntry; subject?: AuditSubject }) {
+export function AuditLine({
+  entry: a,
+  subject,
+  context,
+}: {
+  entry: AuditEntry;
+  subject?: AuditSubject;
+  /** What the entry is about, when the page does not already say it (a Statement's period and amount). */
+  context?: string | null;
+}) {
   const { t } = useTranslation();
   const why = detailLine(a, t);
   const who = subject?.(a) ?? null;
@@ -38,6 +47,7 @@ export function AuditLine({ entry: a, subject }: { entry: AuditEntry; subject?: 
         {a.via === 'scheduled sync' && (
           <span className="text-text-dim"> ({t('corpTaxBook.moons.activity.viaScheduled')})</span>
         )}
+        {context && <span className="text-text-dim"> · {context}</span>}
         {why && <span className="text-text-dim"> · {why}</span>}
       </span>
     </li>

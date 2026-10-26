@@ -15824,8 +15824,6 @@
         "statements": "Statements",
         "moonOwners": "Moon owners"
       },
-      "neverSynced": "Never synced",
-      "syncedBy": "Synced {{age}} by {{name}}",
       "scheduledBy": "Scheduled sync ({{name}})",
       "syncNow": "Sync now",
       "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
@@ -15834,6 +15832,7 @@
       "declared": "Declared paid, overdue paused",
       "overdueDays_one": "Overdue {{count}} day",
       "overdueDays_other": "Overdue {{count}} days",
+      "overduePaused": "Paused",
       "moreCharacters_one": "+{{count}} character",
       "moreCharacters_other": "+{{count}} characters",
       "oreUnknown": "Ore unknown",
@@ -15881,6 +15880,7 @@
         "oldestFirst": "Oldest debt first",
         "correction": "Correction by {{name}}",
         "correctsDay": "Next Statement, for {{date}}",
+        "billedOn": "On the {{period}} Statement, for {{date}}",
         "markNotTaxMenu": "Mark not tax…",
         "markNotTaxNone": "No payment to mark"
       },
@@ -15893,8 +15893,6 @@
         "mined": "Mined vs left",
         "minedShort": "Mined",
         "miner": "Miner",
-        "units": "Units",
-        "value": "Value",
         "tax": "Tax",
         "fractured": "Fractured",
         "taxRecorded": "Tax recorded",
@@ -16032,7 +16030,7 @@
         },
         "overdue": {
           "title": "{{name}} · overdue {{days}} days · {{amount}}",
-          "body": "Statement {{id}} is unpaid past its due date.",
+          "body": "The {{period}} Statement is unpaid past its due date.",
           "remind": "Send reminder",
           "dismiss": "Dismiss…"
         },

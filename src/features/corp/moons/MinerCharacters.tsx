@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  textActionClassName,
-} from '@/components/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { GroupMinersDialog } from './GroupMinersDialog';
@@ -112,7 +106,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                     {characterId !== miner.mainCharacterId && (
                       <button
                         type="button"
-                        className={textActionClassName('shrink-0')}
+                        className={entityLinkClassName('shrink-0 whitespace-nowrap')}
                         onClick={() => void makeMain(characterId)}
                       >
                         {t('corpTaxBook.moons.grouping.makeMain')}
@@ -121,7 +115,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                     {isStored && (
                       <button
                         type="button"
-                        className={textActionClassName('shrink-0')}
+                        className={entityLinkClassName('shrink-0 whitespace-nowrap')}
                         onClick={() => void unlink(characterId)}
                       >
                         {t('corpTaxBook.moons.grouping.unlink')}

@@ -11,7 +11,7 @@ import {
   RecordPaymentDialog,
   ReasonDialog,
 } from './BookDialogs';
-import { isk, shortDate } from './moonsFormat';
+import { isk, periodLabel, shortDate } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { mailTarget, useCorporationName } from './statementMailing';
 
@@ -64,6 +64,11 @@ export function NeedsYouQueue() {
   const close = () => setOpen(null);
   const minerOf = (id: string) => view.miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
+
+  const statementPeriod = (id: string) => {
+    const s = view.input.statements.find((x) => x.id === id);
+    return s ? periodLabel(s.periodStart, s.periodEnd) : id;
+  };
 
   const remind = async (item: Extract<NeedsYouItem, { kind: 'overdue' }>) => {
     const miner = minerOf(item.minerId);
@@ -151,7 +156,9 @@ export function NeedsYouQueue() {
                       })}
                     </Link>
                   }
-                  body={t('corpTaxBook.moons.needs.overdue.body', { id: item.statementId })}
+                  body={t('corpTaxBook.moons.needs.overdue.body', {
+                    period: statementPeriod(item.statementId),
+                  })}
                   actions={
                     canEdit ? (
                       <>
