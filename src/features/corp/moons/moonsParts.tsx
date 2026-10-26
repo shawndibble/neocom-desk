@@ -6,7 +6,9 @@ import { InfoTooltip, ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { ExtractionRow, MinerStanding } from '@/engine/corpTaxBook/bookView';
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
+import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
+import { shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 import { tapTargetClassName } from './sectionHelpers';
 
@@ -119,5 +121,19 @@ export function Crumb({ to, label }: { to: string; label: string }) {
       <Icon.Back size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {label}
     </Link>
+  );
+}
+
+/** A Statement's due date; once past, the days late, in danger. `now` is the book's clock. */
+export function DueWord({ dueAt, now }: { dueAt: string | null; now: string }) {
+  const { t } = useTranslation();
+  if (dueAt === null) return <span className="text-text-dim">—</span>;
+  const elapsed = Date.parse(now) - Date.parse(dueAt);
+  if (elapsed < 0) return <span className="whitespace-nowrap">{shortDate(dueAt)}</span>;
+  const late = Math.max(1, Math.floor(elapsed / DAY_MS));
+  return (
+    <span className="font-semibold whitespace-nowrap text-danger">
+      {t('corpTaxBook.moons.statementPeriod.dueLate', { date: shortDate(dueAt), count: late })}
+    </span>
   );
 }

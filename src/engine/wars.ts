@@ -2,8 +2,8 @@
  * Wars declared on a pilot's corporation, with no fetch or DOM in it.
  *
  * ESI cannot list the wars of one corporation, so the app reads a short list
- * of every open war that `syncActiveWars` keeps in Firestore
- * (`systemConditions/activeWars`) and picks its own out of it here. A war's
+ * of every open war that the active-wars job publishes to R2
+ * (`active-wars/wars.json`) and picks its own out of it here. A war's
  * `allies` are always on the defender's side: only a defender can hire them,
  * so an ally is as much "at war" as the target is.
  *
@@ -177,7 +177,7 @@ function esiParty(value: unknown): WarParty | null {
 
 /**
  * One `GET /wars/{id}` body as a war, or null when it is not one. The same
- * mapping `syncActiveWars` applies (`functions/src/activeWars.ts`), kept here
+ * mapping the active-wars sweep applies (`functions/src/activeWars.ts`), kept here
  * as well because the functions package shares no code with the app.
  */
 export function parseEsiWar(body: unknown): StoredWar | null {

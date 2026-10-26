@@ -6,6 +6,7 @@ import {
   nextRunPeriod,
   paymentCode,
   periodRows,
+  periodStatements,
   planStatementRun,
   statementForLine,
   type BookViewInput,
@@ -618,5 +619,98 @@ describe('officer write-offs (#4637)', () => {
     expect(view.miners[0].owed).toBe(0);
     expect(view.needsYou.some((n) => n.kind === 'leaver')).toBe(false);
     expect(minerDetail(view, 'solo:1')!.days.every((d) => d.status === 'written-off')).toBe(true);
+  });
+});
+
+describe('period page rows (#5285)', () => {
+  const base = input({
+    entries: [entry(1, '2026-08-10', 10_000), entry(2, '2026-08-12', 2000)],
+    now: '2026-09-30T00:00:00Z',
+    lastSyncedAt: '2026-09-30T00:00:00Z',
+  });
+  const first = buildBookView(base);
+  const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+  const [one, two] = plan.lines.map((l) => ({
+    ...statementForLine(first, plan, l),
+    issuedAt: '2026-09-01T00:00:00Z',
+  }));
+
+  it('counts mailed Statements and finds the earliest unpaid due date on the period row', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [{ ...one, mailsSent: 1 } as typeof one, two],
+    });
+    expect(periodRows(view).find((r) => r.start === '2026-08-01')).toMatchObject({
+      statements: 2,
+      mailed: 1,
+      dueAt: '2026-09-15T00:00:00.000Z',
+    });
+    expect(periodRows(view).find((r) => r.status === 'open')).toMatchObject({
+      statements: 0,
+      mailed: 0,
+      dueAt: null,
+    });
+  });
+
+  it('lists each miner Statement with billed, paid, outstanding, due and mail state', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [
+        { ...one, mailsSent: 2 } as typeof one,
+        { ...two, mailsSent: 1, remindersStopped: true } as typeof two,
+      ],
+      payments: [
+        {
+          id: 'p1',
+          minerId: one.minerId,
+          characterId: 1,
+          amount: 400_000,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    const page = periodStatements(view, '2026-08-01')!;
+    const a = page.find((r) => r.statement.id === one.id)!;
+    const b = page.find((r) => r.statement.id === two.id)!;
+    expect(a).toMatchObject({
+      billed: 1_000_000,
+      paid: 400_000,
+      outstanding: 600_000,
+      settled: false,
+      overdue: true,
+      dueAt: '2026-09-15T00:00:00.000Z',
+      mail: { kind: 'sent', count: 2 },
+    });
+    expect(b.mail).toEqual({ kind: 'stopped', count: 1 });
+    expect(b.billed).toBe(200_000);
+    expect(page.reduce((s, r) => s + r.outstanding, 0) + page.reduce((s, r) => s + r.paid, 0)).toBe(
+      1_200_000
+    );
+    expect(periodStatements(view, '2026-07-01')).toBeUndefined();
+  });
+
+  it('reads Not mailed for a Statement nobody mailed and no due date once settled', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [one],
+      payments: [
+        {
+          id: 'p1',
+          minerId: one.minerId,
+          characterId: 1,
+          amount: 1_000_000,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    expect(periodStatements(view, '2026-08-01')![0]).toMatchObject({
+      mail: { kind: 'not-mailed', count: 0 },
+      settled: true,
+      outstanding: 0,
+      dueAt: null,
+      overdue: false,
+    });
   });
 });

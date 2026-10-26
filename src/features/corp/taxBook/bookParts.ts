@@ -20,7 +20,7 @@ export type BookPartSet = ReadonlySet<BookPart>;
 export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 
 /** What a page asks for: a tab id, or a detail page below it. */
-export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner';
+export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner' | 'statementPeriod';
 
 export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPartSet {
   const route = detail ?? tab;
@@ -29,6 +29,7 @@ export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPa
     case 'miners':
       return new Set<BookPart>(['core', 'ledger', 'answers']);
     case 'statements':
+    case 'statementPeriod':
       return new Set<BookPart>(['core', 'ledger']);
     default:
       return new Set<BookPart>(['core']);
