@@ -67,6 +67,9 @@ export function clearBookCache(): void {
   copies.clear();
 }
 
+/** Drops every slot this tab holds under `key`. */
+export const forgetMemoryCopies = (key: string): void => void copies.delete(key);
+
 /** This tab's copy of one slot, for a part that plans its own read (member delta, #5243). */
 export const memoryCopy = (key: string, slot: string): Copy | undefined =>
   copies.get(key)?.get(slot);

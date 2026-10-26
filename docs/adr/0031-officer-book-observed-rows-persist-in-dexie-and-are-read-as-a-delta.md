@@ -8,6 +8,8 @@ Accepted (2026-10-26). Amends the "in memory, per tab" choice of issue #5047 (`b
 
 **Amended 2026-10-26** (`docs/context/decisions/20261026-122211-*`, issue #5243): no timed full read; the server stamps old rows once; a recreated book (`createdAt`) forces a full read.
 
+**Amended 2026-10-26** (`docs/context/decisions/20261026-124832-*`, issue #5243): a member's own lines persist too (`member:` slots), and their `observed` rows are read as a `uid` + `updatedAt` delta.
+
 ## Context
 
 `observed` is the largest part of a book: one row per miner, ore, day and refinery, thousands of reads. The in-memory copy saves re-reads only inside one tab session; every reload, and every scheduled sync (which restamps `observed`), read the whole collection again. The rows are officer-only (`firestore.rules`: officer or own line), which is why the copy was kept in memory: nothing officer-only outlived the page.

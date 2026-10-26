@@ -2,13 +2,14 @@
  * This device's Dexie copy of a member's own lines of a Corp Tax Book (#5243),
  * each part under the version stamp it was read at, so a reload with an
  * unchanged stamp reads none of it. Own lines only (`uid`/`uids` queries), so
- * unlike an officer's copy (bookPartStore.ts) it is not one-book-at-a-time. It
+ * unlike an officer's copy (bookPartStore.ts) it is not one-book-at-a-time.
+ * A copy of a book the Character left lives until that book reads as hidden. It
  * shares the `corpBookParts` table under a `member:` slot prefix, and so
  * the Character-removal wipe (`clearObservedCopies`) and the logout wipe.
  */
 import { db } from '@/db';
 import { currentWipeEpoch } from '@/features/corp/taxBook/observedStore';
-import type { PartStore } from '@/features/corp/taxBook/bookCache';
+import { forgetMemoryCopies, type PartStore } from '@/features/corp/taxBook/bookCache';
 
 const PREFIX = 'member:';
 
@@ -38,18 +39,7 @@ export function memberPartStore(characterId: number, corporationId: number): Par
       await quietly(async () => {
         // A wipe (removal) since this load began: a read still in flight stays unsaved.
         if (currentWipeEpoch() !== epoch) return;
-        await db.transaction('rw', db.corpBookParts, async () => {
-          // A Character that left the corporation keeps no lines of its old book.
-          const held = await db.corpBookParts
-            .where('characterId')
-            .equals(characterId)
-            .primaryKeys();
-          const stale = held.filter(
-            ([, corp, s]) => corp !== corporationId && s.startsWith(PREFIX)
-          );
-          await db.corpBookParts.bulkDelete(stale);
-          await db.corpBookParts.put({ characterId, corporationId, slot: id(slot)[2], ...copy });
-        });
+        await db.corpBookParts.put({ characterId, corporationId, slot: id(slot)[2], ...copy });
       });
     },
     forget: async (slot) => {
@@ -58,8 +48,9 @@ export function memberPartStore(characterId: number, corporationId: number): Par
   };
 }
 
-/** Drops every member part of this Character's copy of one book (the book is gone or hidden). */
+/** Drops every member part of this Character's copy of one book (the book is gone or hidden), here and in this tab. */
 export async function forgetMemberParts(characterId: number, corporationId: number): Promise<void> {
+  forgetMemoryCopies(`member:${characterId}:${corporationId}`);
   await quietly(async () => {
     const held = await db.corpBookParts
       .where('[characterId+corporationId]')

@@ -319,4 +319,36 @@ describe('a member book on this device (#5243)', () => {
 
     expect(await db.corpBookParts.count()).toBeGreaterThan(0);
   });
+
+  it('keeps both books’ copies when a Character reads two of them', async () => {
+    const OTHER = 98000002;
+    store.docs.set(`corps/${OTHER}`, stamped());
+    store.docs.set(`corps/${OTHER}/miners/solo:5`, { characterIds: [ME], uids: [`char:${ME}`] });
+    const both = [
+      { characterId: ME, corporationId: CORP },
+      { characterId: ME, corporationId: OTHER },
+    ];
+    await loadCorpBooks(both);
+    reload();
+    store.reads.length = 0;
+
+    await loadCorpBooks(both);
+
+    expect(store.reads.filter((r) => r.includes('/miners'))).toEqual([]);
+  });
+
+  it('serves nothing from this tab once the book turns hidden', async () => {
+    store.docs.set(`${OBS}/a`, row('a', NOW - 1000));
+    await loadCorpBooks(me);
+    store.docs.set(BOOK, { ...stamped(), active: false });
+    await clearNotFound(BOOK);
+    await loadCorpBooks(me);
+    store.docs.set(BOOK, stamped());
+    await clearNotFound(BOOK);
+    store.reads.length = 0;
+
+    await loadCorpBooks(me);
+
+    expect(store.reads).toContain(OBS);
+  });
 });
