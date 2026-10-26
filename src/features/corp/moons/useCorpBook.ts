@@ -9,7 +9,7 @@
  * (`verifyOfficer`, access token only, ADR 0023). A reload after every edit
  * is the caller's: Firestore here is the `lite` build, with no listeners.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
 import {
@@ -41,12 +41,14 @@ import {
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
 import {
+  mergeBookData,
   readBookData,
   verifyOfficer,
   type BookData,
   type BookSettings,
   type OfficerVerdict,
 } from '../taxBook/bookClient';
+import { ALL_BOOK_PARTS, missingBookParts, type BookPartSet } from '../taxBook/bookParts';
 import { forgetObservedCopy } from '../taxBook/observedStore';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
@@ -118,7 +120,14 @@ function utcNow() {
   return new Date().toISOString();
 }
 
-export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
+const ALL_PARTS: BookPartSet = new Set(ALL_BOOK_PARTS);
+
+/**
+ * `wanted` is what the open page joins (`bookPartsFor`); default the whole book. Only those
+ * slices are read, and a page that wants more reads just the slices it adds. Until they
+ * are in, the state is `loading`.
+ */
+export function useCorpBook(sync: CorpTaxBookSync, wanted: BookPartSet = ALL_PARTS): CorpBook {
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
@@ -128,6 +137,12 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
   const [memberIds, setMemberIds] = useState<ReadonlySet<number> | undefined>(undefined);
   const [surveyOreLines, setSurveyOreLines] = useState<BookViewInput['surveyOreLines']>(undefined);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
+  const wantedKey = [...wanted].sort().join(',');
+  // A stable copy: the full read below and the tab-switch read both start from the latest ask.
+  const wantedRef = useRef(wanted);
+  useEffect(() => {
+    wantedRef.current = wanted;
+  }, [wanted]);
 
   // A page left open turns stale and rolls a day over (the sync hook's known gap).
   useEffect(() => {
@@ -151,7 +166,13 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
           setFetched({ status: 'off', verdict });
           return;
         }
-        const data = await readBookData(characterId, corporationId);
+        let data = await readBookData(characterId, corporationId, wantedRef.current);
+        // The page moved on while this read ran: take the slices it now wants.
+        const late = data ? missingBookParts(wantedRef.current, data.parts) : undefined;
+        if (data && late && late.size > 0) {
+          const more = await readBookData(characterId, corporationId, late);
+          if (more) data = mergeBookData(data, more);
+        }
         if (cancelled) return;
         if (!data?.settings.active) {
           setFetched({ status: 'off', verdict });
@@ -206,6 +227,34 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       cancelled = true;
     };
   }, [characterId, corporationId, attempt, finishedAt]);
+
+  // A page that wants slices the book was opened without reads just those.
+  useEffect(() => {
+    if (fetched.status !== 'loaded' || characterId === null || corporationId === null) return;
+    const missing = missingBookParts(wantedRef.current, fetched.data.parts);
+    if (missing.size === 0) return;
+    let cancelled = false;
+    readBookData(characterId, corporationId, missing).then(
+      (extra) => {
+        if (cancelled || !extra) return;
+        setFetched((prev) =>
+          prev.status === 'loaded' ? { ...prev, data: mergeBookData(prev.data, extra) } : prev
+        );
+      },
+      (error) => {
+        if (cancelled) return;
+        const code = (error as { code?: string }).code ?? '';
+        setFetched({
+          status: 'failed',
+          message: code || (error instanceof Error ? error.message : String(error)),
+        });
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+    // `wantedKey` is the dependency: the ref carries the set itself.
+  }, [fetched, wantedKey, characterId, corporationId]);
 
   // Current membership comes from the public affiliation endpoint, so an Accountant sees leavers too (#4194).
   useEffect(() => {
@@ -399,7 +448,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
 
   const state: CorpBookState =
     fetched.status === 'loaded'
-      ? view
+      ? view && missingBookParts(wanted, fetched.data.parts).size === 0
         ? {
             status: 'ready',
             verdict: fetched.verdict,
