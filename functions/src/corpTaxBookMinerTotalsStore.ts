@@ -200,16 +200,6 @@ export async function refreshAfterEvent(
   }
 }
 
-/** The owner a payment has right now, read before an edit that may move it. */
-export async function paymentOwner(
-  db: Firestore,
-  corporationId: number,
-  paymentId: string
-): Promise<string | undefined> {
-  const owner = (await sub(db, corporationId, 'payments').doc(paymentId).get()).get('minerId');
-  return typeof owner === 'string' ? owner : undefined;
-}
-
 // --- The scheduled verifier ---------------------------------------------------
 
 export const HEALTH_DOC = 'minerTotalsHealth';
@@ -280,9 +270,12 @@ export async function verifyAllMinerTotals(
 ): Promise<{ books: number; failed: number; truncated: boolean }> {
   const start = now();
   const active = await db.collection('corps').where('active', '==', true).get();
+  // A run cut short by the budget starts one book further along tomorrow, so none starves.
+  const docs = [...active.docs].sort((a, b) => a.id.localeCompare(b.id));
+  const turn = docs.length > 0 ? Math.floor(start / 86_400_000) % docs.length : 0;
   let books = 0;
   let failed = 0;
-  for (const doc of active.docs) {
+  for (const doc of [...docs.slice(turn), ...docs.slice(0, turn)]) {
     if (now() - start > budgetMs) return { books, failed, truncated: true };
     try {
       await verifyMinerTotals(db, Number(doc.id), now);

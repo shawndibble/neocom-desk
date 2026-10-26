@@ -217,7 +217,7 @@ function freshState(): State {
 type Event = { action: string } & Data;
 
 /** One random event: the edit action, applied to the state the way the server's edit would. */
-function randomEvent(r: ReturnType<typeof rng>, s: State): { event: Event; priorOwner?: string } {
+function randomEvent(r: ReturnType<typeof rng>, s: State): { event: Event } {
   const id = (p: string) => `${p}${++s.counter}`;
   const miner = r.pick(MINERS);
   const at = (d: number) => `${dayOf(d)}T12:00:00Z`;
@@ -316,14 +316,12 @@ function randomEvent(r: ReturnType<typeof rng>, s: State): { event: Event; prior
       return { event: { action: 'markNotTax', paymentId: p.id } };
     }
     case 'assign': {
-      if (!s.payments.length) return { event: { action: 'sync', minerIds: [] } };
-      const p = r.pick(s.payments);
-      const prior = p.minerId as string | undefined;
+      // The server only assigns a payment nobody holds yet (`already-assigned`).
+      const unassigned = s.payments.filter((p) => p.minerId === undefined);
+      if (!unassigned.length) return { event: { action: 'sync', minerIds: [] } };
+      const p = r.pick(unassigned);
       p.minerId = miner;
-      return {
-        event: { action: 'assignPayment', paymentId: p.id, minerId: miner },
-        priorOwner: prior,
-      };
+      return { event: { action: 'assignPayment', paymentId: p.id, minerId: miner } };
     }
     case 'dismiss': {
       const scope = r.pick(['record', 'miner', 'moon', 'extraction'] as const);
@@ -476,11 +474,11 @@ describe('Miner running totals', () => {
       const s = freshState();
       const docs = new Map<string, Data>();
       for (let step = 0; step < 45; step++) {
-        const { event, priorOwner } = randomEvent(r, s);
+        const { event } = randomEvent(r, s);
         let scope: string[] | 'all';
         if (event.action === 'verify') scope = 'all';
         else if (event.action === 'sync') scope = event.minerIds as string[];
-        else scope = resolve(editScope(event, priorOwner), s);
+        else scope = resolve(editScope(event), s);
         const plan = planTotals(records(s), docs, scope);
         for (const t of plan.writes) docs.set(t.minerId, t as unknown as Data);
         for (const id of plan.deletes) docs.delete(id);

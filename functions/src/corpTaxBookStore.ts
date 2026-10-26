@@ -93,7 +93,7 @@ import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
-import { paymentOwner, refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
+import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import {
   fail,
   requireLiveRoles,
@@ -1552,11 +1552,6 @@ export async function editBookAs(
   via?: string
 ) {
   const ref = bookRef(deps.db, call.corporationId);
-  // Who held a payment before it moves: that Miner's totals change too (ADR 0032).
-  const priorOwner =
-    action.action === 'assignPayment'
-      ? await paymentOwner(deps.db, call.corporationId, action.paymentId).catch(() => undefined)
-      : undefined;
   const result = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.get('active') !== true)
@@ -1574,7 +1569,7 @@ export async function editBookAs(
     return outcome.result ?? {};
   });
   // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
-  await refreshAfterEvent(deps.db, call.corporationId, editScope(action, priorOwner));
+  await refreshAfterEvent(deps.db, call.corporationId, editScope(action));
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
     await restampStructures(

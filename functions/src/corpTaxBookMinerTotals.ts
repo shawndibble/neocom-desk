@@ -309,10 +309,9 @@ const none = (): Scope => ({ minerIds: [], statementIds: [], paymentIds: [], all
 
 /**
  * The Miners an edit action changes the frozen totals of. Over-including only costs a
- * read; leaving one out is what the verifier exists to catch. `priorPaymentOwner` is the
- * Miner a payment belonged to before an `assignPayment`.
+ * read; leaving one out is what the verifier exists to catch.
  */
-export function editScope(action: { action: string } & Data, priorPaymentOwner?: string): Scope {
+export function editScope(action: { action: string } & Data): Scope {
   const s = none();
   const a = action as Data;
   const miner = (id: unknown) => {
@@ -338,7 +337,6 @@ export function editScope(action: { action: string } & Data, priorPaymentOwner?:
       break;
     case 'assignPayment':
       miner(a.minerId);
-      miner(priorPaymentOwner);
       break;
     case 'markNotTax':
       s.paymentIds.push(a.paymentId as string);
