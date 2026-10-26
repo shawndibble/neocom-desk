@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   buildFleetBoard,
@@ -157,5 +158,54 @@ describe('laneOffset', () => {
   it('pins anything farther to the right edge and says so', () => {
     expect(laneOffset(151)).toEqual({ fraction: 1, beyond: true });
     expect(laneOffset(3_000_000)).toEqual({ fraction: 1, beyond: true });
+  });
+});
+
+describe('ORE hulls', () => {
+  const read = <T>(file: string): T => JSON.parse(readFileSync(`public/data/${file}`, 'utf8')) as T;
+
+  // ORE builds no combat ship, but some hulls share a group with combat ones
+  // (the Pioneer is a Destroyer), so those are pinned by type id.
+  it.each([
+    ['Pioneer', 89240, 420],
+    ['Pioneer Consortium Issue', 89647, 420],
+    ['Perseverance', 91174, 420],
+    ['Venture Consortium Issue', 89648, 25],
+    ['Outrider', 89649, 1534],
+  ])('files %s (type %i, group %i) under industrial', (_name, typeId, groupId) => {
+    expect(roleOfType({ typeId, groupId, categoryId: SHIP }, '')).toBe('industrial');
+  });
+
+  it('leaves other hulls of the same group as they were', () => {
+    expect(roleOfType({ typeId: 16240, groupId: 420, categoryId: SHIP }, '')).toBe('dps');
+  });
+
+  it('files the Odysseus (Expedition Command Ship) under industrial', () => {
+    expect(roleOfType({ typeId: 89607, groupId: 4902, categoryId: SHIP }, '')).toBe('industrial');
+  });
+
+  it('leaves the Zephyr and the yachts out of the fleet', () => {
+    expect(roleOfType({ typeId: 2078, groupId: 1022, categoryId: SHIP }, '')).toBeNull();
+    expect(roleOfType({ typeId: 1, groupId: 5087, categoryId: SHIP }, '')).toBeNull();
+  });
+
+  // Fails when CCP adds an ORE hull: pin its type id above.
+  it('files every ORE hull in the Ship Tree under industrial or transport', () => {
+    const ORE = 500014;
+    const tree = read<{ ships: { typeID: number; name: string; factionID: number }[] }>(
+      'shipTree.json'
+    );
+    const types = read<Record<string, { groupID: number }>>('types.json');
+    const misfiled = tree.ships
+      .filter((s) => s.factionID === ORE)
+      .filter((s) => {
+        const role = roleOfType(
+          { typeId: s.typeID, groupId: types[String(s.typeID)].groupID, categoryId: SHIP },
+          s.name
+        );
+        return role !== 'industrial' && role !== 'transport';
+      })
+      .map((s) => s.name);
+    expect(misfiled).toEqual([]);
   });
 });
