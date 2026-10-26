@@ -133,8 +133,9 @@ export function OverviewCustomize() {
   if (editing) return null;
   return (
     // `shrink-0`: its min-content is the 16px icon, so a crowded header row could squeeze it
-    // under the 24px target floor (WCAG 2.5.8).
-    <Button className="w-9 shrink-0 px-0 md:w-auto md:px-4" onClick={startEditing}>
+    // under the 24px target floor (WCAG 2.5.8). `max-md:px-0`, not `px-0`: `cx` does not merge, so a bare
+    // `px-0` loses to the size tier's `px-4` and the 36px box squeezes the icon to a dot.
+    <Button className="w-9 shrink-0 max-md:px-0 md:w-auto" onClick={startEditing}>
       <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
       <span className="sr-only md:not-sr-only">{t('overview.header.customize')}</span>
     </Button>
