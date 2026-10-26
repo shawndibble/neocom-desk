@@ -4,8 +4,10 @@ import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { createPayee } from './payees';
 import {
   applySurveyConnections,
+  refreshSurveyConnection,
   removeSurveyConnection,
-  saveSurveyConnection,
+  restoreSurveyConnections,
+  startSurveyConnection,
   surveyMoonOreTypeIds,
   useSurveyConnections,
 } from './surveyConnections';
@@ -75,10 +77,39 @@ beforeEach(async () => {
   });
 });
 
+describe('startSurveyConnection', () => {
+  it('stops every other connection, on any Character, and resolves to what it replaced', async () => {
+    const mine = connection({ surveyId: 'a', untilMs: Date.now() + 3_600_000 });
+    const alt = connection({ surveyId: 'b', characterId: 2, untilMs: Date.now() + 3_600_000 });
+    await restoreSurveyConnections([mine, alt]);
+    const next = connection({ surveyId: 'c' });
+
+    expect(await startSurveyConnection(next)).toEqual([mine, alt]);
+    expect(useSurveyConnections.getState().value).toEqual([next]);
+
+    await restoreSurveyConnections([mine, alt]);
+    expect(useSurveyConnections.getState().value).toEqual([mine, alt]);
+  });
+});
+
+describe('refreshSurveyConnection', () => {
+  it('saves onto a running connection but never brings back a stopped one', async () => {
+    const running = connection({ untilMs: Date.now() + 3_600_000 });
+    await startSurveyConnection(running);
+    const moved = { ...running, untilMs: running.untilMs + 60_000 };
+    await refreshSurveyConnection(moved);
+    expect(useSurveyConnections.getState().value).toEqual([moved]);
+
+    await startSurveyConnection({ ...running, surveyId: 'other' });
+    await refreshSurveyConnection(moved);
+    expect(useSurveyConnections.getState().value.map((c) => c.surveyId)).toEqual(['other']);
+  });
+});
+
 describe('applySurveyConnections', () => {
   it('assigns the moon’s unassigned ore to the connected Payee at the survey’s rate', async () => {
     const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
-    await saveSurveyConnection(connection({ payeeId: payee.id }));
+    await startSurveyConnection(connection({ payeeId: payee.id }));
 
     const created = await applySurveyConnections([ledger(50)], NOW);
 
@@ -96,7 +127,7 @@ describe('applySurveyConnections', () => {
 
   it('assigns nothing twice: a second pass leaves growth to the first Assignment', async () => {
     const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
-    await saveSurveyConnection(connection({ payeeId: payee.id }));
+    await startSurveyConnection(connection({ payeeId: payee.id }));
     await applySurveyConnections([ledger(50)], NOW);
 
     expect(await applySurveyConnections([ledger(80)], NOW)).toEqual([]);
@@ -104,13 +135,13 @@ describe('applySurveyConnections', () => {
   });
 
   it('skips a connection whose Payee was deleted', async () => {
-    await saveSurveyConnection(connection({ payeeId: 'gone' }));
+    await startSurveyConnection(connection({ payeeId: 'gone' }));
     expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
   });
 
   it('does nothing once the connection is removed', async () => {
     const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
-    await saveSurveyConnection(connection({ payeeId: payee.id }));
+    await startSurveyConnection(connection({ payeeId: payee.id }));
     await removeSurveyConnection('s1', CHAR);
     expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
   });

@@ -1,7 +1,8 @@
 /**
  * "Assign Taxes" on a moon Survey, in one click (issue #4684): finds or adds
- * the Payee, connects the Survey's moon to it (`surveyConnections.ts`) and
- * assigns whatever of that moon's ore is already in the Mining Ledger. While
+ * the Payee, connects the Survey's moon to it (`surveyConnections.ts`),
+ * stopping any other Survey's connection, and assigns whatever of that moon's
+ * ore is already in the Mining Ledger. While
  * the Survey is open and connected it re-reads the ledger on opening and then
  * every few minutes, so ore mined since is assigned too; the Tax tab's own
  * load does the same. Each run that assigns or adds something says so with
@@ -25,8 +26,10 @@ import { createPayee, loadPayees } from '@/features/miningTax/payees';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import {
   autoAssignFromSurveys,
+  refreshSurveyConnection,
   removeSurveyConnection,
-  saveSurveyConnection,
+  restoreSurveyConnections,
+  startSurveyConnection,
   surveyMoonOreTypeIds,
   useSurveyConnections,
 } from '@/features/miningTax/surveyConnections';
@@ -155,7 +158,7 @@ export function useSurveyConnection({
         next.systemId !== connection.systemId ||
         next.structureLabel !== connection.structureLabel ||
         !sameIds(next.typeIds, connection.typeIds);
-      if (changed) await saveSurveyConnection(next);
+      if (changed) await refreshSurveyConnection(next);
     })().catch(() => undefined); // Kept as it was; the next change or reopen tries again.
     return () => {
       cancelled = true;
@@ -209,7 +212,8 @@ export function useSurveyConnection({
     ]);
     const structureLabel = structureFromLocation(survey.locationName);
     const connectedAt = Date.now();
-    await saveSurveyConnection({
+    // Only one runs at a time: whichever was running stops, and Undo brings it back.
+    const replaced = await startSurveyConnection({
       surveyId: survey.id,
       characterId,
       payeeId: payee.id,
@@ -231,7 +235,6 @@ export function useSurveyConnection({
         ? t('survey.moonTax.assigned', { count: created.length, name: payee.name })
         : t('survey.moonTax.willAssign', { name: payee.name, pct: tax.pct }),
     ];
-    const surveyId = survey.id;
     setToast({
       message: parts.filter((p) => p !== '').join(' '),
       onUndo: undoWith(async () => {
@@ -245,7 +248,7 @@ export function useSurveyConnection({
           const undone = await unassign(assigned);
           if (!undone.ok) throw undone.cause;
         }
-        await removeSurveyConnection(surveyId, characterId);
+        await restoreSurveyConnections(replaced);
         if (known === undefined) {
           const removed = await deletePayee(payee);
           if (!removed.ok) throw removed.cause;

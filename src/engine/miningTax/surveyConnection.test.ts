@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   LEDGER_GRACE_MS,
   connectionWindow,
-  findOreClash,
   isConnectionLive,
   parseSurveyConnections,
   planSurveyAutoAssign,
   structureFromLocation,
-  upsertSurveyConnection,
+  updateSurveyConnection,
   type SurveyConnection,
 } from './surveyConnection';
 import type { MiningLedgerEntry } from './types';
@@ -157,13 +156,18 @@ describe('isConnectionLive', () => {
   });
 });
 
-describe('upsertSurveyConnection', () => {
+describe('updateSurveyConnection', () => {
   it('replaces the same survey for the same character and drops ones no longer live', () => {
     const stale = connection({ surveyId: 'old', untilMs: NOON - 5 * HOUR });
     const other = connection({ surveyId: 'other' });
     const first = connection({ taxPct: 5 });
     const next = connection({ taxPct: 10 });
-    expect(upsertSurveyConnection([stale, other, first], next, NOON)).toEqual([other, next]);
+    expect(updateSurveyConnection([stale, other, first], next, NOON)).toEqual([other, next]);
+  });
+
+  it('adds nothing once the connection was stopped or replaced', () => {
+    const other = connection({ surveyId: 'other' });
+    expect(updateSurveyConnection([other], connection(), NOON)).toEqual([other]);
   });
 });
 
@@ -309,48 +313,5 @@ describe('planSurveyAutoAssign', () => {
     const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
     const b = connection({ surveyId: 'b', payeeId: 'p2' });
     expect(planSurveyAutoAssign([e], [], [connection(), b], NOON)).toEqual([]);
-  });
-});
-
-describe('findOreClash', () => {
-  const mining = { untilMs: NOON + HOUR };
-  const a = connection({ surveyId: 'a', ...mining });
-
-  it('finds another Payee mining the same ore in the same system', () => {
-    const b = connection({ surveyId: 'b', payeeId: 'p2', ...mining });
-    expect(findOreClash(a, [a, b], NOON)).toBe(b);
-  });
-
-  it('finds the same Payee on two surveys, which the engine also leaves unassigned', () => {
-    const b = connection({ surveyId: 'b', ...mining });
-    expect(findOreClash(a, [a, b], NOON)).toBe(b);
-  });
-
-  it('finds two connections both in the grace window', () => {
-    const late = NOON + HOUR / 2;
-    const x = connection({ surveyId: 'x', payeeId: 'p1', untilMs: NOON + 1 });
-    const y = connection({ surveyId: 'y', payeeId: 'p2', untilMs: NOON + 1 });
-    expect(findOreClash(x, [x, y], late)).toBe(y);
-  });
-
-  it('is clear when only one is still being mined', () => {
-    const done = connection({ surveyId: 'b', payeeId: 'p2', untilMs: NOON - 1 });
-    expect(findOreClash(a, [a, done], NOON)).toBeUndefined();
-  });
-
-  it('is clear for another system, ore, Character, or an expired connection', () => {
-    const others = [
-      connection({ surveyId: 'b', payeeId: 'p2', systemId: OTHER_SYSTEM, ...mining }),
-      connection({ surveyId: 'c', payeeId: 'p2', typeIds: [ZEOLITES], ...mining }),
-      connection({ surveyId: 'd', payeeId: 'p2', characterId: 2, ...mining }),
-      connection({ surveyId: 'e', payeeId: 'p2', untilMs: NOON - 2 * HOUR }),
-    ];
-    expect(findOreClash(a, [a, ...others], NOON)).toBeUndefined();
-  });
-
-  it('is clear with no system, since such a connection claims nothing', () => {
-    const x = connection({ surveyId: 'x', systemId: null, ...mining });
-    const y = connection({ surveyId: 'y', payeeId: 'p2', systemId: null, ...mining });
-    expect(findOreClash(x, [x, y], NOON)).toBeUndefined();
   });
 });

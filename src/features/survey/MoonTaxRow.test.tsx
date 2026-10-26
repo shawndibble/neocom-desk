@@ -223,6 +223,7 @@ describe('MoonTaxReadout', () => {
     const manage = screen.getByRole('button', { name: 'Assign Taxes' });
     expect(manage.getAttribute('aria-disabled')).toBe('true');
     expect(manage.getAttribute('aria-describedby')).toBe(screen.getByText('Log in to access').id);
+    expect(screen.queryByRole('link', { name: 'Mining Tax' })).toBeNull();
     fireEvent.click(manage);
     expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
     expect(useSurveyConnections.getState().value).toEqual([]);
@@ -275,15 +276,43 @@ describe('MoonTaxReadout', () => {
     expect(await screen.findByText('Assigned 1 mining entry to Moon Corp.')).toBeTruthy();
   });
 
-  it('Stop disconnects the moon', async () => {
+  it('Stop takes the place of Assign Taxes and disconnects the moon; Mining Tax stays', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
     await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
     renderReadout();
+    expect(screen.getByRole('link', { name: 'Mining Tax' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Assign Taxes' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+    const stop = await screen.findByRole('button', { name: 'Stop' });
+    expect(screen.getByRole('link', { name: 'Mining Tax' })).toBeTruthy();
+    fireEvent.click(stop);
     const manage = await screen.findByRole('button', { name: 'Assign Taxes' });
     await waitFor(() => expect(document.activeElement).toBe(manage));
     expect(useSurveyConnections.getState().value).toEqual([]);
+  });
+
+  it("stops another survey's auto-assign, and Undo brings it back", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
+    const other = {
+      surveyId: 'other',
+      characterId: 9,
+      payeeId: 'p9',
+      payeeName: 'Other Corp',
+      taxPct: 5,
+      systemId: SYSTEM,
+      typeIds: [BITUMENS],
+      fromDate: '2026-10-26',
+      untilMs: NOW + 60 * 60 * 1000,
+      expiresAt: NOW + 24 * 60 * 60 * 1000,
+      connectedAt: NOW,
+    };
+    useSurveyConnections.setState({ value: [other], hydrated: true });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Assign Taxes' }));
+    await screen.findByRole('button', { name: 'Stop' });
+    expect(useSurveyConnections.getState().value.map((c) => c.surveyId)).toEqual(['abc123XYZ']);
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(useSurveyConnections.getState().value).toEqual([other]));
   });
 
   it('says so and stays when the Payee cannot be added', async () => {

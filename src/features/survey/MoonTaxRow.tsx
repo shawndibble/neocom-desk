@@ -9,6 +9,7 @@
  * (`useSurveyConnection`, issue #4684): the Payee is added if need be, ore
  * already mined there is assigned, and ore mined until the Survey's ETA is
  * assigned as it reaches the ledger, so the pilot never assigns it by hand.
+ * Stop takes its place while connected; the Mining Tax tab is always beside it.
  *
  * The fields start blank for each survey (only what the survey itself stored
  * comes back), so a tax is shown only when the pilot sets it.
@@ -55,36 +56,16 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-/** The Tax tab and Stop, then "Auto-assigned until …" on its own line below: what a connected Survey shows in place of Assign Taxes. */
-function ConnectedNote({
-  connection,
-  nowMs,
-  onStop,
-  stopId,
-}: {
-  connection: SurveyConnection;
-  nowMs: number;
-  onStop: () => void;
-  stopId: string;
-}) {
+/** "Auto-assigned until …" on its own line below the row, while the Survey is connected. */
+function ConnectedNote({ connection, nowMs }: { connection: SurveyConnection; nowMs: number }) {
   const { t } = useTranslation();
   return (
-    <>
-      <div className="flex items-center gap-x-3 sm:ml-auto">
-        <Link to={MINING_TAX_HREF} className={buttonClassName({ size: 'sm' })}>
-          {t('survey.moonTax.openTax')}
-        </Link>
-        <Button id={stopId} size="sm" variant="ghost" onClick={onStop}>
-          {t('survey.moonTax.stop')}
-        </Button>
-      </div>
-      <span role="status" className="-mt-1 flex w-full items-center gap-1.5 text-sm text-text-dim">
-        <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        {connection.systemId === null
-          ? t('survey.moonTax.connectedNoLocation')
-          : t('survey.moonTax.connected', { time: eveWhen(connection.untilMs, nowMs) })}
-      </span>
-    </>
+    <span role="status" className="-mt-1 flex w-full items-center gap-1.5 text-sm text-text-dim">
+      <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+      {connection.systemId === null
+        ? t('survey.moonTax.connectedNoLocation')
+        : t('survey.moonTax.connected', { time: eveWhen(connection.untilMs, nowMs) })}
+    </span>
   );
 }
 
@@ -134,26 +115,39 @@ function useManageTaxes(
   };
 }
 
-/** Assign Taxes (`children`) until the Survey is connected, then what it is doing, plus its Undo toast. */
+/**
+ * Assign Taxes (`children`) until the Survey is connected, then Stop in its
+ * place; the Mining Tax tab always at the far right (`taxLink`). Below, what a
+ * connected Survey is doing, plus its Undo toast.
+ */
 function MoonConnectionSlot({
   moon,
+  taxLink = true,
   children,
 }: {
   moon: ReturnType<typeof useManageTaxes>;
+  /** Off for a logged-out viewer, who has no Tax tab to open. */
+  taxLink?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <>
-      {moon.connection ? (
-        <ConnectedNote
-          connection={moon.connection}
-          nowMs={moon.now}
-          stopId={moon.stopId}
-          onStop={moon.stop}
-        />
-      ) : (
-        children
-      )}
+      <div className="flex items-start gap-x-3 sm:ml-auto">
+        {moon.connection ? (
+          <Button id={moon.stopId} size="sm" variant="ghost" onClick={moon.stop}>
+            {t('survey.moonTax.stop')}
+          </Button>
+        ) : (
+          children
+        )}
+        {taxLink && (
+          <Link to={MINING_TAX_HREF} className={buttonClassName({ size: 'sm' })}>
+            {t('survey.moonTax.openTax')}
+          </Link>
+        )}
+      </div>
+      {moon.connection && <ConnectedNote connection={moon.connection} nowMs={moon.now} />}
       <ConnectionToastView toast={moon.toast} onClose={moon.closeToast} />
     </>
   );
@@ -298,7 +292,6 @@ export function MoonTaxRow({
           <Button
             id={moon.manageId}
             size="sm"
-            className="sm:ml-auto"
             disabled={!ready}
             loading={busy}
             onClick={() => void openTax()}
@@ -375,7 +368,7 @@ export function MoonTaxReadout({
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
         </p>
-        <MoonConnectionSlot moon={moon}>
+        <MoonConnectionSlot moon={moon} taxLink={!loggedOut}>
           <div className={blockedButtonClassName}>
             <Button
               id={moon.manageId}

@@ -1,21 +1,19 @@
 /**
- * The Moon Mining Tax tab's list of live Survey connections (issue #4684): who
- * each connected moon's ore is being assigned to, until when, and Stop. The
- * same Stop as on the Survey, for a pilot who has moved on to another one.
+ * The Moon Mining Tax tab's Auto Assignment bar (issue #4684): one slim row
+ * per live Survey connection, like the attention strip but in accent, since it
+ * is something running rather than something wrong. Who the moon's ore goes to
+ * and at what rate · where · until when, then Stop: the same Stop as on the
+ * Survey, for a pilot who has moved on to another one.
  *
- * Moon ore of one type is often owed to different Payees, so a connection
- * claims a moon system and ore (kept in data, not listed here). Ore two
- * connections claim while both are being mined is left unassigned (`planSurveyAutoAssign`), and the
- * row says so rather than leaving a pilot to wonder where it went.
+ * Only one connection runs at a time (`startSurveyConnection`), so this is
+ * one row; a list synced from an older device can briefly hold two.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
-import {
-  findOreClash,
-  isConnectionLive,
-  type SurveyConnection,
-} from '@/engine/miningTax/surveyConnection';
+import { Button } from '@/components/ui';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { isConnectionLive, type SurveyConnection } from '@/engine/miningTax/surveyConnection';
+import { cx } from '@/lib/cx';
 import { eveWhen } from '@/lib/eveTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { systemLabel } from './names';
@@ -29,7 +27,7 @@ export function SurveyConnectionsPanel({
 }: {
   /** The Characters the tab shows. */
   characterIds: readonly number[];
-  /** Named beside each row only when more than one Character is tracked. */
+  /** Named in the row only when more than one Character is tracked. */
   characterNames: ReadonlyMap<number, string>;
   systemNames: ReadonlyMap<number, string>;
   /** For tests; otherwise the clock, read each minute. */
@@ -56,47 +54,41 @@ export function SurveyConnectionsPanel({
   }
 
   return (
-    <Panel title={t('miningTax.surveyConnections.title')}>
-      <ul className="divide-y divide-line text-sm">
-        {live.map((c) => {
-          const clash = findOreClash(c, live, nowMs);
-          return (
-            <li
-              key={`${c.surveyId}:${c.characterId}`}
-              className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold [overflow-wrap:anywhere]">
-                  {t('miningTax.surveyConnections.line', { name: c.payeeName, pct: c.taxPct })}
-                  {characterIds.length > 1 && characterNames.has(c.characterId)
-                    ? ` · ${characterNames.get(c.characterId)}`
-                    : ''}
-                </p>
-                <p className="text-text-dim">
-                  {c.systemId === null
-                    ? t('miningTax.surveyConnections.noLocation')
-                    : systemLabel(systemNames, c.systemId)}
-                  {' · '}
-                  {t('miningTax.surveyConnections.until', { time: eveWhen(c.untilMs, nowMs) })}
-                </p>
-                {clash && (
-                  <p role="status" className="text-xs text-warning">
-                    {t('miningTax.surveyConnections.overlap', { name: clash.payeeName })}
-                  </p>
-                )}
-              </div>
-              <Button size="sm" onClick={() => stop(c)}>
-                {t('survey.moonTax.stop')}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+    <div className="space-y-1">
+      {live.map((c) => {
+        const parts = [
+          t('miningTax.surveyConnections.line', { name: c.payeeName, pct: c.taxPct }),
+          c.systemId === null
+            ? t('miningTax.surveyConnections.noLocation')
+            : systemLabel(systemNames, c.systemId),
+          t('miningTax.surveyConnections.until', { time: eveWhen(c.untilMs, nowMs) }),
+          characterIds.length > 1 ? characterNames.get(c.characterId) : undefined,
+        ].filter((part) => part !== undefined);
+        const detail = parts.join(' · ');
+        return (
+          <section
+            key={`${c.surveyId}:${c.characterId}`}
+            role="status"
+            aria-label={t('miningTax.surveyConnections.title')}
+            className="flex min-h-9 items-center gap-2 rounded-xs border border-accent/60 bg-accent/10 px-2.5 py-1 text-xs md:min-h-0"
+          >
+            <span className={cx(eyebrowClassName, 'shrink-0 text-accent')}>
+              {t('miningTax.surveyConnections.title')}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-text-dim" title={detail}>
+              {detail}
+            </span>
+            <Button size="sm" className="shrink-0" onClick={() => stop(c)}>
+              {t('survey.moonTax.stop')}
+            </Button>
+          </section>
+        );
+      })}
       {failed && (
         <p role="alert" className="text-xs text-danger">
           {t('miningTax.surveyConnections.stopFailed')}
         </p>
       )}
-    </Panel>
+    </div>
   );
 }
