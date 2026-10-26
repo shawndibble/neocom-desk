@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -19,6 +20,7 @@ import { useBook } from './useBook';
 import { MOONS_TABS } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { Crumb, DueWord } from './moonsParts';
+import { StatementPanel } from './StatementPanel';
 
 const STATEMENTS_PATH = tabPath(MOONS_TABS, 'statements');
 
@@ -47,6 +49,8 @@ function MailWord({ mail }: { mail: PeriodStatementRow['mail'] }) {
 export function StatementPeriodDetail({ periodStart }: { periodStart: string }) {
   const { t } = useTranslation();
   const { view, names } = useBook();
+  const [params, setParams] = useSearchParams();
+  const openId = params.get('statement');
   const statements = periodStatements(view, periodStart);
   const period = periodRows(view).find((r) => r.start === periodStart && r.statements > 0);
   if (!statements || !period) {
@@ -146,8 +150,13 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
           defaultSort={{ columnId: 'outstanding', direction: 'desc' }}
           mobileSort
           stackColumns={2}
+          onRowClick={(r) => setParams({ statement: r.statement.id })}
+          selectedRowKey={openId}
         />
       </Panel>
+      {openId && statements.some((r) => r.statement.id === openId) && (
+        <StatementPanel key={openId} statementId={openId} onClose={() => setParams({})} />
+      )}
     </div>
   );
 }
