@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-26). Issue #5247. Builds on ADR 0023 and ADR 0031; amends neither. No build ticket exists until this is accepted.
+Accepted (2026-10-26). Issue #5247. Builds on ADR 0023 and ADR 0031; amends neither. The build tickets are #5254-#5261 (epic #5247).
 
 ## Context
 
@@ -19,7 +19,7 @@ Facts the design rests on:
 
 - **Statements are frozen.** Create-only, with frozen lines (day, structure, ore lines, unit prices, tax %). Payments, dismissals, adjustments and write-offs are small per-miner collections. A paid Statement's days stay closed (D22).
 - **Only unbilled and unpaid days are open.** Late prices, new rates and dismissals only ever change those.
-- **Rows carry no extraction id.** The engine derives it at read time: `moonOnDay` (`src/engine/corpTaxBook/sync.ts`, line 290) scans Extractions and returns the first match; `placeObservedRows` stores only `moonId`, write-once, and only when absent.
+- **Rows carry no extraction id.** The engine derives it at read time: `moonOnDay` (`src/engine/corpTaxBook/sync.ts`, line 290) scans Extractions and returns the first match; `placeObservedRows` stores only `moonId` and `solarSystemId`, each write-once and only when absent.
 - **Residue is not in the ledger.** `minedDuringExtraction` and `minedVsLeft` (`src/engine/corpTaxBook/extraction.ts`, lines 218 and 246) give the combined loss (Residue plus ore never mined), because delivered ore is all the ledger records.
 
 ## Decision
@@ -30,12 +30,12 @@ Screens read **Read Models**: small docs the server builds from raw rows and eve
 
 - **Statements are the frozen history.** Per-moon, per-ore amounts come from their frozen lines; the device groups lines by moon.
 - **The open set is computed on the device.** It loads a miner's unbilled and unpaid days and runs the existing engine, so late prices, rate changes and dismissals never need a stored total recomputed.
-- **Miner doc.** Running totals of the frozen part only (billed, paid, lifetime mined, value, tax), updated on events: Statement issued, payment recorded or matched, dismissal and reversal, adjustment, write-off, rebill, regroup. Not on ledger-row merge, which removes the hot-doc contention of officer sync, the 6-hourly sync and a feeder pull writing one doc. Volatile fields (balances) stay out of large lists.
+- **Miner doc.** A NEW collection, proposed name `minerTotals` (to confirm in phase 1); `miners/{minerId}` already exists as grouping docs (in `VERSIONED_COLLECTIONS`, with rules), and those docs and rules stay untouched. Running totals of the frozen part only (billed, paid, lifetime mined, value, tax), updated on events: Statement issued, payment recorded or matched, dismissal and reversal, adjustment, write-off, rebill, regroup. Not on ledger-row merge, which removes the hot-doc contention of officer sync, the 6-hourly sync and a feeder pull writing one doc. Volatile fields (balances) stay out of large lists.
 - **Miner list doc.** One doc with the sortable and filterable fields of every miner, small enough to load whole. The Miners tab searches by name, and names are never stored: ESI resolves them by character id. Standing (member, left, guest) needs current ESI membership and is never stored.
 - **Per-pull moon doc.** One per `extractionId`, built server-side from raw structure-and-date rows, never from miner docs. It holds per-ore mined quantity from every row at that structure in the fracture-to-expiry window (including rows no charge covers: before the book, unrated, outside coverage, guests, feeder rows), `minerCount`, per-ore chunk total and its source (notification, survey, unknown), total tax under the frozen-or-live rule (frozen once a Statement issues, D22), and the Fully Mined flag. Past cycles read each pull's `minedPct` (`bookView.ts`) and `minerCount` from it. A moon page is one read.
 - **Miner row fields.** Owed (excludes credit), overdue days, unbilled vs pending, credit, last paid, paused, character ids, tolerance and officer write-offs are either fields of the miner list doc or computed from the open set. Phase 1 decides each by whether it changes on an event (stored) or with now and prices (computed).
 - **Overview doc.** Outstanding and overdue miners, declarations, unmatched and unattributed payments, leavers with debt, unrated count, ledger gaps, health flags, and a rolling window of Extractions with state counts. State, overdue days, billable-through and "in chunks" ISK depend on now and today's prices: the doc stores inputs and the device computes on read.
-- **Feeder summary only.** A **Feeder** sees the existing `feederViews` summary (minedVolume, minedValueIsk, accruedIsk, paidIsk, balance). Day lines show only what the in-game mining ledger shows: character, ore, quantity, structure, date. Per-line value, due and % are dropped, and character names come from ESI by id. A corp that owns its moons and runs its own taxes sees what an officer sees.
+- **Feeder summary only.** A **Feeder** sees the existing `feederViews` summary (minedVolume, minedValueIsk, accruedIsk, paidIsk, balance). Day lines show only what the in-game mining ledger shows: character, ore, quantity, structure, date. `FeederViewDayLine` today has only `characterId`, `structureId`, `volume` and `valueIsk`, so showing ore is a new field on the server-built line, not just a trim. Per-line value, due and % are dropped, and character names come from ESI by id. A corp that owns its moons and runs its own taxes sees what an officer sees.
 
 Larger docs are fine; one doc is one read whatever its size. Each stays under 1 MiB, and a write rewrites the whole doc, which is why volatile fields stay out.
 
@@ -43,7 +43,9 @@ Larger docs are fine; one doc is one read whatever its size. Each stays under 1 
 
 Stamp every ledger row with `extractionId` at write time and backfill old rows. The format is the existing Extraction doc id, `{structureId}_{startTimeMs}`; keep it.
 
-**Assumption (owner decision): a refinery never pops a new rock on the day the previous one expires.** The minimum cycle is 6 days and a pop is mineable for at most 3 (the book's expiry setting allows up to 96 h, still under 6 days). So every `(structureId, date)` belongs to at most one pull and the lookup is deterministic, with no "newest pull wins" rule. The verifier writes a health flag whenever two pulls at one structure cover the same day, and treats that as bad data to surface, not a case to resolve. A pull is never ended early by "mined out": only the expiry window or a cancel notification ends it; the Fully Mined flag does not end it.
+**Assumption (owner decision): a refinery never pops a new rock on the day the previous one expires.** The minimum cycle is 6 days (owner statement, no code source). A pull's window runs from the fracture day through the expiry day inclusive; expiry defaults to 48 h and is capped at 96 h (`DEFAULT_EXPIRY_HOURS`, `MAX_EXPIRY_HOURS`, `src/engine/corpTaxBook/extraction.ts`), so a window covers at most 5 calendar dates, under the 6-day cycle. So every `(structureId, date)` belongs to at most one pull and the lookup is deterministic, with no "newest pull wins" rule. The phase 1 verifier writes a health flag whenever two pulls at one structure cover the same day, and treats that as bad data to surface, not a case to resolve. A pull is never ended early by "mined out": only the expiry window or a cancel notification ends it; the Fully Mined flag does not end it.
+
+Stamping must use the per-structure expiry so write-time and read-time agree: `moonOnDay` (`sync.ts`) takes no per-structure expiry and uses the 48 h default, while read-time placement (`placeOfFactory`, `bookView.ts`) uses the per-structure expiry. The stamping code passes the per-structure expiry, and so does the backfill.
 
 An Extraction correction rebuilds the affected moon doc and re-stamps its rows. Regroup, and rate or start-date changes, change miner ids (`solo:<characterId>` changes on regroup) or charges, and each needs a defined rebuild of the miner doc and list: regroup moves the frozen totals from the old miner ids to the new; a rate or start-date change touches only open days, so it rebuilds nothing stored. Phase 1 writes these as tests.
 
@@ -61,7 +63,7 @@ Residue is ore that came off the rock but was never delivered. Per moon and ore:
 Running totals must equal a full recompute. Three gates:
 
 1. **Property test.** Random sequences of events (new rows, late growth, rate changes, per-moon rates, dismissal and reversal, rebill, adjustment, write-off, payment, Statement issue, extraction correction, regroup) must leave every running total equal to the pure engine's full recompute (`src/engine/corpTaxBook`, mirrored in `functions/src/corpTaxBookEngine.ts`). `functionsMirror.test.ts` and `syncMirror.test.ts` stay green.
-2. **Scheduled verifier.** Off-peak, per miner, it recomputes from raw rows, writes any mismatch to the audit log and a visible health flag, and repairs the read model. It also writes the overlapping-pulls flag above.
+2. **Scheduled verifier.** Off-peak, per miner, it recomputes from raw rows, writes any mismatch to the audit log and a visible health flag, and repairs the read model. It also writes the overlapping-pulls flag above. It ships in phase 1; until then phase 0 only stamps.
 3. **Shadow mode.** Write the read models, keep screens on the old path, compare in production for about a week, then switch screens one at a time.
 
 ## Screens that still read raw or open-set rows
@@ -80,7 +82,7 @@ The member `/mining/tax` overlay needs per-day, per-character, per-system own ro
 
 - A book can bill monthly or every N days (`StatementCadence`). No read model assumes Statement equals month.
 - D22: late ore on a paid day is written off, never rebilled. Frozen unit prices per charge key stay frozen. The moon doc's tax total flips from live to frozen when a Statement issues.
-- Each new collection gets a version stamp, goes in `VERSIONED_COLLECTIONS` (`functions/src/corpTaxBookVersionKeys.ts`) and `CORP_COLLECTION_FAQ_ITEM` (`src/features/faq/whatWeStore.ts`), with rules and rules tests. New docs carry `updatedAt` and `observedThrough` (ADR 0031) so a client's cache key is the stamp.
+- Each new collection gets a version stamp, goes in `VERSIONED_COLLECTIONS` (`functions/src/corpTaxBookVersionKeys.ts`) and `CORP_COLLECTION_FAQ_ITEM` (`src/features/faq/whatWeStore.ts`), with rules and rules tests. New docs carry a server `updatedAt` (ADR 0031) so a client's cache key is the stamp. `observedThrough` is a different thing: a per-structure field on the book doc (`functions/src/corpTaxBookObservedThrough.ts`, #5059), not a per-doc cache stamp.
 
 ## Migration
 
@@ -109,7 +111,7 @@ Estimates, not measurements. Today an officer open is thousands of reads.
 
 ## Risks
 
-- A hot miner doc under contention. Mitigated by updating on events, not rows, with idempotent deltas; the transaction limit is 500 writes and merges run in chunks of 200 rows.
+- A hot miner doc under contention. Mitigated by updating on events, not rows, with idempotent deltas; Firestore's per-transaction write limit applies; the scheduled merge takes 2000 rows per call (`OBSERVED_PER_CALL`, `functions/src/corpTaxBookScheduledSync.ts`) and `mergeObservedInto` commits them in transactions of 200 rows (`CHUNK`, `corpTaxBookStore.ts`).
 - A backfill that misassigns old rows if an Extraction was corrected or is missing. The backfill reports rows it cannot assign.
 - Docs growing past 1 MiB (a very long pull history). Page old moon records into separate docs.
 
@@ -123,10 +125,10 @@ Estimates, not measurements. Today an officer open is thousands of reads.
 
 ## Phases
 
-Each becomes tickets after acceptance.
+Tickets #5254-#5261 cover these.
 
-0. `extractionId` on every row, with backfill, and the verifier's overlap flag.
-1. Miner doc in shadow mode, with the property test and the scheduled verifier.
+0. `extractionId` on every row, with backfill (#5254). Stamping only; no verifier yet.
+1. Miner doc (`minerTotals`) in shadow mode, with the property test, the scheduled verifier and its overlap flag (#5255).
 2. Miner page switches to miner doc, open set, Statements, payments, dismissals.
 3. Moon doc and the Fully Mined flag (control `ready-for-human`); moon page switches.
 4. Overview doc and miner list doc; overview and Miners tab switch.
@@ -135,5 +137,6 @@ Each becomes tickets after acceptance.
 
 ## Open questions
 
-- Can an officer clear the Fully Mined flag? Undoing changes the residue shown and the audit trail; undecided.
+- Can an officer clear the Fully Mined flag? Undoing changes the residue shown and the audit trail; undecided. The owner decides, and phase 3 ticket #5257 settles it.
+- Miner page paging rule: page by Statement, not by 10 moons.
 - Where do dismissed amounts show once a Statement is issued? The miner page lists them today.
