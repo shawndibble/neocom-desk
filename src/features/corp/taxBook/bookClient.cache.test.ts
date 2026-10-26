@@ -38,7 +38,7 @@ vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
 import { db } from '@/db';
 import { clearBookCache } from './bookCache';
-import { readBookData, readBookState } from './bookClient';
+import { readBookData, readBookState, readRebills } from './bookClient';
 
 const CORP = 98000001;
 const BOOK = `corps/${CORP}`;
@@ -72,6 +72,7 @@ beforeEach(async () => {
   clearBookCache();
   await db.corpBookObserved.clear();
   await db.corpBookObservedMeta.clear();
+  await db.corpBookParts.clear();
   store.docs.clear();
   store.reads.length = 0;
   store.denied.clear();
@@ -111,6 +112,85 @@ describe('readBookData over the version marker', () => {
 
     expect(store.reads).not.toContain(`${BOOK}/observed`);
     expect(again?.observed).toEqual(first?.observed);
+  });
+
+  it('after a reload, reads the head doc and meta/paid only', async () => {
+    const first = await readBookData(7, CORP);
+    clearBookCache();
+    store.reads.length = 0;
+
+    const again = await readBookData(7, CORP);
+
+    expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`]);
+    expect(again).toEqual(first);
+  });
+
+  it('after a reload, re-reads only the part whose stamp moved', async () => {
+    await readBookData(7, CORP);
+    clearBookCache();
+    store.docs.set(`${BOOK}/statements/s2`, { id: 's2' });
+    store.docs.set(BOOK, stamped({ statements: 'statements-2' }));
+    store.reads.length = 0;
+
+    const data = await readBookData(7, CORP);
+
+    expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/statements`].sort());
+    expect(data?.state.statements).toHaveLength(2);
+  });
+
+  it('after a reload, reads a part again once its copy is over a day old', async () => {
+    await readBookData(7, CORP);
+    clearBookCache();
+    await db.corpBookParts.toCollection().modify({ at: Date.now() - 25 * 60 * 60 * 1000 });
+    store.reads.length = 0;
+
+    await readBookData(7, CORP);
+
+    expect(store.reads).toContain(`${BOOK}/miners`);
+  });
+
+  it('wipes every held part when the rules refuse the Character', async () => {
+    await readBookData(7, CORP);
+    expect(await db.corpBookParts.count()).toBeGreaterThan(0);
+    clearBookCache();
+    store.denied.add(`${BOOK}/meta/paid`);
+
+    await expect(readBookData(7, CORP)).rejects.toMatchObject({ code: 'permission-denied' });
+    await vi.waitFor(async () => expect(await db.corpBookParts.count()).toBe(0));
+    expect(await db.corpBookObserved.count()).toBe(0);
+  });
+
+  it('wipes the parts of a book that is gone', async () => {
+    await readBookData(7, CORP);
+    store.docs.delete(BOOK);
+
+    expect(await readBookData(7, CORP)).toBeNull();
+    expect(await db.corpBookParts.count()).toBe(0);
+  });
+
+  it('keeps one book at a time: opening another corporation drops the first', async () => {
+    await readBookData(7, CORP);
+    store.docs.set(`corps/${CORP + 1}`, stamped());
+    store.docs.set(`corps/${CORP + 1}/meta/paid`, { ids: [] });
+
+    await readBookData(7, CORP + 1);
+
+    const held = await db.corpBookParts.toArray();
+    expect(held.length).toBeGreaterThan(0);
+    expect(new Set(held.map((r) => r.corporationId))).toEqual(new Set([CORP + 1]));
+  });
+
+  it('caches the rebills, so a second read costs the head doc and meta/paid', async () => {
+    store.docs.set(BOOK, stamped({ rebills: 'rebills-1' }));
+    store.docs.set(`${BOOK}/rebills/r1`, { minerId: 'm1', fromDate: '2026-10-01' });
+    expect(await readRebills(7, CORP)).toEqual([
+      { minerId: 'm1', fromDate: '2026-10-01', id: 'r1' },
+    ]);
+    store.reads.length = 0;
+
+    await readRebills(7, CORP);
+
+    expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`]);
   });
 
   it('re-reads only the collection an edit restamped', async () => {

@@ -11,8 +11,9 @@
  * exactly what it wrote. The stamp is read *before* the part, so a write that
  * lands in between is in the copy and still moves the stamp past it.
  *
- * In memory, per tab: nothing officer-only outlives the page except `observed`,
- * whose copy persists in Dexie (observedRead.ts, ADR 0031). Nothing is trusted without a stamp —
+ * In memory, per tab, and for an officer's book also in Dexie (`PartStore`,
+ * bookPartStore.ts; `observed` has its own copy, observedRead.ts, ADR 0031), so a
+ * reload with an unchanged stamp reads none of it. Nothing is trusted without a stamp —
  * the client can ship before the functions that write it — and no copy is
  * served past {@link BOOK_CACHE_MAX_AGE_MS}, which bounds the cost of a stamp
  * the server failed to write.
@@ -22,7 +23,8 @@ import {
   COLLECTION_VERSIONS_FIELD,
 } from '../../../../functions/src/corpTaxBookVersionKeys';
 
-export const BOOK_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
+/** The stamp already forces a reload on any change; the age only guards a stamp the server failed to write. */
+export const BOOK_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** The marker on `corps/{id}`. */
 export interface BookVersions {
@@ -45,10 +47,17 @@ export function bookVersionsOf(d: Record<string, unknown> | undefined): BookVers
   return { book, collections };
 }
 
-interface Copy {
+export interface Copy {
   version: string;
   at: number;
   data: unknown;
+}
+
+/** A copy that outlives the page; every method may fail, and a failure costs the copy, never the read. */
+export interface PartStore {
+  load(slot: string): Promise<Copy | undefined>;
+  save(slot: string, copy: Copy): Promise<void>;
+  forget(slot: string): Promise<void>;
 }
 
 /** Caller's key (officer `${characterId}:${corporationId}`, member `member:…`) → slot → copy. */
@@ -70,19 +79,33 @@ export async function cachedPart<T>(
   collection: string,
   versions: BookVersions | null,
   read: () => Promise<T>,
-  { now = Date.now(), slot = collection }: { now?: number; slot?: string } = {}
+  {
+    now = Date.now(),
+    slot = collection,
+    store,
+  }: { now?: number; slot?: string; store?: PartStore } = {}
 ): Promise<T> {
   const version = versions?.collections[collection];
-  const book = copies.get(key);
-  const held = book?.get(slot);
-  if (version !== undefined && held?.version === version && now - held.at <= BOOK_CACHE_MAX_AGE_MS)
-    return structuredClone(held.data as T);
+  const fresh = (c: Copy | undefined): c is Copy =>
+    version !== undefined && c?.version === version && now - c.at <= BOOK_CACHE_MAX_AGE_MS;
+  let held = copies.get(key)?.get(slot);
+  if (!fresh(held) && version !== undefined && store) {
+    held = await store.load(slot).catch(() => undefined);
+    if (fresh(held)) {
+      if (!copies.has(key)) copies.set(key, new Map());
+      copies.get(key)!.set(slot, held);
+    }
+  }
+  if (fresh(held)) return structuredClone(held.data as T);
   const data = await read();
   if (version === undefined) {
-    book?.delete(slot);
+    copies.get(key)?.delete(slot);
+    await store?.forget(slot).catch(() => {});
   } else {
+    const copy = { version, at: now, data: structuredClone(data) };
     if (!copies.has(key)) copies.set(key, new Map());
-    copies.get(key)!.set(slot, { version, at: now, data: structuredClone(data) });
+    copies.get(key)!.set(slot, copy);
+    await store?.save(slot, copy).catch(() => {});
   }
   return data;
 }
