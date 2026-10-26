@@ -1,7 +1,7 @@
 /**
  * The pieces the Corp Tax Book's entity pages are stacked from: a header
- * with the big number first, sections with a count in the title, a link to
- * another entity, and the place line. They compose `Panel`, `CollapsiblePanel`,
+ * with the big number first, sections with a count in the title,
+ * and the place line. They compose `Panel`, `CollapsiblePanel`,
  * `Button` and the link classes; nothing here is a new primitive.
  */
 import { useMemo, useState, type ReactNode } from 'react';
