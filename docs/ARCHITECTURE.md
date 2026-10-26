@@ -593,6 +593,15 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   shortcut, never the sync. Functions that only delete synced docs (`purgeFeed`,
   `purgeStaleAccounts`) do not bump: an incremental pull never reads absence. Deploy
   `firestore:rules` before the client ships: `firebase deploy --only firestore:rules`.
+- **Corp Tax Book section pages** (issue #5247). The Overview (first tab), the
+  Miner page and the moon page are one scroll of `BookSection`s
+  (`features/corp/moons/sectionParts.tsx`): a count in the title, the newest
+  ten rows, "Load older" (`usePaged`), a phone fold. No inner tabs. Everything
+  they group comes from the client-side `buildBookView` (ADR 0032's read models
+  are not built); the pure grouping (day phases Next Statement / Still
+  accruing / earlier, the Overview's 7-day pops window, ore lines per Miner and
+  moon, the place line, the merged Payments and Activity ledgers) is
+  `src/engine/corpTaxBook/bookSections.ts`.
 - **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
   `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
   reminder rule) and `statementMail.ts` (the short Statement mail). Client:

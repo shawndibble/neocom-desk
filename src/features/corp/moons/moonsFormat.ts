@@ -1,6 +1,8 @@
 import { formatIsk } from '@/lib/isk';
 import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { MONTHS } from '@/engine/corpTaxBook/monthNames';
+import { extractionWindowDays } from '@/engine/corpTaxBook/extractionWindow';
+import type { TFunction } from 'i18next';
 
 export const isk = (value: number) => formatIsk(Math.round(value));
 
@@ -16,6 +18,15 @@ export function shortDate(value: string): string {
 /** "18 Oct 14:00" from an instant (EVE time is UTC). */
 export function shortDateTime(value: string): string {
   return `${shortDate(value)} ${value.slice(11, 16)}`;
+}
+
+/** "18 Oct - 24 Oct (6 days)": an Extraction's start to its chunk arriving. */
+export function extractionWindowLabel(
+  t: TFunction,
+  row: { startedAt: string; chunkArrivalAt: string }
+): string {
+  const days = extractionWindowDays(row.startedAt, row.chunkArrivalAt);
+  return `${shortDate(row.startedAt)} - ${shortDate(row.chunkArrivalAt)} (${t('corpTaxBook.moons.windowDays', { count: days })})`;
 }
 
 /** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */

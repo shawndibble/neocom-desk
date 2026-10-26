@@ -93,18 +93,22 @@ function renderPanel(
 
 beforeEach(() => editBook.mockReset().mockResolvedValue({}));
 
+/** The characters are behind the "N characters" link (#5247). */
+const openCharacters = () => userEvent.click(screen.getByRole('button', { name: /characters?$/ }));
+
 describe('MinerCharacters', () => {
-  it('marks the main and a character waiting for its confirmation', () => {
+  it('marks the main and a character waiting for its confirmation', async () => {
     renderPanel(
       [{ id: 'g1', characterIds: [1, 3], mainCharacterId: 1, pendingConfirmation: [3] }],
       'g1',
       (row) => <MinerCharacters miner={row} />
     );
+    await openCharacters();
     expect(screen.getByText(/waiting for their confirmation/)).toBeInTheDocument();
     expect(screen.getByText(/· main/)).toBeInTheDocument();
   });
 
-  it('shows the officers a confirmation and a decline after the fact (#4210)', () => {
+  it('shows the officers a confirmation and a decline after the fact (#4210)', async () => {
     const answer = (
       characterId: number,
       a: 'confirmed' | 'declined',
@@ -116,6 +120,7 @@ describe('MinerCharacters', () => {
       (row) => <MinerCharacters miner={row} />,
       [answer(3, 'confirmed', 'character'), answer(4, 'declined', 'verify-link')]
     );
+    await openCharacters();
     expect(screen.getByText(/confirmed by the player/)).toBeInTheDocument();
     expect(screen.getByText('Pilot 4')).toBeInTheDocument();
     expect(screen.getByText(/declined, from the main's Statement link/)).toBeInTheDocument();
@@ -125,6 +130,7 @@ describe('MinerCharacters', () => {
     renderPanel([{ id: 'g1', characterIds: [1, 2], mainCharacterId: 1 }], 'g1', (row) => (
       <MinerCharacters miner={row} />
     ));
+    await openCharacters();
     await userEvent.click(screen.getByRole('button', { name: 'Make main' }));
     expect(editBook).toHaveBeenLastCalledWith(7, CORP, {
       action: 'setMiner',
@@ -144,6 +150,7 @@ describe('MinerCharacters', () => {
 
   it('groups another Miner into this one with the engine’s plan', async () => {
     renderPanel([], 'solo:1', (row) => <MinerCharacters miner={row} />);
+    await openCharacters();
     await userEvent.click(screen.getByRole('button', { name: 'Group with…' }));
     await userEvent.click(await screen.findByText('Pilot 2'));
     await userEvent.click(screen.getByRole('button', { name: 'Group 1 Miner' }));

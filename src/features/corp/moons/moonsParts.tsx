@@ -1,9 +1,8 @@
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { InfoTooltip, ProgressBar, textActionClassName } from '@/components/ui';
+import { InfoTooltip, ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { ExtractionRow, MinerStanding } from '@/engine/corpTaxBook/bookView';
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
@@ -47,8 +46,10 @@ export function StandingWord({ standing }: { standing: MinerStanding }) {
   );
 }
 
-export function OverdueWord({ days }: { days: number | null }) {
+export function OverdueWord({ days, paused }: { days: number | null; paused?: boolean }) {
   const { t } = useTranslation();
+  if (days === null && paused)
+    return <span className="text-warning">{t('corpTaxBook.moons.overduePaused')}</span>;
   if (days === null) return <span className="text-text-dim">—</span>;
   return (
     <span className="font-semibold whitespace-nowrap text-danger">
@@ -80,7 +81,7 @@ export function OreLine({
           />
         </span>
         {onLink && (
-          <button type="button" className={textActionClassName()} onClick={onLink}>
+          <button type="button" className={entityLinkClassName()} onClick={onLink}>
             {t('corpTaxBook.moons.moon.link.open')}
           </button>
         )}
@@ -117,14 +118,5 @@ export function Crumb({ to, label }: { to: string; label: string }) {
       <Icon.Back size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {label}
     </Link>
-  );
-}
-
-export function Fact({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt className={eyebrowClassName}>{label}</dt>
-      <dd className="text-sm">{value}</dd>
-    </div>
   );
 }
