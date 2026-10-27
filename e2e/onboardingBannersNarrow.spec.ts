@@ -1,17 +1,17 @@
 /**
  * One onboarding banner at a time on a phone (issue #1124).
  *
- * The three one-time banners are all `position: fixed` in the same bottom
+ * The one-time banners are all `position: fixed` in the same bottom
  * corner, each with its own offset, so a first login on a fresh device
- * stacked two or three of them up the viewport and buried the page content
+ * stacked two of them up the viewport and buried the page content
  * behind them at 390x844. They now share a single slot
  * (`src/app/onboardingBannerSlot.ts`): the highest-priority eligible one
  * renders, and the next one down only appears once that one is gone.
  *
- * The pair fabricated here is notifications + install, the two reachable
- * without a Director-tier character: `Notification.permission` is pinned to
- * 'default' (headless Chromium reports 'denied', which suppresses the
- * explainer by design), and a synthetic `beforeinstallprompt` satisfies the
+ * The notification explainer is no longer one of them: it opens with the
+ * bell's alerts panel. `Notification.permission` is pinned to 'default'
+ * (headless Chromium reports 'denied', which suppresses the explainer by
+ * design), and a synthetic `beforeinstallprompt` satisfies the
  * install banner's native variant the same way a real Chromium would. The
  * Install Prompt is mobile-only, so the page also has to claim to be
  * Android Chrome — headless Chromium's desktop UA would hide it. It also
@@ -65,40 +65,29 @@ async function makeInstallPromptEligible(page: import('@playwright/test').Page):
   );
 }
 
-test('shows one onboarding banner at a time at 390px, then the next one', async ({ page }) => {
+test('shows the install banner alone, and the notification explainer only from the bell', async ({
+  page,
+}) => {
   await pinNotificationPermissionToDefault(page);
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './overview', undefined, [
     { key: 'installPrompt.pageVisits', value: 5 },
   ]);
-  // issue #1788: the explainer now waits for a second route. Wait for the
-  // overview heading before navigating away — `page.goto`'s `load` event
-  // fires before the dev server's lazy-loaded Layout/Prompt tree commits, so
-  // navigating too early records `/characters` as the "first screen" instead.
   await expect(page.getByRole('heading', { name: CHARACTER_NAME })).toBeVisible();
-  await page.goto('./characters');
 
   // Counted as the AC words it: every `role="alert"` on the page, so a future
   // fixed banner that regresses the rule without opting into the shared
-  // testid still fails this. The testid only says which banner is showing.
+  // testid still fails this.
   const alerts = page.getByRole('alert');
-  const banners = page.getByTestId('onboarding-banner');
-  const notificationBanner = banners.filter({ hasText: 'Turn on notifications?' });
-
-  // Both are eligible from here on: the notification explainer has never been
-  // offered on this fresh profile, and the install banner now holds a
-  // deferred prompt.
-  await expect(notificationBanner).toBeVisible();
   await makeInstallPromptEligible(page);
-
-  // Priority order — notifications outrank install, and install must not
-  // appear alongside it.
   await expect(alerts).toHaveCount(1);
-  await expect(notificationBanner).toBeVisible();
+  await expect(page.getByTestId('onboarding-banner')).toContainText('Install Neocom Desk');
+  // The permission explainer is not a banner: nothing asks until the bell opens.
+  await expect(page.getByText('Turn on notifications?')).toHaveCount(0);
 
-  // Dismissing the winner hands the slot to the next-highest eligible banner.
-  await notificationBanner.getByRole('button', { name: 'Not now' }).click();
-  await expect(notificationBanner).toBeHidden();
-  await expect(alerts).toHaveCount(1);
-  await expect(banners.first()).toContainText('Install Neocom Desk');
+  await page.getByRole('button', { name: 'Alerts, none waiting' }).click();
+  const explainer = page.getByRole('dialog').getByText('Turn on notifications?');
+  await expect(explainer).toBeVisible();
+  await page.getByRole('button', { name: 'Not now' }).click();
+  await expect(explainer).toBeHidden();
 });

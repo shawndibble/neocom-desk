@@ -1,11 +1,17 @@
 /**
  * The onboarding banner must not cover the keyboard-focused control (WCAG
  * 2.4.11 Focus Not Obscured). Asserted on rendered bounding boxes while
- * tabbing through /settings/notifications with the banner showing.
+ * tabbing through /settings/notifications with the install banner showing.
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_NAME } from './support/fixtureData';
+
+// The Install Prompt is mobile-only by user agent, so the page claims to be Android Chrome.
+test.use({
+  userAgent:
+    'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
+});
 
 for (const viewport of [
   { width: 1280, height: 720 },
@@ -14,16 +20,20 @@ for (const viewport of [
   test(`banner never fully covers the focused control at ${viewport.width}x${viewport.height}`, async ({
     page,
   }) => {
-    await page.addInitScript(() =>
-      Object.defineProperty(Notification, 'permission', {
-        get: () => 'default',
-        configurable: true,
-      })
-    );
     await page.setViewportSize(viewport);
-    await signInAndGoto(page, './overview');
+    await signInAndGoto(page, './overview', undefined, [
+      { key: 'installPrompt.pageVisits', value: 5 },
+    ]);
     await expect(page.getByRole('heading', { name: CHARACTER_NAME })).toBeVisible();
     await page.goto('./settings/notifications');
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        Object.assign(new Event('beforeinstallprompt'), {
+          prompt: () => Promise.resolve(),
+          userChoice: Promise.resolve({ outcome: 'dismissed' as const }),
+        })
+      );
+    });
     const banner = page.getByTestId('onboarding-banner');
     await expect(banner).toBeVisible();
     await expect
