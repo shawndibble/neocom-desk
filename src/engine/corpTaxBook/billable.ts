@@ -1,13 +1,13 @@
 /**
  * Day closing (epic #4055, "Day closing"): a UTC day becomes Billable only
- * once the day has ended, the grace (6h by default, adjustable) has passed —
+ * once the day has ended, the grace (30 minutes by default, adjustable) has passed —
  * the refinery ledger lags real time on top of its 1h cache — and an officer
  * has synced after that, so the book holds the day's final quantities.
  */
 import { shiftDate } from '../miningTax/yieldRange';
 import { HOUR_MS } from '@/lib/age';
 
-export const DEFAULT_GRACE_HOURS = 6;
+export const DEFAULT_GRACE_HOURS = 0.5;
 
 export interface DayClosingClock {
   now: string;

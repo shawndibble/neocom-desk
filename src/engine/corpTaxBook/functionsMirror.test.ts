@@ -498,6 +498,17 @@ describe('feeder view mirror', () => {
       }
     }
     expect(mirror.dayClosesAt('2026-06-01')).toBe(dayClosesAt('2026-06-01'));
+    expect(mirror.dayClosesAt('2026-06-01')).toBe('2026-06-02T00:30:00.000Z');
+    for (const g of [0.5, 1.5])
+      expect(mirror.dayClosesAt('2026-06-01', g)).toBe(dayClosesAt('2026-06-01', g));
+  });
+
+  it('closes a day for a read stamped at the 00:30 tick, not before', () => {
+    const closes = Date.parse('2026-06-02T00:30:00Z');
+    const rule = (at: number) => mirror.feederBillableRule(at, mirror.BOOK_DEFAULTS.graceHours);
+    expect(rule(closes + 40_000)('2026-06-01')).toBe(true);
+    expect(rule(closes)('2026-06-01')).toBe(true);
+    expect(rule(closes - 1)('2026-06-01')).toBe(false);
   });
 
   it('applies the moon owner Billable rule the same', () => {

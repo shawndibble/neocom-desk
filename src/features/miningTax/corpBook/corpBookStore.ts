@@ -18,6 +18,7 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
+import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -121,7 +122,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
   return {
     corporationId,
     startDate,
-    graceHours: num(d.graceHours) ?? 6,
+    graceHours: num(d.graceHours) ?? DEFAULT_GRACE_HOURS,
     hubId: str(d.hubId) ?? 'jita',
     oreForm: d.oreForm === 'raw' ? ('raw' as const) : ('compressed' as const),
     divisions: (Array.isArray(d.divisions) ? d.divisions : [1]).filter(

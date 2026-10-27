@@ -16100,7 +16100,7 @@
         "writtenOffValue_one": "{{tolerance}} · {{count}} line",
         "writtenOffValue_other": "{{tolerance}} · {{count}} lines",
         "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged.",
-        "accruingHint": "Not Billable until the day ends and an officer syncs.",
+        "accruingHint": "Not Billable until the day ends and a sync happens.",
         "earlierHint": "On a Statement, paid, dismissed or written off",
         "daysSummary_one": "{{count}} day · {{tax}}",
         "daysSummary_other": "{{count}} days · {{tax}}",

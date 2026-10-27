@@ -121,8 +121,8 @@ export function BookHealthStrip() {
           title: `Last synced ${BOOK.lastSynced} by ${BOOK.lastSyncedBy}`,
           detail: (
             <p>
-              Billable through {BOOK.billableThrough} (day end + 6h grace, then a sync). The book
-              warns here once nobody has synced for about 3 days.
+              Billable through {BOOK.billableThrough} (day end + 30 min grace, then a sync). The
+              book warns here once nobody has synced for about 3 days.
             </p>
           ),
           action: <Button size="sm">Sync now</Button>,

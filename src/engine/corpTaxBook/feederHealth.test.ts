@@ -87,7 +87,7 @@ describe('disconnectedCoverage', () => {
 
   it('a read before the grace ended does not fully sync that day', () => {
     expect(
-      disconnectedCoverage([{ from: '2026-08-01' }], { lastReadWellAt: '2026-09-10T05:00:00.000Z' })
+      disconnectedCoverage([{ from: '2026-08-01' }], { lastReadWellAt: '2026-09-10T00:10:00.000Z' })
     ).toEqual([{ from: '2026-08-01', to: '2026-09-08' }]);
   });
 

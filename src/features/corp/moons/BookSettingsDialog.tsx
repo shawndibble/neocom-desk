@@ -255,7 +255,7 @@ export function BookSettingsDialog({
       const patch: Record<string, unknown> = {
         hubId,
         oreForm,
-        graceHours: Number(grace),
+        graceHours: Number(grace.replace(',', '.')),
         minimumStatement: Number(minimum),
         overdueDays: Number(overdue),
         divisions: [...divisions].sort(),
@@ -612,7 +612,7 @@ export function BookSettingsDialog({
                   <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
                     <TextInput
                       className="w-20"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       id={`${fieldId}-grace`}
                       value={grace}
                       onChange={(e) => setGrace(e.target.value)}
