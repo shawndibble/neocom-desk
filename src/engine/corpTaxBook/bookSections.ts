@@ -15,7 +15,7 @@ export const POPS_WINDOW_DAYS = 7;
 
 /**
  * A Miner's days by where they stand: Next Statement (Billable, not on a Statement yet),
- * Still accruing (not Billable yet), and every earlier one (on a Statement, paid, dismissed,
+ * Today's mining (not Billable yet), and every earlier one (on a Statement, paid, dismissed,
  * written off). Order within each is the input's.
  */
 export function daysByPhase(days: readonly DayRow[]) {
@@ -177,7 +177,7 @@ export function minersOnMoon(view: BookView, extractionId: string): MinerOnMoon[
 
 /**
  * Whether an Extraction's tax is already billed: it has days, and none of them is still waiting
- * for a Statement or accruing. `statementIds` are the Statements those days sit on.
+ * for a Statement or Today's mining. `statementIds` are the Statements those days sit on.
  */
 export function extractionBilling(
   view: BookView,

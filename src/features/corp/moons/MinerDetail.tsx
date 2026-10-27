@@ -47,6 +47,7 @@ import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
 import { CorrectionsMenu } from './MinerCorrections';
 import { OreLinesTable } from './OreLinesTable';
+import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { moonLabel, tapTargetClassName } from './sectionHelpers';
 import { StatementPanel } from './StatementPanel';
@@ -68,7 +69,7 @@ type PaymentRow = LedgerRow<Payment, Adjustment>;
 
 /**
  * A Miner's page: the owed figure and its facts first, then one
- * scroll of Next Statement, Still accruing, Earlier days, Payments (corrections are a kind of
+ * scroll of Today's mining, Next Statement, Earlier days, Payments (corrections are a kind of
  * row in it), Moons and Activity (mail, dismissals and the audit log behind filter chips).
  * No inner tabs; each section carries its count and pages its newest ten rows.
  */
@@ -330,7 +331,7 @@ export function MinerDetail({ id }: { id: string }) {
   const daysSection = (
     title: string,
     key: 'nextStatement' | 'stillAccruing' | 'earlier',
-    hint: string,
+    hint: ReactNode,
     opts: { select: boolean; status: boolean; startOpen: boolean }
   ) => {
     const columns = dayColumns(opts.select, opts.status, phone);
@@ -342,7 +343,9 @@ export function MinerDetail({ id }: { id: string }) {
         empty={t(`corpTaxBook.moons.miner.empty.${key === 'earlier' ? 'earlier' : key}`)}
         rows={phases[key]}
         sortColumns={columns}
-        meta={<span className="text-xs text-text-dim">{hint}</span>}
+        meta={
+          typeof hint === 'string' ? <span className="text-xs text-text-dim">{hint}</span> : hint
+        }
         actions={opts.select ? dismissSelected : undefined}
         phone={phone}
         startOpen={opts.startOpen}
@@ -696,16 +699,22 @@ export function MinerDetail({ id }: { id: string }) {
         ]}
       />
       {daysSection(
+        t('corpTaxBook.moons.sections.stillAccruing'),
+        'stillAccruing',
+        <InfoTooltip
+          label={t('corpTaxBook.moons.sections.stillAccruing')}
+          content={t('corpTaxBook.moons.miner.dayEndTip', {
+            time: dayEndTime(view.input.graceHours),
+          })}
+          glyph="info"
+        />,
+        { select: true, status: false, startOpen: false }
+      )}
+      {daysSection(
         t('corpTaxBook.moons.sections.nextStatement'),
         'nextStatement',
         t('corpTaxBook.moons.miner.daysHint'),
         { select: true, status: false, startOpen: true }
-      )}
-      {daysSection(
-        t('corpTaxBook.moons.sections.stillAccruing'),
-        'stillAccruing',
-        t('corpTaxBook.moons.miner.accruingHint'),
-        { select: true, status: false, startOpen: false }
       )}
       {daysSection(
         t('corpTaxBook.moons.sections.earlierDays'),

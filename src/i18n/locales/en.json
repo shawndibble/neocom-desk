@@ -15856,7 +15856,7 @@
         "paid": "Paid",
         "on-statement": "On Statement",
         "unbilled": "Next Statement",
-        "not-billable": "Still accruing",
+        "not-billable": "Today's mining",
         "dismissed": "Dismissed",
         "written-off": "Written off"
       },
@@ -15937,7 +15937,7 @@
         "overdueValue_other": "{{amount}} · {{count}} Miners",
         "unbilled": "Next Statement",
         "credit": "Credit held",
-        "pending": "Still accruing"
+        "pending": "Today's mining"
       },
       "timeline": {
         "title": "Timeline",
@@ -16023,7 +16023,7 @@
         "nonMembersHidden_other": "{{count}} non-members hidden · {{amount}} owed",
         "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
         "hidden_other": "{{count}} other Miners owe nothing and have no credit.",
-        "accruing": "{{amount}} still accruing",
+        "accruing": "{{amount}} in today's mining",
         "statementAdjust": "Corrections and late ore: {{amount}}",
         "lastPayments": "Last payments",
         "moreDays_one": "and {{count}} more day",
@@ -16095,12 +16095,12 @@
         "reverse": "Reverse",
         "activity": "Activity",
         "activityHint": "Mail, dismissals and the audit log for this Miner, newest first",
-        "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is still accruing.",
+        "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is in today's mining.",
         "writtenOff": "Written off",
         "writtenOffValue_one": "{{tolerance}} · {{count}} line",
         "writtenOffValue_other": "{{tolerance}} · {{count}} lines",
         "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged.",
-        "accruingHint": "Not Billable until the day ends and an officer syncs.",
+        "dayEndTip": "Today ends at {{time}} EVE time.",
         "earlierHint": "On a Statement, paid, dismissed or written off",
         "daysSummary_one": "{{count}} day · {{tax}}",
         "daysSummary_other": "{{count}} days · {{tax}}",
@@ -16117,7 +16117,7 @@
         },
         "empty": {
           "nextStatement": "Nothing is waiting for the next Statement.",
-          "stillAccruing": "Nothing is still accruing.",
+          "stillAccruing": "Nothing in today's mining.",
           "earlier": "No earlier days.",
           "payments": "No payments yet.",
           "moons": "No moons mined yet.",
@@ -16757,7 +16757,7 @@
         },
         "dismissMiner": {
           "title": "Dismiss {{name}}'s tax?",
-          "intro": "Everything this Miner owes, and everything waiting for the next Statement, is waived. Days still accruing are not included. It stays on the record as dismissed and can be reversed."
+          "intro": "Everything this Miner owes, and everything waiting for the next Statement, is waived. Today's mining is not included. It stays on the record as dismissed and can be reversed."
         },
         "record": {
           "title": "Record a payment for {{name}}",
@@ -16997,7 +16997,7 @@
       },
       "sections": {
         "nextStatement": "Next Statement",
-        "stillAccruing": "Still accruing",
+        "stillAccruing": "Today's mining",
         "earlierDays": "Earlier days",
         "show": "Show {{title}}",
         "hide": "Hide {{title}}",

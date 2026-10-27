@@ -34,7 +34,7 @@ export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPa
     case 'miner':
     case 'miners':
       return new Set<BookPart>(['core', 'ledger', 'answers']);
-    // An Extraction's page says whether its days are billed, dismissed or still accruing.
+    // An Extraction's page says whether its days are billed, dismissed or in today's mining.
     case 'extraction':
     case 'statements':
     case 'statementPeriod':
