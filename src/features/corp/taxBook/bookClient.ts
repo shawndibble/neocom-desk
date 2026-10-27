@@ -18,6 +18,7 @@ import {
   limit as limitTo,
   orderBy,
   query,
+  where,
 } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
@@ -49,6 +50,11 @@ import { bookVersionsOf, cachedPart } from './bookCache';
 import { bookPartStore } from './bookPartStore';
 import { ALL_BOOK_PART_SET, mergeBookParts, type BookPart, type BookPartSet } from './bookParts';
 import { readObservedRows } from './observedRead';
+import {
+  minerScopedRows,
+  openWindowStart,
+  type HeaderTotals,
+} from '@/engine/corpTaxBook/minerScope';
 import { forgetObservedCopy } from './observedStore';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
@@ -504,6 +510,31 @@ const feederPayouts = (characterId: number, book: number, feeder: number) =>
     'payouts'
   );
 
+type OpenBook = NonNullable<Awaited<ReturnType<typeof openBook>>>;
+
+/** Every feeder with its payouts. One stamp covers a feeder's record and its payouts: both live under `feeders`. */
+function feedersOf(
+  book: Pick<OpenBook, 'part' | 'read'>,
+  characterId: number,
+  corporationId: number
+): Promise<BookFeeder[]> {
+  return book.part(
+    'feeders',
+    async () =>
+      Promise.all(
+        (await book.read<FeederDoc>('feeders')).map(async (f) =>
+          bookFeederFrom(
+            f,
+            (await getDocs(feederPayouts(characterId, corporationId, f.corporationId))).docs.map(
+              (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+            )
+          )
+        )
+      ),
+    'feeders:rows'
+  );
+}
+
 /**
  * `parts` limits the read to those slices (bookParts.ts); the others come back
  * empty, and `parts` on the result says which were read. Default: the whole book.
@@ -516,7 +547,7 @@ export async function readBookData(
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
   const settings = settingsFrom(book.data);
-  const { list, part, read } = book;
+  const { list, part } = book;
   const meta = (id: string) =>
     getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id));
   const slice = <T>(name: BookPart, readSlice: () => Promise<T>, empty: T) =>
@@ -537,22 +568,7 @@ export async function readBookData(
           list<SyncExtraction>('extractions'),
           book.observed(),
           part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
-          // One stamp covers a feeder's record and its payouts: both live under `feeders`.
-          part(
-            'feeders',
-            async () =>
-              Promise.all(
-                (await read<FeederDoc>('feeders')).map(async (f) =>
-                  bookFeederFrom(
-                    f,
-                    (
-                      await getDocs(feederPayouts(characterId, corporationId, f.corporationId))
-                    ).docs.map((d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow)
-                  )
-                )
-              ),
-            'feeders:rows'
-          ),
+          feedersOf(book, characterId, corporationId),
         ] as const),
       [none, none, none, none, undefined, none] as const
     ),
@@ -594,6 +610,166 @@ export async function readBookData(
     groupingAnswers: groupingAnswersFrom(answers),
     scheduledSync: scheduledSyncFrom(scheduled),
     parts,
+  };
+}
+
+// --- One Miner's page from the read models (issue #5258, ADR 0032) ---------------
+
+/** What the Miner page reads, scoped to one Miner. */
+export interface MinerBookRead {
+  /** A whole-book shape, scoped: this Miner's records and ledger window only. */
+  data: BookData;
+  /** First day whose ledger rows were read; frozen days before it come from Statement lines. */
+  from: string;
+  /** The Miner's stored totals; absent when the read model is not deployed or built yet. */
+  totals?: HeaderTotals;
+}
+
+const IN_LIMIT = 30;
+const isMissingIndex = (error: unknown) =>
+  String((error as { code?: unknown } | null)?.code ?? '').endsWith('failed-precondition');
+
+/**
+ * One Miner's page: the Miner's totals doc, their Statements, payments, write-offs,
+ * adjustments and declarations by Miner, the book's dismissals and Extractions, and the
+ * ledger rows since the newest Statement began. Never the whole ledger. Officer-only.
+ * A missing composite index (observed: characterId + date) falls back to the Miner's
+ * characters' whole ledger, filtered here, so an undeployed index costs reads, not the page.
+ */
+export async function readMinerBookData(
+  characterId: number,
+  corporationId: number,
+  minerId: string
+): Promise<MinerBookRead | null> {
+  const book = await openBook(characterId, corporationId);
+  if (!book) return null;
+  const settings = settingsFrom(book.data);
+  const { db, list, part } = book;
+  const under = (name: string) => collection(db, 'corps', String(corporationId), name);
+  const byMiner = async <T>(name: string): Promise<T[]> =>
+    (await getDocs(query(under(name), where('minerId', '==', minerId)))).docs.map(
+      (d) => d.data() as T
+    );
+  const meta = (id: string) => getDoc(doc(db, 'corps', String(corporationId), 'meta', id));
+  const one = async (name: string) => {
+    try {
+      const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
+      return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
+    } catch (error) {
+      // A doc the rules or deploy do not offer yet is no reason to lose the page; a refusal is.
+      if (String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied'))
+        throw error;
+      return undefined;
+    }
+  };
+  const [grouping, totalsDoc, statements, payments, writeOffs, adjustments] = await Promise.all([
+    one('miners'),
+    one('minerTotals'),
+    byMiner<Statement>('statements'),
+    byMiner<SettlePayment>('payments'),
+    byMiner<RecordedWriteOff>('writeOffs'),
+    byMiner<Adjustment>('adjustments'),
+  ]);
+  const solo = /^solo:(\d+)$/.exec(minerId);
+  const characterIds = Array.isArray(grouping?.characterIds)
+    ? (grouping.characterIds as number[])
+    : solo
+      ? [Number(solo[1])]
+      : [];
+  const from = openWindowStart(statements, settings.startDate);
+
+  const windowRows = async (): Promise<ObservedRow[]> => {
+    const rows: ObservedRow[] = [];
+    for (let i = 0; i < characterIds.length; i += IN_LIMIT) {
+      const ids = characterIds.slice(i, i + IN_LIMIT);
+      try {
+        const snap = await getDocs(
+          query(under('observed'), where('characterId', 'in', ids), where('date', '>=', from))
+        );
+        rows.push(...snap.docs.map((d) => d.data() as ObservedRow));
+      } catch (error) {
+        if (!isMissingIndex(error)) throw error;
+        const snap = await getDocs(query(under('observed'), where('characterId', 'in', ids)));
+        rows.push(...snap.docs.map((d) => d.data() as ObservedRow).filter((r) => r.date >= from));
+      }
+    }
+    return rows;
+  };
+  /** The corporation a character's newest ledger row was recorded under: member, leaver or guest. */
+  const latestCorp = async (id: number, known: readonly ObservedRow[]) => {
+    const mine = known.filter((r) => r.characterId === id);
+    if (mine.length > 0)
+      return mine.reduce((a, b) => (b.date >= a.date ? b : a)).recordedCorporationId;
+    try {
+      const snap = await getDocs(
+        query(
+          under('observed'),
+          where('characterId', '==', id),
+          orderBy('date', 'desc'),
+          limitTo(1)
+        )
+      );
+      const newest = snap.docs[0]?.data() as ObservedRow | undefined;
+      return newest?.recordedCorporationId ?? corporationId;
+    } catch {
+      return corporationId;
+    }
+  };
+  const declarationsOf = async (): Promise<BookDeclaration[]> => {
+    const ids = statements.map((s) => s.id);
+    const out: BookDeclaration[] = [];
+    for (let i = 0; i < ids.length; i += IN_LIMIT)
+      out.push(
+        ...(
+          await getDocs(
+            query(under('declarations'), where('statementId', 'in', ids.slice(i, i + IN_LIMIT)))
+          )
+        ).docs.map((d) => d.data() as BookDeclaration)
+      );
+    return out;
+  };
+
+  const [windowed, dismissals, extractions, feeders, declarations, answers, scheduled, paid] =
+    await Promise.all([
+      windowRows(),
+      list<Dismissal>('dismissals'),
+      list<SyncExtraction>('extractions'),
+      feedersOf(book, characterId, corporationId),
+      statements.length > 0 ? declarationsOf() : Promise.resolve([] as BookDeclaration[]),
+      part('meta', async () => (await meta('groupingAnswers')).data(), 'meta:answers'),
+      part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
+      book.paidStatementIds(),
+    ]);
+  const corps = new Map(
+    await Promise.all(characterIds.map(async (id) => [id, await latestCorp(id, windowed)] as const))
+  );
+  const observed = minerScopedRows(statements, windowed, {
+    corpFor: (id) => corps.get(id) ?? corporationId,
+  });
+  const miner = grouping ? [grouping as unknown as Miner] : [];
+  return {
+    from,
+    ...(totalsDoc ? { totals: totalsDoc as unknown as HeaderTotals } : {}),
+    data: {
+      settings,
+      state: {
+        book: settings,
+        miners: miner,
+        statements,
+        payments,
+        dismissals,
+        extractions,
+        paidStatementIds: paid,
+        writeOffs,
+      },
+      observed,
+      declarations,
+      adjustments,
+      feeders,
+      groupingAnswers: groupingAnswersFrom(answers),
+      scheduledSync: scheduledSyncFrom(scheduled),
+      parts: ALL_BOOK_PART_SET,
+    },
   };
 }
 
