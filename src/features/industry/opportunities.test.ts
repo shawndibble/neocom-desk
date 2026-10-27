@@ -458,6 +458,8 @@ describe('rows count owned materials as the plan page’s hero does', () => {
       brokerRelationsLevel: 0,
     });
     expect(row.result.profit).toBe(hero.profit);
+    // What was charged, so a loss tooltip can add up.
+    expect(row.forgoneSale).toBe(sale.net);
     expect(row.result.iskPerHour).toBe(hero.iskPerHour);
     expect(row.result.marginPct).toBe(hero.marginPct);
     // The claim itself is untouched: the plan still lists the stock as held.
@@ -487,6 +489,7 @@ describe('rows count owned materials as the plan page’s hero does', () => {
       { snapshot }
     );
     expect(row.result.profit).toBe(result!.profit);
+    expect(row.forgoneSale).toBe(0);
   });
 });
 
@@ -849,6 +852,7 @@ describe('rankOpportunityRows', () => {
       materialSourcing: {},
       buildHere: [],
       defaultsFrom: null,
+      forgoneSale: 0,
     };
   }
 

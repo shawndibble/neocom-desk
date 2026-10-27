@@ -339,11 +339,17 @@ export function MobileOpportunityList({
                   {row.result.profit !== null && row.result.profit < 0 && (
                     <InfoTooltip
                       label={t('industry.opportunitiesLossBreakdownFor', { name: productName })}
-                      content={t('industry.opportunitiesLossBreakdown', {
-                        cost: formatIsk(row.result.totalCost),
-                        revenue:
-                          row.result.revenue !== null ? formatIsk(row.result.revenue) : unknown,
-                      })}
+                      content={t(
+                        row.forgoneSale > 0
+                          ? 'industry.opportunitiesLossBreakdownWithStock'
+                          : 'industry.opportunitiesLossBreakdown',
+                        {
+                          forgone: formatIsk(row.forgoneSale),
+                          cost: formatIsk(row.result.totalCost),
+                          revenue:
+                            row.result.revenue !== null ? formatIsk(row.result.revenue) : unknown,
+                        }
+                      )}
                     />
                   )}
                 </div>

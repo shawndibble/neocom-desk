@@ -10,3 +10,6 @@ _Recorded 2026-10-27._
 - **Snapshots are per hub and build system.** A snapshot carries one system's cost index, so two Characters at one hub who build in different systems are priced from separate requests (`groupCandidatesByHub`).
 - **A rebuilt latest-plan lookup does not reprice.** Rows reprice when what they read off the plan changes (`planSettings`: hub, basis, facility, rigs, tax, security, build system), not on every plan write; the Market-Wide scan key carries the same projection.
 - **A plan opened from a row belongs to the active Character** but starts from the row owner's latest plan, as the row was priced.
+- **A loss row names the stock it charged.** The row carries `forgoneSale`; its loss tooltip reads "Build cost X, plus Y for your own materials counted at what they would sell for, vs. sell price Z" when Y is charged, so the three figures add up to the profit shown.
+- **Market-Wide rows stay stock-agnostic**: they claim no owned materials, and the plan a Market-Wide click opens starts unclaimed, so the two agree; the sell-value basis applies where a row uses held stock (Ranked builds, All owned).
+- **Known gap: Compare.** Build Plan Compare reads each plan's own profit (the free basis) and has no sale of owned stock to net off, so a plan added from a row can read higher there than the row. Left as is.

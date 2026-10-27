@@ -257,6 +257,8 @@ export interface UnrankedOpportunityRow {
   buildHere: number[];
   /** The owner's latest plan this row took its price basis and build location from; reused by `planForOpportunityCandidate` so the plan opened from the row starts at the same settings. */
   defaultsFrom: BuildPlanRecord | null;
+  /** ISK the owned stock this job uses would net if sold, charged against `result.profit` (the plan hero's sell-value basis); 0 when none is charged. */
+  forgoneSale: number;
 }
 
 /**
@@ -301,7 +303,7 @@ function onPlanHeroBasis(
     productQuantity: number;
     productUnitPrice: number | null;
   }
-): BuildResult {
+): { result: BuildResult; forgone: number } {
   const { snapshot, modifiers, standing } = input;
   const sale = planOwnedStockSale(
     result.materials,
@@ -310,7 +312,7 @@ function onPlanHeroBasis(
     modifiers.skills,
     standing
   );
-  if (sale.ownedUnits === 0 || sale.unpriced.length > 0) return result;
+  if (sale.ownedUnits === 0 || sale.unpriced.length > 0) return { result, forgone: 0 };
   const figures = profitOnBasis('sellValue', {
     result,
     ownedSellNet: sale.net,
@@ -322,11 +324,14 @@ function onPlanHeroBasis(
     corpStanding: standing?.corpStanding,
   });
   return {
-    ...result,
-    profit: figures.profit,
-    marginPct: figures.marginPct,
-    iskPerHour: figures.iskPerHour,
-    breakEvenPrice: figures.breakEvenPrice,
+    result: {
+      ...result,
+      profit: figures.profit,
+      marginPct: figures.marginPct,
+      iskPerHour: figures.iskPerHour,
+      breakEvenPrice: figures.breakEvenPrice,
+    },
+    forgone: sale.net,
   };
 }
 
@@ -415,7 +420,7 @@ export function computeOpportunityRow(
 
   const productTypeID = candidate.catalogEntry.productTypeID;
   const sellPrice = productTypeID !== null ? snapshot.hubPrices[productTypeID] : undefined;
-  const planResult = onPlanHeroBasis(result, {
+  const { result: planResult, forgone } = onPlanHeroBasis(result, {
     snapshot,
     modifiers,
     standing,
@@ -434,6 +439,7 @@ export function computeOpportunityRow(
     materialSourcing,
     buildHere,
     defaultsFrom,
+    forgoneSale: forgone,
   };
 }
 

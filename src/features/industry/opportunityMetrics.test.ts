@@ -49,6 +49,7 @@ function row(runs: number, profit: number | null, productQuantity = 1): Opportun
     materialSourcing: {},
     buildHere: [],
     defaultsFrom: null,
+    forgoneSale: 0,
     orderDepth: 'unknown',
   };
 }

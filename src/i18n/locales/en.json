@@ -3778,6 +3778,7 @@
     "opportunitiesSelectFor": "Select {{name}} to compare plans",
     "opportunitiesLossBreakdownFor": "Why {{name}} is a loss",
     "opportunitiesLossBreakdown": "Build cost {{cost}} vs. sell price {{revenue}}",
+    "opportunitiesLossBreakdownWithStock": "Build cost {{cost}}, plus {{forgone}} for your own materials counted at what they would sell for, vs. sell price {{revenue}}",
     "opportunitiesViewHistory": "View {{name}} price history",
     "opportunitiesPriceHistoryTitle": "{{name}} — Price History",
     "marketOpportunitiesTitle": "What's profitable",

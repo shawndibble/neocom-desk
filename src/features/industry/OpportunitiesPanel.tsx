@@ -562,10 +562,16 @@ export function OpportunitiesPanel({
               label={t('industry.opportunitiesLossBreakdownFor', {
                 name: row.candidate.catalogEntry.productName,
               })}
-              content={t('industry.opportunitiesLossBreakdown', {
-                cost: formatIsk(row.result.totalCost),
-                revenue: row.result.revenue !== null ? formatIsk(row.result.revenue) : unknown,
-              })}
+              content={t(
+                row.forgoneSale > 0
+                  ? 'industry.opportunitiesLossBreakdownWithStock'
+                  : 'industry.opportunitiesLossBreakdown',
+                {
+                  forgone: formatIsk(row.forgoneSale),
+                  cost: formatIsk(row.result.totalCost),
+                  revenue: row.result.revenue !== null ? formatIsk(row.result.revenue) : unknown,
+                }
+              )}
             />
           )}
         </span>
