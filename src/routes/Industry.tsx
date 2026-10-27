@@ -772,10 +772,13 @@ export function Industry() {
   // with the settings the plan page uses, and a click opens a plan with those same settings.
   const latestPlan = mostRecentlyUpdatedPlan(plans);
   const marketWideHub = (latestPlan && getTradeHub(latestPlan.hubId)) ?? DEFAULT_TRADE_HUB;
-  const marketWidePanel = catalog && (
+  // Not mounted until the plans have loaded: the hub it prices at is the latest plan's,
+  // and a scan restored at Jita would flip when that lands.
+  const marketWidePanel = catalog && plans !== undefined && (
     <MarketWideOpportunitiesPanel
       key="market-wide"
       hub={marketWideHub}
+      latestPlan={latestPlan}
       trees={marketWideTrees}
       treesFailed={marketWideTreesFailed}
       onRetryTrees={retryMarketWideTrees}

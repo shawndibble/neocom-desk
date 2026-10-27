@@ -23,6 +23,7 @@
  * codebase's `react-hooks/set-state-in-effect` rule.
  */
 import type { BuildPlanRecord } from '@/db';
+import { startingLocation } from './newBuildPlan';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   NO_CHARACTER_MODIFIERS,
@@ -48,7 +49,6 @@ import {
   deleteOpportunitiesCache,
   detectOpportunityStock,
   groupCandidatesByHub,
-  latestPlanOf,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
   opportunitySnapshotRequest,
@@ -125,6 +125,12 @@ export function useOpportunities({
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
 
+  // Read through a ref: the lookup is rebuilt on every plan write, but only a
+  // change to what rows read off it (`inputsKey`) should reprice a batch.
+  const defaultsRef = useRef(defaultsForCharacter);
+  useEffect(() => {
+    defaultsRef.current = defaultsForCharacter;
+  });
   const candidatesRef = useRef(candidates);
   useEffect(() => {
     candidatesRef.current = candidates;
@@ -214,7 +220,13 @@ export function useOpportunities({
       // Grouped by hub (issue #2055's "batched per Character/hub, not per
       // row"): one snapshot request per distinct hub the batch's owning
       // Characters resolve to, not one shared hard-coded default.
-      const hubGroups = groupCandidatesByHub(currentCandidates, hubForCharacter);
+      const hubGroups = groupCandidatesByHub(
+        currentCandidates,
+        hubForCharacter,
+        (characterId) =>
+          startingLocation('manufacturing', facilityDefaults, defaultsRef.current(characterId))
+            .buildSystemId
+      );
       const requests = hubGroups.map((group) =>
         opportunitySnapshotRequest(
           group.candidates,
@@ -222,7 +234,8 @@ export function useOpportunities({
           catalog,
           pi,
           facilityDefaults,
-          latestPlanOf(group.candidates.map((c) => defaultsForCharacter(c.characterId)))
+          // One build system per group, so any member's latest plan names it.
+          defaultsRef.current(group.candidates[0]!.characterId)
         )
       );
       const snapshots = await Promise.all(loadMarketSnapshots(requests));
@@ -263,7 +276,7 @@ export function useOpportunities({
             },
             hub,
             tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id),
-            defaultsForCharacter(candidate.characterId)
+            defaultsRef.current(candidate.characterId)
           );
           if (row) unranked.push(row);
         }
@@ -304,7 +317,6 @@ export function useOpportunities({
     catalog,
     pi,
     hubForCharacter,
-    defaultsForCharacter,
     facilityDefaults,
     modifiersByCharacter,
     standingsByCharacter,

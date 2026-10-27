@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { BuildPlanRecord } from '@/db';
 import { intParam } from '@/lib/urlState';
 import { useUrlParam } from '@/lib/useUrlState';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -22,6 +23,8 @@ interface UseMarketWideScanArgs {
   characterIds: number[];
   /** Whose Build Plans rows are priced as: the active Character. */
   characterId: number | null;
+  /** That Character's latest plan: rows start from its hub, price basis and build location. */
+  latestPlan: BuildPlanRecord | null;
   research: MarketWideResearch;
   filter: MarketWideFilterState;
   setFilter: (next: MarketWideFilterState) => void;
@@ -43,6 +46,7 @@ export function useMarketWideScan({
   standing,
   characterIds,
   characterId,
+  latestPlan,
   research,
   filter,
   setFilter,
@@ -57,6 +61,7 @@ export function useMarketWideScan({
     standing,
     characterIds,
     characterId,
+    latestPlan,
     research,
     filters: filter,
   });

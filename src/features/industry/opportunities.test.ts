@@ -13,10 +13,12 @@ import {
   buildOpportunityCandidates,
   computeOpportunityRow,
   decideOpportunitiesCache,
+  groupCandidatesByHub,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
   opportunitySnapshotRequest,
   planForOpportunityCandidate,
+  planSettings,
   rankOpportunityRows,
   type OpportunityCandidate,
   type OpportunityPricingInputs,
@@ -25,6 +27,8 @@ import {
 import { recipeForLookup } from './recipes';
 import { computeBuildPlan } from './computeBuildPlan';
 import { resolveBuildPlan } from './resolveBuildPlan';
+import { planOwnedStockSale } from '@/engine/industry/ownedStockSale';
+import { profitOnBasis } from '@/engine/industry/profitBasis';
 import type { DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { MarketSnapshot } from './marketData';
@@ -389,6 +393,103 @@ describe('a plan opened from a row prices the row', () => {
   });
 });
 
+describe('rows count owned materials as the plan page’s hero does', () => {
+  const entry = catalogEntry(1);
+  const cat = catalog([entry]);
+  const ownedCopy = owned(1);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: ownedCopy,
+    catalogEntry: entry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 500 },
+    hubBuyPrices: { 2: 90_000, 34: 300 },
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1 },
+    systemCostIndex: 0.05,
+  };
+  const stock = new Map([[34, { quantity: 90 }]]) as unknown as DetectedOwnedStockMap;
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
+  const priceRow = (held: DetectedOwnedStockMap) =>
+    computeOpportunityRow(
+      candidate,
+      snapshot,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      NO_CHARACTER_MODIFIERS,
+      held,
+      { recipeFor, depth: 0 },
+      DEFAULT_TRADE_HUB
+    )!;
+
+  it('charges the stock it uses at what it would sell for, so ISK/hour matches the plan hero', () => {
+    const row = priceRow(stock);
+    // What BuildPlanDetail does by default: sell-value basis over an instant sale.
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      row.materialSourcing,
+      row.buildHere,
+      100,
+      row.hub
+    );
+    const { result } = resolveBuildPlan(
+      plan,
+      {
+        catalog: cat,
+        pi: null,
+        ownedBlueprints: [ownedCopy],
+        assumedMe: 0,
+        modifiers: NO_CHARACTER_MODIFIERS,
+        bpcOffersFor: () => [],
+      },
+      { snapshot }
+    );
+    const sale = planOwnedStockSale(result!.materials, snapshot, 'instant', {});
+    expect(sale.net).toBeGreaterThan(0);
+    const hero = profitOnBasis('sellValue', {
+      result: result!,
+      ownedSellNet: sale.net,
+      productQuantity: 1,
+      productUnitPrice: snapshot.hubPrices[2]!,
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+    });
+    expect(row.result.profit).toBe(hero.profit);
+    expect(row.result.iskPerHour).toBe(hero.iskPerHour);
+    expect(row.result.marginPct).toBe(hero.marginPct);
+    // The claim itself is untouched: the plan still lists the stock as held.
+    expect(row.result.profit!).toBeLessThan(result!.profit!);
+  });
+
+  it('keeps the plan’s own figure when nothing is held', () => {
+    const row = priceRow(new Map());
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      row.materialSourcing,
+      row.buildHere,
+      100,
+      row.hub
+    );
+    const { result } = resolveBuildPlan(
+      plan,
+      {
+        catalog: cat,
+        pi: null,
+        ownedBlueprints: [ownedCopy],
+        assumedMe: 0,
+        modifiers: NO_CHARACTER_MODIFIERS,
+        bpcOffersFor: () => [],
+      },
+      { snapshot }
+    );
+    expect(row.result.profit).toBe(result!.profit);
+  });
+});
+
 describe('rows price with the plan page’s settings', () => {
   const entry = catalogEntry(1);
   const ownedCopy = owned(1);
@@ -607,6 +708,74 @@ describe('opportunitiesInputsKey', () => {
         defaultsByCharacter: new Map([[1, null]]),
       })
     );
+  });
+});
+
+describe('opportunitiesInputsKey — the latest plan', () => {
+  const base: Omit<OpportunityPricingInputs, 'defaultsByCharacter'> = {
+    assumedMe: 10,
+    modifiersByCharacter: new Map([[1, NO_CHARACTER_MODIFIERS]]),
+    standingsByCharacter: new Map([[1, new Map([['jita', ZERO_STANDINGS]])]]),
+    facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    ownedByCharacter: new Map([[1, [owned(1)]]]),
+  };
+  const entry = catalogEntry(1);
+  const plan = planForOpportunityCandidate(
+    {
+      id: '1:1',
+      characterId: 1,
+      characterName: 'P',
+      blueprint: owned(1),
+      catalogEntry: entry,
+    },
+    DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    {},
+    undefined,
+    1,
+    DEFAULT_TRADE_HUB
+  );
+  const keyFor = (latest: typeof plan | null) =>
+    opportunitiesInputsKey({ ...base, defaultsByCharacter: new Map([[1, latest]]) });
+
+  it.each([
+    ['price basis', { materialPriceBasis: 'buy' as const }],
+    ['hub', { hubId: 'amarr' as const }],
+    ['build system', { buildSystemId: 30000142 }],
+    ['facility', { facility: 'raitaru' as const }],
+  ])('changes when the latest plan’s %s changes', (_label, patch) => {
+    expect(keyFor({ ...plan, ...patch })).not.toBe(keyFor(plan));
+  });
+
+  it('does not change for an edit that moves no price: a rename, runs, a timestamp', () => {
+    expect(keyFor({ ...plan, name: 'Renamed', runs: 9, updatedAt: plan.updatedAt + 1 })).toBe(
+      keyFor(plan)
+    );
+  });
+
+  it('reads no plan as no settings', () => {
+    expect(planSettings(null)).toBeNull();
+    expect(keyFor(null)).not.toBe(keyFor(plan));
+  });
+});
+
+describe('groupCandidatesByHub — build systems', () => {
+  const mk = (id: string, characterId: number): OpportunityCandidate => ({
+    id,
+    characterId,
+    characterName: 'P',
+    blueprint: owned(1),
+    catalogEntry: catalogEntry(1),
+  });
+  it('splits two Characters at one hub who build in different systems', () => {
+    const groups = groupCandidatesByHub(
+      [mk('a', 1), mk('b', 2), mk('c', 3)],
+      () => DEFAULT_TRADE_HUB,
+      (characterId) => (characterId === 2 ? 30000142 : 30002187)
+    );
+    expect(groups.map((g) => g.candidates.map((c) => c.id))).toEqual([['a', 'c'], ['b']]);
+  });
+  it('keeps one group per hub when no system is named', () => {
+    expect(groupCandidatesByHub([mk('a', 1), mk('b', 2)], () => DEFAULT_TRADE_HUB)).toHaveLength(1);
   });
 });
 

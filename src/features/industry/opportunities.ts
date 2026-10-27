@@ -21,6 +21,9 @@ import {
 import { buildPlanTypeIds } from './recipes';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
+import { planOwnedStockSale } from '@/engine/industry/ownedStockSale';
+import { profitOnBasis } from '@/engine/industry/profitBasis';
+import { SKILL_IDS } from '@/engine/industry/types';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { takeEveryOffer } from '@/engine/industry/ownedStockOffer';
@@ -94,11 +97,6 @@ export function hubForCharacter(
   return (plan && getTradeHub(plan.hubId)) ?? DEFAULT_TRADE_HUB;
 }
 
-/** The most recently updated of several Characters' latest plans, or null when none has a plan. */
-export function latestPlanOf(plans: readonly (BuildPlanRecord | null)[]): BuildPlanRecord | null {
-  return mostRecentlyUpdatedPlan(plans.filter((plan): plan is BuildPlanRecord => plan !== null));
-}
-
 export interface OpportunityHubGroup {
   hub: TradeHub;
   candidates: OpportunityCandidate[];
@@ -112,16 +110,23 @@ export interface OpportunityHubGroup {
  */
 export function groupCandidatesByHub(
   candidates: readonly OpportunityCandidate[],
-  hubFor: (characterId: number) => TradeHub
+  hubFor: (characterId: number) => TradeHub,
+  /**
+   * The build system each owning Character's rows are charged a job fee at.
+   * A snapshot carries one system's cost index, so two Characters at one hub
+   * who build in different systems are different groups.
+   */
+  buildSystemFor: (characterId: number) => number | undefined = () => undefined
 ): OpportunityHubGroup[] {
-  const byHubId = new Map<TradeHub['id'], OpportunityHubGroup>();
+  const byKey = new Map<string, OpportunityHubGroup>();
   for (const candidate of candidates) {
     const hub = hubFor(candidate.characterId);
-    const group = byHubId.get(hub.id);
+    const key = `${hub.id}|${buildSystemFor(candidate.characterId) ?? ''}`;
+    const group = byKey.get(key);
     if (group) group.candidates.push(candidate);
-    else byHubId.set(hub.id, { hub, candidates: [candidate] });
+    else byKey.set(key, { hub, candidates: [candidate] });
   }
-  return [...byHubId.values()];
+  return [...byKey.values()];
 }
 
 /** One request, one hub, every candidate's materials+product unioned — the "bounded, batched" pricing the ticket asks for. */
@@ -279,6 +284,53 @@ export interface OpportunityAutoBuildOptions {
 }
 
 /**
+ * The figures a Build Plan's hero shows by default, on `result`: owned
+ * materials are charged at what they would sell for (instant sale into buy
+ * orders), so profit reads as what building earns over just selling them. The
+ * plan page does this through the same `planOwnedStockSale` and
+ * `profitOnBasis`; with nothing owned, or an owned material with no price, the
+ * plan's own figure stands, as it does there. Only the headline figures move:
+ * cost columns keep the plan's own `totalCost`.
+ */
+function onPlanHeroBasis(
+  result: BuildResult,
+  input: {
+    snapshot: MarketSnapshot;
+    modifiers: CharacterModifiers;
+    standing: ResolvedStandings | undefined;
+    productQuantity: number;
+    productUnitPrice: number | null;
+  }
+): BuildResult {
+  const { snapshot, modifiers, standing } = input;
+  const sale = planOwnedStockSale(
+    result.materials,
+    snapshot,
+    'instant',
+    modifiers.skills,
+    standing
+  );
+  if (sale.ownedUnits === 0 || sale.unpriced.length > 0) return result;
+  const figures = profitOnBasis('sellValue', {
+    result,
+    ownedSellNet: sale.net,
+    productQuantity: input.productQuantity,
+    productUnitPrice: input.productUnitPrice,
+    accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+    brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
+    factionStanding: standing?.factionStanding,
+    corpStanding: standing?.corpStanding,
+  });
+  return {
+    ...result,
+    profit: figures.profit,
+    marginPct: figures.marginPct,
+    iskPerHour: figures.iskPerHour,
+    breakEvenPrice: figures.breakEvenPrice,
+  };
+}
+
+/**
  * Prices one candidate against an already-fetched snapshot. Null only when
  * the plan cannot be built at all (an engine-level throw `computeBuildPlan`
  * already guards).
@@ -363,11 +415,26 @@ export function computeOpportunityRow(
 
   const productTypeID = candidate.catalogEntry.productTypeID;
   const sellPrice = productTypeID !== null ? snapshot.hubPrices[productTypeID] : undefined;
+  const planResult = onPlanHeroBasis(result, {
+    snapshot,
+    modifiers,
+    standing,
+    productQuantity: (blueprint.products[0]?.quantity ?? 0) * plan.runs,
+    productUnitPrice: sellPrice ?? null,
+  });
   const sellVolume = productTypeID !== null ? snapshot.hubSellVolumes[productTypeID] : undefined;
   const sellDepthIsk =
     sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
 
-  return { candidate, result, sellDepthIsk, hub, materialSourcing, buildHere, defaultsFrom };
+  return {
+    candidate,
+    result: planResult,
+    sellDepthIsk,
+    hub,
+    materialSourcing,
+    buildHere,
+    defaultsFrom,
+  };
 }
 
 /** Sorts and classifies through the tested engine module, then re-attaches each row's own candidate/result. */
@@ -445,6 +512,26 @@ export interface OpportunityPricingInputs {
   defaultsByCharacter: ReadonlyMap<number, BuildPlanRecord | null>;
 }
 
+/**
+ * What a row reads off the latest plan a new plan starts from: its hub, price
+ * basis and build location. Not its name, runs or timestamps, so a plan edit
+ * that moves no price doesn't read as repriced. One list, for every key that
+ * must notice these settings changing.
+ */
+export function planSettings(plan: BuildPlanRecord | null) {
+  return (
+    plan && {
+      hubId: plan.hubId,
+      materialPriceBasis: plan.materialPriceBasis ?? null,
+      facility: plan.facility,
+      rigFit: plan.rigFit ?? null,
+      facilityTaxPct: plan.facilityTaxPct ?? null,
+      security: plan.security,
+      buildSystemId: plan.buildSystemId ?? null,
+    }
+  );
+}
+
 /** JSON with object keys sorted, so equal values built in a different key order serialize the same. */
 function stableSerialize(value: unknown): string {
   return JSON.stringify(value, (_key, v: unknown) =>
@@ -467,22 +554,9 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
       ([characterId, byHub]) =>
         [characterId, [...byHub.entries()].sort(([a], [b]) => a.localeCompare(b))] as const
     );
-  // Only what a row reads off the plan: not its name, runs or timestamps, so a
-  // plan edit that moves no price doesn't read as repriced.
   const defaults = [...inputs.defaultsByCharacter.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([characterId, plan]) => [
-      characterId,
-      plan && {
-        hubId: plan.hubId,
-        materialPriceBasis: plan.materialPriceBasis ?? null,
-        facility: plan.facility,
-        rigFit: plan.rigFit ?? null,
-        facilityTaxPct: plan.facilityTaxPct ?? null,
-        security: plan.security,
-        buildSystemId: plan.buildSystemId ?? null,
-      },
-    ]);
+    .map(([characterId, plan]) => [characterId, planSettings(plan)]);
   return stableSerialize({
     assumedMe: inputs.assumedMe,
     modifiers,
