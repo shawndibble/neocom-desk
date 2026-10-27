@@ -31,21 +31,21 @@ const PARAMS = {
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
 const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
 
-const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner';
+const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
 
 /** The expanded row survives Open page then Back: kept for the tab session, never required. */
-function readOpenMiner(): string | null {
+function readOpenMiner(corporationId: number): string | null {
   try {
-    return sessionStorage.getItem(OPEN_MINER_KEY);
+    return sessionStorage.getItem(OPEN_MINER_KEY + corporationId);
   } catch {
     return null;
   }
 }
 
-function writeOpenMiner(id: string | null) {
+function writeOpenMiner(corporationId: number, id: string | null) {
   try {
-    if (id === null) sessionStorage.removeItem(OPEN_MINER_KEY);
-    else sessionStorage.setItem(OPEN_MINER_KEY, id);
+    if (id === null) sessionStorage.removeItem(OPEN_MINER_KEY + corporationId);
+    else sessionStorage.setItem(OPEN_MINER_KEY + corporationId, id);
   } catch {
     // Blocked storage: the row just closes after a visit elsewhere.
   }
@@ -53,7 +53,7 @@ function writeOpenMiner(id: string | null) {
 
 export function MinersTab() {
   const { t } = useTranslation();
-  const { view, names, edit, canEdit } = useBook();
+  const { view, names, edit, canEdit, corporationId } = useBook();
   const { miners, totals, donationsBeforeBook } = useTabsProjection();
   const [dialog, setDialog] = useState<
     | { kind: 'record' | 'dismiss'; miner: MinerRow }
@@ -62,6 +62,11 @@ export function MinersTab() {
   >(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [tableRef, cards] = useCards();
+  // Read once; a stored miner the list no longer holds opens nothing and is cleared on mount.
+  const [openMiner] = useState(() => {
+    const id = readOpenMiner(corporationId);
+    return id !== null && miners.some((m) => m.id === id) ? id : null;
+  });
   const rowContextMenu = useCallback(
     (m: MinerRow, tr: ReactElement) => (
       <MinerRowMenu
@@ -219,8 +224,9 @@ export function MinersTab() {
             expandableRow={{
               renderDetail: (m) => <MinerExpandedRow miner={m} />,
               leadingIcon: true,
-              initialKey: readOpenMiner(),
-              onExpandedChange: (key) => writeOpenMiner(key === null ? null : String(key)),
+              initialKey: openMiner,
+              onExpandedChange: (key) =>
+                writeOpenMiner(corporationId, key === null ? null : String(key)),
             }}
             stacked={cards}
             rowClassName={() => 'group'}

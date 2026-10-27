@@ -338,13 +338,8 @@ export function CorpMoons() {
   const { t } = useTranslation();
   const access = useCorpAccess();
   const { ledger } = useCorpTaxBook({ autoSync: false });
-  if (access.state === 'unknown') {
-    return (
-      <div className="flex justify-center p-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
+  const { pathname } = useLocation();
+  if (access.state === 'unknown') return <MoonsLoading showTabs={moonsDetail(pathname) === null} />;
   if (access.state !== 'ready') {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">

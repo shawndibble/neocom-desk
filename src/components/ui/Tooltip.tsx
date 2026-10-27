@@ -249,10 +249,12 @@ export function Tooltip({
 
   /**
    * A tooltip on a menu item (a disabled item's reason) sits above the menu in Radix's layer
-   * stack, so Escape would close only it. Re-send the key once it is gone so the menu closes too.
+   * stack, so Escape would close only it. Close it ourselves, then re-send the key once so the
+   * menu closes too; the tooltip is gone by then, so the re-sent key cannot come back here.
    */
   function handleEscape() {
     if (!triggerRef.current?.closest('[role="menu"]')) return;
+    forceClose();
     setTimeout(
       () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
       0

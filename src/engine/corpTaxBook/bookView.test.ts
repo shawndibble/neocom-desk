@@ -860,6 +860,7 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
     expect(row.billed - row.paid - row.outstanding).toBe(0);
     const detail = statementDetail(view, fractional.id)!;
     expect(detail.remaining).toBe(0);
+    expect(detail.credited + detail.writtenOff + detail.remaining).toBe(row.billed);
     expect(detail.payments).toEqual([
       { id: 'p1', amount: 1_000_000, at: '2026-09-02T00:00:00Z', source: 'donation' },
     ]);
