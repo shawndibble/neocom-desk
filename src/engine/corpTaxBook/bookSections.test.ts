@@ -42,7 +42,7 @@ const day = (over: Partial<DayRow> & { key: string }): DayRow => ({
 });
 
 describe('daysByPhase', () => {
-  it('splits open days into Next Statement and Still accruing, leaving closed days out', () => {
+  it("splits open days into Next Statement and Today's mining, leaving closed days out", () => {
     const days = [
       day({ key: 'a', status: 'unbilled' }),
       day({ key: 'b', status: 'not-billable' }),
@@ -258,7 +258,7 @@ describe('extractionBilling', () => {
         byMiner: new Map([['m', { days: days.map((d) => ({ extractionId: 'x', ...d })) }]]),
       },
     }) as unknown as BookView;
-  it('is billed once every day left Next Statement and Still accruing', () => {
+  it("is billed once every day left Next Statement and Today's mining", () => {
     const billed = extractionBilling(
       viewOf([
         { status: 'on-statement', statementId: 's1' },
