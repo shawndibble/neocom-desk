@@ -298,3 +298,33 @@ describe('readBookData over the version marker', () => {
     expect(store.reads).toEqual([BOOK]);
   });
 });
+
+describe('readBookData and the Overview/Miners read models (#5259)', () => {
+  const MODELS = { minerList: { schema: 1, miners: [] }, overview: { schema: 1 } };
+  beforeEach(() => {
+    store.docs.set(`${BOOK}/readModels/minerList`, MODELS.minerList);
+    store.docs.set(`${BOOK}/readModels/overview`, MODELS.overview);
+  });
+
+  it('never touches readModels with the switch off, the default', async () => {
+    const data = await readBookData(7, CORP);
+    expect(store.reads.some((p) => p.includes('/readModels'))).toBe(false);
+    expect(data?.readModels).toBeUndefined();
+  });
+
+  it('reads the two docs with the switch on, and reuses them while their stamp holds', async () => {
+    const stamp = { readModels: 'readModels-1' };
+    store.docs.set(BOOK, stamped(stamp));
+    const data = await readBookData(7, CORP, undefined, true);
+    expect(data?.readModels).toEqual(MODELS);
+    expect(store.reads.filter((p) => p.includes('/readModels'))).toHaveLength(2);
+
+    store.reads.length = 0;
+    await readBookData(7, CORP, undefined, true);
+    expect(store.reads.some((p) => p.includes('/readModels'))).toBe(false);
+
+    store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
+    await readBookData(7, CORP, undefined, true);
+    expect(store.reads.filter((p) => p.includes('/readModels'))).toHaveLength(2);
+  });
+});

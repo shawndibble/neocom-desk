@@ -21,6 +21,7 @@ import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookV
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useBook } from './useBook';
 import { ReasonDialog } from './BookDialogs';
+import { FullyMinedPanel } from './FullyMinedPanel';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
@@ -210,7 +211,8 @@ export function MoonDetail({ id }: { id: string }) {
             value: row.minedPct === null ? '—' : `${isk(mined)} · ${row.minedPct}%`,
           },
           // An expired chunk has no "left": the field is gone, so only what was mined says anything.
-          ...(row.state === 'expired'
+          // A Fully Mined one has none either: the panel below shows its residue instead.
+          ...(row.state === 'expired' || row.fullyMined
             ? []
             : [
                 {
@@ -230,6 +232,7 @@ export function MoonDetail({ id }: { id: string }) {
           },
         ]}
       />
+      <FullyMinedPanel id={row.id} />
       <BookSection
         title={t('corpTaxBook.moons.moon.whoMined')}
         noun={t('corpTaxBook.moons.sections.nouns.miners')}

@@ -95,6 +95,7 @@ import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
+import { refreshReadModels } from './corpTaxBookReadModelsStore.js';
 import {
   fail,
   requireLiveRoles,
@@ -670,6 +671,9 @@ export async function syncBookAs(
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
+  // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
+  if (donationsAdded > 0 || input.extractions.length > 0)
+    await refreshReadModels(deps.db, input.corporationId, deps.now());
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
@@ -1151,6 +1155,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.update(ref, { surveyId: action.surveyId ?? FieldValue.delete() });
       return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };
     }
+    case 'setFullyMined': {
+      const ref = col(c, EXTRACTIONS).doc(action.extractionId);
+      await mustGet(c, ref, 'Extraction');
+      // Never written by the sync's merge-set, so a later sync keeps the flag. Clearing drops it.
+      tx.update(ref, {
+        fullyMined: action.fullyMined
+          ? { by: by, byName: c.access.characterName, at: iso }
+          : FieldValue.delete(),
+      });
+      return { detail: { extractionId: action.extractionId, fullyMined: action.fullyMined } };
+    }
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
@@ -1622,6 +1637,14 @@ export async function editBookAs(
   await refreshAfterEvent(deps.db, call.corporationId, editScope(action));
   // Statements freeze a pull's tax, and a survey link or expiry changes its doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
+  // The same edits move the Overview and Miners tab docs (ADR 0032). Best effort.
+  const scope = editScope(action);
+  if (
+    scope.all ||
+    scope.minerIds.length + scope.statementIds.length + scope.paymentIds.length > 0 ||
+    action.action === 'linkSurvey'
+  )
+    await refreshReadModels(deps.db, call.corporationId, deps.now());
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
     await restampStructures(
@@ -1664,6 +1687,7 @@ export async function confirmGrouping(
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
   await refreshAfterEvent(deps.db, corporationId, [minerId]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
@@ -1692,6 +1716,7 @@ async function declinePending(
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
   await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** The added character itself declines, signed in as itself. */
@@ -1769,6 +1794,7 @@ export async function claimPayment(
 ) {
   const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId);
   await refreshAfterEvent(deps.db, corporationId, [claimed.minerId]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
   return claimed;
 }
 

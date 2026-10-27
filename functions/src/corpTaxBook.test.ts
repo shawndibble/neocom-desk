@@ -328,6 +328,31 @@ describe('regroupMiner', () => {
   });
 });
 
+describe('setFullyMined', () => {
+  it('parses set and clear, and refuses a non-boolean or a path-escaping id', () => {
+    expect(
+      parseEditAction({ action: 'setFullyMined', extractionId: 'x_1', fullyMined: true })
+    ).toEqual({
+      action: 'setFullyMined',
+      extractionId: 'x_1',
+      fullyMined: true,
+    });
+    expect(
+      parseEditAction({ action: 'setFullyMined', extractionId: 'x_1', fullyMined: false })
+    ).toEqual({
+      action: 'setFullyMined',
+      extractionId: 'x_1',
+      fullyMined: false,
+    });
+    expect(() =>
+      parseEditAction({ action: 'setFullyMined', extractionId: 'x_1', fullyMined: 'yes' })
+    ).toThrow();
+    expect(() =>
+      parseEditAction({ action: 'setFullyMined', extractionId: '../x', fullyMined: true })
+    ).toThrow();
+  });
+});
+
 describe('linkSurvey', () => {
   it('parses a link and an unlink, and refuses a path-escaping id', () => {
     expect(

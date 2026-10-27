@@ -56,11 +56,16 @@ export const VERSIONED_COLLECTIONS = [
   'minerTotals',
   // Server-built per-pull moon docs (#5256, ADR 0032); shadow mode, no client reads yet.
   'moonDocs',
+  // Server-built Overview and Miners tab docs (#5259, ADR 0032); read only behind CORP_BOOK_READ_MODELS.
+  'readModels',
   // The member side (issue #5050) caches it too.
   'feederCoverage',
 ] as const;
 
 export type VersionedCollection = (typeof VERSIONED_COLLECTIONS)[number];
+
+/** Bump when a field of a `readModels` doc changes meaning (#5259): the verifier then rewrites both docs and a client ignores the old ones. */
+export const READ_MODELS_SCHEMA = 1;
 
 /**
  * Where a document or collection path lands in a book: its corporation id, and

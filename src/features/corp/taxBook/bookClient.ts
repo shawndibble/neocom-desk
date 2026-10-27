@@ -56,6 +56,8 @@ import {
   type HeaderTotals,
 } from '@/engine/corpTaxBook/minerScope';
 import { forgetObservedCopy } from './observedStore';
+import { CORP_BOOK_READ_MODELS } from './readModelSwitch';
+import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -498,6 +500,8 @@ export interface BookData {
   scheduledSync?: ScheduledSyncStatus | null;
   /** Which slices this read covered (bookParts.ts); the rest are empty. Absent: the whole book. */
   parts?: BookPartSet;
+  /** The Overview and Miners tab docs (ADR 0032); read only behind `CORP_BOOK_READ_MODELS`. */
+  readModels?: ReadModelDocs;
 }
 
 const feederPayouts = (characterId: number, book: number, feeder: number) =>
@@ -542,7 +546,8 @@ function feedersOf(
 export async function readBookData(
   characterId: number,
   corporationId: number,
-  parts: BookPartSet = ALL_BOOK_PART_SET
+  parts: BookPartSet = ALL_BOOK_PART_SET,
+  withReadModels: boolean = CORP_BOOK_READ_MODELS
 ): Promise<BookData | null> {
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
@@ -558,6 +563,7 @@ export async function readBookData(
     [payments, dismissals, declarations, adjustments, writeOffs],
     answers,
     paidStatementIds,
+    readModels,
   ] = await Promise.all([
     slice(
       'core',
@@ -590,6 +596,19 @@ export async function readBookData(
       undefined
     ),
     book.paidStatementIds(),
+    // Two docs, one stamp (ADR 0032). Off: not a single read.
+    withReadModels
+      ? part('readModels', async () => {
+          const docs = async (id: string) =>
+            (
+              await getDoc(
+                doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'readModels', id)
+              )
+            ).data();
+          const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
+          return { minerList, overview } as ReadModelDocs;
+        })
+      : Promise.resolve(undefined),
   ]);
   return {
     settings,
@@ -610,6 +629,7 @@ export async function readBookData(
     groupingAnswers: groupingAnswersFrom(answers),
     scheduledSync: scheduledSyncFrom(scheduled),
     parts,
+    ...(readModels ? { readModels } : {}),
   };
 }
 
@@ -801,6 +821,9 @@ export function mergeBookData(held: BookData, extra: BookData): BookData {
     adjustments: pick('ledger', held.adjustments, extra.adjustments),
     groupingAnswers: pick('answers', held.groupingAnswers, extra.groupingAnswers),
     parts,
+    ...((extra.readModels ?? held.readModels)
+      ? { readModels: extra.readModels ?? held.readModels }
+      : {}),
   };
 }
 
