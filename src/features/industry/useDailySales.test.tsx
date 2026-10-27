@@ -33,4 +33,13 @@ describe('useDailySales', () => {
     await waitFor(() => expect(result.current.pending).toBe(0));
     expect(loadDailySales).toHaveBeenCalledWith(10000043, 1);
   });
+
+  it('reads again when the scanned hub changes', async () => {
+    const { result, rerender } = renderHook(({ region }) => useDailySales([1], region, true), {
+      initialProps: { region: 10000002 },
+    });
+    await waitFor(() => expect(result.current.pending).toBe(0));
+    rerender({ region: 10000043 });
+    await waitFor(() => expect(loadDailySales).toHaveBeenCalledWith(10000043, 1));
+  });
 });
