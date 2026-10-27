@@ -48,6 +48,7 @@ function row(runs: number, profit: number | null, productQuantity = 1): Opportun
     hub: DEFAULT_TRADE_HUB,
     materialSourcing: {},
     buildHere: [],
+    defaultsFrom: null,
     orderDepth: 'unknown',
   };
 }

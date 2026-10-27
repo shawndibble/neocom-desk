@@ -79,7 +79,7 @@ import type {
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
 
@@ -674,7 +674,8 @@ export function Industry() {
           row.materialSourcing,
           row.buildHere,
           activeCharacterId,
-          row.hub
+          row.hub,
+          row.defaultsFrom
         )
       )
     );
@@ -742,7 +743,8 @@ export function Industry() {
         seed.materialSourcing,
         seed.buildHere,
         activeCharacterId,
-        seed.hub
+        seed.hub,
+        seed.defaultsFrom
       );
       await createBuildPlans([plan]);
       navigate(`/industry/plans/${plan.id}`);
@@ -766,10 +768,14 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
+  // The Trade Hub a new plan starts at (the latest plan's), not a fixed default: rows price
+  // with the settings the plan page uses, and a click opens a plan with those same settings.
+  const latestPlan = mostRecentlyUpdatedPlan(plans);
+  const marketWideHub = (latestPlan && getTradeHub(latestPlan.hubId)) ?? DEFAULT_TRADE_HUB;
   const marketWidePanel = catalog && (
     <MarketWideOpportunitiesPanel
       key="market-wide"
-      hub={DEFAULT_TRADE_HUB}
+      hub={marketWideHub}
       trees={marketWideTrees}
       treesFailed={marketWideTreesFailed}
       onRetryTrees={retryMarketWideTrees}

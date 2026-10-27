@@ -43,6 +43,7 @@ function argsWith(overrides: Partial<UseOpportunitiesArgs> = {}): UseOpportuniti
     catalog: CATALOG,
     pi: null,
     hubForCharacter,
+    defaultsForCharacter: () => null,
     facilityDefaults: FACILITY_DEFAULTS,
     modifiersByCharacter: new Map(),
     standingsByCharacter: new Map(),

@@ -389,6 +389,100 @@ describe('a plan opened from a row prices the row', () => {
   });
 });
 
+describe('rows price with the plan page’s settings', () => {
+  const entry = catalogEntry(1);
+  const ownedCopy = owned(1);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: ownedCopy,
+    catalogEntry: entry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 500 },
+    // Buy orders sit well under sell orders.
+    hubBuyPrices: { 2: 90_000, 34: 300 },
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1 },
+    systemCostIndex: 0.05,
+  };
+  const cat = catalog([entry]);
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
+  // The pilot's latest plan: priced on buy orders, built at a Raitaru.
+  const latest = {
+    ...planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      100,
+      DEFAULT_TRADE_HUB
+    ),
+    materialPriceBasis: 'buy' as const,
+    facility: 'raitaru' as const,
+  };
+  const rowWith = (defaultsFrom: typeof latest | null) =>
+    computeOpportunityRow(
+      candidate,
+      snapshot,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      NO_CHARACTER_MODIFIERS,
+      new Map(),
+      { recipeFor, depth: 0 },
+      DEFAULT_TRADE_HUB,
+      undefined,
+      defaultsFrom
+    )!;
+
+  it('buys materials at the side of the market the latest plan’s basis names', () => {
+    const sell = rowWith(null);
+    const buy = rowWith(latest);
+    // 90 Tritanium (the owned copy is ME 10) at 300 against 500.
+    expect(sell.result.materialCost - buy.result.materialCost).toBe(90 * (500 - 300));
+  });
+
+  it('opens a plan at the same basis, and the plan page prices it as the row did', () => {
+    const row = rowWith(latest);
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      row.materialSourcing,
+      row.buildHere,
+      100,
+      row.hub,
+      row.defaultsFrom
+    );
+    expect(plan.materialPriceBasis).toBe('buy');
+    const { result } = resolveBuildPlan(
+      plan,
+      {
+        catalog: cat,
+        pi: null,
+        ownedBlueprints: [ownedCopy],
+        assumedMe: 0,
+        modifiers: NO_CHARACTER_MODIFIERS,
+        bpcOffersFor: () => [],
+      },
+      { snapshot }
+    );
+    expect(result!.profit).toBe(row.result.profit);
+  });
+
+  it('starts from the latest plan’s build location when none is remembered, as a new plan does', () => {
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      100,
+      DEFAULT_TRADE_HUB,
+      latest
+    );
+    expect(plan.facility).toBe('raitaru');
+  });
+});
+
 describe('opportunitiesBatchKey', () => {
   function candidate(id: string): OpportunityCandidate {
     return {
@@ -432,6 +526,7 @@ describe('opportunitiesInputsKey', () => {
     standingsByCharacter: new Map([[1, new Map([['jita', ZERO_STANDINGS]])]]),
     facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
     ownedByCharacter: new Map([[1, [owned(1), owned(2)]]]),
+    defaultsByCharacter: new Map([[1, null]]),
   };
 
   it('changes when Assumed ME changes', () => {
@@ -509,6 +604,7 @@ describe('opportunitiesInputsKey', () => {
         standingsByCharacter: new Map([[1, new Map([['jita', { ...ZERO_STANDINGS }]])]]),
         modifiersByCharacter: new Map([[1, { ...NO_CHARACTER_MODIFIERS }]]),
         assumedMe: 10,
+        defaultsByCharacter: new Map([[1, null]]),
       })
     );
   });
@@ -583,6 +679,7 @@ describe('rankOpportunityRows', () => {
       hub: DEFAULT_TRADE_HUB,
       materialSourcing: {},
       buildHere: [],
+      defaultsFrom: null,
     };
   }
 

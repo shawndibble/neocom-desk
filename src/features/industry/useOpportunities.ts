@@ -22,6 +22,7 @@
  * calls) so every branch below is exactly one `setState` call, matching this
  * codebase's `react-hooks/set-state-in-effect` rule.
  */
+import type { BuildPlanRecord } from '@/db';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   NO_CHARACTER_MODIFIERS,
@@ -47,6 +48,7 @@ import {
   deleteOpportunitiesCache,
   detectOpportunityStock,
   groupCandidatesByHub,
+  latestPlanOf,
   opportunitiesBatchKey,
   opportunitiesInputsKey,
   opportunitySnapshotRequest,
@@ -68,6 +70,8 @@ export interface UseOpportunitiesArgs {
   pi: PiData | null;
   /** The Trade Hub each candidate's owning Character would price at (issue #2055) — `hubForCharacter`'s resolution, not a hard-coded default. */
   hubForCharacter: (characterId: number) => TradeHub;
+  /** Each candidate's owning Character's latest plan — the price basis and build location a new plan starts from, which rows price with so they use the plan page's settings. */
+  defaultsForCharacter: (characterId: number) => BuildPlanRecord | null;
   facilityDefaults: ActivityFacilityDefaults;
   /** Each candidate's owning Character's own skills/implants (issue #2055) — absent reads as `NO_CHARACTER_MODIFIERS`. */
   modifiersByCharacter: ReadonlyMap<number, CharacterModifiers>;
@@ -110,6 +114,7 @@ export function useOpportunities({
   catalog,
   pi,
   hubForCharacter,
+  defaultsForCharacter,
   facilityDefaults,
   modifiersByCharacter,
   standingsByCharacter,
@@ -144,8 +149,19 @@ export function useOpportunities({
         standingsByCharacter,
         facilityDefaults,
         ownedByCharacter,
+        defaultsByCharacter: new Map(
+          candidates.map((c) => [c.characterId, defaultsForCharacter(c.characterId)] as const)
+        ),
       }),
-    [assumedMe, modifiersByCharacter, standingsByCharacter, facilityDefaults, ownedByCharacter]
+    [
+      assumedMe,
+      modifiersByCharacter,
+      standingsByCharacter,
+      facilityDefaults,
+      ownedByCharacter,
+      candidates,
+      defaultsForCharacter,
+    ]
   );
 
   useEffect(() => {
@@ -200,7 +216,14 @@ export function useOpportunities({
       // Characters resolve to, not one shared hard-coded default.
       const hubGroups = groupCandidatesByHub(currentCandidates, hubForCharacter);
       const requests = hubGroups.map((group) =>
-        opportunitySnapshotRequest(group.candidates, group.hub, catalog, pi, facilityDefaults)
+        opportunitySnapshotRequest(
+          group.candidates,
+          group.hub,
+          catalog,
+          pi,
+          facilityDefaults,
+          latestPlanOf(group.candidates.map((c) => defaultsForCharacter(c.characterId)))
+        )
       );
       const snapshots = await Promise.all(loadMarketSnapshots(requests));
       if (cancelled) return;
@@ -239,7 +262,8 @@ export function useOpportunities({
               depth: 0,
             },
             hub,
-            tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id)
+            tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id),
+            defaultsForCharacter(candidate.characterId)
           );
           if (row) unranked.push(row);
         }
@@ -280,6 +304,7 @@ export function useOpportunities({
     catalog,
     pi,
     hubForCharacter,
+    defaultsForCharacter,
     facilityDefaults,
     modifiersByCharacter,
     standingsByCharacter,

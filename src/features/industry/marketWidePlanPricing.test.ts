@@ -159,6 +159,25 @@ describe('priceCandidatesAsPlans', () => {
     expect(capped!.profit).toBeLessThan(real!.profit);
   });
 
+  it('prices with the latest plan’s settings: its material price basis, as the plan page does', async () => {
+    vi.mocked(loadMarketSnapshot).mockResolvedValue({
+      hubPrices: { [PRODUCT]: 1_000_000, [TRITANIUM]: 500 },
+      hubBuyPrices: { [PRODUCT]: 900_000, [TRITANIUM]: 300 },
+      hubSellVolumes: {},
+      adjustedPrices: {},
+      systemCostIndex: 0,
+    } as unknown as Awaited<ReturnType<typeof loadMarketSnapshot>>);
+    const [sell] = await priceCandidatesAsPlans([candidate()], context);
+    vi.mocked(loadLatestBuildPlan).mockResolvedValue({
+      materialPriceBasis: 'buy',
+      facility: 'npcStation',
+      hubId: 'jita',
+    } as unknown as Awaited<ReturnType<typeof loadLatestBuildPlan>>);
+    const [buy] = await priceCandidatesAsPlans([candidate()], context);
+    // 100 Tritanium at 300 against 500.
+    expect(buy!.profit - sell!.profit).toBe(100 * (500 - 300));
+  });
+
   it('leaves out a candidate whose material has no price rather than guessing', async () => {
     vi.mocked(loadMarketSnapshot).mockResolvedValue({
       hubPrices: { [PRODUCT]: 1_000_000 },

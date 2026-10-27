@@ -107,7 +107,7 @@ export async function priceCandidatesAsPlans(
   const blueprintIds = blueprintTypeIdsIn([...typeIds], catalog);
 
   // The job fee is charged where a new plan builds: the remembered system, else the hub's own.
-  const location = startingLocation('manufacturing', facilityDefaults);
+  const location = startingLocation('manufacturing', facilityDefaults, latestPlan);
   const [snapshot, purchaseOffers, inventionMarket] = await Promise.all([
     loadMarketSnapshot(
       hub,

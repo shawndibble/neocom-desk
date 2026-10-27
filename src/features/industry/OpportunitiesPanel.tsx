@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAccountCharacters } from '@/features/character/useCharacters';
 import { db, type BuildPlanRecord } from '@/db';
+import { mostRecentlyUpdatedPlan } from './newBuildPlan';
 import {
   Button,
   DataTable,
@@ -238,6 +239,13 @@ export function OpportunitiesPanel({
     [plansByCharacter]
   );
 
+  // The same latest plan, whose price basis and build location a fresh plan starts
+  // from: rows price with the plan page's settings, not their own defaults.
+  const defaultsForCharacter = useMemo(
+    () => (characterId: number) => mostRecentlyUpdatedPlan(plansByCharacter.get(characterId)),
+    [plansByCharacter]
+  );
+
   // Each owning Character's own standings/skills (issue #2055), not just the
   // active Character's — a candidate seeded by an alt prices at that alt's
   // real broker fee, not the pilot currently viewing the panel.
@@ -259,6 +267,7 @@ export function OpportunitiesPanel({
     catalog,
     pi,
     hubForCharacter: resolveHubForCharacter,
+    defaultsForCharacter,
     facilityDefaults,
     modifiersByCharacter,
     standingsByCharacter,

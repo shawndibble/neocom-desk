@@ -1,0 +1,8 @@
+# Scope decisions — Opportunity rows price with the plan page's settings
+
+_Recorded 2026-10-27._
+
+- **Market-Wide, Ranked builds and All owned price every row with the settings the plan page starts a plan with**: the Character's latest plan (its Trade Hub, its material price basis, and its build location when none is remembered) plus the remembered build location, assumed ME/TE, standings, skills and LP Value. A row used to price at a fixed Jita (Market-Wide), at sell orders always, and without the latest-plan location fallback, so a pilot who buys on buy orders or last built at Amarr saw a row and a plan that could not agree. The plan opened from a row starts from the same latest plan (`defaultsFrom`), so the figures agree by construction.
+- **Market-Wide's hub is the latest plan's hub, not a fixed Jita.** Supersedes "Hub fixed `DEFAULT_TRADE_HUB`, no picker" in `docs/features/industry-records-sourcing.md`. The sales-volume region follows it (`20261027-070014-*`). A pilot with no plan keeps Jita.
+- **Ranked builds and All owned buy materials at the plan's price basis** (`materialPricesFor`), the same side of the book the plan page and its make-or-buy verdicts read.
+- **What still differs from the plan page, by design:** Depth Prices (an order-book walk per large material need, one request per material, for the one plan the page shows), Community Offers (read by a page hook), a plan's own overrides (cost index override, Include Reactions, hand-set material prices) and its Owned materials scope. Rows are computed for hundreds of blueprints at once; these are per-plan choices a row has no plan to read.
