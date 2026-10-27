@@ -652,11 +652,15 @@ export async function readMinerBookData(
     );
   const meta = (id: string) => getDoc(doc(db, 'corps', String(corporationId), 'meta', id));
   const one = async (name: string) => {
+    const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
+    return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
+  };
+  // The totals doc may not be deployed or readable yet: no reason to lose the page.
+  // A refusal is not that, and neither is a failed grouping read (the Miner would vanish).
+  const totalsOrNone = async () => {
     try {
-      const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
-      return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
+      return await one('minerTotals');
     } catch (error) {
-      // A doc the rules or deploy do not offer yet is no reason to lose the page; a refusal is.
       if (String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied'))
         throw error;
       return undefined;
@@ -664,7 +668,7 @@ export async function readMinerBookData(
   };
   const [grouping, totalsDoc, statements, payments, writeOffs, adjustments] = await Promise.all([
     one('miners'),
-    one('minerTotals'),
+    totalsOrNone(),
     byMiner<Statement>('statements'),
     byMiner<SettlePayment>('payments'),
     byMiner<RecordedWriteOff>('writeOffs'),

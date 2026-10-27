@@ -110,7 +110,13 @@ export function withMinerTotals(
   minerId: string,
   totals: HeaderTotals | undefined
 ): BookView {
-  if (!totals || totals.schema !== MINER_TOTALS_SCHEMA_READ) return view;
+  const ok =
+    totals !== undefined &&
+    totals.schema === MINER_TOTALS_SCHEMA_READ &&
+    Number.isFinite(totals.owed) &&
+    Number.isFinite(totals.credit) &&
+    (totals.lastPaidAt === null || typeof totals.lastPaidAt === 'string');
+  if (!ok) return view;
   return {
     ...view,
     miners: view.miners.map((m) =>

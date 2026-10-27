@@ -291,6 +291,7 @@ describe('Miner page read-model path', () => {
       lastPaidAt: '2026-01-01T00:00:00Z',
     });
     expect(withMinerTotals(old, MINER, { ...doc, schema: 99 })).toBe(old);
+    expect(withMinerTotals(old, MINER, { ...doc, owed: NaN })).toBe(old);
     expect(withMinerTotals(old, MINER, undefined)).toBe(old);
     expect(minerDetail(old, MINER)!.row).toEqual(row);
   });
