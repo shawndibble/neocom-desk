@@ -157,7 +157,7 @@ describe('VerifyPage', () => {
     expect(jas).toHaveTextContent('30.00 ISK');
     const day = zeo.parentElement!.closest('li')!;
     expect(day.textContent).not.toMatch(/·\s*·/);
-    expect(day.textContent?.match(/Aug 13, 2026/g)).toHaveLength(3);
+    expect(day.textContent?.match(/Aug 13, 2026/g)).toHaveLength(1);
   });
 
   it('says so when nothing is credited yet', async () => {
