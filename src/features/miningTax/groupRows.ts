@@ -1,0 +1,154 @@
+/**
+ * Flattens Mining Ledger Entries + their Assignments into one row per table
+ * row, collapsing a joined group (issue #523's "join entries" — 2+
+ * Assignments sharing a `groupId`) into a single combined `DisplayRow`.
+ * Pulled out of `MoonMiningTax.tsx` so this grouping logic (worst-status
+ * priority, the one-member-is-ungrouped rule) is unit-testable without the
+ * route's ESI/Dexie-backed snapshot loading.
+ */
+import type { MiningTaxAssignmentRecord } from '@/db';
+import type { MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
+import type { CorpRowInfo } from './corpBook/corpRows';
+import type { MoonMiningTaxRow } from './snapshot';
+
+export interface GroupMember {
+  row: MoonMiningTaxRow;
+  assignment: MiningTaxAssignmentRecord;
+}
+
+/** One flattened table row: an entry's covering Assignment, or its still-unassigned residual. */
+export interface DisplayRow {
+  key: string;
+  row: MoonMiningTaxRow;
+  assignment: MiningTaxAssignmentRecord | null;
+  status: MiningTaxRowStatus;
+  /**
+   * Present only for a real join (2+ Assignments sharing a `groupId`) — the
+   * other member(s) beyond `row`/`assignment` above. A `groupId` shared by
+   * only one surviving member (its sibling deleted, or a sync race) has
+   * nothing to combine with, so it renders as an ordinary row instead
+   * (`flatten` below).
+   */
+  groupMembers?: GroupMember[];
+  /**
+   * Set when a Corp Tax Book has a say in this row (#4065): a row the book
+   * decided, owed to the virtual corp Payee and never written to Dexie, or a
+   * personal unassigned row relabelled Pending corp record / Unattributed.
+   */
+  corp?: CorpRowInfo;
+}
+
+/** Every Assignment this display row represents — the lone one for an ordinary row, or the whole group for a joined one. Empty for the unassigned-residual row (no Assignment at all). */
+export function allMembers(dr: DisplayRow): GroupMember[] {
+  if (!dr.assignment) return [];
+  return [{ row: dr.row, assignment: dr.assignment }, ...(dr.groupMembers ?? [])];
+}
+
+// Worst-first: a joined group's combined status is whichever member most
+// needs attention, so a group with one outstanding and one paid member still
+// shows (and filters) as Outstanding rather than quietly reading as Paid.
+const STATUS_PRIORITY: Record<MiningTaxRowStatus, number> = {
+  'needs-review': 0,
+  outstanding: 1,
+  paid: 2,
+  dismissed: 3,
+  unassigned: 4,
+};
+
+/** "2026-09-04 – 2026-09-06" for a span of EVE dates (already sorted, earliest first), or the one date on its own. Shared by the table's Date column and the Settle-up dialog so both show a span the same way. */
+export function formatDateRange(sortedDates: readonly string[]): string {
+  if (sortedDates.length === 0) return '';
+  const first = sortedDates[0];
+  const last = sortedDates[sortedDates.length - 1];
+  return first === last ? first : `${first} – ${last}`;
+}
+
+/**
+ * EVE's wallet transfer "reason" field truncates silently well short of a
+ * normal sentence — a pasted "Moon mining tax · Talidal/Ainsan · 2026-09-12"
+ * (45 characters) came through in-game as exactly its first 40 characters,
+ * with no client-side warning. There's no documented limit to cite, so this
+ * is that observed cutoff, not a rounder number with margin built in.
+ */
+export const SETTLE_UP_REASON_MAX_LENGTH = 40;
+
+/** "MM-DD" for an EVE date already known to be "YYYY-MM-DD". */
+function shortDate(date: string): string {
+  return date.slice(5);
+}
+
+/** "09-04" for a single EVE date, or "09-04/09-06" for a span — compact enough for the reason field's tight budget. */
+function compactDateRange(sortedDates: readonly string[]): string {
+  if (sortedDates.length === 0) return '';
+  const first = sortedDates[0];
+  const last = sortedDates[sortedDates.length - 1];
+  return first === last ? shortDate(first) : `${shortDate(first)}/${shortDate(last)}`;
+}
+
+/**
+ * The copyable "paste into the transfer" reason for Settle Up, kept inside
+ * [[SETTLE_UP_REASON_MAX_LENGTH]]. Drops the system list first when it
+ * doesn't fit — it's the least essential part, since the payer already sees
+ * which systems are covered in the itemized list one step back.
+ */
+export function buildSettleUpReason(
+  prefix: string,
+  systems: readonly string[],
+  sortedDates: readonly string[]
+): string {
+  const range = compactDateRange(sortedDates);
+  const base = range === '' ? prefix : `${prefix} ${range}`;
+  const withSystems = systems.length > 0 ? `${base} ${systems.join('/')}` : base;
+  return withSystems.length <= SETTLE_UP_REASON_MAX_LENGTH ? withSystems : base;
+}
+
+export function worstStatus(statuses: readonly MiningTaxRowStatus[]): MiningTaxRowStatus {
+  return statuses.reduce((worst, s) => (STATUS_PRIORITY[s] < STATUS_PRIORITY[worst] ? s : worst));
+}
+
+export function flatten(rows: readonly MoonMiningTaxRow[]): DisplayRow[] {
+  const byGroup = new Map<string, GroupMember[]>();
+  const ungrouped: GroupMember[] = [];
+  for (const row of rows) {
+    for (const assignment of row.assignments) {
+      if (assignment.groupId) {
+        const list = byGroup.get(assignment.groupId) ?? [];
+        list.push({ row, assignment });
+        byGroup.set(assignment.groupId, list);
+      } else {
+        ungrouped.push({ row, assignment });
+      }
+    }
+  }
+
+  const out: DisplayRow[] = [];
+  for (const members of byGroup.values()) {
+    if (members.length < 2) {
+      ungrouped.push(...members);
+      continue;
+    }
+    const sorted = [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date));
+    const [primary, ...rest] = sorted;
+    out.push({
+      key: primary.assignment.id,
+      row: primary.row,
+      assignment: primary.assignment,
+      status: worstStatus(sorted.map((m) => m.assignment.status)),
+      groupMembers: rest,
+    });
+  }
+  for (const { row, assignment } of ungrouped) {
+    out.push({ key: assignment.id, row, assignment, status: assignment.status });
+  }
+  for (const row of rows) {
+    if (row.unassignedOreLines.length > 0) {
+      out.push({
+        key: `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}:unassigned`,
+        row,
+        assignment: null,
+        status: 'unassigned',
+      });
+    }
+  }
+  return out;
+}

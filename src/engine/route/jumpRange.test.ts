@@ -1,0 +1,118 @@
+import { describe, expect, it } from 'vitest';
+import {
+  adoptGameBaseline,
+  effectiveCurrentSystem,
+  jumpRangeLimit,
+  jumpRangeSystems,
+  withinJumpRange,
+} from './jumpRange';
+
+const HERE = 30000001;
+const NEAR = 30000002;
+const MID = 30000003;
+const FAR = 30000004;
+
+const JUMPS = new Map([
+  [HERE, 0],
+  [NEAR, 2],
+  [MID, 5],
+  [FAR, 11],
+]);
+
+describe('jumpRangeSystems', () => {
+  it('is no restriction at all for any', () => {
+    expect(jumpRangeSystems(JUMPS, 'any')).toBeNull();
+  });
+
+  it('keeps only the origin for system', () => {
+    expect([...(jumpRangeSystems(JUMPS, 'system') ?? [])]).toEqual([HERE]);
+  });
+
+  it('includes the boundary jump count', () => {
+    expect(jumpRangeSystems(JUMPS, '5')).toEqual(new Set([HERE, NEAR, MID]));
+    expect(jumpRangeSystems(JUMPS, '3')).toEqual(new Set([HERE, NEAR]));
+    expect(jumpRangeSystems(JUMPS, '10')).toEqual(new Set([HERE, NEAR, MID]));
+    expect(jumpRangeSystems(JUMPS, '15')).toEqual(new Set([HERE, NEAR, MID, FAR]));
+    expect(jumpRangeSystems(JUMPS, '20')).toEqual(new Set([HERE, NEAR, MID, FAR]));
+  });
+});
+
+describe('withinJumpRange', () => {
+  const allowed = new Set([HERE, NEAR]);
+
+  it('passes every row, placed or not, when unrestricted', () => {
+    expect(withinJumpRange(null, null)).toBe(true);
+    expect(withinJumpRange(FAR, null)).toBe(true);
+  });
+
+  it('drops a row it cannot place once a range is set', () => {
+    expect(withinJumpRange(null, allowed)).toBe(false);
+  });
+
+  it('keeps only systems in range', () => {
+    expect(withinJumpRange(NEAR, allowed)).toBe(true);
+    expect(withinJumpRange(FAR, allowed)).toBe(false);
+  });
+});
+
+describe('effectiveCurrentSystem', () => {
+  it('uses the game location when nothing was picked', () => {
+    expect(effectiveCurrentSystem(HERE, null)).toEqual({ systemId: HERE, source: 'game' });
+  });
+
+  it('is unknown with neither', () => {
+    expect(effectiveCurrentSystem(null, null)).toEqual({ systemId: null, source: null });
+  });
+
+  it('uses the pick while the game still reports where it was made', () => {
+    expect(effectiveCurrentSystem(HERE, { systemId: FAR, gameSystemId: HERE })).toEqual({
+      systemId: FAR,
+      source: 'picked',
+    });
+  });
+
+  it('uses the pick when the game location is unreadable', () => {
+    expect(effectiveCurrentSystem(null, { systemId: FAR, gameSystemId: HERE })).toEqual({
+      systemId: FAR,
+      source: 'picked',
+    });
+  });
+
+  it('drops a stale pick once the game reports a new system', () => {
+    expect(effectiveCurrentSystem(NEAR, { systemId: FAR, gameSystemId: HERE })).toEqual({
+      systemId: NEAR,
+      source: 'game',
+    });
+  });
+
+  it('keeps a pick made before ESI had answered, whatever ESI then reports', () => {
+    // Slow ESI while travelling: the first answer may be where you were, not where you are.
+    expect(effectiveCurrentSystem(HERE, { systemId: FAR, gameSystemId: null })).toEqual({
+      systemId: FAR,
+      source: 'picked',
+    });
+  });
+});
+
+describe('adoptGameBaseline', () => {
+  it('stamps a pick made before ESI answered with the first location it reports', () => {
+    expect(adoptGameBaseline({ systemId: FAR, gameSystemId: null }, HERE)).toEqual({
+      systemId: FAR,
+      gameSystemId: HERE,
+    });
+  });
+
+  it('changes nothing without a pick, without a game location, or with a baseline already', () => {
+    expect(adoptGameBaseline(null, HERE)).toBeNull();
+    expect(adoptGameBaseline({ systemId: FAR, gameSystemId: null }, null)).toBeNull();
+    expect(adoptGameBaseline({ systemId: FAR, gameSystemId: NEAR }, HERE)).toBeNull();
+  });
+});
+
+describe('jumpRangeLimit', () => {
+  it('is no limit for any, zero for the current system, else the jump count', () => {
+    expect(jumpRangeLimit('any')).toBeNull();
+    expect(jumpRangeLimit('system')).toBe(0);
+    expect(jumpRangeLimit('15')).toBe(15);
+  });
+});

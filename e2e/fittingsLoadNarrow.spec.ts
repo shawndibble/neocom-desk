@@ -1,0 +1,164 @@
+/**
+ * Fittings section tracer (issue #1532): pasting an EFT fit Loads it and
+ * renders the List view, at a phone width where every tappable control still
+ * meets the 36px touch-target floor (DESIGN.md, `min-h-9`). The stats
+ * sections wait on the dogma engine's own WASM+SDE download — genuinely slow
+ * on a cold CI runner — so this spec asserts on the List view and the Load
+ * control only, not on any stat figure.
+ */
+import { test, expect } from './support/testBase';
+import { signInAndGoto } from './support/authSeed';
+import { answerAnyType } from './support/universeTypes';
+
+const PHONE = { width: 390, height: 844 };
+
+const RIFTER_EFT = [
+  '[Rifter, Tracer Test]',
+  '125mm Gatling AutoCannon I',
+  '',
+  '1MN Afterburner I',
+].join('\n');
+
+test.describe('Fittings — Load (EFT paste) at 390px', () => {
+  test('loads a pasted fit into the List view, and the Load button meets the touch-target floor', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, './ships/fittings');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    // The Start screen's Import opens the Load card in a dialog.
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByLabel('Link or text').fill(RIFTER_EFT);
+    const loadButton = page.getByRole('button', { name: 'Load', exact: true });
+    const box = await loadButton.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThanOrEqual(36);
+
+    await loadButton.click();
+
+    await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
+    await expect(page.getByText('High slots', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mid slots', { exact: true })).toBeVisible();
+
+    // No sideways scroll at 390px — the usual narrow-width regression.
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+
+  test('switches to the Ring overview, edits a rack through a 36px rack button, and remembers the choice across a reload', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, './ships/fittings');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    // The Start screen's Import opens the Load card in a dialog.
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByLabel('Link or text').fill(RIFTER_EFT);
+    await page.getByRole('button', { name: 'Load', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
+
+    // Below desktop the Ring, the List and the stats are one row of tabs.
+    const ringToggle = page.getByRole('tab', { name: 'Ring', exact: true });
+    const toggleBox = await ringToggle.boundingBox();
+    expect(toggleBox!.height).toBeGreaterThanOrEqual(36);
+    await ringToggle.click();
+
+    await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
+    // At 390px the ring is an overview — its tiles are too small to be the
+    // tap target (scope decision 20260924-205720) — so the rack buttons are.
+    await expect(page.getByLabel(/^High slots 1[:,]/)).toBeVisible();
+    const rackButton = page.getByRole('button', { name: /^High slots\s*\d+ \/ \d+/ });
+    const rackBox = await rackButton.boundingBox();
+    expect(rackBox!.height).toBeGreaterThanOrEqual(36);
+    await rackButton.click();
+    const sheet = page.getByRole('dialog', { name: 'High slots' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText('125mm Gatling AutoCannon I')).toBeVisible();
+    await page.keyboard.press('Escape');
+    // Closing a sheet pops its history entry (Back); reloading while that
+    // navigation is in flight aborts it (net::ERR_ABORTED).
+    await expect(sheet).toBeHidden();
+    await page.waitForLoadState('load');
+
+    // The Back pop is a same-document navigation `load` can't see, so on a
+    // slow runner it can still be in flight; retry the reload until it lands.
+    // Each attempt gets its own short budget: a reload that hangs behind the
+    // in-flight pop would otherwise eat the whole test timeout in one attempt.
+    await expect(async () => {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 6000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+
+  test('starts a new Fitting from a hull on the Start screen', async ({ page }) => {
+    await signInAndGoto(page, './ships/fittings');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    const newFromHull = page.getByRole('button', { name: 'New from hull' });
+    expect((await newFromHull.boundingBox())!.height).toBeGreaterThanOrEqual(36);
+    await newFromHull.click();
+    await page.getByRole('searchbox', { name: 'Search hulls' }).fill('Rifter');
+    await page.getByRole('button', { name: 'Rifter', exact: true }).click();
+    const start = page.getByRole('button', { name: 'Start fitting' });
+    expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(36);
+    await start.click();
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Rifter' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+
+  test('a long fit name takes two lines at most, with Save and the menu beside it on one row', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, './ships/fittings');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    const longName = 'Rifter - long PvE mission tackle fit name here for the header';
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.getByLabel('Link or text').fill(`[Rifter, ${longName}]
+1MN Afterburner I`);
+    await page.getByRole('button', { name: 'Load', exact: true }).click();
+
+    const h1 = page.getByRole('heading', { level: 1 });
+    await expect(h1).toContainText('Rifter - long PvE');
+    const h1Box = (await h1.boundingBox())!;
+    // Readable beside Save and ⋮ (Rename is in that menu), and no more than two 28px lines.
+    expect(h1Box.width).toBeGreaterThan(80);
+    expect(h1Box.height).toBeLessThanOrEqual(60);
+    const h1Size = await h1.evaluate((el) => el.scrollWidth <= el.clientWidth);
+    expect(h1Size).toBe(true);
+
+    for (const control of [
+      page.getByRole('button', { name: 'Fitting actions' }),
+      page.getByRole('button', { name: /^Save/ }).first(),
+    ]) {
+      const box = (await control.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(h1Box.x + h1Box.width);
+      expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+      expect(box.height).toBeGreaterThanOrEqual(36);
+    }
+
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+});

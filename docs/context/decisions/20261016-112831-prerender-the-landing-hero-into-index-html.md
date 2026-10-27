@@ -1,0 +1,10 @@
+# Scope decisions — Prerender the landing hero into index.html (issue #3926)
+
+_Recorded 2026-10-16 · issue #3926._
+
+- **The landing page's header and hero ship as static HTML in `index.html`, cut from the real `Login` render, not hand-written.** `src/features/landing/landingShell.test.tsx` keeps them as a file snapshot (`landingShell.snapshot.html`) that `vite.config.ts` injects into a `<template>`; a hero change fails that test until the snapshot is regenerated (`-u`). Chosen over a `preload` hint alone, which only fetched the ship sooner while the text still waited on the JS (mobile LCP 11.6 s, 6.9 s of it load delay). It rules out a build-time SSR step: the snapshot needs no server render of components that read Dexie.
+- **Shown only on `/` and `/login`, without the signed-in hint, outside the Play Store app.** `index.html` serves every route (and is `404.html`, and the service worker's navigation fallback), so the boot script gates on the same hint key and TWA flag the app uses; a returning pilot never sees a marketing flash.
+- **React renders under it, `#root` hidden, and the first real screen lets it go** (`src/app/landingShell.ts`): `Login` in a layout effect once its Dexie read resolves, so the shell and the boot screen never alternate; any other route on arrival; any render error at once; a 10 s backstop from the entry. The shell is `inert`: its buttons only look live.
+- **The Overview demo stays out of the shell.** Its countdowns change by the minute, which would churn the snapshot, and it is its own chunk (#3927). It appears below the hero at the hand-off, adding content without moving any.
+- **The hero's entry fade is off when the shell was shown** (`html[data-landing-shell-shown]`): it would blink out text the visitor already read.
+- **The gate runs in `<head>`, ahead of the stylesheet, and preloads the hero's ship** (follow-up, 2026-10-16). A script placed after a stylesheet waits for it, so with the gate in `<body>` the ship only started once the CSS was in (mobile LCP load delay 5.8 s after #3926). Only the landing paths preload it; every other route never fetches it.

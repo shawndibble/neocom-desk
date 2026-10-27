@@ -1,0 +1,184 @@
+import { describe, it, expect } from 'vitest';
+import { buildSkillRequirements } from './skillRequirements';
+import type { SkillCatalog } from './skillMap';
+import type { SkillType } from '@/sde/types';
+import type { EngineSkill, TrainedSkill } from '@/engine/types';
+
+function sdeSkill(overrides: Partial<SkillType> & { typeID: number; name: string }): SkillType {
+  return {
+    description: '',
+    groupID: 1,
+    groupName: 'Group',
+    rank: 1,
+    primaryAttr: 'intelligence',
+    secondaryAttr: 'memory',
+    prereqs: [],
+    ...overrides,
+  };
+}
+
+function engineSkill(overrides: Partial<EngineSkill> & { typeID: number }): EngineSkill {
+  return {
+    name: `Skill ${overrides.typeID}`,
+    rank: 1,
+    primary: 'intelligence',
+    secondary: 'memory',
+    prereqs: [],
+    ...overrides,
+  };
+}
+
+function catalogOf(skills: EngineSkill[], sde: SkillType[]): SkillCatalog {
+  const engineSkills = new Map(skills.map((s) => [s.typeID, s]));
+  const bySkillTypeID = new Map(sde.map((s) => [s.typeID, s]));
+  const unlocksByTypeID = new Map<number, { typeID: number; level: number }[]>();
+  for (const skill of skills) {
+    for (const prereq of skill.prereqs) {
+      const list = unlocksByTypeID.get(prereq.typeID) ?? [];
+      list.push({ typeID: skill.typeID, level: prereq.level });
+      unlocksByTypeID.set(prereq.typeID, list);
+    }
+  }
+  return { engineSkills, bySkillTypeID, unlocksByTypeID };
+}
+
+describe('buildSkillRequirements', () => {
+  const catalog = catalogOf(
+    [engineSkill({ typeID: 1 }), engineSkill({ typeID: 2, prereqs: [{ typeID: 1, level: 3 }] })],
+    [sdeSkill({ typeID: 1, name: 'Spaceship Command' }), sdeSkill({ typeID: 2, name: 'Frigate' })]
+  );
+
+  it('returns null for a typeID the catalog does not know', () => {
+    expect(buildSkillRequirements(catalog, new Map(), 999)).toBeNull();
+  });
+
+  it('marks a prereq trained when the trained level meets the requirement', () => {
+    const trainedSkills = new Map<number, TrainedSkill>([[1, { level: 3, sp: 1 }]]);
+    const result = buildSkillRequirements(catalog, trainedSkills, 2);
+    expect(result?.prereqs).toEqual([
+      { typeID: 1, name: 'Spaceship Command', level: 3, trained: true, planned: false },
+    ]);
+  });
+
+  it('marks a prereq untrained when the trained level falls short', () => {
+    const trainedSkills = new Map<number, TrainedSkill>([[1, { level: 1, sp: 1 }]]);
+    const result = buildSkillRequirements(catalog, trainedSkills, 2);
+    expect(result?.prereqs).toEqual([
+      { typeID: 1, name: 'Spaceship Command', level: 3, trained: false, planned: false },
+    ]);
+  });
+
+  it('marks a prereq planned when an open plan already targets its level', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 2, [
+      { skillTypeID: 1, targetLevel: 3 },
+    ]);
+    expect(result?.prereqs).toEqual([
+      { typeID: 1, name: 'Spaceship Command', level: 3, trained: false, planned: true },
+    ]);
+  });
+
+  it('does not mark a prereq planned when the plan targets a lower level', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 2, [
+      { skillTypeID: 1, targetLevel: 2 },
+    ]);
+    expect(result?.prereqs[0].planned).toBe(false);
+  });
+
+  it('marks a prereq planned when the plan trains it only on the way to another entry', () => {
+    // Frigate I needs Spaceship Command III, which the plan schedules ahead of it.
+    const result = buildSkillRequirements(catalog, new Map(), 2, [
+      { skillTypeID: 2, targetLevel: 1 },
+    ]);
+    expect(result?.prereqs[0].planned).toBe(true);
+  });
+
+  it('falls back to the plan entries alone when the plan cannot be scheduled', () => {
+    const circular = catalogOf(
+      [
+        engineSkill({ typeID: 1, prereqs: [{ typeID: 3, level: 1 }] }),
+        engineSkill({ typeID: 2, prereqs: [{ typeID: 1, level: 3 }] }),
+        engineSkill({ typeID: 3, prereqs: [{ typeID: 1, level: 1 }] }),
+      ],
+      [
+        sdeSkill({ typeID: 1, name: 'Spaceship Command' }),
+        sdeSkill({ typeID: 2, name: 'Frigate' }),
+        sdeSkill({ typeID: 3, name: 'Loop' }),
+      ]
+    );
+    const result = buildSkillRequirements(circular, new Map(), 2, [
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 3, targetLevel: 1 },
+    ]);
+    expect(result?.prereqs[0].planned).toBe(true);
+  });
+
+  it('treats a skill with no trained-skills entry as untrained (level 0)', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 2);
+    expect(result?.prereqs[0].trained).toBe(false);
+  });
+
+  it('reads unlocks from the catalog reverse index', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 1);
+    expect(result?.unlocks).toEqual([{ typeID: 2, name: 'Frigate', level: 3 }]);
+    expect(result?.prereqs).toEqual([]);
+  });
+
+  it('falls back to #typeID when a referenced skill has no SDE name', () => {
+    const withGap = catalogOf(
+      [engineSkill({ typeID: 1 }), engineSkill({ typeID: 2, prereqs: [{ typeID: 1, level: 1 }] })],
+      [sdeSkill({ typeID: 2, name: 'Frigate' })] // typeID 1 missing from bySkillTypeID
+    );
+    const result = buildSkillRequirements(withGap, new Map(), 2);
+    expect(result?.prereqs).toEqual([
+      { typeID: 1, name: '#1', level: 1, trained: false, planned: false },
+    ]);
+  });
+
+  it('strips EVE markup from the description', () => {
+    const withDescription = catalogOf(
+      [engineSkill({ typeID: 1 })],
+      [sdeSkill({ typeID: 1, name: 'Spaceship Command', description: 'Pilots a <b>ship</b>.' })]
+    );
+    const result = buildSkillRequirements(withDescription, new Map(), 1);
+    expect(result?.description).toBe('Pilots a ship.');
+  });
+
+  it('returns a null description for a skill with no description', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 1);
+    expect(result?.description).toBeNull();
+  });
+
+  it("carries the skill's group, rank and training attributes for the facts line", () => {
+    const facts = catalogOf(
+      [engineSkill({ typeID: 1 })],
+      [
+        sdeSkill({
+          typeID: 1,
+          name: 'Upwell Hauler',
+          groupName: 'Spaceship Command',
+          rank: 4,
+          primaryAttr: 'perception',
+          secondaryAttr: 'willpower',
+        }),
+      ]
+    );
+    expect(buildSkillRequirements(facts, new Map(), 1)).toMatchObject({
+      groupName: 'Spaceship Command',
+      rank: 4,
+      primaryAttr: 'perception',
+      secondaryAttr: 'willpower',
+    });
+  });
+
+  it('carries the SDE base price as the NPC price', () => {
+    const priced = catalogOf(
+      [engineSkill({ typeID: 1 })],
+      [sdeSkill({ typeID: 1, name: 'Upwell Hauler', basePrice: 2_000_000 })]
+    );
+    expect(buildSkillRequirements(priced, new Map(), 1)?.npcPrice).toBe(2_000_000);
+  });
+
+  it('has no NPC price when the SDE gives none', () => {
+    expect(buildSkillRequirements(catalog, new Map(), 1)?.npcPrice).toBeNull();
+  });
+});

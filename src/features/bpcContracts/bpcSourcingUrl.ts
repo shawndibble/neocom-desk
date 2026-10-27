@@ -1,0 +1,98 @@
+/**
+ * BPC Sourcing's view state in the URL (ADR 0015): the search box, filters,
+ * source toggles, Jump Range, Show all, and the blueprint the search is
+ * pinned to — so a reload of `/industry/sourcing` reopens the same search.
+ * Keys are prefixed `sourcing.` so they never collide with another Industry
+ * tab's.
+ *
+ * The Space filter and visible columns are *not* here: both are persisted
+ * local settings already (`bpcSpaceFilterPref.ts`, `bpcSearchColumns.ts`).
+ * `sourcing.src` is here, with a remembered default behind it
+ * (`bpcSourcesPref.ts`) that a bare visit reads instead of
+ * `DEFAULT_SOURCE_TOGGLES`.
+ */
+import { tabPath } from '@/lib/pageTabs';
+import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import type { BpcSearchSource } from '@/engine/contracts/bpcSearch';
+import { DEFAULT_JUMP_RANGE, JUMP_RANGES } from '@/engine/route/jumpRange';
+
+/**
+ * Which listings the search covers: `contract` BPCs, `contractBpo` contract
+ * originals and `market` market BPO sell orders (issue #1241), `lp` copies from the pilot's LP stores, plus `owned` and `community` (Shared Blueprints from the pilot's Communities, issue #3602).
+ */
+export type SourceToggle = BpcSearchSource | 'contractBpo';
+export const SOURCE_TOGGLES: readonly SourceToggle[] = [
+  'contract',
+  'contractBpo',
+  'market',
+  'lp',
+  'community',
+  'owned',
+];
+/** Content key of a source set, order-independent: equal sets share a key. */
+export function sourceToggleKey(sources: ReadonlySet<SourceToggle>): string {
+  return SOURCE_TOGGLES.filter((source) => sources.has(source)).join();
+}
+
+/** Inverse of `sourceToggleKey`, so a memo keyed on the key holds a stable Set. */
+export function sourceToggleSet(key: string): ReadonlySet<SourceToggle> {
+  return new Set(key === '' ? [] : (key.split(',') as SourceToggle[]));
+}
+
+/** Every source on until the pilot picks their own (`bpcSourcesPref.ts`): a search should look everywhere, and Community/LP cost nothing for a pilot with none. */
+export const DEFAULT_SOURCE_TOGGLES: readonly SourceToggle[] = SOURCE_TOGGLES;
+
+export const BPC_SOURCING_PARAMS = {
+  'sourcing.q': textParam(),
+  'sourcing.region': optionalIdParam(),
+  'sourcing.minMe': textParam(),
+  'sourcing.minTe': textParam(),
+  'sourcing.minRuns': textParam(),
+  'sourcing.maxPrice': textParam(),
+  /** Hides an auction-type contract row (issue #1105) — never an owned or market row. */
+  'sourcing.hideAuctions': boolParam(),
+  /** Hides a contract row that asks for PLEX in return (issue #1105) — never an owned or market row. */
+  'sourcing.hidePlex': boolParam(),
+  'sourcing.src': enumSetParam(SOURCE_TOGGLES, DEFAULT_SOURCE_TOGGLES),
+  /** Jump Range from the Current System (`engine/route/jumpRange.ts`). */
+  'sourcing.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
+  'sourcing.type': optionalIdParam(),
+};
+
+/**
+ * The schema with the two exclude toggles' defaults swapped for the pilot's
+ * Settings (`sourcingDefaults.ts`). The URL still wins: only a toggle that
+ * differs from *their* default is written to it, so `?sourcing.hideAuctions=0`
+ * is how a view opts out of a default that hides auctions.
+ */
+export function bpcSourcingParams(defaults: { hideAuctions: boolean; hidePlex: boolean }) {
+  return {
+    ...BPC_SOURCING_PARAMS,
+    'sourcing.hideAuctions': boolParam(defaults.hideAuctions),
+    'sourcing.hidePlex': boolParam(defaults.hidePlex),
+  };
+}
+
+/** Key for the offers table's sort. */
+export const BPC_SOURCING_SORT_KEY = 'sourcing.sort';
+
+/** BPC Sourcing, pinned to one blueprint — the "search BPC Sourcing for this" links (issue #839). */
+export function bpcSourcingHref(blueprintTypeId: number): string {
+  const params = new URLSearchParams();
+  const typeParam = BPC_SOURCING_PARAMS['sourcing.type'].serialize(blueprintTypeId);
+  if (typeParam !== null) params.set('sourcing.type', typeParam);
+  return `${tabPath(INDUSTRY_TABS, 'sourcing')}?${params.toString()}`;
+}
+
+/**
+ * BPC Sourcing narrowed to the pilot's own blueprints and the ones their
+ * Communities share: no contract, market or LP store rows. The Community
+ * page's "Browse every blueprint" link.
+ */
+export function bpcSourcingCommunityHref(): string {
+  const params = new URLSearchParams();
+  const sources = BPC_SOURCING_PARAMS['sourcing.src'].serialize(new Set(['community', 'owned']));
+  if (sources !== null) params.set('sourcing.src', sources);
+  return `${tabPath(INDUSTRY_TABS, 'sourcing')}?${params.toString()}`;
+}

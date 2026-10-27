@@ -1,0 +1,312 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import '@/i18n';
+import { BpcContractModal } from './BpcContractModal';
+import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import type { PublicContractItem } from '@/esi/endpoints';
+import type { BlueprintMap } from '@/sde/types';
+import { LocationProbe } from '@/test/LocationProbe';
+
+const BLUEPRINTS: BlueprintMap = {
+  // Rifter Blueprint -> Rifter
+  '638': {
+    name: 'Rifter Blueprint',
+    time: 1200,
+    materials: [],
+    products: [{ typeID: 587, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+};
+
+vi.mock('@/sde/loadSde', () => ({
+  loadBlueprints: vi.fn(async (): Promise<BlueprintMap> => BLUEPRINTS),
+}));
+
+const loadContractLocationName =
+  vi.fn<(characterId: number, locationId: number) => Promise<string | null>>();
+vi.mock('@/features/character/contractLocationName', () => ({
+  loadContractLocationName: (characterId: number, locationId: number) =>
+    loadContractLocationName(characterId, locationId),
+}));
+
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: vi.fn(
+    async () =>
+      new Map([
+        [638, 'Rifter Blueprint'],
+        [34, 'Tritanium'],
+      ])
+  ),
+}));
+
+const loadPublicContractItems = vi.fn();
+vi.mock('@/features/bpcContracts/publicContractItems', () => ({
+  loadPublicContractItems: (...args: unknown[]) => loadPublicContractItems(...args),
+}));
+
+const ROW: BpcContractRow = {
+  contractId: 12345,
+  regionId: 10000002,
+  locationId: 60003760,
+  typeId: 638,
+  price: 5_000_000,
+  isAuction: false,
+  me: 10,
+  te: 20,
+  runs: 5,
+  quantity: 1,
+  dateExpired: Date.parse('2099-09-10T00:00:00Z'),
+  isMultiType: false,
+};
+
+function items(list: PublicContractItem[]) {
+  return {
+    data: { kind: 'items' as const, items: list },
+    fetchedAt: new Date(),
+    fromCache: false,
+    truncated: false,
+  };
+}
+
+/** Reports where the router ended up, so a navigating menu action is assertable. */
+
+const CHARACTER_ID = 91;
+
+function renderModal(row: BpcContractRow = ROW, comparables: readonly BpcContractRow[] = []) {
+  return render(
+    <MemoryRouter initialEntries={['/industry/sourcing']}>
+      <BpcContractModal
+        row={row}
+        comparables={comparables}
+        characterId={CHARACTER_ID}
+        blueprintName="Rifter Blueprint"
+        regionName="The Forge"
+        onClose={() => {}}
+      />
+      <LocationProbe />
+    </MemoryRouter>
+  );
+}
+
+beforeEach(() => {
+  loadContractLocationName.mockReset();
+  loadContractLocationName.mockResolvedValue('Jita IV - Moon 4');
+  loadPublicContractItems.mockReset();
+  loadPublicContractItems.mockResolvedValue(
+    items([
+      {
+        record_id: 1,
+        type_id: 638,
+        quantity: 1,
+        is_included: true,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 20,
+        runs: 5,
+      },
+      { record_id: 2, type_id: 34, quantity: 744, is_included: true },
+    ])
+  );
+});
+
+describe('BpcContractModal — where the contract is', () => {
+  it('names a contract sitting in a player structure (issue #655 item F)', async () => {
+    // This used to call `loadStationName` with no structure fallback at all,
+    // so a citadel contract rendered "Unknown location" forever — and spent a
+    // 404 on every open discovering that.
+    loadContractLocationName.mockResolvedValue('1DQ1-A - 1-st Imperial Palace');
+    const structureRow: BpcContractRow = { ...ROW, locationId: 1022734985679 };
+
+    renderModal(structureRow);
+
+    expect(await screen.findByText('1DQ1-A - 1-st Imperial Palace')).toBeInTheDocument();
+    expect(loadContractLocationName).toHaveBeenCalledWith(CHARACTER_ID, 1022734985679);
+  });
+
+  it('falls back to the id when the location resolves to nothing', async () => {
+    // A structure outside this character's ACL: `null` means "don't know",
+    // and the id is the only honest thing left to show.
+    loadContractLocationName.mockResolvedValue(null);
+
+    renderModal();
+
+    expect(await screen.findByText('Unknown location (#60003760)')).toBeInTheDocument();
+  });
+});
+
+describe('BpcContractModal — contract no longer listed', () => {
+  it('shows a distinct message for a 404 rather than the generic load-failed one', async () => {
+    // ESI 404s a contract_id it no longer recognizes as public (expired,
+    // fulfilled, withdrawn) — an ordinary outcome, not a fetch failure.
+    loadPublicContractItems.mockResolvedValue({
+      data: { kind: 'not-found' as const },
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+
+    renderModal();
+
+    expect(await screen.findByText('Contract no longer listed')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load')).not.toBeInTheDocument();
+  });
+});
+
+describe('BpcContractModal — Build Plan context menu', () => {
+  it('right-clicking a blueprint line starts a Build Plan seeded at that line’s ME/TE/runs', async () => {
+    renderModal();
+
+    // Scoped to the contents list: the modal's own title is the blueprint name too.
+    const contents = await screen.findByRole('list');
+    fireEvent.contextMenu(within(contents).getByText('Rifter Blueprint'));
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    // 587 (Rifter), not 638 (the blueprint in the contract) — and this
+    // line's own 10/20 x5, not the generic defaults (issue #638).
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/industry/plans?product=587&me=10&te=20&runs=5'
+    );
+  });
+
+  it('seeds the same line identically on a second click, the key Industry’s reuse rule matches on', async () => {
+    renderModal();
+    const contents = await screen.findByRole('list');
+    const line = within(contents).getByText('Rifter Blueprint');
+
+    for (let i = 0; i < 2; i++) {
+      fireEvent.contextMenu(line);
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/industry/plans?product=587&me=10&te=20&runs=5'
+      );
+    }
+  });
+
+  it('falls back to the unseeded menu when ESI omits one of the copy’s numbers', async () => {
+    loadPublicContractItems.mockResolvedValue(
+      items([
+        {
+          record_id: 1,
+          type_id: 638,
+          quantity: 1,
+          is_included: true,
+          is_blueprint_copy: true,
+          material_efficiency: 10,
+          time_efficiency: 20,
+          // runs omitted — a worse answer would seed a 0-run plan.
+        },
+      ])
+    );
+    renderModal();
+
+    const contents = await screen.findByRole('list');
+    fireEvent.contextMenu(within(contents).getByText('Rifter Blueprint'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/industry/plans?product=587');
+    expect(screen.getByTestId('location')).not.toHaveTextContent('me=');
+  });
+
+  it('seeds two bundled copies at different research to different plans', async () => {
+    loadPublicContractItems.mockResolvedValue(
+      items([
+        {
+          record_id: 1,
+          type_id: 638,
+          quantity: 1,
+          is_included: true,
+          is_blueprint_copy: true,
+          material_efficiency: 10,
+          time_efficiency: 20,
+          runs: 5,
+        },
+        {
+          record_id: 2,
+          type_id: 638,
+          quantity: 1,
+          is_included: true,
+          is_blueprint_copy: true,
+          material_efficiency: 2,
+          time_efficiency: 4,
+          runs: 1,
+        },
+      ])
+    );
+    renderModal();
+
+    const contents = await screen.findByRole('list');
+    const rows = within(contents).getAllByText('Rifter Blueprint');
+    expect(rows).toHaveLength(2);
+
+    fireEvent.contextMenu(rows[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/industry/plans?product=587&me=10&te=20&runs=5'
+    );
+
+    fireEvent.contextMenu(rows[1]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/industry/plans?product=587&me=2&te=4&runs=1'
+    );
+  });
+
+  it('disables the action on a bundled item nothing builds', async () => {
+    renderModal();
+
+    fireEvent.contextMenu(await screen.findByText('Tritanium'));
+
+    const item = await screen.findByRole('menuitem', { name: 'No blueprint options' });
+    expect(item).toHaveAttribute('data-disabled');
+  });
+
+  describe('price check', () => {
+    // ROW is 5,000,000 for 5 runs: 1,000,000 a run, ME 10 / TE 20.
+    const similar = (contractId: number, price: number): BpcContractRow => ({
+      ...ROW,
+      contractId,
+      price,
+    });
+
+    it('holds the copy per run against similar copies, with the median and the cheapest', async () => {
+      renderModal(ROW, [
+        ROW,
+        similar(2, 4_000_000), // 800,000 / run
+        similar(3, 5_500_000), // 1,100,000 / run
+        similar(4, 6_000_000), // 1,200,000 / run
+      ]);
+
+      const check = await screen.findByRole('region', {
+        name: 'Is it fair? · 3 similar copies for sale now',
+      });
+      expect(within(check).getByText('1,000,000 ISK')).toBeInTheDocument(); // this copy
+      expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // median
+      expect(within(check).getByText('800,000 ISK')).toBeInTheDocument(); // cheapest
+      expect(within(check).getByText('−9.1%')).toBeInTheDocument();
+      expect(within(check).getByText('Below the median per run')).toBeInTheDocument();
+    });
+
+    it('says there are too few similar copies when fewer than three are for sale', async () => {
+      renderModal(ROW, [ROW, similar(2, 4_000_000)]);
+      expect(
+        await screen.findByText('Too few similar copies for sale to compare with.')
+      ).toBeInTheDocument();
+    });
+
+    it('puts the per-run price beside the asking price in the header', async () => {
+      renderModal(ROW, []);
+      expect(await screen.findByText('Per run')).toBeInTheDocument();
+      expect(screen.getAllByText('1,000,000')).not.toHaveLength(0);
+    });
+
+    it('tags the blueprint itself as the line that was searched for', async () => {
+      renderModal(ROW, []);
+      const rows = await screen.findAllByRole('listitem');
+      expect(rows[0]).toHaveTextContent('Your search');
+      expect(rows[1]).not.toHaveTextContent('Your search');
+    });
+  });
+});

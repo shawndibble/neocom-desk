@@ -1,0 +1,908 @@
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import '@/i18n';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import type { CachedResult, StatusResult } from '@/esi/cache';
+import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
+import {
+  useCorpAccess,
+  type CorpAccess,
+  type CorpAccessState,
+} from '@/features/corp/useCorpAccess';
+import type { CorporationMemberTracking } from '@/esi/endpoints';
+import * as boardData from '@/features/corp/boardData';
+import * as corpMembers from '@/features/corp/members';
+import * as rosterState from '@/features/corp/rosterState';
+import * as roleAudit from '@/features/corp/roleAudit';
+import * as download from '@/lib/download';
+import { configureClipboard } from '@/lib/clipboard';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { db } from '@/db';
+import {
+  CORP_ROSTER_DEFAULT_COLUMNS,
+  useVisibleCorpRosterColumns,
+} from '@/features/corp/corpRosterColumns';
+import { CorpMembers } from './CorpMembers';
+import { LocationProbe } from '@/test/LocationProbe';
+
+vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
+vi.mock('@/features/corp/boardData', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/boardData')>()),
+  loadCorporationId: vi.fn(),
+}));
+vi.mock('@/features/corp/members', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/members')>()),
+  loadCorporationCeoId: vi.fn(),
+  loadCorporationMemberIds: vi.fn(),
+  loadCorporationMemberRoles: vi.fn(),
+  loadCorporationMemberTracking: vi.fn(),
+  loadMemberLabels: vi.fn(),
+}));
+vi.mock('@/features/corp/roleAudit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/roleAudit')>()),
+  loadRoleAudit: vi.fn(),
+}));
+vi.mock('@/features/corp/rosterState', () => ({
+  readPreviousRoster: vi.fn(),
+  recordRoster: vi.fn(async () => {}),
+}));
+
+const mockedAccess = vi.mocked(useCorpAccess);
+const mocked = { ...vi.mocked(boardData), ...vi.mocked(corpMembers), ...vi.mocked(rosterState) };
+
+const CHARACTER_ID = 42;
+const CORPORATION_ID = 98000001;
+const NOW = Date.parse('2026-09-03T12:00:00Z');
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+const ago = (ms: number) => new Date(NOW - ms).toISOString();
+
+function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities>): CorpAccess {
+  return {
+    state,
+    capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
+    missingScopes: [],
+    roles: [],
+    readFailed: false,
+    retry: () => {},
+  };
+}
+
+function cached<T>(data: T): StatusResult<T> {
+  const result: CachedResult<T> = {
+    data,
+    fetchedAt: new Date(NOW - 30 * 60_000),
+    fromCache: false,
+    truncated: false,
+  };
+  return { cached: result, needsReauth: false };
+}
+
+/** A read that fell back to its saved copy, an hour older than a fresh one. */
+function savedCopy<T>(data: T): StatusResult<T> {
+  const result = cached(data).cached!;
+  return {
+    cached: { ...result, fromCache: true, fetchedAt: new Date(NOW - HOUR) },
+    needsReauth: false,
+  };
+}
+
+function tracking(
+  overrides: Partial<CorporationMemberTracking> & { character_id: number }
+): CorporationMemberTracking {
+  return {
+    logon_date: ago(2 * HOUR),
+    logoff_date: ago(HOUR),
+    start_date: ago(400 * DAY),
+    ship_type_id: 587,
+    location_id: 60003760,
+    ...overrides,
+  };
+}
+
+const NAMES = new Map([
+  [1001, 'Jita Local'],
+  [1002, 'Silent Ren'],
+  [1003, 'Fresh Recruit'],
+  [1004, 'Departed Soul'],
+]);
+
+function labels(overrides: Partial<corpMembers.MemberLabels> = {}): corpMembers.MemberLabels {
+  return {
+    characters: NAMES,
+    ships: new Map([[587, 'Rifter']]),
+    locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+    ...overrides,
+  };
+}
+
+function renderMembers(initialEntry = '/corp/members') {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <CorpMembers />
+      <LocationProbe />
+    </MemoryRouter>
+  );
+}
+
+/** Opens the funnel: the dark-only chip and the other filters sit behind it. */
+async function openFilters(user = userEvent.setup()) {
+  await user.click(screen.getByRole('button', { name: /^Filters/ }));
+}
+
+/** The dark-only chip, by its own name — the stat strip's "About" tooltip also mentions it. */
+function darkToggle(): HTMLElement {
+  return screen.getByRole('button', { name: /^Dark 30d\+/ });
+}
+
+function currentLocation(): string {
+  return screen.getByTestId('location').textContent ?? '';
+}
+
+/** Renders, then waits for the roster table to have replaced the loading spinner. */
+async function rosterTable(): Promise<HTMLElement> {
+  renderMembers();
+  return waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+}
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  // The column picker test hides a column; that must not leak into the next test.
+  await db.settings.clear();
+  useVisibleCorpRosterColumns.setState({ value: CORP_ROSTER_DEFAULT_COLUMNS, hydrated: false });
+  vi.setSystemTime(NOW);
+  useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+  usePublicInfoModalStore.setState({ request: null });
+
+  mocked.loadCorporationId.mockResolvedValue(CORPORATION_ID);
+  mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
+  mocked.loadCorporationMemberTracking.mockResolvedValue(
+    cached([tracking({ character_id: 1001 })])
+  );
+  mocked.loadCorporationMemberRoles.mockResolvedValue(cached([]));
+  mocked.loadCorporationCeoId.mockResolvedValue(null);
+  mocked.loadMemberLabels.mockResolvedValue(labels());
+  mocked.readPreviousRoster.mockResolvedValue(undefined);
+  mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  configureClipboard(null);
+});
+
+describe('access (AC1)', () => {
+  it('waits rather than deciding while corp access is still resolving', () => {
+    mockedAccess.mockReturnValue(accessOf('unknown', {}));
+    renderMembers();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+
+  it('says the roles could not be checked, with a Try again, instead of waiting for good', async () => {
+    const retry = vi.fn();
+    mockedAccess.mockReturnValue({ ...accessOf('unknown', {}), readFailed: true, retry });
+    renderMembers();
+    expect(
+      screen.getAllByText("Can't check your corporation roles right now").length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The narrower half of the gate. `membertracking` answers to Director alone,
+   * so a `ready` Accountant must get the explanation rather than the table —
+   * and must not spend a request buying a guaranteed 403.
+   */
+  it('renders nothing but the reason for a ready character without the membership capability', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    renderMembers();
+    expect(await screen.findByText('Member tracking needs Director')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+
+  it('renders the reason for a character with no corp access at all', async () => {
+    mockedAccess.mockReturnValue(accessOf('none', {}));
+    renderMembers();
+    expect(await screen.findByText('Member tracking needs Director')).toBeInTheDocument();
+  });
+
+  it('fetches nothing when the corporation is not known yet', async () => {
+    mocked.loadCorporationId.mockResolvedValue(null);
+    renderMembers();
+    await waitFor(() => expect(mocked.loadCorporationId).toHaveBeenCalled());
+    expect(mocked.loadCorporationMemberIds).not.toHaveBeenCalled();
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+});
+
+describe('the cached data notice', () => {
+  it('says nothing while every read is fresh', async () => {
+    await rosterTable();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['the roster read', 'loadCorporationMemberIds', [1001, 1002]],
+    ['the tracking read', 'loadCorporationMemberTracking', [tracking({ character_id: 1001 })]],
+  ] as const)('shows it, aged, when %s is the saved copy', async (_name, loader, data) => {
+    (mocked[loader] as ReturnType<typeof vi.fn>).mockResolvedValue(savedCopy(data));
+    renderMembers();
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('1h ago', { selector: 'p time' })).toBeInTheDocument();
+  });
+
+  it('ignores a saved-copy roles read, which only feeds an optional column', async () => {
+    mocked.loadCorporationMemberRoles.mockResolvedValue(savedCopy([]));
+    await rosterTable();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+});
+
+describe('the roster table', () => {
+  it('joins each member to its resolved name, ship and location', async () => {
+    const table = await rosterTable();
+    const row = within(table).getByText('Jita Local').closest('tr');
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent('Rifter');
+    expect(row).toHaveTextContent('Jita IV - Moon 4');
+    expect(row).toHaveTextContent('1h ago');
+    // Member and ship names are real links (§6c): Show Info and Market.
+    expect(
+      within(row as HTMLElement)
+        .getByRole('link', { name: 'Jita Local' })
+        .getAttribute('href')
+    ).toContain('info=character-');
+    expect(
+      within(row as HTMLElement)
+        .getByRole('link', { name: 'Rifter' })
+        .getAttribute('href')
+    ).toContain('info=type-587');
+  });
+
+  it('says Never for a member who joined and has not logged in', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({
+          character_id: 1003,
+          logon_date: undefined,
+          logoff_date: undefined,
+          ship_type_id: undefined,
+          location_id: undefined,
+          start_date: ago(3 * DAY),
+        }),
+      ])
+    );
+    const table = await rosterTable();
+    const row = within(table).getByText('Fresh Recruit').closest('tr');
+    expect(row).toHaveTextContent('Never');
+  });
+
+  /** CX-13: newest first by default, so the down arrow reads like a date column. */
+  it('opens with the most recently seen member first, under a down arrow', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    const table = await rosterTable();
+    const names = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.textContent);
+    expect(names[0]).toContain('Jita Local');
+    expect(names[1]).toContain('Silent Ren');
+    expect(within(table).getByRole('columnheader', { name: 'Last seen' })).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+  });
+
+  it('marks the corporation CEO on the roster', async () => {
+    mocked.loadCorporationCeoId.mockResolvedValue(1001);
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    const table = await rosterTable();
+    expect(
+      within(within(table).getByText('Jita Local').closest('tr')!).getByText('CEO')
+    ).toBeVisible();
+    expect(
+      within(within(table).getByText('Silent Ren').closest('tr')!).queryByText('CEO')
+    ).toBeNull();
+  });
+
+  it('tones a member past the dark threshold and counts them', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    const table = await rosterTable();
+    const dark = within(table).getByText('90d ago').closest('td')!;
+    const active = within(table).getByText('1h ago').closest('td')!;
+    expect(dark.className).toContain('text-warning');
+    expect(active.className).not.toContain('text-warning');
+    // Not hue alone (WCAG 1.4.1): the dark cell carries a glyph, the active one none.
+    expect(dark.querySelectorAll('svg')).toHaveLength(1);
+    expect(active.querySelectorAll('svg')).toHaveLength(0);
+    expect(screen.getByText('Dark 30d+').parentElement).toHaveTextContent('1');
+  });
+
+  it('sorts every sortable column and reports it through aria-sort (AC4)', async () => {
+    const user = userEvent.setup();
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    const table = await rosterTable();
+    for (const name of ['Member', 'Last seen', 'Ship', 'Location', 'Joined']) {
+      const header = within(table).getByRole('columnheader', { name });
+      await user.click(within(header).getByRole('button'));
+      expect(header).toHaveAttribute('aria-sort', 'ascending');
+    }
+    const member = within(table).getByRole('columnheader', { name: 'Member' });
+    expect(within(member).getByRole('button')).toBeInTheDocument();
+  });
+
+  /** Issue #2187: matches the EmploymentHistory table's `duration` sibling. */
+  it('right-aligns the Last seen column, header and cells alike', async () => {
+    const table = await rosterTable();
+    const header = within(table).getByRole('columnheader', { name: 'Last seen' });
+    expect(within(header).getByRole('button').className).toContain('text-right');
+    expect(within(table).getByText('1h ago').className).toContain('text-right');
+  });
+
+  it('falls back to the id rather than a blank cell when a name will not resolve', async () => {
+    mocked.loadMemberLabels.mockResolvedValue(labels({ characters: new Map(), ships: new Map() }));
+    const table = await rosterTable();
+    expect(within(table).getByText('#1001')).toBeInTheDocument();
+  });
+
+  it('shows an empty state rather than a bare table when tracking returns nothing', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    renderMembers();
+    expect(await screen.findByText('No member activity')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('says it could not load, not "no member activity", when the tracking read failed (offline)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue({ cached: null, needsReauth: false });
+    renderMembers();
+    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
+    expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // The join/leave baseline is not consumed while the page cannot show the change.
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
+
+    // Retry reads again, and a read that now succeeds fills the table.
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 })])
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+  });
+});
+
+describe('manual refresh keeps the roster visible (issue #418)', () => {
+  it('does not blank the table while a refresh is in flight', async () => {
+    await rosterTable();
+
+    let resolveSecondFetch!: (
+      value: ReturnType<typeof cached<CorporationMemberTracking[]>>
+    ) => void;
+    mocked.loadCorporationMemberTracking.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSecondFetch = resolve;
+      })
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh member list' }));
+    expect(screen.getByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+
+    resolveSecondFetch(cached([tracking({ character_id: 1001 })]));
+    await waitFor(() => expect(mocked.loadCorporationMemberTracking).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+  });
+});
+
+describe('the joins/leaves summary', () => {
+  it('shows nothing at all when the roster has not changed (AC6)', async () => {
+    mocked.readPreviousRoster.mockResolvedValue([1001, 1002]);
+    await rosterTable();
+    expect(screen.queryByText(/\d+ joined:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ left:/)).not.toBeInTheDocument();
+  });
+
+  it('shows nothing on a first visit, when there is no baseline to compare against', async () => {
+    mocked.readPreviousRoster.mockResolvedValue(undefined);
+    await rosterTable();
+    expect(screen.queryByText(/\d+ joined:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ left:/)).not.toBeInTheDocument();
+  });
+
+  it('names who joined and who left since the last visit', async () => {
+    mocked.readPreviousRoster.mockResolvedValue([1001, 1004]);
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
+    await rosterTable();
+    expect(screen.getByText(/^1 joined:/)).toBeInTheDocument();
+    const summary = screen.getByText(/^1 joined:/).closest('p');
+    expect(
+      within(summary as HTMLElement).getByRole('link', { name: 'Silent Ren' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^1 left:/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Departed Soul' })).toBeInTheDocument();
+  });
+
+  /** A leaver is in neither read any more, so their name has to be asked for. */
+  it('asks for the names of members who left', async () => {
+    mocked.readPreviousRoster.mockResolvedValue([1001, 1004]);
+    await rosterTable();
+    expect(mocked.loadMemberLabels).toHaveBeenCalledWith(CHARACTER_ID, expect.anything(), [1004]);
+  });
+
+  it('records this visit as the baseline the next one diffs against', async () => {
+    await rosterTable();
+    expect(mocked.recordRoster).toHaveBeenCalledWith(
+      CHARACTER_ID,
+      CORPORATION_ID,
+      [1001, 1002],
+      NOW
+    );
+  });
+
+  /**
+   * Overwriting the baseline with a roster we could not read would swallow
+   * every change made since the last successful read.
+   */
+  it('leaves the baseline alone when the roster could not be read', async () => {
+    mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
+    await rosterTable();
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
+  });
+});
+
+describe('roster row menu', () => {
+  it('keeps the name as the Show info link and opens the member actions from the ⋮ or a right-click', async () => {
+    const table = await rosterTable();
+    expect(within(table).getByRole('link', { name: 'Jita Local' })).toBeInTheDocument();
+
+    expect(
+      within(table).getByRole('button', { name: /More actions for Jita Local/ })
+    ).toBeInTheDocument();
+    fireEvent.contextMenu(within(table).getByText('Jita Local').closest('tr')!);
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
+  });
+});
+
+describe('roster search (issue #421, AC2)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+  });
+
+  it('narrows the roster by name, ship, or location', async () => {
+    const table = await rosterTable();
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+
+    await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
+    expect(screen.getByText('Jita Local')).toBeInTheDocument();
+  });
+
+  it('composes with the dark-only toggle rather than replacing it (round 55 AND-stacking)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    await rosterTable();
+    await openFilters();
+    await userEvent.setup().click(darkToggle());
+    expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
+    expect(screen.getByText('Silent Ren')).toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+
+    await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
+    expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
+  });
+});
+
+describe('dark-only toggle (issue #421, AC3)', () => {
+  it('filters the table to members past the dark threshold when toggled on', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    const table = await rosterTable();
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+
+    await openFilters();
+    const toggle = darkToggle();
+    await userEvent.setup().click(toggle);
+
+    expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
+    expect(screen.getByText('Silent Ren')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.setup().click(toggle);
+    expect(screen.getByText('Jita Local')).toBeInTheDocument();
+  });
+});
+
+describe('ship and location filters', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001 }),
+        tracking({ character_id: 1002, ship_type_id: 11377, location_id: 30000142 }),
+      ])
+    );
+    mocked.loadMemberLabels.mockResolvedValue(
+      labels({
+        ships: new Map([
+          [587, 'Rifter'],
+          [11377, 'Nemesis'],
+        ]),
+        locations: new Map([
+          [60003760, 'Jita IV - Moon 4'],
+          [30000142, 'Jita'],
+        ]),
+      })
+    );
+  });
+
+  it('narrows the roster to one ship, offering only ships members fly', async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await openFilters(user);
+    await user.click(screen.getByRole('combobox', { name: 'Ship' }));
+    expect(screen.getAllByRole('option')).toHaveLength(3);
+    expect(screen.getByRole('option', { name: 'Rifter' })).toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Nemesis' }));
+
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+    expect(within(table).queryByText('Jita Local')).not.toBeInTheDocument();
+    expect(currentLocation()).toBe('/corp/members?ship=11377');
+  });
+
+  it('applies a location from the URL on arrival and counts it on the funnel', async () => {
+    renderMembers('/corp/members?loc=60003760');
+    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+    expect(within(table).queryByText('Silent Ren')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAccessibleName(
+      'Filters (1 active)'
+    );
+  });
+});
+
+describe('filtered to zero', () => {
+  it('says the filters hid everyone, not that EVE sent nothing, and resets them', async () => {
+    const user = userEvent.setup();
+    renderMembers('/corp/members?q=nobody-by-this-name');
+    expect(await screen.findByText('No members match your search or filters.')).toBeInTheDocument();
+    expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+    // Text params reach the URL once typing pauses, so the cleared `q` lands a beat later.
+    await waitFor(() => expect(currentLocation()).toBe('/corp/members'));
+    expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('');
+  });
+});
+
+describe('column picker', () => {
+  it('hides an optional column but never the member name', async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Member' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Ship' }));
+    // The open menu hides the page from the accessibility tree; close it first.
+    await user.keyboard('{Escape}');
+
+    expect(within(table).queryByRole('columnheader', { name: 'Ship' })).not.toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Member' })).toBeInTheDocument();
+  });
+});
+
+describe('roles column (issue #1766)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    mocked.loadCorporationMemberRoles.mockResolvedValue(
+      cached([{ character_id: 1001, roles: ['Junior_Accountant', 'Director'] }])
+    );
+  });
+
+  it('is hidden until the pilot turns it on', async () => {
+    const table = await rosterTable();
+    expect(within(table).queryByRole('columnheader', { name: 'Roles' })).not.toBeInTheDocument();
+  });
+
+  it("shows each member's in-game roles once toggled on", async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Roles' }));
+    await user.keyboard('{Escape}');
+
+    expect(within(table).getByRole('columnheader', { name: 'Roles' })).toBeInTheDocument();
+    expect(within(table).getByText('Jita Local').closest('tr')).toHaveTextContent(
+      'Director, Junior Accountant'
+    );
+  });
+
+  it('turns the column back off on reset', async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Roles' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
+    await user.keyboard('{Escape}');
+
+    expect(within(table).queryByRole('columnheader', { name: 'Roles' })).not.toBeInTheDocument();
+  });
+});
+
+describe('"you" tag (issue #1766)', () => {
+  it("marks the active character's own row, and only that row", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 1001, hydrated: true });
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    const table = await rosterTable();
+
+    expect(within(table).getByText('Jita Local').closest('tr')).toHaveTextContent('You');
+    expect(within(table).getByText('Silent Ren').closest('tr')).not.toHaveTextContent('You');
+  });
+});
+
+describe('CSV export (issue #421, AC4)', () => {
+  /** Title-bar export button → Download CSV, by keyboard (jsdom has no hover intent). */
+  async function downloadCsvFromMenu() {
+    const user = userEvent.setup();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Members' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    (await screen.findByRole('menuitem', { name: 'Download CSV' })).focus();
+    await user.keyboard('{Enter}');
+  }
+
+  it('exports the visible rows named neocom-corp-members-<date>.csv', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    await rosterTable();
+
+    await downloadCsvFromMenu();
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    const [filename, content] = spy.mock.calls[0];
+    expect(filename).toMatch(/^neocom-corp-members-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(content).toContain('Jita Local');
+    expect(content).toContain('Silent Ren');
+  });
+
+  it('exports only what the search/dark-only filters currently show', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    await rosterTable();
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+    await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
+
+    await downloadCsvFromMenu();
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    const content = spy.mock.calls[0][1];
+    expect(content).toContain('Jita Local');
+    expect(content).not.toContain('Silent Ren');
+  });
+
+  it('exports only the header row when nothing is visible', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    renderMembers();
+    await screen.findByText('No member activity');
+
+    await downloadCsvFromMenu();
+
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy.mock.calls[0][1].trim().split('\n')).toHaveLength(1);
+  });
+
+  it('sits in PageHeader actions beside Refresh, not in the roster panel (issue #2188)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 })])
+    );
+    await rosterTable();
+
+    const exportButton = screen.getByRole('button', { name: 'Export Members' });
+    const refreshButton = screen.getByRole('button', { name: 'Refresh member list' });
+
+    expect(exportButton.parentElement).toBe(refreshButton.parentElement);
+  });
+});
+
+describe('filters and sort in the URL (issue #1306)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+  });
+
+  it('keeps an untouched view out of the URL', async () => {
+    await rosterTable();
+    expect(currentLocation()).toBe('/corp/members');
+  });
+
+  it('applies search, dark-only and sort from the URL on arrival', async () => {
+    renderMembers('/corp/members?q=ren&dark=1&sort=member:asc');
+    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('ren');
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAccessibleName(
+      'Filters (1 active)'
+    );
+    await openFilters();
+    expect(darkToggle()).toHaveAttribute('aria-pressed', 'true');
+    expect(within(table).getByRole('columnheader', { name: 'Member' })).toHaveAttribute(
+      'aria-sort',
+      'ascending'
+    );
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+    expect(within(table).queryByText('Jita Local')).not.toBeInTheDocument();
+  });
+
+  it('writes typed search text to the URL once typing pauses', async () => {
+    await rosterTable();
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+    await waitFor(() => expect(currentLocation()).toBe('/corp/members?q=local'));
+  });
+
+  it('writes the dark-only toggle, and removes it again when switched off', async () => {
+    const user = userEvent.setup();
+    await rosterTable();
+    await openFilters(user);
+    const toggle = darkToggle();
+    await user.click(toggle);
+    expect(currentLocation()).toBe('/corp/members?dark=1');
+    await user.click(toggle);
+    expect(currentLocation()).toBe('/corp/members');
+  });
+
+  it('writes a header sort to the URL', async () => {
+    const table = await rosterTable();
+    const header = within(table).getByRole('columnheader', { name: 'Member' });
+    await userEvent.setup().click(within(header).getByRole('button'));
+    expect(currentLocation()).toBe('/corp/members?sort=member%3Aasc');
+  });
+
+  it('falls back to the defaults on garbage values', async () => {
+    renderMembers('/corp/members?dark=maybe&sort=bogus:asc');
+    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    await openFilters();
+    expect(darkToggle()).toHaveAttribute('aria-pressed', 'false');
+    expect(within(table).getByRole('columnheader', { name: 'Last seen' })).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+  });
+});
+
+describe('Roles tab (#4613)', () => {
+  const audit = {
+    data: {
+      holders: [{ characterId: 1001, roles: ['Director', 'Trader'], titles: ['CEO'] }],
+      changes: [
+        {
+          characterId: 1001,
+          issuerId: 1002,
+          changedAtMs: NOW - 2 * DAY,
+          granted: ['Trader'],
+          removed: [],
+        },
+        {
+          characterId: 1002,
+          issuerId: 1001,
+          changedAtMs: NOW - 40 * DAY,
+          granted: [],
+          removed: ['Accountant'],
+        },
+      ],
+      titlesKnown: true,
+      names: NAMES,
+      ceoId: null,
+      fetchedAt: new Date(NOW),
+      fromCache: false,
+    },
+  };
+
+  beforeEach(() => {
+    vi.mocked(roleAudit.loadRoleAudit).mockResolvedValue(audit);
+    mockedAccess.mockReturnValue(
+      accessOf('ready', { canReadMembers: true, canReadRoleAudit: true })
+    );
+  });
+
+  it('draws no tab bar without the capability', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    await rosterTable();
+    expect(screen.queryByRole('tab', { name: 'Roles' })).toBeNull();
+  });
+
+  it('offers the tab, and writes it to the URL', async () => {
+    const user = userEvent.setup();
+    await rosterTable();
+    await user.click(screen.getByRole('tab', { name: 'Roles' }));
+    expect(currentLocation()).toBe('/corp/members/roles');
+    expect(
+      await screen.findByRole('table', { name: 'Members with sensitive roles' })
+    ).toBeVisible();
+  });
+
+  it('shows sensitive holders and recent changes, older ones behind a button', async () => {
+    const user = userEvent.setup();
+    renderMembers('/corp/members/roles');
+    const holders = await screen.findByRole('table', { name: 'Members with sensitive roles' });
+    expect(within(holders).getByText('Director, Trader')).toBeInTheDocument();
+    expect(within(holders).getByText('CEO')).toBeInTheDocument();
+    const history = screen.getByRole('table', { name: 'Role changes' });
+    expect(within(history).getByText('Granted Trader')).toBeInTheDocument();
+    expect(within(history).queryByText('Removed Accountant')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Show 1 older change' }));
+    expect(within(history).getByText('Removed Accountant')).toBeInTheDocument();
+  });
+
+  it('never reads or records the roster while the Roles tab is open', async () => {
+    renderMembers('/corp/members/roles');
+    await screen.findByRole('table', { name: 'Members with sensitive roles' });
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
+  });
+
+  it('moves the Roles path to the roster without the capability', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    renderMembers('/corp/members/roles');
+    await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(currentLocation()).toBe('/corp/members/roster');
+    expect(roleAudit.loadRoleAudit).not.toHaveBeenCalled();
+  });
+});

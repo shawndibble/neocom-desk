@@ -1,0 +1,690 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { db } from '@/db';
+import type { NotificationEventId } from './events';
+import {
+  useNotificationPreferences,
+  hydrateNotificationPreferences,
+  NOTIFICATION_PREFS_SETTING_KEY,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  characterEventPrefs,
+  withMasterEnabled,
+  withEventChannelToggled,
+  isEventEnabledFor,
+  isBrowserChannelEnabled,
+  isFeedChannelEnabled,
+  withBrowserEnabled,
+  withFeedEnabled,
+  characterEveTypePrefs,
+  withEveNotificationTypeToggled,
+  isEveTypeEnabledFor,
+  characterEventThresholds,
+  withCharacterEventThreshold,
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+  DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+  DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+  DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+  DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+  DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+  DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+  DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+  DEFAULT_WALLET_FOLD_INTO_CONTRACT,
+  DEFAULT_INCURSION_NEARBY_JUMPS,
+  DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+  DEFAULT_SHIP_LOST_MINIMUM_ISK,
+  DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+  DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+  updateNotificationPrefs,
+  toggleEventChannelPref,
+  toggleEveTypeChannelPref,
+  broadcastEventChannelPref,
+  broadcastEveTypeChannelPref,
+  broadcastAllEveTypesChannelPref,
+  setDeviceNotificationPrefs,
+  withCharacterEventThreshold as withThreshold,
+} from './preferences';
+import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
+import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
+
+vi.mock('./projectionRebuildScheduler', () => ({ scheduleProjectionRebuild: vi.fn() }));
+
+const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
+const EVENT_B = 'newMail' satisfies NotificationEventId;
+const TYPE_A = 'BillOutOfMoneyMsg';
+const TYPE_B = 'AllWarDeclaredMsg';
+
+beforeEach(async () => {
+  await db.settings.clear();
+  useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
+  vi.mocked(scheduleProjectionRebuild).mockClear();
+});
+
+describe('useNotificationPreferences', () => {
+  it('defaults to the master switch on with no per-character overrides, unhydrated', () => {
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+    expect(useNotificationPreferences.getState().hydrated).toBe(false);
+  });
+
+  it('persists a value to Dexie under the notificationPreferences key', async () => {
+    await useNotificationPreferences.getState().setValue({
+      masterEnabled: false,
+      perCharacter: { 1: { [EVENT_A]: false } },
+    });
+    expect((await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))?.value).toEqual({
+      masterEnabled: false,
+      perCharacter: { 1: { [EVENT_A]: false } },
+    });
+  });
+
+  it('applies a persisted value on hydrate', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: { masterEnabled: false, perCharacter: { 2: { [EVENT_B]: false } } },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual({
+      masterEnabled: false,
+      perCharacter: { 2: { [EVENT_B]: false } },
+    });
+  });
+
+  it('falls back to the default when the stored value has the wrong shape', async () => {
+    await db.settings.put({ key: NOTIFICATION_PREFS_SETTING_KEY, value: { masterEnabled: 'yes' } });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+
+  it('rejects a perCharacter entry whose event flags are not booleans', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: 'nope' } } },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+
+  it('applies a persisted eveNotificationTypesByCharacter map on hydrate', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        eveNotificationTypesByCharacter: { 1: { BillOutOfMoneyMsg: { browser: true } } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value.eveNotificationTypesByCharacter).toEqual({
+      1: { BillOutOfMoneyMsg: { browser: true } },
+    });
+  });
+
+  it('rejects an eveNotificationTypesByCharacter entry whose channel flags are not booleans', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        eveNotificationTypesByCharacter: { 1: { BillOutOfMoneyMsg: { browser: 'nope' } } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+});
+
+describe('characterEventPrefs', () => {
+  it('returns an empty map for a character with no overrides', () => {
+    expect(characterEventPrefs(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({});
+  });
+
+  it("returns the character's stored map", () => {
+    const value = { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: false } } };
+    expect(characterEventPrefs(value, 1)).toEqual({ [EVENT_A]: false });
+  });
+});
+
+describe('withMasterEnabled', () => {
+  it('flips only the master switch, leaving per-character prefs untouched', () => {
+    const value = { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: false } } };
+    expect(withMasterEnabled(value, false)).toEqual({
+      masterEnabled: false,
+      perCharacter: { 1: { [EVENT_A]: false } },
+    });
+  });
+});
+
+describe('withEventChannelToggled', () => {
+  it('disables one channel of an event that was on by default (absent)', () => {
+    const next = withEventChannelToggled(DEFAULT_NOTIFICATION_PREFERENCES, 1, EVENT_A, 'browser');
+    const prefs = characterEventPrefs(next, 1);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'feed')).toBe(true);
+  });
+
+  it('re-enables a channel that was explicitly disabled', () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: { 1: { [EVENT_A]: { browser: false } } },
+    };
+    const next = withEventChannelToggled(value, 1, EVENT_A, 'browser');
+    expect(isEventEnabledFor(characterEventPrefs(next, 1), EVENT_A, 'browser')).toBe(true);
+  });
+
+  it('splits a legacy bare boolean into channels without changing the other one', () => {
+    const value = { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: false } } };
+    const next = withEventChannelToggled(value, 1, EVENT_A, 'feed');
+    const prefs = characterEventPrefs(next, 1);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'feed')).toBe(true);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
+  });
+
+  it("does not disturb another character's prefs", () => {
+    const value = { masterEnabled: true, perCharacter: { 2: { [EVENT_B]: false } } };
+    const next = withEventChannelToggled(value, 1, EVENT_A, 'browser');
+    expect(characterEventPrefs(next, 2)).toEqual({ [EVENT_B]: false });
+  });
+});
+
+describe('delivery channels', () => {
+  it('treats an absent channel flag as enabled, so pre-channel prefs keep working', () => {
+    const stored = { masterEnabled: true, perCharacter: {} };
+    expect(isBrowserChannelEnabled(stored)).toBe(true);
+    expect(isFeedChannelEnabled(stored)).toBe(true);
+  });
+
+  it('reads an explicit false', () => {
+    expect(
+      isBrowserChannelEnabled({ masterEnabled: true, browserEnabled: false, perCharacter: {} })
+    ).toBe(false);
+    expect(
+      isFeedChannelEnabled({ masterEnabled: true, feedEnabled: false, perCharacter: {} })
+    ).toBe(false);
+  });
+
+  it('toggles each channel independently of the other and of the master switch', () => {
+    const base = { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: false } } };
+    const noBrowser = withBrowserEnabled(base, false);
+    expect(isBrowserChannelEnabled(noBrowser)).toBe(false);
+    expect(isFeedChannelEnabled(noBrowser)).toBe(true);
+    expect(noBrowser.masterEnabled).toBe(true);
+    expect(noBrowser.perCharacter).toEqual(base.perCharacter);
+
+    const neither = withFeedEnabled(noBrowser, false);
+    expect(isBrowserChannelEnabled(neither)).toBe(false);
+    expect(isFeedChannelEnabled(neither)).toBe(false);
+  });
+
+  it('hydrates a stored value that predates channels without dropping per-character toggles', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: { masterEnabled: true, perCharacter: { 7: { [EVENT_B]: false } } },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    const value = useNotificationPreferences.getState().value;
+    expect(value.perCharacter).toEqual({ 7: { [EVENT_B]: false } });
+    expect(isBrowserChannelEnabled(value)).toBe(true);
+    expect(isFeedChannelEnabled(value)).toBe(true);
+  });
+});
+
+describe('characterEveTypePrefs / withEveNotificationTypeToggled', () => {
+  it('returns an empty map for a character with no overrides', () => {
+    expect(characterEveTypePrefs(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({});
+  });
+
+  it('toggling a type off its default browser value takes effect immediately', () => {
+    const next = withEveNotificationTypeToggled(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'BillOutOfMoneyMsg',
+      'browser'
+    );
+    const prefs = characterEveTypePrefs(next, 1);
+    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'browser')).toBe(true);
+    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'feed')).toBe(true);
+  });
+
+  it("does not disturb another character's type prefs", () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: {},
+      eveNotificationTypesByCharacter: { 2: { AllWarDeclaredMsg: { feed: false } } },
+    };
+    const next = withEveNotificationTypeToggled(value, 1, 'BillOutOfMoneyMsg', 'browser');
+    expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
+  });
+});
+
+describe('characterEventThresholds / withCharacterEventThreshold', () => {
+  it('defaults to the documented defaults for a character with no overrides', () => {
+    expect(characterEventThresholds(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({
+      structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+      skillQueueEndingLeadHours: DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+      courierDeliveryDueLeadHours: DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+      contractExpiringLeadHours: DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+      ordersLapsingLeadHours: DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+      corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+    });
+  });
+
+  it('sets one field, leaving the others at their default', () => {
+    const next = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'structureFuelLowDays',
+      3
+    );
+    expect(characterEventThresholds(next, 1)).toEqual({
+      structureFuelLowDays: 3,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+      skillQueueEndingLeadHours: DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+      courierDeliveryDueLeadHours: DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+      contractExpiringLeadHours: DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+      ordersLapsingLeadHours: DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+      corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+    });
+  });
+
+  it('sets a second field without disturbing the first', () => {
+    const withFuel = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'structureFuelLowDays',
+      1
+    );
+    const next = withCharacterEventThreshold(withFuel, 1, 'corpWalletBalanceFloorIsk', 10_000_000);
+    expect(characterEventThresholds(next, 1)).toEqual({
+      structureFuelLowDays: 1,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+      skillQueueEndingLeadHours: DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+      courierDeliveryDueLeadHours: DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+      contractExpiringLeadHours: DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+      ordersLapsingLeadHours: DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+      corpWalletBalanceFloorIsk: 10_000_000,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+    });
+  });
+
+  it("does not disturb another character's thresholds", () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: {},
+      thresholdsByCharacter: { 2: { structureFuelLowDays: 1 } },
+    };
+    const next = withCharacterEventThreshold(value, 1, 'structureFuelLowDays', 3);
+    expect(characterEventThresholds(next, 2).structureFuelLowDays).toBe(1);
+  });
+
+  it('sets walletBalanceChangedThresholdIsk, leaving the other fields at their default', () => {
+    const next = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'walletBalanceChangedThresholdIsk',
+      10_500_000
+    );
+    expect(characterEventThresholds(next, 1)).toEqual({
+      structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+      skillQueueEndingLeadHours: DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+      courierDeliveryDueLeadHours: DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+      contractExpiringLeadHours: DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
+      ordersLapsingLeadHours: DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+      corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: 10_500_000,
+      walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
+      incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+    });
+  });
+
+  it('applies a persisted thresholdsByCharacter map on hydrate', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        thresholdsByCharacter: { 1: { structureFuelLowDays: 1 } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(
+      characterEventThresholds(useNotificationPreferences.getState().value, 1).structureFuelLowDays
+    ).toBe(1);
+  });
+
+  it('rejects a thresholdsByCharacter entry whose field is not a number', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        thresholdsByCharacter: { 1: { structureFuelLowDays: 'nope' } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+});
+
+describe('toggleEventChannelPref / toggleEveTypeChannelPref', () => {
+  /**
+   * These wrap `with*Toggled` + `updateNotificationPrefs` into one call so a
+   * caller states `channel` once instead of passing it to both — the two used
+   * to be independent arguments a caller could accidentally mismatch (issue:
+   * nothing checked that a `with*Toggled` call's channel and the trailing
+   * `updateNotificationPrefs` channel argument agreed). The tests below pin
+   * the sync-vs-local rule `updateNotificationPrefs` documents: a browser
+   * write never reaches the synced setting, a feed write always does.
+   */
+  it('toggleEventChannelPref: a browser toggle updates the store but never touches the synced setting', async () => {
+    await toggleEventChannelPref(1, DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'browser'
+      )
+    ).toBe(false);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('toggleEventChannelPref: a feed toggle updates the store and pushes the synced setting', async () => {
+    await toggleEventChannelPref(1, DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'feed');
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'feed'
+      )
+    ).toBe(false);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('toggleEveTypeChannelPref: a browser toggle never touches the synced setting', async () => {
+    await toggleEveTypeChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      'StructureUnderAttack',
+      'browser'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('toggleEveTypeChannelPref: a feed toggle pushes the synced setting', async () => {
+    await toggleEveTypeChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      'StructureUnderAttack',
+      'feed'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('a threshold write (no channel argument) still pushes the synced setting', async () => {
+    const next = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'structureFuelLowDays',
+      3
+    );
+    await updateNotificationPrefs(1, next);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+});
+
+describe('broadcastEventChannelPref (issue #738)', () => {
+  it('writes the broadcast value into every known Character at once', async () => {
+    await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    const value = useNotificationPreferences.getState().value;
+    expect(isEventEnabledFor(characterEventPrefs(value, 1), EVENT_A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(characterEventPrefs(value, 2), EVENT_A, 'browser')).toBe(false);
+  });
+
+  it('a browser broadcast never touches the synced setting; a feed broadcast does', async () => {
+    await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+
+    await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'feed');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('is a no-op with no known Characters', async () => {
+    await broadcastEventChannelPref([], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+});
+
+describe('broadcastEveTypeChannelPref / broadcastAllEveTypesChannelPref (issue #745)', () => {
+  it('writes the broadcast value into every known Character at once', async () => {
+    await broadcastEveTypeChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'feed');
+    const value = useNotificationPreferences.getState().value;
+    expect(isEveTypeEnabledFor(characterEveTypePrefs(value, 1), TYPE_A, 'feed')).toBe(false);
+    expect(isEveTypeEnabledFor(characterEveTypePrefs(value, 2), TYPE_A, 'feed')).toBe(false);
+  });
+
+  it('a browser broadcast never touches the synced setting; a feed broadcast does', async () => {
+    await broadcastEveTypeChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'browser');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+
+    await broadcastEveTypeChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'feed');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('is a no-op with no known Characters', async () => {
+    await broadcastEveTypeChannelPref([], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'feed');
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+
+  it('broadcastAllEveTypesChannelPref writes every type to every known Character', async () => {
+    await broadcastAllEveTypesChannelPref(
+      [1, 2],
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      [TYPE_A, TYPE_B],
+      'feed'
+    );
+    const value = useNotificationPreferences.getState().value;
+    for (const characterId of [1, 2]) {
+      const prefs = characterEveTypePrefs(value, characterId);
+      expect(isEveTypeEnabledFor(prefs, TYPE_A, 'feed')).toBe(false);
+      expect(isEveTypeEnabledFor(prefs, TYPE_B, 'feed')).toBe(false);
+    }
+  });
+});
+
+describe('hydrateNotificationPreferences', () => {
+  it('splices synced feed data on top of the local row', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: { 1: { [EVENT_A]: { browser: true, feed: true } } },
+      },
+    });
+    await db.settings.put({
+      key: SYNCED_NOTIFICATION_FEED_PREFS_KEY,
+      value: {
+        perCharacter: { 1: { [EVENT_A]: false } },
+        eveNotificationTypesByCharacter: {},
+        thresholdsByCharacter: {},
+      },
+    });
+    await hydrateNotificationPreferences();
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'feed'
+      )
+    ).toBe(false);
+    // The browser flag came from the local row and must survive the merge untouched.
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'browser'
+      )
+    ).toBe(true);
+  });
+
+  /**
+   * Regression test for a bug caught in review: `withSyncedFeedPrefsApplied`
+   * rebuilds a fresh object graph for every Character present in the synced
+   * blob even when nothing changed, so a naive reference check
+   * (`merged !== current`) is true on nearly every call. Both
+   * NotificationsPanel and the Alerts page re-run this (via
+   * `refreshAppBadge`) from a `useEffect` keyed on the store's value — a
+   * reference check there would call `setValue` every time, looping without
+   * end. This asserts the store's value reference is stable across repeated
+   * calls when the synced blob hasn't actually changed.
+   */
+  it('does not re-apply (or re-persist) an unchanged synced value on repeated calls', async () => {
+    await db.settings.put({
+      key: SYNCED_NOTIFICATION_FEED_PREFS_KEY,
+      value: {
+        perCharacter: { 1: { [EVENT_A]: false } },
+        eveNotificationTypesByCharacter: {},
+        thresholdsByCharacter: {},
+      },
+    });
+    await hydrateNotificationPreferences();
+    const afterFirstCall = useNotificationPreferences.getState().value;
+
+    await hydrateNotificationPreferences();
+    expect(useNotificationPreferences.getState().value).toBe(afterFirstCall);
+  });
+});
+
+describe('Projection rebuild scheduling (issue #1259 follow-up)', () => {
+  const DEFAULTS = DEFAULT_NOTIFICATION_PREFERENCES;
+
+  it('turning the master switch off, then on, schedules a rebuild each time', async () => {
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, false));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, true));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('turning the browser channel gate off, then on, schedules a rebuild each time', async () => {
+    await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, false));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+    await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, true));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('the feed channel gate does not schedule a rebuild', async () => {
+    await setDeviceNotificationPrefs(withFeedEnabled(DEFAULTS, false));
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+
+  it('hands the scheduler the write itself, so the rebuild waits for it', async () => {
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, false));
+    const [write] = vi.mocked(scheduleProjectionRebuild).mock.calls[0];
+    await write;
+    expect((await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))?.value).toMatchObject({
+      masterEnabled: false,
+    });
+  });
+
+  it('a browser event toggle schedules one rebuild; a feed toggle does not', async () => {
+    await toggleEventChannelPref(1, DEFAULTS, EVENT_A, 'feed');
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+    await toggleEventChannelPref(
+      1,
+      useNotificationPreferences.getState().value,
+      EVENT_A,
+      'browser'
+    );
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('turning on a browser-off-by-default event schedules a rebuild', async () => {
+    await toggleEventChannelPref(1, DEFAULTS, 'walletBalanceChanged', 'browser');
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('browser EVE-type and broadcast writes each schedule one rebuild', async () => {
+    await toggleEveTypeChannelPref(1, DEFAULTS, TYPE_A, 'browser');
+    await broadcastEventChannelPref(
+      [1, 2],
+      useNotificationPreferences.getState().value,
+      EVENT_B,
+      'browser'
+    );
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('feed-only EVE-type and broadcast writes do not schedule a rebuild', async () => {
+    await toggleEveTypeChannelPref(1, DEFAULTS, TYPE_A, 'feed');
+    await broadcastEventChannelPref(
+      [1, 2],
+      useNotificationPreferences.getState().value,
+      EVENT_A,
+      'feed'
+    );
+    await broadcastAllEveTypesChannelPref(
+      [1, 2],
+      useNotificationPreferences.getState().value,
+      [TYPE_B],
+      'feed'
+    );
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+
+  it('fuel and extractor thresholds schedule a rebuild; wallet thresholds do not', async () => {
+    await updateNotificationPrefs(1, withThreshold(DEFAULTS, 1, 'corpWalletBalanceFloorIsk', 5));
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+    await updateNotificationPrefs(
+      1,
+      withThreshold(useNotificationPreferences.getState().value, 1, 'structureFuelLowDays', 3)
+    );
+    await updateNotificationPrefs(
+      1,
+      withThreshold(useNotificationPreferences.getState().value, 1, 'extractorExpiringLeadHours', 1)
+    );
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('a write that changes nothing uploaded does not schedule a rebuild', async () => {
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, true));
+    await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, true));
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+});

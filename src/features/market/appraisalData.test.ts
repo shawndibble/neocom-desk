@@ -1,0 +1,692 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
+import { resetMarketOpenPricesCache } from '@/features/market/marketOpenPrices';
+import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
+import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
+import { clearMarketPriceCache } from '@/market/prices';
+import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
+import { SKILL_IDS } from '@/engine/industry/types';
+import { loadMutaplasmids, loadReprocessing, loadTypes } from '@/sde/loadSde';
+import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterImplants } from '@/features/skills/data';
+import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
+import { clearMarketTypeIndex } from '@/sde/marketTypesById';
+import { appraisePaste, clearAppraisalCatalogue, compareHubs } from './appraisalData';
+
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadMarketTypes: vi.fn(async () => [
+    { typeId: 34, name: 'Tritanium', marketGroupId: 18, volume: 0.01 },
+    { typeId: 2048, name: 'Damage Control II', marketGroupId: 300, volume: 5 },
+    { typeId: 999, name: 'Civilian Gatling Railgun', marketGroupId: 300, volume: 5 },
+    // Assembled 27,289 m³, packaged 2,500 — a hauler carries the packaged hull.
+    { typeId: 587, name: 'Rifter', marketGroupId: 64, volume: 27_289, packagedVolume: 2_500 },
+    // No volume at all: a catalogue built before issue #2336 carried none.
+    { typeId: 1230, name: 'Veldspar', marketGroupId: 402 },
+  ]),
+}));
+
+vi.mock('@/sde/loadSde', () => ({
+  loadReprocessing: vi.fn(),
+  loadMutaplasmids: vi.fn(),
+  loadTypes: vi.fn(),
+}));
+vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
+vi.mock('@/features/skills/data', () => ({ loadCharacterImplants: vi.fn(async () => null) }));
+vi.mock('@/features/market/appraisalLpAcquisition', () => ({
+  findLpOfferMatches: vi.fn(),
+  toLpOfferInputs: vi.fn(),
+}));
+
+const mockedLoadReprocessing = vi.mocked(loadReprocessing);
+const mockedLoadCorrectedSkills = vi.mocked(loadCorrectedSkills);
+const mockedLoadCharacterImplants = vi.mocked(loadCharacterImplants);
+const mockedFindLpOfferMatches = vi.mocked(findLpOfferMatches);
+const mockedToLpOfferInputs = vi.mocked(toLpOfferInputs);
+
+function skillsFixture(trained: [number, number][]): CorrectedSkills {
+  return {
+    skillsResult: null,
+    skillsNeedsReauth: false,
+    queueResult: null,
+    queueNeedsReauth: false,
+    completedLevels: new Map(),
+    trained: new Map(trained.map(([id, level]) => [id, { level, sp: 0 }])),
+    effective: new Map(trained.map(([id, level]) => [id, level])),
+    completedSp: 0,
+    totalSp: null,
+    fetchedAt: null,
+  };
+}
+
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => server.use(...fallbackSourcesDown));
+afterEach(() => {
+  server.resetHandlers();
+  resetMarketOpenPricesCache();
+  clearMarketPriceCache();
+  clearAppraisalCatalogue();
+  clearMarketTypeIndex();
+  mockedLoadReprocessing.mockReset();
+  mockedLoadCorrectedSkills.mockReset();
+  mockedLoadCharacterImplants.mockReset();
+  mockedFindLpOfferMatches.mockReset();
+  mockedToLpOfferInputs.mockReset();
+});
+afterAll(() => server.close());
+
+function aggregates(body: Record<string, unknown>) {
+  return http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.json(body));
+}
+
+const PRICED = {
+  34: {
+    buy: { min: '5.0', max: '5.41', volume: '100', orderCount: '4' },
+    sell: { min: '5.62', max: '6.0', volume: '200', orderCount: '9' },
+  },
+  2048: {
+    buy: { min: '400000', max: '498500', volume: '10', orderCount: '3' },
+    sell: { min: '512000', max: '600000', volume: '20', orderCount: '7' },
+  },
+  // Nobody is buying this one: orderCount 0 on the buy side.
+  999: {
+    buy: { min: '0', max: '0', volume: '0', orderCount: '0' },
+    sell: { min: '1000', max: '1200', volume: '5', orderCount: '2' },
+  },
+};
+
+describe('appraisePaste', () => {
+  it('resolves names, prices both sides and scales by the percentage', async () => {
+    server.use(aggregates(PRICED));
+
+    const outcome = await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 90);
+
+    expect(outcome.appraisal.rows).toEqual([
+      {
+        typeId: 2048,
+        name: 'Damage Control II',
+        quantity: 3,
+        buyEach: 448_650,
+        sellEach: 460_800,
+        buyTotal: 1_345_950,
+        sellTotal: 1_382_400,
+        volume: 15,
+      },
+    ]);
+    expect(outcome.unmatched).toEqual([]);
+  });
+
+  it('gives each row its packaged volume, and an unknown one as null (issue #2337)', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Tritanium\t100', 'Rifter\t2', 'Veldspar\t1000'].join('\n');
+    const { appraisal } = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    expect(appraisal.rows.map((row) => row.volume)).toEqual([1, 5_000, null]);
+    expect(appraisal.totals.volume).toBe(5_001);
+    expect(appraisal.totals.volumeUnknownRows).toBe(1);
+  });
+
+  it('reports a name the catalogue does not hold, with its line number', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Tritanium\t100', 'Nanite Repair Past\t2'].join('\n');
+    const outcome = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    expect(outcome.appraisal.rows.map((row) => row.name)).toEqual(['Tritanium']);
+    expect(outcome.unmatched).toEqual([{ name: 'Nanite Repair Past', lines: [2] }]);
+  });
+
+  it('leaves a side with no orders out of the total rather than pricing it at zero', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Damage Control II\t1', 'Civilian Gatling Railgun\t4'].join('\n');
+    const { appraisal } = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    const railgun = appraisal.rows[1];
+    expect(railgun.buyEach).toBeNull();
+    expect(railgun.buyTotal).toBeNull();
+    expect(railgun.sellTotal).toBe(4_000);
+    expect(appraisal.totals.buy).toBe(498_500);
+    expect(appraisal.totals.unpricedRows).toBe(1);
+  });
+
+  it('prices nothing as free when Fuzzwork is unreachable', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+
+    const { appraisal } = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100);
+
+    expect(appraisal.rows[0].buyTotal).toBeNull();
+    expect(appraisal.rows[0].sellTotal).toBeNull();
+    expect(appraisal.totals.sell).toBe(0);
+    expect(appraisal.totals.unpricedRows).toBe(1);
+  });
+
+  it('prices from yesterday\u2019s close, flagged pricesStale, when only the R2 open prices answer', async () => {
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()),
+      http.get(`${R2_SNAPSHOT_ORIGIN}/open-prices/34.json`, () =>
+        HttpResponse.json({
+          typeId: 34,
+          dates: [new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)],
+          stations: { '60003760': { buy: [3], sell: [4] } },
+        })
+      )
+    );
+
+    const out = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100);
+
+    expect(out.pricesStale).toBe(true);
+    expect(out.pricesUnreachable).toBe(false);
+    expect(out.appraisal.rows[0].sellTotal).toBe(400);
+  });
+
+  it('flags pricesUnreachable when Fuzzwork is down, but not for a genuine no-orders answer', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+    const down = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100);
+    expect(down.pricesUnreachable).toBe(true);
+
+    clearMarketPriceCache();
+    server.use(aggregates(PRICED));
+    const up = await appraisePaste('Civilian Gatling Railgun\t4', DEFAULT_TRADE_HUB, 100);
+    expect(up.appraisal.totals.unpricedRows).toBe(1);
+    expect(up.pricesUnreachable).toBe(false);
+  });
+
+  it('reports a line whose quantity cannot be read instead of pricing it as one (issue #4022)', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Tritanium\t124.500', 'Damage Control II\t12.5', 'Nanite Repair Past\t2'].join(
+      '\n'
+    );
+    const outcome = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    expect(outcome.appraisal.rows.map((row) => [row.name, row.quantity])).toEqual([
+      ['Tritanium', 124500],
+    ]);
+    expect(outcome.unmatched).toEqual([
+      { name: 'Damage Control II\t12.5', lines: [2] },
+      { name: 'Nanite Repair Past', lines: [3] },
+    ]);
+  });
+
+  it('makes no price request for a paste that matches nothing', async () => {
+    let hits = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits += 1;
+        return HttpResponse.json({});
+      })
+    );
+
+    const { appraisal, unmatched } = await appraisePaste('Nope\t1', DEFAULT_TRADE_HUB, 100);
+
+    expect(appraisal.rows).toEqual([]);
+    expect(unmatched).toHaveLength(1);
+    expect(hits).toBe(0);
+  });
+
+  it('tells a pasted abyssal module apart from a line that names nothing', async () => {
+    vi.mocked(loadMutaplasmids).mockResolvedValueOnce({
+      attributeNames: {},
+      mutaplasmids: {},
+      abyssalTypeIds: [47832],
+    });
+    vi.mocked(loadTypes).mockResolvedValueOnce({
+      '47832': { name: 'Heavy Abyssal Energy Neutralizer', groupID: 71, volume: 50 },
+    });
+
+    const { unmatched, abyssal } = await appraisePaste(
+      'Nope\t1\nHeavy Abyssal Energy Neutralizer\t1',
+      DEFAULT_TRADE_HUB,
+      100
+    );
+
+    expect(unmatched).toEqual([{ name: 'Nope', lines: [1] }]);
+    expect(abyssal).toEqual([{ name: 'Heavy Abyssal Energy Neutralizer', lines: [2] }]);
+  });
+
+  it('merges the same item pasted twice into one priced row', async () => {
+    server.use(aggregates(PRICED));
+
+    const text = ['Tritanium\t100', 'Tritanium\t50'].join('\n');
+    const { appraisal } = await appraisePaste(text, DEFAULT_TRADE_HUB, 100);
+
+    expect(appraisal.rows).toHaveLength(1);
+    expect(appraisal.rows[0].quantity).toBe(150);
+  });
+
+  describe('refine-then-sell (issue #672)', () => {
+    /** One portion of 100 Veldspar returns 415 Tritanium at 100% efficiency. */
+    const VELDSPAR_ENTRY = { portionSize: 100, materials: [{ typeID: 34, quantity: 415 }] };
+
+    it('fetches neither reprocessing data nor skills with no active Character', async () => {
+      server.use(aggregates(PRICED));
+
+      const { appraisal } = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, null);
+
+      expect(mockedLoadReprocessing).not.toHaveBeenCalled();
+      expect(mockedLoadCorrectedSkills).not.toHaveBeenCalled();
+      expect(appraisal.rows[0].refineTotal).toBeUndefined();
+      expect(appraisal.totals.refine).toBe(0);
+    });
+
+    it('adds a refine value for a reprocessable row when a Character is active', async () => {
+      server.use(
+        aggregates({
+          ...PRICED,
+          1230: {
+            buy: { min: '4', max: '5', volume: '1000', orderCount: '2' },
+            sell: { min: '6', max: '7', volume: '1000', orderCount: '2' },
+          },
+        })
+      );
+      mockedLoadReprocessing.mockResolvedValue({ '1230': VELDSPAR_ENTRY });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(mockedLoadCorrectedSkills).toHaveBeenCalledWith(1, expect.any(Number), {});
+      const row = appraisal.rows[0];
+      // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5.41 ISK (Tritanium's buyMax)
+      expect(row.refineTotal).toBeCloseTo(Math.floor(415 * 10 * 0.5) * 5.41, 6);
+      expect(row.refinePricedAll).toBe(true);
+      expect(appraisal.totals.refine).toBe(row.refineTotal);
+    });
+
+    it('still appraises, without a refine value, when reprocessing data cannot load', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockRejectedValue(new Error('offline'));
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const { appraisal } = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(appraisal.rows).toHaveLength(1);
+      expect(appraisal.rows[0].refineTotal).toBeUndefined();
+    });
+
+    it('leaves a non-reprocessable row without a refine value even with a Character active', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const { appraisal } = await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(appraisal.rows[0].refineTotal).toBeUndefined();
+    });
+
+    it('reports a material with no price at the hub as partially priced, not free', async () => {
+      // Tritanium (34) is not in this response at all, so it has no buy price.
+      server.use(aggregates({}));
+      mockedLoadReprocessing.mockResolvedValue({ '1230': VELDSPAR_ENTRY });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
+
+      const row = appraisal.rows[0];
+      expect(row.refineTotal).toBe(0);
+      expect(row.refinePricedAll).toBe(false);
+    });
+
+    it('recomputes using the given Character’s own reprocessing skills', async () => {
+      server.use(
+        aggregates({
+          ...PRICED,
+          1230: {
+            buy: { min: '4', max: '5', volume: '1000', orderCount: '2' },
+            sell: { min: '6', max: '7', volume: '1000', orderCount: '2' },
+          },
+        })
+      );
+      const SIMPLE_ORE_PROCESSING = 60377;
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SKILL_IDS.reprocessing, 5],
+          [SKILL_IDS.reprocessingEfficiency, 5],
+          [SIMPLE_ORE_PROCESSING, 5],
+        ])
+      );
+
+      const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
+
+      // efficiency = 0.5 x 1.15 x 1.10 x 1.10 (Veldspar carries Simple Ore
+      // Processing's specialisationSkillID, so Reprocessing, Reprocessing
+      // Efficiency and the ore specialisation all apply — issue #1226).
+      // Tritanium's buyMax is 5.41.
+      const efficiency = 0.5 * 1.15 * 1.1 * 1.1;
+      const expected = Math.floor(415 * 10 * efficiency) * 5.41;
+      expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
+    });
+
+    it('resolves each row against its own specialisation skill (issue #1058)', async () => {
+      // Veldspar carries the SDE's attribute-790 join to Simple Ore
+      // Processing; Damage Control II carries none, so it falls back to
+      // Scrapmetal Processing — a mixed paste resolves each independently.
+      const SIMPLE_ORE_PROCESSING = 60377;
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+        '2048': { portionSize: 1, materials: [{ typeID: 34, quantity: 100 }] },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SIMPLE_ORE_PROCESSING, 5],
+          [SKILL_IDS.scrapmetalProcessing, 0],
+        ])
+      );
+
+      const { appraisal } = await appraisePaste(
+        'Veldspar\t1000\nDamage Control II\t1',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      // Veldspar: 0.5 x 1.10 (Simple Ore Processing V) = 0.55 -> floor(415*10*0.55) = 2282
+      const veldsparRow = appraisal.rows.find((row) => row.typeId === 1230)!;
+      expect(veldsparRow.refineTotal).toBeCloseTo(2282 * 5.41, 6);
+      // Damage Control II: 0.5 x 1.0 (untrained Scrapmetal) -> floor(100*0.5) = 50
+      const dcuRow = appraisal.rows.find((row) => row.typeId === 2048)!;
+      expect(dcuRow.refineTotal).toBeCloseTo(50 * 5.41, 6);
+    });
+
+    it('does not apply Reprocessing or Reprocessing Efficiency to scrap, only Scrapmetal Processing (issue #1226)', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '2048': { portionSize: 1, materials: [{ typeID: 34, quantity: 100 }] },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SKILL_IDS.reprocessing, 5],
+          [SKILL_IDS.reprocessingEfficiency, 5],
+          [SKILL_IDS.scrapmetalProcessing, 5],
+        ])
+      );
+
+      const { appraisal } = await appraisePaste('Damage Control II\t1', DEFAULT_TRADE_HUB, 100, 1);
+
+      // Damage Control II is scrap: only Scrapmetal Processing V applies.
+      // 0.5 x 1.10 -> floor(100*0.55) = 55
+      const dcuRow = appraisal.rows[0];
+      expect(dcuRow.refineTotal).toBeCloseTo(55 * 5.41, 6);
+    });
+
+    it("applies the active clone's refining implant to an ore row, and reports the pct (issue #1227)", async () => {
+      const RX_804 = 27174; // Zainou 'Beancounter' Reprocessing RX-804, +4%.
+      const SIMPLE_ORE_PROCESSING = 60377;
+      server.use(
+        aggregates({
+          ...PRICED,
+          1230: {
+            buy: { min: '4', max: '5', volume: '1000', orderCount: '2' },
+            sell: { min: '6', max: '7', volume: '1000', orderCount: '2' },
+          },
+        })
+      );
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedLoadCharacterImplants.mockResolvedValue({
+        data: [RX_804],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      });
+
+      const { appraisal, implantBonusPct } = await appraisePaste(
+        'Veldspar\t1000',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      // 0.5 x 1.04 -> floor(415 * 10 * 0.52) Tritanium x 5.41 ISK.
+      const expected = Math.floor(415 * 10 * 0.52) * 5.41;
+      expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
+      expect(implantBonusPct).toBe(4);
+    });
+
+    it("does not apply the refining implant to scrap, and reports 0 rather than the character's raw bonus (issue #1227)", async () => {
+      const RX_804 = 27174;
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '2048': { portionSize: 1, materials: [{ typeID: 34, quantity: 100 }] },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedLoadCharacterImplants.mockResolvedValue({
+        data: [RX_804],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      });
+
+      const { appraisal, implantBonusPct, refinesOreOrIce } = await appraisePaste(
+        'Damage Control II\t1',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      // Untrained Scrapmetal Processing, no implant: 0.5 x 1.0 -> floor(100*0.5) = 50.
+      expect(appraisal.rows[0].refineTotal).toBeCloseTo(50 * 5.41, 6);
+      expect(implantBonusPct).toBe(0);
+      expect(refinesOreOrIce).toBe(false);
+    });
+
+    it('flags an ore paste as implant-eligible even with no implant read, so the page can say it assumed none (issue #1588)', async () => {
+      const SIMPLE_ORE_PROCESSING = 60377;
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedLoadCharacterImplants.mockResolvedValue(null);
+
+      const { implantBonusPct, refinesOreOrIce } = await appraisePaste(
+        'Veldspar\t1000',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      expect(implantBonusPct).toBe(0);
+      expect(refinesOreOrIce).toBe(true);
+    });
+  });
+
+  describe('LP store acquisition', () => {
+    it('fetches no LP matches with no active Character', async () => {
+      server.use(aggregates(PRICED));
+
+      await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, null);
+
+      expect(mockedFindLpOfferMatches).not.toHaveBeenCalled();
+    });
+
+    it('attaches the cheapest LP option to a matching row', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedFindLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map([
+          [
+            2048,
+            [{ corporationId: 1000125, corpName: 'Test Corp', offer: {} as never, playerLp: 0 }],
+          ],
+        ]),
+        requiredItemTypeIds: [],
+      });
+      mockedToLpOfferInputs.mockReturnValue([
+        {
+          corporationId: 1000125,
+          corpName: 'Test Corp',
+          quantityPerRedemption: 1,
+          lpCostPerRedemption: 100_000,
+          iskCostPerRedemption: 200_000,
+          requiredItemsCostPerRedemption: 0,
+          playerLp: 500_000,
+        },
+      ]);
+
+      const { appraisal } = await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      const row = appraisal.rows[0];
+      expect(row.lpCorpName).toBe('Test Corp');
+      // 3 units at 1-per-redemption needs 3 redemptions.
+      expect(row.lpIskCost).toBe(600_000);
+      expect(row.lpAffordable).toBe(true);
+      // The LP option (600,000) beats the market sell total (1,382,400).
+      expect(appraisal.totals.cheapestBuy).toBe(600_000);
+      expect(appraisal.totals.cheapestBuyViaLp).toBe(1);
+    });
+
+    it('widens the price fetch with required-item type ids from matched offers', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedFindLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map(),
+        requiredItemTypeIds: [1230],
+      });
+
+      await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      // getHubPrices is called through Fuzzwork; the widened batch is only
+      // observable via the request itself, so assert on the mocked adapter's
+      // own inputs instead of a second network round trip.
+      expect(mockedFindLpOfferMatches).toHaveBeenCalledWith(1, [2048]);
+    });
+
+    it('leaves a row untouched when nothing the character holds LP with sells it', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedFindLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map(),
+        requiredItemTypeIds: [],
+      });
+
+      const { appraisal } = await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(appraisal.rows[0].lpCorpName).toBeUndefined();
+      expect(appraisal.totals.cheapestBuy).toBe(appraisal.totals.sell);
+      expect(appraisal.totals.cheapestBuyViaLp).toBe(0);
+    });
+  });
+
+  describe('net-of-fees inputs (issue #1426)', () => {
+    it('reports null Accounting/Broker Relations levels with no active Character', async () => {
+      server.use(aggregates(PRICED));
+
+      const outcome = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, null);
+
+      expect(outcome.accountingLevel).toBeNull();
+      expect(outcome.brokerRelationsLevel).toBeNull();
+    });
+
+    it("resolves the active Character's own Accounting and Broker Relations levels", async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SKILL_IDS.accounting, 4],
+          [SKILL_IDS.brokerRelations, 2],
+        ])
+      );
+
+      const outcome = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(outcome.accountingLevel).toBe(4);
+      expect(outcome.brokerRelationsLevel).toBe(2);
+    });
+
+    it('reads 0 for an untrained Accounting/Broker Relations, same as any other skill', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const outcome = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(outcome.accountingLevel).toBe(0);
+      expect(outcome.brokerRelationsLevel).toBe(0);
+    });
+  });
+});
+
+describe('compareHubs', () => {
+  it('prices the pile at every Trade Hub, one batched call each', async () => {
+    let hits = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits += 1;
+        return HttpResponse.json(PRICED);
+      })
+    );
+
+    const rows = await compareHubs('Damage Control II\t3', 90);
+
+    expect(hits).toBe(TRADE_HUBS.length);
+    expect(rows.map((row) => row.hub)).toEqual(TRADE_HUBS);
+    // Same aggregate served for every hub in this fixture, so every row
+    // matches the primary appraisal's own totals at the same percentage.
+    for (const row of rows) {
+      expect(row.buy).toBe(1_345_950);
+      expect(row.sell).toBe(1_382_400);
+    }
+  });
+
+  it('flags every hub unreachable when Fuzzwork is down, and none when it answers', async () => {
+    server.use(http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()));
+    const down = await compareHubs('Damage Control II\t3', 100);
+    expect(down.every((row) => row.unreachable && row.buy === null && row.sell === null)).toBe(
+      true
+    );
+
+    clearMarketPriceCache();
+    server.use(aggregates(PRICED));
+    const up = await compareHubs('Damage Control II\t3', 100);
+    expect(up.some((row) => row.unreachable)).toBe(false);
+  });
+
+  it('reports a hub with no orders on a side as null, not zero', async () => {
+    server.use(aggregates(PRICED));
+
+    const rows = await compareHubs('Civilian Gatling Railgun\t4', 100);
+
+    for (const row of rows) {
+      expect(row.buy).toBeNull();
+      expect(row.sell).toBe(4_000);
+    }
+  });
+
+  it('makes no price request for a paste that matches nothing', async () => {
+    let hits = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits += 1;
+        return HttpResponse.json({});
+      })
+    );
+
+    const rows = await compareHubs('Nope\t1', 100);
+
+    expect(hits).toBe(0);
+    expect(rows).toHaveLength(TRADE_HUBS.length);
+    expect(rows.every((row) => row.buy === null && row.sell === null)).toBe(true);
+  });
+
+  it('scales both sides by the given price percent', async () => {
+    server.use(aggregates(PRICED));
+
+    const rows = await compareHubs('Damage Control II\t3', 50);
+
+    expect(rows[0].sell).toBe(768_000);
+  });
+});

@@ -1,0 +1,244 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { MoonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
+import { MoonOwnerPage } from './MoonOwnerPage';
+import { PayeeChangeStrip } from './MoonOwnerPayee';
+
+const CHARACTERS: Record<number, string> = {
+  1: 'Varro Kestane',
+  2: 'Tamsin Holloway',
+  3: 'Odile Marchetti',
+  4: 'Juno Rask',
+};
+const REFINERIES: Record<number, string> = { 10: 'Efa - Ashfall Tatara', 11: 'Ashfall Athanor II' };
+
+const detail: MoonOwnerDetail = {
+  row: {
+    id: '98',
+    corporationId: 98,
+    status: 'active',
+    refineryCount: 2,
+    mined: 412_806_000,
+    since: '2026-10-01',
+    theirRatePct: 8,
+    minerRatePct: 12,
+    owed: 13_024_480,
+    balance: { kind: 'owed', isk: 13_024_480 },
+    mode: 'normal',
+    lastReadWellAt: '2026-10-20T06:00:00Z',
+  },
+  joinedAt: Date.UTC(2026, 8, 28, 10),
+  offeredOwnerRatePct: 8,
+  requestedRatePct: 6,
+  history: [
+    { kind: 'agreed', pct: 8, effectiveFrom: '2026-10-01', recordedAt: '2026-10-01T12:00:00Z' },
+    { kind: 'requested', pct: 6, effectiveFrom: '2026-10-01', recordedAt: '2026-10-01T09:00:00Z' },
+  ],
+  payouts: [
+    {
+      id: 'b',
+      date: '2026-10-16',
+      amount: 12_000_000,
+      method: 'donation',
+      status: 'matched',
+      notAPayout: false,
+    },
+    {
+      id: 'a',
+      date: '2026-10-04',
+      amount: 8_000_000,
+      method: 'donation',
+      status: 'matched',
+      notAPayout: false,
+    },
+  ],
+  hasPayee: true,
+  accrued: 33_024_480,
+  paid: 20_000_000,
+  payee: { kind: 'corporation', id: 98 },
+  period: { from: '2026-10-17', to: '2026-10-19' },
+  mined: [
+    { characterId: 3, structureId: 11, oreTypeIds: [1, 2], quantity: 801_150, value: 152_430_000 },
+    { characterId: 1, structureId: 10, oreTypeIds: [1, 2], quantity: 412_300, value: 81_204_000 },
+    { characterId: 2, structureId: 10, oreTypeIds: [3], quantity: 290_800, value: 58_960_000 },
+    { characterId: 4, structureId: 11, oreTypeIds: [3], quantity: 118_400, value: 45_800_000 },
+  ],
+};
+
+const ORES: Record<number, string> = { 1: 'Zeolites', 2: 'Sylvite', 3: 'Bitumens' };
+
+/** @summary One moon owner's page: their rate beside the miner rate and margin, rate history, payments, ore mined at their refineries. */
+const meta = {
+  title: 'corp/MoonOwnerPage',
+  component: MoonOwnerPage,
+  parameters: { layout: 'padded' },
+  args: {
+    detail,
+    name: 'Ashfall Mining Collective',
+    accountingName: 'Brass Meridian Logistics',
+    characterName: (id: number) => CHARACTERS[id] ?? `#${id}`,
+    refineryName: (id: number) => REFINERIES[id] ?? `Refinery ${id}`,
+    refineryEdit: {
+      current: (id: number) => (id === 10 ? 'Efa - Ashfall Tatara' : ''),
+      onSave: async () => {},
+    },
+    oreName: (id: number) => ORES[id] ?? `#${id}`,
+    backTo: '/corp/moons/moon-owners',
+    payee: { kind: 'corporation', id: 98, name: 'Ashfall Mining Collective' },
+    onSetRate: () => {},
+    onSettledOtherwise: () => {},
+    onPay: () => {},
+    onRemove: () => {},
+    onAddPayment: () => {},
+    onMarkPayout: () => {},
+  },
+} satisfies Meta<typeof MoonOwnerPage>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** @summary Active, with a rate they asked for that the book overrode; an officer who may edit sees Pay, Set rate, Settled otherwise and Remove from this book. */
+export const Active: Story = {};
+
+/** @summary The moon owner named a player as its payee: shown read-only with Open in EVE. */
+export const PaidToAPlayer: Story = {
+  args: {
+    detail: { ...detail, payee: { kind: 'character', id: 77 } },
+    payee: { kind: 'character', id: 77, name: 'Kestrel Vane' },
+  },
+};
+
+/** @summary The moon owner changed who gets paid (#4653): the strip with Dismiss, and Change on the "Paid to" line. */
+export const PayeeChangedByMoonOwner: Story = {
+  args: {
+    detail: { ...detail, payee: { kind: 'character', id: 77 } },
+    payee: { kind: 'character', id: 77, name: 'Kestrel Vane' },
+    onChangePayee: () => {},
+    payeeNotice: (
+      <PayeeChangeStrip
+        storageKey="story"
+        at={Date.UTC(2026, 9, 21, 15)}
+        payeeName="Kestrel Vane"
+        byName="Ashfall Mining Collective"
+      />
+    ),
+  },
+};
+
+/** @summary Their ledger cannot be read: the warning names the date. */
+export const CantReadLedger: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: { ...detail.row, status: 'cant-read', staleSince: Date.UTC(2026, 9, 11, 9, 12) },
+    },
+  },
+};
+
+/** @summary Compensated another way: nothing owed, the note shows. */
+export const SettledOtherwise: Story = {
+  args: {
+    detail: {
+      ...detail,
+      note: 'Fuel for their refineries and free rock access',
+      row: { ...detail.row, status: 'settled-otherwise', mode: 'settled-otherwise', owed: 0 },
+    },
+  },
+};
+
+/** @summary No rate set yet: nothing is due until one is. */
+export const NoRateSet: Story = {
+  args: {
+    detail: {
+      ...detail,
+      requestedRatePct: undefined,
+      history: [],
+      payouts: [],
+      accrued: 0,
+      paid: 0,
+      row: { ...detail.row, status: 'no-rate', theirRatePct: undefined, owed: 0 },
+    },
+  },
+};
+
+const removalRow = { ...detail.row, status: 'removal-pending' } as const;
+
+/** @summary A removal whose notice went out: the strip says when it takes effect, with Cancel removal. */
+export const RemovalPending: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: removalRow,
+      removal: {
+        startedAt: Date.UTC(2026, 9, 17, 14, 22),
+        startedByName: 'Kestrel Vane',
+        effectiveAt: Date.UTC(2026, 9, 18, 14, 22),
+      },
+    },
+    onRemove: () => {},
+    onCancelRemoval: async () => {},
+    onNoticeSent: async () => {},
+  },
+};
+
+/** @summary A removal whose notice has not gone out: the 24 hours have not begun. */
+export const RemovalPendingNoticeUnsent: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: removalRow,
+      removal: { startedAt: Date.UTC(2026, 9, 17, 14, 22), startedByName: 'Kestrel Vane' },
+    },
+    onRemove: () => {},
+    onCancelRemoval: async () => {},
+    onNoticeSent: async () => {},
+  },
+};
+
+/** @summary A detected payment an officer marked "not a payout": it stays listed and can be counted again. */
+export const NotAPayout: Story = {
+  args: {
+    detail: {
+      ...detail,
+      payouts: [
+        ...detail.payouts,
+        {
+          id: 'j1_9',
+          date: '2026-10-12',
+          amount: 3_000_000,
+          method: 'donation',
+          status: 'matched',
+          journalRef: 9,
+          notAPayout: true,
+        },
+      ],
+    },
+  },
+};
+
+/** @summary Refineries through the label chain: one an officer labelled, one with neither name nor system, so it reads as the moon owner's name plus its id. Either side can edit a label behind the faint pencil. */
+export const RefineryLabels: Story = {
+  args: {
+    refineryName: (id: number) =>
+      id === 10 ? 'Efa - Ashfall Tatara' : `Ashfall Mining Collective ${id}`,
+  },
+};
+
+/** @summary A refinery with no label and no readable structure name reads as the system a miner's own ledger placed it in (#4650), not the moon owner's name plus its id. */
+export const LearnedSystem: Story = {
+  args: {
+    refineryName: (id: number) => (id === 10 ? 'Efa - Ashfall Tatara' : 'Ikao'),
+  },
+};
+
+/** @summary A viewer who may not edit: no Pay, Set rate, Settled otherwise or payment actions. */
+export const ReadOnly: Story = {
+  args: {
+    refineryEdit: undefined,
+    onSetRate: undefined,
+    onSettledOtherwise: undefined,
+    onRemove: undefined,
+    onPay: undefined,
+    onAddPayment: undefined,
+    onMarkPayout: undefined,
+  },
+};

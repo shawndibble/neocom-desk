@@ -1,0 +1,276 @@
+# Pilot Lookup
+
+Travel tab `/travel/pilot`. Find one pilot by name; see identity from public ESI and all-time + recent killboard figures from zKillboard. A Travel tab again (scope decision `20261009-163837-pinned-rail-alerts-bell-pilot-lookup-back-under`, which supersedes the own-page half of `20261002-145653-lp-store-under-market-pilot-lookup-its-own`). Origin: issue #2331 (stats), #2332 (recent kills/fits), decision `20260929-234357`.
+
+Glossary (GLOSSARY.md): **Pilot Lookup** - portrait, corporation, alliance, character age from public ESI; all-time kills, losses, ISK, solo kills, danger and gang ratios, most-used hulls from zKillboard; newest 25 kills and losses, each expanding to the victim's fit with Open in Fittings (killmail read only then). A Threat badge beside the name (here and on every Local list row); beyond that, numbers: no pilot is called hostile or safe. "No zKillboard history" and "zKillboard couldn't be reached" are different answers.
+
+## Feature summary
+
+| Feature                             | Where                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name search with suggestions        | Search panel                                 | Combobox, >= 3 chars, 300 ms debounce, max 15 hits; needs the active Character's search scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Exact-name lookup                   | Search panel (Enter / Look up)               | Public `POST /universe/ids`; works without the scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Shareable lookup                    | URL `?pilot=<characterId>`                   | Pushes history; opens on that pilot                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Identity header                     | Result                                       | Portrait beside the name, corporation and alliance (links) on one line, then security status, age and the zKillboard link on a facts line                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| All-time line                       | Result                                       | One line: kills (green), losses (red), ISK destroyed, ISK lost, solo kills, with the "as zKillboard states them" note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Threat badge and band               | Pilot profile; badge on every Local list row | `ThreatBadge`: Dangerous (red), Active (amber), Low threat, Inactive, from `threatVerdict` (kills in 90 days plus either ratio: danger 50+ or 60%+ kills). A recent loss keeps a pilot with no recent kill at Low threat, not Inactive (dates from `fetchPilotKillmails`, the list Recent kills and losses shows). The profile adds `PilotThreatBand`: the level in large type (the one red on the profile; the name row carries no badge), a one-line reading with its "?" rule, and neutral chips (space hunted and other spaces, gangs or mostly solo, pods). A list row fetches stats only at 10+ recent kills and losses only with none; "Checking" until they land                                                                                              |
+| Ratio meters                        | Result                                       | Danger ("N% dangerous", Snuggly <-> Dangerous), Fleet size (Solo <-> Gang), Kills vs losses (Victim <-> Killer, by ship count)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Ships                               | Result                                       | Side by side: "Flies on kills" (zKillboard all-time top 5) and "Kills most" (hulls in their latest 200 kills), counts, Show info links                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Recent kills and losses             | Result                                       | Newest 25 merged; expandable rows with victim fit + Open in Fittings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Pasted or typed Local list / D-Scan | Search box (one name per line), global paste | 2+ lines. Local: groups (red/orange contacts, killed in your space, killed elsewhere, quiet, not checked, friendly), kills per space with age, max 40 names, `src/features/travel/PilotListView.tsx`; a repeat paste tags pilots new since the last one when half its names match (`src/engine/pilotList/localDiff.ts`, device-local `lastLocal.ts`); D-Scan: a Danger read first (level, one sentence of counts, Watch these, Leave or re-check if, read for your ship from `src/engine/pilotList/dscanDanger.ts`, `src/features/travel/DangerRead.tsx`), then the collapsed Full scan holding the Fleet board (ships grouped by role, one expandable distance chart), worth and changes. Decision `20261009-111531`. Decisions `20261007-224716`, `20261008-143948` |
+| Name box lines                      | Search box                                   | Enter looks up one name; Shift+Enter adds a line; with 2+ lines Enter adds a line and Ctrl/Cmd+Enter looks the list up (touch: Enter always adds a line). Suggestions follow the caret's line (`engine/pilotList/nameLines.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Reading-from system                 | Under the list                               | "Last API system" (`useHereSpace` over `useCurrentSystem`): ESI location or a picked system; picker never waits for ESI (`adoptGameBaseline`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Where they kill                     | Pilot profile (and Show Info)                | 30-day kills per space with age, a labelled 6-month chart (month names, counts, colour legend), your standing as the Contacts page's `StandingIcon` (`PilotKillActivity.tsx`); the hulls flown and killed are `PilotShips`, and the latest kills a section below it; one zKillboard kills request (`fetchPilotKillHistory`)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Shared D-Scan link                  | D-Scan view (share button)                   | Stores the raw scan (max 50,000 chars) as a `dscan` Share Link, 7 days, no revoke (#2943). `/s/<id>` shows the same `FleetBoard`; Open Neocom Desk returns to `/pilot-lookup?share=<id>` and re-pastes it (`sharedDscanSeed.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Show Info Character tab             | `PublicInfoModal`                            | Same `PilotProfileView` reused (corp/alliance switch tabs)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Command palette                     | Ctrl/Cmd+K                                   | Page entry only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+## Purpose and user goal
+
+Answer "who is this pilot and what have they done" from facts: identity (public ESI) plus all-time and recent killboard figures (zKillboard). Typical goals: check a stranger before a contract, trade or fleet invite; share a link to a pilot. It used to never label a pilot (decision `20260912-172628`); `20261008-181210-pilot-profile-and-local-list-state-a-threat` superseded that with the Threat verdict badge (Dangerous, Active, Low threat, Inactive). The badge has no green level and never calls a pilot safe; the copy guard in `PilotLookupPanel.test.tsx` still forbids "safe", "hostile" and "avoid".
+
+- **Top jobs (ranked):** 1. "Am I in danger, and what should I watch?" (a pasted D-Scan opens with the Danger read, `20261009-111531`). 2. "Who is in Local, and which of them kill in this kind of space?" (pasted Local list, `20261007-224716`, #2863). 3. "Who is this one pilot?" (name lookup, profile, #2331).
+- **Device and cadence:** desktop primary, with the EVE client open beside it: D-Scan and Local lists are copied from the client and pasted here (owner, 2026-10-11). Several times in a play session (inferred: Scan age turns to a warning after 2 minutes, `20261009-111531`). The phone is for one-off lookups of a friend or a pilot by name (job 3; owner, 2026-10-11); Pilot Lookup is not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`).
+- **Above the fold:** the search and paste box; then, for a D-Scan, the Danger read (level, sentence, Watch these); for a Local list, the grouped rows with Threat badges; for one pilot, identity and the Threat band (on a phone, the name box and this profile are the whole job).
+- **Not for:** route conditions (Route Safety, `travel.md`); a corporation or alliance (Show Info).
+- **Sources:** owner, 2026-10-11 (desktop primary beside the client; phone for one-off friend or pilot lookups); #2331, #2332, #2863, #2943; decisions `20260929-234357`, `20261007-224716`, `20261009-111531`, `20261008-181210`, `20261008-222917`; GLOSSARY.md Threat, Danger read.
+- **Unconfirmed:** the job ranking.
+
+### Mobbin brief
+
+- **Fit:** low to medium. A player profile with stats and a match list is generic; the Danger read, Local grouping and D-Scan Fleet board are EVE-specific.
+- **Analog apps:** Truecaller, Steam, Chess.com, Strava.
+- **Screen queries:**
+  - `web: player profile with avatar, team, an all-time stats line, ratio meters and a recent matches list that expands per match`
+  - `web: pasted list of names checked into grouped rows, each with a risk badge and counts`
+  - `ios: caller lookup result with a risk level badge and a one-line reason`
+- **Flow queries:** none.
+- **Mobbin won't help with:** the Danger read, Fleet board and victim fits. Reference zKillboard, dscan.info and the EVE client's D-Scan and Local windows.
+
+## Access, routing, scopes
+
+- Route `/travel/pilot` is the `pilot` tab of `TRAVEL_TABS`; `src/routes/Travel.tsx` waits for `hydrated` and sends a missing Character to `/characters`, then renders `PilotLookupPanel` with the shared tab bar. Ungated like Travel.
+- Nav: no page of its own (no Intel group); Ctrl K lists it as "Travel › Pilot Lookup" from `TRAVEL_TABS`. Tab label `nav.pilotLookup`.
+- Legacy redirects: `/pilot-lookup` -> `/travel/pilot` (`src/app/legacyPaths.ts`, query, hash and route state kept); defaulted `/travel?pilot=` -> `/travel/pilot` (`src/routes/Travel.tsx`).
+- Scope: only suggestions use one - `esi-search.search_structures.v1` (`getCharacterSearch`, `src/esi/registry.ts:573`), gated by `useEndpointsGranted(['getCharacterSearch'])` and an active Character (`PilotLookupPanel.tsx:75`). Without it the hint reads "Type the pilot's full name and press Enter. Suggestions need this character's search permission." and exact-name lookup still works. No grant banner or Grant button on the page.
+- Layout: `mx-auto max-w-6xl`; `PageHeader` title `travel.title` over the Travel tab bar; `DataAgeBadge` on the profile panel (when the profile loaded).
+
+## Data sources
+
+| Source                | Endpoint                                                                                  | Used for                                                                   | Code                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| ESI (Character scope) | `GET /characters/{id}/search?categories=character` + `resolveNames`                       | Suggestions                                                                | `src/features/character/mailRecipientSearch.ts` (same search Mail's recipient picker uses; floor 3 chars) |
+| ESI public            | `POST /universe/ids`                                                                      | Exact name -> id (case-insensitive)                                        | `resolvePilotByName`, `src/features/travel/pilotLookup.ts`                                                |
+| ESI public            | Character public info (cached loader) + one direct `getCharacterPublicInfo` fallback      | Name, birthday, corporation, alliance, security status                     | `loadPilotProfile`                                                                                        |
+| ESI public            | `POST /characters/affiliation`                                                            | Current corp/alliance (wins over the cached, possibly stale public record) | `resolveAffiliations`                                                                                     |
+| ESI public            | `resolveNames`                                                                            | Corporation / alliance names                                               | `loadPilotProfile`                                                                                        |
+| zKillboard            | `GET https://zkillboard.com/api/stats/characterID/{id}/` (302 -> `.../kills/`, CORS-open) | All-time stats, danger/gang ratio, top ships                               | `fetchPilotStats`, `src/lib/zkillboard.ts:228`                                                            |
+| zKillboard            | `GET /api/kills/characterID/{id}/` and `/api/losses/characterID/{id}/`                    | Recent killmails (id, hash, inline body, total value)                      | `fetchPilotKillmails`, `zkillboard.ts:341`                                                                |
+| ESI public            | `GET /killmails/{id}/{hash}`                                                              | Victim body only when zKillboard sent the hash-only shape                  | `loadKillmailFit`, `src/features/travel/pilotKillmailFit.ts`                                              |
+| Local SDE             | `types.json`, fitting slot data                                                           | Hull/module names, slot placement                                          | `loadTypes`, `loadFittingSlots`                                                                           |
+
+zKillboard calls are plain browser fetches with no custom headers (decision `20260924-195833`). Stats and killmail lists cached 10 min in memory per id (`PILOT_STATS_CACHE_MS`); a failure is never cached. No Firestore or Dexie involved.
+
+## Search panel (`PilotSearch`, `PilotLookupPanel.tsx:71`)
+
+- Form: labelled text input (`role=combobox`, `aria-autocomplete=list`), placeholder "Pilot name", `w-72`; primary "Look up" button (disabled when empty or while resolving).
+- Suggestions: listbox below input (max-h 56, scroll), shown only when scope granted, trimmed length >= 3 and results exist. Keys: Arrow Up/Down, Home, End move highlight (opens list); Enter picks highlighted option else does exact-name lookup; Escape closes. Hover highlights; mousedown selects without blurring. Blur closes.
+- Typing clears suggestions, resets state, cancels an exact lookup in flight (ticket counters make stale answers drop; aborts the search request).
+- Search failure silently falls back to exact-name lookup (suggestions emptied).
+- Status line (`role=status`, polite): resolving; not found ("No pilot is named X. Check the spelling - the name must match exactly."); couldn't reach EVE.
+- Choosing a pilot sets input to the name and pushes `?pilot=<id>` (`setParams({ pilot }, { push: true })`).
+
+## Result states (`PilotResult`, keyed by id)
+
+| State                                  | Shown                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------ |
+| no `pilot` param                       | EmptyState pickTitle / pickHint                                                |
+| loading                                | Spinner                                                                        |
+| `unknown` (ESI 404, no such character) | EmptyState "EVE has no pilot with this id. Check the link, or search by name." |
+| `failed` (ESI unreachable)             | EmptyState "This pilot's details aren't available right now..."                |
+| ready                                  | Panel with `PilotProfileView`                                                  |
+
+Distinction rests on `publicInfoOrNull`: the cached loader folds "no such character" and "unreachable" into null, so one direct request separates 404 (null) from other errors (throw).
+
+## Profile view (`PilotProfileView.tsx`)
+
+Shared with `PublicInfoModal`'s Character tab (`src/components/PublicInfoModal.tsx:40`), which lazy-loads it and owns its own loading/failure; mount keyed by character id.
+
+- Identity: `CharacterAvatar` (lg) + name heading (hidden in the modal via `hideName`); definition list: Corporation (`CorporationLink` -> Show Info; inside the modal a button switching tabs), Alliance (`AllianceLink`, or "No alliance"), Security status (1 decimal, or Unknown), Age ("N years, M days" from birthday, to last anniversary, UTC; Unknown for unreadable/future). External "zKillboard" link to `characterZkillUrl`. corp/alliance links stay text height (they were 44 px hit areas in #2520; the compact header dropped that). Unresolved corp/alliance names show `#id`.
+- Loads `fetchPilotStats` on mount; fits section independent.
+
+### Stats (`ZkillStatsSection.tsx`)
+
+- Status (`ZkillStatsStatus`): loading ("statsLoading"), failed EmptyState, `no-history` EmptyState (no kill or loss recorded; wording differs for pilot / corporation / alliance). Failed vs no-history are separate answers.
+- Ratio meters (`ZkillRatioMeters`): Danger (Snuggly 0 ... Dangerous 100, always read "N% dangerous"), Gang (Solo 0 ... Gang 100) and Kills vs losses (`killerRatio`: kills / (kills + losses) by ship count, Victim 0 ... Killer 100); `role=meter`; the fill follows `ratioMeterColor` (gray, blue, green, then yellow past about half, orange, muted red; decision `20261009-092214`), the readout is plain text and names the end in words. They sit in one "How they fight" card: three narrow columns showing just the figure, stacked as full rows with the words beside the chart once the profile is `@3xl` wide. The Corporation and Alliance tabs draw the same card, always as columns.
+- All-time line (`ZkillStatsSection`): kills (green), losses (red), ISK destroyed and lost (`IskAmount`, compact with exact on hover), solo kills, then "All-time figures as zKillboard states them." The Corporation and Alliance tabs keep `StatTiles`. No ISK efficiency anywhere on a pilot: the danger ratio and the kills meter already are kills against losses.
+- Top ships (`ZkillTopShips`): up to `PILOT_TOP_SHIPS = 5` ranked rows: rank, `TypeIcon`, `ItemInfoLink` name, bar sized vs top hull, kill count. Half width on desktop. Names resolved with `loadTypeNames`. Corporation and Alliance tabs only; a pilot's profile draws `PilotShips` (two columns, no bars).
+- Parts exported for reuse: Corporation and Alliance tabs of Show Info reuse `StatTiles`, `ZkillRatioMeters`, `ZkillTopShips`, `ZkillStatsNote` with `fetchCorporationStats` / `fetchAllianceStats`.
+
+### Recent kills and losses (`PilotKillmailsSection.tsx`)
+
+- Fetches kills and losses in parallel, merges newest first by killmail id, keeps `PILOT_KILLMAIL_LIMIT = 25`. Either list failing fails the whole answer ("couldn't be loaded", warning tone) - kills alone would misstate the record. Empty: "zKillboard lists no recent kills or losses." Header link "More on zKillboard".
+- Row (button, `aria-expanded`): caret, Kill (green) / Loss (red), timestamp (user time-zone setting), ship icon + hull name, system name, "Victim: <name>" (for kills) or "Final blow: <name>" (for losses) - pilot, else corporation, else NPC's ship type -, total value (`formatIskCompact`). Phone: party text takes its own last line.
+- Expand: reads the killmail only now (inline zKillboard body, else ESI killmail by hash). Once read or in flight it is kept (no refetch on collapse/re-expand); a failed read retries on next expand. Spinner delayed 200 ms.
+- Expanded states: loading; failed ("couldn't be read from EVE. Try again in a minute."); no fit ("wasn't in a ship that can be fitted"); empty fit ("Nothing was fitted."); else `FittingModuleList` with linked item names.
+- Open in Fittings: encodes the victim's fit as a share payload (`encodeFittingShare`) and navigates to the Fittings editor (`fittingEditLocation`); busy state; error "couldn't be opened in Fittings."
+- Names (pilots, corps, systems) resolved in one batched `resolveNames` as rows load.
+
+## Other entry points
+
+- Command palette Pages group lists "Pilot Lookup" (`createPagesProvider`, `src/features/commandPalette/providers.ts:25`). No pilot-name search or "look up <pilot>" command; no way to deep-link a lookup from the palette.
+- No other page links to `/pilot-lookup`; `CharacterLink`s elsewhere open the Show Info modal's Character tab, which renders the same profile view.
+- Share: copy the URL (`?pilot=<id>`).
+
+## Engine / helpers
+
+- `pilotAge(birthday, now)`: whole years to last anniversary (UTC) + days since; null for unreadable or future (`pilotLookup.ts:33`).
+- `parsePilotStats`: defensive parse; `{"error":"Invalid type or id"}` or zero kills + losses = `no-history`; any other error body = failure; `iskEfficiency = destroyed / (destroyed + lost)`, null when no ISK moved; zero counts missing from the body read as 0 (`zkillboard.ts:166`).
+- `parsePilotKillmails`, `readKillmailDetail`: drop entries without id/hash; final blow = flagged attacker else first listed.
+- `killFigures`: tile data + tones (`zkillFigures.ts`). Danger/gang meters quote zKillboard's own scales (decisions `20261002-145207`; colour `20261009-092214`, which replaced `20261002-163430`).
+
+## Where it lives
+
+| Layer            | Path                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| Route / gate     | `src/routes/PilotLookup.tsx` (waits for `hydrated`, redirects to `/characters` with no Character) |
+| Page             | `src/features/travel/PilotLookupPanel.tsx` (search, result switch)                                |
+| Profile (shared) | `src/features/travel/PilotProfileView.tsx`, `ZkillStatsSection.tsx`, `PilotKillmailsSection.tsx`  |
+| Data             | `src/features/travel/pilotLookup.ts`, `pilotKillmailFit.ts`, `src/lib/zkillboard.ts`              |
+| Figures          | `src/features/travel/zkillFigures.ts`                                                             |
+
+Folder is `features/travel/`, where the tab lives.
+
+## Formulas and parsing rules
+
+| Rule                   | Exact behavior                                                                                                                                                                                 | Code                                                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Age                    | whole years to last anniversary (UTC) + whole days since; null (shown "Unknown") for unparseable or future birthday                                                                            | `pilotLookup.ts:33`                                                                                                                    |
+| Exact name             | trimmed, blank never asked; `POST /universe/ids`, first `characters` match, case-insensitive                                                                                                   | `pilotLookup.ts:48`                                                                                                                    |
+| Suggestion floor       | trimmed length >= 3 (ESI minimum); hits sliced to 15; names resolved via `resolveNames`; unnamed hits dropped                                                                                  | `mailRecipientSearch.ts:10-37`                                                                                                         |
+| Current affiliation    | `POST /characters/affiliation` wins over cached public record (static cache can be stale); alliance null when affiliation says none                                                            | `pilotLookup.ts:79`                                                                                                                    |
+| Unknown vs unreachable | cached loader returns null for both; one direct `getCharacterPublicInfo`: 404 = unknown, any other error rethrows = failed                                                                     | `pilotLookup.ts:64`                                                                                                                    |
+| Stats parse            | non-object / array = failure; `error == "Invalid type or id"` = no-history; any other error = failure; kills = `shipsDestroyed`, losses = `shipsLost`, missing counts = 0; both 0 = no-history | `zkillboard.ts:166`                                                                                                                    |
+| ISK efficiency         | `iskDestroyed / (iskDestroyed + iskLost)`; null (shown "—") if no ISK moved                                                                                                                    | `zkillboard.ts:184`                                                                                                                    |
+| Ratios                 | zKillboard's own `dangerRatio` / `gangRatio`, null if not finite; clamped 0-100, rounded; lean high > 50, low < 50, even == 50                                                                 | `ZkillStatsSection.tsx:233`                                                                                                            |
+| Ships                  | Result                                                                                                                                                                                         | Side by side: "Flies on kills" (zKillboard all-time top 5) and "Kills most" (hulls in their latest 200 kills), counts, Show info links |
+| Recent list            | kills + losses lists merged, sorted by killmail id desc (ids rise with time), first 25 (`PILOT_KILLMAIL_LIMIT`); entries lacking id or hash dropped                                            | `zkillboard.ts:341`                                                                                                                    |
+| Final blow             | attacker flagged `final_blow`, else first listed; party label = pilot, else corporation, else NPC ship type name, else "—"                                                                     | `zkillboard.ts:283`, `PilotKillmailsSection.tsx:194`                                                                                   |
+| Row columns            | Kill/Loss tag, timestamp (user time zone), VICTIM's hull icon + name (the hull that died, on kills too), system, party (Victim on kills, Final blow on losses), total value `formatIskCompact` | `PilotKillmailsSection.tsx:204-260`                                                                                                    |
+
+## Persistence and sync
+
+| State                      | Where                                                                                 | Notes                                |
+| -------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------ |
+| Selected pilot             | URL `?pilot=<characterId>` (`optionalIdParam`), `push` on select                      | only durable state; shareable        |
+| Stats, killmail list       | memory, 10 min per `kind:id` / per id (`PILOT_STATS_CACHE_MS`); failures never cached | lost on reload                       |
+| Public info                | ESI cache (Dexie, `STALE_AFTER.static`)                                               | via `loadPublicCharacterInfo`        |
+| Expanded rows, loaded fits | component state, kept for the mounted pilot                                           | lost on pilot change (keyed remount) |
+| Query text                 | component state only                                                                  | not restored from the URL            |
+| Firestore / Dexie sync     | none for this page                                                                    |                                      |
+
+## State matrix
+
+| Where            | State                               | Display                                                  |
+| ---------------- | ----------------------------------- | -------------------------------------------------------- |
+| Search           | idle                                | hint (suggest vs exact wording)                          |
+| Search           | resolving exact name                | "resolving" status; Look up disabled                     |
+| Search           | not found                           | status "No pilot is named X..."                          |
+| Search           | ESI failure                         | status "couldn't reach EVE"                              |
+| Search           | suggestion request fails            | silent: list emptied, exact lookup still works           |
+| Search           | scope missing / no active Character | no list; exact-name hint                                 |
+| Result           | no `pilot` param                    | EmptyState pick title/hint                               |
+| Result           | loading                             | Spinner                                                  |
+| Result           | 404                                 | EmptyState unknown pilot                                 |
+| Result           | other ESI error                     | EmptyState unavailable                                   |
+| Stats            | loading                             | "statsLoading" line                                      |
+| Stats            | failed                              | EmptyState stats-failed (distinct from no history)       |
+| Stats            | no-history                          | EmptyState; wording for pilot/corp/alliance              |
+| Stats            | ratios absent                       | meters hidden; tiles still show                          |
+| Killmails        | loading / failed / empty            | status line / warning line / "no recent kills or losses" |
+| Row expand       | loading                             | Spinner after 200 ms                                     |
+| Row expand       | failed                              | retry on next expand                                     |
+| Row expand       | no fit / empty fit                  | text lines                                               |
+| Open in Fittings | busy / failed                       | disabled button / `role=alert`                           |
+| Rate limiting    | zKillboard 429 or any non-ok        | same as failed; Try again control; no cache              |
+
+## Mobile vs desktop
+
+- Page `max-w-6xl`; search input `w-72 max-w-full`. Stat tiles 6 columns from `md`, 2-3 below; ratio meters side by side, stacked on phone; top ships half width on desktop (`md:w-1/2`).
+- Killmail row: `min-h-11` on phone, party text takes its own last line below `sm` (#2520); corp/alliance links stay text height on a phone (they were 44 px tall in #2520; the compact header dropped that).
+- No separate mobile layout for search; `mobileTab: true` puts the page in the phone tab bar's More area.
+
+## Permissions
+
+| Feature                                        | Scope                                                                                                                                                                | Missing                                                                                      |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Exact-name lookup, profile, stats, kills, fits | none (public ESI, zKillboard, ESI killmail)                                                                                                                          | n/a; page still needs a signed-in Character                                                  |
+| Name suggestions                               | `esi-search.search_structures.v1` (`getCharacterSearch`)                                                                                                             | hint text only; no Grant button                                                              |
+| D-Scan danger read, default "Your ship"        | `esi-location.read_ship_type.v1` (`getCharacterShip`, Permission "Current ship", default-on) via `useCharacterShipTypeId` (`features/character/ship.ts`, 90 s cache) | `needsScope`: existing Grant flow, pick a hull by hand; a 403 never trips the re-auth banner |
+
+## Test coverage map
+
+| Behavior                                                                                                                                                                                                        | Test                                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| age math, exact-name resolve, affiliation merge, 404 vs outage                                                                                                                                                  | `pilotLookup.test.ts`                                                                                                                                                                               |
+| scope vs no-scope search, not found, deep link, unknown/outage/no-history/zKill failure distinctions, no-verdict copy, list without reading killmails, hash-only read once + Open in Fittings, killmail failure | `PilotLookupPanel.test.tsx`                                                                                                                                                                         |
+| inline vs hash-only fit, ESI failure                                                                                                                                                                            | `pilotKillmailFit.test.ts`                                                                                                                                                                          |
+| meters lean/ramp colour/even, tile colours, efficiency help, top-ship ranking, corp "no history" copy                                                                                                           | `ZkillStatsSection.test.tsx`                                                                                                                                                                        |
+| Not covered by a dedicated test                                                                                                                                                                                 | keyboard navigation of suggestions, debounce/abort race handling, Show Info modal reuse (stats parsing is covered by `src/lib/zkillboardStats.test.ts`, killmails by `zkillboardKillmails.test.ts`) |
+
+## Decision links (why)
+
+| Decision                                                                   | Gist                                                                                                     |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `20260929-234357-travel-section-route-safety-thera-turnur-pilot-lookup`    | intel tools in scope; signed-in; numbers not verdicts                                                    |
+| `20261002-145653-lp-store-under-market-pilot-lookup-its-own`               | own page `/pilot-lookup`, old links redirect                                                             |
+| `20260930-104922-public-infos-character-tab-is-pilot-lookups-view`         | Show Info Character tab renders this view; caller owns corp/alliance links; live affiliation drives tabs |
+| `20260924-195833-fittings-load-reads-killmail-hashes-from-zkillboards-api` | zKillboard calls are plain browser fetches, no custom headers (avoids preflight)                         |
+| `20261002-163430-show-info-colours-zkillboards-figures-by-side-and`        | kills green, losses red, meters coloured by lean                                                         |
+| `20260912-172628-courier-risk-flags-state-a-condition-never-a`             | conditions, never verdicts                                                                               |
+
+## Interview Q&A
+
+1. Why can a lookup work without the search scope? Exact name goes through public `POST /universe/ids` (`pilotLookup.ts:48`); only the suggestion list calls the Character-scoped search (`PilotLookupPanel.tsx:75`, `registry.ts:573`). Hint wording switches on `canSuggest`.
+2. How does it tell "no such pilot" from "ESI is down"? The cached loader folds both to null, so `publicInfoOrNull` makes one direct call: 404 returns null (unknown), anything else throws (failed) (`pilotLookup.ts:64-72`; tested `pilotLookup.test.ts:143,150`).
+3. Why prefer the affiliation lookup over public info for corp/alliance? Public record is cached as static and can be stale; `/characters/affiliation` is current, and wins when it answered (`pilotLookup.ts:79-96`). Show Info tabs follow the same ids so they never disagree (`20260930-104922`).
+4. What is the difference between "no history" and "couldn't be reached"? zKillboard `{"error":"Invalid type or id"}` or zero kills+losses = no-history; any other error body, non-ok HTTP or fetch error = failed (`zkillboard.ts:166-193`, `fetchEntityStats`, `zkillboard.ts:211`). A failure is never cached, no-history is.
+5. How is ISK efficiency computed? destroyed / (destroyed + lost), null when no ISK moved (`zkillboard.ts:184`). It is parsed but no longer drawn.
+6. How are the danger and gang meters coloured, and what are their numbers? They quote zKillboard's own 0-100 figures (not computed here), clamped and rounded; > 50 high, < 50 low, == 50 "even", with the end named in words; the fill colour follows the percentage, not the side (`ZkillStatsSection.tsx:233-266`).
+7. Why is the recent list limited to 25 and how are kills and losses merged? Both lists fetched in parallel, merged by killmail id desc, first 25; either list failing fails the answer because kills alone would misstate the record (`zkillboard.ts:341-361`).
+8. When is a killmail body fetched? Only when a row is expanded; inline zKillboard body else ESI `GET /killmails/{id}/{hash}`; result kept once landed or in flight (ref guard), failed read retries on the next expand (`PilotKillmailsSection.tsx:106-126`, `pilotKillmailFit.ts:20-40`).
+9. What does Open in Fittings do? Encodes the victim's fit as a share payload (`encodeFittingShare`) and navigates to the Fittings editor via `fittingEditLocation`; busy/failed states local (`PilotKillmailsSection.tsx:296-310`).
+10. How do suggestions avoid stale results? Ticket counters (`latestSearch`, `latestLookup`), 300 ms debounce, `AbortController` on cleanup; typing clears suggestions and cancels exact lookup in flight (`PilotLookupPanel.tsx:82-110`).
+11. What happens to the previous result while typing a new name? It stays: typing resets only the search status and suggestions; the result changes only when a pilot is chosen and `?pilot=` is pushed (`PilotLookupPanel.tsx:177-190`, `:51-56`).
+12. Who else reuses this? `PublicInfoModal`'s Character tab lazy-loads `PilotProfileView` and the stat parts for corporation/alliance (`PublicInfoModal.tsx:53,268`); corp/alliance links there switch tabs instead of opening Show Info.
+13. How is a kill row's "ship" chosen? The victim's hull (`detail.victim.ship_type_id`) on both kills and losses; the party column is the other side: victim for kills, final blow for losses (`PilotKillmailsSection.tsx:204-208`).
+14. Why are zKillboard requests plain `fetch` with no headers? A custom header would force a CORS preflight; decision `20260924-195833`; hence also no `X-User-Agent` (the CLAUDE.md ESI header rule covers ESI calls only).
+
+## Observed gaps (from code)
+
+- No pilot-name search or lookup command in the command palette; palette lists the page only.
+- No Grant control on the page when suggestions lack the search scope; only a hint (`PilotLookupPanel.tsx:232`).
+- Name search is exact-match only without the scope (first `characters` match, no disambiguation, no partial-name search via public ESI).
+- Kills/losses list fixed at 25 with no pagination, filter or sort; "More on zKillboard" is the only way further.
+- No employment history, standings or contact add on this page.
+- No copy-link or share button; sharing relies on the address bar.
+- The badge dates the profile load only; stats/killmail cache is memory-only (10 min, reload refetches) and shows no age.
+- Profile, stats and killmail failures each offer a Try again control (failures are not cached, so it refetches).
+- Killmail row shows only victim or final blow; no attacker count, damage, or location detail.
+- Top ships use zKillboard's all-time "ships used on kills" only; no losses-by-hull or recent-activity timeline.
+- Show Info Character tab and this page duplicate one view; Show Info does not link to `/travel/pilot`.
+- Orphaned i18n key `travel.pilotTab` remains in `en.json`; the tab label is `nav.pilotLookup`.
+- Opening a `?pilot=` link leaves the search box empty (query text is local state, never filled from the URL or the loaded profile).
+- Kill row shows the victim's hull for both kills and losses, so the pilot's own ship on a kill is not shown.
+- No test for keyboard navigation or the debounce/abort race beyond happy paths.
+
+## Improvement ideas
+
+- Fill the input from the loaded pilot; show a Copy link control.
+- Retry button for fits; surface 429 distinctly.
+- Pagination or "load more" and side filter (kills/losses) on the recent list; show attacker count and damage.
+- Losses-by-hull and recent-activity timeline from zKillboard stats.
+- Grant button next to the suggestion hint when the search scope is missing.
+- Palette command "look up <name>" that deep-links `?pilot=`.
+- Employment history and standings/contact actions behind the existing Show Info tabs.
+- Drop the orphan `travel.pilotTab` i18n key.

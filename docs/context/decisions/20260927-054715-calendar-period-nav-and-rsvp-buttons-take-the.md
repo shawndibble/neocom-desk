@@ -1,0 +1,5 @@
+# Scope decisions — Calendar period-nav and RSVP buttons take the md control size (issue #2107)
+
+_Recorded 2026-09-27 · issue #2107._
+
+- **Calendar's period-nav controls (`Calendar.tsx`'s prev/Today/next) and `EventDetailModal`'s RSVP row (Accept/Decline/Tentative) move from `size="sm"` to `size="md"` outright, at every breakpoint.** These are sole touch targets on their row at 390px, and `sm` (`h-9 md:h-7`) renders under the 44px touch floor at that width. Same shape as `docs/context/decisions/20260915-224343-scopegates-sole-reauth-cta-takes-the-md-control.md` (#1135): rather than hand-writing a nonexistent `h-11 md:h-7` rung (forbidden by DESIGN.md §3), the control takes `md` (`h-11 md:h-9`) at both tiers, accepting that its pointer-width height also grows 28px→36px. Rules out inventing a bespoke breakpoint-specific class for these controls. Left unchanged: the density-toggle `IconButton` (desktop-only, not a sole touch target) and the Export/ICS buttons in `EventDetailModal` (out of scope per the ticket).

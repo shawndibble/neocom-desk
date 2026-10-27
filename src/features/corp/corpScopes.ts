@@ -1,0 +1,233 @@
+/**
+ * The other half of the corp gate: which OAuth scopes each capability needs.
+ *
+ * Split from `engine/corpRoles.ts` on purpose. Role -> capability is pure game
+ * logic and lives in the engine, which `CLAUDE.md` forbids from importing
+ * `esi/registry.ts`; capability -> scope is an ESI concern and lives here.
+ *
+ * The mapping below is a *selection* from the registry, not a second copy of
+ * it. #295 registered all seven corp scopes under the opt-in `corp` group, and
+ * typing these as `Scope` — the union `esi/registry.ts` derives — makes an
+ * unregistered or misspelled string a compile error; `corpScopes.test.ts` adds
+ * that every one of them is in `scopesForGroup('corp')`. What cannot be
+ * derived is which capability needs which, because a *capability* is a
+ * role-shaped idea, not an endpoint-shaped one — several corp endpoints share
+ * a scope and answer to different roles.
+ */
+import {
+  CORP_CAPABILITIES,
+  hasAnyCorpCapability,
+  NO_CORP_CAPABILITIES,
+  type CorpCapabilities,
+  type CorpCapability,
+} from '@/engine/corpRoles';
+import type { Scope } from '@/esi/registry';
+
+/**
+ * The scopes each capability's endpoints require, from
+ * https://esi.evetech.net/meta/openapi.json.
+ *
+ * Two capabilities need more than one, and both matter: without
+ * `read_divisions` a corp wallet renders as "Division 3" rather than the name
+ * the corp gave it, and `membertracking` answers nothing useful without the
+ * membership list beside it. Naming only one scope each would let
+ * `missingCorpScopes` under-report and call a Character `ready` for a surface
+ * that is still half-blind.
+ *
+ * `esi-industry.read_corporation_mining.v1` was registered by #295 with no
+ * capability claiming it. The moon-chunk clock is one of the corp board's item
+ * kinds (#296), so `canReadMoonExtractions` now claims it — every registered
+ * corp scope is spoken for.
+ *
+ * Note what claiming a scope here costs, because #327 is the first entry added
+ * after the group shipped: a Character who granted the corp group when it held
+ * seven scopes is now missing the eighth, so `useCorpAccess` moves them from
+ * `ready` to `roles-without-grant` and every corp surface hides until they
+ * re-grant from the Settings Corporation Permission row. The grant prompt is offered once
+ * per Character per device (round 37) and will not re-offer. Every future
+ * addition to the group carries the same cost — unless the capability that
+ * claims it is additive (`ADDITIVE_CORP_CAPABILITIES` below), which is how
+ * #4058 added the mining ledger without that cost.
+ */
+export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly Scope[]>> = {
+  canReadWallet: ['esi-wallet.read_corporation_wallets.v1', 'esi-corporations.read_divisions.v1'],
+  canReadStructures: ['esi-corporations.read_structures.v1'],
+  /**
+   * Its own entry rather than a second scope on `canReadStructures`, even
+   * though `Station_Manager` opens both: keyed per capability, a Character
+   * missing only this one is reported as missing only this one.
+   */
+  canReadMoonExtractions: ['esi-industry.read_corporation_mining.v1'],
+  /**
+   * The same scope as the extraction schedule, claimed by an Accountant-gated
+   * capability (issue #4058). An Accountant who granted the corp group before
+   * #327 added this scope never needed it until now, which is why this
+   * capability is additive (below) rather than blocking.
+   */
+  canReadMiningLedger: ['esi-industry.read_corporation_mining.v1'],
+  canReadMembers: [
+    'esi-corporations.track_members.v1',
+    'esi-corporations.read_corporation_membership.v1',
+  ],
+  canReadIndustry: ['esi-industry.read_corporation_jobs.v1'],
+  /**
+   * `read_divisions` too, not `canReadWallet`'s alone (#330, GLOSSARY.md round
+   * 44): naming a division ("SRP") rather than a number needs the `hangar`
+   * half of the same read the wallet rail already uses for its `wallet` half
+   * (`features/corp/divisions.ts`), and without this a Director-only assets
+   * surface would want a scope this map never admitted to needing. It costs
+   * no one a re-grant — `canReadAssets` answers to `Director` alone
+   * (`engine/corpRoles.ts`), and a Director already holds `canReadWallet` too
+   * (`corpCapabilities` grants every capability to a Director), so the scope
+   * was already required through that entry for every Character who can
+   * reach this surface at all.
+   */
+  canReadAssets: ['esi-assets.read_corporation_assets.v1', 'esi-corporations.read_divisions.v1'],
+  /**
+   * The corp twin of the base grant's `esi-characters.read_blueprints.v1`
+   * (issue #839) — its own scope, since a character granting the personal
+   * read says nothing about the corp one.
+   */
+  canReadBlueprints: ['esi-corporations.read_blueprints.v1'],
+  /**
+   * The tower list and detail (issue #4610). Additive (below): a Director who
+   * granted the corp group before it existed keeps every corp surface and only
+   * the Starbases widget stays off until the scope arrives.
+   */
+  canReadStarbases: ['esi-corporations.read_starbases.v1'],
+  /** Director-only (issue #4611). Additive, so a Director's older corp grant keeps working. */
+  canReadCustomsOffices: ['esi-planets.read_customs_offices.v1'],
+  /**
+   * Director-only (issue #4613). `read_titles` is the new scope; the membership one
+   * is already held by any Director with `canReadMembers`. Additive.
+   */
+  canReadRoleAudit: [
+    'esi-corporations.read_corporation_membership.v1',
+    'esi-corporations.read_titles.v1',
+  ],
+  /** Open to every member; additive (below), so a corp grant made before it stays `ready`. */
+  canReadContracts: ['esi-contracts.read_corporation_contracts.v1'],
+  /** Accountant or Trader; additive (below), so a corp grant made before it stays `ready`. */
+  canReadOrders: ['esi-markets.read_corporation_orders.v1'],
+  /**
+   * Director-only (issue #4756). Additive (below): `canReadWallet` and
+   * `canReadAssets` already claim this scope, so no Director loses a surface.
+   */
+  canReadDivisions: ['esi-corporations.read_divisions.v1'],
+  /**
+   * Station_Manager (issue #4775). Additive (below): the scope is new, so a
+   * Station_Manager's older corp grant keeps every surface it had.
+   */
+  canReadSkyhooks: ['esi-structures.read_corporation.v1'],
+  /**
+   * Officer gate for SRP Claims (Director or Accountant), like canEdit in functions/src/corpTaxBook.ts.
+   * Not an ESI read; the callables re-check live. Settings need a Director.
+   * Additive (below): the roles scope is already in the corp group.
+   */
+  canManageSrp: ['esi-characters.read_corporation_roles.v1'],
+  /** SRP Settings, Director alone. Additive (below), for the same reason as `canManageSrp`. */
+  canConfigureSrp: ['esi-characters.read_corporation_roles.v1'],
+};
+
+/**
+ * Capabilities added after Characters already reached `ready` without them.
+ * Missing one of their scopes never hides corp surfaces the Character could
+ * already read: the capability itself just stays off until the scope arrives,
+ * and `missingScopes` still names it so a surface that needs it can ask.
+ *
+ * Why not simply require the scope, as #327 did: an Accountant who granted
+ * the corp group before #327 holds every wallet scope and not the mining one,
+ * so a plain requirement would drop them from `ready` to
+ * `roles-without-grant` and hide their corp wallet until they re-granted —
+ * breaking a working surface to offer a new one. Additive, they keep the
+ * wallet. Asking them for the scope is left to the first surface that reads
+ * the ledger (#4062/#4063): an offer made before anything uses it would spend
+ * the corp grant prompt's once-only ask on nothing (decision
+ * `20261018-141225-additive-corp-capabilities-do-not-hide-corp-ui`).
+ */
+const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
+  'canReadMiningLedger',
+  'canReadStarbases',
+  'canReadCustomsOffices',
+  'canReadRoleAudit',
+  'canReadContracts',
+  'canReadOrders',
+  'canReadDivisions',
+  'canReadSkyhooks',
+  'canManageSrp',
+  'canConfigureSrp',
+]);
+
+/**
+ * Every scope the held capabilities need, deduplicated and in capability order.
+ *
+ * Keyed on capability rather than on "all corp scopes": a Factory_Manager who
+ * is not an Accountant can never use the corp wallet scope, so counting it as
+ * missing would hold them at `roles-without-grant` over a permission their
+ * roles make useless.
+ */
+function requiredCorpScopes(capabilities: CorpCapabilities): readonly Scope[] {
+  const required = new Set<Scope>();
+  for (const capability of CORP_CAPABILITIES) {
+    if (!capabilities[capability]) continue;
+    for (const scope of CORP_SCOPES_FOR_CAPABILITY[capability]) required.add(scope);
+  }
+  return [...required];
+}
+
+/**
+ * Required corp scopes absent from `granted`. Plain strings on the way in,
+ * because a JWT's `scp` claim carries whatever CCP put there — the same reading
+ * `missingScopesForRoute` and `revokedScopes` give it.
+ */
+export function missingCorpScopes(
+  capabilities: CorpCapabilities,
+  granted: readonly string[]
+): readonly Scope[] {
+  const held = new Set(granted);
+  return requiredCorpScopes(capabilities).filter((scope) => !held.has(scope));
+}
+
+/** How far a grant covers the held capabilities — `corpGrantCoverage`'s answer. */
+export interface CorpGrantCoverage {
+  /** Every needed scope not granted, additive or not: what a grant would ask for. */
+  missingScopes: readonly Scope[];
+  /** A non-additive capability lacks a scope, so corp surfaces stay hidden until a grant. */
+  blocking: boolean;
+  /** The held capabilities, with each additive one the grant does not cover turned off. */
+  capabilities: CorpCapabilities;
+}
+
+/**
+ * `missingCorpScopes`, plus whether the gap blocks corp UI and which
+ * capabilities are actually readable with the grant in hand. See
+ * `ADDITIVE_CORP_CAPABILITIES` for why the two can differ.
+ */
+export function corpGrantCoverage(
+  capabilities: CorpCapabilities,
+  granted: readonly string[]
+): CorpGrantCoverage {
+  const held = new Set(granted);
+  const covered = { ...NO_CORP_CAPABILITIES };
+  let blocking = false;
+  for (const capability of CORP_CAPABILITIES) {
+    if (!capabilities[capability]) continue;
+    const complete = CORP_SCOPES_FOR_CAPABILITY[capability].every((scope) => held.has(scope));
+    const additive = ADDITIVE_CORP_CAPABILITIES.has(capability);
+    if (!complete && !additive) blocking = true;
+    // A non-additive capability keeps the roles' answer even when incomplete,
+    // as `useCorpAccess` always reported it: that gap blocks, and a blocked
+    // grant hides every corp surface regardless.
+    covered[capability] = complete || !additive;
+  }
+  // Every capability this Character holds is additive and ungranted (a
+  // Trader-only Character): nothing is readable, so corp UI would be an empty
+  // board. Treat that as blocking so the grant prompt fires. A Character with
+  // some granted capability keeps it; the additive ones stay off.
+  if (hasAnyCorpCapability(capabilities) && !hasAnyCorpCapability(covered)) blocking = true;
+  return {
+    missingScopes: missingCorpScopes(capabilities, granted),
+    blocking,
+    capabilities: covered,
+  };
+}

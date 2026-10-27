@@ -1,0 +1,207 @@
+/**
+ * Market Browser order book's optional-column catalog and its device-local
+ * visible-columns preference — the `bpcSearchColumns.ts` pattern, applied to
+ * the Sell and Buy tables, which share one picker and one stored preference
+ * (`Market.tsx`'s `baseColumns` already builds `buyColumns` off the same base).
+ */
+import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
+import type { RegionOrder } from '@/esi/endpoints';
+import type { OrderFeeContext } from '@/engine/market/orderFees';
+import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
+import { formatMarketIsk } from '@/lib/isk';
+import { formatVolume } from './format';
+
+/**
+ * In table column order. Sell only ever renders the `baseColumns` prefix
+ * (`price` through `expiry`); Buy adds `range` and `minVolume` after `expiry`.
+ * Neither table can lose its columns entirely — there is no identity column
+ * here to hold back. Every id but `minVolume` defaults visible below.
+ */
+export const MARKET_ORDER_COLUMN_IDS = [
+  'price',
+  'fees',
+  'finalPrice',
+  'quantity',
+  'jumps',
+  'location',
+  'security',
+  'expiry',
+  'range',
+  'minVolume',
+] as const;
+
+export type MarketOrderColumnId = (typeof MARKET_ORDER_COLUMN_IDS)[number];
+
+/** Sell has no `range`/`minVolume` — buy-order-only fields (ESI's `RegionOrder`). */
+export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
+  'price',
+  'fees',
+  'finalPrice',
+  'quantity',
+  'jumps',
+  'location',
+  'security',
+  'expiry',
+];
+export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
+
+/** Columns that need the active Character's Accounting and Broker Relations levels, so they exist only once those have loaded. */
+export const FEE_COLUMN_IDS: readonly MarketOrderColumnId[] = ['fees', 'finalPrice'];
+
+/**
+ * Whether the book holds a column back right now: Location when one station
+ * is already named by the scope bar, the fee columns until the active
+ * Character's skills are known. The one rule the picker, the table,
+ * the row detail and the width budget all follow.
+ */
+export function isColumnWithheld(
+  id: MarketOrderColumnId,
+  { hideLocation, feeContext }: { hideLocation: boolean; feeContext: OrderFeeContext | null }
+): boolean {
+  return (
+    (hideLocation && id === 'location') || (feeContext === null && FEE_COLUMN_IDS.includes(id))
+  );
+}
+
+/**
+ * Every column but Min. Volume, which is almost always 1 (the expanded row
+ * states it for every buy order) and would cost the book 8rem of width
+ * before its rows become cards, and the two fee columns, which are there to
+ * tick. A pilot who wants one ticks it.
+ */
+export const DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS: readonly MarketOrderColumnId[] =
+  MARKET_ORDER_COLUMN_IDS.filter((id) => id !== 'minVolume' && !FEE_COLUMN_IDS.includes(id));
+
+export const VISIBLE_MARKET_ORDER_COLUMNS_KEY = 'marketOrderVisibleColumns';
+
+// Unknown ids are dropped rather than voiding the whole preference: a
+// retired column (Cum. qty's `depth`) shouldn't reset a pilot's picks.
+export const useVisibleMarketOrderColumns = createColumnVisibilitySetting({
+  key: VISIBLE_MARKET_ORDER_COLUMNS_KEY,
+  ids: MARKET_ORDER_COLUMN_IDS,
+  defaultVisible: DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS,
+  dropUnknown: true,
+});
+
+/**
+ * Location's width cap in a table row: `roomy` while the book has room, then
+ * `squeezed` (still truncated, the full name in the tooltip and expanded row)
+ * before the rows give up and become cards.
+ */
+export const ORDER_BOOK_LOCATION_REM = { roomy: 16, squeezed: 9 } as const;
+
+/** `ORDER_BOOK_LOCATION_REM` as the cell's class, spelled out for Tailwind to find. */
+export const ORDER_BOOK_LOCATION_CLASS = {
+  roomy: 'max-w-[16rem] truncate',
+  squeezed: 'max-w-[9rem] truncate',
+} as const;
+
+/**
+ * What each column needs in a table row, in rem, measured in Chrome with the
+ * table squeezed to its floor. Each is its header's width (label, `px-3`,
+ * sort icon) — wider than any value it holds, except Price and Quantity,
+ * whose figures can outgrow theirs (`ORDER_BOOK_FIGURE`). Location is
+ * `ORDER_BOOK_LOCATION_REM`.
+ */
+const ORDER_BOOK_COLUMN_REM: Record<Exclude<MarketOrderColumnId, 'location'>, number> = {
+  price: 4.75,
+  fees: 5.25,
+  finalPrice: 6.25,
+  quantity: 4.125,
+  jumps: 5.125,
+  security: 4,
+  expiry: 5.625,
+  range: 5.25,
+  // Its header is 92px (5.75rem); a ten-character minimum needs
+  // 10 × charRem + paddingRem (`ORDER_BOOK_FIGURE`), about 6.1rem.
+  minVolume: 6.25,
+};
+
+/**
+ * A right-aligned figure's cell: one tabular-numeral character's width, and
+ * its padding (`px-3` plus the sort-icon gutter `pr-7`, `DataTable`).
+ */
+const ORDER_BOOK_FIGURE = { charRem: 0.36, paddingRem: 2.5 } as const;
+
+/**
+ * The row's expand toggle (`expandableRow`), its ⋮ column (`rowMoreActions`:
+ * a 1.75rem button in `px-2`), plus the card's border. Leaving the ⋮ column
+ * out let Buy, the wider table, scroll its ⋮ out of the card.
+ */
+const ORDER_BOOK_FIXED_REM = 2.5 + 2.75 + 0.25;
+
+/** `BaitFlag`'s or `MyOrderMark`'s icon and its margin, beside a price. */
+const ORDER_BOOK_PRICE_GLYPH_REM = 1.25;
+
+/** How long the widest Price and Quantity on screen are, as formatted. */
+export interface OrderBookFigureChars {
+  priceChars: number;
+  quantityChars: number;
+  /** Some sell order on screen carries `BaitFlag` beside its price. */
+  baitFlag: boolean;
+  /** Some order on screen is the pilot's own, with `MyOrderMark` beside its price. */
+  myOrder: boolean;
+}
+
+function figureRem(headerRem: number, chars: number, extraRem = 0): number {
+  return Math.max(
+    headerRem,
+    chars * ORDER_BOOK_FIGURE.charRem + ORDER_BOOK_FIGURE.paddingRem + extraRem
+  );
+}
+
+/**
+ * The order book widths its Sell and Buy tables need for the picked columns
+ * (Buy's, the wider set — Sell's are a subset) and the figures actually on
+ * screen: below `roomy` Location's cap shrinks to `squeezed`, below `cards`
+ * the rows become cards. Following the picker means a pilot who hides
+ * columns keeps the table at a narrower width; following the figures means a
+ * book of seven-figure prices is not held to a twelve-figure budget.
+ */
+export function orderBookWidthsRem(
+  visible: readonly MarketOrderColumnId[],
+  { priceChars, quantityChars, baitFlag, myOrder }: OrderBookFigureChars
+): { roomy: number; cards: number } {
+  let rest = ORDER_BOOK_FIXED_REM;
+  for (const id of visible) {
+    if (id === 'location') continue;
+    rest +=
+      id === 'price'
+        ? figureRem(
+            ORDER_BOOK_COLUMN_REM.price,
+            priceChars,
+            (baitFlag ? ORDER_BOOK_PRICE_GLYPH_REM : 0) + (myOrder ? ORDER_BOOK_PRICE_GLYPH_REM : 0)
+          )
+        : id === 'quantity'
+          ? figureRem(ORDER_BOOK_COLUMN_REM.quantity, quantityChars)
+          : ORDER_BOOK_COLUMN_REM[id];
+  }
+  if (!visible.includes('location')) return { roomy: rest, cards: rest };
+  return {
+    roomy: rest + ORDER_BOOK_LOCATION_REM.roomy,
+    cards: rest + ORDER_BOOK_LOCATION_REM.squeezed,
+  };
+}
+
+/**
+ * The widest Price and Quantity among the rows on screen, in characters as
+ * the table prints them, and whether any price carries `BaitFlag` or
+ * `MyOrderMark`.
+ */
+export function orderBookFigureChars(
+  rows: readonly RegionOrder[],
+  bestSell: number | null,
+  myOrderIds: ReadonlySet<number> = new Set()
+): OrderBookFigureChars {
+  let priceChars = 0;
+  let quantityChars = 0;
+  let baitFlag = false;
+  let myOrder = false;
+  for (const order of rows) {
+    priceChars = Math.max(priceChars, formatMarketIsk(order.price).length);
+    quantityChars = Math.max(quantityChars, formatVolume(order.volume_remain).length);
+    if (!order.is_buy_order && sellOutlierMultiple(order.price, bestSell) !== null) baitFlag = true;
+    if (myOrderIds.has(order.order_id)) myOrder = true;
+  }
+  return { priceChars, quantityChars, baitFlag, myOrder };
+}

@@ -1,0 +1,327 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { configureEsi, ESI_BASE_URL } from '@/esi/client';
+import { db } from '@/db';
+import {
+  loadAllCharactersAssets,
+  loadCharacterAssets,
+  loadOtherCharactersAssetsDetailed,
+} from './assets';
+
+const CHAR_ID = 91;
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(async () => {
+  configureEsi({ getToken: vi.fn(async () => 'tok') });
+  await db.esiCache.clear();
+  await db.characters.clear();
+  await db.tokens.clear();
+});
+
+const ASSETS_SCOPE = 'esi-assets.read_assets.v1';
+
+function tokenWith(characterId: number, scopes: string[]) {
+  return {
+    characterId,
+    accessToken: 'at',
+    refreshToken: 'rt',
+    expiresAt: Date.now() + 6e5,
+    scopes,
+  };
+}
+afterEach(() => {
+  server.resetHandlers();
+  configureEsi({ getToken: null });
+});
+afterAll(() => server.close());
+
+const ASSET = (id: number) => ({
+  item_id: id,
+  type_id: 34,
+  quantity: 1,
+  location_id: 60003760,
+  location_type: 'station' as const,
+  location_flag: 'Hangar',
+  is_singleton: false,
+});
+
+describe('loadCharacterAssets', () => {
+  it('concatenates every page and caches the combined result', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json([ASSET(page === '2' ? 2 : 1)], { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const result = await loadCharacterAssets(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({
+      data: [ASSET(1), ASSET(2)],
+      fetchedAt: expect.any(Date),
+      fromCache: false,
+      truncated: false,
+    });
+    expect((await db.esiCache.get([CHAR_ID, 'assets']))?.value).toEqual([ASSET(1), ASSET(2)]);
+  });
+
+  it('falls back to cache offline', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'assets',
+      value: [ASSET(1)],
+      fetchedAt: 5,
+      truncated: false,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
+    );
+
+    const result = await loadCharacterAssets(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({
+      data: [ASSET(1)],
+      fetchedAt: new Date(5),
+      fromCache: true,
+      truncated: false,
+    });
+  });
+
+  it('reports needsReauth when the scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCharacterAssets(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+});
+
+describe('loadOtherCharactersAssetsDetailed entries (issue #85)', () => {
+  const loadOtherCharactersAssets = async (ids: number[]) =>
+    (await loadOtherCharactersAssetsDetailed(ids)).entries;
+
+  const OTHER_ID = 92;
+  const THIRD_ID = 93;
+
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID, name: 'Active Pilot', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: OTHER_ID, name: 'Alt Pilot', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: THIRD_ID, name: 'No Scope Pilot', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+  });
+
+  it('fetches only the given Character ids', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => {
+        throw new Error('must not fetch a Character id that was not requested');
+      }),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => {
+        throw new Error('must not fetch a Character id that was not requested');
+      })
+    );
+
+    const results = await loadOtherCharactersAssets([OTHER_ID]);
+
+    expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+  });
+
+  it('fetches every requested Character', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json([ASSET(3)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const results = await loadOtherCharactersAssets([OTHER_ID, THIRD_ID]);
+
+    expect(results).toEqual(
+      expect.arrayContaining([
+        { characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] },
+        { characterId: THIRD_ID, name: 'No Scope Pilot', assets: [ASSET(3)] },
+      ])
+    );
+    expect(results).toHaveLength(2);
+  });
+
+  it('silently skips a Character whose scope was revoked, keeping the rest', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const results = await loadOtherCharactersAssets([OTHER_ID, THIRD_ID]);
+
+    expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+  });
+});
+
+describe('loadOtherCharactersAssetsDetailed', () => {
+  const OTHER_ID = 92;
+  const THIRD_ID = 93;
+
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: OTHER_ID, name: 'Alt Pilot', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: THIRD_ID, name: 'Offline Pilot', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+  });
+
+  it('names the Characters whose assets could not be read instead of dropping them silently', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => HttpResponse.error())
+    );
+
+    const { entries, skipped } = await loadOtherCharactersAssetsDetailed([OTHER_ID, THIRD_ID]);
+
+    expect(entries).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+    expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'Offline Pilot' }]);
+  });
+
+  it('dates the read by the oldest saved-copy list, and by none when every list is live', async () => {
+    const savedAt = Date.now() - 5 * 3_600_000;
+    await db.esiCache.put({
+      characterId: OTHER_ID,
+      key: 'assets',
+      value: [ASSET(2)],
+      fetchedAt: savedAt,
+    });
+    server.use(
+      // ESI is down for the Character whose list is saved; the other answers live.
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () => HttpResponse.error()),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json([ASSET(3)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const mixed = await loadOtherCharactersAssetsDetailed([OTHER_ID, THIRD_ID]);
+    expect(mixed.entries.map((e) => e.characterId).sort()).toEqual([OTHER_ID, THIRD_ID]);
+    expect(mixed.cachedAt).toBe(savedAt);
+
+    await db.esiCache.clear();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    expect((await loadOtherCharactersAssetsDetailed([OTHER_ID, THIRD_ID])).cachedAt).toBeNull();
+  });
+
+  it('skips nobody when every Character loads', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const { skipped } = await loadOtherCharactersAssetsDetailed([OTHER_ID]);
+    expect(skipped).toEqual([]);
+  });
+});
+
+describe('loadAllCharactersAssets (issue #181)', () => {
+  const OTHER_ID = 92;
+  const THIRD_ID = 93;
+
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID, name: 'Active Pilot', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: OTHER_ID, name: 'Alt Pilot', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: THIRD_ID, name: 'No Scope Pilot', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+    await db.tokens.bulkPut([
+      tokenWith(CHAR_ID, [ASSETS_SCOPE]),
+      tokenWith(OTHER_ID, [ASSETS_SCOPE]),
+      tokenWith(THIRD_ID, [ASSETS_SCOPE]),
+    ]);
+  });
+
+  it('includes the active Character, unlike the cross-character search fan-out', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersAssets();
+
+    expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID, THIRD_ID]);
+    expect(entries.every((e) => e.truncated === false)).toBe(true);
+    expect(entries.every((e) => e.fetchedAt instanceof Date)).toBe(true);
+    expect(skipped).toEqual([]);
+  });
+
+  it('skips a Character that never granted the assets scope without calling ESI', async () => {
+    // This fan-out runs on every Build Plan open, and a live 403 raises the
+    // app-wide re-auth banner for an alt the player never asked about — with
+    // nothing cached to stop it happening again on the next plan.
+    await db.tokens.put(tokenWith(THIRD_ID, ['esi-skills.read_skills.v1']));
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => {
+        throw new Error('must not call ESI for a Character without the scope');
+      }),
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersAssets();
+
+    expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID]);
+    expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'No Scope Pilot' }]);
+  });
+
+  it('records a Character it could not read instead of failing the whole fan-out', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersAssets();
+
+    expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID]);
+    expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'No Scope Pilot' }]);
+  });
+
+  it('reports a capped list as truncated so totals derived from it read as a floor', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page') ?? '1');
+        return page === 1
+          ? HttpResponse.json([ASSET(1)], { headers: { 'X-Pages': '2' } })
+          : HttpResponse.json({ error: 'gone' }, { status: 404 });
+      }),
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries } = await loadAllCharactersAssets();
+
+    expect(entries.find((e) => e.characterId === OTHER_ID)?.truncated).toBe(true);
+  });
+});

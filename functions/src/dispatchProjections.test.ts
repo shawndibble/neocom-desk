@@ -1,0 +1,149 @@
+import { describe, expect, it } from 'vitest';
+import {
+  isDue,
+  isHourlyTick,
+  isStaleUnsent,
+  isPastRetention,
+  shouldDeleteDeviceToken,
+  buildPushData,
+  STALE_UNSENT_MS,
+  FIRED_RETENTION_MS,
+  type StoredProjectionRow,
+} from './dispatchProjections.js';
+
+const ROW: StoredProjectionRow = {
+  occurrenceKey: '1:industryJobComplete:987',
+  characterId: 1,
+  eventId: 'industryJobComplete',
+  fireAt: 1_700_000_000_000,
+  title: 'Industry job complete',
+  body: "Aurelia's industry job for Tritanium is complete.",
+};
+
+describe('isDue', () => {
+  it('is due once fireAt has passed', () => {
+    expect(isDue(ROW, ROW.fireAt + 1)).toBe(true);
+  });
+
+  it('is due exactly at fireAt', () => {
+    expect(isDue(ROW, ROW.fireAt)).toBe(true);
+  });
+
+  it('is not due before fireAt', () => {
+    expect(isDue(ROW, ROW.fireAt - 1)).toBe(false);
+  });
+});
+
+describe('isStaleUnsent', () => {
+  it('is stale once more than 7 days past fireAt', () => {
+    expect(isStaleUnsent(ROW, ROW.fireAt + STALE_UNSENT_MS + 1)).toBe(true);
+  });
+
+  it('is not stale exactly at the 7-day boundary', () => {
+    expect(isStaleUnsent(ROW, ROW.fireAt + STALE_UNSENT_MS)).toBe(false);
+  });
+
+  it('is not stale for a row that just became due', () => {
+    expect(isStaleUnsent(ROW, ROW.fireAt)).toBe(false);
+  });
+});
+
+describe('isPastRetention', () => {
+  const firedAt = 1_700_000_000_000;
+
+  it('is past retention once more than 30 days after firedAt', () => {
+    expect(isPastRetention(firedAt, firedAt + FIRED_RETENTION_MS + 1)).toBe(true);
+  });
+
+  it('is not past retention exactly at the 30-day boundary', () => {
+    expect(isPastRetention(firedAt, firedAt + FIRED_RETENTION_MS)).toBe(false);
+  });
+});
+
+describe('shouldDeleteDeviceToken', () => {
+  it('deletes on UNREGISTERED', () => {
+    expect(shouldDeleteDeviceToken('messaging/registration-token-not-registered')).toBe(true);
+  });
+
+  it('deletes on a malformed registration token', () => {
+    expect(shouldDeleteDeviceToken('messaging/invalid-registration-token')).toBe(true);
+  });
+
+  it('deletes on INVALID_ARGUMENT only when FCM blames the registration token', () => {
+    expect(
+      shouldDeleteDeviceToken(
+        'messaging/invalid-argument',
+        'The registration token is not a valid FCM registration token'
+      )
+    ).toBe(true);
+  });
+
+  it('leaves the token alone on an INVALID_ARGUMENT about the payload', () => {
+    // FCM v1 reports a bad payload with the same code as a bad token; deleting
+    // the registration then would orphan every row that device has.
+    expect(
+      shouldDeleteDeviceToken('messaging/invalid-argument', 'Message payload is too big')
+    ).toBe(false);
+    expect(shouldDeleteDeviceToken('messaging/invalid-argument')).toBe(false);
+  });
+
+  it('leaves the token alone on any other error', () => {
+    expect(shouldDeleteDeviceToken('messaging/internal-error')).toBe(false);
+    expect(shouldDeleteDeviceToken('messaging/server-unavailable')).toBe(false);
+    expect(shouldDeleteDeviceToken('unknown')).toBe(false);
+  });
+});
+
+describe('buildPushData', () => {
+  it('builds the FCM data payload matching PushPayload, every value a string', () => {
+    expect(buildPushData(ROW)).toEqual({
+      characterId: '1',
+      eventId: 'industryJobComplete',
+      occurrenceKey: '1:industryJobComplete:987',
+      title: 'Industry job complete',
+      body: "Aurelia's industry job for Tritanium is complete.",
+      fireAt: '1700000000000',
+    });
+  });
+
+  it('carries eveType through when the row has one, for per-type muting of a push-delivered eveNotification', () => {
+    expect(buildPushData({ ...ROW, eveType: 'StructureLostShields' })).toEqual({
+      characterId: '1',
+      eventId: 'industryJobComplete',
+      occurrenceKey: '1:industryJobComplete:987',
+      title: 'Industry job complete',
+      body: "Aurelia's industry job for Tritanium is complete.",
+      fireAt: '1700000000000',
+      eveType: 'StructureLostShields',
+    });
+  });
+
+  it('omits eveType from the FCM data payload when the row has none', () => {
+    expect(buildPushData(ROW).eveType).toBeUndefined();
+  });
+});
+
+describe('isHourlyTick', () => {
+  const at = (h: number, m: number, s = 0) => Date.UTC(2026, 9, 26, h, m, s);
+
+  it('is true for the tick at the top of the hour', () => {
+    expect(isHourlyTick(at(13, 0))).toBe(true);
+    expect(isHourlyTick(at(13, 0, 40))).toBe(true);
+  });
+
+  it('is false for the other three ticks of the hour', () => {
+    expect(isHourlyTick(at(13, 15))).toBe(false);
+    expect(isHourlyTick(at(13, 30))).toBe(false);
+    expect(isHourlyTick(at(13, 45))).toBe(false);
+  });
+
+  it('still catches the tick when the scheduler starts it a few minutes late', () => {
+    expect(isHourlyTick(at(13, 14, 59))).toBe(true);
+  });
+
+  it('fires exactly once across a day of 15-minute ticks', () => {
+    let fired = 0;
+    for (let i = 0; i < 96; i++) if (isHourlyTick(at(0, 0) + i * 15 * 60_000)) fired++;
+    expect(fired).toBe(24);
+  });
+});

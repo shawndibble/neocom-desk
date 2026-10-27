@@ -1,0 +1,349 @@
+import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import { MultiSelect } from './MultiSelect';
+
+const OPTIONS = [
+  { id: 1, label: 'Alice' },
+  { id: 2, label: 'Bob' },
+  { id: 3, label: 'Carol' },
+];
+
+const GROUPS = [
+  {
+    label: 'Alpha team',
+    options: [
+      { id: 1, label: 'Alice' },
+      { id: 2, label: 'Bob' },
+    ],
+  },
+  {
+    label: 'Beta team',
+    options: [{ id: 3, label: 'Carol' }],
+  },
+];
+
+async function openMenu() {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: /Open$/ }));
+  return user;
+}
+
+describe('MultiSelect', () => {
+  it('lists every flat option, selected per the current set', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set([1])}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    await openMenu();
+    expect(screen.getByRole('option', { name: 'Alice' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'Bob' })).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('calls onToggle with the clicked option id', async () => {
+    const onToggle = vi.fn();
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={onToggle}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    await user.click(screen.getByRole('option', { name: 'Bob' }));
+    expect(onToggle).toHaveBeenCalledWith(2);
+  });
+
+  it('typing in the search box narrows the visible options by label', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    await user.type(screen.getByPlaceholderText('Search'), 'ali');
+    expect(screen.getByRole('option', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Bob' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Carol' })).not.toBeInTheDocument();
+  });
+
+  it('clearing the search box restores the full list', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, 'ali');
+    await user.clear(search);
+    expect(screen.getByRole('option', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Bob' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Carol' })).toBeInTheDocument();
+  });
+
+  it('shows the no-results label when nothing matches', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    await user.type(screen.getByPlaceholderText('Search'), 'zzz');
+    expect(screen.getByText('No matches', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  it('renders grouped options under their group label, hiding a group with zero matches', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        groups={GROUPS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    expect(screen.getByText('Alpha team')).toBeInTheDocument();
+    expect(screen.getByText('Beta team')).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText('Search'), 'carol');
+    expect(screen.queryByText('Alpha team')).not.toBeInTheDocument();
+    expect(screen.getByText('Beta team')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Carol' })).toBeInTheDocument();
+  });
+
+  it('renders extraContent above the search box', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+        extraContent={<button>Quick select</button>}
+      />
+    );
+    await openMenu();
+    expect(screen.getByRole('button', { name: 'Quick select' })).toBeInTheDocument();
+  });
+
+  it('gives a function extraContent a close callback that dismisses the popover', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+        extraContent={(close) => <button onClick={close}>Quick select</button>}
+      />
+    );
+    const user = await openMenu();
+    await user.click(screen.getByRole('button', { name: 'Quick select' }));
+    expect(screen.queryByPlaceholderText('Search')).not.toBeInTheDocument();
+  });
+
+  it('does not close the popover when an option is toggled', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    await user.click(screen.getByRole('option', { name: 'Alice' }));
+    expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
+  });
+
+  it('moves the highlight with arrow keys and toggles the highlighted option with Enter', async () => {
+    const onToggle = vi.fn();
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={onToggle}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, '{ArrowDown}{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Bob' })).toHaveAttribute(
+      'id',
+      search.getAttribute('aria-activedescendant')
+    );
+    // The active option carries the keyboard-only ring cue; its neighbours don't.
+    expect([...screen.getByRole('option', { name: 'Bob' }).classList]).toContain(
+      'in-data-[input=keyboard]:outline-accent'
+    );
+    expect([...screen.getByRole('option', { name: 'Alice' }).classList]).not.toContain(
+      'in-data-[input=keyboard]:outline-accent'
+    );
+    await user.type(search, '{Enter}');
+    expect(onToggle).toHaveBeenCalledWith(2);
+    expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
+  });
+
+  it('wraps from the last option back to the first with ArrowDown', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, '{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Alice' })).toHaveAttribute(
+      'id',
+      search.getAttribute('aria-activedescendant')
+    );
+  });
+
+  it('resets the highlight when the search query changes', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, '{ArrowDown}');
+    expect(search).toHaveAttribute('aria-activedescendant');
+    await user.type(search, 'a');
+    expect(search).not.toHaveAttribute('aria-activedescendant');
+    await user.type(search, '{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Alice' })).toHaveAttribute(
+      'id',
+      search.getAttribute('aria-activedescendant')
+    );
+  });
+
+  it('names the dialog and listbox', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    await openMenu();
+    expect(screen.getByRole('dialog', { name: 'People' })).toBeInTheDocument();
+    expect(screen.getByRole('listbox', { name: 'People' })).toBeInTheDocument();
+  });
+
+  it('announces no results through a status and hides the visible copy', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    await user.type(screen.getByPlaceholderText('Search'), 'zzzz');
+    expect(await screen.findByRole('status')).toHaveTextContent('No matches');
+    const list = screen.getByRole('listbox');
+    expect(list.children).toHaveLength(1);
+    expect(list.children[0]).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('opens from a select-shaped trigger showing the field name and its summary', async () => {
+    render(
+      <MultiSelect
+        label="People"
+        summary="1 / 3"
+        triggerAriaLabel="People, 1 of 3 picked"
+        options={OPTIONS}
+        selected={new Set([1])}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'People, 1 of 3 picked' });
+    expect(trigger).toHaveTextContent('People1 / 3');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+    await userEvent.setup().click(trigger);
+    expect(screen.getByRole('dialog', { name: 'People' })).toBeInTheDocument();
+  });
+
+  it('names a self-named trigger "label: value" when no aria label is given', () => {
+    render(
+      <MultiSelect
+        label="Location"
+        triggerLabel="All locations"
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Location: All locations' })).toBeInTheDocument();
+  });
+});

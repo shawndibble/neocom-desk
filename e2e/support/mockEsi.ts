@@ -1,0 +1,362 @@
+/**
+ * Mocks every ESI / market / image endpoint Neocom Desk touches: no real
+ * request ever reaches esi.evetech.net, market.fuzzwork.co.uk or
+ * images.evetech.net. Endpoints not yet consumed by the UI (markets/prices,
+ * industry/systems, fuzzwork aggregates) are mocked anyway so a future
+ * caller never falls through to the network guard mid-run.
+ */
+import type { Page } from '@playwright/test';
+import {
+  ALLIANCE_ID,
+  ALLIANCE_NAME,
+  CHARACTER_ATTRIBUTES,
+  CHARACTER_ID,
+  CHARACTER_NAME,
+  CHARACTER_SKILLS,
+  CORPORATION_ID,
+  CORPORATION_NAME,
+  IMPLANT_DESCRIPTIONS,
+  IMPLANT_IDS,
+  IMPLANT_NAMES,
+  WALLET_BALANCE,
+} from './fixtureData';
+
+const PUBLIC_INFO = {
+  name: CHARACTER_NAME,
+  corporation_id: CORPORATION_ID,
+  birthday: '2020-01-01T00:00:00Z',
+  bloodline_id: 1,
+  gender: 'male' as const,
+  race_id: 1,
+  alliance_id: ALLIANCE_ID,
+  security_status: 0.5,
+};
+
+const CORPORATION_INFO = {
+  name: CORPORATION_NAME,
+  ticker: 'TEST',
+  ceo_id: CHARACTER_ID,
+  creator_id: CHARACTER_ID,
+  member_count: 1,
+  tax_rate: 0.1,
+  alliance_id: ALLIANCE_ID,
+};
+
+const ALLIANCE_INFO = {
+  name: ALLIANCE_NAME,
+  ticker: 'TESTA',
+  creator_corporation_id: CORPORATION_ID,
+  creator_id: CHARACTER_ID,
+  date_founded: '2019-01-01T00:00:00Z',
+};
+
+const SKILL_QUEUE: unknown[] = [];
+
+const UNIVERSE_TYPES: Record<number, unknown> = Object.fromEntries(
+  IMPLANT_IDS.map((typeId) => [
+    typeId,
+    {
+      type_id: typeId,
+      name: IMPLANT_NAMES[typeId],
+      description: IMPLANT_DESCRIPTIONS[typeId],
+      group_id: 300,
+      published: true,
+    },
+  ])
+);
+
+const MARKET_PRICES = [{ type_id: 34, average_price: 5.5, adjusted_price: 5.2 }];
+const INDUSTRY_SYSTEMS = [
+  {
+    solar_system_id: 30000142,
+    cost_indices: [{ activity: 'manufacturing', cost_index: 0.02 }],
+  },
+];
+const FUZZWORK_AGGREGATES = {
+  34: {
+    buy: { max: 5.4, volume: 100000 },
+    sell: { min: 5.6, volume: 100000 },
+  },
+};
+
+/** Character endpoints the boot prefetch reads that every spec is happy to see empty. */
+const PREFETCHED_EMPTY = new Set(
+  [
+    'assets',
+    'blueprints',
+    'calendar',
+    'contacts',
+    // Not warmed at boot: the Contacts and Mail pages read these on mount.
+    'contacts/labels',
+    'contracts',
+    'corporationhistory',
+    // Not warmed at boot — the Fittings page's In-game Fittings panel fetches
+    // it on mount (issue #1539) — but every spec that merely visits that page
+    // is happy to see none; a fittings spec should override this route.
+    'fittings',
+    'industry/jobs',
+    'mail',
+    'mail/lists',
+    // Trailing slash on purpose: `getCharacterMining` fetches
+    // `/characters/{id}/mining/`, and the Overview board reads it on every
+    // page now that the Mining Tax card is on the landing route.
+    'mining/',
+    'notifications',
+    'orders',
+    'orders/history',
+    'planets',
+    // Trailing slash on purpose, same reason as 'mining/': `getCharacterStandings`
+    // fetches `/characters/{id}/standings/` (issue #1238).
+    'standings/',
+    'wallet/journal',
+    'wallet/transactions',
+  ].map((suffix) => `/characters/${CHARACTER_ID}/${suffix}`)
+);
+
+/** `/mail/labels` answers an object, not a list. */
+const EMPTY_MAIL_LABELS = { labels: [], total_unread_count: 0 };
+
+/** `/clones` likewise. `home_location` is optional in ESI's schema, so it is omitted rather than nulled. */
+const EMPTY_CLONES = { jump_clones: [] };
+
+const TINY_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1"/></svg>';
+
+export async function installEsiMock(page: Page): Promise<void> {
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const json = (body: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (path === `/characters/${CHARACTER_ID}`) return json(PUBLIC_INFO);
+    if (path === `/characters/${CHARACTER_ID}/skills`) return json(CHARACTER_SKILLS);
+    if (path === `/characters/${CHARACTER_ID}/skillqueue`) return json(SKILL_QUEUE);
+    if (path === `/characters/${CHARACTER_ID}/attributes`) return json(CHARACTER_ATTRIBUTES);
+    if (path === `/characters/${CHARACTER_ID}/implants`) return json(IMPLANT_IDS);
+    if (path === `/characters/${CHARACTER_ID}/wallet`) return json(WALLET_BALANCE);
+    // Jump Range's Current System (Market, Item Offers, BPC Sourcing): Jita.
+    if (path === `/characters/${CHARACTER_ID}/location`) return json({ solar_system_id: 30000142 });
+    if (path === `/characters/${CHARACTER_ID}/ship`) {
+      return json({ ship_item_id: 1_000_000_000_001, ship_name: 'E2E ship', ship_type_id: 24702 });
+    }
+    // The PI strip names that system for a pilot with no colonies.
+    if (path === '/universe/systems/30000142') {
+      return json({
+        system_id: 30000142,
+        name: 'Jita',
+        security_status: 0.9459,
+        constellation_id: 20000020,
+        star_id: 40009076,
+      });
+    }
+    if (path === `/corporations/${CORPORATION_ID}`) return json(CORPORATION_INFO);
+    if (path === `/alliances/${ALLIANCE_ID}`) return json(ALLIANCE_INFO);
+    if (path === '/markets/prices') return json(MARKET_PRICES);
+    // No market history unless a spec serves one: "vs 90d" reads it on every Opportunities row and plan.
+    if (/^\/markets\/\d+\/history\/?$/.test(path)) return json([]);
+    // Route Safety's Incursions near you (issue #3540): none active unless a spec overrides.
+    if (path === '/incursions') return json([]);
+    // The raidable skyhook list (issue #4784): public, none raidable unless a spec overrides.
+    if (path === '/skyhooks/raidable') return json({ skyhooks: [] });
+    if (path === '/industry/systems') return json(INDUSTRY_SYSTEMS);
+
+    // usePublicInfo.loadMany's bulk roster lookup (src/stores/publicInfo.ts):
+    // affiliations for whichever ids it was asked about, then names for the
+    // corp/alliance ids that came back. The fixture roster is one character,
+    // so only that id ever resolves — same shape ESI itself would return for
+    // an id it can't affiliate (silently omitted, not an error).
+    if (path === '/characters/affiliation') {
+      const ids = route.request().postDataJSON() as number[];
+      return json(
+        ids
+          .filter((id) => id === CHARACTER_ID)
+          .map((id) => ({
+            character_id: id,
+            corporation_id: CORPORATION_ID,
+            alliance_id: ALLIANCE_ID,
+          }))
+      );
+    }
+    if (path === '/universe/names') {
+      const ids = route.request().postDataJSON() as number[];
+      return json(
+        ids.map((id) => {
+          if (id === CORPORATION_ID) return { id, name: CORPORATION_NAME, category: 'corporation' };
+          if (id === ALLIANCE_ID) return { id, name: ALLIANCE_NAME, category: 'alliance' };
+          return { id, name: `Unknown ${id}`, category: 'character' };
+        })
+      );
+    }
+
+    // Warmed at boot by `app/prefetch.ts` for every scope the mocked JWT
+    // grants — which is all of them. No spec asserts on these surfaces yet, so
+    // they answer empty; a spec that needs real rows should override this
+    // route rather than filling the fixture in for everyone.
+    if (PREFETCHED_EMPTY.has(path)) return json([]);
+    if (path === `/characters/${CHARACTER_ID}/mail/labels`) return json(EMPTY_MAIL_LABELS);
+    if (path === `/characters/${CHARACTER_ID}/clones`) return json(EMPTY_CLONES);
+    // Mercenary Dens (the Calendar's den clocks, the Overview widget): none unless a spec overrides.
+    if (path === `/characters/${CHARACTER_ID}/structures/mercenary-dens`) {
+      return json({ mercenary_dens: [] });
+    }
+    if (path === `/characters/${CHARACTER_ID}/mercenary-tactical-operations`) {
+      return json({ operations: [] });
+    }
+    // `{}`, not a role list: ESI omits the array for a character with no corp
+    // roles, and that is the fixture pilot. It puts `useCorpAccess` in `none`,
+    // which renders nothing — so the corp grant prompt does not appear over
+    // every page of every spec. A corp spec should override this route.
+    if (path === `/characters/${CHARACTER_ID}/roles`) return json({});
+
+    // The two Loyalty Store surfaces, both empty. Not in `PREFETCHED_EMPTY`:
+    // neither is warmed at boot — the Wallet and LP Store routes fetch them
+    // on demand — and the offers endpoint is public, not character-scoped.
+    // The route renders its chrome (header, back link, empty state) with no
+    // offers at all; a spec that needs real rows should override these.
+    if (path === `/characters/${CHARACTER_ID}/loyalty/points`) return json([]);
+    if (/^\/loyalty\/stores\/\d+\/offers\/$/.test(path)) return json([]);
+
+    // Station lookup for a location the SDE snapshot cannot name. Broker-fee
+    // standings no longer come through here (issue #1675 — they read the
+    // snapshot's owner columns), so this only answers name/system lookups.
+    const stationMatch = /^\/universe\/stations\/(\d+)$/.exec(path);
+    if (stationMatch) {
+      return json({
+        station_id: Number(stationMatch[1]),
+        name: `Station ${stationMatch[1]}`,
+        type_id: 52678,
+        system_id: 30000142,
+        owner: CORPORATION_ID,
+      });
+    }
+
+    const typeMatch = /^\/universe\/types\/(\d+)$/.exec(path);
+    if (typeMatch) {
+      const info = UNIVERSE_TYPES[Number(typeMatch[1])];
+      if (info) return json(info);
+    }
+
+    // Item Detail resolves a dogma attribute that names a Group by id
+    // (features/market/groupNames.ts). No fixture carries such an attribute
+    // today, but one gaining `dogma_attributes` shouldn't fail the run on the
+    // network guard.
+    const groupMatch = /^\/universe\/groups\/(\d+)$/.exec(path);
+    if (groupMatch) {
+      const groupId = Number(groupMatch[1]);
+      return json({
+        group_id: groupId,
+        name: `Group ${groupId}`,
+        category_id: 7,
+        published: true,
+        types: [],
+      });
+    }
+
+    // A region Order Book, empty. A Build Plan whose need crosses 1% of the
+    // Fuzzwork fixture's listed units walks it for a Depth Price; empty keeps
+    // the lowest sell. A market spec that needs real orders overrides this.
+    if (/^\/markets\/\d+\/orders\/?$/.test(path)) return json([]);
+
+    // BPC Sourcing's region lookup (Industry's `sourcing` tab, getUniverseRegion).
+    const regionMatch = /^\/universe\/regions\/(\d+)$/.exec(path);
+    if (regionMatch) {
+      const regionId = Number(regionMatch[1]);
+      return json({
+        region_id: regionId,
+        name: `Region ${regionId}`,
+        description: '',
+        constellations: [],
+      });
+    }
+
+    // Detail rows the background prefetch fetches after a list sync
+    // (`features/character/detailPrefetch.ts`: mail bodies, calendar event
+    // details). A spec that seeds mail or calendar rows (via its own list
+    // route) triggers them on a desktop "online" browser, where the gate is
+    // open, so every such id answers a plausible record rather than escaping.
+    const calendarEventMatch = /^\/characters\/\d+\/calendar\/(\d+)$/.exec(path);
+    if (calendarEventMatch) {
+      const eventId = Number(calendarEventMatch[1]);
+      return json({
+        event_id: eventId,
+        title: `Event ${eventId}`,
+        date: '2099-01-01T18:00:00Z',
+        duration: 60,
+        importance: 0,
+        owner_id: CORPORATION_ID,
+        owner_name: CORPORATION_NAME,
+        owner_type: 'corporation',
+        response: 'not_responded',
+        text: 'Fixture event.',
+      });
+    }
+    const mailBodyMatch = /^\/characters\/\d+\/mail\/(\d+)$/.exec(path);
+    if (mailBodyMatch) {
+      return json({
+        from: CHARACTER_ID,
+        subject: `Mail ${mailBodyMatch[1]}`,
+        timestamp: '2026-01-01T12:00:00Z',
+        body: 'Fixture mail body.',
+        read: false,
+        labels: [1],
+        recipients: [{ recipient_id: CHARACTER_ID, recipient_type: 'character' }],
+      });
+    }
+
+    // Unknown ESI path: fall through to the network guard so it shows up as
+    // an explicit "unmocked request" failure rather than a silent 404.
+    await route.fallback();
+  });
+
+  // Popular fits (issue #2327) ask zKillboard for a picked hull's recent
+  // losses; none here, so the panel settles on its empty note.
+  await page.route('https://zkillboard.com/api/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '[]',
+    });
+  });
+
+  // Travel's Thera / Turnur tab (issue #2330) reads EVE-Scout's public
+  // signatures; none here, so the tab settles on its empty state.
+  await page.route('https://api.eve-scout.com/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '[]',
+    });
+  });
+
+  // R2 public snapshots (ADR 0019): none published here, so every reader finds
+  // R2 unavailable and serves only what a spec seeded into its Dexie cache.
+  await page.route('https://data.neocomdesk.com/**', async (route) => {
+    await route.fulfill({
+      status: 404,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: '',
+    });
+  });
+
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(FUZZWORK_AGGREGATES),
+    });
+  });
+
+  await page.route('https://images.evetech.net/**', async (route) => {
+    // The app's EVE image <img>s are crossOrigin="anonymous" (so the service
+    // worker can cache them), which makes a response without this header a
+    // CORS failure. The real image server sends it.
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/svg+xml',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: TINY_SVG,
+    });
+  });
+}

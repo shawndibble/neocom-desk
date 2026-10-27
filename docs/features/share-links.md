@@ -1,0 +1,115 @@
+# Share links
+
+User goal: send someone a short URL to an appraisal, a fitting, a D-Scan or a Survey; the recipient (account or not) sees it read-only (a Survey also takes new scans) and can open it in the app.
+
+| Route / piece                                                     | What                                                   | Where                                                     |
+| ----------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| `/s/:shareId` (+ legacy `/share/:shareId`)                        | Stored Share Link, 6-char key, 7 days                  | `src/routes/SharedLink.tsx`                               |
+| `/share/fitting?f=<code>`                                         | Permanent Fitting Share Code URL, no storage or expiry | `src/routes/FittingShared.tsx`                            |
+| Create: Appraisal "Copy Share Link"                               | `createShareLink`                                      | `src/features/market/AppraisalPanel.tsx:191`              |
+| Create: Fittings Export "Copy Share Link" / "Copy permanent link" |                                                        | `src/features/fittings/useFittingExport.ts:64`            |
+| Create: D-Scan share button (`dscan`)                             | raw scan text, max 50,000 chars                        | `src/features/travel/PilotListView.tsx:508`               |
+| Create: Survey start (`survey`)                                   | `startSurvey`, payload owner name                      | `src/features/survey/surveyStore.ts:71`                   |
+| Shared Appraisal screen                                           | read-only table, totals, export                        | `src/features/market/AppraisalShareScreen.tsx`            |
+| Shared Fitting view                                               | stats at all skills V, modules, Copy Fitting           | `FittingShared.tsx FittingShareView`                      |
+| Shared D-Scan screen                                              | Fleet board; Open Neocom Desk re-pastes it             | `src/features/travel/DscanShareScreen.tsx`                |
+| Shared Survey screen                                              | live board; anyone with the link can add a scan        | `src/features/survey/SurveyShareScreen.tsx`               |
+| Frame + "Open Neocom Desk"                                        |                                                        | `src/features/share/ShareShell.tsx`                       |
+| Store                                                             | Firestore `shares/{id}`                                | `src/features/share/shareStore.ts`, `firestore.rules:243` |
+
+Both routes sit outside `RequireCharacter`/`ScopeGate` (`src/app/App.tsx:360-370`; `routeScopes.test.ts` asserts the exemption). The literal `/share/fitting` outranks `:shareId`.
+
+See also: `entities-share.md` (another author; key format, 7-day TTL and in-memory reuse agree).
+
+## Purpose and user goal
+
+"Send them exactly what I am looking at." Two people: the sender copies a short link from an Appraisal, a Fitting, a D-Scan or a Survey; the recipient, often signed out, opens it read-only and can carry it into the app. This doc owns Share Links; `entities-share.md` owns Show Info and only points here for sharing. Since `20261002-125432` a Shared Appraisal is frozen at its prices, so the recipient sees the sender's numbers.
+
+- **Top jobs (ranked):** 1. Sender: "Copy a link to this in one click." 2. Recipient: "What did they send me, and is it still valid?" (frozen figures, expiry). 3. Recipient: "Open it in my own app" (Open Neocom Desk, or Log in).
+- **Device and cadence:** n/a as a page. Moment of use: the sender right after building an appraisal, fit, scan or survey, on the desktop, the app's primary device (owner, 2026-10-11); the recipient opening a pasted link, possibly on a phone (ShareShell wraps its header on a phone).
+- **Above the fold:** recipient view: brand and the one way in, title, expiry and key figures (stat chips), then the content.
+- **Not for:** Show Info on a name (`entities-share.md`); a permanent fit link (that is a Fitting Share Code, not a Share Link).
+- **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20261002-125432`, `20261009-113400`; GLOSSARY.md Share Link (four types); `src/features/share/shareStore.ts:27` (`appraisal`, `fitting`, `dscan`, `survey`); #2943, #3225, #3497.
+- **Unconfirmed:** where recipients open links (Discord, in-game chat, phone or desk).
+
+### Mobbin brief
+
+- **Fit:** medium. Copy-link and a public read-only page with a sign-up entry are generic; the shared content (fit ring, fleet board, priced items) is EVE-specific.
+- **Analog apps:** Figma, Notion, Google Docs, Loom.
+- **Screen queries:**
+  - `web: public read-only shared page with the app brand and a sign-up button in the header and an expiry note above the content`
+  - `web: copy link button that confirms copied in a tooltip, next to an export menu`
+  - `web: expired link page with a short message and one button into the app`
+- **Flow queries:** `web: open a shared link while signed out, sign in, and land on the shared item inside the app`.
+- **Mobbin won't help with:** the fitting ring and stats, the Fleet board, hub pricing. Reference the EVE client and the app's own pages.
+
+## Controls and behavior
+
+**Creating**
+
+- Appraisal icon button "Copy Share Link": snapshot = hub id, price percent, `generatedAt` (epoch s), items with per-unit prices at 100% (`buildAppraisalSnapshot`, max `MAX_SNAPSHOT_ITEMS` = 1000). Disabled with no Character, sync not configured, no rows, too many items, or while saving. Tooltips only for too-large, saving, failed, copied ("works for 7 days"). Clipboard refusal shows a "Share Link - works for 7 days" row with Copy (`manual`). Icon becomes a tick when copied.
+- Fitting: encodes `fittingShareCode`; too large -> "Too large to share as a link."; no Character or sync not configured -> "Couldn't create the Share Link. Try again."; clipboard refusal after save -> "Share Link ready - choose Copy Share Link again to copy it." A reused link copies with no await so it stays inside the click gesture.
+
+**Opening `/s/:shareId`** (`loadShare`)
+
+- Bad id shape -> `not-found` with no Firestore read; `permission-denied` -> `not-found`; other error -> `failed`; missing or expired -> `not-found`; unknown type -> `unsupported`.
+- A result for a previous id is ignored if the visitor follows another link.
+- `appraisal`: `parseAppraisalSnapshot` -> `AppraisalShareScreen` (invalid state on parse failure). Never redirects, even signed in (the live tab re-prices; the sender's figures would vanish).
+- `fitting`: `FittingShareView`; a visitor with a Character is `Navigate`d into the editor (`fittingEditLocation(code)`); malformed payload -> empty code -> invalid.
+- `ShareShell` titled "Shared link": spinner; `goneTitle` "This link has expired"; `unsupportedTitle` "needs a newer Neocom Desk"; `failedTitle` "Couldn't load this link".
+
+**ShareShell**: no nav. A `<header>` carries the brand (logo + "Neocom Desk", linking to `/`) at the left and the one way in at the right (accent, not primary; wraps under the brand on a phone): "Open Neocom Desk" to `openInApp` or `/`, or, signed out (count 0), "Log in with EVE Online" plus "Choose permissions". Under it, in `<main>`: the page `<h1>`, header `actions` (export menu), content. Nothing at the foot. Signed out: `setLoginReturnTo(target.path)` then `beginAddCharacterLogin()`; while the count loads it links straight but also stashes. Router `state` reaches only signed-in visitors.
+
+**Shared Appraisal**: StatChips hub at {percent}%, Sell total (accent), Buy total, volume, Generated, Expires. Columns Quantity, Item (sticky), Buy each, Sell each (phone hidden), Buy total, Sell total, Volume (phone hidden); sortable; missing price = dash; each-prices exact, totals `IskAmount`. Export CSV/XLSX/copy (`surface: 'appraisal-shared'`) only with rows. Invalid: "This link isn't valid". "Open Neocom Desk" -> `/market/appraisal?hub=<id>&<price percent param>&share=<id>` (`sharedAppraisalOpenInApp`); `useSharedAppraisalSeed` reads `?share=` once, strips it (replace), re-reads the share and pastes its text into the tab; a dead share seeds nothing.
+
+**Shared Fitting**: warning banner "Shown at every skill level V, with no clone"; fitting's own implants if any; viewer's own damage profile. Content: ship icon/name, `FittingRing`, `FittingStatsSections` (abyssal weather picker, retry), `FittingModuleList`. Renders in `ShareShell` (`openInApp` = the editor path), so the brand and "Log in" + "Choose permissions" sit at the top; no entry link at the foot. "Copy Fitting" (primary, header actions slot; EFT; "Copied"/"Couldn't copy" for 2 s). An "Expires" StatChip only via a stored link.
+
+## Persistence and sync
+
+- Firestore `shares` (`firebase/firestore/lite`): `type`, `payload`, `createdAt` (server), `expiresAt`. No uid or Character id. Nothing in Dexie. Reuse map is in memory only (`madeThisSession`).
+- Writing needs a Firebase session (`ensureAnySession(characterId)`); reading needs none.
+
+## Scopes and states
+
+No ESI call, no scope. Creating requires `isSyncConfigured()`. States: loading spinner, expired/unknown, unsupported, failed, invalid payload, ready (see Controls).
+
+## Rules and thresholds
+
+- `SHARE_TYPES = ['appraisal','fitting']`, `SHARE_TTL_MS` 7 d. Rules: `get` iff `expiresAt > request.time`; `list` denied; `create` needs auth, id `^([0-9A-Za-z]{9}|[2-9a-hj-kmnp-z]{6})$` (legacy or new), exact keys, type in list, `payload` map, `createdAt == request.time`, `expiresAt` future and < 8 d; appraisal `items` list <= 1000; fitting `code` <= 20100 chars; update/delete denied. A Firestore TTL deletes docs (can lag ~1 day), so `loadShare` also checks expiry.
+- Id: 6 chars of a 31-letter unambiguous lowercase alphabet (no 0/o/1/l/i), unbiased rejection sampling, ~30 bits; legacy 9-char base-62 ids from `/share/<id>` still open until they expire, minted client-side (`engine/share/shareId.ts`); a collision is refused by the create-only rule.
+- Reuse: same content returns the session's link unless < 24 h from expiry (`REUSE_MARGIN_MS`).
+
+## Decisions
+
+`docs/context/decisions/20261002-125432-stored-short-share-links-in-firestore.md`; earlier packed encoding `20260911-110045-appraisal-share-links-encode-base36-pairs-no-compression.md`; `20260908-164742-appraisal-prices-at-a-trade-hub-and-shares.md`. No dedicated ADR.
+
+## Tests assert
+
+- `SharedLink.test.tsx`: appraisal shows at its shared prices plus expiry; a signed-in visitor is never redirected from an appraisal; "Open" goes to the live Appraisal tab at the share's hub and percent, re-reading by id; a signed-out visitor goes through login first; expired or unknown reads as expired; a malformed stored appraisal is an invalid link, not a crash; a fitting redirects a signed-in visitor to the editor on its code; a malformed fitting payload is invalid for a signed-out visitor.
+- `shareStore.test.ts`: `shareUrl` is `/s/<id>` on this origin; `saveShare` signs in, then creates with server `createdAt` and a week expiry; `loadShare` returns type and payload; an expired doc is gone; missing or rule-refused is gone; an impossible id never touches Firestore; unknown type = unsupported, network failure = failed; `createShareLink` stores under a fresh id and returns the short URL, same content gives the same link without a second doc, different content or type makes a new link, no reuse within a day of expiry, nothing remembered after a failed save.
+- `FittingShared.test.tsx`: invalid message with no code or an undecodable one; read-only All V view with no session, and Copy Fitting writes EFT text (`[Rifter, Rifter]`); a signed-in visitor is redirected without computing stats; load-failed message when resolving throws; hull named above the Ring and cargo in the module list.
+
+## Interview Q&A
+
+1. Why stored short links? Big appraisals and fits exceed sane URLs (decision `20261002-125432`).
+2. Who can read one? Anyone with the 6-char key; `get` only, no list, no uid (`firestore.rules:243-263`).
+3. How is expiry enforced? Rules, client re-check, TTL policy (lags ~1 day).
+4. How are duplicates avoided? In-session reuse by content unless < 24 h left (`shareStore.ts`).
+5. Why copy inside the click? The client-minted id lets a reused link copy with no await; failures fall to a manual-copy row.
+6. Appraisal vs fitting for a signed-in visitor? Appraisal shows frozen prices; a fitting opens in the editor under their pilot (GLOSSARY.md Fitting Share Code).
+7. Limits? 1000 items, 20100-char code, 7 d, create-only.
+8. Signed-out "Open Neocom Desk"? `/login` with the target stashed.
+9. Newer doc type? `unsupported`, "needs a newer Neocom Desk".
+10. Why does creating need sync? It needs a Firebase session (`ensureAnySession`).
+
+## Observed gaps
+
+- Appraisal Share button greys out for no Character, no sync or empty list without a tooltip (`AppraisalPanel.tsx:586-600`).
+- Only two share types; unknown ones show a generic message.
+- Reuse is per session; a reload or another device mints a second doc for identical content.
+- No revoke or list of own links.
+- Permanent `/share/fitting?f=` embeds the fitting in the URL (capped) and never expires.
+
+## Improvement ideas
+
+- Revoke and list own links; show expiry at creation; persist reuse across reloads; disabled-reason tooltips.

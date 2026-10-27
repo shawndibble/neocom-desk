@@ -1,0 +1,540 @@
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import { db } from '@/db';
+import { PriceHistoryPanel } from './PriceHistoryPanel';
+import { loadPriceHistory } from './priceHistory';
+import { loadMarketOpenPrices } from './marketOpenPrices';
+import { usePriceHistorySeries, DEFAULT_PRICE_HISTORY_SERIES } from './priceHistorySeriesPref';
+import {
+  usePriceHistoryRange,
+  DEFAULT_PRICE_HISTORY_RANGE,
+  PRICE_HISTORY_RANGE_KEY,
+} from './priceHistoryRangePref';
+import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
+
+// Every fixed-date fixture below is well within 30 days of this, so the
+// panel's default range never has to change per test just to keep a point visible.
+const FIXED_NOW = new Date('2026-08-05T00:00:00Z');
+
+vi.mock('./priceHistory', () => ({
+  loadPriceHistory: vi.fn(),
+}));
+
+vi.mock('./marketOpenPrices', () => ({
+  loadMarketOpenPrices: vi.fn(async () => null),
+}));
+
+vi.mock('./PriceHistoryChart', () => ({
+  default: ({
+    points,
+    itemName,
+    movingAverage,
+    comparisons,
+    primaryRegionName,
+    openPrices,
+    series,
+    openMissing,
+  }: {
+    openPrices?: { regionId: number; station?: string; points: unknown[] }[];
+    series?: string;
+    openMissing?: ReadonlySet<number>;
+    points: unknown[];
+    itemName: string;
+    movingAverage?: unknown[];
+    comparisons?: { name: string; status: string; points: unknown[] }[];
+    primaryRegionName?: string;
+  }) => (
+    <div data-testid="chart">
+      {itemName}: {points.length} points, {movingAverage?.length ?? 0} ma points
+      {primaryRegionName ? ` primary=${primaryRegionName}` : ''}
+      {(openPrices ?? [])
+        .map(
+          (o) =>
+            ` {open ${o.regionId}:${o.points.length}:${series}}${o.station ? `@${o.station}` : ''}`
+        )
+        .join('')}
+      {(comparisons ?? []).map((c) => ` [${c.name}:${c.status}:${c.points.length}]`).join('')}
+      {` series=${series} missing=${[...(openMissing ?? [])].join(',')}`}
+    </div>
+  ),
+}));
+
+const mockedLoad = vi.mocked(loadPriceHistory);
+const mockedOpen = vi.mocked(loadMarketOpenPrices);
+
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+beforeEach(async () => {
+  await db.settings.clear();
+  // Module-scope store: without a reset, the range one test picks is the
+  // window the next one opens on.
+  usePriceHistoryRange.setState({ value: DEFAULT_PRICE_HISTORY_RANGE, hydrated: false });
+  usePriceHistorySeries.setState({ value: DEFAULT_PRICE_HISTORY_SERIES, hydrated: false });
+  mockedOpen.mockResolvedValue(null);
+});
+
+describe('PriceHistoryPanel', () => {
+  it('shows a loading state while the request is in flight', () => {
+    mockedLoad.mockReturnValue(new Promise(() => {}));
+    render(<PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" />);
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+  });
+
+  it('shows an empty state, not the chart, when ESI has no history for the item', async () => {
+    mockedLoad.mockResolvedValue({ points: [], fetchedAt: 1_000_000 });
+    render(<PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" />);
+    expect(await screen.findByText('No price history')).toBeInTheDocument();
+    expect(screen.queryByTestId('chart')).not.toBeInTheDocument();
+  });
+
+  it('shows a distinct error state, not the empty state, when the fetch fails', async () => {
+    mockedLoad.mockRejectedValue(new Error('network down'));
+    render(<PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" />);
+    expect(await screen.findByText("Couldn't load price history")).toBeInTheDocument();
+    expect(screen.queryByText('No price history')).not.toBeInTheDocument();
+  });
+
+  it('renders the lazy chart once history points arrive', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [historyPoint({ date: '2026-08-01', average: 5, volume: 50 })],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
+  });
+
+  it('says the series is a saved copy, with its age, only when the read fell back to the cache', async () => {
+    const points = [historyPoint({ date: '2026-08-01', average: 5, volume: 50 })];
+    mockedLoad.mockResolvedValueOnce({
+      points,
+      fetchedAt: Date.now() - 3 * 3_600_000 - 60_000,
+      fromCache: true,
+    });
+    const { unmount } = render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('3h ago')).toBeInTheDocument();
+    unmount();
+
+    mockedLoad.mockResolvedValueOnce({ points, fetchedAt: Date.now(), fromCache: false });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it('re-fetches when the region or type changes', async () => {
+    mockedLoad.mockResolvedValue({ points: [], fetchedAt: 1_000_000 });
+    const { rerender } = render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(mockedLoad).toHaveBeenCalledTimes(1));
+    rerender(
+      <PriceHistoryPanel regionId={10000043} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(mockedLoad).toHaveBeenCalledTimes(2));
+    expect(mockedLoad).toHaveBeenLastCalledWith(10000043, 34);
+  });
+
+  it('shows a hi/lo/median summary line above the chart', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, volume: 5 }),
+        historyPoint({ date: '2026-08-02', average: 30, volume: 5 }),
+        historyPoint({ date: '2026-08-03', average: 20, volume: 5 }),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    // Shorthand on screen (#947), so each figure is matched by its accessible
+    // name and still checked against the label it sits beside.
+    expect(
+      screen.getByText('30.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('High');
+    expect(
+      screen.getByText('10.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('Low');
+    expect(
+      screen.getByText('20.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('Median');
+  });
+
+  it('takes the summary high and low from the days\u2019 own extremes, not their averages', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, lowest: 4, highest: 16 }),
+        historyPoint({ date: '2026-08-02', average: 30, lowest: 25, highest: 44 }),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(
+      screen.getByText('44.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('High');
+    expect(
+      screen.getByText('4.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('Low');
+  });
+
+  it('sums traded volume and averages the daily order count across the range', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, volume: 1_200, orderCount: 40 }),
+        historyPoint({ date: '2026-08-02', average: 10, volume: 800, orderCount: 41 }),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    // Matched from the figure outward, like the ISK stats above, so each
+    // number is pinned to the label it actually sits beside. The mean keeps
+    // its decimal rather than rounding — 40.5 orders a day is the fact.
+    expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume');
+    expect(screen.getByText('40.5').parentElement).toHaveTextContent('Orders / day');
+  });
+
+  it('keeps a thin market off a flat zero in the orders-per-day stat', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, orderCount: 1 }),
+        ...Array.from({ length: 9 }, (_, i) =>
+          historyPoint({
+            date: `2026-08-${String(i + 2).padStart(2, '0')}`,
+            average: 10,
+            orderCount: 0,
+          })
+        ),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day');
+  });
+
+  it('names the summary figures without colons, so the row reads as a readout', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [historyPoint({ date: '2026-08-01', average: 10, volume: 5, orderCount: 2 })],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    // One assertion over the whole group rather than a negative beside each
+    // label: the substring checks elsewhere in this file would all still pass
+    // if `Label:` came back, and five separate `not.toHaveTextContent` lines
+    // would say the same thing five times. Nothing in this group — labels,
+    // figures, "Orders / day" — contains a colon.
+    const stats = screen.getByText('High').parentElement?.parentElement;
+    expect(stats?.textContent).not.toContain(':');
+  });
+
+  it('narrows the chart to the selected date range', async () => {
+    const user = userEvent.setup();
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }), // within 30d (default) but outside 7d
+        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }), // within 7d
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 2 points');
+
+    await user.click(screen.getByRole('combobox', { name: 'Range' }));
+    await user.click(await screen.findByRole('option', { name: '7 days' }));
+    expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
+  });
+
+  /**
+   * The panel is remounted per item, so before this a trader comparing a run
+   * of prices across several items re-picked their window on every one. The
+   * range slices points already fetched, so remembering it costs nothing.
+   */
+  it('opens the next item on the range last chosen, not back at 30 days', async () => {
+    const user = userEvent.setup();
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }), // within 30d, outside 7d
+        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }), // within 7d
+      ],
+      fetchedAt: 1_000_000,
+    });
+    const { unmount } = render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    await user.click(screen.getByRole('combobox', { name: 'Range' }));
+    await user.click(await screen.findByRole('option', { name: '7 days' }));
+    unmount();
+
+    usePriceHistoryRange.setState({ hydrated: false });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={35} itemName="Pyerite" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('7 days');
+    });
+    expect(screen.getByTestId('chart')).toHaveTextContent('Pyerite: 1 points');
+    expect((await db.settings.get(PRICE_HISTORY_RANGE_KEY))?.value).toBe('7d');
+  });
+
+  it('passes no moving-average points when the item has fewer real days than the window', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-03', average: 10, volume: 5 }),
+        historyPoint({ date: '2026-08-04', average: 12, volume: 5 }),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByTestId('chart')).toHaveTextContent('0 ma points');
+  });
+
+  it('computes the moving average over the full unfiltered series, not the filtered range', async () => {
+    // 10 real days of history: the default 30d range keeps all of them, and
+    // a correct 7-day window (computed pre-filter) yields 4 MA points
+    // (days 7-10). Computing after filtering would still yield 4 here since
+    // 30d keeps everything — the 7d-range assertion below is what actually
+    // distinguishes pre- vs post-filter computation.
+    const points = Array.from({ length: 10 }, (_, i) =>
+      historyPoint({
+        date: `2026-07-${String(20 + i).padStart(2, '0')}`,
+        average: 10 + i,
+        volume: 5,
+      })
+    );
+    mockedLoad.mockResolvedValue({ points, fetchedAt: 1_000_000 });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByTestId('chart')).toHaveTextContent('4 ma points');
+  });
+
+  it('uses a shorter window on the 7d range so it never collapses to a single point', async () => {
+    const user = userEvent.setup();
+    // 7 real days ending today: a 7-day window here would produce exactly 1
+    // MA point (a restatement of the summary), which is the defect the
+    // ticket calls out. The 7d range must use a shorter window instead.
+    const points = [
+      historyPoint({ date: '2026-07-30', average: 10, volume: 5 }),
+      historyPoint({ date: '2026-07-31', average: 11, volume: 5 }),
+      historyPoint({ date: '2026-08-01', average: 12, volume: 5 }),
+      historyPoint({ date: '2026-08-02', average: 13, volume: 5 }),
+      historyPoint({ date: '2026-08-03', average: 14, volume: 5 }),
+      historyPoint({ date: '2026-08-04', average: 15, volume: 5 }),
+      historyPoint({ date: '2026-08-05', average: 16, volume: 5 }),
+    ];
+    mockedLoad.mockResolvedValue({ points, fetchedAt: 1_000_000 });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    await user.click(screen.getByRole('combobox', { name: 'Range' }));
+    await user.click(await screen.findByRole('option', { name: '7 days' }));
+    expect(screen.getByTestId('chart')).toHaveTextContent('5 ma points');
+  });
+
+  describe('comparing regions', () => {
+    const REGIONS = [
+      { id: 10000002, name: 'The Forge' },
+      { id: 10000043, name: 'Domain' },
+      { id: 10000032, name: 'Sinq Laison' },
+    ];
+    const ONE_DAY = { points: [historyPoint({ date: '2026-08-01' })], fetchedAt: 1 };
+
+    function renderCompared(regionIds: number[], onChange = vi.fn()) {
+      return render(
+        <PriceHistoryPanel
+          regionId={10000002}
+          typeId={34}
+          itemName="Tritanium"
+          now={FIXED_NOW}
+          compare={{ regionIds, onChange, regions: REGIONS }}
+        />
+      );
+    }
+
+    it('fetches nothing beyond the primary region until a region is picked', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      renderCompared([]);
+      await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+      expect(mockedLoad).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('[');
+    });
+
+    it('fetches each picked region once and hands its line to the chart', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      renderCompared([10000043, 10000032]);
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent(
+          'primary=The Forge [Domain:ready:1] [Sinq Laison:ready:1]'
+        )
+      );
+      expect(mockedLoad).toHaveBeenCalledWith(10000043, 34);
+      expect(mockedLoad).toHaveBeenCalledWith(10000032, 34);
+      expect(mockedLoad).toHaveBeenCalledTimes(3);
+    });
+
+    it('never compares the primary region against itself', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      renderCompared([10000002, 10000043]);
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('[Domain:ready:1]')
+      );
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('[The Forge');
+      expect(mockedLoad).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the chart drawn while one region fails and another is still loading', async () => {
+      mockedLoad.mockImplementation((regionId) => {
+        if (regionId === 10000043) return Promise.reject(new Error('down'));
+        if (regionId === 10000032) return new Promise(() => {});
+        return Promise.resolve(ONE_DAY);
+      });
+      renderCompared([10000043, 10000032]);
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent(
+          'Tritanium: 1 points, 0 ma points primary=The Forge [Domain:error:0] [Sinq Laison:loading:0]'
+        )
+      );
+    });
+
+    it('says the chart is cached when only a compared region came from the saved copy', async () => {
+      mockedLoad.mockImplementation((regionId) =>
+        Promise.resolve(
+          regionId === 10000043
+            ? { ...ONE_DAY, fetchedAt: Date.now() - 2 * 3_600_000 - 60_000, fromCache: true }
+            : { ...ONE_DAY, fetchedAt: Date.now(), fromCache: false }
+        )
+      );
+      renderCompared([10000043]);
+      expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+      expect(screen.getByText('2h ago')).toBeInTheDocument();
+    });
+
+    it('adds a picked region through the Compare regions control', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      const onChange = vi.fn();
+      const user = userEvent.setup();
+      renderCompared([10000043], onChange);
+      await user.click(
+        await screen.findByRole('button', { name: 'Compare regions, 1 of 4 picked' })
+      );
+      await user.click(await screen.findByRole('option', { name: /Sinq Laison/ }));
+      expect(onChange).toHaveBeenCalledWith([10000043, 10000032]);
+    });
+
+    it('shows no Compare control when the caller offers no comparison', async () => {
+      mockedLoad.mockResolvedValue(ONE_DAY);
+      render(
+        <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+      );
+      await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: /Compare regions/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('open buy and sell prices', () => {
+    const SERIES = {
+      dates: ['2026-08-01', '2026-08-02'],
+      buy: [9, 10],
+      sell: [12, 13],
+    };
+    const OPEN = { stationId: 60003760, series: SERIES };
+
+    function renderPanel() {
+      mockedLoad.mockResolvedValue({
+        points: [historyPoint({ date: '2026-08-01' })],
+        fetchedAt: 1,
+      });
+      return render(
+        <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+      );
+    }
+
+    it('still offers the Lines select, and tells the chart the region has no series, when there is none', async () => {
+      renderPanel();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('missing=10000002')
+      );
+      expect(screen.getByTestId('chart')).not.toHaveTextContent('open');
+      expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
+      expect(mockedOpen).toHaveBeenCalledWith(10000002, 34);
+    });
+
+    it('offers Average, which drops the open medians from the summary', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      const user = userEvent.setup();
+      renderPanel();
+      expect(await screen.findByText('Median sell')).toBeInTheDocument();
+      expect(screen.getByText('Median buy')).toBeInTheDocument();
+      await user.click(screen.getByRole('combobox', { name: 'Lines' }));
+      await user.click(await screen.findByRole('option', { name: 'Average' }));
+      expect(screen.getByTestId('chart')).toHaveTextContent('series=average');
+      expect(screen.queryByText('Median sell')).not.toBeInTheDocument();
+      expect(screen.queryByText('Median buy')).not.toBeInTheDocument();
+    });
+
+    it('reads the series once and hands the chart the days inside the range', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      renderPanel();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}')
+      );
+      expect(screen.getByRole('combobox', { name: 'Lines' })).toHaveTextContent('Buy / Sell');
+      // A region with a series is never reported as missing one.
+      expect(screen.getByTestId('chart')).toHaveTextContent(/missing=$/);
+      expect(mockedOpen).toHaveBeenCalledTimes(1);
+    });
+
+    it('hands the chart the hub station the series is from', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      renderPanel();
+      await waitFor(() =>
+        expect(screen.getByTestId('chart')).toHaveTextContent('{open 10000002:2:both}@Jita 4-4')
+      );
+    });
+
+    it('remembers the chosen side across panels', async () => {
+      mockedOpen.mockResolvedValue(OPEN);
+      const user = userEvent.setup();
+      const first = renderPanel();
+      await user.click(await screen.findByRole('combobox', { name: 'Lines' }));
+      await user.click(await screen.findByRole('option', { name: 'Sell' }));
+      expect(screen.getByTestId('chart')).toHaveTextContent(':sell}');
+      first.unmount();
+      usePriceHistorySeries.setState({ hydrated: false });
+      renderPanel();
+      await waitFor(() => expect(screen.getByTestId('chart')).toHaveTextContent(':sell}'));
+    });
+  });
+});

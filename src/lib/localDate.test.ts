@@ -1,0 +1,67 @@
+import { describe, it, expect, afterAll } from 'vitest';
+import { formatLocalDate, formatLocalDateTime } from './localDate';
+
+const originalTz = process.env.TZ;
+afterAll(() => {
+  process.env.TZ = originalTz;
+});
+
+describe('formatLocalDate', () => {
+  it('renders in the host local timezone, not UTC', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    // Just after UTC midnight — still the previous day in a negative-offset zone.
+    expect(formatLocalDate(new Date('2026-09-01T00:00:00Z'))).toBe('2026-08-31');
+  });
+
+  it('renders as the same day in UTC', () => {
+    process.env.TZ = 'UTC';
+    expect(formatLocalDate(new Date('2026-09-01T00:00:00Z'))).toBe('2026-09-01');
+  });
+
+  it('renders as the next local day in a positive-offset zone', () => {
+    process.env.TZ = 'Pacific/Kiritimati';
+    expect(formatLocalDate(new Date('2026-08-31T23:45:00Z'))).toBe('2026-09-01');
+  });
+});
+
+describe('formatLocalDateTime', () => {
+  it('carries the time of day the date-only formatter drops', () => {
+    process.env.TZ = 'UTC';
+    expect(formatLocalDateTime(new Date('2026-09-01T14:51:00Z'))).toBe('2026-09-01, 14:51');
+  });
+
+  it('shifts date and time together into the host local timezone', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    expect(formatLocalDateTime(new Date('2026-09-01T00:30:00Z'))).toBe('2026-08-31, 17:30');
+  });
+
+  it('renders midnight as 00:00 rather than 24:00', () => {
+    process.env.TZ = 'UTC';
+    expect(formatLocalDateTime(new Date('2026-09-01T00:00:00Z'))).toBe('2026-09-01, 00:00');
+  });
+});
+
+describe('formatLocalDate with the EVE clock', () => {
+  it('renders the UTC date whatever the host zone, only when asked', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const late = new Date('2026-09-01T02:00:00Z');
+    expect(formatLocalDate(late)).toBe('2026-08-31');
+    expect(formatLocalDate(late, 'UTC')).toBe('2026-09-01');
+    expect(formatLocalDate(late, undefined)).toBe('2026-08-31');
+  });
+});
+
+describe('formatLocalDateTime with the EVE clock', () => {
+  it('renders UTC date and time whatever the host zone, only when asked', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const late = new Date('2026-09-01T02:30:00Z');
+    expect(formatLocalDateTime(late)).toBe('2026-08-31, 19:30');
+    expect(formatLocalDateTime(late, 'UTC')).toBe('2026-09-01, 02:30');
+    expect(formatLocalDateTime(late, undefined)).toBe('2026-08-31, 19:30');
+  });
+
+  it('renders the first minutes after UTC midnight as 00:05, never 24:05', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    expect(formatLocalDateTime(new Date('2026-09-01T00:05:00Z'), 'UTC')).toBe('2026-09-01, 00:05');
+  });
+});

@@ -1,0 +1,214 @@
+import { useState } from 'react';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type BuildPlanRecord } from '@/db';
+import { DataGate } from '@/components/DataGate';
+import { Spinner, TabPanel, Toast, useTimedToast } from '@/components/ui';
+import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
+import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
+import { IndustryHeader } from '@/features/industry/IndustryHeader';
+import {
+  INDUSTRY_TABS_ID,
+  industryTabHref,
+  type IndustryTab,
+} from '@/features/industry/industryTabs';
+import {
+  buildGroupsFor,
+  withGroupAutoBuildDefault,
+  withGroupOwnedStock,
+  withGroupOwnedStockScope,
+} from '@/features/industry/buildGroups';
+import { retargetBuildGroup } from '@/features/industry/buildGroupActions';
+import { patchBuildPlans } from '@/features/industry/buildPlanStore';
+import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
+import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
+import { loadBpcContractRows } from '@/features/industry/buildPlanPricingInputs';
+import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
+import type { OwnedStockScope } from '@/engine/industry/types';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
+import type { BlueprintPasteNoticeState } from '@/lib/shortcuts';
+
+const NO_PLANS: BuildPlanRecord[] = [];
+
+/**
+ * `/industry/groups/:groupId` — a Build Group's rollup as a full-width page.
+ * Replaces the old `/industry` list+detail split; the Members panel opens a
+ * plan by navigating to `/industry/plans/:id` rather than swapping an
+ * in-memory selection.
+ */
+export function IndustryGroupPage() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { groupId } = useParams<{ groupId: string }>();
+  const workspace = useIndustryWorkspace();
+  const {
+    activeCharacterId,
+    catalog,
+    catalogFailed,
+    retryCatalog,
+    pi,
+    ownedBlueprints,
+    pricingInputs,
+    modifiers,
+    ownedStockSnapshot,
+    blueprintsNeedsReauth,
+  } = workspace;
+
+  const itemActions = usePageItemActions({ activeCharacterId });
+
+  // What a blueprint paste just did, read once from the navigation that
+  // brought the pilot here; it fades, and a reload does not bring it back.
+  const [pasteNote, setPasteNote] = useState<string | null>(() => {
+    const notice = (location.state as Partial<BlueprintPasteNoticeState> | null)
+      ?.blueprintPasteNotice;
+    if (!notice) return null;
+    const parts = [
+      t(notice.reused ? 'industry.blueprintPasteReused' : 'industry.blueprintPasteCreated'),
+    ];
+    if (notice.skipped > 0)
+      parts.push(t('industry.blueprintPasteSkipped', { count: notice.skipped }));
+    return parts.join(' ');
+  });
+  useTimedToast(pasteNote, () => setPasteNote(null), 12000);
+
+  const plansQuery = useLiveQuery(async () => {
+    if (activeCharacterId === null || groupId === undefined) return undefined;
+    return db.buildPlans
+      .where('characterId')
+      .equals(activeCharacterId)
+      .filter((p) => p.buildGroupId === groupId)
+      .toArray();
+  }, [activeCharacterId, groupId]);
+  const plans = plansQuery ?? NO_PLANS;
+
+  async function handleRetargetGroup(
+    target: Parameters<typeof retargetBuildGroup>[1],
+    planIds: readonly string[]
+  ) {
+    if (activeCharacterId === null || groupId === undefined) return;
+    await retargetBuildGroup(groupId, target, planIds, {
+      characterId: activeCharacterId,
+      buildGroups: workspace.buildGroups,
+      setBuildGroups: workspace.setBuildGroups,
+    });
+  }
+
+  // Same account-wide skill gate a member's own page applies to its Auto Build.
+  const accountSkills = useAccountSkillLevels([...ownedStockSnapshot.characterNames.keys()]);
+
+  /** @see BuildGroupPanel's `onAutoBuild` doc — same one-shot bulk build/buy control, run once per member. */
+  async function handleAutoBuildGroup(options: { strategy: BuildStrategy; depth: number }) {
+    if (activeCharacterId === null || groupId === undefined || !catalog) return;
+    await workspace.setBuildGroups(
+      withGroupAutoBuildDefault(workspace.buildGroups, activeCharacterId, groupId, {
+        strategy: options.strategy,
+      })
+    );
+    // Same BPC Sourcing snapshot each member's own page resolves its
+    // top-level tier against, read fresh at click time rather than off
+    // `pricingInputs.bpcRows`, which may not have landed yet; no offers (not
+    // synced / fetch failed) degrades to owned, forced and BPO tiers,
+    // exactly as on the plan page.
+    const bpcRows = (await loadBpcContractRows()) ?? [];
+    const picks = await applyGroupAutoBuild(
+      plans,
+      catalog,
+      pi,
+      ownedBlueprints,
+      modifiers,
+      pricingInputs.assumedMe,
+      options,
+      pricingInputs.corpBlueprints,
+      bpcRows,
+      pricingInputs.communityRows,
+      accountSkills
+    );
+    if (picks.size === 0) return;
+    await patchBuildPlans([...picks.keys()], (p) => {
+      const picked = picks.get(p.id);
+      return picked ? { buildHere: [...picked] } : null;
+    });
+  }
+
+  async function handleGroupOwnedStockChange(ownedStock: Record<number, number>) {
+    if (activeCharacterId === null || groupId === undefined) return;
+    await workspace.setBuildGroups(
+      withGroupOwnedStock(workspace.buildGroups, activeCharacterId, groupId, ownedStock)
+    );
+  }
+
+  async function handleGroupOwnedStockScopeChange(scope: OwnedStockScope | undefined) {
+    if (activeCharacterId === null || groupId === undefined) return;
+    await workspace.setBuildGroups(
+      withGroupOwnedStockScope(workspace.buildGroups, activeCharacterId, groupId, scope)
+    );
+  }
+
+  if (!workspace.hydrated || !workspace.buildGroupsHydrated || plansQuery === undefined) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner label={t('common.loading')} />
+      </div>
+    );
+  }
+  if (activeCharacterId === null) return <Navigate to="/characters" replace />;
+  if (groupId === undefined) return <Navigate to={industryTabHref('plans')} replace />;
+
+  const group = buildGroupsFor(workspace.buildGroups, activeCharacterId).find(
+    (g) => g.id === groupId
+  );
+  // Deleted elsewhere, or a stale URL — the index is the only page left to
+  // send the pilot back to (same rule `IndustryPlanPage` follows).
+  if (!group) return <Navigate to={industryTabHref('plans')} replace />;
+
+  return (
+    <ItemActionsProvider page={itemActions}>
+      <div className="mx-auto max-w-7xl space-y-4">
+        {/* Same chrome the index shows above its own tab strip — see
+            `IndustryPlanPage`'s identical use of it. */}
+        <IndustryHeader
+          activeCharacterId={activeCharacterId}
+          activeTab="plans"
+          onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+          tabsActivation="manual"
+          blueprintsNeedsReauth={blueprintsNeedsReauth}
+        />
+
+        <TabPanel tabsId={INDUSTRY_TABS_ID} tabId="plans" className="space-y-4">
+          <DataGate
+            status={catalogFailed ? 'failed' : !catalog ? 'busy' : 'ok'}
+            title={t('industry.catalogUnavailable')}
+            hint={
+              ownedBlueprints.length > 0 ? t('industry.catalogUnavailableOwnedHint') : undefined
+            }
+            onRetry={retryCatalog}
+            resetKey={activeCharacterId}
+          >
+            {catalog && (
+              <BuildGroupPanel
+                key={group.id}
+                group={group}
+                plans={plans}
+                catalog={catalog}
+                pi={pi}
+                ownedBlueprints={ownedBlueprints}
+                modifiers={modifiers}
+                pricingInputs={pricingInputs}
+                ownedStockSnapshot={ownedStockSnapshot}
+                onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
+                onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
+                onAutoBuild={(options) => handleAutoBuildGroup(options)}
+                onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
+                onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
+              />
+            )}
+          </DataGate>
+        </TabPanel>
+      </div>
+      {pasteNote && <Toast message={pasteNote} />}
+    </ItemActionsProvider>
+  );
+}

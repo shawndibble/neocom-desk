@@ -1,0 +1,107 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Disclosure } from './Disclosure';
+
+describe('Disclosure', () => {
+  it('renders the label and trailing value, hiding children while collapsed', () => {
+    render(
+      <Disclosure label="Job fee" trailing="65" expanded={false} onToggle={vi.fn()}>
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    expect(screen.getByRole('button', { name: /job fee/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.getByText('65')).toBeInTheDocument();
+    expect(screen.queryByText('EIV detail')).not.toBeInTheDocument();
+  });
+
+  it('reveals children and flips aria-expanded when expanded', () => {
+    render(
+      <Disclosure label="Job fee" expanded={true} onToggle={vi.fn()}>
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    expect(screen.getByRole('button', { name: /job fee/i })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(screen.getByText('EIV detail')).toBeInTheDocument();
+  });
+
+  it('calls onToggle on click and on keyboard activation', async () => {
+    const onToggle = vi.fn();
+    render(
+      <Disclosure label="Job fee" expanded={false} onToggle={onToggle}>
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    const button = screen.getByRole('button', { name: /job fee/i });
+    await userEvent.click(button);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    button.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onToggle).toHaveBeenCalledTimes(2);
+
+    await userEvent.keyboard(' ');
+    expect(onToggle).toHaveBeenCalledTimes(3);
+  });
+
+  it('carries the touch-tier height floor, reverting to the compact size at md (issue #1071)', () => {
+    // jsdom applies no real CSS, so this can't measure a pixel height the
+    // way `e2e/skillsTrainedNarrow.spec.ts` does for the trained-skills
+    // page's own hand-rolled header — this asserts the class tokens
+    // themselves, on every one of this shared primitive's consumers
+    // (BuildLocationPicker, ResultsSummary, AppraisalPanel, PlanToolsPane,
+    // CollapsiblePanel), not just the one page with a dedicated e2e spec.
+    render(
+      <Disclosure label="Job fee" expanded={false} onToggle={vi.fn()}>
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    const button = screen.getByRole('button', { name: /job fee/i });
+    expect(button.className).toContain('min-h-9');
+    expect(button.className).toContain('md:min-h-0');
+  });
+
+  it('renders a label accessory outside the toggle so clicking it does not toggle', async () => {
+    const onToggle = vi.fn();
+    render(
+      <Disclosure
+        label="Job fee"
+        labelAccessory={<button type="button">About job fee</button>}
+        trailing="65"
+        expanded={false}
+        onToggle={onToggle}
+      >
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    const toggle = screen.getByRole('button', { name: /^job fee/i });
+    // The value stays in the toggle's name even though it renders outside it.
+    expect(toggle).toHaveAccessibleName('Job fee65');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).not.toContainElement(screen.getByRole('button', { name: /about job fee/i }));
+
+    await userEvent.click(screen.getByRole('button', { name: /about job fee/i }));
+    expect(onToggle).not.toHaveBeenCalled();
+
+    await userEvent.click(toggle);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByText('65', { selector: '[aria-hidden="true"] > span' }));
+    expect(onToggle).toHaveBeenCalledTimes(2);
+
+    toggle.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onToggle).toHaveBeenCalledTimes(3);
+  });
+});

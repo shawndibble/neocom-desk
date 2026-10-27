@@ -1,0 +1,6 @@
+# Scope decisions — Cap boosters get their own Charge Picker guide
+
+_Recorded 2026-10-03._
+
+- **A cap booster's charges are rated by what they do for the capacitor, not by the weapon picker's damage and range.** Its group in the Add panel's Charges tab and the List row's picker shows each Cap Booster charge with the Fitting's capacitor (stable level, or time until empty) with that charge in every booster, the group's GJ/s averaged over reloads, boosts per load and ISK per GJ, from the same one-calculation-per-charge engine run as the weapon picker. Quick picks are the smallest charge that keeps the fit cap stable, the most GJ/s, and the cheapest GJ among the charges that hold it (of all, when none does). A charge another one beats on GJ/s and capacitor for less ISK is dimmed and names it. The figures are the stats panel's own reload-aware headline, so they agree with it; like the weapon picker, they leave out the Damage Profile, weather and incoming projections.
+- **The "Change charge ▸" menu keeps its plain list for a cap booster.** The menu's quick picks are a weapon's; a cap booster's choice needs the capacitor column to read, which a menu row has no room for. Scripts, paste and other non-injecting charges keep the plain list everywhere. Mining crystals are a separate follow-up.

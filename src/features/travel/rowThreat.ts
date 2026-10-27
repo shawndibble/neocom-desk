@@ -1,0 +1,36 @@
+/**
+ * A Local list row's Threat level, split from `pilotListData` so the view can
+ * read it without pulling in the loader (which its tests replace wholesale).
+ */
+import {
+  needsLossHistory,
+  threatVerdict,
+  type ThreatLevel,
+} from '@/engine/pilotList/threatVerdict';
+import type { PilotListRow } from './pilotListData';
+
+/**
+ * A row's Threat level, `pending` while its danger ratio is still on the way
+ * (the level could still change), and null for a row with no kill list to
+ * read: friendly, not found, still loading or unreachable. A pilot with no recent
+ * kill whose losses could not be read or dated gets none either: "inactive" would
+ * be a guess, and a wrong one for a pilot who just lost a ship.
+ */
+export function rowThreat(row: PilotListRow, nowMs: number): ThreatLevel | 'pending' | null {
+  if (row.kills.kind !== 'ready') return null;
+  if (row.extras.kind === 'loading') return 'pending';
+  if (
+    row.extras.kind === 'ready' &&
+    row.extras.lossTimesMs === null &&
+    needsLossHistory(row.kills.kills, nowMs)
+  ) {
+    return null;
+  }
+  return threatVerdict({
+    kills: row.kills.kills,
+    dangerRatio: row.extras.kind === 'ready' ? row.extras.dangerRatio : null,
+    killerRatio: row.extras.kind === 'ready' ? row.extras.killerRatio : null,
+    lossTimesMs: row.extras.kind === 'ready' ? row.extras.lossTimesMs : null,
+    nowMs,
+  }).level;
+}

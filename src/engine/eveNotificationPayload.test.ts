@@ -1,0 +1,504 @@
+import { describe, it, expect } from 'vitest';
+import { parseEveNotificationPayload, reinforcementExitMs } from './eveNotificationPayload';
+
+/**
+ * Robustness first (issue #300 AC2): the parser is fed a `text` blob CCP can
+ * reshape without notice, so "returns nothing useful" is a first-class result
+ * and throwing is never one. Only after that do the per-type happy paths
+ * matter — every one of those fixtures is a real payload sample.
+ */
+describe('parseEveNotificationPayload — degrades instead of throwing', () => {
+  const HOSTILE: ReadonlyArray<[string, string]> = [
+    ['empty string', ''],
+    ['whitespace only', '   \n\n  '],
+    ['an empty YAML mapping', '{}'],
+    ['truncated mid-key', 'structureI'],
+    ['truncated mid-value', 'structureID: '],
+    ['a key with no colon', 'structureID 1000000000001'],
+    ['a leading colon', ': 1000000000001'],
+    ['prose rather than a mapping', 'The structure was attacked. Good luck!'],
+    ['an unresolved YAML alias', 'structureID: *id001'],
+    ['a nested block with no scalars', 'oreVolumeByType:\n  46300: 12.5\n'],
+    ['a list with no scalars', 'listOfTypesAndQty:\n- - 154\n  - 4312\n'],
+    ['CRLF line endings and no known keys', 'someKey: 1\r\notherKey: 2\r\n'],
+    ['a non-numeric value in a numeric field', 'structureID: not-a-number\namount: ???\n'],
+    ['a numeric field left blank', 'amount:\ndueDate:\n'],
+    ['an infinite numeric value', 'amount: .inf\ndueDate: -.inf\n'],
+  ];
+
+  it.each(HOSTILE)('returns a payload with no numeric fields for %s', (_label, text) => {
+    expect(() => parseEveNotificationPayload(text)).not.toThrow();
+    const payload = parseEveNotificationPayload(text);
+    expect(payload.structureId).toBeUndefined();
+    expect(payload.amount).toBeUndefined();
+    expect(payload.dueDateMs).toBeUndefined();
+  });
+
+  it('never throws on a huge blob of unrelated lines', () => {
+    const text = Array.from({ length: 5_000 }, (_, i) => `key${i}: value${i}`).join('\n');
+    expect(() => parseEveNotificationPayload(text)).not.toThrow();
+  });
+
+  it('never throws when ESI omits `text` entirely, which the type system cannot prevent', () => {
+    // `EveNotificationFire.text` is typed `string`, but it comes from a
+    // response body TypeScript never sees — a `.split` on `undefined` is the
+    // one throw this module promises not to do.
+    const notAString = undefined as unknown as string;
+    expect(() => parseEveNotificationPayload(notAString)).not.toThrow();
+    expect(parseEveNotificationPayload(notAString)).toEqual(parseEveNotificationPayload(''));
+  });
+});
+
+describe('parseEveNotificationPayload — YAML subset the payloads actually use', () => {
+  it('strips the anchor CCP attaches to every structure id', () => {
+    // `structureID: &id001 1000000000001` is how every structure payload
+    // carries the id, so a parser that keeps the `&id001` finds nothing at
+    // all for eight of the types this ticket renders.
+    expect(parseEveNotificationPayload('structureID: &id001 1000000000001').structureId).toBe(
+      1_000_000_000_001
+    );
+  });
+
+  it('strips an anchor whose name is not the usual `id001`', () => {
+    expect(
+      parseEveNotificationPayload('structureID: &notification_id001 1000000000001').structureId
+    ).toBe(1_000_000_000_001);
+  });
+
+  it('splits on the first colon only, so link markup survives intact', () => {
+    const payload = parseEveNotificationPayload(
+      'structureLink: <a href="showinfo:35835//1000000000001">Amamake - Alpha</a>'
+    );
+    expect(payload.structureName).toBe('Amamake - Alpha');
+  });
+
+  it('drops the quotes an emitter adds around a name that needs them', () => {
+    // A structure name containing a colon has to come back quoted; the quotes
+    // are YAML syntax, not part of what the pilot named the thing.
+    expect(parseEveNotificationPayload("structureName: 'Chunk Line 3'").structureName).toBe(
+      'Chunk Line 3'
+    );
+    expect(parseEveNotificationPayload('structureName: "Home: Alpha"').structureName).toBe(
+      'Home: Alpha'
+    );
+  });
+
+  it('leaves an unbalanced quote alone rather than eating a real apostrophe', () => {
+    expect(parseEveNotificationPayload("structureName: Pilot's Rest").structureName).toBe(
+      "Pilot's Rest"
+    );
+  });
+
+  it('ignores indented keys so a nested map cannot shadow a top-level one', () => {
+    const payload = parseEveNotificationPayload(
+      'oreVolumeByType:\n  46300: 1928443.08\nstructureID: 1000000000002\n'
+    );
+    expect(payload.structureId).toBe(1_000_000_000_002);
+  });
+
+  it('reads floats and exponent notation without mangling them', () => {
+    expect(parseEveNotificationPayload('amount: 10000.0').amount).toBe(10_000);
+    expect(parseEveNotificationPayload('amount: -1').amount).toBe(-1);
+    expect(parseEveNotificationPayload('amount: 4.7045e-14').amount).toBeCloseTo(4.7045e-14);
+  });
+
+  it('accepts either spelling of the solar-system key CCP is inconsistent about', () => {
+    // Not rendered anywhere, but the inconsistency is real (`solarsystemID` on
+    // the structure types, `solarSystemID` on the moonmining ones) and is the
+    // reason keys are matched case-insensitively.
+    expect(parseEveNotificationPayload('structureid: 42').structureId).toBe(42);
+    expect(parseEveNotificationPayload('STRUCTUREID: 42').structureId).toBe(42);
+  });
+});
+
+describe('parseEveNotificationPayload — EVE time encodings', () => {
+  it("converts a `dueDate` from EVE's 100ns-since-1601 ticks to epoch ms", () => {
+    // BillOutOfMoneyMsg sample: dueDate 132936019800000000 is 2022-04-05T03:13Z.
+    const payload = parseEveNotificationPayload('billTypeID: 7\ndueDate: 132936019800000000\n');
+    expect(payload.dueDateMs).toBe(Date.parse('2022-04-05T03:13:00Z'));
+  });
+
+  it('converts `timeLeft` as a duration, not an instant', () => {
+    // StructureLostShields sample: 1727805401093 ticks is ~2 days of
+    // reinforcement, and the sibling `vulnerableTime: 9000000000` is exactly
+    // the documented 15-minute vulnerability window — which is what pins the
+    // 100ns tick scale.
+    const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');
+    expect(payload.timeLeftMs).toBe(172_780_540);
+  });
+
+  it('rejects a tick count that would land before the EVE epoch', () => {
+    expect(parseEveNotificationPayload('dueDate: 0').dueDateMs).toBeUndefined();
+    expect(parseEveNotificationPayload('dueDate: -5').dueDateMs).toBeUndefined();
+    expect(parseEveNotificationPayload('timeLeft: -5').timeLeftMs).toBeUndefined();
+  });
+});
+
+describe('parseEveNotificationPayload — real payload samples', () => {
+  it('reads StructureUnderAttack: the structure plus the aggressor CCP spells out', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'allianceID: 3011',
+        'allianceLinkData:',
+        '- showinfo',
+        '- 16159',
+        '- 3011',
+        'allianceName: Big Bad Alliance',
+        'armorPercentage: 98.65129050962584',
+        'charID: 1011',
+        'corpLinkData:',
+        '- showinfo',
+        '- 2',
+        '- 2011',
+        'corpName: Bad Company',
+        'hullPercentage: 100.0',
+        'shieldPercentage: 4.704536686417284e-14',
+        'solarsystemID: 30002537',
+        'structureID: &id001 1000000000001',
+        'structureShowInfoData:',
+        '- showinfo',
+        '- 35835',
+        '- *id001',
+        'structureTypeID: 35835',
+        '',
+      ].join('\n')
+    );
+    expect(payload.structureId).toBe(1_000_000_000_001);
+    expect(payload.corpName).toBe('Bad Company');
+    expect(payload.allianceName).toBe('Big Bad Alliance');
+    expect(payload.charId).toBe(1011);
+  });
+
+  it('reads StructureLostShields: the structure and the reinforcement duration', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'solarsystemID: 30002537',
+        'structureID: &id001 1000000000001',
+        'structureShowInfoData:',
+        '- showinfo',
+        '- 35835',
+        '- *id001',
+        'structureTypeID: 35835',
+        'timeLeft: 1727805401093',
+        'timestamp: 132148470780000000',
+        'vulnerableTime: 9000000000',
+        '',
+      ].join('\n')
+    );
+    expect(payload.structureId).toBe(1_000_000_000_001);
+    expect(payload.timeLeftMs).toBe(172_780_540);
+  });
+
+  it('reads StructureImpendingAbandonmentAssetsAtRisk: name from the link, days from the count', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'daysUntilAbandon: 2',
+        'isCorpOwned: true',
+        'solarsystemID: 30002537',
+        'structureID: &id001 1000000000001',
+        'structureLink: <a href="showinfo:35835//1000000000001">Amamake - Alpha</a>',
+        'structureShowInfoData:',
+        '- showinfo',
+        '- 35835',
+        '- *id001',
+        'structureTypeID: 35835',
+        '',
+      ].join('\n')
+    );
+    expect(payload.structureName).toBe('Amamake - Alpha');
+    expect(payload.daysUntilAbandon).toBe(2);
+  });
+
+  it('reads MoonminingExtractionFinished: the structure name straight out of the payload', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'autoTime: 132187608610000000',
+        'moonID: 40161465',
+        'oreVolumeByType:',
+        '  46300: 6022254.470615254',
+        '  46301: 1920395.2662618621',
+        'solarSystemID: 30002537',
+        'structureID: 1000000000002',
+        'structureLink: <a href="showinfo:35835//1000000000002">Dummy</a>',
+        'structureName: Chunk Line 3',
+        'structureTypeID: 35835',
+        '',
+      ].join('\n')
+    );
+    // `structureName` wins over the link text: it is the unmarked-up value.
+    expect(payload.structureName).toBe('Chunk Line 3');
+    expect(payload.structureId).toBe(1_000_000_000_002);
+  });
+
+  it('reads CorpAllBillMsg: amount and due date', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'amount: 6000000',
+        'billTypeID: 5',
+        'creditorID: 2011',
+        'currentDate: 133462502887835953',
+        'debtorID: 2001',
+        'dueDate: 133488422887817240',
+        'externalID: 3001',
+        'externalID2: -1',
+        '',
+      ].join('\n')
+    );
+    expect(payload.amount).toBe(6_000_000);
+    expect(payload.dueDateMs).toBe(Date.parse('2024-01-04T11:44:48.782Z'));
+  });
+
+  it('reads WarDeclared: the aggressor and the war headquarters', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'againstID: 3001',
+        'cost: 100000000',
+        'declaredByID: 3011',
+        'delayHours: 24',
+        'hostileState: false',
+        'timeStarted: 132192693000000000',
+        'warHQ: <b>Amamake - Test Structure Alpha</b>',
+        'warHQ_IdType:',
+        '- 1000000000001',
+        '- 35835',
+        '',
+      ].join('\n')
+    );
+    expect(payload.declaredById).toBe(3011);
+    expect(payload.againstId).toBe(3001);
+    expect(payload.warHqName).toBe('Amamake - Test Structure Alpha');
+  });
+
+  it('reads CorpAppNewMsg: the applicant', () => {
+    const payload = parseEveNotificationPayload(
+      'applicationText: example\ncharID: 1011\ncorpID: 2001\n'
+    );
+    expect(payload.charId).toBe(1011);
+    expect(payload.corpId).toBe(2001);
+  });
+
+  it('reads StructureDestroyed: the structure, no aggressor spelled out', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'isAbandoned: false',
+        'ownerCorpLinkData:',
+        '- showinfo',
+        '- 2',
+        '- 1000001',
+        'ownerCorpName: Doomheim',
+        'solarsystemID: 31000671',
+        'structureID: &id001 1032717532381',
+        'structureShowInfoData:',
+        '- showinfo',
+        '- 35835',
+        '- *id001',
+        'structureTypeID: 35835',
+        '',
+      ].join('\n')
+    );
+    expect(payload.structureId).toBe(1_032_717_532_381);
+    expect(payload.structureTypeId).toBe(35835);
+  });
+
+  it('reads OrbitalAttacked: the planet, the customs office type, and the aggressor', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'aggressorAllianceID: 434243723',
+        'aggressorCorpID: 98749616',
+        'aggressorID: 2117204642',
+        'planetID: 40121487',
+        'planetTypeID: 2017',
+        'shieldLevel: 0.6',
+        'solarSystemID: 30001901',
+        'typeID: 2233',
+        '',
+      ].join('\n')
+    );
+    expect(payload.planetId).toBe(40121487);
+    expect(payload.aggressorId).toBe(2117204642);
+    expect(payload.aggressorCorpId).toBe(98749616);
+    expect(payload.aggressorAllianceId).toBe(434243723);
+  });
+
+  it('reads OrbitalReinforced: the planet and the reinforcement exit instant', () => {
+    // Real sample: reinforceExitTime 134259524910000000 ticks.
+    const payload = parseEveNotificationPayload(
+      [
+        'aggressorCorpID: 98749616',
+        'aggressorID: 2117204642',
+        'planetID: 40121487',
+        'planetTypeID: 2017',
+        'reinforceExitTime: 134259524910000000',
+        'solarSystemID: 30001901',
+        'typeID: 2233',
+        '',
+      ].join('\n')
+    );
+    expect(payload.planetId).toBe(40121487);
+    // 134259524910000000 ticks (100ns since 1601-01-01) converts to this instant.
+    expect(payload.reinforceExitMs).toBe(Date.parse('2026-06-14T23:14:51.000Z'));
+  });
+
+  it('reads OrbitalAttacked with no aggressor alliance (unallied attacker)', () => {
+    const payload = parseEveNotificationPayload(
+      'aggressorCorpID: 98749616\naggressorID: 2117204642\nplanetID: 40121487\n'
+    );
+    expect(payload.aggressorAllianceId).toBeUndefined();
+    expect(payload.aggressorId).toBe(2117204642);
+  });
+
+  it('reads CorpKicked: the corporation kicked from the alliance', () => {
+    const payload = parseEveNotificationPayload('corpID: 2001\n');
+    expect(payload.corpId).toBe(2001);
+  });
+
+  it('reads InfrastructureHubBillAboutToExpire: the corp and the due date, no amount field', () => {
+    const payload = parseEveNotificationPayload(
+      'billID: 5001\ncorpID: 2001\ndueDate: 132936019800000000\nsolarSystemID: 30001901\n'
+    );
+    expect(payload.corpId).toBe(2001);
+    expect(payload.dueDateMs).toBe(Date.parse('2022-04-05T03:13:00Z'));
+    expect(payload.amount).toBeUndefined();
+  });
+});
+
+/**
+ * The three moon-drill types issue #4058 allow-lists, plus the ore volumes the
+ * moon chunk estimate reads (epic #4055, D13). Their shape is
+ * taken from public samples (aa-moonmining's fixtures), not from CCP, and is
+ * unverified against live data — so every field is optional and the ore
+ * block is read defensively: one bad line costs that line, never the rest.
+ */
+describe('parseEveNotificationPayload — moon drill', () => {
+  const STARTED = [
+    'autoTime: 132052212600000000',
+    'moonID: 40161708',
+    'moonLink: <a href="showinfo:14//40161708">Dital II - Moon 1</a>',
+    'oreVolumeByType:',
+    '  45490: 1288475.0734476',
+    '  46677: 544976.2512398',
+    'readyTime: 132052104600000000',
+    'solarSystemID: 30002640',
+    'startedBy: 92168909',
+    'startedByLink: <a href="showinfo:1383//92168909">Pilot One</a>',
+    'structureID: 1029754054149',
+    'structureLink: <a href="showinfo:35835//1029754054149">Dital - Refinery</a>',
+    'structureName: Dital - Refinery',
+    'structureTypeID: 35835',
+    '',
+  ].join('\n');
+
+  it('reads MoonminingExtractionStarted: moon, times, who started it and the ore volumes', () => {
+    const payload = parseEveNotificationPayload(STARTED);
+    expect(payload.structureId).toBe(1_029_754_054_149);
+    expect(payload.structureName).toBe('Dital - Refinery');
+    expect(payload.moonId).toBe(40_161_708);
+    expect(payload.moonName).toBe('Dital II - Moon 1');
+    expect(payload.startedById).toBe(92_168_909);
+    // 132052104600000000 ticks = 2019-06-17T02:01:00Z; autoTime is 3h later.
+    expect(payload.readyTimeMs).toBe(Date.parse('2019-06-17T02:01:00Z'));
+    expect(payload.autoTimeMs).toBe(Date.parse('2019-06-17T05:01:00Z'));
+    expect(payload.oreVolumes).toEqual([
+      { typeId: 45490, volumeM3: 1288475.0734476 },
+      { typeId: 46677, volumeM3: 544976.2512398 },
+    ]);
+  });
+
+  it('reads MoonminingLaserFired: who fired it', () => {
+    const payload = parseEveNotificationPayload(
+      'firedBy: 92168909\nmoonID: 40161708\noreVolumeByType:\n  45490: 10.5\nstructureID: 1029754054149\n'
+    );
+    expect(payload.firedById).toBe(92_168_909);
+    expect(payload.oreVolumes).toEqual([{ typeId: 45490, volumeM3: 10.5 }]);
+  });
+
+  it('reads MoonminingExtractionCancelled: who cancelled it, and tolerates a null canceller', () => {
+    expect(
+      parseEveNotificationPayload('cancelledBy: 92168909\nstructureID: 1\n').cancelledById
+    ).toBe(92_168_909);
+    expect(
+      parseEveNotificationPayload('cancelledBy: null\nstructureID: 1\n').cancelledById
+    ).toBeUndefined();
+  });
+
+  it('keeps the good ore lines and drops malformed ones', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'oreVolumeByType:',
+        '  45490: 100.5',
+        '  notATypeId: 12',
+        '  46677: -3',
+        '  46678: .nan',
+        '  46679:',
+        '  0: 50',
+        '  1.5: 50',
+        '    46680: 7',
+        '  46681: 8',
+        'structureID: 1',
+        '  46682: 9',
+      ].join('\n')
+    );
+    // 46680 is a deeper nesting level than the block's own keys; 46682 sits
+    // under a different key. Neither is this block's.
+    expect(payload.oreVolumes).toEqual([
+      { typeId: 45490, volumeM3: 100.5 },
+      { typeId: 46681, volumeM3: 8 },
+    ]);
+    expect(payload.structureId).toBe(1);
+  });
+
+  it('reads a flow-style ore mapping', () => {
+    expect(
+      parseEveNotificationPayload('oreVolumeByType: {45490: 1.5, 46677: 2}\n').oreVolumes
+    ).toEqual([
+      { typeId: 45490, volumeM3: 1.5 },
+      { typeId: 46677, volumeM3: 2 },
+    ]);
+  });
+
+  it('reads an ore block carrying a YAML anchor', () => {
+    expect(
+      parseEveNotificationPayload('oreVolumeByType: &id001\n  45490: 1.5\n').oreVolumes
+    ).toEqual([{ typeId: 45490, volumeM3: 1.5 }]);
+  });
+
+  it('reads CRLF ore lines', () => {
+    expect(parseEveNotificationPayload('oreVolumeByType:\r\n  45490: 1.5\r\n').oreVolumes).toEqual([
+      { typeId: 45490, volumeM3: 1.5 },
+    ]);
+  });
+
+  it.each([
+    ['no ore block', 'structureID: 1\n'],
+    ['an empty ore block', 'oreVolumeByType:\nstructureID: 1\n'],
+    ['an empty flow mapping', 'oreVolumeByType: {}\n'],
+    ['only malformed ore lines', 'oreVolumeByType:\n  x: y\n  1: -1\n'],
+    ['an ore block given as a list', 'oreVolumeByType:\n- 45490\n- 12\n'],
+  ])('leaves oreVolumes undefined for %s', (_label, text) => {
+    expect(parseEveNotificationPayload(text).oreVolumes).toBeUndefined();
+  });
+});
+
+/**
+ * Round 36's rule, extracted so `projection.ts` (issue #359) can reuse the
+ * identical derivation `eveNotificationText.ts`'s `timerEnd` renders from,
+ * rather than a second copy that could drift.
+ */
+describe('reinforcementExitMs', () => {
+  it('adds the envelope timestamp to the payload timeLeft duration', () => {
+    const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');
+    expect(reinforcementExitMs('2026-09-03T00:00:00Z', payload)).toBe(
+      Date.parse('2026-09-03T00:00:00Z') + payload.timeLeftMs!
+    );
+  });
+
+  it('is undefined when the payload carries no timeLeft', () => {
+    const payload = parseEveNotificationPayload('structureID: 111\n');
+    expect(reinforcementExitMs('2026-09-03T00:00:00Z', payload)).toBeUndefined();
+  });
+
+  it('is undefined when the envelope timestamp is unparseable', () => {
+    const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');
+    expect(reinforcementExitMs('not-a-date', payload)).toBeUndefined();
+  });
+});

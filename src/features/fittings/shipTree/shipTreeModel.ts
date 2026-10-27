@@ -1,0 +1,293 @@
+/**
+ * The Ship Tree tab's view rules that sit on top of the engine
+ * (`engine/shipTree`): how the ladder nests, flyable counts, a tile's tech
+ * corner, bonus grouping, search, and the Ship Info window's Mastery and
+ * Blueprint read-outs. Pure — no React, no fetch.
+ */
+import {
+  CALDARI_FACTION_ID,
+  PIRATE_FACTION_IDS,
+  STACKED_CLASSES,
+} from '@/engine/shipTree/templates';
+import type { ShipTreeHullStatus, ShipTreeNodeDef } from '@/engine/shipTree/types';
+import type { PlanEntry } from '@/engine/types';
+import type { CharacterBlueprint } from '@/esi/endpoints';
+import { isEntryCovered } from '@/features/skills/planner/reorder';
+import type {
+  ShipTreeData,
+  ShipTreeFaction,
+  ShipTreeShip,
+  ShipTreeTrait,
+  SkillPrereq,
+} from '@/sde/types';
+
+/** Caldari State — the in-game tree's first tab. */
+export const DEFAULT_FACTION_ID = CALDARI_FACTION_ID;
+
+/** The faction the URL asked for when the tree has it, else the default. */
+export function resolveFactionID(data: ShipTreeData | null, requested: number): number {
+  return data?.factions.some((f) => f.id === requested) ? requested : DEFAULT_FACTION_ID;
+}
+
+/** A faction's name, or '' for one the tree doesn't list. */
+/**
+ * The in-game Ship Tree panel's faction order: empires and ORE, then the
+ * pirates, then the rest — read off an in-game screenshot.
+ */
+const IN_GAME_FACTION_ORDER = [
+  500003, 500001, 500004, 500002, 500014, 500010, 500019, 500012, 500011, 500020, 500016, 500018,
+  500026, 500027, 500006, 500017, 500029,
+];
+
+/** Factions in the in-game panel's order; any the game panel doesn't list go last, as given. */
+export function inGameFactionOrder<T extends { id: number }>(factions: readonly T[]): T[] {
+  const rank = (id: number) => {
+    const i = IN_GAME_FACTION_ORDER.indexOf(id);
+    return i === -1 ? IN_GAME_FACTION_ORDER.length : i;
+  };
+  return [...factions].sort((a, b) => rank(a.id) - rank(b.id));
+}
+
+export function factionNameOf(factions: readonly ShipTreeFaction[], factionID: number): string {
+  return factions.find((f) => f.id === factionID)?.name ?? '';
+}
+
+/** How many of `ships` the pilot can fly, out of how many. */
+export function flyableCount(
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>
+): { flyable: number; total: number } {
+  const flyable = ships.filter((s) => statuses.get(s.typeID)?.canFly).length;
+  return { flyable, total: ships.length };
+}
+
+/** The ladder's fly-state tabs: every hull, the ones the pilot can fly, the gaps. */
+export type FlyState = 'all' | 'canFly' | 'cantFly';
+
+/** What the ladder is narrowed to. Mastery tiers: 0 (can fly, no Mastery yet) to 5. */
+export interface ShipTreeFilter {
+  fly: FlyState;
+  mastery: ReadonlySet<number>;
+}
+
+export const NO_SHIP_TREE_FILTER: ShipTreeFilter = { fly: 'all', mastery: new Set() };
+
+export const MASTERY_TIERS = [0, 1, 2, 3, 4, 5] as const;
+
+/** Mastery is a can-fly property, so a Mastery pick means nothing under Can't fly. */
+export function masteryFilterActive(f: ShipTreeFilter): boolean {
+  return f.mastery.size > 0 && f.fly !== 'cantFly';
+}
+
+export function isShipTreeFiltered(f: ShipTreeFilter): boolean {
+  return f.fly !== 'all' || masteryFilterActive(f);
+}
+
+/** Whether a hull passes the filter. No status yet (skills unread) reads as can't fly. */
+export function hullMatches(status: ShipTreeHullStatus | undefined, f: ShipTreeFilter): boolean {
+  const canFly = status?.canFly === true;
+  if (f.fly === 'canFly' && !canFly) return false;
+  if (f.fly === 'cantFly' && canFly) return false;
+  if (masteryFilterActive(f)) return canFly && f.mastery.has(status?.mastery ?? 0);
+  return true;
+}
+
+/** A faction's own split, which no filter changes: the tabs' counts. */
+export function flyStateCounts(
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>
+): Record<FlyState, number> {
+  const canFly = ships.filter((s) => statuses.get(s.typeID)?.canFly).length;
+  return { all: ships.length, canFly, cantFly: ships.length - canFly };
+}
+
+/** Flyable hulls per Mastery tier, index 0 (None) to 5: what each Mastery chip would show. */
+export function masteryCounts(
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>
+): number[] {
+  const counts = MASTERY_TIERS.map(() => 0);
+  for (const s of ships) {
+    const status = statuses.get(s.typeID);
+    if (status?.canFly) counts[status.mastery] += 1;
+  }
+  return counts;
+}
+
+/** How many hulls of each faction pass the filter, in `factionIDs`' order. */
+export function factionMatchCounts(
+  factionIDs: readonly number[],
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>,
+  f: ShipTreeFilter
+): Map<number, number> {
+  const counts = new Map(factionIDs.map((id) => [id, 0]));
+  for (const s of ships) {
+    const n = counts.get(s.factionID);
+    if (n !== undefined && hullMatches(statuses.get(s.typeID), f)) counts.set(s.factionID, n + 1);
+  }
+  return counts;
+}
+
+export interface LadderSection {
+  def: ShipTreeNodeDef;
+  children: LadderSection[];
+}
+
+/**
+ * The ladder's shape: one section per main- and industry-line class in tree
+ * order, each specialised class (branch, capital, drop) nested under its
+ * parent. A class with no parent that isn't on a line — one the template
+ * doesn't know yet — gets its own section so it still shows up.
+ */
+export function ladderSections(defs: readonly ShipTreeNodeDef[]): LadderSection[] {
+  const build = (def: ShipTreeNodeDef): LadderSection => ({
+    def,
+    children: defs.filter((d) => d.parent === def.id && isNested(d)).map(build),
+  });
+  return defs.filter((d) => !isNested(d) || d.parent === null).map(build);
+}
+
+/** The class ids from a top-level section down to `classId`'s, or [] if it isn't there. */
+export function sectionPath(sections: readonly LadderSection[], classId: number): number[] {
+  for (const s of sections) {
+    if (s.def.id === classId) return [classId];
+    const below = sectionPath(s.children, classId);
+    if (below.length) return [s.def.id, ...below];
+  }
+  return [];
+}
+
+/** Every section's class id, nested ones too: what Expand all opens. */
+export function allSectionIds(sections: readonly LadderSection[]): number[] {
+  return sections.flatMap((s) => [s.def.id, ...allSectionIds(s.children)]);
+}
+
+function isNested(def: ShipTreeNodeDef): boolean {
+  return def.lane === 'branch' || def.lane === 'capital' || def.lane === 'drop';
+}
+
+export type TechMark = 't2' | 't3' | 'faction';
+
+/** A tile's corner, always shown, as in game: II, III, or ◇ for Navy and faction hulls. */
+export function techMark(ship: ShipTreeShip): TechMark | null {
+  if (ship.techLevel >= 3) return 't3';
+  if (ship.techLevel === 2) return 't2';
+  if (
+    ship.metaLevel >= 6 ||
+    STACKED_CLASSES.has(ship.treeGroupID) ||
+    PIRATE_FACTION_IDS.has(ship.factionID)
+  ) {
+    return 'faction';
+  }
+  return null;
+}
+
+export interface TraitGroup {
+  /** null: role bonuses. */
+  skillTypeID: number | null;
+  traits: ShipTreeTrait[];
+}
+
+/** A hull's bonuses grouped as the game shows them: per skill, then role bonuses, first-seen order. */
+export function traitGroups(traits: readonly ShipTreeTrait[]): TraitGroup[] {
+  const groups: TraitGroup[] = [];
+  for (const trait of traits) {
+    let group = groups.find((g) => g.skillTypeID === trait.skillTypeID);
+    if (!group) {
+      group = { skillTypeID: trait.skillTypeID, traits: [] };
+      groups.push(group);
+    }
+    group.traits.push(trait);
+  }
+  return groups;
+}
+
+/** Hulls whose name contains `query`, earliest match first; none for a blank query. */
+export function searchHulls(ships: readonly ShipTreeShip[], query: string): ShipTreeShip[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return ships
+    .map((ship) => ({ ship, at: ship.name.toLowerCase().indexOf(q) }))
+    .filter((hit) => hit.at >= 0)
+    .sort((a, b) => a.at - b.at || a.ship.name.localeCompare(b.ship.name))
+    .map((hit) => hit.ship);
+}
+
+/** Whether every skill a Mastery tier asks for is trained. An empty tier is never complete. */
+export function tierComplete(
+  tier: readonly SkillPrereq[] | undefined,
+  trainedLevel: (skillTypeID: number) => number
+): boolean {
+  return !!tier && tier.length > 0 && tier.every((p) => trainedLevel(p.skillTypeID) >= p.level);
+}
+
+/**
+ * Whether a still-incomplete tier is nonetheless fully covered by the target
+ * Skill Plan already — every skill this tier still needs trained is either
+ * trained or has a plan entry at that level or higher. Never true for an
+ * empty tier, and always false once `tierComplete` is true (nothing left to
+ * plan for).
+ */
+export function tierPlanned(
+  tier: readonly SkillPrereq[] | undefined,
+  trainedLevel: (skillTypeID: number) => number,
+  planEntries: readonly PlanEntry[]
+): boolean {
+  if (tierComplete(tier, trainedLevel)) return false;
+  return (
+    !!tier &&
+    tier.length > 0 &&
+    tier.every(
+      (p) =>
+        trainedLevel(p.skillTypeID) >= p.level ||
+        isEntryCovered(planEntries, p.skillTypeID, p.level)
+    )
+  );
+}
+
+/**
+ * What reaching Mastery `tier` (1–5) still needs: tiers I..N merged by skill
+ * at the highest level any of them asks, trained ones dropped.
+ */
+export function masteryTierEntries(
+  tiers: readonly (readonly SkillPrereq[])[],
+  tier: number,
+  trainedLevel: (skillTypeID: number) => number
+): PlanEntry[] {
+  const want = new Map<number, number>();
+  for (const bundle of tiers.slice(0, tier)) {
+    for (const p of bundle)
+      want.set(p.skillTypeID, Math.max(want.get(p.skillTypeID) ?? 0, p.level));
+  }
+  return [...want]
+    .filter(([id, level]) => trainedLevel(id) < level)
+    .map(([skillTypeID, targetLevel]) => ({ skillTypeID, targetLevel }));
+}
+
+/**
+ * `masteryTierEntries`, minus whatever the target Skill Plan already covers —
+ * what an "Add tier N" click would actually add. Empty when every untrained
+ * skill through this tier is already planned, even though `masteryTierEntries`
+ * itself is not.
+ */
+export function unplannedTierEntries(
+  tiers: readonly (readonly SkillPrereq[])[],
+  tier: number,
+  trainedLevel: (skillTypeID: number) => number,
+  planEntries: readonly PlanEntry[]
+): PlanEntry[] {
+  return masteryTierEntries(tiers, tier, trainedLevel).filter(
+    (e) => !isEntryCovered(planEntries, e.skillTypeID, e.targetLevel)
+  );
+}
+
+/** Owned originals and copies of one blueprint — one ESI row per copy (`quantity` is a sentinel). */
+export function ownedBlueprintSummary(
+  blueprints: readonly CharacterBlueprint[],
+  blueprintTypeID: number
+): { originals: number; copies: number } {
+  const mine = blueprints.filter((b) => b.type_id === blueprintTypeID);
+  const originals = mine.filter((b) => b.runs === -1).length;
+  return { originals, copies: mine.length - originals };
+}

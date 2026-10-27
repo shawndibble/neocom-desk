@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.neocomdesk.app",
+      "sha256_cert_fingerprints": [
+        "41:EF:BB:8E:04:2E:E8:F3:2A:4B:6F:07:D6:0D:7E:64:3B:71:12:3E:54:C7:11:2E:55:FF:0B:28:B7:76:D0:CE"
+      ]
+    }
+  }
+]

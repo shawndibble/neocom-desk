@@ -1,0 +1,5 @@
+# Scope decisions — Refining implant bonus now applies to reprocessing yield (issue #1227)
+
+_Recorded 2026-09-22 · issue #1227._
+
+- **The active clone's refining implant now multiplies reprocessing yield, reversing v1's exclusion.** The v1 reprocessing decision (`20260906-180034-reprocessing-v1-models-the-skills-and-states-the.md`, issue #537) explicitly left implants out. This issue reads the RX-801/802/804 (Zainou 'Beancounter' Reprocessing) implant typeIDs already fetched for skill training (`loadCharacterImplants`) and, per each implant's own ESI description ("bonus to ore and ice reprocessing yield"), applies the bonus only on the non-scrap branch of `reprocessingEfficiency` — mirroring #1226's `isScrap` gate, since Scrapmetal Processing is the only skill/implant that reaches scrap. A flat `REFINING_IMPLANT_TYPE_IDS` lookup (`src/engine/industry/reprocessing.ts`) is used rather than a general dogma-attribute read: only three implants exist and none can be fitted simultaneously (same implant slot), so a hardcoded table is simpler and matches the existing `SKILL_IDS`/`RIG_KIND_BONUS` pattern for small fixed sets.

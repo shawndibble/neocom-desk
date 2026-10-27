@@ -1,0 +1,273 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
+import { useAppraisal } from './useAppraisal';
+import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
+
+const appraisePaste = vi.hoisted(() => vi.fn());
+const compareHubs = vi.hoisted(() => vi.fn());
+vi.mock('./appraisalData', () => ({ appraisePaste, compareHubs }));
+
+function outcome(sell: number): AppraisalOutcome {
+  return {
+    appraisal: {
+      rows: [],
+      totals: {
+        buy: 0,
+        sell,
+        spread: sell,
+        unpricedRows: 0,
+        refine: 0,
+        refineUnpricedRows: 0,
+        cheapestBuy: sell,
+        cheapestBuyViaLp: 0,
+        volume: 0,
+        volumeUnknownRows: 0,
+      },
+      items: [],
+    },
+    unmatched: [],
+    implantBonusPct: 0,
+    refinesOreOrIce: false,
+    accountingLevel: null,
+    brokerRelationsLevel: null,
+    pricesUnreachable: false,
+  };
+}
+
+const COMPARE_ROWS: HubComparisonRow[] = [
+  { hub: DEFAULT_TRADE_HUB, buy: 90, sell: 100, unreachable: false },
+];
+
+beforeEach(() => {
+  appraisePaste.mockReset();
+  appraisePaste.mockResolvedValue(outcome(100));
+  compareHubs.mockReset();
+  compareHubs.mockResolvedValue(COMPARE_ROWS);
+});
+
+describe('useAppraisal', () => {
+  it('does not price anything until Appraise is pressed', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    await waitFor(() => expect(result.current.canAppraise).toBe(true));
+
+    expect(appraisePaste).not.toHaveBeenCalled();
+    expect(compareHubs).not.toHaveBeenCalled();
+    expect(result.current.result).toBeNull();
+    expect(result.current.compare).toBeNull();
+  });
+
+  it('prices the submitted text on Appraise', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+
+    await waitFor(() => expect(result.current.result).not.toBeNull());
+    expect(appraisePaste).toHaveBeenCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, null, {
+      force: false,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+  });
+
+  it('compares all 5 hubs alongside the primary appraisal', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+
+    await waitFor(() => expect(result.current.compare).not.toBeNull());
+    expect(compareHubs).toHaveBeenCalledWith('Tritanium 5', 90, { force: false });
+    expect(result.current.compare).toBe(COMPARE_ROWS);
+  });
+
+  /**
+   * The percentage is pure arithmetic and the hub's prices are usually
+   * cached, so making the pilot press the button again to see a figure that
+   * has already changed would just be a stale screen with a button on it.
+   */
+  it('re-prices on its own when the percentage changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ percent }) => useAppraisal(DEFAULT_TRADE_HUB, percent, null),
+      { initialProps: { percent: 90 } }
+    );
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+
+    rerender({ percent: 80 });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(2));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 80, null, {
+      force: false,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+  });
+
+  it("re-prices when the pilot's Refining Setup changes", async () => {
+    const { result, rerender } = renderHook(
+      ({ refining }) => useAppraisal(DEFAULT_TRADE_HUB, 90, 1, refining),
+      { initialProps: { refining: { stationRate: 0.5, taxRate: 0 } } }
+    );
+
+    act(() => result.current.setText('Veldspar 100'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+
+    rerender({ refining: { stationRate: 0.54, taxRate: 0.01 } });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(2));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Veldspar 100', DEFAULT_TRADE_HUB, 90, 1, {
+      force: false,
+      refining: { stationRate: 0.54, taxRate: 0.01 },
+    });
+  });
+
+  it('waits for the stored Refining Setup before pricing, so it is priced once', async () => {
+    const setup = { stationRate: 0.54, taxRate: 0.01 };
+    const { result, rerender } = renderHook(
+      ({ ready }) => useAppraisal(DEFAULT_TRADE_HUB, 90, 1, setup, ready),
+      { initialProps: { ready: false } }
+    );
+
+    act(() => result.current.setText('Veldspar 100'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(result.current.canAppraise).toBe(true));
+    expect(appraisePaste).not.toHaveBeenCalled();
+
+    rerender({ ready: true });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Veldspar 100', DEFAULT_TRADE_HUB, 90, 1, {
+      force: false,
+      refining: setup,
+    });
+  });
+
+  it('re-prices when the hub changes', async () => {
+    const amarr = getTradeHub('amarr')!;
+    const { result, rerender } = renderHook(({ hub }) => useAppraisal(hub, 90, null), {
+      initialProps: { hub: DEFAULT_TRADE_HUB },
+    });
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+
+    rerender({ hub: amarr });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(2));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', amarr, 90, null, {
+      force: false,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+    // The comparison is hub-invariant on its own, but AC #689 says changing
+    // the primary hub still recomputes it — which only holds because it
+    // shares this effect's dependency array, not because compareHubs itself
+    // takes the hub as an argument.
+    expect(compareHubs).toHaveBeenCalledTimes(2);
+  });
+
+  /** AC: switching the active Character recomputes every row from scratch. */
+  it('re-prices when the active Character changes', async () => {
+    const { result, rerender } = renderHook(
+      ({ characterId }) => useAppraisal(DEFAULT_TRADE_HUB, 90, characterId),
+      { initialProps: { characterId: null as number | null } }
+    );
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+
+    rerender({ characterId: 42 });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(2));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, 42, {
+      force: false,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+  });
+
+  it('bypasses the price cache on refresh, and only that once', async () => {
+    const { result, rerender } = renderHook(
+      ({ percent }) => useAppraisal(DEFAULT_TRADE_HUB, percent, null),
+      { initialProps: { percent: 90 } }
+    );
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(2));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, null, {
+      force: true,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+    expect(compareHubs).toHaveBeenLastCalledWith('Tritanium 5', 90, { force: true });
+
+    // The next ordinary re-price must not still be forcing a network round trip.
+    rerender({ percent: 80 });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(3));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 80, null, {
+      force: false,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+  });
+
+  it('drops the result on Clear', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(result.current.result).not.toBeNull());
+
+    act(() => result.current.clear());
+    await waitFor(() => expect(result.current.result).toBeNull());
+    expect(result.current.text).toBe('');
+    expect(result.current.compare).toBeNull();
+  });
+
+  it('reports a catalogue failure without losing the pasted text', async () => {
+    appraisePaste.mockRejectedValue(new Error('catalogue down'));
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    expect(result.current.result).toBeNull();
+    expect(result.current.compare).toBeNull();
+    expect(result.current.text).toBe('Tritanium 5');
+  });
+
+  /**
+   * `setText` then `appraise()` in the same handler would submit the text
+   * from *before* the pending `setText`, since `appraise` closes over the
+   * hook's own `text` state — the Quickbar-to-Appraisal handoff (#726) needs
+   * a single call that submits a given string directly.
+   */
+  it('submits given text directly via appraiseText', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.appraiseText('Tritanium\nRifter'));
+
+    expect(result.current.text).toBe('Tritanium\nRifter');
+    await waitFor(() => expect(result.current.result).not.toBeNull());
+    expect(appraisePaste).toHaveBeenCalledWith('Tritanium\nRifter', DEFAULT_TRADE_HUB, 90, null, {
+      force: false,
+      refining: { stationRate: 0.5, taxRate: 0 },
+    });
+  });
+
+  it('retries after a failure when Appraise is pressed again', async () => {
+    appraisePaste.mockRejectedValueOnce(new Error('catalogue down'));
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(result.current.failed).toBe(true));
+
+    act(() => result.current.appraise());
+    await waitFor(() => expect(result.current.result).not.toBeNull());
+    expect(result.current.failed).toBe(false);
+  });
+});

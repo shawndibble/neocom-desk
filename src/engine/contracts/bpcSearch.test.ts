@@ -1,0 +1,879 @@
+import { describe, it, expect } from 'vitest';
+import {
+  EMPTY_BPC_SEARCH_FILTER,
+  filterBpcContracts,
+  filterBpcSearchRows,
+  communityOfferToSearchRow,
+  contractRowToSearchRow,
+  ownedBlueprintToSearchRow,
+  blueprintOfferStats,
+  bpcPriceSummary,
+  cheapestByRegion,
+  effectivePrice,
+  iskPerRun,
+  listedBlueprintTypeOptions,
+  lpOfferToSearchRow,
+  marketBpoToSearchRow,
+  type BpcContractRow,
+  type MarketBpoInput,
+  type OwnedBlueprintInput,
+  blueprintSearchName,
+} from './bpcSearch';
+
+function row(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
+  return {
+    contractId: 1,
+    regionId: 10000002,
+    locationId: 60003760,
+    typeId: 32858,
+    price: 5_000_000,
+    isAuction: false,
+    me: 10,
+    te: 20,
+    runs: 5,
+    quantity: 1,
+    dateExpired: Date.parse('2026-09-10T00:00:00Z'),
+    isMultiType: false,
+    ...overrides,
+  };
+}
+
+describe('filterBpcContracts', () => {
+  it('returns every row for the empty filter', () => {
+    const rows = [row({ contractId: 1 }), row({ contractId: 2 })];
+    expect(filterBpcContracts(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
+  });
+
+  it('narrows to the given type ids', () => {
+    const rows = [row({ contractId: 1, typeId: 100 }), row({ contractId: 2, typeId: 200 })];
+    const filtered = filterBpcContracts(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      typeIds: new Set([200]),
+    });
+    expect(filtered.map((r) => r.contractId)).toEqual([2]);
+  });
+
+  it('an empty (but non-null) type id set matches nothing — a search with zero results, not "unfiltered"', () => {
+    const rows = [row({ contractId: 1, typeId: 100 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, typeIds: new Set() });
+    expect(filtered).toEqual([]);
+  });
+
+  it('narrows to one region', () => {
+    const rows = [
+      row({ contractId: 1, regionId: 10000002 }),
+      row({ contractId: 2, regionId: 10000043 }),
+    ];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000043 });
+    expect(filtered.map((r) => r.contractId)).toEqual([2]);
+  });
+
+  it('keeps only rows at or above the minimum ME', () => {
+    const rows = [row({ contractId: 1, me: 9 }), row({ contractId: 2, me: 10 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, minMe: 10 });
+    expect(filtered.map((r) => r.contractId)).toEqual([2]);
+  });
+
+  it('keeps only rows at or above the minimum TE', () => {
+    const rows = [row({ contractId: 1, te: 18 }), row({ contractId: 2, te: 20 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, minTe: 20 });
+    expect(filtered.map((r) => r.contractId)).toEqual([2]);
+  });
+
+  it('keeps only rows at or above the minimum runs', () => {
+    const rows = [row({ contractId: 1, runs: 1 }), row({ contractId: 2, runs: 10 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 10 });
+    expect(filtered.map((r) => r.contractId)).toEqual([2]);
+  });
+
+  it('keeps only rows at or below the maximum price', () => {
+    const rows = [
+      row({ contractId: 1, price: 1_000_000 }),
+      row({ contractId: 2, price: 9_000_000 }),
+    ];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 5_000_000 });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('an auction with no flat price is judged on its buyout against maxPrice', () => {
+    const rows = [
+      row({ contractId: 1, isAuction: true, price: 100, buyout: 9_000_000 }),
+      row({ contractId: 2, isAuction: true, price: 100, buyout: 1_000_000 }),
+    ];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 5_000_000 });
+    expect(filtered.map((r) => r.contractId)).toEqual([2]);
+  });
+
+  it('an auction with no buyout at all always passes maxPrice — its final price is unknown, not disqualifying', () => {
+    const rows = [row({ contractId: 1, isAuction: true, price: 100 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('a contract original (runs -1) passes minRuns — unlimited runs, not too few (issue #1241)', () => {
+    const rows = [row({ contractId: 1, runs: -1 }), row({ contractId: 2, runs: 5 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 10 });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('combines every active criterion (AND, not OR)', () => {
+    const rows = [
+      row({ contractId: 1, typeId: 100, regionId: 10000002, me: 10, te: 20, runs: 5 }),
+      row({ contractId: 2, typeId: 100, regionId: 10000043, me: 10, te: 20, runs: 5 }),
+      row({ contractId: 3, typeId: 100, regionId: 10000002, me: 0, te: 20, runs: 5 }),
+    ];
+    const filtered = filterBpcContracts(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      typeIds: new Set([100]),
+      regionId: 10000002,
+      minMe: 10,
+    });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('drops an auction row when hideAuctions is set', () => {
+    const rows = [
+      row({ contractId: 1, isAuction: false }),
+      row({ contractId: 2, isAuction: true }),
+    ];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, hideAuctions: true });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('drops a contract asking for PLEX when hidePlexRequests is set', () => {
+    const rows = [row({ contractId: 1 }), row({ contractId: 2, price: 0, requestedPlex: 1000 })];
+    const filtered = filterBpcContracts(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      hidePlexRequests: true,
+    });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('a maxPrice filter never excludes a PLEX-barter row — its 0 ISK price is not a real ceiling to judge', () => {
+    const rows = [row({ contractId: 1, price: 0, requestedPlex: 1_000_000 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+});
+
+function ownedInput(overrides: Partial<OwnedBlueprintInput> = {}): OwnedBlueprintInput {
+  return {
+    itemId: 1,
+    typeId: 32858,
+    runs: 5,
+    me: 10,
+    te: 20,
+    quantity: 1,
+    ...overrides,
+  };
+}
+
+describe('contractRowToSearchRow', () => {
+  it('carries the common fields plus the original contract row, unresolved location by default', () => {
+    const contract = row({ contractId: 7, typeId: 100, me: 10, te: 20, runs: 5, quantity: 2 });
+    expect(contractRowToSearchRow(contract)).toEqual({
+      source: 'contract',
+      typeId: 100,
+      me: 10,
+      te: 20,
+      runs: 5,
+      quantity: 2,
+      contract,
+      locationName: null,
+      space: null,
+      systemId: null,
+    });
+  });
+
+  it('carries a resolved location when given one', () => {
+    const contract = row({ contractId: 7 });
+    const result = contractRowToSearchRow(contract, {
+      name: 'Jita IV - Moon 4',
+      space: 'highsec',
+      systemId: 30000142,
+    });
+    expect(result.locationName).toBe('Jita IV - Moon 4');
+    expect(result.space).toBe('highsec');
+    expect(result.systemId).toBe(30000142);
+  });
+});
+
+describe('ownedBlueprintToSearchRow', () => {
+  it('maps an owned blueprint to the unified row shape', () => {
+    const bp = ownedInput({ itemId: 42, typeId: 100, runs: 5, me: 10, te: 20, quantity: 1 });
+    expect(ownedBlueprintToSearchRow(bp)).toEqual({
+      source: 'owned',
+      typeId: 100,
+      me: 10,
+      te: 20,
+      runs: 5,
+      quantity: 1,
+      itemId: 42,
+      locationName: null,
+      regionId: null,
+      space: null,
+      systemId: null,
+    });
+  });
+
+  it('carries a resolved location when given one', () => {
+    const bp = ownedInput({
+      itemId: 42,
+      locationName: 'J105443 - Some structure',
+      regionId: 11000001,
+      space: 'wormhole',
+      systemId: 31000001,
+    });
+    const result = ownedBlueprintToSearchRow(bp);
+    expect(result.systemId).toBe(31000001);
+    expect(result.locationName).toBe('J105443 - Some structure');
+    expect(result.source === 'owned' && result.regionId).toBe(11000001);
+    expect(result.space).toBe('wormhole');
+  });
+
+  /**
+   * ESI's `quantity` is a count only when positive — a single original comes
+   * back as -1 and a single copy as -2. Rendering either sentinel as-is would
+   * show "-2 owned" for one blueprint, so both normalize to the real count: 1.
+   */
+  it("normalizes ESI's single-original sentinel (-1) to a quantity of 1", () => {
+    expect(ownedBlueprintToSearchRow(ownedInput({ quantity: -1 })).quantity).toBe(1);
+  });
+
+  it("normalizes ESI's single-copy sentinel (-2) to a quantity of 1", () => {
+    expect(ownedBlueprintToSearchRow(ownedInput({ quantity: -2 })).quantity).toBe(1);
+  });
+
+  it('keeps a real stack count as-is', () => {
+    expect(ownedBlueprintToSearchRow(ownedInput({ quantity: 4 })).quantity).toBe(4);
+  });
+});
+
+function marketInput(overrides: Partial<MarketBpoInput> = {}): MarketBpoInput {
+  return {
+    orderId: 9001,
+    typeId: 32858,
+    regionId: 10000002,
+    locationId: 60003760,
+    price: 12_500_000,
+    volumeRemain: 3,
+    atHub: true,
+    locationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+    space: 'highsec',
+    systemId: 30000142,
+    ...overrides,
+  };
+}
+
+describe('marketBpoToSearchRow (issue #1241)', () => {
+  it('is an unresearched original: ME0/TE0, unlimited runs, the order volume as quantity', () => {
+    expect(marketBpoToSearchRow(marketInput())).toEqual({
+      source: 'market',
+      typeId: 32858,
+      me: 0,
+      te: 0,
+      runs: -1,
+      quantity: 3,
+      orderId: 9001,
+      price: 12_500_000,
+      regionId: 10000002,
+      locationId: 60003760,
+      atHub: true,
+      locationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      space: 'highsec',
+      systemId: 30000142,
+    });
+  });
+});
+
+describe('lpOfferToSearchRow', () => {
+  const lp = (overrides = {}) =>
+    lpOfferToSearchRow({
+      corporationId: 1000125,
+      offerId: 4321,
+      corpName: 'Sisters of EVE',
+      typeId: 33078,
+      quantity: 1,
+      price: 3_000_000,
+      iskCost: 1_000_000,
+      lpCost: 400,
+      lpPriced: true,
+      ...overrides,
+    });
+
+  it('is an unresearched copy with no known runs and no location', () => {
+    expect(lp()).toEqual({
+      source: 'lp',
+      typeId: 33078,
+      me: 0,
+      te: 0,
+      runs: null,
+      quantity: 1,
+      corporationId: 1000125,
+      offerId: 4321,
+      corpName: 'Sisters of EVE',
+      price: 3_000_000,
+      iskCost: 1_000_000,
+      lpCost: 400,
+      lpPriced: true,
+      regionId: null,
+      locationName: null,
+      space: null,
+      systemId: null,
+    });
+  });
+
+  it('judges maxPrice on its priced cost; a minRuns floor never excludes it (runs unknown)', () => {
+    const rows = [lp({ offerId: 1, price: 10 }), lp({ offerId: 2, price: 100 })];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      maxPrice: 50,
+      minRuns: 5,
+    });
+    expect(filtered.map((r) => (r.source === 'lp' ? r.offerId : null))).toEqual([1]);
+  });
+
+  it('drops out once a Region filter is set — an LP store has no region here', () => {
+    expect(filterBpcSearchRows([lp()], { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000002 })).toEqual(
+      []
+    );
+  });
+});
+
+describe('filterBpcSearchRows', () => {
+  it('judges a market BPO row on its order price against maxPrice (issue #1241)', () => {
+    const rows = [
+      marketBpoToSearchRow(marketInput({ orderId: 1, price: 10 })),
+      marketBpoToSearchRow(marketInput({ orderId: 2, price: 100 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 50 });
+    expect(filtered.map((r) => (r.source === 'market' ? r.orderId : null))).toEqual([1]);
+  });
+
+  it('matches a market BPO row on its own region, fails minMe, passes minRuns (issue #1241)', () => {
+    const rows = [marketBpoToSearchRow(marketInput({ regionId: 10000043 }))];
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000043 })).toEqual(
+      rows
+    );
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000002 })).toEqual(
+      []
+    );
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minMe: 1 })).toEqual([]);
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 500 })).toEqual(rows);
+  });
+
+  it('narrows to the given type ids across both sources', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, typeId: 100 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, typeId: 200 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      typeIds: new Set([200]),
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.typeId).toBe(200);
+  });
+
+  it('applies minMe and minTe uniformly to both sources', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, me: 5, te: 20 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, me: 10, te: 5 })),
+    ];
+    expect(
+      filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minMe: 10 }).map((r) => r.source)
+    ).toEqual(['owned']);
+    expect(
+      filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minTe: 10 }).map((r) => r.source)
+    ).toEqual(['contract']);
+  });
+
+  it('an owned BPO original (runs -1) always passes a minRuns filter — it offers unlimited runs, not too few', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1, runs: -1 }))];
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 50 })).toEqual(rows);
+  });
+
+  it('still applies minRuns normally to an owned copy with a real run count', () => {
+    const rows = [
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, runs: 3 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 2, runs: 10 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 10 });
+    expect(filtered.map((r) => (r.source === 'owned' ? r.itemId : null))).toEqual([2]);
+  });
+
+  it('a region filter excludes an owned row with no resolved region', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, regionId: 10000002 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      regionId: 10000002,
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['contract']);
+  });
+
+  it('a region filter matches an owned row once its location resolves to that region', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, regionId: 10000043 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, regionId: 10000002 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      regionId: 10000002,
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('a space filter narrows both sources to the checked kinds', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 }), { name: 'Jita', space: 'highsec' }),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, space: 'wormhole' })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      spaceKinds: new Set(['wormhole']),
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('a space filter excludes a row whose space could not be resolved', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1 }))];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      spaceKinds: new Set(['highsec', 'lowsec', 'nullsec', 'wormhole']),
+    });
+    expect(filtered).toEqual([]);
+  });
+
+  it('no space filter (null) passes every row regardless of resolved space', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, space: 'nullsec' })),
+    ];
+    expect(filterBpcSearchRows(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
+  });
+
+  it('a jump range keeps only rows in an allowed system, across every source', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 }), {
+        name: 'Jita',
+        space: 'highsec',
+        systemId: 30000142,
+      }),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, systemId: 30002187 })),
+      marketBpoToSearchRow(marketInput({ orderId: 1, systemId: 30000144 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      allowedSystems: new Set([30000142, 30000144]),
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['contract', 'market']);
+  });
+
+  it('a jump range excludes a row this app cannot place', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1 }))];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      allowedSystems: new Set([30000142]),
+    });
+    expect(filtered).toEqual([]);
+  });
+
+  it('no jump range (null) passes an unplaced row', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1 }))];
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, allowedSystems: null })).toEqual(
+      rows
+    );
+  });
+
+  it('a maxPrice filter never excludes an owned row — it has no price to judge', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, price: 9_000_000 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('a maxPrice filter never excludes a PLEX-barter contract row — its 0 ISK price is not a real ceiling to judge', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, price: 0, requestedPlex: 1_000_000 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered).toEqual(rows);
+  });
+
+  it('returns every row for the empty filter', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    expect(filterBpcSearchRows(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
+  });
+
+  it('drops an auction contract row when hideAuctions is set, never an owned row', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, isAuction: true })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, hideAuctions: true });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('drops a contract row asking for PLEX when hidePlexRequests is set, never an owned row', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, price: 0, requestedPlex: 1000 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      hidePlexRequests: true,
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+});
+
+describe('listedBlueprintTypeOptions', () => {
+  it('names and de-duplicates the distinct type ids present in the rows', () => {
+    const rows = [
+      row({ contractId: 1, typeId: 100 }),
+      row({ contractId: 2, typeId: 100 }),
+      row({ contractId: 3, typeId: 200 }),
+    ];
+    const names = new Map([
+      [100, 'Rifter Blueprint'],
+      [200, 'Catalyst Blueprint'],
+    ]);
+    expect(listedBlueprintTypeOptions(rows, names)).toEqual([
+      { typeId: 200, name: 'Catalyst Blueprint' },
+      { typeId: 100, name: 'Rifter Blueprint' },
+    ]);
+  });
+
+  it('falls back to #typeId when the SDE has no name for it', () => {
+    const rows = [row({ contractId: 1, typeId: 999 })];
+    expect(listedBlueprintTypeOptions(rows, new Map())).toEqual([{ typeId: 999, name: '#999' }]);
+  });
+
+  it('is empty given no rows', () => {
+    expect(listedBlueprintTypeOptions([], new Map())).toEqual([]);
+  });
+
+  it('accepts any typeId-bearing rows, not just contract rows — e.g. owned blueprints merged in', () => {
+    const names = new Map([[300, 'Vexor Blueprint']]);
+    expect(listedBlueprintTypeOptions([{ typeId: 300 }], names)).toEqual([
+      { typeId: 300, name: 'Vexor Blueprint' },
+    ]);
+  });
+});
+
+describe('effectivePrice', () => {
+  it('is the plain price for an item exchange', () => {
+    expect(effectivePrice(row({ price: 5_000_000 }))).toBe(5_000_000);
+  });
+
+  it('is the buyout for an auction that has one — what the row actually costs', () => {
+    expect(effectivePrice(row({ isAuction: true, price: 1_000, buyout: 9_000_000 }))).toBe(
+      9_000_000
+    );
+  });
+
+  it('falls back to the starting bid for an auction with no buyout', () => {
+    expect(effectivePrice(row({ isAuction: true, price: 1_000 }))).toBe(1_000);
+  });
+});
+
+describe('iskPerRun', () => {
+  it('divides the asking price by the run count', () => {
+    expect(iskPerRun(10_000_000, 10, 1)).toBe(1_000_000);
+  });
+
+  it('divides by every copy the ask buys, not one — a 3-copy lot is one purchase', () => {
+    expect(iskPerRun(30_000_000, 10, 3)).toBe(1_000_000);
+  });
+
+  it('has no rate for a BPO, whose runs are unlimited rather than a number', () => {
+    expect(iskPerRun(10_000_000, -1, 1)).toBeNull();
+  });
+
+  it('has no rate for a copy stating zero runs — never an infinite one', () => {
+    expect(iskPerRun(10_000_000, 0, 1)).toBeNull();
+  });
+
+  it('has no rate for a listing stating no copies', () => {
+    expect(iskPerRun(10_000_000, 10, 0)).toBeNull();
+  });
+
+  it('has no rate for a zero-ISK price — a barter contract, not a genuine free listing (issue #1080)', () => {
+    expect(iskPerRun(0, 10, 1)).toBeNull();
+  });
+
+  it('has no rate for a negative price either — malformed data, same as any other bad-data path', () => {
+    expect(iskPerRun(-5, 10, 1)).toBeNull();
+  });
+
+  it("has no rate for a multi-type row — its price is the whole contract's, not this copy's (issue #1076)", () => {
+    expect(iskPerRun(10_000_000, 10, 1, true)).toBeNull();
+  });
+
+  it('still rates a single-type row when isMultiType is omitted or false', () => {
+    expect(iskPerRun(10_000_000, 10, 1, false)).toBe(1_000_000);
+    expect(iskPerRun(10_000_000, 10, 1)).toBe(1_000_000);
+  });
+});
+
+describe('blueprintOfferStats', () => {
+  it('counts offers and keeps the best ME/TE per type', () => {
+    const stats = blueprintOfferStats([
+      row({ contractId: 1, typeId: 100, me: 8, te: 14, price: 9_000_000 }),
+      row({ contractId: 2, typeId: 100, me: 10, te: 20, price: 12_000_000 }),
+      row({ contractId: 3, typeId: 200, me: 4, te: 6, price: 3_000_000 }),
+    ]);
+    expect(stats.get(100)).toEqual({ offerCount: 2, bestMe: 10, bestTe: 20 });
+    expect(stats.get(200)).toEqual({ offerCount: 1, bestMe: 4, bestTe: 6 });
+  });
+
+  it('takes the best ME and the best TE independently — they need not come from one row', () => {
+    const stats = blueprintOfferStats([
+      row({ contractId: 1, typeId: 100, me: 10, te: 0 }),
+      row({ contractId: 2, typeId: 100, me: 0, te: 20 }),
+    ]);
+    expect(stats.get(100)?.bestMe).toBe(10);
+    expect(stats.get(100)?.bestTe).toBe(20);
+  });
+
+  it('counts one offer per contract row, not per copy — a quantity-3 contract is one offer', () => {
+    const stats = blueprintOfferStats([row({ contractId: 1, typeId: 100, quantity: 3 })]);
+    expect(stats.get(100)?.offerCount).toBe(1);
+  });
+
+  it('is empty given no rows', () => {
+    expect(blueprintOfferStats([]).size).toBe(0);
+  });
+});
+
+describe('bpcPriceSummary', () => {
+  it('summarises count, cheapest, median and the best ME/TE on offer', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 5_000_000, me: 10, te: 12 }),
+      row({ contractId: 2, price: 1_000_000, me: 2, te: 20 }),
+      row({ contractId: 3, price: 3_000_000, me: 4, te: 4 }),
+    ]);
+    expect(summary).toEqual({
+      offerCount: 3,
+      cheapest: 1_000_000,
+      cheapestPerRun: 200_000,
+      median: 3_000_000,
+      bestMe: 10,
+      bestTe: 20,
+    });
+  });
+
+  it('averages the middle pair for an even number of offers', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 1_000_000 }),
+      row({ contractId: 2, price: 2_000_000 }),
+      row({ contractId: 3, price: 3_000_000 }),
+      row({ contractId: 4, price: 6_000_000 }),
+    ]);
+    expect(summary.median).toBe(2_500_000);
+  });
+
+  it('reports nulls rather than zeroes for no offers — a missing price is not a free one', () => {
+    expect(bpcPriceSummary([])).toEqual({
+      offerCount: 0,
+      cheapest: null,
+      cheapestPerRun: null,
+      median: null,
+      bestMe: null,
+      bestTe: null,
+    });
+  });
+
+  it('excludes a zero-price (barter) row from cheapest/median, but still counts it as an offer (issue #1080)', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 0, me: 10, te: 18 }),
+      row({ contractId: 2, price: 1_000_000, me: 5, te: 5 }),
+      row({ contractId: 3, price: 3_000_000, me: 2, te: 2 }),
+    ]);
+    expect(summary).toEqual({
+      offerCount: 3,
+      cheapest: 1_000_000,
+      cheapestPerRun: 200_000,
+      median: 2_000_000,
+      bestMe: 10,
+      bestTe: 18,
+    });
+  });
+
+  it('reports cheapest/median as null when every offer is unpriced', () => {
+    const summary = bpcPriceSummary([row({ price: 0 }), row({ price: -1 })]);
+    expect(summary.cheapest).toBeNull();
+    expect(summary.median).toBeNull();
+    expect(summary.offerCount).toBe(2);
+  });
+
+  it('ranks a 10-run copy over a cheaper-looking 1-run copy once ISK/run is the yardstick (issue #1782)', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 6_000_000, runs: 1, quantity: 1 }),
+      row({ contractId: 2, price: 9_500_000, runs: 10, quantity: 1 }),
+      row({ contractId: 3, price: 12_000_000, runs: 10, quantity: 1 }),
+    ]);
+    expect(summary.cheapest).toBe(6_000_000);
+    expect(summary.cheapestPerRun).toBe(950_000);
+  });
+
+  it('excludes an unlimited-run (BPO, runs: -1) row from the per-run comparison entirely', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 1, runs: -1, quantity: 1 }),
+      row({ contractId: 2, price: 5_000_000, runs: 5, quantity: 1 }),
+    ]);
+    expect(summary.cheapestPerRun).toBe(1_000_000);
+  });
+
+  it('reports cheapestPerRun as null when no row yields a finite rate', () => {
+    const summary = bpcPriceSummary([
+      row({ price: 5_000_000, runs: -1 }),
+      row({ price: 5_000_000, isMultiType: true }),
+    ]);
+    expect(summary.cheapestPerRun).toBeNull();
+  });
+});
+
+describe('cheapestByRegion', () => {
+  it('gives one entry per region, cheapest first', () => {
+    expect(
+      cheapestByRegion([
+        row({ contractId: 1, regionId: 10000002, price: 4_000_000 }),
+        row({ contractId: 2, regionId: 10000002, price: 2_000_000 }),
+        row({ contractId: 3, regionId: 10000043, price: 1_000_000 }),
+      ])
+    ).toEqual([
+      { regionId: 10000043, cheapest: 1_000_000, offerCount: 1 },
+      { regionId: 10000002, cheapest: 2_000_000, offerCount: 2 },
+    ]);
+  });
+
+  it('prices an auction at its buyout', () => {
+    expect(
+      cheapestByRegion([
+        row({ contractId: 1, regionId: 10000002, isAuction: true, price: 1, buyout: 7_000_000 }),
+      ])
+    ).toEqual([{ regionId: 10000002, cheapest: 7_000_000, offerCount: 1 }]);
+  });
+
+  it('is empty given no rows', () => {
+    expect(cheapestByRegion([])).toEqual([]);
+  });
+
+  it('never lets a zero-price (barter) row win cheapest, though it still counts as an offer (issue #1080)', () => {
+    expect(
+      cheapestByRegion([
+        row({ contractId: 1, regionId: 10000002, price: 0 }),
+        row({ contractId: 2, regionId: 10000002, price: 4_000_000 }),
+      ])
+    ).toEqual([{ regionId: 10000002, cheapest: 4_000_000, offerCount: 2 }]);
+  });
+
+  it('omits a region whose only offers are unpriced, rather than reporting it free', () => {
+    expect(cheapestByRegion([row({ contractId: 1, regionId: 10000002, price: 0 })])).toEqual([]);
+  });
+});
+
+describe('blueprintSearchName', () => {
+  it('drops the trailing "Blueprint", which every name in the catalogue shares', () => {
+    expect(blueprintSearchName('Buzzard Blueprint')).toBe('Buzzard');
+    expect(blueprintSearchName('Heron Navy Issue Blueprint')).toBe('Heron Navy Issue');
+  });
+
+  it('leaves a name that does not end in Blueprint alone', () => {
+    expect(blueprintSearchName('Buzzard')).toBe('Buzzard');
+    expect(blueprintSearchName('#12345')).toBe('#12345');
+  });
+
+  it('keeps an interior "Blueprint" — only the trailing word is noise', () => {
+    expect(blueprintSearchName('Blueprint Efficiency Blueprint')).toBe('Blueprint Efficiency');
+  });
+
+  /**
+   * Stripping is what stops a one-letter query matching all ~2,900 types
+   * through the shared word, but it must never strip a name down to nothing —
+   * that would make the entry unmatchable rather than merely over-matched.
+   */
+  it('keeps the name when stripping would empty it', () => {
+    expect(blueprintSearchName('Blueprint')).toBe('Blueprint');
+  });
+
+  it('is case- and space-insensitive about the suffix', () => {
+    expect(blueprintSearchName('Buzzard BLUEPRINT')).toBe('Buzzard');
+    expect(blueprintSearchName('Buzzard blueprint  ')).toBe('Buzzard');
+  });
+});
+
+describe('communityOfferToSearchRow', () => {
+  const offer = (overrides = {}) =>
+    communityOfferToSearchRow({
+      uid: 'u1',
+      memberName: 'Ann',
+      typeId: 33078,
+      me: 10,
+      te: 20,
+      runs: 5,
+      quantity: 1,
+      communities: [{ id: 'c1', name: 'Alpha' }],
+      stale: false,
+      asOf: 1,
+      locationName: 'Jita IV',
+      systemName: 'Jita',
+      ...overrides,
+    });
+
+  it('is a free row named for the Member, with no resolvable region, space or system', () => {
+    expect(offer()).toMatchObject({
+      source: 'community',
+      price: 0,
+      memberName: 'Ann',
+      me: 10,
+      runs: 5,
+      regionId: null,
+      space: null,
+      systemId: null,
+    });
+  });
+
+  it('takes its system, region and space from a resolved system, so a Jump Range can place it', () => {
+    const row = communityOfferToSearchRow(
+      {
+        uid: 'u1',
+        memberName: 'Ann',
+        typeId: 33078,
+        me: 10,
+        te: 20,
+        runs: 5,
+        quantity: 1,
+        communities: [{ id: 'c1', name: 'Alpha' }],
+        stale: false,
+        asOf: 1,
+        locationName: 'Rens 6 - Moon 8 - Brutor Tribe Treasury',
+        systemName: 'Rens',
+      },
+      { id: 30002510, name: 'Rens', security: 0.9, regionId: 10000030 }
+    );
+    expect(row).toMatchObject({ systemId: 30002510, regionId: 10000030, space: 'highsec' });
+  });
+
+  it('passes a max price and min runs filter for a shared original, never hides a stale row', () => {
+    const rows = [offer({ runs: -1 }), offer({ stale: true })];
+    const kept = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      maxPrice: 1,
+      minRuns: 99,
+    });
+    expect(kept).toEqual([rows[0]]);
+    expect(
+      filterBpcSearchRows([rows[1]], { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 })
+    ).toHaveLength(1);
+  });
+});

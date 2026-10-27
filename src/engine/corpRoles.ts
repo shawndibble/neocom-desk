@@ -1,0 +1,281 @@
+/**
+ * In-game corporation roles, mapped to what the Character can actually *see*.
+ *
+ * Corp data is gated on a second axis the rest of the app doesn't have: CCP
+ * role-gates the corporation endpoints server-side, so a Character can grant
+ * every corp scope and still take a permanent 403. Scopes are knowable
+ * offline; roles are not — which is why they get their own read
+ * (`features/corp/roles.ts`) and this mapping.
+ *
+ * Capability, never a raw role string, is what leaves this module. Consumers
+ * ask "can this Character read the corp wallet", not "is this Character an
+ * Accountant" — so the Junior_Accountant case and the Director case below are
+ * decided once, here, instead of at every call site.
+ *
+ * Pure and free of any ESI import by design (CLAUDE.md): plain strings in,
+ * booleans out. `src/engine` must never reach `esi/registry.ts`, so the
+ * capability -> *scope* half of the story lives in `features/corp/corpScopes.ts`
+ * instead.
+ */
+
+/** What a Character can read, independent of which scopes were granted. */
+export interface CorpCapabilities {
+  /** GET /corporations/{id}/wallets, /wallets/{division}/journal, /transactions. */
+  canReadWallet: boolean;
+  /** GET /corporations/{id}/structures. */
+  canReadStructures: boolean;
+  /**
+   * GET /corporation/{id}/mining/extractions — the moon-chunk schedule.
+   *
+   * Separate from `canReadStructures` even though the two share a role: they
+   * are separate reads behind separate scopes, and a capability names what a
+   * Character can *read*. Folding the moon drill into "structures" would make
+   * that capability stand for something it does not, and would leave the moon
+   * panel with nothing of its own to gate on.
+   */
+  canReadMoonExtractions: boolean;
+  /**
+   * GET /corporation/{id}/mining/observers and /observers/{observer_id} —
+   * who mined how much of what at the corporation's refineries, by
+   * character, ore type and day (issue #4058, epic #4055).
+   *
+   * Not folded into `canReadMoonExtractions` although both read through the
+   * same scope: the extraction schedule answers to Station_Manager, the
+   * ledger to Accountant, so either can hold one without the other.
+   */
+  canReadMiningLedger: boolean;
+  /** GET /corporations/{id}/membertracking. */
+  canReadMembers: boolean;
+  /** GET /corporations/{id}/industry/jobs. */
+  canReadIndustry: boolean;
+  /**
+   * GET /corporations/{id}/assets — every item the corporation owns, across its
+   * seven hangar divisions and every office and structure it holds.
+   *
+   * Director-only, like `canReadMembers`: the in-game Hangar_Take/Hangar_Query
+   * roles open a division in the client but open nothing in ESI.
+   */
+  canReadAssets: boolean;
+  /**
+   * GET /corporations/{id}/blueprints — the corporation's own BPOs/BPCs
+   * (issue #839). Director-only, like `canReadAssets` and `canReadMembers`:
+   * `x-required-roles` on this route is `["Director"]` alone.
+   */
+  canReadBlueprints: boolean;
+  /**
+   * GET /corporations/{id}/starbases and /starbases/{starbase_id} — each
+   * tower's state, fuel and strontium (issue #4610). Director-only:
+   * `x-required-roles` is ["Director"] on both.
+   */
+  canReadStarbases: boolean;
+  /**
+   * GET /corporations/{id}/customs_offices — tax rates and reinforce window of
+   * each customs office (issue #4611). Director-only: `x-required-roles` is
+   * ["Director"] alone.
+   */
+  canReadCustomsOffices: boolean;
+  /**
+   * GET /corporations/{id}/roles/history, /titles and /members/titles — who holds
+   * sensitive roles, their titles, and recent role changes (issue #4613).
+   * Director-only: `x-required-roles` on all three is ["Director"] alone.
+   */
+  canReadRoleAudit: boolean;
+  /**
+   * GET /corporations/{id}/contracts — contracts issued by or assigned to the
+   * corporation (issue #4607). ESI names no required role, so every member
+   * holds this; it alone never opens a corp surface (`hasAnyCorpCapability`).
+   */
+  canReadContracts: boolean;
+  /**
+   * GET /corporations/{id}/orders — the corporation's open market orders
+   * (issue #4612). `x-required-roles` is Accountant or Trader.
+   */
+  canReadOrders: boolean;
+  /**
+   * GET /corporations/{id}/divisions — the names the corp gave its wallet and
+   * hangar divisions (issue #4756). Director-only: `x-required-roles` is
+   * ["Director"] alone, narrower than the wallet it labels, so an Accountant
+   * reads the wallet and takes a 403 here.
+   */
+  canReadDivisions: boolean;
+  /**
+   * GET /corporations/{id}/structures/skyhooks and /sovereignty-hubs detail —
+   * raid windows and reagent bays (issue #4775). Station_Manager per
+   * `x-required-roles`, behind a scope the structure list does not use.
+   */
+  canReadSkyhooks: boolean;
+  /**
+   * Officer gate for SRP Claims (Director or Accountant), like canEdit in functions/src/corpTaxBook.ts.
+   * Not an ESI read; the callables re-check live. Settings need a Director.
+   */
+  canManageSrp: boolean;
+  /**
+   * SRP Settings: Director alone, like `decideRoles`' settings gate. A role check needing only
+   * the roles scope, so a Director whose older grant lacks the titles scope (which
+   * `canReadRoleAudit` needs) still sees Settings.
+   */
+  canConfigureSrp: boolean;
+}
+
+export type CorpCapability = keyof CorpCapabilities;
+
+/**
+ * Every capability, for consumers that must handle each one exhaustively
+ * (`corpScopes.ts` maps each to the scopes it needs). Typed as
+ * `readonly CorpCapability[]` so adding a field to `CorpCapabilities` without
+ * adding it here fails `corpRoles.test.ts` rather than silently dropping a
+ * capability from the scope prompt.
+ */
+export const CORP_CAPABILITIES: readonly CorpCapability[] = [
+  'canReadWallet',
+  'canReadStructures',
+  'canReadMoonExtractions',
+  'canReadMiningLedger',
+  'canReadMembers',
+  'canReadIndustry',
+  'canReadAssets',
+  'canReadBlueprints',
+  'canReadStarbases',
+  'canReadCustomsOffices',
+  'canReadRoleAudit',
+  'canReadContracts',
+  'canReadOrders',
+  'canReadDivisions',
+  'canReadSkyhooks',
+  'canManageSrp',
+  'canConfigureSrp',
+];
+
+/** The answer for a Character with no roles — and the shape of "not loaded yet". */
+export const NO_CORP_CAPABILITIES: CorpCapabilities = {
+  canReadWallet: false,
+  canReadStructures: false,
+  canReadMoonExtractions: false,
+  canReadMiningLedger: false,
+  canReadMembers: false,
+  canReadIndustry: false,
+  canReadAssets: false,
+  canReadBlueprints: false,
+  canReadStarbases: false,
+  canReadCustomsOffices: false,
+  canReadRoleAudit: false,
+  canReadContracts: false,
+  canReadOrders: false,
+  canReadDivisions: false,
+  canReadSkyhooks: false,
+  canManageSrp: false,
+  canConfigureSrp: false,
+};
+
+/**
+ * Which roles each capability's endpoints accept, transcribed from the
+ * `x-required-roles` extension on https://esi.evetech.net/meta/openapi.json —
+ * ESI's own machine-readable statement of the server-side gate, not a guess
+ * from prose. Any one of the listed roles suffices.
+ *
+ * `Director` is deliberately absent here and handled separately below.
+ */
+const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> = {
+  canReadWallet: ['Accountant', 'Junior_Accountant'],
+  canReadStructures: ['Station_Manager'],
+  // Same role as the structure list, straight from `x-required-roles` on the
+  // mining/extractions path. Issue #296's brief calls this role
+  // `Structure_manager`; that string appears nowhere in ESI's spec, and using
+  // it would have denied the moon board to every user entitled to it.
+  canReadMoonExtractions: ['Station_Manager'],
+  // `x-required-roles` on both mining/observers paths is ["Accountant"] alone:
+  // unlike the wallet, Junior_Accountant does not open it.
+  canReadMiningLedger: ['Accountant'],
+  canReadMembers: [],
+  canReadIndustry: ['Factory_Manager'],
+  // `x-required-roles` on /corporations/{id}/assets is ["Director"] alone, so
+  // this is empty for the same reason `canReadMembers` is: the Director clause
+  // below already satisfies it, and repeating the string here would say there
+  // is a second way in when there is not.
+  canReadAssets: [],
+  // Same story on /corporations/{id}/blueprints: `x-required-roles` is
+  // ["Director"] alone (issue #839's own brief guessed Director/
+  // Factory_Manager, which the live spec does not confirm).
+  canReadBlueprints: [],
+  // ['Director'] alone on both starbases paths, so the Director clause covers it.
+  canReadStarbases: [],
+  // `x-required-roles` on customs_offices is ["Director"] alone.
+  canReadCustomsOffices: [],
+  // `x-required-roles` on roles/history, titles and members/titles is ["Director"] alone.
+  canReadRoleAudit: [],
+  // No `x-required-roles` on the contracts routes: handled as "every member" in `corpCapabilities`.
+  canReadContracts: [],
+  // `x-required-roles` on /corporations/{id}/orders: Accountant or Trader.
+  canReadOrders: ['Accountant', 'Trader'],
+  // `x-required-roles` on /corporations/{id}/divisions is ["Director"] alone.
+  canReadDivisions: [],
+  // `x-required-roles` on the skyhook routes and the hub detail is Station_Manager.
+  canReadSkyhooks: ['Station_Manager'],
+  // Director (via the Director clause) or Accountant; Junior_Accountant only views the Tax Book.
+  canManageSrp: ['Accountant'],
+  // Director alone, via the Director clause.
+  canConfigureSrp: [],
+};
+
+/** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */
+const OPEN_TO_MEMBERS: ReadonlySet<CorpCapability> = new Set(['canReadContracts']);
+
+/**
+ * A Director implicitly holds every other role in game, and ESI does **not**
+ * expand that in the response — a Director's `roles` array is frequently just
+ * `["Director"]`. Listing it as an ordinary entry against each capability in the
+ * table above would deny corp data to precisely the users who have all of it the
+ * moment a new capability forgot to repeat it, so it satisfies every capability
+ * on its own instead. It is also the only role `membertracking` and the corp
+ * asset list accept, which is why `canReadMembers` and `canReadAssets` have no
+ * other entry.
+ */
+const DIRECTOR = 'Director';
+
+/**
+ * What `roles` lets this Character read.
+ *
+ * Takes the corporation-wide role list only — never `roles_at_hq` /
+ * `roles_at_base` / `roles_at_other`, whose grants are scoped to one office and
+ * do not open the corporation-wide endpoints these capabilities stand for.
+ *
+ * Unrecognised strings are ignored rather than rejected: CCP extends the role
+ * enum without notice, and a role this app has never heard of must not stop the
+ * ones it has from resolving.
+ */
+export function corpCapabilities(roles: readonly string[]): CorpCapabilities {
+  const held = new Set(roles);
+  const isDirector = held.has(DIRECTOR);
+
+  const capabilities = { ...NO_CORP_CAPABILITIES };
+  for (const capability of CORP_CAPABILITIES) {
+    capabilities[capability] =
+      isDirector ||
+      OPEN_TO_MEMBERS.has(capability) ||
+      ROLES_FOR_CAPABILITY[capability].some((role) => held.has(role));
+  }
+  return capabilities;
+}
+
+/**
+ * Who may open the Corp Tax Book (epic #4055, D8): Director (the CEO holds
+ * every role), Accountant and Junior_Accountant. Distinct from
+ * `canReadMiningLedger`, which gates *syncing* because ESI's observer ledger
+ * wants Accountant; a Junior_Accountant views what an Accountant synced.
+ * Mirrors `decideRoles` in `functions/src/corpTaxBook.ts`, which is the real gate.
+ */
+export function canViewCorpTaxBook(roles: readonly string[]): boolean {
+  return roles.some((r) => r === DIRECTOR || r === 'Accountant' || r === 'Junior_Accountant');
+}
+
+/**
+ * Whether any corp surface is readable at all. The rendering rule keys off
+ * this: a Character with no capability gets no corp UI, not a locked one
+ * (GLOSSARY.md round 35).
+ */
+export function hasAnyCorpCapability(capabilities: CorpCapabilities): boolean {
+  // A capability open to every member says nothing about this Character's roles.
+  return CORP_CAPABILITIES.some(
+    (capability) => capabilities[capability] && !OPEN_TO_MEMBERS.has(capability)
+  );
+}

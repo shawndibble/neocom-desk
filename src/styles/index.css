@@ -1,0 +1,1694 @@
+@import 'tailwindcss' source(none);
+
+/*
+ * Opts every same-origin navigation — including the reload that applies a
+ * waiting service-worker update at boot (bootUpdate.ts) or from Settings →
+ * Update app — into the browser's native cross-document View Transition,
+ * where supported (Chromium). The browser cross-fades the outgoing and
+ * incoming documents itself; the boot screen (BootCoverHost) is already on
+ * screen underneath. This rule is a no-op in browsers without support. Gated on
+ * prefers-reduced-motion since @view-transition offers no built-in opt-out.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+
+/*
+ * The same-document route change has no rule here: `Layout`'s `useRouteFade`
+ * animates the outlet directly, because restarting a CSS animation would mean
+ * remounting the outlet and several routes must keep their instance across a
+ * pathname change. Why it is a plain fade rather than a view transition is
+ * `docs/DESIGN.md` §6b.
+ */
+
+/*
+ * Scan only the app source. Tailwind's automatic content detection walks every
+ * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
+ * name emits real utility rules into the shipped stylesheet.
+ */
+/*
+ * `touch:` — the input is a finger (`(pointer: coarse)`), whatever the width.
+ * The 36px touch tier is "below `md` or `touch:`", so a touch tablet or laptop
+ * is treated as touch (DESIGN.md §3, §6c). Declared here, after Tailwind's own
+ * variants, so `md:h-7 touch:h-9` lets `touch:` win above `md` on a coarse
+ * pointer while a fine pointer never matches it.
+ */
+@custom-variant touch (@media (pointer: coarse));
+
+@source '../../index.html';
+@source '../../src';
+
+/* Design tokens — see docs/DESIGN.md. Photon-UI-inspired dark theme. */
+@theme {
+  /* `xl` at 1250px rather than Tailwind's 1280px default, so the wide
+     two-column layouts (Fittings, Build Plans, Overview and others) split a little sooner. */
+  --breakpoint-xl: 78.125rem;
+
+  /* Background layers (darkest -> lightest) */
+  --color-bg: #0a0e14;
+  --color-panel: #11161d;
+  --color-panel-2: #161d27;
+
+  /* Hairlines (always 1px) */
+  --color-line: #2a3442;
+  --color-line-bright: #586c86; /* 3.15:1 vs panel-2 — also the resting input border (issue #1491) */
+
+  /* Text hierarchy */
+  --color-text: #dee7ee;
+  --color-text-dim: #95a3b4;
+  --color-text-faint: #5c6b7a; /* decorative only — below AA */
+
+  /* Accent (interactive/selected) */
+  --color-accent: #57c7f4;
+  --color-accent-dim: #2e7da3; /* borders/fills only — not text */
+  --color-accent-contrast: #04181f; /* text on accent fills */
+  --color-selection: #276c8d; /* text-selection fill only — accent-dim darkened for 4.64:1 with `text` (issue #1491) */
+
+  /* Status */
+  --color-success: #5fd584;
+  --color-warning: #f5b94a;
+  --color-danger: #ff7369;
+
+  /* ISK / market deltas */
+  --color-isk-pos: #4fd98a;
+  --color-isk-neg: #ff8177;
+
+  /*
+   * Chart series that needs a hue of its own. One token, not a palette: the
+   * Price History activity strip draws traded volume and the daily order
+   * count together, and the order count is the only series in the app with no
+   * neighbouring hue it can borrow honestly. `warning` was the obvious amber
+   * and is wrong — a data series painted in the caution tone reads as an
+   * alert about the data. A clock-kind hue is equally wrong: those name where
+   * a *deadline* came from (DESIGN.md §1), and reusing one here would give a
+   * single hue two meanings, which is the fork that section refuses.
+   *
+   * Sits clear of `warning` (#f5b94a) on the orange side and of
+   * `kind-industry-job` (#e59a55) on the saturated side. Extend this comment
+   * rather than adding a sibling: the next series that wants a colour should
+   * first try to be told apart by form — dash, bar against line — the way the
+   * moving average is.
+   */
+  --color-series-order-count: #e9a13b;
+
+  /*
+   * Plan a move: one hue per pickup location, so a location's rail dot, its
+   * share of the split bar and its footer segment match from the picker to
+   * the plan. NOMINAL identity only (the location's name is always written
+   * beside it), never a status. Four slots, reused in order after that. Clear
+   * of accent (interactive) and of every status tone.
+   */
+  --color-pickup-1: #6ea8fe;
+  --color-pickup-2: #b79cff;
+  --color-pickup-3: #4fd1b5;
+  --color-pickup-4: #f08fb8;
+
+  /*
+   * The PI Map's "what if I add a planet" colour: what a planet type you do
+   * not have would unlock. One meaning, drawn only beside a non-colour marker
+   * (a "+" on the tile, "what if" under the planet, words in the accessible
+   * name). Clear of accent (interactive), warning (the gold picks) and every
+   * status tone.
+   */
+  --color-map-whatif: #ff79c6;
+
+  /*
+   * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
+   * magnitude and not status: these say which part of the app a deadline came
+   * from. Every hue sits at least 20 ΔE (CIE76) from accent/success/warning/danger
+   * so none of them can be mistaken for a status tone, and all ten clear AA on
+   * bg, panel and panel-2 because they colour countdown text, not just dots.
+   * mercenary-den (#c88be9, orchid) fills the gap between skill-training and
+   * contract-expiry: 59 ΔE from the nearest status tone, 25 from skill-training.
+   */
+  --color-kind-calendar-event: #7e9cfd;
+  --color-kind-skill-training: #d8beff;
+  --color-kind-industry-job: #e59a55;
+  --color-kind-planet-extraction: #6fdecd;
+  --color-kind-mercenary-den: #c88be9;
+  --color-kind-moon-chunk: #a0a8b8;
+  --color-kind-skyhook-raid: #d9a7a0;
+  --color-kind-contract-expiry: #f2879f;
+  --color-kind-order-expiry: #c9d96a;
+  --color-kind-skill-plan: #e0d0a8;
+  /*
+   * Kind of space on a pilot's kill activity and the Local list. Highsec and
+   * lowsec keep success and warning; nullsec and wormhole get their own hues so
+   * nullsec stops reading as the Threat verdict's red. Same values as
+   * kind-calendar-event / kind-skill-training, so the AA ratios in DESIGN.md hold.
+   */
+  --color-space-nullsec: #7e9cfd;
+  --color-space-wormhole: #d8beff;
+
+  /*
+   * Damage types — a second NOMINAL set, and a deliberate exception to the
+   * clock-kind rule above (DESIGN.md §1): these are the game's own EM/
+   * Thermal/Kinetic/Explosive colours, kept as-is because every EVE player
+   * already reads them that way. Added with the Fittings section — see
+   * docs/context/decisions/20260924-150509-fittings-section-a-fitter-after-all.md.
+   * Only for damage types (resist bars, damage profiles, breakdowns), never
+   * for status; a red meaning "over budget" stays `danger`, never `dmg-*`.
+   */
+  --color-dmg-em: #4f9fe8;
+  --color-dmg-thermal: #e0524a;
+  --color-dmg-kinetic: #a3adb8;
+  --color-dmg-explosive: #e8a13d;
+
+  /*
+   * Ship Tree golds — the game's own, part of the Ship Tree's documented
+   * exception (DESIGN.md §1 "Ship Tree (ISIS)"). `mastery-elite` marks
+   * Mastery V and nothing else; `omega` marks "needs an Omega clone" and
+   * nothing else. Never for status or decoration.
+   */
+  --color-mastery-elite: #e8b84a;
+  --color-omega: #d9a72c;
+
+  /*
+   * Blueprint copy — the Assets pages' BPC badge and nothing else (DESIGN.md
+   * §1 "Blueprints"). Its BPO sibling is plain `accent`. >= 34 deltaE from
+   * every other colour token, 7.3:1 on panel-2.
+   */
+  --color-blueprint-copy: #ea86ea;
+
+  /* Type — system stack approximating EVE's condensed sans */
+  --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Deliberately the `utilities` layer, not `components`. A cascade layer beats
+ * every earlier layer whatever the specificity, so from `components` these
+ * rules lose to the `px-3`/`text-right`/`whitespace-nowrap` utilities on the
+ * very cells they need to re-lay-out. Inside `utilities` ordinary specificity
+ * applies again and `.dt-stacked td` (0,1,1) wins over a bare utility (0,1,0).
+ */
+/*
+ * Tap feedback and zoom delay (DESIGN.md §6c). The browser's grey tap flash is
+ * off — the `active:` colour step from the shared recipe is the feedback — and
+ * `manipulation` drops the double-tap-zoom delay on everything tappable while
+ * keeping pan and pinch. In the `base` layer so a `touch-none` grip still wins.
+ */
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a,
+  [role='button'],
+  input,
+  select,
+  textarea,
+  summary,
+  label {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  /*
+   * The tab bar's scroll frame (`components/ui/tabStyles.ts`).
+   *
+   * Tailwind can express the scrolling; it cannot express hiding the
+   * scrollbar, which is the whole reason this lives here. A native horizontal
+   * scrollbar is drawn in the bottom few pixels of its scroller — the exact
+   * pixels the bar's hairline baseline and the active tab's accent underline
+   * occupy — so on a narrow desktop window it would appear across the one
+   * part of the control that carries state. The tab cut off at the edge is
+   * the affordance instead, which is how a tab bar signals more on a phone
+   * anyway; `Tabs` also scrolls the selected tab into view, so a selection
+   * that changes without a click never lands off-screen.
+   */
+  .tab-scroller {
+    scrollbar-width: none;
+  }
+
+  .tab-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * Edge fade: a bar that overflows fades out at whichever end still has
+   * tabs beyond it (right at rest, left once scrolled, both mid-way), so a
+   * tab cut off at the edge reads as "swipe for more" and not as a clipped
+   * label. Driven by the scroller's own scroll position, so a bar that fits
+   * keeps both fades at their 0 initial value and is untouched. Browsers
+   * without scroll-driven animations just get the cut-off tab.
+   */
+  @property --tab-fade-l {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @property --tab-fade-r {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @keyframes tab-fade-left {
+    0% {
+      --tab-fade-l: 0px;
+    }
+    4%,
+    100% {
+      --tab-fade-l: 1.5rem;
+    }
+  }
+
+  @keyframes tab-fade-right {
+    0%,
+    96% {
+      --tab-fade-r: 1.5rem;
+    }
+    100% {
+      --tab-fade-r: 0px;
+    }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .tab-scroller {
+      /* A tab scrolled into view stops clear of the fade, not under it. */
+      scroll-padding-inline: 1.5rem;
+      animation:
+        tab-fade-left linear both,
+        tab-fade-right linear both;
+      animation-timeline: scroll(self inline);
+      mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 var(--tab-fade-l),
+        #000 calc(100% - var(--tab-fade-r)),
+        transparent
+      );
+    }
+  }
+
+  /*
+   * Responsive collapse for `DataTable` (docs/DESIGN.md §4).
+   *
+   * Below `sm` a dense table cannot be a table: measured on a 390px viewport,
+   * a six-column row is 505px wide — it scrolls the whole page sideways *and*
+   * squashes the name column to 74px, shattering one item name over five
+   * lines. So each row becomes a stacked card: the `dt-primary` cell titles
+   * it, every other cell prints its column header into a left gutter via
+   * `data-label`.
+   *
+   * The markup is identical at every width — no `sm:hidden`/`hidden sm:flex`
+   * pair, nothing rendered twice — which is the same rule the Assets rework
+   * follows. `display: block` drops the implicit table roles in real
+   * browsers, so `DataTable` sets them explicitly.
+   *
+   * What switches the card on is a class, `dt-stacked`, not a media query
+   * (ADR 0017). `DataTable` sets it below `sm` (`useIsPhone`, the same 40rem
+   * this block used to query), so every table stacks exactly where it always
+   * did; a table can also ask to stack by its own width (`stacked`), which
+   * no media query can see — Hauling, whose panel is narrower than a phone's
+   * on a tablet with the rail open. `dt-stack` alone still marks a table that
+   * can stack.
+   *
+   * Two opt-in phone features are the deliberate exceptions to that rule,
+   * and only for the tables that ask for them: `mobileSort` renders an
+   * `sm:hidden` sort picker (the stack hides the header row and every sort
+   * button in it, and CSS cannot turn a hidden `<th>` into a picker), and
+   * `groupBy` changes the rows themselves via `useIsPhone` (a collapsed
+   * group's members are not rendered at all, which no stylesheet can do
+   * without also hiding them from desktop). The dense card below is pure
+   * CSS again.
+   */
+  .dt-stacked,
+  .dt-stacked tbody,
+  .dt-stacked tr,
+  .dt-stacked td {
+    display: block;
+  }
+
+  /* Redundant once every cell is labelled, but kept for header semantics. */
+  .dt-stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /*
+   * A column flexbox, so the title cell can be hoisted to the top of the
+   * card without moving in the markup. The table keeps its own reading
+   * order at every width — a ledger still leads with its date column on
+   * desktop while the card is titled by what the row actually is.
+   */
+  .dt-stacked tr {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .dt-stacked td {
+    position: relative;
+    padding: 0.125rem 0 0.125rem 7rem;
+    /* The label below is out of flow, so an empty cell would be only its
+       own 4px of padding tall and its label would print over the next
+       cell's. Reserves the label's own box: top offset + its pinned
+       line-height + bottom padding. Inert on any cell with content, which
+       is always taller. */
+    min-height: 1.25rem;
+    /* Beats the `text-right`/`whitespace-nowrap` utilities on the cell:
+       nothing may force a card wider than the screen. */
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* A fixed-width column's `truncate` is for the table; a card has room. */
+  .dt-stacked td.truncate {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .dt-stacked td::before {
+    content: attr(data-label);
+    position: absolute;
+    top: 0.125rem;
+    left: 0;
+    width: 6.5rem;
+    overflow: hidden;
+    font-size: 0.625rem;
+    /* Pinned rather than inherited, so the `min-height` above is arithmetic
+       and not a guess at each browser's `normal`. */
+    line-height: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-dim);
+  }
+
+  /* The cell that names the row: first in the card, no label, no gutter. */
+  .dt-stacked td.dt-primary {
+    order: -1;
+    padding-left: 0;
+    padding-bottom: 0.25rem;
+    font-weight: 600;
+  }
+
+  .dt-stacked td.dt-primary::before {
+    content: none;
+  }
+
+  /* A labelless text-button cell (Active Jobs' "Log production"): its own
+     row at the card's foot, button at its natural width and a 36px tap
+     height. Not `dt-actions`, whose fixed 36px square is for an icon button
+     and squeezes a labelled one into a sliver. */
+  .dt-stacked td.dt-action-row {
+    padding-left: 0;
+    padding-top: 0.25rem;
+    min-height: 0;
+  }
+
+  .dt-stacked td.dt-action-row::before {
+    content: none;
+  }
+
+  .dt-stacked td.dt-action-row:empty {
+    display: none;
+  }
+
+  .dt-stacked td.dt-action-row button {
+    min-height: 2.25rem;
+  }
+
+  /*
+   * Two-value-per-row cards (`DataTable`'s `stackColumns={2}`).
+   *
+   * The default card is a single column with each label pinned into a 7rem
+   * left gutter, which reads well for four or five fields and wastes half
+   * the screen on a table of short figures — the Price History day list is
+   * four numbers, none wider than a price. Here the card becomes a
+   * two-track grid and each label moves *above* its value instead of
+   * beside it: a 6.5rem gutter inside a half-width column would leave a
+   * price barely 60px to render in.
+   *
+   * The primary cell still titles the card, now across both tracks. Grid
+   * places the rest in source order, so a table choosing this puts its
+   * widest field where a wrap costs least.
+   */
+  .dt-stacked.dt-stack-2col tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.75rem;
+  }
+
+  .dt-stacked.dt-stack-2col td {
+    padding-left: 0;
+    /* The label is in flow here, so the empty-cell reservation the pinned
+       version needs does not apply — the label itself gives the cell its
+       height. */
+    min-height: 0;
+  }
+
+  .dt-stacked.dt-stack-2col td::before {
+    position: static;
+    display: block;
+    width: auto;
+    margin-bottom: 0.0625rem;
+  }
+
+  .dt-stacked.dt-stack-2col td.dt-primary {
+    grid-column: 1 / -1;
+  }
+
+  /* A decorative corner cell (e.g. an edit-affordance icon): pinned out of
+     the card's label/value flow entirely, rather than rendering as its own
+     row with a blank label. */
+  .dt-stacked td.dt-corner {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    padding: 0;
+  }
+
+  .dt-stacked td.dt-corner::before {
+    content: none;
+  }
+
+  /* `cardCorner: 'start'` (e.g. a row-selection checkbox): the card's own
+     top-left corner instead of top-right — its own control, not a value
+     about the row, so it reads as the card's leading affordance rather
+     than crowding the actions/expand cluster on the right. */
+  .dt-stacked td.dt-corner-start {
+    right: auto;
+    left: 0.75rem;
+  }
+
+  /* The title clears a start-pinned corner the same way it clears the
+     actions button below — first line reads to its right, not under it. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-corner-start) td.dt-primary {
+    padding-left: 1.75rem;
+  }
+
+  /* The More actions button (`rowMoreActions`): a control, not a field —
+     no label gutter. `width: auto` overrides the cell's own `w-0` (kept
+     for desktop's tight actions column, see the JSX): a zero-width flowed
+     cell left the button clipped past the card's right edge and scrolled
+     the whole page sideways (#1708). Where the cell actually sits is
+     layout-specific — the dense card (below) places it inline; every
+     other layout pins it to the card's own corner next. */
+  .dt-stacked td.dt-actions {
+    padding: 0;
+    min-height: 0;
+    width: auto;
+  }
+
+  .dt-stacked td.dt-actions::before {
+    content: none;
+  }
+
+  /* Labelled cards (`stackColumns={1}`/`{2}`): pinned to the card's own
+     top-right corner instead of flowing as a bottom row, which used to
+     leave a dead ~40px strip under a title-height's worth of nothing. The
+     button is the 36px touch tier (`sm`, DESIGN.md §3) here regardless of
+     its own (desktop-oriented) size prop, and centred on the title line
+     (card padding + half a title line, minus half the button) so the first
+     row reads as one row rather than a title beside a 36px block. */
+  .dt-stacked:not(.dt-stack-dense) td.dt-actions {
+    position: absolute;
+    top: 0;
+    right: 0.75rem;
+  }
+
+  .dt-stacked:not(.dt-stack-dense) td.dt-actions button {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  /* The expand/collapse disclosure chevron (`expandableRow`): pinned beside
+     the actions button rather than flowing as its own unlabelled line at
+     the card's bottom, where it used to sit. */
+  .dt-stacked:not(.dt-stack-dense) td.dt-disclosure {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    padding: 0;
+    /* Overrides the cell's own `w-0` (kept for desktop's tight trailing
+       column, see the JSX) — left at `w-0` the icon rendered from this
+       corner anchor with no box to fill and overlapped the actions
+       button beside it, the same #1708 mistake `dt-actions` above notes. */
+    width: auto;
+  }
+
+  .dt-stacked:not(.dt-stack-dense) td.dt-disclosure::before {
+    content: none;
+  }
+
+  /* A row with both a corner value and the actions button: one corner
+     control per position, not two overlapping. The button keeps the
+     card's actual top-right corner; the value shifts left to clear it.
+     Excludes `dt-corner-start`, which already sits in the opposite
+     corner and needs no shift. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner:not(.dt-corner-start) {
+    right: 3.75rem;
+  }
+
+  /* A row with both a disclosure chevron and the actions button: the
+     chevron sits immediately left of the button rather than under it. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-disclosure {
+    right: 3.75rem;
+  }
+
+  /* All three corner controls at once (a card with `cardCorner`,
+     `expandableRow` and `rowMoreActions` together, e.g. HaulingPanel):
+     the corner value shifts further left again to clear the chevron,
+     which otherwise shares its offset and sits on top of it. Excludes
+     `dt-corner-start`, which sits in the opposite corner (top-left) and
+     needs no shift — `right` and `left` set together on the same
+     absolutely-positioned, `width: auto` element would fight each other
+     for the box's width instead of just moving it. */
+  .dt-stacked:not(.dt-stack-dense)
+    tr:has(> td.dt-actions):has(> td.dt-disclosure)
+    td.dt-corner:not(.dt-corner-start) {
+    right: 5.25rem;
+  }
+
+  /* The card title truncates before the pinned button rather than
+     running under it. Only when the row actually has one. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-primary {
+    padding-right: 3rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Both a disclosure chevron and the actions button pinned in the corner
+     need more clearance than the button alone. */
+  .dt-stacked:not(.dt-stack-dense) tr:has(> td.dt-actions):has(> td.dt-disclosure) td.dt-primary {
+    padding-right: 5rem;
+  }
+
+  /*
+   * The dense card (`stackLayout="dense"`): two lines instead of one field
+   * per line, for a long list a reader scans rather than reads — a courier
+   * search returns hundreds of offers, and the labelled card fits four on
+   * a screen.
+   *
+   * Line one is the title (`dt-primary`) with the headline figure
+   * (`dt-corner`) in flow at its right; line two is every other cell
+   * inline, small and dim, `·`-separated, with no column labels —
+   * `stackAffix` (`data-stack-before`/`-after`) says what a bare number is.
+   *
+   * A wrapping row flexbox. `tr::before` is a flex item too: a zero-height,
+   * full-basis one ordered between the two lines forces the break, so the
+   * meta cells can never ride up beside the title however short they are.
+   */
+  .dt-stacked.dt-stack-dense tr {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    /* About one no-break space wide, so the gap before each `·` matches
+       the one the separator prints after it. */
+    column-gap: 0.1875rem;
+    row-gap: 0.125rem;
+    /* A thumb target even for a card whose two lines are short. */
+    min-height: 36px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .dt-stacked.dt-stack-dense tr::before {
+    content: '';
+    order: 0;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-primary {
+    order: -2;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+    /* A size step above the meta line's 0.6875rem — this is the card's
+       title, not just another field. */
+    font-size: 0.8125rem;
+  }
+
+  /* Undoes the decorative corner's absolute pin: here it is content, and
+     an absolute cell would overlap a title long enough to reach it. */
+  .dt-stacked.dt-stack-dense td.dt-corner {
+    position: static;
+    order: -1;
+    flex: none;
+    margin-left: auto;
+    padding: 0 0 0 0.5rem;
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 700;
+    /* The card's headline figure — a size step above the title, two above
+       the meta line, so it reads as the number the whole card is for. */
+    font-size: 0.9375rem;
+  }
+
+  /* On line one, after the title and headline figure. */
+  .dt-stacked.dt-stack-dense td.dt-actions {
+    order: -1;
+    flex: none;
+    align-self: center;
+  }
+
+  /* The ⋮ is a 36px thumb target, taller than the title: it stretches line one
+     to its own height, and the title and figure (baseline-aligned like the
+     rest of the row) would ride at the top of it while the ⋮ and a leading
+     tick box centre. Centre them too, so line one reads as one line. */
+  .dt-stacked.dt-stack-dense tr:has(> td.dt-actions) :is(td.dt-primary, td.dt-corner) {
+    align-self: center;
+  }
+
+  /* The leading expand caret (`expandableRow.leadingIcon`) is a desktop cue:
+     a card is itself the tap target. */
+  .dt-stacked .dt-lead-caret {
+    display: none;
+  }
+
+  /* Opt-in (`dt-actions-pinned-only` on the table, Market order book): the
+     actions button pinned to the card's right edge and centred across both
+     lines, the way a `start` edge control is on the left. In flow on line
+     one its 36px touch target makes that line 36px tall and pushes the meta
+     line a button's height below the title; pinned, the card is two text
+     lines. Not the default because the other dense tables with actions
+     (Hauling, Contract Search, Mining Tax) carry chevrons and `end` edge
+     boxes this has not been checked against. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    transform: translateY(-50%);
+  }
+
+  /* The headline figure stays in flow on line one (a long ISK price would
+     not fit a pinned corner's fixed width). The button flush to the card's edge, a 36px gutter of its own (the
+     row's right padding) the card's text never enters: both lines live
+     in the width left of it. Line one's figure keeps a hair of air. Line two
+     (a buy's five cells and an 8-figure quantity nearly fill it) can never
+     overlap the button or wrap on a wider font: the Range cell, the last
+     one, takes what is left (`flex-basis: 0`, so it never forces the wrap
+     itself) and ellipsizes only in that worst case; it needs room for a few
+     characters (`min-width`) before it wraps instead. The row, Range
+     included, stays in the expanded detail's reach via the column picker. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-actions {
+    right: 0;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) {
+    padding-right: 2.25rem;
+    padding-left: 0.5rem;
+    column-gap: 0.1875rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only tr:has(> td.dt-actions) td.dt-corner {
+    margin-right: 0.25rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-meta[data-label='Range'] {
+    flex: 1 1 0;
+    min-width: 2.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* No expand chevron on the card: line two runs the card's full width (a
+     buy's five meta cells, an 8-figure quantity reach the button's edge), so
+     a chevron beside the pinned button either rides line one, off the
+     button's axis, or lands on the meta text. The whole card is the tap
+     target (§6c phone cards) and the ⋮ is the one visible control. */
+  .dt-stacked.dt-stack-dense.dt-actions-pinned-only td.dt-disclosure {
+    display: none;
+  }
+
+  /* The row menu's ⋮ in the text colour, not the shared plain button's dim
+     one: this table's only visible way into the row menu. `!important`
+     because the button's own `text-text-dim` utility sits in a later layer. */
+  .dt-actions-pinned-only td.dt-actions button {
+    color: var(--color-text) !important;
+  }
+
+  /* The expand chevron (`expandableRow`) joins the actions on line one.
+     Left to the base card rules it flowed onto the meta line carrying the
+     labelled card's 7rem label gutter, pushing the first meta value a
+     third of the way across. A hidden icon (`hideIcon`) leaves the cell
+     empty: it takes no room at all then. */
+  .dt-stacked.dt-stack-dense td.dt-disclosure {
+    order: -1;
+    flex: none;
+    align-self: center;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-disclosure::before {
+    content: none;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-disclosure:empty {
+    display: none;
+  }
+
+  /* A control at the card's edge (`stackEdge`), kept off the 11px meta
+     line where it would be neither tappable nor readable. */
+  .dt-stacked.dt-stack-dense td.dt-edge {
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-edge::before {
+    content: none;
+  }
+
+  /* `start` (a tick box): pinned to the left edge, centred across both
+     lines; the row pads its left side to clear it. */
+  .dt-stacked.dt-stack-dense td.dt-edge-start {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+  }
+
+  .dt-stacked.dt-stack-dense tr:has(> td.dt-edge-start) {
+    padding-left: 2.5rem;
+  }
+
+  /* A coarse pointer grows the tick box's label to 36px (`touch:size-9`):
+     0.75rem + 2.25rem of box needs more than the 2.5rem above to leave a gap
+     before the text. */
+  @media (pointer: coarse) {
+    .dt-stacked.dt-stack-dense:not(.dt-dense-tight, .dt-dense-lead) tr:has(> td.dt-edge-start) {
+      padding-left: 3.5rem;
+    }
+  }
+
+  /* `end` (a quantity box): closes the meta line, pushed to its right end.
+     Not pinned across both lines like `start`: a box that wide would take
+     its width from the title line too, and the title needs it more.
+     `baseline` (the row's own alignment), not `center`: the box's text
+     lines up with the meta text, so the two read as one line rather than
+     the meta floating at the top of a box-tall line. */
+  .dt-stacked.dt-stack-dense td.dt-edge-end {
+    order: 2;
+    flex: none;
+    align-self: baseline;
+    margin-left: auto;
+    padding-left: 0.5rem;
+  }
+
+  /* `below` (Thera's signature pair and Copy): a third line of its own,
+     after the meta line and anything closing it. Full basis, so it can
+     never share a line with the meta values however short they are. */
+  .dt-stacked.dt-stack-dense td.dt-edge-below {
+    order: 3;
+    flex: 1 1 100%;
+    padding-top: 0.25rem;
+  }
+
+  /* Opt-in (`dt-dense-tight` on the table, Hauling; BPC Sourcing too, with
+     no tick or `end` box, its ISK figure too wide for `dt-actions-pinned-only`'s
+     corner): a card whose tick box,
+     title, headline figure and More actions button all sit on line one,
+     centred on each other, with the `end` box closing line two. Without it
+     the button's 36px box made line one button-tall (the title riding its
+     top edge, the ⋮ below it), the tick box sat centred across both lines
+     rather than beside the name, and the box's height pushed the meta text
+     to its baseline, a gap's width under the title. */
+
+  /* The tick box joins line one ahead of the title, pulled back into the
+     left padding the row already keeps for a `start` edge. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-start {
+    position: static;
+    transform: none;
+    order: -3;
+    flex: none;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin-left: -1.5rem;
+    margin-right: 0.5rem;
+    /* Over the title, so the coarse pointer's 36px label overhang takes the tap. */
+    z-index: 1;
+  }
+
+  /* Never shrunk to the cell: the overhang is the touch target, centred on
+     the box so it neither touches the name nor adds height to line one. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-start > label {
+    flex: none;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-dense-tight tr:has(> td.dt-edge-start) {
+    padding-left: 2.25rem;
+  }
+
+  /* The button keeps its 36px touch target, but negative margins stop it
+     counting towards line one's height. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-actions {
+    margin-block: -0.75rem;
+  }
+
+  /* Line two centres on the box rather than sitting on its baseline. The
+     box stacks above the button's overhanging touch target, so a tap on
+     its top edge reaches the box. */
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-meta,
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-end {
+    align-self: center;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-dense-tight td.dt-edge-end {
+    position: relative;
+    z-index: 1;
+    /* A tighter gap than the base rule's, so a 360px phone still fits the
+       meta line and the box on one line. */
+    padding-left: 0.25rem;
+  }
+
+  /* Opt-in (`dt-dense-lead` on the table, Mining Tax): the tick box joins
+     line one ahead of the title with a small gap, and the row keeps its
+     ordinary left padding, so line two starts at the card's left edge under
+     the box rather than indented to the title. The cell is only the box
+     wide; a coarse pointer's 36px label overflows it evenly into the
+     padding around, so the touch target grows without the box carrying
+     visible empty space. Stacked above the title (z-index) so the overhang
+     takes the tap. An unselectable row keeps the empty cell, so every date
+     in the list shares one left edge. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-edge-start) {
+    padding-left: 0.75rem;
+  }
+
+  .dt-stacked.dt-stack-dense.dt-dense-lead td.dt-edge-start {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    order: -3;
+    flex: none;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.25rem;
+    z-index: 1;
+  }
+
+  /* Never shrunk to the cell: the overhang is the touch target. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead td.dt-edge-start > label {
+    flex: none;
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-meta {
+    order: 1;
+    display: inline;
+    /* Inline field: a column's table width/align would leave a gap before the next `·`. */
+    width: auto;
+    text-align: left;
+    padding: 0;
+    min-height: 0;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--color-text-dim);
+  }
+
+  /* A meta cell's own content can be a control (`PriceSourceTag`'s
+     tooltip button) rather than bare text — its border/padding/background
+     read fine as a standalone pill in the labelled card or the desktop
+     table, but stacked inline with three or four `·`-separated fields it
+     is both too wide (crowds the line into wrapping) and visually heavier
+     than its neighbours despite matching their font size. Strip the
+     button chrome down to plain colored text here; the per-source color
+     class it already carries still says which source it is. */
+  .dt-stacked.dt-stack-dense td.dt-meta button {
+    border: none;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  /* The separator and the affix share the one pseudo-element a cell has
+     before its value. The space after `·` is a no-break space: an ordinary
+     one at the start of the cell's line would be collapsed away. Every
+     gutter-label property of the base rule is reset, not just `content`. */
+  .dt-stacked.dt-stack-dense td.dt-meta::before {
+    content: '\00b7\00a0' attr(data-stack-before);
+    position: static;
+    width: auto;
+    overflow: visible;
+    font-size: inherit;
+    line-height: inherit;
+    text-overflow: clip;
+    white-space: pre;
+    letter-spacing: normal;
+    text-transform: none;
+    /* Pinned, not inherited: a sorted cell bolds its value, and a bold
+       separator would read as part of it. */
+    font-weight: 400;
+    color: var(--color-text-dim);
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-meta.dt-meta-first::before {
+    content: attr(data-stack-before);
+  }
+
+  .dt-stacked.dt-stack-dense td.dt-meta::after {
+    content: attr(data-stack-after);
+    white-space: pre;
+  }
+
+  /* A cell holding only a value the card can do without (`data-dense-omit`):
+     a "none" dash reads as "none" in a table column, but on the meta line it
+     would print one more "· —" between real values, so the card leaves it
+     out — likewise a word the card already says another way. */
+  .dt-stacked.dt-stack-dense td.dt-meta:has(> [data-dense-omit]:only-child) {
+    display: none;
+  }
+
+  /* `dt-meta-first` is fixed at render, so when the leading meta cells are
+     omitted the first one left standing would open the line with a stray
+     "·". Hand it the first cell's no-separator content instead, past one or
+     two omitted cells (Contacts' Type, then an empty Corp / Alliance). */
+  .dt-stacked.dt-stack-dense
+    td.dt-meta-first:has(> [data-dense-omit]:only-child)
+    + td.dt-meta:not(:has(> [data-dense-omit]:only-child))::before,
+  .dt-stacked.dt-stack-dense
+    td.dt-meta-first:has(> [data-dense-omit]:only-child)
+    + td.dt-meta:has(> [data-dense-omit]:only-child)
+    + td.dt-meta::before {
+    content: attr(data-stack-before);
+  }
+
+  /* No header row to show the sort on, so the sorted value itself says it
+     — its trailing affix too, which inherits; the leading separator and
+     affix stay dim (pinned above). The corner never
+     changes: it is already the bold figure. */
+  .dt-stacked.dt-stack-dense td.dt-meta.dt-sorted {
+    color: var(--color-text);
+    font-weight: 700;
+  }
+
+  /*
+   * Phone grouping (`groupBy`): a toggle row whose one full-width cell is
+   * the button, in either card. It is not a field, so it gets neither the
+   * labelled card's gutter and `data-label` slot nor the dense card's
+   * line-break pseudo — the button carries its own padding and 48px height.
+   */
+  .dt-stacked tr.dt-group-header {
+    padding: 0;
+  }
+
+  /*
+   * A full-width note row (`fullWidthRow`): one unlabelled cell, so it keeps
+   * the card's own padding but drops the field gutter and label slot.
+   */
+  .dt-stacked tr.dt-full-row > td {
+    flex: 1 1 100%;
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked tr.dt-full-row > td::before,
+  .dt-stacked.dt-stack-dense tr.dt-full-row::before {
+    content: none;
+  }
+
+  /*
+   * A row's expand detail (`DataTable`'s `expandableRow`): the same
+   * full-width, no-gutter, no-label cell as the group-header toggle above —
+   * it is prose/sub-fields of its own, not one more labelled field of the
+   * row it hangs off.
+   */
+  .dt-stacked tr.dt-row-detail {
+    padding: 0;
+  }
+
+  /*
+   * `.dt-stacked.dt-stack-2col tr` (above) sets every `tr` under it —
+   * including this one — to a two-track `display: grid`, at equal
+   * specificity to the plain rule above. Left alone, the detail `<td>` then
+   * lands in a single grid track (half the card) instead of the full-width
+   * flex cell the rule below expects: `flex: 1 1 100%` is a no-op once its
+   * parent isn't a flex container (Market's order-row expand, #2138 — the
+   * required-skills section rendered at half width). Restoring `flex` here
+   * — at higher specificity than the 2-col rule, so order doesn't matter —
+   * makes `.dt-stacked tr.dt-row-detail > td`'s existing rule apply again
+   * regardless of `stackColumns`.
+   */
+  .dt-stacked.dt-stack-2col tr.dt-row-detail {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dt-stacked tr.dt-row-detail > td {
+    flex: 1 1 100%;
+    padding: 0.75rem;
+    min-height: 0;
+  }
+
+  .dt-stacked tr.dt-row-detail > td::before {
+    content: none;
+  }
+
+  .dt-stacked.dt-stack-dense tr.dt-group-header::before {
+    content: none;
+  }
+
+  .dt-stacked tr.dt-group-header > td {
+    flex: 1 1 100%;
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked tr.dt-group-header > td::before {
+    content: none;
+  }
+
+  /*
+   * `DataTable`'s `virtualize` spacers stand in for rows scrolled out of
+   * the window, so their inline height is the whole box: no card padding,
+   * thumb-target floor, line-break pseudo, or labelled cell.
+   */
+  .dt-stacked tr.dt-spacer,
+  .dt-stacked.dt-stack-dense tr.dt-spacer {
+    padding: 0;
+    min-height: 0;
+  }
+
+  .dt-stacked.dt-stack-dense tr.dt-spacer::before {
+    content: none;
+  }
+
+  .dt-stacked tr.dt-spacer > td {
+    display: none;
+  }
+
+  /* An expanded group's members: indented and on the panel fill, so where
+     the group ends is visible without a closing row. */
+  tr.dt-group-member {
+    background-color: var(--color-panel);
+  }
+
+  .dt-stacked tr.dt-group-member {
+    padding-left: 2rem;
+  }
+
+  /* Opt-in (`dt-flat-groups` on the table, Mining Tax's History): groups that
+     are sections (a month) rather than folded duplicates. Their members keep
+     the card's own left inset, in line with the cards of the list above. */
+  .dt-stacked.dt-flat-groups tr.dt-group-member {
+    padding-left: 0.75rem;
+  }
+
+  table:not(.dt-stacked) tr.dt-group-member > td:first-child {
+    padding-left: 2rem;
+  }
+
+  /*
+   * A cell with no value keeps its label and shows blank, rather than
+   * disappearing. Hiding it (`td:empty { display: none }`) would drop a
+   * field on a phone that desktop still shows as an empty column — and
+   * `:empty` only matches when `render` returns exactly nullish, so which
+   * fields vanished would depend on how each column happened to be
+   * written. A labelled blank says the same thing at both widths.
+   */
+
+  /*
+   * A `type="number"` field narrow enough that the platform spin buttons
+   * would break it. Same call `NativeSelect` makes with `appearance-none`
+   * and its own caret: the browser's own control is the wrong size for this
+   * system.
+   *
+   * Measured on the plan editor's what-if implant row (five fields across a
+   * 294px sidebar): each field is 55.6px wide, and `px-3` leaves a 29.6px
+   * content box. Chrome only draws the spinner on hover and focus, and it
+   * takes roughly half of that and shoves the digit hard left — so the one
+   * cell under the cursor jumps out of alignment with the other four. The
+   * pane's other two number fields (`w-14` remaps-available, `w-16` booster
+   * bonus) are the same field at the same size, so they take it too — one
+   * hover behaviour across the pane, not two.
+   *
+   * Nothing is lost. Mobile browsers never render spin buttons for
+   * `type="number"` at all (they raise the numeric keypad instead), so touch
+   * users never had them; `ArrowUp`/`ArrowDown` still step the value, and
+   * the `spinbutton` role with its `min`/`max`/`step` semantics is untouched.
+   * Only the drawn buttons go.
+   *
+   * Not folded into `TextInput` for every `type="number"` in the app: the
+   * remaining number fields are wide enough that their spinners are harmless,
+   * and a field with room for one is better with it. The Industry sourcing
+   * fields are no longer among them — they mask their value
+   * (`src/lib/numberMask.ts`), which a `number` input cannot hold, so they are
+   * text fields with `inputMode` and have no spinner to suppress.
+   */
+  .field-no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .field-no-spinner::-webkit-outer-spin-button,
+  .field-no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+
+  /*
+   * A day the Calendar Map can never fill (`features/character/CalendarMap.tsx`).
+   *
+   * ESI's /calendar returns events from now only, so a past cell is not
+   * "empty today" — it is structurally incapable of holding anything. Dimming
+   * alone reads as "nothing on", which is the wrong conclusion and the exact
+   * one the old grid invited; a hatch reads as "not available" instead.
+   *
+   * A repeating gradient rather than an SVG or a border trick: Tailwind can
+   * express neither the 45-degree rule nor its 6px pitch, and this is one
+   * declaration against an asset request and a second file.
+   */
+  .calendar-map-past {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
+    );
+  }
+
+  /*
+   * Route Safety's strip: a jump through a wormhole (issue #2476) is a step,
+   * not a system, and has no security to colour it by — the same hard-stop
+   * hatch, finer to fit a cell a few pixels wide (DESIGN.md "No gradients").
+   */
+  .route-strip-hole {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 2px,
+      var(--color-line-bright) 2px 3px
+    );
+  }
+
+  /*
+   * A Stock List row's bar: the hangar stock at the market that could be
+   * listed, drawn after the solid listed part (features/stockTargets). The same
+   * hard-stop hatch, so "not on sale yet" reads apart from the status colour.
+   */
+  .stock-bar-hangar {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--color-line-bright) 0 2px,
+      transparent 2px 4px
+    );
+  }
+
+  /*
+   * The one row a notification sent the reader to
+   * (`features/market/TransactionsPanel.tsx`). Three slow washes of accent
+   * behind an otherwise ordinary row: enough to catch the eye on arrival,
+   * gone before it becomes a permanent second kind of selected row.
+   *
+   * A `<tr>` background rather than an outline or a border — a table row
+   * cannot carry either without the cell borders fighting it, and the cells
+   * are transparent, so the row's own background shows through.
+   */
+  .row-pulse {
+    animation: row-pulse 1.2s ease-out 3;
+  }
+
+  @keyframes row-pulse {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    35% {
+      background-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
+    }
+  }
+
+  /*
+   * One-shot flash for a Fitting readout that just went over budget. The
+   * text still says "over by N" (DESIGN.md §7: colour never alone); this is
+   * only the attention cue, and reduced motion swaps it for a single fade.
+   */
+  .flash-danger {
+    animation: flash-danger 0.9s ease-out 1;
+  }
+
+  @keyframes flash-danger {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    40% {
+      background-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flash-danger {
+      animation: row-pulse-fade 2.4s ease-out 1;
+    }
+  }
+
+  /*
+   * Reduced motion drops the flashing but keeps the *ending*: one slow fade
+   * from tint to nothing, no repeats.
+   *
+   * A `animation: none` plus a static tint was the obvious version and the
+   * wrong one — nothing ever removes the class (the panel latches the
+   * highlight for its lifetime), so the row would stay permanently coloured,
+   * which is the "second kind of selected row" the block above exists to
+   * avoid, and colour standing alone as a persistent encoding is what
+   * DESIGN.md §7 rules out. Transient is what makes this an attention cue
+   * rather than a state, and it pairs with the scroll that put the row on
+   * screen. A colour crossfade moves nothing, so it is not what a
+   * reduced-motion request is asking to be spared.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .row-pulse {
+      animation: row-pulse-fade 2.4s ease-out 1;
+    }
+  }
+
+  /*
+   * The Grant button a "Grant missing Permissions" link sent the reader to
+   * (`features/permissions/PermissionsPanel.tsx`). An accent ring that swells
+   * and fades three times, then is gone: an attention cue, never a state.
+   * Reduced motion gets one slow fade of the same ring.
+   */
+  .grant-flash {
+    animation: grant-flash 1.2s ease-out 3;
+  }
+
+  @keyframes grant-flash {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+    35% {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 55%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grant-flash {
+      animation: grant-flash-fade 2.4s ease-out 1;
+    }
+  }
+
+  @keyframes grant-flash-fade {
+    0% {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 45%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+
+  /*
+   * A `Toast` arriving (`components/ui/Toast.tsx`): a short rise and fade so
+   * the eye catches it over a busy page. `transform`, not `translate`, so it
+   * leaves the toast's `-translate-x-1/2` centring alone. Plays on mount, and
+   * `Toast` restarts it when a new message replaces the old one in place. Reduced motion
+   * gets none (DESIGN.md §6c: no transitions).
+   */
+  .toast-in {
+    animation: toast-in 200ms ease-out both;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast-in {
+      animation: none;
+    }
+  }
+
+  /*
+   * Slides a column out from behind the nav as it opens (the Fitting editor's
+   * Improve column): its whole width, under the nav rail, which sits above the
+   * page (Layout's z-30). Reduced motion gets none (DESIGN.md §6c).
+   */
+  .slide-in-left {
+    animation: slide-in-left 220ms ease-out both;
+  }
+
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide-in-left {
+      animation: none;
+    }
+  }
+
+  /*
+   * Slides a control in from the left as it mounts, e.g. the Permissions "Grant selected"
+   * button appearing beside Select none. Reduced motion gets none (DESIGN.md §6c).
+   */
+  .grant-selected-in {
+    animation: grant-selected-in 200ms ease-out both;
+  }
+
+  @keyframes grant-selected-in {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grant-selected-in {
+      animation: none;
+    }
+  }
+
+  @keyframes row-pulse-fade {
+    0% {
+      background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+
+  /*
+   * A row of the Order Book that is one of my own orders
+   * (`routes/Market.tsx`). A flat accent wash, and nothing else: the book is
+   * scanned down the price column, and a badge or a second line under the
+   * price would break that column on some rows and not others. Unlike
+   * `row-pulse` above this is a state, not an arrival cue, so it persists —
+   * the row also carries an `sr-only` "You", which is what keeps colour from
+   * standing alone (DESIGN.md §7).
+   *
+   * Written here rather than as a `bg-accent/10` class handed to
+   * `DataTable`'s `rowClassName` because the component's own
+   * `hover:bg-panel-2` is a class *plus* a pseudo-class, and so outranks any
+   * plain background utility on the same element: the cursor would wipe out
+   * the one marker these rows have. `tr.row-mine` outranks it in turn, and
+   * the `:hover` rule keeps the row's hover feedback rather than trading it
+   * away.
+   */
+  tr.row-mine {
+    background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  }
+
+  @media (hover: hover) {
+    tr.row-mine:hover {
+      background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    }
+  }
+}
+
+@layer base {
+  /* A native <dialog> leaves the page behind it scrollable (only inert), so
+     on a phone a scroll that starts over an open Modal chains into the page.
+     One selector locks it for every dialog in the app, with nothing to
+     restore when the last one closes. */
+  body:has(dialog[open]) {
+    overflow: hidden;
+  }
+
+  :root {
+    color-scheme: dark;
+    /* A viewport-bounded scroller (useViewportBoundedHeight) shrinking can
+       remove the document scrollbar, narrowing the viewport and reflowing
+       anything above it that wraps at that width — which would re-trigger
+       the measurement. Reserving the gutter always keeps viewport width
+       stable regardless of whether a scrollbar is actually showing. */
+    scrollbar-gutter: stable;
+  }
+
+  /* A modal Radix menu locks body scroll (react-remove-scroll) and, to stop the
+     page widening when the scrollbar vanishes, adds a body margin-right equal
+     to the scrollbar's width. The stable gutter above already keeps that width
+     reserved, so the compensation only shoves the whole page left while a menu
+     is open. Layered !important beats the library's unlayered !important. */
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
+  }
+
+  /* Below md the phone tab bar (Layout) is fixed over the bottom of the
+     viewport — including desktop at 200% zoom. Without this, focusing a
+     control near the bottom scrolls it only as far as the viewport edge,
+     i.e. under the bar (WCAG 2.4.11). Bar: min-h-11 + 1px border + the
+     safe-area inset; the extra 0.75rem keeps the focus ring clear too. */
+  :root {
+    /* What a bottom-pinned control must clear on a phone: the tab bar's
+       height plus the safe-area inset. Also the Build Opportunities
+       compare bar's offset. */
+    --bottom-nav-clearance: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+  /* Every bottom-pinned bar publishes its own term via useStickyClearance
+     (src/lib); unset terms are 0px. */
+  :root {
+    --sticky-clearance: calc(
+      var(--onboarding-banner-clearance, 0px) + var(--selection-toolbar-clearance, 0px) +
+        var(--compare-drawer-clearance, 0px) + var(--hauling-trip-bar-clearance, 0px) +
+        var(--unsaved-bar-clearance, 0px)
+    );
+  }
+  /* From md up the page reserves nothing by default (computed `auto`), so
+     the sum applies only once a bar has published a term on the root's
+     inline style. */
+  @media (width >= 48rem) {
+    :root[style*='-clearance'] {
+      scroll-padding-bottom: var(--sticky-clearance);
+    }
+  }
+  /* Hauling's trip bar and the unsaved-changes bar sit on top of the tab bar, so their term
+     already covers the tab bar: take that back out rather than count it twice. */
+  @media (width < 48rem) {
+    :root {
+      scroll-padding-bottom: calc(
+        var(--sticky-clearance) + var(--bottom-nav-clearance) -
+          min(
+            var(--hauling-trip-bar-clearance, 0px) + var(--unsaved-bar-clearance, 0px),
+            var(--bottom-nav-clearance)
+          )
+      );
+    }
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-selection);
+    color: var(--color-text);
+  }
+}
+
+/*
+ * Landing page: the sticky header's anchor links scroll smoothly (motion only
+ * for people who have not asked for less), and the small login button slides
+ * in when the hero's large one scrolls out of view.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.landing-root) {
+    scroll-behavior: smooth;
+  }
+}
+
+/*
+ * Landing page motion (scroll reveal, hero entry, CTA glow, demo float and
+ * alert pulse). Everything that moves is inside `no-preference`; without it,
+ * or without JS, the page is simply static and fully visible. `Reveal` only
+ * sets data-reveal="hidden" on below-the-fold elements when motion is allowed.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .lp-reveal {
+    transition:
+      opacity 500ms ease-out var(--lp-delay, 0ms),
+      transform 500ms ease-out var(--lp-delay, 0ms);
+  }
+  .lp-reveal[data-reveal='hidden'] {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  @keyframes lp-hero-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+  .lp-hero-in {
+    animation: lp-hero-in 600ms ease-out both;
+  }
+  .lp-hero-in-0 {
+    animation-delay: 0ms;
+  }
+  .lp-hero-in-1 {
+    animation-delay: 90ms;
+  }
+  .lp-hero-in-2 {
+    animation-delay: 180ms;
+  }
+  .lp-hero-in-3 {
+    animation-delay: 270ms;
+  }
+  /* The prerendered hero (src/app/landingShell.ts) already showed this text,
+     still: fading it in again would blink it out and back. */
+  html[data-landing-shell-shown] .lp-hero-in {
+    animation: none;
+  }
+
+  /* Accent glow behind the hero login button. Static: an infinite animation on a large gradient layer made scrolling choppy. */
+  .lp-cta-glow {
+    position: relative;
+    isolation: isolate;
+  }
+  .lp-cta-glow::before {
+    content: '';
+    position: absolute;
+    inset: -1.5rem -3rem;
+    z-index: -1;
+    border-radius: 9999px;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--color-accent) 22%, transparent),
+      transparent
+    );
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* The demo frame drifts up to 12px as the page scrolls (--lp-float set by OverviewDemo). */
+  .lp-float {
+    transform: translateY(var(--lp-float, 0px));
+    will-change: transform;
+  }
+
+  @keyframes lp-badge-pulse {
+    40% {
+      transform: scale(1.5);
+      box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 35%, transparent);
+    }
+  }
+  .lp-badge-pulse {
+    animation: lp-badge-pulse 700ms ease-out;
+  }
+}
+
+/*
+ * Landing page backdrops (LandingSection / LandingBackdrop). Every band keeps
+ * the page background; a tone layer sits behind the content and fades out at
+ * its top and bottom edge, so bands blend into one another instead of being
+ * cut by a rule. Stars are tiled radial-gradients and the nebula is a few
+ * blurred accent/violet washes: no image is downloaded for either. Ship
+ * renders (public/landing, CCP imagery) are decorative, dimmed and masked so
+ * body text stays above AA contrast. Nothing here animates: an infinite
+ * animation on these full-bleed layers made scrolling choppy.
+ */
+.lp-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 5rem,
+    #000 calc(100% - 5rem),
+    transparent
+  );
+}
+.lp-layer-panel {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-panel) 70%, var(--color-bg)),
+    color-mix(in oklab, var(--color-panel) 80%, var(--color-panel-2))
+  );
+}
+.lp-layer-space {
+  background:
+    radial-gradient(
+      60rem 28rem at 85% 0%,
+      color-mix(in oklab, #6b4bd6 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      50rem 26rem at 10% 100%,
+      color-mix(in oklab, var(--color-accent-dim) 30%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 16rem at 50% 50%,
+      color-mix(in oklab, #6b4bd6 10%, transparent),
+      transparent 70%
+    ),
+    #06090e;
+}
+.lp-layer-space::before,
+.lp-layer-space::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.lp-layer-space::before {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgb(255 255 255 / 0.8), transparent),
+    radial-gradient(1px 1px at 110px 140px, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 170px 60px, rgb(190 233 255 / 0.8), transparent),
+    radial-gradient(1px 1px at 60px 190px, rgb(255 255 255 / 0.5), transparent);
+  background-size: 210px 210px;
+}
+.lp-layer-space::after {
+  background-image:
+    radial-gradient(1px 1px at 40px 90px, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 250px 40px, rgb(255 226 190 / 0.7), transparent),
+    radial-gradient(1px 1px at 180px 260px, rgb(255 255 255 / 0.6), transparent);
+  background-size: 337px 313px;
+}
+.lp-ship {
+  position: absolute;
+  top: 0.5rem;
+  z-index: -1;
+  width: 20rem;
+  height: 20rem;
+  max-width: none;
+  opacity: 0.3;
+  pointer-events: none;
+  user-select: none;
+  mask-image: linear-gradient(to bottom, #000 25%, transparent 85%);
+}
+.lp-ship-right {
+  right: -7rem;
+}
+.lp-ship-left {
+  left: -7rem;
+  transform: scaleX(-1);
+}
+@media (min-width: 64rem) {
+  .lp-ship {
+    width: 30rem;
+    height: 30rem;
+    opacity: 0.4;
+  }
+  .lp-ship-right {
+    right: -4rem;
+  }
+  .lp-ship-left {
+    left: -4rem;
+  }
+}

@@ -1,0 +1,143 @@
+/**
+ * Pure date-grid math for the Calendar's Month/Week views. A cell is a
+ * `Date` at local midnight whose calendar fields are the day it stands for;
+ * which instants fall in it (the pilot's local day or the EVE day, per the
+ * Time format) is `engine/localDay.ts`'s `cellDayStart` — no
+ * fetch/DOM/Dexie imports.
+ */
+
+/** Which day a week grid starts on. Default is Monday, EVE's own in-game calendar value. */
+export type WeekStart = 'monday' | 'sunday';
+
+export interface GridDay {
+  /** Local midnight for this day. */
+  date: Date;
+  /** Local 'YYYY-MM-DD'. */
+  key: string;
+  inCurrentMonth: boolean;
+  isToday: boolean;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+export function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+export function isSameDay(a: Date, b: Date): boolean {
+  return dayKey(a) === dayKey(b);
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function addDays(date: Date, delta: number): Date {
+  const result = startOfDay(date);
+  result.setDate(result.getDate() + delta);
+  return result;
+}
+
+export function addWeeks(date: Date, delta: number): Date {
+  return addDays(date, delta * 7);
+}
+
+export function addMonths(date: Date, delta: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + delta, date.getDate());
+}
+
+/** Rewinds to the first day of the anchor's week, per `weekStart` (default Monday). */
+export function startOfWeek(date: Date, weekStart: WeekStart = 'monday'): Date {
+  const day = date.getDay(); // 0 = Sunday .. 6 = Saturday
+  const startDay = weekStart === 'sunday' ? 0 : 1;
+  const offset = (day - startDay + 7) % 7;
+  return addDays(date, -offset);
+}
+
+function toGridDay(date: Date, monthAnchor: Date, today: Date): GridDay {
+  return {
+    date,
+    key: dayKey(date),
+    inCurrentMonth:
+      date.getMonth() === monthAnchor.getMonth() &&
+      date.getFullYear() === monthAnchor.getFullYear(),
+    isToday: isSameDay(date, today),
+  };
+}
+
+/** 42 cells (6 weeks, aligned per `weekStart`) covering the anchor's month, plus lead/trail days. */
+export function buildMonthGrid(
+  monthAnchor: Date,
+  today: Date = new Date(),
+  weekStart: WeekStart = 'monday'
+): GridDay[] {
+  const firstOfMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+  const gridStart = startOfWeek(firstOfMonth, weekStart);
+  return Array.from({ length: 42 }, (_, i) => toGridDay(addDays(gridStart, i), monthAnchor, today));
+}
+
+/**
+ * 14 days, aligned per `weekStart`, containing the anchor — the Calendar
+ * Map's Fortnight density.
+ *
+ * Its own builder rather than a span argument on `buildMonthGrid`: that one is
+ * a fixed 42 cells aligned to a month, and a caller asking for 14 wants two
+ * whole weeks around a date instead, which is a different question about a
+ * different anchor.
+ */
+export function buildFortnightDays(
+  anchor: Date,
+  today: Date = new Date(),
+  weekStart: WeekStart = 'monday'
+): GridDay[] {
+  const gridStart = startOfWeek(anchor, weekStart);
+  return Array.from({ length: 14 }, (_, i) => toGridDay(addDays(gridStart, i), anchor, today));
+}
+
+/**
+ * `count` days running forward from `start` — the Day Ticker's window.
+ *
+ * Deliberately not week-aligned, unlike every other builder here: a phone
+ * reading "what is coming up" wants today in the first column, not up to six
+ * days of last week before it.
+ */
+export function buildDaysFrom(start: Date, count: number, today: Date = new Date()): GridDay[] {
+  return Array.from({ length: count }, (_, i) => toGridDay(addDays(start, i), start, today));
+}
+
+/** Short weekday names in the viewer's locale, ordered per `weekStart` (default Monday first). */
+export function weekdayLabels(weekStart: WeekStart = 'monday'): string[] {
+  const formatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  // 2024-01-01 is a Monday — an arbitrary fixed anchor, not tied to "today".
+  const start = startOfWeek(new Date(2024, 0, 1), weekStart);
+  return Array.from({ length: 7 }, (_, i) => formatter.format(addDays(start, i)));
+}
+
+export function formatMonthLabel(monthAnchor: Date): string {
+  return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(monthAnchor);
+}
+
+/**
+ * The 14-day span `buildFortnightDays` draws, as a label.
+ *
+ * Its own function because `formatWeekLabel` spans six days from the Monday
+ * and would print a seven-day range over a fourteen-day grid — a caption
+ * quietly disagreeing with the thing it captions.
+ */
+export function formatFortnightLabel(anchor: Date, weekStart: WeekStart = 'monday'): string {
+  return formatSpanLabel(startOfWeek(anchor, weekStart), 13);
+}
+
+/** Shared by the week and fortnight labels: a start date, and how many days after it. */
+function formatSpanLabel(start: Date, spanDays: number): string {
+  const end = addDays(start, spanDays);
+  const dayFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+  const yearFormatter = new Intl.DateTimeFormat(undefined, { year: 'numeric' });
+  const startLabel =
+    start.getFullYear() === end.getFullYear()
+      ? dayFormatter.format(start)
+      : `${dayFormatter.format(start)}, ${yearFormatter.format(start)}`;
+  return `${startLabel} – ${dayFormatter.format(end)}, ${yearFormatter.format(end)}`;
+}

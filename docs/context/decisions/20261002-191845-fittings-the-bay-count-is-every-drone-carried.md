@@ -1,0 +1,12 @@
+# Scope decisions — Fittings: the bay count is every drone carried; launch squares per drone row
+
+_Recorded 2026-10-02._
+
+This supersedes `20260930-184245` (drones in space take bandwidth, not drone bay room).
+
+- **A drone row's "In bay" count is every drone of that type the Fitting carries, launched or not.** Launching or recalling drones never changes it. Raising it adds drones to the Fitting, and lowering it removes them: first from the bay, then from space. At zero the type is removed. The old "In space" box is gone. Lowering it used to leave the bay count alone, so taking a flight of 5 out of space deleted all 5 drones. That flight was exactly what a Loaded In-game Fitting had just auto-launched (`20260925-113331`).
+- **Launch squares replace the "In space" box.** Each drone row shows five squares, or as many as are already out if that's more. One square lights per drone of the type in space. Clicking a square launches up to it, and clicking the highest lit square recalls one. A square past what the Fitting carries, or past what bandwidth and the pilot's drone count allow, is disabled. A type the engine has no bandwidth for yet has every unlit square disabled until the stats recalculate. Squares are per row, not one shared strip for the whole flight, the way EVE Workbench shows them.
+- **Bay m³ counts every drone carried again.** A launched drone came out of the bay and goes back in, so it still takes room there. This restores the rule from `20260924-215855`. It also matches the sources: a saved In-game Fitting lists all its drones under `DroneBay`. A fit saved under the 2026-09-30 rule, with a flight out and the bay refilled beside it, now shows the bay bar over the cap. Nothing is dropped, and lowering a count still works.
+- **A drone dragged from the Add panel onto the Drones rack needs bay room.** It is added to the Fitting, then its type launches as far as bandwidth and the pilot allow. A new type whose bandwidth isn't known yet still launches one while any bandwidth and a drone of the pilot's count are left. When the bay is full, nothing happens.
+- **Recall ("Move to bay", "Recall all drones") always brings every drone of the type back.** They're carried already, so the bay always has room. "Move to bay" is disabled only when none of the type is out.
+- **Storage and the wire formats are unchanged.** Drones are still active stacks and bay stacks. Share Links, My Fittings records and the ESI export read and write exactly as before. Only the editor's controls and the bay's m³ changed meaning.

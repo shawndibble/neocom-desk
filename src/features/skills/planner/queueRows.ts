@@ -1,0 +1,208 @@
+/**
+ * Merge a plan's entries with its computed queue into one row list (#112):
+ * one row per user entry (own aggregated per-level/cumulative time), plus
+ * dimmed prereq rows for any scheduled steps that entry's expansion needed
+ * but the user didn't add directly. Pure — no React/DOM — like markers.ts
+ * and bands.ts, which this composes with (entry/marker row ids match
+ * buildRows exactly, so bandStarts keeps working unmodified against those).
+ */
+import type { PlanEntry, ScheduledStep } from '@/engine/types';
+import type { QueueEndProjection } from '@/engine/skills/queueStatus';
+import { entrySlices } from './entrySlices';
+import { buildRows, type PlanRow } from './markers';
+import { entryId } from './reorder';
+
+export interface EntryQueueSummary {
+  /** Sum of `seconds` across this entry's own (non-prereq) scheduled steps. */
+  seconds: number;
+  /** `cumulativeSeconds` of the last step in this entry's range, carried forward unchanged if the range was empty. */
+  cumulativeSeconds: number;
+  /**
+   * This entry's own scheduled steps — one per level the plan actually trains,
+   * so a "Caldari Carrier V" entry on a character already at III carries IV
+   * and V, not I–V. The row reads its level range and its per-level
+   * disclosure off these (#254).
+   *
+   * Positional contract: `steps[i]` is the step at `stepIndices[i]`. Both are
+   * mapped from the same `own` slice and must stay derived together — the
+   * per-level Booster mark pairs one against the other.
+   */
+  steps: ScheduledStep[];
+  /** Indices into `scheduled` this entry's own steps occupy (for booster-mark lookups). */
+  stepIndices: number[];
+}
+
+export interface PrereqQueueRow {
+  step: ScheduledStep;
+  stepIndex: number;
+}
+
+export interface EntryQueueInfo {
+  summary: EntryQueueSummary;
+  /** Leading steps in this entry's range belonging to a different skill — prereqs normalizePlan inserted just ahead of it. */
+  prereqRows: PrereqQueueRow[];
+}
+
+/**
+ * Zip entries + entryBoundaries (from normalizePlanWithBoundaries, computed
+ * over the catalog-known subset only) + scheduled into one lookup keyed by
+ * `entryId`. Entries unknown to the catalog consume no boundary and
+ * contribute zero time, carrying the previous entry's cumulative forward
+ * (matching computeQueue's own validEntries filtering).
+ *
+ * Keyed by `entryId`, not skillTypeID: a plan holds one entry per skill
+ * *level*, so "Mass Production IV" and "Mass Production V" are two rows with
+ * two different summaries, and a skill-keyed map would hand both rows
+ * whichever summary was written last.
+ */
+export function summarizeEntryQueue(
+  entries: readonly PlanEntry[],
+  entryBoundaries: readonly number[],
+  scheduled: readonly ScheduledStep[],
+  isKnown: (skillTypeID: number) => boolean
+): Map<string, EntryQueueInfo> {
+  const result = new Map<string, EntryQueueInfo>();
+  const slices = entrySlices(entries, entryBoundaries, scheduled, isKnown);
+
+  entries.forEach((entry, i) => {
+    const { start, ownStart, end } = slices[i];
+    const carried = start > 0 ? scheduled[start - 1].cumulativeSeconds : 0;
+    const own = ownStart === -1 ? [] : scheduled.slice(ownStart, end);
+    const prereq = scheduled.slice(start, ownStart === -1 ? end : ownStart);
+
+    result.set(entryId(entry), {
+      summary: {
+        seconds: own.reduce((sum, s) => sum + s.seconds, 0),
+        cumulativeSeconds: end > start ? scheduled[end - 1].cumulativeSeconds : carried,
+        steps: own,
+        stepIndices: own.map((_, offset) => (ownStart === -1 ? 0 : ownStart) + offset),
+      },
+      prereqRows: prereq.map((step, offset) => ({ step, stepIndex: start + offset })),
+    });
+  });
+  return result;
+}
+
+export interface PinnedInProgressEntry {
+  /** Matches a MergedRow['id'] (see `entryId`) — the plan entry this pins. */
+  id: string;
+  /** Real seconds left on the in-game queue's own clock, floored at 0. */
+  seconds: number;
+}
+
+/**
+ * The plan entry that is also the in-game queue's currently-training level, if
+ * any (#1701 follow-up). `projectQueueEnd` always pins that level
+ * (`queuedLevels[0]`) to its real `finish_date` and credits it as already
+ * trained as of the plan's start, so the matching plan entry contributes none
+ * of its own scheduled steps (`entrySlices` reports `ownStart: -1` for it) and
+ * its row would otherwise read a bare, misleading "0m". EntryList uses this
+ * instead to show the level's real remaining time, straight off the ESI
+ * queue's own `finish_date` rather than the plan's (zeroed) schedule.
+ */
+export function pinnedInProgressEntry(
+  entries: readonly PlanEntry[],
+  projection: Pick<QueueEndProjection, 'queuedLevels' | 'paused'>,
+  nowMs: number
+): PinnedInProgressEntry | null {
+  if (projection.paused) return null;
+  const head = projection.queuedLevels[0];
+  if (!head?.finish_date) return null;
+  const finishMs = Date.parse(head.finish_date);
+  if (!Number.isFinite(finishMs)) return null;
+  const match = entries.find(
+    (e) => e.skillTypeID === head.skill_id && e.targetLevel === head.finished_level
+  );
+  return match ? { id: entryId(match), seconds: Math.max(0, (finishMs - nowMs) / 1000) } : null;
+}
+
+export type MergedRow =
+  | { kind: 'marker'; id: string; markerIndex: number }
+  | { kind: 'prereq'; id: string; step: ScheduledStep; stepIndex: number }
+  | {
+      kind: 'entry';
+      id: string;
+      entry: PlanEntry;
+      seconds: number;
+      cumulativeSeconds: number;
+      /** The levels this row trains, `steps[i]` at `stepIndices[i]` (see EntryQueueSummary). */
+      steps: ScheduledStep[];
+      stepIndices: number[];
+    };
+
+const EMPTY_SUMMARY: EntryQueueInfo = {
+  summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
+  prereqRows: [],
+};
+
+/**
+ * Entry+marker interleave (buildRows) with each entry's prereq rows expanded
+ * ahead of it.
+ *
+ * `precomputedRows`: a caller that already built the entry/marker interleave
+ * for something else (PlanEditor.tsx also needs it for band placement) passes
+ * it here to skip a second `buildRows` pass over the same entries/markers —
+ * the two calls always agreed anyway, so building it twice was pure waste,
+ * not a second opinion.
+ */
+export function buildMergedRows(
+  entries: readonly PlanEntry[],
+  markers: readonly number[] | undefined,
+  entryQueue: ReadonlyMap<string, EntryQueueInfo>,
+  precomputedRows?: readonly PlanRow[]
+): MergedRow[] {
+  const rows: MergedRow[] = [];
+  for (const row of precomputedRows ?? buildRows(entries, markers)) {
+    if (row.kind === 'marker') {
+      rows.push({ kind: 'marker', id: row.id, markerIndex: row.markerIndex });
+      continue;
+    }
+    const info = entryQueue.get(row.id) ?? EMPTY_SUMMARY;
+    for (const p of info.prereqRows) {
+      rows.push({
+        kind: 'prereq',
+        id: `prereq-${p.step.skillTypeID}-${p.step.level}`,
+        step: p.step,
+        stepIndex: p.stepIndex,
+      });
+    }
+    rows.push({
+      kind: 'entry',
+      id: row.id,
+      entry: row.entry,
+      seconds: info.summary.seconds,
+      cumulativeSeconds: info.summary.cumulativeSeconds,
+      steps: info.summary.steps,
+      stepIndices: info.summary.stepIndices,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Re-key bandsAt (keyed by an entry's own row id, from bandStarts or
+ * attributePairBandStarts) so a band header renders before the FIRST row of
+ * that entry's merged block — its leading prereq rows, if any, rather than
+ * landing between them and the entry row itself. Generic over the band value
+ * (priority or attribute pair) since the re-keying logic has nothing
+ * priority-specific in it.
+ */
+export function placeBandHeaders<T>(
+  rows: readonly MergedRow[],
+  bandsAt: ReadonlyMap<string, T>
+): Map<string, T> {
+  const placement = new Map<string, T>();
+  let runStartId: string | null = null;
+  for (const row of rows) {
+    if (row.kind === 'prereq') {
+      runStartId ??= row.id;
+      continue;
+    }
+    if (row.kind === 'entry') {
+      const band = bandsAt.get(row.id);
+      if (band) placement.set(runStartId ?? row.id, band);
+    }
+    runStartId = null;
+  }
+  return placement;
+}

@@ -1,0 +1,308 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  FilterChip,
+  IconButton,
+  Modal,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  sortRows,
+  Toast,
+} from '@/components/ui';
+import { Skills } from '@/components/ui/icons';
+import { romanLevel } from '@/engine/projection';
+import type { PlanEntry } from '@/engine/types';
+import { formatCountdown } from '@/lib/duration';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
+import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
+import { isEntryCovered, plannedLevelFor } from '@/features/skills/planner/reorder';
+import { buildFitCheckRows } from '@/features/skills/ships/fitCheckRows';
+import { scheduleEntries } from '@/features/skills/ships/scheduleEntries';
+import {
+  masteryRowSortValue,
+  mergeShipEntries,
+  tagUnifiedRows,
+} from '@/features/skills/ships/unifiedShipRows';
+import { SkillRow } from '@/features/skills/SkillRow';
+import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
+import { targetPlanEntries, useTargetPlan } from '@/features/skills/useTargetPlan';
+import { HeaderBadgeSlot } from './HeaderBadgeSlot';
+import { useRetryFocus } from '@/lib/useRetryFocus';
+import { useMasteries } from './useMasteries';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+
+const TIERS = [0, 1, 2, 3, 4] as const;
+interface MasteryChipProps {
+  /**
+   * `badge` (default): the header's icon button opening a popover. `dialog`:
+   * no button of its own — the phone header's ⋮ menu opens it, as a sheet,
+   * through `open`; `onAvailable` says whether this hull has anything to show.
+   */
+  presentation?: 'badge' | 'dialog';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onAvailable?: (available: boolean) => void;
+  hullTypeId: number;
+  hullName: string;
+  characterId: number;
+}
+
+/**
+ * "Mastery" — what skills a hull's Mastery tiers ask for and how long they
+ * take at the active Character's attributes and implants, no fit required.
+ * The tier picker shows the union of tiers I..N deduped by skill; Add All puts
+ * exactly the untrained rows on screen into a Skill Plan. Renders nothing for
+ * a hull `masteries.json` carries no data for; until that is known, and
+ * while the skill catalogue loads, it holds the badge's place with an empty
+ * slot so the header doesn't reflow when it lands (issue #2255).
+ */
+export function MasteryChip({
+  presentation = 'badge',
+  open: dialogOpen = false,
+  onOpenChange,
+  onAvailable,
+  hullTypeId,
+  hullName,
+  characterId,
+}: MasteryChipProps) {
+  const { t } = useTranslation();
+  const dialog = presentation === 'dialog';
+  const [open, setOpen] = useState(false);
+  const masteryState = useMasteries();
+  const masteries = masteryState.status === 'loaded' ? masteryState.masteries : null;
+  const unavailable = masteryState.status === 'unavailable';
+  // Retry stays mounted while it runs; the result takes focus when it replaces the panel.
+  const [focusRef, armFocus] = useRetryFocus<HTMLDivElement>(
+    unavailable ? 'failed' : masteryState.status === 'loaded' ? 'ok' : 'busy',
+    hullTypeId
+  );
+  const [tier, setTier] = useState(4);
+  const [hideCompleted, setHideCompleted] = useState(false);
+  const [added, setAdded] = useState<{
+    planId: string;
+    planName: string;
+    entries: readonly PlanEntry[];
+  } | null>(null);
+  const { catalog, trainedSkills, attributes, implants } = usePlanEditorData(characterId);
+  const target = useTargetPlan(characterId);
+  const cloneStates = useCloneStates((state) => state.value);
+  useHydratedStore(useCloneStates);
+  const cloneState = cloneStateFor(cloneStates, characterId);
+
+  const tiers = masteries?.[String(hullTypeId)];
+  const hasData = tiers !== undefined && tiers.some((bundle) => bundle.length > 0);
+  // Unavailable still offers the entry point, so it can say why there is nothing to show.
+  const offered = hasData || unavailable;
+  useEffect(() => {
+    onAvailable?.(offered);
+  }, [offered, onAvailable]);
+
+  const rows = useMemo(() => {
+    if (!catalog || !tiers) return null;
+    const merged = mergeShipEntries(tiers.slice(0, tier + 1), null);
+    const scheduled = scheduleEntries(merged.entries, {
+      skills: catalog.engineSkills,
+      trainedSkills,
+      attributes,
+      implants,
+      cloneState,
+    });
+    const built = buildFitCheckRows(merged.entries, catalog.engineSkills, trainedSkills, scheduled);
+    // Grouped by the tier that first asks for the skill, quickest first inside a tier.
+    return sortRows(
+      tagUnifiedRows(built, merged.highestMasteryTier, merged.fromFit),
+      { sortValue: masteryRowSortValue },
+      'asc'
+    );
+  }, [catalog, tiers, tier, trainedSkills, attributes, implants, cloneState]);
+
+  if (!unavailable) {
+    if (masteries === null || (hasData && !rows)) return dialog ? null : <HeaderBadgeSlot />;
+    if (!hasData || !rows) return null;
+  }
+
+  const visible = hideCompleted
+    ? (rows ?? []).filter((row) => row.status !== 'trained')
+    : (rows ?? []);
+  const untrained = visible.filter((row) => row.status !== 'trained');
+  const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
+  const planEntries = targetPlanEntries(target);
+  const unplanned = untrained.filter(
+    (row) => !isEntryCovered(planEntries, row.skillTypeID, row.targetLevel)
+  );
+
+  async function add(entries: readonly PlanEntry[]) {
+    const result = await target.addEntries(entries, hullName);
+    if (result.added.length === 0) return;
+    setAdded({ planId: result.planId, planName: result.planName, entries: result.added });
+  }
+
+  const unavailableBody = (
+    <div className="space-y-2 text-xs text-text-dim">
+      <p>{t('fittings.mastery.unavailable')}</p>
+      <Button
+        size="sm"
+        loading={masteryState.retrying}
+        onClick={() => {
+          armFocus();
+          masteryState.retry();
+        }}
+      >
+        {t('common.retry')}
+      </Button>
+    </div>
+  );
+
+  const content = unavailable ? (
+    unavailableBody
+  ) : (
+    <div className="space-y-2">
+      {!dialog && (
+        <p className="text-xs font-semibold text-text">
+          {t('fittings.mastery.title', { name: hullName })}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        {TIERS.map((n) => (
+          <FilterChip
+            key={n}
+            label={romanLevel(n + 1)}
+            selected={tier === n}
+            onToggle={() => setTier(n)}
+          />
+        ))}
+        <FilterChip
+          label={t('fittings.mastery.hideCompleted')}
+          selected={hideCompleted}
+          onToggle={() => setHideCompleted((v) => !v)}
+        />
+      </div>
+      {untrained.length > 0 && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
+      {visible.length === 0 ? (
+        <p className="text-xs text-text-dim">{t('fittings.mastery.empty')}</p>
+      ) : (
+        <div className="max-h-72 overflow-y-auto">
+          {visible.map((row) => {
+            const planned = isEntryCovered(planEntries, row.skillTypeID, row.targetLevel);
+            return (
+              <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
+                <SkillRow
+                  name={row.name}
+                  skillTypeID={row.skillTypeID}
+                  planEntries={planEntries}
+                  status={row.status}
+                  currentLevel={row.currentLevel}
+                  timeLabel={
+                    row.status === 'trained'
+                      ? t('skills.fitCheck.trained')
+                      : formatCountdown(row.seconds)
+                  }
+                  addLabel={t('skills.fitCheck.add')}
+                  inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
+                  plannedLevel={plannedLevelFor(planEntries, row.skillTypeID)}
+                  onAdd={
+                    planned
+                      ? undefined
+                      : () =>
+                          void add([{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }])
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-xs text-text-dim">{t('fittings.mastery.suggestedNote')}</p>
+      {untrained.length > 0 && unplanned.length < untrained.length && (
+        <p className="text-xs text-text-dim">
+          {unplanned.length === 0
+            ? t('skills.fitCheck.allPlanned')
+            : t('skills.fitCheck.alreadyPlanned', {
+                count: untrained.length - unplanned.length,
+              })}
+        </p>
+      )}
+      {target.plans !== undefined && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {untrained.length > 0 && (
+            <span className="text-xs text-text-dim">
+              {t('fittings.mastery.total', { time: formatCountdown(totalSeconds) })}
+            </span>
+          )}
+          <TargetPlanPicker target={target} />
+          {unplanned.length > 0 && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() =>
+                void add(
+                  unplanned.map((row) => ({
+                    skillTypeID: row.skillTypeID,
+                    targetLevel: row.targetLevel,
+                  }))
+                )
+              }
+            >
+              {target.plans.length === 0
+                ? t('skills.fitCheck.createPlanAndAdd')
+                : t('skills.fitCheck.addAllToPlan')}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const body = (
+    <div ref={focusRef} tabIndex={-1} className="focus:outline-none">
+      {content}
+    </div>
+  );
+
+  return (
+    <>
+      {dialog ? (
+        <Modal
+          open={dialogOpen}
+          onClose={() => onOpenChange?.(false)}
+          title={t('fittings.mastery.title', { name: hullName })}
+          placement="sheet"
+        >
+          {body}
+        </Modal>
+      ) : (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <IconButton
+              icon={<Skills />}
+              label={t('fittings.mastery.chip')}
+              tooltip={t('fittings.mastery.tooltip', { name: hullName })}
+            />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
+            {body}
+          </PopoverContent>
+        </Popover>
+      )}
+      {added && (
+        <Toast
+          message={t('skills.fitCheck.addedToast', {
+            count: added.entries.length,
+            plan: added.planName,
+          })}
+          undo={{
+            label: t('skills.fitCheck.addedToastUndo'),
+            onUndo: () => {
+              void target.removeEntries(added.planId, added.entries);
+              setAdded(null);
+            },
+          }}
+          onClose={() => setAdded(null)}
+        />
+      )}
+    </>
+  );
+}

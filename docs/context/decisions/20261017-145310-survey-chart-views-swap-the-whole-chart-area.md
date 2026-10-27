@@ -1,0 +1,10 @@
+# Scope decisions — Survey chart views swap the whole chart area
+
+_Recorded 2026-10-17._
+
+- **A Survey page offers selectable chart views, and a view replaces the whole chart area.** The default, **Ore left**, is today's pair (volume left stacked by ore with the dashed run to the projected finish, and the mining rate under it). Every other view is one chart, so the page never grows taller. Shipped now: Ore left, **Depletion by ore** and **ISK left**. Not shipped, left for later: mining rate by ore (m³/s lines) and time left per ore (needs a per-ore pace and ETA).
+- **The select sits on the chart row, beside the ore legend, at the same `sm` height as the hub select.** Not in the panel header: that slot holds page-wide controls (price hub, chat and link copy), already two on a phone, and this one changes only the chart. It is hidden when the Survey has no chart (one scan or fewer).
+- **The view is not remembered.** Every load, and every shared-link visitor, opens on Ore left. It holds while the page is open and resets when another Survey is opened. The Overview Mining survey widget stays volume-only and unchanged; the public `/s/<id>` page gets the select.
+- **Depletion by ore** draws one line per ore (same colours as the legend) of its volume left as a percent of that ore's `startVolume`, the basis of the headline percent, plus a dim "All ore" reference line. No dashed projection: the finish estimate exists only for the whole field.
+- **ISK left** is the Ore left stack in ISK at the Survey's hub, with the dashed run to zero at the field's finish; the tooltip adds the ISK mined since the previous scan. It re-prices when the hub changes. An ore with no market price drops out of the stack and the tooltip says "no price"; when nothing is priced the option is not offered.
+- **Only Ore left keeps the owner's scan-node remove action** (the scan list still removes). The other views are read-only with the same scan-time and scanner tooltip header. The legend shows ore swatches in every view and the mining-rate swatch only on Ore left. Each view keeps its hidden data table for screen readers.

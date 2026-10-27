@@ -1,0 +1,9 @@
+# Scope decisions — Push alerts: 12 surprise events are a permanent boundary (issue #2952)
+
+_Recorded 2026-10-08 · issue #2952._
+
+- **Only an event with a known future time can wake a closed app.** The backend stores client-rendered rows (`eventId`, `occurrenceKey`, `fireAt`, title, body); no ESI data syncs to Firestore, and refresh tokens stay in Dexie. So an event is pushable only when the client can compute its fire time ahead from data it already holds. This restates `20260903-224842-server-push-and-the-notification-catalog`: the limit is a boundary, not a gap.
+- **Of the 14 events not pushed closed, `corpIndustryJobReady` is the only one widened.** A corp job's `end_date` is a known future timestamp, the same shape as `industryJobComplete`. It ships as its own ticket (#3145), client-side only.
+- **The other 13 stay open-app only.** Twelve are surprises with no time known ahead: `newMail`, `marketOrderFilled`, `marketOrderUndercut`, `newCalendarEvent`, `contractAccepted`, `contractCompleted`, `contractFailed`, `walletBalanceChanged`, `corpMemberJoined`, `corpMemberLeft`, `corpWalletThreshold`, `priceAlertTriggered`. The thirteenth, `spExtractionReady`, is computable but weak (it needs total SP and the training rate both projected, and the skill queue is already pushed), so it is not pursued.
+- **Server-side polling is out.** It is the only way to cover surprises and needs a refresh token off the device, which breaks the rule that tokens live in Dexie only. Periodic Background Sync and silent data pushes stay rejected per the earlier push decisions.
+- **Not decided here:** a generic "next check" reminder push, a daily digest of what is projected, and new expiry events (contract, market order, moon chunk). Each changes how the app feels or adds an event, so each needs its own ticket and a user decision before any code.

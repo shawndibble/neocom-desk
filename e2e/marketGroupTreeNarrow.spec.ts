@@ -1,0 +1,140 @@
+/**
+ * Market Browser item-finder tree touch targets (issue #1123): every row in
+ * `MarketGroupTree` — the group-header disclosure and the leaf item row, at
+ * every depth — was a hand-rolled `py-1` button with no height class, so it
+ * rendered 24px tall at every viewport, well under the app's 36px touch
+ * floor, on the Market page's only way to browse to an item on a phone.
+ * Fixed with a phone-only `min-h-9 md:min-h-0` on both row shapes — on a
+ * header only while it's expandable, since a disabled one is no target —
+ * rather than the shared `controlHeightClassName.md` tier, whose `md:h-9`
+ * would also have grown the dense desktop row.
+ *
+ * jsdom has no layout, so a unit test could only assert the class token is
+ * present, not the rendered pixel height — the same reasoning
+ * `marketCompareNarrow.spec.ts` gives for running this against a real
+ * browser instead.
+ */
+import type { Page } from '@playwright/test';
+import { test, expect } from './support/testBase';
+import { signInAndGoto } from './support/authSeed';
+
+const PHONE = { width: 390, height: 844 };
+const DESKTOP = { width: 1280, height: 800 };
+// Exactly `md` — the width at which `md:min-h-0` engages, so the one place a
+// breakpoint mismatch in this fix would surface.
+const MD_EDGE = { width: 768, height: 800 };
+
+/**
+ * Searches the item finder for a partial "Tritaniu" (an exact name would pin the item above the tree, out of it), which lives at
+ * Manufacture & Research > Materials > Minerals. Search auto-expands the
+ * matched branch, so both row shapes this spec measures — the `Minerals`
+ * group header and the `Tritanium` leaf — are rendered afterwards.
+ */
+async function searchTritanium(page: Page) {
+  await signInAndGoto(page, './market');
+
+  await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritaniu');
+}
+
+/** The tree has its own scrollport (`max-h-[32rem]`), so scroll before measuring. */
+async function heightOf(page: Page, name: string) {
+  const row = page.getByRole('button', { name, exact: true });
+  await expect(row).toBeVisible();
+  await row.scrollIntoViewIfNeeded();
+  const box = await row.boundingBox();
+  expect(box).not.toBeNull();
+  return box!.height;
+}
+
+test('item-finder tree rows meet the 36px touch floor at 390px', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await searchTritanium(page);
+
+  expect(await heightOf(page, 'Minerals')).toBeGreaterThanOrEqual(36);
+  expect(await heightOf(page, 'Tritanium')).toBeGreaterThanOrEqual(36);
+});
+
+test('item-finder tree rows keep their dense height at and above md (1280px)', async ({ page }) => {
+  await page.setViewportSize(DESKTOP);
+  await searchTritanium(page);
+
+  // Pinned to the exact dense height (`py-1` around a `text-xs` line box =
+  // 24px), not a range — a band wide enough to admit a partial regression
+  // toward the 36px `md:h-9` tier would defeat the point of this test.
+  expect(await heightOf(page, 'Minerals')).toBe(24);
+  expect(await heightOf(page, 'Tritanium')).toBe(24);
+});
+
+test('item-finder tree rows keep their dense height at exactly md (768px)', async ({ page }) => {
+  await page.setViewportSize(MD_EDGE);
+  await searchTritanium(page);
+
+  expect(await heightOf(page, 'Minerals')).toBe(24);
+  expect(await heightOf(page, 'Tritanium')).toBe(24);
+});
+
+/**
+ * Issue #3136: a broad search lists its top-level categories with counts, so a
+ * pilot looking for a ship sees the category list first rather than a column
+ * of skins and modules. Invariants, not pixels: headers sit in the first
+ * viewport, nothing overflows sideways.
+ */
+for (const viewport of [PHONE, DESKTOP]) {
+  test(`a broad search shows category headers in the first viewport at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await signInAndGoto(page, './market');
+    await page.getByRole('searchbox', { name: 'Search items' }).fill('Caldari');
+
+    const headers = page.getByRole('button', { name: /^.+ · \d+$/ });
+    await expect(headers.first()).toBeVisible();
+    const box = await headers.first().boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
+
+for (const size of [
+  { width: 1024, height: 768 },
+  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
+]) {
+  test(`finder keeps the Quickbar in view with a search and a pinned item (${size.width}px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    for (const kind of ['orders', 'history']) {
+      await page.route(`https://esi.evetech.net/markets/*/${kind}*`, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      );
+    }
+    await page.route('https://esi.evetech.net/universe/types/*', (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"nf"}' })
+    );
+    await searchTritanium(page);
+    await page.getByRole('button', { name: 'Tritanium', exact: true }).click();
+    await page.getByRole('button', { name: 'Add Tritanium to Quickbar' }).click();
+    await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritaniu');
+
+    const quickbar = page.getByTestId('quickbar');
+    await expect(quickbar.getByRole('heading')).toBeVisible();
+    const heading = await quickbar.getByRole('heading').boundingBox();
+    const panel = await page.locator('section', { has: quickbar }).boundingBox();
+    // Inside the viewport-bounded panel (not the viewport itself: at scroll 0 the page chrome
+    // offsets the sticky panel, which only reaches `top-4` once the page scrolls).
+    expect(heading!.y + heading!.height).toBeLessThanOrEqual(panel!.y + panel!.height);
+    // Height, not bottom edge: at scroll 0 the page chrome offsets the panel; once stuck it sits at `top-4`.
+    expect(panel!.height).toBeLessThanOrEqual(size.height - 32);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+    );
+    expect(overflow).toBe(false);
+  });
+}

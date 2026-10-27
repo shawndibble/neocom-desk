@@ -1,0 +1,232 @@
+/**
+ * Fitting Compare tracer: adding Fittings, the phone paging window, and the
+ * differences-only toggle at a phone width, without waiting on the dogma
+ * engine's own WASM+SDE stats compute — `fittingsLoadNarrow`'s own precedent
+ * is to assert on structure only, never a stat figure, since that download
+ * is genuinely slow on a cold CI runner. The new Price rows and per-column
+ * "Fits" status read off that same slow compute, so their values are left
+ * to `fittingCompare.test.ts`'s engine-level coverage rather than asserted
+ * on here.
+ */
+import type { Page } from '@playwright/test';
+import { test, expect } from './support/testBase';
+import { signInAndGoto } from './support/authSeed';
+import { answerAnyType } from './support/universeTypes';
+
+const PHONE = { width: 390, height: 844 };
+
+// A compare column's header shows the fit's own name — a Fitting Share Code carries it since
+// version 2 (#1718), so the name typed into the EFT header survives the round trip.
+const FIT_A = ['[Rifter, Fit A]', '125mm Gatling AutoCannon I'].join('\n');
+const FIT_B = ['[Merlin, Fit B]', '125mm Gatling AutoCannon I'].join('\n');
+const FIT_C = ['[Punisher, Fit C]', '125mm Gatling AutoCannon I'].join('\n');
+
+async function addFitting(page: Page, eft: string) {
+  await page.getByRole('button', { name: 'Compare with' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Compare with' });
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await dialog.getByLabel('Link or text').fill(eft);
+  await dialog.getByRole('button', { name: 'Load', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+}
+
+test.describe('Fitting Compare at 390px', () => {
+  test('adds Fittings, pages through three on phone, and keeps the layout within 390px', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, './ships/fittings/compare');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    // The compared Fittings' names only render once `FittingCompare`'s own `statsReady` gate
+    // opens (the same dogma WASM+SDE compute `fittingsLoadNarrow` avoids waiting on elsewhere) —
+    // give it the same cold-runner headroom the other narrow specs already use for that gate.
+    const STATS_TIMEOUT = { timeout: 20_000 };
+
+    await addFitting(page, FIT_A);
+    await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
+
+    await addFitting(page, FIT_B);
+    await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Fit B')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Show differences only')).toBeVisible();
+
+    // A third slot brings phone paging into play (2 of 3 columns shown at a time).
+    await addFitting(page, FIT_C);
+    const prev = page.getByRole('button', { name: 'Previous' });
+    const next = page.getByRole('button', { name: 'Next' });
+    await expect(prev).toBeVisible(STATS_TIMEOUT);
+    expect(await prev.isDisabled()).toBe(true);
+    const nextBox = await next.boundingBox();
+    expect(nextBox!.height).toBeGreaterThanOrEqual(36);
+
+    await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Fit C')).not.toBeVisible();
+
+    await next.click();
+    await expect(page.getByText('Fit C')).toBeVisible();
+    await expect(page.getByText('Fit A')).not.toBeVisible();
+    expect(await prev.isDisabled()).toBe(false);
+
+    // No sideways scroll at 390px — the usual narrow-width regression.
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+});
+
+test.describe('Fitting Compare long names at 390px', () => {
+  test('a long Fitting name keeps the Modules table inside its panel', async ({ page }) => {
+    await signInAndGoto(page, './ships/fittings/compare');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+    const longFit = [
+      '[Merlin, Fit B With A Rather Long Name Indeed]',
+      '125mm Gatling AutoCannon I',
+      '125mm Gatling AutoCannon I',
+    ].join(String.fromCharCode(10));
+    await addFitting(page, FIT_A);
+    await addFitting(page, longFit);
+    const modules = page.locator('table').nth(1);
+    await expect(modules.locator('thead th')).toHaveCount(3, { timeout: 20_000 });
+
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+
+    const table = (await modules.boundingBox())!;
+    const remove = (await modules.locator('thead th').last().getByRole('button').boundingBox())!;
+    expect(remove.x + remove.width).toBeLessThanOrEqual(table.x + table.width + 0.5);
+  });
+});
+
+test.describe('Fitting Compare control toolbar', () => {
+  const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
+
+  test('at 390 the Target profile summary reads as text, not a raw i18n key', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page, './ships/fittings/compare');
+    await expect(page.getByText(/\d+ m sig · \d+ m\/s/).first()).toBeVisible();
+    expect(await page.locator('body').innerText()).not.toMatch(/\bfittings\.\w+\./);
+  });
+
+  test('at 1440 the three selects share one row', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInAndGoto(page, './ships/fittings/compare');
+    const ys: number[] = [];
+    for (const name of LABELS) {
+      const box = await page.getByRole('combobox', { name }).boundingBox();
+      ys.push(box!.y);
+    }
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(1);
+  });
+
+  test('at 1024 the block is compact and each label sits beside its select', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await signInAndGoto(page, './ships/fittings/compare');
+    const block = await page.getByTestId('compare-controls').boundingBox();
+    expect(block!.height).toBeLessThan(70);
+    for (const name of LABELS) {
+      const select = await page.getByRole('combobox', { name }).boundingBox();
+      const label = await page.getByText(name, { exact: true }).first().boundingBox();
+      expect(select!.x - (label!.x + label!.width)).toBeLessThan(12);
+    }
+  });
+});
+
+test.describe('Fitting Compare column alignment', () => {
+  for (const size of [
+    { width: 1024, height: 768 },
+    { width: 1440, height: 900 },
+  ]) {
+    for (const fits of [
+      [FIT_A, FIT_B],
+      [FIT_A, FIT_B, FIT_C],
+    ]) {
+      test(`${fits.length} fits line up between Stats and Modules at ${size.width}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(size);
+        await signInAndGoto(page, './ships/fittings/compare');
+        await answerAnyType(page);
+        // Every later fit carries one more gun, so the "Modules that differ" table renders.
+        for (const [i, eft] of fits.entries()) {
+          await addFitting(
+            page,
+            i === 0
+              ? eft
+              : `${eft}
+125mm Gatling AutoCannon I`
+          );
+        }
+        const tables = page.locator('table');
+        await expect(tables).toHaveCount(2, { timeout: 20_000 });
+        for (const index of [0, 1]) {
+          await expect(tables.nth(index).locator('thead tr:first-child th')).toHaveCount(
+            fits.length + 1,
+            {
+              timeout: 20_000,
+            }
+          );
+        }
+        const rights = async (index: number) =>
+          tables
+            .nth(index)
+            .locator('thead tr:first-child th')
+            .evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().right));
+        const stats = await rights(0);
+        const modules = await rights(1);
+        expect(stats).toHaveLength(fits.length + 1);
+        stats.forEach((right, i) => expect(Math.abs(right - modules[i]!)).toBeLessThanOrEqual(1));
+      });
+    }
+  }
+});
+
+test.describe('Fitting Compare pinned names row', () => {
+  test('keeps a slim row of Fitting names over their columns while the stats scroll at 1440', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInAndGoto(page, './ships/fittings/compare');
+    await answerAnyType(page);
+    await addFitting(page, FIT_A);
+    await addFitting(page, FIT_B);
+    const table = page.locator('table').first();
+    const pinned = table.getByTestId('compare-pinned-names');
+    await expect(pinned).toBeVisible({ timeout: 20_000 });
+
+    // Scroll until the table's first stat row has left the viewport.
+    const firstRow = table.locator('tbody tr').first();
+    await firstRow.evaluate((el) => {
+      const bottom = el.getBoundingClientRect().bottom + window.scrollY;
+      window.scrollTo(0, bottom + 1);
+    });
+    await expect(async () => {
+      const row = await firstRow.boundingBox();
+      expect(row!.y + row!.height).toBeLessThan(0);
+    }).toPass();
+
+    // The cells carry the sticky offset (a `tr`'s own box doesn't move with them), so measure one.
+    const box = (await pinned.locator('th').first().boundingBox())!;
+    expect(Math.abs(box.y)).toBeLessThanOrEqual(1);
+    expect(box.height).toBeLessThan(40);
+
+    // Each pinned name sits over its own column: same right edge as that column's cells.
+    const names = pinned.locator('th');
+    const cells = table.locator('tbody tr').first().locator('td');
+    for (const i of [1, 2]) {
+      const nameBox = (await names.nth(i).boundingBox())!;
+      const cellBox = (await cells.nth(i - 1).boundingBox())!; // the stat name is a row header (th), so td 0 is column 1
+      expect(Math.abs(nameBox.x + nameBox.width - (cellBox.x + cellBox.width))).toBeLessThanOrEqual(
+        1
+      );
+    }
+    await expect(names.nth(1)).toHaveText('Fit A');
+    await expect(names.nth(2)).toHaveText('Fit B');
+  });
+});

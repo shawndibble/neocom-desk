@@ -1,0 +1,62 @@
+/**
+ * Kind to tokens: fill and text tone, for the ten clocks the Calendar merges.
+ *
+ * The sibling of `severityTone.ts`, and deliberately its opposite. That one
+ * colours a **magnitude** — how close a deadline is, on an ordered ladder.
+ * This one colours an **identity**: which part of the app a deadline came
+ * from. The Calendar page paints this one; the corp ops board still paints
+ * that one.
+ *
+ * **This is the app's first nominal palette, and it is meant to be its only
+ * one.** The Mail decision refused per-folder hues partly because a first
+ * nominal set would be "either reused wrongly or forked" by the next one — so
+ * this lives in `components/ui/` beside the other tone maps rather than under
+ * `features/character/`, and the next categorical set that genuinely needs
+ * colour should extend these tokens instead of minting its own.
+ *
+ * **Colour is never the only signal here** (DESIGN.md §7), and it never has to
+ * be: every place a hue appears, the kind is also named or drawn. The rail's
+ * rows, the map's cells and the filter menu (the legend) all draw `KIND_ICON`
+ * in the hue, so a kind is told apart by shape too; the rows and the menu add
+ * its words, and the map's cells and the ticker's columns name their kinds in
+ * the `aria-label`. That is what lets the palette stay inside the house colour
+ * band instead of being stretched for colour-blind separation it does not
+ * need to carry alone: the closest pair under deuteranopia is industry/orders
+ * at ΔE 12, which is a weak *reinforcement* rather than a lost signal.
+ */
+import { isProjectedKind, type CharacterBoardItemKind } from '@/engine/character/board';
+
+/** Background fill — flat, per DESIGN.md §6. Map dots, ticker segments, menu swatches. */
+export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
+  calendarEvent: 'bg-kind-calendar-event',
+  skillTraining: 'bg-kind-skill-training',
+  industryJob: 'bg-kind-industry-job',
+  planetExtraction: 'bg-kind-planet-extraction',
+  mercenaryDen: 'bg-kind-mercenary-den',
+  moonChunk: 'bg-kind-moon-chunk',
+  skyhookRaid: 'bg-kind-skyhook-raid',
+  contractExpiry: 'bg-kind-contract-expiry',
+  orderExpiry: 'bg-kind-order-expiry',
+  skillPlan: 'bg-kind-skill-plan',
+};
+
+/** Text tone — the rail's countdown and the glyph beside it. */
+export const KIND_TEXT: Record<CharacterBoardItemKind, string> = {
+  calendarEvent: 'text-kind-calendar-event',
+  skillTraining: 'text-kind-skill-training',
+  industryJob: 'text-kind-industry-job',
+  planetExtraction: 'text-kind-planet-extraction',
+  mercenaryDen: 'text-kind-mercenary-den',
+  moonChunk: 'text-kind-moon-chunk',
+  skyhookRaid: 'text-kind-skyhook-raid',
+  contractExpiry: 'text-kind-contract-expiry',
+  orderExpiry: 'text-kind-order-expiry',
+  skillPlan: 'text-kind-skill-plan',
+};
+
+/** A ticker segment (2px tall): solid for a real clock, a dashed line for a projected one. */
+export function kindSegmentClassName(kind: CharacterBoardItemKind): string {
+  return isProjectedKind(kind)
+    ? 'flex-1 border-t-2 border-dashed border-kind-skill-plan'
+    : `flex-1 ${KIND_FILL[kind]}`;
+}

@@ -1,0 +1,152 @@
+import { describe, expect, it, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { IconButton } from './IconButton';
+
+const glyph = <svg data-testid="glyph" />;
+
+describe('IconButton', () => {
+  it('shortens only the tooltip when `tooltip` is given, keeping the full accessible name', async () => {
+    render(<IconButton icon={glyph} label="Delete Rifter run" tooltip="Delete" />);
+    const button = screen.getByRole('button', { name: 'Delete Rifter run' });
+
+    fireEvent.pointerMove(button);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete');
+  });
+
+  it('names the button after its label, so it is never announced as just "button"', () => {
+    render(<IconButton icon={glyph} label="Collapse all" />);
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeInTheDocument();
+  });
+
+  it('hides the glyph from assistive tech — the label is the accessible name', () => {
+    render(<IconButton icon={glyph} label="Refresh" />);
+    expect(screen.getByTestId('glyph').parentElement).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('exposes the same text as a tooltip, so pointer users get the name too', () => {
+    render(<IconButton icon={glyph} label="Export CSV" />);
+    const button = screen.getByRole('button');
+    fireEvent.focus(button);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Export CSV');
+    expect(button).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id);
+  });
+
+  it('is a toggle only when `pressed` is given', () => {
+    const { rerender } = render(<IconButton icon={glyph} label="Select" />);
+    expect(screen.getByRole('button')).not.toHaveAttribute('aria-pressed');
+
+    rerender(<IconButton icon={glyph} label="Select" pressed={false} />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false');
+
+    rerender(<IconButton icon={glyph} label="Select" pressed />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('calls onClick', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Refresh" onClick={onClick} />);
+    await userEvent.click(screen.getByRole('button'));
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('does not fire while disabled', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Refresh" onClick={onClick} disabled />);
+    await userEvent.click(screen.getByRole('button'));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('takes the touch tier on phones but stays row-sized from md up at size row', () => {
+    render(<IconButton icon={glyph} label="More" size="row" />);
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('size-9', 'md:size-7');
+  });
+
+  it('takes the touch-sized box on phones and the standard control size from md up', () => {
+    render(<IconButton icon={glyph} label="Refresh" />);
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('size-9');
+    expect(button).not.toHaveClass('md:size-9');
+  });
+});
+
+describe('IconButton visibleLabel', () => {
+  it('shows the text from md up, keeps the accessible name, and swaps the size classes', () => {
+    render(<IconButton icon="x" label="Filters (2 active)" visibleLabel="Filters" />);
+    const button = screen.getByRole('button', { name: 'Filters (2 active)' });
+    const text = screen.getByText('Filters');
+    expect(text).toHaveClass('hidden', 'md:inline');
+    expect(button).toHaveClass('size-9', 'md:size-auto', 'md:h-9');
+    expect(button).not.toHaveClass('md:size-9');
+  });
+
+  it('stays a bare icon without it', () => {
+    render(<IconButton icon="x" label="Go" />);
+    expect(screen.getByRole('button')).toHaveTextContent('x');
+    expect(screen.getByRole('button')).toHaveClass('size-9');
+  });
+});
+
+describe('IconButton states', () => {
+  it('gives every tone a hover and a pressed step', () => {
+    for (const tone of ['default', 'danger', 'positive', 'warning'] as const) {
+      const { unmount } = render(<IconButton icon="x" label={tone} tone={tone} />);
+      const { className } = screen.getByRole('button', { name: tone });
+      expect(className).toContain('hover:');
+      expect(className).toContain('active:bg-');
+      unmount();
+    }
+  });
+
+  it('shows no hover or press while aria-disabled', () => {
+    render(<IconButton icon="x" label="Soon" tone="danger" aria-disabled="true" />);
+    const { className } = screen.getByRole('button', { name: 'Soon' });
+    expect(className).not.toContain('hover:');
+    expect(className).not.toContain('active:bg-');
+  });
+
+  it('keeps a hover on a pressed toggle, and none while disabled', () => {
+    const { rerender } = render(<IconButton icon="x" label="Pin" pressed />);
+    expect(screen.getByRole('button').className).toContain('hover:bg-accent/20');
+    rerender(<IconButton icon="x" label="Pin" pressed disabled />);
+    expect(screen.getByRole('button').className).not.toContain('hover:');
+  });
+
+  it('with `busy`, is aria-disabled and aria-busy, ignores clicks, and stays focusable', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Refresh" busy onClick={onClick} />);
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).not.toBeDisabled();
+
+    await userEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+
+    button.focus();
+    expect(button).toHaveFocus();
+  });
+
+  it('ignores clicks when `aria-disabled` is passed directly', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Soon" aria-disabled="true" onClick={onClick} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Soon' }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('calls onClick when not busy', async () => {
+    const onClick = vi.fn();
+    render(<IconButton icon={glyph} label="Refresh" onClick={onClick} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps focus when `busy` flips on while focused', () => {
+    const { rerender } = render(<IconButton icon={glyph} label="Refresh" />);
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    button.focus();
+    rerender(<IconButton icon={glyph} label="Refresh" busy />);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveFocus();
+  });
+});

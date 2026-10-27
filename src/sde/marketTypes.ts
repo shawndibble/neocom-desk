@@ -1,0 +1,160 @@
+// Shapes of the market catalogue JSON emitted by scripts/build-sde.mjs into
+// public/data/market/ — kept out of the install precache (vite.config.ts
+// globIgnores) and fetched lazily on first visit to /market, since most
+// installs never open it (GLOSSARY.md round 10).
+
+/** One entry in public/data/market/groups.json — a node in invMarketGroups. */
+export interface MarketGroupNode {
+  id: number;
+  name: string;
+  parentId: number | null;
+  /** Only groups with hasTypes hold items directly; the rest are branches. */
+  hasTypes: boolean;
+}
+
+/** One entry in public/data/market/types.json — a published, market-grouped type. */
+export interface MarketTypeEntry {
+  typeId: number;
+  name: string;
+  marketGroupId: number;
+  /** Assembled volume in m3, from invTypes (issue #2336). */
+  volume: number;
+  /**
+   * Packaged volume in m3, from ESI's type record, present only where it
+   * differs from `volume` — a hull, and a few other assembled items.
+   */
+  packagedVolume?: number;
+}
+
+/** The m3 a type takes up packaged: what a hauler or a hangar counts. */
+export function packagedVolumeOf(type: Pick<MarketTypeEntry, 'volume' | 'packagedVolume'>): number {
+  return type.packagedVolume ?? type.volume;
+}
+
+/**
+ * `packagedVolumeOf`, or null where the entry is missing or carries no usable
+ * volume — a catalogue snapshot cached from before issue #2336 has no
+ * `volume` field at all, which must read as unknown, never as 0 m3.
+ */
+export function knownPackagedVolumeOf(
+  type: Pick<MarketTypeEntry, 'volume' | 'packagedVolume'> | undefined
+): number | null {
+  if (type === undefined) return null;
+  const volume = packagedVolumeOf(type) as number | undefined;
+  return typeof volume === 'number' && Number.isFinite(volume) ? volume : null;
+}
+
+/**
+ * public/data/market/systemPositions.json: flat `[id, x, y, z, ...]` in light years,
+ * read by `engine/route/jumpDrive.ts`'s `indexSystemPositions`.
+ */
+export type SystemPositionData = number[];
+
+/** One entry in public/data/market/systems.json. */
+export interface SolarSystemEntry {
+  id: number;
+  name: string;
+  security: number;
+  regionId: number;
+}
+
+/**
+ * public/data/market/jumps.json — stargate adjacency by solar system id
+ * (issue #942). Every solar system has a key; a gateless one maps to an empty
+ * array, so membership answers "is this a solar system" rather than "does it
+ * have stargates".
+ */
+export type JumpGraphData = Readonly<Record<string, readonly number[]>>;
+
+/** One entry in public/data/market/stations.json — an NPC station. */
+export interface NpcStationEntry {
+  id: number;
+  name: string;
+  systemId: number;
+  /**
+   * `staStations.stationTypeID`, carried so `loadStationSummary` can fill a
+   * Build Location's facility preset without an ESI call (issue #655).
+   * Optional because a snapshot built before that change simply has no such
+   * field — a caller must fall back rather than read `undefined` as a type id.
+   */
+  typeId?: number;
+  /**
+   * `staStations.corporationID` — the NPC corporation that owns the station
+   * (issue #1675). Optional because a snapshot built before that change has no
+   * such field; a caller must treat its absence as "owner unknown".
+   */
+  ownerCorporationId?: number;
+  /**
+   * The owner's faction, from `crpNPCCorporations.factionID`. Absent for a
+   * factionless owner as well as for an older snapshot — ESI's corporation
+   * endpoint cannot supply it for NPC corps, so there is nothing to fall back to.
+   */
+  ownerFactionId?: number;
+}
+
+/**
+ * One entry in public/data/market/lpCorporations.json — an NPC corporation
+ * that runs an LP Store (issue #2320). Probed live at build time: the SDE has
+ * no "has an LP store" flag, so only corps whose store lists an offer are kept.
+ */
+export interface LpCorporationEntry {
+  id: number;
+  name: string;
+  /** `crpNPCCorporations.factionID`; absent for a factionless corp (e.g. Sisters of EVE). */
+  factionId?: number;
+}
+
+/** One entry in public/data/market/regions.json — a region probed to actually carry orders. */
+export interface MarketRegionEntry {
+  id: number;
+  name: string;
+}
+
+/**
+ * One entry in public/data/market/globalMarkets.json — a type that trades in
+ * a Global Market Region (GLOSSARY.md round 12) instead of the normal
+ * regional books, e.g. PLEX in GPMR-01. Read live at build time, not
+ * hardcoded — see scripts/build-sde.mjs.
+ */
+export interface GlobalMarketEntry {
+  typeId: number;
+  regionId: number;
+  regionName: string;
+}
+
+/**
+ * One entry in public/data/market/attributes.json — turns a dogma
+ * attribute_id from Item Detail's live ESI read into a display name, unit
+ * and category (GLOSSARY.md round 6). Published attributes only; an id
+ * absent here has no display name and is skipped rather than shown raw.
+ */
+export interface AttributeDictionaryEntry {
+  name: string;
+  unit: string | null;
+  category: string;
+  /**
+   * The SDE unit id behind `unit`, which says how to read the raw value
+   * ("%" alone could be a share, a resonance or a modifier; "s" is
+   * milliseconds). Absent for an attribute with no unit.
+   */
+  unitId?: number;
+}
+
+export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEntry>>;
+
+/**
+ * One entry in public/data/market/variations.json's `types` map — a
+ * published type's Tech/Meta/Faction classification (invMetaTypes.csv).
+ * `parentTypeId` is null for the Tech I root; `metaGroupId` looks up a
+ * display name in the sibling `metaGroups` map (see src/engine/market/variations.ts).
+ */
+export interface VariationEntry {
+  parentTypeId: number | null;
+  metaGroupId: number;
+}
+
+/** public/data/market/variations.json — the Tech/Meta/Faction variation relation. */
+export interface VariationData {
+  types: Readonly<Record<number, VariationEntry>>;
+  metaGroups: Readonly<Record<number, string>>;
+}

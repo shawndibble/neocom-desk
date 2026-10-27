@@ -1,0 +1,105 @@
+import { useTranslation } from 'react-i18next';
+import type { SupportRow } from '@/engine/fittings/support';
+import type { FittingStats } from '@/engine/fittings/types';
+import { rangeLines } from './rangeText';
+import { HeatFigure, StatRow, StatRows } from './StatFacts';
+import { joinDetail } from './statKit';
+import { fixed2, fixedFormat } from '@/lib/fixedFormat';
+
+/** Rates and points to one decimal; percentages and jam strength as the game shows them. */
+const DIGITS: Record<SupportRow['kind'], number> = {
+  remoteShield: 1,
+  remoteArmor: 1,
+  remoteHull: 1,
+  neutralizer: 1,
+  nosferatu: 1,
+  capTransfer: 1,
+  web: 0,
+  warpDisruption: 0,
+  ecm: 2,
+  targetPainter: 0,
+  trackingDisruptor: 0,
+  sensorDampener: 0,
+  guidanceDisruptor: 0,
+};
+
+/**
+ * A signed % reads −17 / +12, the way the kind labels already spell them;
+ * one that rounds to nothing is a plain 0, never −0.
+ */
+function signed(amount: number, digits: number): string {
+  const text = fixedFormat(digits)(Math.abs(amount));
+  if (Number(text) === 0) return text;
+  return amount < 0 ? `−${text}` : `+${text}`;
+}
+
+/**
+ * Every effect of a disruptor or dampener, or each differing jam strength of
+ * an ECM; null where the kind label alone says it (one effect, or a
+ * multispectral jammer's single strength).
+ */
+function effectsText(
+  row: SupportRow,
+  t: (key: string, options: Record<string, unknown>) => string
+): string | null {
+  // fixed format: identity key, never shown
+  const distinct = new Set(row.effects.map((e) => e.amount.toFixed(4)));
+  if (row.effects.length === 0 || (row.kind === 'ecm' && distinct.size === 1)) return null;
+  return row.effects
+    .map((e) =>
+      t(`fittings.stats.support.effect.${e.effect}`, {
+        value: row.kind === 'ecm' ? fixed2(e.amount) : signed(e.amount, 0),
+      })
+    )
+    .join(', ');
+}
+
+/**
+ * Support out: every running module that reaches another ship, one row a
+ * module type — what it hands out or takes away, and at what range.
+ */
+export function SupportFacts({
+  stats,
+  typeName,
+}: {
+  stats: FittingStats;
+  typeName: (typeId: number) => string;
+}) {
+  const { t } = useTranslation();
+  const range = (row: SupportRow) => rangeLines(t, row.optimal, row.falloff);
+  const amount = (row: SupportRow) =>
+    effectsText(row, t) ??
+    t(`fittings.stats.support.kind.${row.kind}`, {
+      value: fixedFormat(DIGITS[row.kind])(row.amount),
+      count: row.amount,
+    });
+  // What a row does, apart from how much: a scripted and an unscripted
+  // module of one type are two rows, and heat changes only the amounts.
+  const effectNames = (row: SupportRow) => row.effects.map((e) => e.effect).join(',');
+  return (
+    <StatRows>
+      {stats.support.rows.map((row, index) => {
+        // The same row in the other calculation, by what it is — or this one when it has none.
+        const same = (s: FittingStats) =>
+          s.support.rows.find(
+            (other) =>
+              other.kind === row.kind &&
+              other.typeId === row.typeId &&
+              effectNames(other) === effectNames(row)
+          ) ?? row;
+        return (
+          <StatRow
+            key={`${row.kind}:${row.typeId}:${index}`}
+            name={t('fittings.stats.weaponRow', { count: row.count, name: typeName(row.typeId) })}
+            detail={joinDetail(
+              range(row).map((_, line) => (
+                <HeatFigure key={line} stats={stats} format={(s) => range(same(s))[line] ?? ''} />
+              ))
+            )}
+            figure={<HeatFigure stats={stats} format={(s) => amount(same(s))} />}
+          />
+        );
+      })}
+    </StatRows>
+  );
+}

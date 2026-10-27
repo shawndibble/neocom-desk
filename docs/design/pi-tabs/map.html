@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PI Map</title>
+<link rel="stylesheet" href="tokens.css">
+<script src="data.js"></script>
+<script src="calc.js"></script>
+<script src="icons.js"></script>
+<style>
+/* Neocom Desk design rules (DESIGN-RULES.md): boxes = clickable; Panel is the only bordered display container; radius 2px; no gradients/glows. Map keeps its icons, planet images and colour. */
+:root{--gold:#f5b94a;--path:#57c7f4;--new:#ff79c6;--hs:#5fd584;--ls:#f5b94a;--ns:#ff7369;font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,system-ui,sans-serif}
+body{min-height:100vh;font-size:14px}
+a{color:var(--accent)}
+.app{padding-top:12px;padding-bottom:40px;display:flex;flex-direction:column;gap:12px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dim{color:var(--text-dim)}.faint{color:var(--text-faint)}
+/* ---- primitives ---- */
+.panel{background:rgba(17,22,29,.85);backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:2px;padding:0}
+.ph{min-height:36px;padding:4px 12px;background:var(--panel-2);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ph h2,.ph h3{margin:0;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:8px}
+.ph .meta{font-size:11px;color:var(--text-dim);display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.pb{padding:12px}
+.micro{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin:12px 0 6px}
+.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:2px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--line-bright);background:var(--panel-2)}
+.btn.accent{border-color:var(--accent);color:var(--accent)}.btn.accent:hover{background:rgba(87,199,244,.1)}
+.btn.md{height:36px;padding:0 16px;font-size:12px}
+.textact{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:none;border:0;padding:0;height:auto;cursor:pointer}
+.textact:hover{text-decoration:underline}
+.ilink{color:var(--accent);font-weight:500;text-decoration:underline;cursor:pointer}
+.stats{display:flex;flex-wrap:wrap;align-items:center;row-gap:2px}
+.st{display:inline-flex;align-items:center;gap:6px;height:28px;font-size:11px;white-space:nowrap;padding-left:12px;margin-left:12px;position:relative}
+.st:first-child{padding-left:0;margin-left:0}
+.st:not(:first-child)::before{content:"";position:absolute;left:0;top:7px;width:1px;height:14px;background:var(--line)}
+.st .l{font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.st .v{font-weight:500;font-variant-numeric:tabular-nums;color:var(--text)}
+.st .v.pos{color:var(--isk-pos)}.st .v.warn{color:var(--warning)}
+.tag18{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--line);border-radius:2px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap}
+.tag18.est{border-color:rgba(245,185,74,.6);color:var(--warning)}
+.tag18.pick{border-color:rgba(245,185,74,.6);color:var(--warning)}
+.tag18.stop{border-color:rgba(245,185,74,.45);background:rgba(245,185,74,.1);color:var(--warning)}
+.tag18.add{border-color:rgba(87,199,244,.45);background:rgba(87,199,244,.1);color:var(--accent)}
+.tier{display:inline-flex;align-items:center;height:18px;padding:0 5px;border:1px solid var(--line);background:var(--panel-2);border-radius:2px;font-size:11px;color:var(--text-dim);font-weight:600}
+.cmp{font-size:11px;font-weight:600;color:var(--text-dim)}
+.cmp.better{color:var(--success)}.cmp.worse{color:var(--danger)}
+.ar{color:var(--text-dim)}
+.est{font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.4}
+.hair{border-top:1px solid var(--line)}
+/* ---- mock + context ---- */
+.mock{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 12px;border:1px dashed var(--line-bright);border-radius:2px;font-size:12px;color:var(--text-dim)}
+.mock #pilotsw{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:2px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.fchip:hover{border-color:var(--line-bright);color:var(--text)}
+.fchip.on{border-color:var(--accent-dim);background:rgba(87,199,244,.15);color:var(--accent)}
+.ctx select{height:28px;padding:0 8px;font-size:12px;border:1px solid var(--line-bright);background:var(--panel-2);color:var(--text);border-radius:2px;text-transform:none;letter-spacing:0;font-weight:400}
+.sec{font-weight:600;font-variant-numeric:tabular-nums}
+/* ---- guidance panel ---- */
+.guide{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(0,1.1fr);font-size:12px;color:var(--text-dim);line-height:1.45}
+.guide>div{padding:10px 12px}
+.guide>div+div{border-left:1px solid var(--line)}
+.guide .g b{display:block;color:var(--text);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.guide .g b span{color:var(--accent);margin-right:4px}
+.guide .learn a{display:block;margin:3px 0;font-weight:500}
+/* ---- segmented control (question) ---- */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:2px;overflow:hidden;max-width:100%}
+.seg button{height:36px;padding:0 12px;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;color:var(--text-dim);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button:hover{background:var(--panel-2);color:var(--text)}
+.seg button.on{background:rgba(87,199,244,.15);color:var(--accent)}
+.qrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.qrow .hint{font-size:12px;color:var(--text-dim)}
+.specific{margin-left:auto;font-size:12px;color:var(--text-dim)}
+/* ---- layout ---- */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.layout.docked{grid-template-columns:minmax(0,1fr) 360px}
+.layout:not(.docked)>.side{display:none}
+.legend{display:flex;gap:12px;align-items:center;flex-wrap:wrap;text-transform:none;letter-spacing:0;font-weight:400}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:5px;vertical-align:0}
+.whatif{display:flex;align-items:center;gap:10px;min-height:40px;padding:6px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--text-dim);flex-wrap:wrap}
+.whatif .wi{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);white-space:nowrap}
+.whatif.on .wi{color:var(--new)}
+.whatif.on{color:var(--text)}
+.whatif .icons{display:flex;gap:2px;flex-wrap:wrap}
+.whatif .icons img{width:22px;height:22px}
+.whatif img.wp{width:28px;height:28px;border-radius:50%}
+/* ---- map ---- */
+.mapwrap{position:relative;padding:12px 12px 12px 0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain}
+.map{position:relative;display:grid;grid-template-columns:72px 116px 146px 196px 184px 194px;column-gap:16px;width:max-content;margin:0 auto}
+.map svg.wires{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.col{position:relative;display:flex;flex-direction:column}
+.col.planets{position:sticky;left:0;z-index:3;background:#10151c;padding-left:12px;box-sizing:content-box;box-shadow:1px 0 0 var(--line)}
+.colhead{height:52px}
+.planets .colhead .t{gap:4px}
+.colhead .t{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text);display:flex;align-items:center;gap:6px}
+.colhead .s{font-size:11px;color:var(--text-dim);line-height:1.25;margin-top:3px}
+.ibtn{height:16px;width:16px;min-width:16px;padding:0;border-radius:50%;font-size:10px;font-weight:600;line-height:14px;text-align:center;border:1px solid var(--line);color:var(--text-dim);background:transparent;cursor:pointer}
+.ibtn:hover{border-color:var(--line-bright);color:var(--text)}
+.items{flex:1;display:flex;flex-direction:column;justify-content:center;gap:3px}
+
+
+
+
+
+
+.it{flex:none;position:relative;display:grid;grid-template-columns:24px minmax(0,1fr) auto;column-gap:6px;align-items:center;height:34px;padding:0 5px 0 3px;border-radius:2px;cursor:pointer;font-size:12px;border:1px solid var(--line);background:var(--panel-2)}
+.it img{width:24px;height:24px}
+.it .nm{white-space:normal;line-height:13px;min-width:0;overflow-wrap:normal;word-break:normal}
+.it .sub{display:flex;align-items:center;gap:4px;font-size:11px;line-height:13px;font-variant-numeric:tabular-nums;color:var(--text)}
+.it .sub b{font-weight:600}
+.sym{font-size:10px;line-height:11px;font-weight:700}
+.sym.better{color:var(--success)}.sym.same{color:var(--text-dim)}.sym.worse{color:var(--danger)}
+.it:hover{border-color:var(--line-bright)}
+.it.dim{opacity:.3}
+.it.ghost{background:rgba(22,29,39,.35);border-color:transparent;cursor:default}
+.it.ghost>*{visibility:hidden}
+.it.path{background:rgba(87,199,244,.12);border-color:var(--accent-dim)}
+.it.path .nm{color:var(--text);font-weight:600}
+.it.goal{background:rgba(245,185,74,.12);border-color:var(--gold)}
+.it.new{opacity:1;background:rgba(255,121,198,.12);border-color:var(--new)}
+.it.new>*{visibility:visible}
+.it .rank{position:absolute;width:max-content;justify-self:start;left:-15px;top:50%;transform:translateY(-50%);height:18px;min-width:22px;padding:0 3px;border-radius:2px;background:var(--gold);color:var(--bg);font-size:11px;font-weight:700;display:grid;place-items:center;z-index:2}
+.it .rank.alt{background:var(--bg);color:var(--gold);border:1px solid var(--gold)}
+/* planets (toggle buttons) */
+.planets .items{justify-content:space-between;gap:0;padding:0}
+
+
+
+
+
+.pl{display:flex;flex-direction:column;align-items:center;gap:3px;width:72px;cursor:pointer;border-radius:2px;padding:3px 0;position:relative;border:1px solid transparent;height:auto;background:transparent;color:var(--text);font:inherit}
+.pl img{width:40px;height:40px;flex:none;border-radius:50%;outline:2px solid transparent;outline-offset:1px}
+.pl .pn{font-size:11px;font-weight:600;line-height:13px}
+.pl .box{position:absolute;top:2px;right:6px;width:14px;height:14px;border-radius:2px;border:1px solid var(--line-bright);background:var(--panel-2);display:grid;place-items:center;font-size:10px;line-height:1;color:var(--accent-contrast)}
+.pl .tag{display:inline-flex;align-items:center;height:14px;padding:0 3px;border:1px solid var(--line);border-radius:2px;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.pl .ptag:empty{display:none}
+.pl.on .box{background:var(--accent);border-color:var(--accent)}
+.pl.off img{filter:grayscale(1) brightness(.45)}
+.pl.off .pn{color:var(--text-dim)}
+.pl:hover{border-color:var(--line-bright);background:var(--panel-2)}
+.pl.off:hover img,.pl.off.hov img{filter:none;outline-color:var(--new)}
+.pl.on.extra img{outline-color:var(--new)}
+.pl.use img{outline-color:var(--gold)}
+.pl.need img{filter:none;outline-color:var(--danger)}
+
+.tag.have{color:var(--success);border-color:rgba(95,213,132,.5)}.tag.need{color:var(--danger);border-color:rgba(255,115,105,.5)}.tag.use{color:var(--gold);border-color:rgba(245,185,74,.6)}.tag.wi{color:var(--new);border-color:rgba(255,121,198,.6)}
+/* wires */
+.w{fill:none;stroke:#2c3a4b;stroke-width:1;opacity:.55}
+.w.lit{stroke:#3f5a74;opacity:.85}
+.w.dim{opacity:.1}
+.w.path{stroke:var(--path);stroke-width:2;opacity:1}
+.w.pp{stroke:var(--gold);stroke-width:2;opacity:1}
+.w.nw{stroke:var(--new);stroke-width:1.2;opacity:.5}
+/* ---- side panels ---- */
+.side{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px}
+.card{background:rgba(17,22,29,.85);border:1px solid var(--line);border-radius:2px;padding:0 12px 12px}
+.card>h3:first-child{margin:0 -12px 12px;min-height:36px;padding:4px 12px;background:var(--panel-2);border-bottom:1px solid var(--line);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:8px}
+.card>h3:not(:first-child){font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin:14px 0 6px}
+.card>h3 .xbtn{margin-left:auto}
+.pick{display:flex;align-items:center;gap:12px}
+.pick img.big{width:48px;height:48px}
+.pname{font-size:16px;font-weight:600;line-height:1.25}
+.big-isk{font-size:30px;font-weight:600;color:var(--isk-pos);font-variant-numeric:tabular-nums;line-height:1.1;margin-top:10px}
+.big-isk small{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-left:4px}
+.story{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;margin:8px 0 4px;font-size:12px;line-height:1.6}
+.story .pi{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.story .pi img{width:20px;height:20px;border-radius:50%}
+.story .ii img,.story img{width:20px;height:20px;vertical-align:-5px}
+.effort{margin-top:8px}
+.alts{display:flex;flex-direction:column;margin-top:12px;border-top:1px solid var(--line)}
+.alt{display:flex;align-items:center;gap:8px;height:36px;padding:0 8px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;color:var(--text);font-size:12px;text-align:left;cursor:pointer;width:100%}
+.alt:hover{background:var(--panel-2)}
+.alt.on{background:rgba(87,199,244,.12);box-shadow:inset 2px 0 0 var(--accent)}
+.alt img{width:22px;height:22px;flex:none}
+.alt .rk{font-weight:700;color:var(--gold);font-size:11px;min-width:18px}
+.alt .gn{font-size:12px;color:var(--isk-pos);font-variant-numeric:tabular-nums}
+.alt .lbl{min-width:0;flex:1;display:flex;justify-content:space-between;gap:8px;overflow:hidden}
+.alt .lbl div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alt::after{content:"›";color:var(--text-dim);font-size:16px}
+.todo{display:flex;flex-direction:column}
+.todo .pc{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
+.todo .pc:first-child{border-top:0;padding-top:0}
+.todo .pc>img{width:32px;height:32px;border-radius:50%}
+.todo .pc .h{font-weight:600;font-size:12px}
+.todo .pc .h small{font-weight:400;color:var(--text-dim)}
+.todo ol{margin:4px 0 0;padding-left:18px;font-size:12px;line-height:1.7}
+.todo ol img{width:18px;height:18px;vertical-align:-4px;margin-right:3px}
+.todo .stop{color:var(--text-dim);text-decoration:line-through}
+.keep{font-size:12px;color:var(--text-dim);display:flex;flex-direction:column}
+.keep span{display:flex;gap:6px;align-items:center;padding:4px 0;border-top:1px solid var(--line)}
+.keep img{width:18px;height:18px;border-radius:50%}
+.blist{display:flex;flex-direction:column}
+.brow{display:grid;grid-template-columns:24px minmax(0,1fr) auto auto 10px;gap:8px;align-items:center;height:36px;padding:0 4px;cursor:pointer;font-size:12px;border-top:1px solid var(--line)}
+.brow:first-child{border-top:0}
+.brow::after{content:"›";color:var(--text-dim)}
+.brow>span:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow:hover{background:var(--panel-2)}
+.brow img{width:24px;height:24px}
+.brow .pls{display:flex;gap:2px}
+.brow .pls img{width:16px;height:16px;border-radius:50%}
+.howto{display:flex;flex-direction:column}
+.hrow{display:grid;grid-template-columns:32px 1fr;gap:8px;align-items:center;font-size:12px;padding:6px 0;border-top:1px solid var(--line)}
+.hrow>img{width:32px;height:32px;border-radius:50%}
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:3px}
+.flow img{width:22px;height:22px}
+.flow .ar{font-size:11px;margin:0 2px}
+.fin{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap}
+.fin>img{width:28px;height:28px}
+/* finder */
+.sysrow{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:12px}
+.sysrow .types-s{display:flex;gap:4px;grid-column:1/-1}
+.sysrow .types-s img{width:20px;height:20px;border-radius:50%;opacity:.25;filter:grayscale(1)}
+.sysrow .types-s img.hit{opacity:1;filter:none}
+.sysrow .sky{grid-column:1/-1;font-size:11px;color:var(--text-dim)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer}
+.chk input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
+.seckey{display:flex;gap:10px;font-size:11px;color:var(--text-dim);flex-wrap:wrap}
+.seckey span::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:1px}
+.seckey .h::before{background:var(--hs)}.seckey .l::before{background:var(--ls)}.seckey .n::before{background:var(--ns)}
+.finderhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:6px}
+/* add-a-planet */
+.addp .ah{display:flex;gap:12px;align-items:center}
+.addp .ah>img{width:44px;height:44px;border-radius:50%;outline:2px solid var(--new);outline-offset:1px}
+.addp .ah b{font-size:14px}
+.addp .unl{color:var(--new);font-weight:600}
+.slot{margin-top:10px;font-size:12px;color:var(--text-dim);line-height:1.5;padding-top:8px;border-top:1px solid var(--line)}
+.slot b{color:var(--text)}
+.slot.full b:first-child{color:var(--warning)}
+.recipe{display:flex;align-items:center;gap:8px;width:100%;margin-top:10px;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:transparent;font-size:12px;cursor:pointer;text-align:left}
+.recipe:hover{border-color:var(--line-bright);background:var(--panel-2)}
+.recipe::after{content:"›";margin-left:auto;color:var(--text-dim);font-size:16px}
+.recipe img{width:28px;height:28px}
+.qw-note{font-size:12px;color:var(--text-dim);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+/* ---- drawer (shared by details + help) ---- */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:100vw;z-index:40;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;transform:translateX(100%);visibility:hidden;transition:transform .18s ease,visibility 0s .18s;box-shadow:-12px 0 32px rgba(0,0,0,.5)}
+.drawer.open{transform:none;visibility:visible;transition:transform .18s ease}
+.drawer>.ph{flex:none}
+.drawer .db{flex:1;overflow:auto;padding:0 12px 16px}
+.drawer .card{border:0;background:transparent;padding:0 0 14px;border-radius:0}
+.drawer .card>h3:first-child{margin:0 -12px 10px;background:transparent;border-bottom:1px solid var(--line);border-top:1px solid var(--line);min-height:32px}
+.drawer .card:first-child>h3:first-child{border-top:0}
+.ibtn-g{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:2px;cursor:pointer;font-size:14px}
+.ibtn-g:hover{border-color:var(--line-bright);color:var(--text)}
+.help ol{margin:0;padding-left:18px;font-size:12px;line-height:1.55;color:var(--text-dim)}
+.help ol li{padding:4px 0}
+.help ol b{color:var(--text)}
+.lg{display:grid;grid-template-columns:44px 1fr;gap:6px 10px;align-items:center;font-size:12px;color:var(--text-dim)}
+.lg .k{display:flex;justify-content:center;font-weight:700}
+.sw{display:inline-block;width:28px;height:14px;border:1px solid;border-radius:2px}
+.hint{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--text-dim)}
+.hint .x{margin-left:auto}
+.picks{display:flex;align-items:center;gap:4px 14px;flex-wrap:wrap;padding:6px 12px;border-bottom:1px solid var(--line);font-size:12px}
+.picks .lbl{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+.pickbtn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:2px;font-size:12px;cursor:pointer}
+.pickbtn:hover{border-color:var(--line-bright);background:var(--panel-2)}
+.pickbtn.on{border-color:var(--accent-dim);background:rgba(87,199,244,.12)}
+.pickbtn img{width:20px;height:20px}
+.pickbtn .rk{color:var(--gold);font-weight:700;font-size:11px}
+.pickbtn .gn{color:var(--isk-pos);font-variant-numeric:tabular-nums}
+/* ---- simulated app left rail ---- */
+.shell{display:flex;min-height:100vh}
+.mainc{flex:1;min-width:0}
+.rail{width:208px;flex:none;position:sticky;top:0;height:100vh;overflow:auto;background:rgba(17,22,29,.85);border-right:1px solid var(--line);display:flex;flex-direction:column;font-size:12px}
+.rail .brand{display:flex;align-items:center;gap:10px;height:52px;padding:0 16px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text);border-bottom:1px solid var(--line)}
+.rail .brand svg{width:22px;height:22px;color:var(--text-dim)}
+.rail .goto{margin:8px;height:32px;display:flex;align-items:center;gap:8px;padding:0 8px;border:1px solid var(--line-bright);border-radius:2px;background:var(--panel-2);color:var(--text-dim)}
+.rail .goto kbd{margin-left:auto;font:inherit;font-size:10px;border:1px solid var(--line);padding:0 4px;border-radius:2px}
+.rail .grp{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);padding:12px 16px 4px}
+.rail a{display:flex;align-items:center;gap:10px;height:32px;margin:0 8px;padding:0 10px;color:var(--text);text-decoration:none;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border:1px solid transparent;border-radius:2px}
+.rail a svg{width:15px;height:15px;color:var(--text-dim);flex:none}
+.rail a:hover{background:var(--panel-2)}
+.rail a.on{border-color:var(--line-bright);background:var(--panel-2);color:var(--accent)}
+.rail a.on svg{color:var(--accent)}
+.rail .subs{margin:2px 8px 4px 24px;border-left:1px solid var(--line)}
+.rail .subs a{height:28px;margin:0;font-weight:400;letter-spacing:0;text-transform:none;border:0;border-left:1px solid transparent;margin-left:-1px;border-radius:0;color:var(--text-dim)}
+.rail .subs a.on{border-left-color:var(--accent);color:var(--accent);background:transparent}
+.rail .foot{margin-top:auto;border-top:1px solid var(--line);height:52px;display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--text)}
+.rail .foot i{width:28px;height:28px;background:#000;display:block}
+@media (max-width:767px){.rail{display:none}
+  .drawer{top:auto;left:0;right:0;width:auto;max-height:82vh;border-left:0;border-top:1px solid var(--line-bright);transform:translateY(100%)}
+  .drawer.open{transform:none}
+  .drawer>.ph{min-height:44px}
+  .ibtn-g{width:44px;height:44px}
+}
+/* tooltip / popover (menus+tooltips may shadow) */
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:8px;font-size:12px;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
+.tip .tt{display:flex;gap:8px;align-items:center;font-weight:600;margin-bottom:4px;color:var(--text)}
+.tip .tt img{width:28px;height:28px}
+.pop{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:8px 10px;font-size:12px;color:var(--text-dim);max-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none;line-height:1.5}
+.pop b{color:var(--text)}
+/* ---- phone ---- */
+.phone{display:none;flex-direction:column;gap:12px}
+.ptog{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ptog button{height:auto;min-height:64px;padding:4px 2px 5px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);border-radius:2px;background:var(--panel-2);color:var(--text-dim);position:relative}
+.ptog button img{width:32px;height:32px;border-radius:50%}
+.ptog button.off img{filter:grayscale(1) brightness(.45)}
+.ptog button.on{border-color:var(--accent-dim);background:rgba(87,199,244,.15);color:var(--accent)}
+.ptog button.on::after{content:'✓';position:absolute;top:2px;right:4px;font-size:10px}
+.ptog button.extra{border-color:var(--new);color:var(--new);background:rgba(255,121,198,.1)}
+.pnote{font-size:12px;color:var(--text-dim)}
+.storyv{display:flex;flex-direction:column}
+.srow{padding:8px 12px}
+.srow+.down{border-top:1px solid var(--line)}
+.srow .lab{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px}
+.srow .lab span:last-child{text-transform:none;letter-spacing:0;font-weight:400;text-align:right}
+.chips{display:flex;flex-wrap:wrap;gap:4px 14px}
+.ich{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.ich img{width:26px;height:26px}
+.ich.planet img{border-radius:50%;width:32px;height:32px}
+.ich small{display:block;color:var(--text-dim);font-size:11px}
+.down{display:flex;align-items:center;gap:8px;justify-content:center;color:var(--text-dim);font-size:11px;height:26px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.down .arw{color:var(--path);font-size:14px;line-height:1}
+.srow.prod .lab span:first-child{color:var(--gold)}
+.srow.prod .ich{font-size:16px;font-weight:600}
+.srow.prod .ich img{width:40px;height:40px}
+.tiers{display:flex;flex-direction:column}
+.tiers>div{padding:8px 12px;border-top:1px solid var(--line)}
+.tiers>div:first-child{border-top:0}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mini{display:grid;grid-template-columns:26px minmax(0,1fr);column-gap:6px;align-items:center;border:1px solid var(--line);background:var(--panel-2);border-radius:2px;padding:3px 5px 3px 3px;cursor:pointer;min-height:44px}
+.mini img{grid-row:1/3;width:26px;height:26px}
+.mini .nm{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini .sub{font-size:11px;color:var(--text-dim);display:flex;gap:5px;font-variant-numeric:tabular-nums;min-width:0}
+.mini .sub .cmp{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini.ghost{border-color:transparent;background:rgba(22,29,39,.35);opacity:.4}
+.mini.new{border-color:var(--new);background:rgba(255,121,198,.1)}
+.thead{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between}
+.thead span:last-child{text-transform:none;letter-spacing:0;font-weight:400}
+.fullmap-btn{width:100%}
+.fullmap{display:none;overflow-x:auto;overflow-y:hidden}
+.fullmap.open{display:block}
+.fullmap .mapwrap{width:max-content;overflow:visible}
+.sheet{display:flex;flex-direction:column;gap:12px}
+.sheet .alts{display:none}
+.pguide{font-size:12px;color:var(--text-dim);line-height:1.5}
+.pguide p{margin:0 0 6px}.pguide b{color:var(--text)}
+.pguide a{margin-right:12px;font-weight:500}
+.short-only{display:none}
+.card .stats{display:block;margin-top:8px}
+.card .stats .st{display:flex;justify-content:space-between;margin:0;padding:0;border-top:1px solid var(--line);height:28px}
+.card .stats .st::before{display:none}
+.card .stats .st:last-child{border-bottom:1px solid var(--line)}
+.gloss-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:2px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.gloss-btn:hover{border-color:var(--line-bright);background:var(--panel-2)}
+.gloss-btn b{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;border:1px solid var(--line);font-size:10px;color:var(--text-dim)}
+@media (max-width:767px){.gloss-btn{height:36px}.gloss-btn .long{display:none}.short-only{display:inline}}
+@media (max-width:767px){
+  .layout,.deskonly{display:none!important}
+  .phone{display:flex}
+  .seg{display:flex;width:100%}
+  .seg button{flex:1;height:44px;padding:0 8px;line-height:1.25}
+  .specific{display:none}
+  .ph{min-height:44px}
+  .btn{height:36px}.btn.md{height:44px}
+  .fchip{height:36px}
+  .ctx select{height:36px}
+}
+@media (max-width:640px){
+  .ctx .st::before{display:none}.ctx .st{margin-left:0;padding-left:0;margin-right:14px}
+  header.pi-hdr .pi-hdr-in{padding-left:16px;padding-right:16px}
+  .mock{font-size:11px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="rail" aria-label="App">
+  <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8 5v10l-8 5-8-5V7z"/><circle cx="12" cy="12" r="3"/></svg>Neocom Desk</div>
+  <div class="goto">› Go to… <kbd>Ctrl K</kbd></div>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/></svg>Overview</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4z"/></svg>Alerts</a>
+  <div class="grp">Progression</div>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l9-5 9 5-9 5z"/><path d="M7 11v5c3 2 7 2 10 0v-5"/></svg>Skills</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21V10l6 4V10l6 4V5h6v16z"/></svg>Industry</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h13l5-4v8l-5-2H3z"/></svg>Ships</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 9-8 9-8-9z"/></svg>Mining</a>
+  <a href="#" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="10" ry="3.5"/></svg>PI</a>
+  <div class="subs"><a href="colonies.html">Colonies</a><a href="plan.html">Plan</a><a href="map.html" class="on">Map</a></div>
+  <div class="grp">Economy</div>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 17l6-6 4 4 8-8"/></svg>Market</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13"/><path d="M16 12h2"/></svg>Wallet</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/></svg>Assets</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l4 4v14H6z"/></svg>Contracts</a>
+  <div class="grp">Social</div>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14"/><path d="M3 6l9 7 9-7"/></svg>Mail</a>
+  <a href="#" class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="15"/><path d="M4 10h16"/></svg>Calendar</a>
+  <div class="foot"><i></i>Test Pilot</div>
+</nav>
+<div class="mainc">
+<!-- ===== PI SHARED HEADER (copy this whole block into each PI tab mockup) =====
+     Matches the real app chrome: page header (20px uppercase h1 + DataAgeBadge + ghost
+     IconButtons) and PageTabs. Includes the shared fluid page container rule (.pi-page):
+     full width, padding-inline 24px (16px below 640px), no centred max-width column.
+     Wrap the page body in <main class="pi-page"> too. Set class "on" + aria-current="page"
+     on the current tab. Page-specific buttons go in .pi-hdr-slot (leave empty otherwise). -->
+<header class="pi-hdr pi-page">
+  <style>
+    .pi-page{width:100%;padding-inline:24px;box-sizing:border-box}
+    @media (max-width:639px){.pi-page{padding-inline:16px}}
+    .pi-hdr{padding-top:16px}
+    .pi-hdr-row{min-height:36px;display:flex;align-items:center;gap:8px;min-width:0}
+    .pi-hdr-title{margin:0;font-size:20px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text);white-space:nowrap}
+    .pi-hdr-age{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;margin-left:4px}
+    .pi-hdr-age::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+    .pi-hdr-acts{margin-left:auto;display:flex;align-items:center;gap:6px}
+    .pi-hdr-ib{display:inline-grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);border-radius:2px;cursor:pointer;padding:0}
+    .pi-hdr-ib:hover{border-color:var(--line-bright);color:var(--text)}
+    .pi-hdr-ib svg{width:18px;height:18px}
+    .pi-hdr-btn{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:2px;font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+    .pi-hdr-btn:hover{border-color:var(--line-bright);background:var(--panel-2)}
+    .pi-hdr-btn svg{display:none;width:18px;height:18px}
+    @media (max-width:639px){.pi-hdr-btn{width:44px;height:44px;padding:0;justify-content:center;background:var(--panel-2);color:var(--text-dim)}.pi-hdr-btn .pi-hdr-btxt{display:none}.pi-hdr-btn svg{display:block}}
+    .pi-hdr-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:12px;overflow-x:auto}
+    .pi-hdr-tabs a{display:flex;align-items:center;height:36px;padding:0 12px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+    .pi-hdr-tabs a:hover{background:rgba(22,29,39,.4);color:var(--text)}
+    .pi-hdr-tabs a.on{border-bottom-color:var(--accent);background:rgba(22,29,39,.6);color:var(--text)}
+    @media (max-width:767px){.pi-hdr-age{display:none}.pi-hdr-title{white-space:normal;min-width:0;line-height:1.2;flex:1}.pi-hdr-acts{flex:none}.pi-hdr-ib{width:44px;height:44px}.pi-hdr-tabs a{height:44px;flex:1;justify-content:center}}
+  </style>
+  <div class="pi-hdr-row">
+    <h1 class="pi-hdr-title">Planetary Industry</h1>
+    <span class="pi-hdr-age" title="Colony data age">just now</span>
+    <div class="pi-hdr-acts">
+      <span class="pi-hdr-slot"><button class="pi-hdr-btn" id="gloss-btn" title="New to PI? 60-second explainer" aria-label="New to PI? 60-second explainer"><span class="pi-hdr-btxt">New to PI?</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-1 .6-1.5 1.2-1.5 2.5M12 17h.01"/></svg></button></span>
+      <button class="pi-hdr-ib" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button>
+      <button class="pi-hdr-ib" title="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+    </div>
+  </div>
+  <nav class="pi-hdr-tabs" aria-label="Planetary Industry">
+    <a href="plan.html">Plan</a>
+    <a href="map.html" class="on" aria-current="page">Map</a>
+    <a href="colonies.html">Colonies</a>
+  </nav>
+</header>
+<!-- ===== /PI SHARED HEADER ===== -->
+
+<main class="pi-page app">
+  <div class="mock">Mockup only, switch the sample pilot:<span id="pilotsw"></span></div>
+  <div class="ctx stats" id="ctx"></div>
+  <div class="qrow"><div class="seg" role="group" aria-label="Question"><button data-q="have">I have planets: what should they make?</button><button data-q="best">What's the best thing to make?</button></div><span class="hint deskonly" id="q1sub"></span><span class="specific" id="specific"></span></div>
+  <div class="layout">
+    <section class="panel" id="mapPanel"><div class="ph"><h2>Planet map</h2><button class="btn" data-help aria-haspopup="dialog">? How to use the map</button></div><div id="hint"></div><div id="picks"></div><div class="whatif" id="whatifDesk"></div><div class="mapwrap" id="mapwrapDesk"></div></section>
+    <aside class="side" id="side"></aside>
+  </div>
+  <div class="phone" id="phone"></div>
+</main>
+</div></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="false" aria-labelledby="drawer-t" tabindex="-1"><div class="ph"><h2 id="drawer-t">Details</h2><button class="ibtn-g" data-close aria-label="Close panel">✕</button></div><div class="db" id="drawerBody"></div></aside>
+<div class="tip" id="tip"></div>
+<div class="pop" id="pop"></div>
+<script>
+(() => {
+const B = PI_BY_ID, N = PI_BY_NAME, I = PI_ITEMS;
+const ALL = ['barren','gas','ice','lava','oceanic','plasma','storm','temperate'], TYPES = ALL;
+const CAP = 6000, TAX = 0.10;
+
+// ================= copied from plan.html (Plan tab): pilots, markets, systems, number model =================
+const C6 = SAMPLE_COLONIES;
+const PILOTS = {
+  six:{label:'6 colonies', home:'Efa', sec:0.4, cols:C6, market:'Amarr', hsOnly:false},
+  two:{label:'2 colonies (highsec)', home:'Hek', sec:0.5, cols:C6.filter(c=>c.type==='barren'||c.type==='temperate').map(c=>({...c,cc:c.type==='barren'?1:4})), market:'Rens', hsOnly:true},
+  none:{label:'No colonies', home:'Hek', sec:0.5, cols:[], market:'Jita', hsOnly:true},
+  nul:{label:'No colonies (nullsec, corp buyback)', home:'Sample null system', sec:-0.3, cols:[], market:'Buyback', hsOnly:false},
+};
+const MARKETS = {Jita:1, Amarr:.98, Dodixie:.96, Rens:.97, Hek:.95, Buyback:null};
+const ROUTES = {Efa:{Jita:[15,4],Amarr:[9,3],Dodixie:[19,3],Rens:[13,3],Hek:[12,3],Buyback:[0,0]},
+                'Sample null system':{Jita:[24,9],Amarr:[27,9],Dodixie:[29,9],Rens:[22,9],Hek:[21,9],Buyback:[0,0]},
+                Hek:{Jita:[11,0],Amarr:[22,0],Dodixie:[14,0],Rens:[4,0],Hek:[0,0],Buyback:[0,0]}};
+const SYSTEMS = {
+  Efa:[['Efa (home)',0,0.4,['barren','gas','lava','storm','temperate']],['Sample system A',1,0.3,['barren','ice','oceanic','plasma']],['Sample system B',2,0.6,['gas','lava','plasma','storm','temperate']],['Sample system C',2,-0.2,['ice','oceanic','plasma','temperate']],['Sample system D',3,0.8,['barren','lava','oceanic','storm']],['Sample system E',3,-0.4,['gas','ice','lava','plasma']],['Sample system F',4,0.5,['ice','oceanic','gas','storm']]],
+  'Sample null system':[['Home system',0,-0.3,['barren','gas','lava','plasma','temperate']],['Sample system A',1,-0.5,['ice','oceanic','storm','temperate']],['Sample system B',2,-0.2,['barren','gas','oceanic','plasma']],['Sample system C',3,-0.6,['lava','ice','storm','gas']],['Sample system D',4,0.2,['temperate','oceanic','barren']]],
+  Hek:[['Hek (home)',0,0.5,['barren','gas','temperate','storm']],['Sample system A',1,0.7,['barren','lava','oceanic','temperate']],['Sample system B',1,0.6,['gas','ice','storm','oceanic']],['Sample system C',2,0.4,['plasma','lava','barren','ice']],['Sample system D',3,0.9,['oceanic','temperate','gas','lava']],['Sample system E',3,0.5,['ice','plasma','storm','barren']],['Sample system F',5,-0.3,['plasma','lava','ice','gas']]],
+};
+const S = { drawer:null, q:'have', pick:0, sel:null, have:new Set(), hover:null, pilot:'six', market:'Amarr', buyback:90, hsOnly:false };
+const Pl = () => PILOTS[S.pilot];
+const cols = () => Pl().cols;
+const have = () => [...new Set(cols().map(c=>c.type))];
+const fm = v => { const a=Math.abs(v), s=v<0?'−':''; if(a>=1e6) return s+(a/1e6).toFixed(2)+'M'; if(a>=1e3) return s+Math.round(a/1e3)+'k'; return s+Math.round(a); };
+const sg = v => (v>=0?'+':'')+fm(v);
+const cap = s => s[0].toUpperCase()+s.slice(1);
+const an = s => (/^[aeiou]/i.test(s)?'an ':'a ')+s;
+const secCls = s => s>=0.45?'hs':s>0?'ls':'ns';
+const secCol = s => `var(--${secCls(s)})`;
+const mf = () => S.market==='Buyback' ? S.buyback/100 : MARKETS[S.market];
+const price = id => B[id].sell * mf();
+const raws = id => [...PI.rawLeaves(id)];
+const oneTypes = id => ALL.filter(t => raws(id).every(p => B[p].planets.includes(t)));
+const rateOne = id => B[id].tier===0 ? CAP : CAP / PI.p0PerUnit(id);
+const volDay = id => rateOne(id)*B[id].vol*24;
+function coverPlanets(id){
+  let left = raws(id), n = 0;
+  while(left.length){ let best=null, bc=[];
+    for(const t of ALL){ const c=left.filter(p=>B[p].planets.includes(t)).slice(0,2); if(c.length>bc.length){bc=c;best=t;} }
+    if(!best) return 99; left = left.filter(p=>!bc.includes(p)); n++; }
+  return n;
+}
+const planetsNeeded = id => oneTypes(id).length ? 1 : coverPlanets(id) + (B[id].tier>=3 ? 1 : 0);
+const MEMO = new Map();
+function value(id){ // ISK/day per planet
+  const key = id+'|'+mf(); if(MEMO.has(key)) return MEMO.get(key);
+  const it = B[id]; let v;
+  if(oneTypes(id).length){ v = rateOne(id)*24*(price(id) - PI.TAX_BASE[it.tier]*TAX); }
+  else { const n = planetsNeeded(id), ext = n - (it.tier>=3?1:0);
+    const e = PI.economics(id, CAP*ext/PI.p0PerUnit(id), 0, TAX).perDay; v = (e.revenue*mf() - e.tax)/n; }
+  MEMO.set(key, v); return v;
+}
+const optionsOn = t => I.filter(i => i.tier>=1 && i.tier<=2 && oneTypes(i.id).includes(t)).map(i=>i.id);
+const bestProcessed = t => optionsOn(t).filter(id=>B[id].tier===1).sort((a,b)=>value(b)-value(a))[0];
+function compare(id){
+  const ts = oneTypes(id).length ? oneTypes(id) : [...new Set(raws(id).flatMap(p=>B[p].planets))];
+  const mine = ts.filter(t=>have().includes(t)); const use = mine.length?mine:ts;
+  const t = use.sort((a,b)=>value(bestProcessed(a))-value(bestProcessed(b)))[0];
+  const ref = bestProcessed(t), r = value(id)/value(ref);
+  const mineT = have().includes(t);
+  const word = r>1.05?'Better than':r>=0.95?'About the same as':'Worse than';
+  const what = mineT ? `selling ${B[ref].name} from this planet` : `${B[ref].name}, the simplest product on ${an(cap(t))} planet`;
+  const txt = id===ref ? (mineT?`Best simple product for your ${cap(t)} planet`:`The simplest product on ${an(cap(t))} planet`) : `${word} ${what}`;
+  const sh = id===ref ? `Best simple product on ${cap(t)}` : `${word} ${B[ref].name}`;
+  return {t, ref, cls: id===ref?'same':r>1.05?'better':r>=0.95?'same':'worse', txt, sh};
+}
+const cmpChip = (id,short) => { const c=compare(id); const t = short ? c.sh : c.txt; return `<span class="cmp ${c.cls}" title="Compared with ${B[c.ref].name} on ${an(cap(c.t))} planet: ${fm(value(c.ref))}/day">${t}</span>`; };
+function pickFor(t, pref){ const o = optionsOn(t); const pool = pref==='haul' ? o.filter(id=>B[id].tier===2) : o; return pool.sort((a,b)=>value(b)-value(a))[0]; }
+function planRows(pref){
+  return cols().map(c=>{ const today=N[c.doing.split('→')[1].trim()].id; const pick=pickFor(c.type,pref);
+    return {c, today, pick, same: pick===today}; });
+}
+const QWDATA = {
+  six:[{p:'Hek VIII',k:'reset',gain:95000,m:1},{p:'Lustrevik III',k:'store',save:120000,m:2},{p:'Uttindar V',k:'idle',gain:40000,m:1},{p:'Hek VI',k:'room',gain:55000,m:2}],
+  two:[{p:'Hek VIII',k:'reset',gain:95000,m:1},{p:'Hek VI',k:'store',save:80000,m:2}],
+};
+const quickWins = () => (QWDATA[S.pilot]||[]).filter(q=>cols().some(c=>c.name===q.p));
+const qwOn = name => quickWins().filter(q=>q.p===name&&q.gain).reduce((s,q)=>s+q.gain,0);
+function route(){ return ROUTES[Pl().home][S.market]; }
+function marketLabel(){ return S.market==='Buyback' ? `corp buyback (${S.buyback}% of Jita)` : S.market; }
+function routeText(){ const [j,l]=route(); if(S.market==='Buyback') return 'Corp buyback: drop off in your home system'; return `${j} jumps to ${S.market}${l?` · <span style="color:${Pl().sec<=0?'var(--ns)':'var(--ls)'}">${l} ${Pl().sec<=0?'lowsec/nullsec':'lowsec'} jumps</span>`:' · all highsec'}`; }
+function renderCtx(){
+  document.getElementById('pilotsw').innerHTML = Object.entries(PILOTS).map(([k,p])=>`<button class="fchip ${S.pilot===k?'on':''}" data-pilot="${k}">${p.label}</button>`).join('');
+  const p=Pl();
+  document.getElementById('ctx').innerHTML = `
+    <span class="st"><span class="l">Home</span><span class="v">${p.home}</span><span class="sec" style="color:${secCol(p.sec)}">${p.sec.toFixed(1)}</span></span>
+    <span class="st"><span class="l">Colonies</span><span class="v">${cols().length} of 6</span></span>
+    <span class="st"><label class="l" for="market">Where do you sell?</label>
+      <select id="market">${Object.keys(MARKETS).map(m=>`<option value="${m}" ${S.market===m?'selected':''}>${m==='Buyback'?'My corp buyback':m}</option>`).join('')}</select>
+      ${S.market==='Buyback'?`<select id="bb">${[80,85,90,95].map(v=>`<option ${S.buyback===v?'selected':''} value="${v}">${v}% of Jita</option>`).join('')}</select>`:''}</span>
+    <span class="st"><span class="l">Route</span><span class="v">${routeText()}</span></span>
+    <span class="st"><span class="tag18 est">Estimate</span><span class="v" style="color:var(--text-dim)">Sample prices, ${marketLabel()}${S.market!=='Jita'&&S.market!=='Buyback'?` (Jita × ${MARKETS[S.market]})`:''} · 10% customs</span></span>`;
+}
+// shared mock state across the PI tabs (D writes the same keys)
+const MOCK_KEY = {six:'6', two:'2', none:'none', nul:'null'};
+const lsGet = k => { try { return localStorage.getItem(k); } catch(e) { return null; } };
+const lsSet = (k,v) => { try { localStorage.setItem(k,v); } catch(e) {} };
+// ================= /copied from D =================
+
+const MY = () => have();
+const SHORT = {'Genetically Enhanced Livestock':'Gen. Enhanced Livestock','Transcranial Microcontroller':'Transcranial Microctrl.','Self-Harmonizing Power Core':'Self-Harmonizing Core','Organic Mortar Applicators':'Organic Mortar Applic.','Recursive Computing Module':'Recursive Computing','Integrity Response Drones':'Integrity Resp. Drones','Biotech Research Reports':'Biotech Research Rep.','Hazmat Detection Systems':'Hazmat Detection Sys.','Cryoprotectant Solution':'Cryoprotectant Sol.'};
+const nm = it => SHORT[it.name] || it.name;
+const ic = id => iconFor(id);
+const reach = (id, types) => B[id].tier === 0 ? B[id].planets.some(t => types.includes(t)) : PI.reachable(id, types).ok;
+const treeIds = (id, acc = new Set()) => { acc.add(+id); (B[id].inputs || []).forEach(x => treeIds(x.id, acc)); return acc; };
+const treeEdges = (id, acc = new Set()) => { (B[id].inputs || []).forEach(x => { acc.add(x.id + '>' + id); treeEdges(x.id, acc); }); return acc; };
+const haveArr = () => [...S.have];
+const extras = () => MY().length ? haveArr().filter(t => !MY().includes(t)) : [];
+
+// Q1 picks = D's Plan picks ("Most ISK"), grouped by product, ranked by +ISK/day vs today (after quick wins, as D shows)
+let TOP = [];
+function computeTop() {
+  const rows = planRows('isk').filter(r => S.have.has(r.c.type) && !r.same);
+  const g = new Map();
+  rows.forEach(r => { const d = value(r.pick) - value(r.today) - qwOn(r.c.name); const e = g.get(r.pick) || { id: r.pick, rows: [], gain: 0 }; e.rows.push({ ...r, d }); e.gain += d; g.set(r.pick, e); });
+  return [...g.values()].sort((a, b) => b.gain - a.gain).slice(0, 3);
+}
+// Q2 ranking: same as D's "best thing to build" (one-planet recipes, ISK/day per planet)
+const ONE = () => I.filter(i => i.tier >= 1 && i.tier <= 2 && oneTypes(i.id).length).map(i => i.id);
+const ranked = () => ONE().sort((a, b) => (oneTypes(a).some(t => S.have.has(t)) ? 0 : 1) - (oneTypes(b).some(t => S.have.has(t)) ? 0 : 1) || value(b) - value(a));
+function typeCover(id) {
+  const ot = oneTypes(id);
+  if (ot.length) { const t = ot.find(x => S.have.has(x)) || ot[0]; const assign = {}; raws(id).forEach(r => assign[r] = t); return { types: [t], assign, alts: ot }; }
+  const rs = raws(id); let left = new Set(rs), used = [];
+  const cands = [...ALL].sort((a, b) => (S.have.has(b) - S.have.has(a)));
+  while (left.size) { let best = null, bc = 0;
+    for (const t of cands) { if (used.includes(t)) continue; const n = [...left].filter(p => B[p].planets.includes(t)).length; if (n > bc) { bc = n; best = t; } }
+    used.push(best); [...left].forEach(p => { if (B[p].planets.includes(best)) left.delete(p); }); }
+  if (B[id].tier === 4 && !used.some(t => t === 'barren' || t === 'temperate')) used.push(S.have.has('barren') ? 'barren' : 'temperate');
+  const assign = {}; rs.forEach(r => assign[r] = used.find(t => B[r].planets.includes(t)));
+  return { types: used, assign, alts: [] };
+}
+
+function view() {
+  const v = { cls: {}, path: new Set(), pedges: new Set(), ptEdges: new Set(), goal: null, ranks: {}, marks: {}, newEdges: new Set() };
+  const H = haveArr(), base = new Set(I.filter(i => reach(i.id, H)).map(i => i.id));
+  const mineSet = MY().length ? new Set(I.filter(i => reach(i.id, MY())).map(i => i.id)) : base;
+  const newSet = new Set([...base].filter(id => !mineSet.has(id)));
+  if (S.hover && !S.have.has(S.hover)) I.forEach(i => { if (!base.has(i.id) && reach(i.id, [...H, S.hover])) newSet.add(i.id); });
+  if (S.q === 'have') {
+    I.forEach(i => v.cls[i.id] = newSet.has(i.id) ? 'new' : base.has(i.id) ? 'lit' : 'ghost');
+    if (TOP.length) {
+      TOP.forEach((r, i) => v.ranks[r.id] = i + 1);
+      const r = TOP[S.pick]; v.goal = r.id;
+      treeIds(r.id).forEach(x => v.path.add(x)); treeEdges(r.id).forEach(e => v.pedges.add(e));
+      r.rows.forEach(row => { raws(r.id).forEach(raw => v.ptEdges.add(row.c.type + '>' + raw)); v.marks[row.c.type] = 'use'; });
+    }
+  } else if (S.sel) {
+    const tc = typeCover(S.sel); v.goal = S.sel;
+    I.forEach(i => v.cls[i.id] = 'dim');
+    treeIds(S.sel).forEach(x => { v.path.add(x); v.cls[x] = 'lit'; }); treeEdges(S.sel).forEach(e => v.pedges.add(e));
+    Object.entries(tc.assign).forEach(([raw, t]) => v.ptEdges.add(t + '>' + raw));
+    tc.types.forEach(t => v.marks[t] = S.have.has(t) ? 'have' : 'need');
+  } else I.forEach(i => v.cls[i.id] = newSet.has(i.id) ? 'new' : base.has(i.id) ? 'lit' : 'dim');
+  I.forEach(it => (it.inputs || []).forEach(x => { if (newSet.has(it.id) && (newSet.has(x.id) || base.has(x.id))) v.newEdges.add(x.id + '>' + it.id); }));
+  return v;
+}
+
+// ---------- map ----------
+const COLS = [
+  { k: 'planets', t: 'Planets', s: 'Tick yours', info: '<b>Planets</b>: a colony (a <b>Command Center</b>) sits on one planet; each type has its own raw resources. Up to 6 colonies per character.<br><br>Ticked = you have one (read from your colonies). Click to switch a type on or off; hover one you don\'t have to see what it would unlock.' },
+  { k: 0, t: 'Raw', s: 'Pulled from the planet', info: '<b>Raw</b> resources are pulled out of the ground by an <b>extractor</b>. Extractors run for a time you choose and must be <b>reset</b> when they stop. Other tools call this P0.' },
+  { k: 1, t: 'Processed', s: 'Made from 1 raw', info: '<b>Processed</b>: a <b>basic factory</b> turns 3,000 of one raw into 20 every 30 minutes. Other tools call this P1.' },
+  { k: 2, t: 'Refined', s: 'Made from 2 processed', info: '<b>Refined</b>: an <b>advanced factory</b> combines two processed products. If one planet yields both raws, it is a one-planet setup: no hauling between planets. P2.' },
+  { k: 3, t: 'Specialized', s: 'Made from 2–3 refined', info: '<b>Specialized</b>: made from refined products; usually needs goods from several planets. P3.' },
+  { k: 4, t: 'Advanced', s: 'Top tier, Barren/Temperate only', info: '<b>Advanced</b>: needs a <b>High-Tech Production Plant</b>, which fits only on Barren or Temperate planets. Long chains, many planets. P4.' },
+];
+const order = (() => {
+  const p0 = I.filter(i => i.tier === 0).sort((a, b) => a.name.localeCompare(b.name));
+  const by = t => I.filter(i => i.tier === t).sort((a, b) => a.name.localeCompare(b.name));
+  return { 0: p0, 1: p0.map(r => I.find(i => i.tier === 1 && i.inputs[0].id === r.id)), 2: by(2), 3: by(3), 4: by(4) };
+})();
+const mapCmp = id => { const c = compare(id); if (B[id].tier === 1) return `<span class="cmp ${c.cls}">${c.ref === id ? 'Best simple' : c.cls === 'better' ? 'Better' : c.cls === 'same' ? '≈ same' : 'Worse'}</span>`; const t = c.ref === id ? 'Best simple' : c.cls === 'better' ? `Better than ${B[c.ref].name}` : c.cls === 'same' ? `≈ ${B[c.ref].name}` : `Worse than ${B[c.ref].name}`; return `<span class="cmp ${c.cls}">${t}</span>`; };
+const symOf = id => { const c = compare(id); const k = c.ref === id ? 'same' : c.cls; return `<span class="sym ${k}" title="${c.txt}" aria-label="${c.txt}" role="img">${k === 'better' ? '▲' : k === 'worse' ? '▼' : '≈'}</span>`; };
+const sub = it => it.tier === 0 ? '' : `${symOf(it.id)}<b>${fm(value(it.id))}</b>`;
+function mapHTML() {
+  let h = `<div class="map"><svg class="wires"></svg>`;
+  COLS.forEach(c => {
+    h += `<div class="col ${c.k === 'planets' ? 'planets' : ''}"><div class="colhead"><div class="t">${c.t}<button class="ibtn" data-info="${encodeURIComponent(c.info)}" aria-label="What is ${c.t}?">i</button></div><div class="s">${c.s}</div></div><div class="items">`;
+    if (c.k === 'planets') TYPES.forEach(t => h += `<button class="pl" data-planet="${t}" aria-pressed="false"><span class="box"></span><img src="${planetIcon(t)}" alt=""><span class="pn">${cap(t)}</span><span class="ptag"></span></button>`);
+    else order[c.k].forEach(it => h += `<div class="it" data-id="${it.id}"><img src="${ic(it.id)}" alt=""><span class="nm">${it.name}</span><span class="sub"></span></div>`);
+    h += `</div></div>`;
+  });
+  return h + `</div>`;
+}
+function paintMap(root, v) {
+  root.querySelectorAll('.it').forEach(el => {
+    const id = +el.dataset.id, c = v.cls[id];
+    el.className = 'it ' + (c === 'new' ? 'new' : v.path.has(id) ? 'path' : c) + (v.goal === id ? ' goal' : '');
+    if (B[id].tier) el.setAttribute('aria-label', `${B[id].name}: about ${fm(value(id))} ISK/day per planet. ${compare(id).txt}.`);
+    el.querySelector('.sub').innerHTML = sub(B[id]);
+    el.querySelector('.rank')?.remove();
+    if (v.ranks[id] && c !== 'ghost') el.insertAdjacentHTML('beforeend', `<span class="rank ${v.goal === id ? '' : 'alt'}">#${v.ranks[id]}</span>`);
+  });
+  root.querySelectorAll('.pl').forEach(el => {
+    const t = el.dataset.planet, on = S.have.has(t), m = v.marks[t], ex = on && MY().length && !MY().includes(t);
+    el.className = 'pl ' + (on ? 'on' : 'off') + (ex ? ' extra' : '') + (m === 'use' || m === 'have' ? ' use' : m === 'need' ? ' need' : '') + (S.hover === t ? ' hov' : '');
+    el.setAttribute('aria-pressed', on);
+    el.querySelector('.box').textContent = on ? '✓' : '';
+    const cn = cols().filter(x => x.type === t).map(x => x.name).join(', ');
+    el.title = `${cap(t)}${cn ? ': ' + cn : ''} · ${on ? 'ticked (click to untick)' : 'not ticked (click to add as a what-if)'}`;
+    el.querySelector('.ptag').innerHTML = m === 'have' ? '<span class="tag have">have</span>' : m === 'need' ? '<span class="tag need">need</span>' : m === 'use' ? '<span class="tag use">#' + (S.pick + 1) + '</span>' : ex ? '<span class="tag wi">what if</span>' : '';
+  });
+  drawWires(root, v);
+}
+function drawWires(root, v) {
+  const map = root.querySelector('.map'), svg = map.querySelector('svg');
+  const mr = map.getBoundingClientRect(); svg.setAttribute('width', mr.width); svg.setAttribute('height', mr.height);
+  const pos = {};
+  map.querySelectorAll('.it').forEach(el => { const r = el.getBoundingClientRect(); pos[el.dataset.id] = { l: r.left - mr.left, r: r.right - mr.left, y: r.top - mr.top + r.height / 2 }; });
+  map.querySelectorAll('.pl').forEach(el => { const im = el.querySelector('img').getBoundingClientRect(), er = el.getBoundingClientRect(); pos['pl:' + el.dataset.planet] = { r: er.right - mr.left + 1, y: im.top - mr.top + im.height / 2 }; });
+  const curve = (a, b) => { const x1 = a.r, x2 = b.l - 1, dx = (x2 - x1) * 0.5; return `M${x1},${a.y} C${x1 + dx},${a.y} ${x2 - dx},${b.y} ${x2},${b.y}`; };
+  let base = '', mid = '', top = '';
+  const vis = id => v.cls[id] !== 'ghost';
+  I.forEach(it => (it.inputs || []).forEach(x => {
+    const a = pos[x.id], b = pos[it.id]; if (!a || !b) return;
+    const key = x.id + '>' + it.id;
+    if (v.pedges.has(key)) { top += `<path class="w path" d="${curve(a, b)}"/>`; return; }
+    if (v.newEdges.has(key)) { mid += `<path class="w nw" d="${curve(a, b)}"/>`; return; }
+    if (!vis(it.id) || !vis(x.id)) return;
+    const lit = v.cls[it.id] === 'lit' && v.cls[x.id] === 'lit' && !(S.q === 'best' && S.sel);
+    base += `<path class="w ${lit ? (v.goal ? '' : 'lit') : 'dim'}" d="${curve(a, b)}"/>`;
+  }));
+  I.filter(i => i.tier === 0).forEach(raw => raw.planets.forEach(t => {
+    const a = pos['pl:' + t], b = pos[raw.id]; if (!a || !b) return;
+    const key = t + '>' + raw.id;
+    if (v.ptEdges.has(key)) { top += `<path class="w pp" d="${curve(a, b)}"/>`; return; }
+    if (S.hover === t && !S.have.has(t)) { mid += `<path class="w nw" d="${curve(a, b)}"/>`; return; }
+    if (!S.have.has(t) || !vis(raw.id) || (S.q === 'best' && S.sel)) return;
+    const ex = MY().length && !MY().includes(t);
+    base += `<path class="w ${ex ? 'nw' : 'lit'}" style="opacity:${ex ? .6 : .3}" d="${curve(a, b)}"/>`;
+  }));
+  svg.innerHTML = base + mid + top;
+}
+
+// ---------- what-if / add a planet ----------
+const whatifType = () => (S.hover && !S.have.has(S.hover)) ? S.hover : extras()[0] || null;
+function unlocks(t) {
+  const H = haveArr(), withT = S.have.has(t) ? H : [...H, t], without = H.filter(x => x !== t);
+  const all = I.filter(i => i.tier >= 1 && reach(i.id, withT) && !reach(i.id, without));
+  const one = optionsOn(t).filter(id => !oneTypes(id).some(x => without.includes(x))).sort((a, b) => value(b) - value(a));
+  return { all, one };
+}
+function whatifHTML() {
+  const t = whatifType();
+  if (!t) {
+    const off = ALL.filter(x => !S.have.has(x)), hov = matchMedia('(hover:hover)').matches ? 'Hover' : 'Tap';
+    const msg = !MY().length ? `No colonies yet, so every planet type is ticked. Untick types you can't reach; ${hov.toLowerCase()} an unticked one to see what it adds.`
+      : off.length ? `${hov} a planet type you don't have (${off.map(cap).join(', ')}): what it would unlock lights up <b style="color:var(--new)">pink</b>. Click it to see where to find one.` : 'Every planet type is ticked.';
+    return { on: false, h: `<span class="wi" style="color:var(--text-dim)">What if I add a ___ planet?</span><span>${msg}</span>` };
+  }
+  const u = unlocks(t);
+  if (!u.all.length) return { on: true, h: `<img class="wp" src="${planetIcon(t)}" alt=""><span class="wi">What if I add ${an(cap(t))} planet?</span><span>Nothing new: every raw it yields already comes from your ticked planets.</span>` };
+  return { on: true, h: `<img class="wp" src="${planetIcon(t)}" alt=""><span class="wi">What if I add ${an(cap(t))} planet?</span><span>Unlocks <b>${u.all.length}</b> product${u.all.length === 1 ? '' : 's'} on the map${u.one[0] ? `; best one-planet recipe <b>${B[u.one[0]].name}</b> ${sg(value(u.one[0]))}/day` : ''}.</span><span class="icons">${u.all.slice(0, 12).map(i => `<img src="${ic(i.id)}" alt="${i.name}" data-tip="${i.id}">`).join('')}${u.all.length > 12 ? `<span class="dim">+${u.all.length - 12}</span>` : ''}</span>` };
+}
+function finder(ts) {
+  const sys = SYSTEMS[Pl().home].filter(s => s[3].some(x => ts.includes(x))).filter(s => !S.hsOnly || s[2] >= 0.45).slice(0, 4);
+  return `<div class="finderhead"><label class="chk"><input type="checkbox" data-hs ${S.hsOnly ? 'checked' : ''}>Highsec only</label><span class="seckey"><span class="h">highsec</span><span class="l">lowsec</span><span class="n">nullsec</span></span></div>
+    ${sys.map(s => `<div class="sysrow ${secCls(s[2])}"><span><b>${s[0]}</b> <span class="faint">· ${s[1] === 0 ? 'here' : s[1] + ' jump' + (s[1] > 1 ? 's' : '')}</span></span><span class="sec" style="color:${secCol(s[2])}">${s[2].toFixed(1)}</span><div class="types-s">${ALL.filter(x => s[3].includes(x)).map(x => `<img src="${planetIcon(x)}" class="${ts.includes(x) ? 'hit' : ''}" title="${x}">`).join('')}</div>${s[2] <= 0 ? '<span class="sky">Nullsec: planets may have a Skyhook next to the customs office. You still export through the customs office.</span>' : ''}</div>`).join('') || '<p class="dim" style="font-size:12px;margin:6px 0">None within 5 jumps in highsec. Switch off “Highsec only”.</p>'}
+    <div class="est">Systems are illustrative sample data.</div>`;
+}
+function addPlanetCard() {
+  const t = whatifType(); if (!t) return '';
+  const u = unlocks(t), n = cols().length, best = u.one[0];
+  let slot;
+  if (n >= 6) {
+    const worst = planRows('isk').map(r => ({ r, v: value(r.today) })).sort((a, b) => a.v - b.v)[0];
+    slot = `<div class="slot full"><b>You're using 6 of 6 planets:</b> train Interplanetary Consolidation or replace one.${best ? ` E.g. replacing ${worst.r.c.name} (${B[worst.r.today].name}, ${fm(worst.v)}/day) with ${B[best].name} is <b class="${value(best) - worst.v >= 0 ? 'pos' : 'neg'}">${sg(value(best) - worst.v)}/day</b>.` : ''} <a href="https://wiki.eveuniversity.org/Planetary_Industry#Skills" target="_blank" rel="noopener">Skill guide ↗</a></div>`;
+  } else slot = `<div class="slot"><b>You're using ${n} of 6 planets</b>${n ? '' : ' (with Interplanetary Consolidation V)'}: room for ${6 - n} more. ${best ? `A new ${cap(t)} colony making ${B[best].name} adds about <b class="pos">${sg(value(best))}/day</b>.` : ''}</div>`;
+  return `<div class="card addp"><h3>Where to put a new colony <button class="textact xbtn" data-clearwhatif>${S.have.has(t) ? 'Untick' : 'Close'}</button></h3>
+    <div class="ah"><img src="${planetIcon(t)}" alt=""><div><b>Add ${an(cap(t))} planet</b><div class="dim" style="font-size:12px">Unlocks <span class="unl">${u.all.length} product${u.all.length === 1 ? '' : 's'}</span> (pink on the map)${u.one.length ? `, ${u.one.length} as one-planet recipes` : ''}.</div></div></div>
+    ${best ? `<button class="recipe" data-sel="${best}"><img src="${ic(best)}" alt=""><div><div>Best one-planet recipe: <b>${B[best].name}</b> <b class="pos">${sg(value(best))}/day</b></div>${cmpChip(best)}</div></button>` : '<div class="slot">Nothing new to build alone on it: the raws it yields already come from your planets.</div>'}
+    ${slot}
+    <h3>Find ${an(cap(t))} planet near ${Pl().home}</h3>${finder([t])}</div>`;
+}
+
+const HELP = () => `<div class="card help"><h3>Steps</h3><ol>
+  <li><b>Tick your planets.</b> The planet column starts with your colonies' types. Click a type to switch it off or on; what your ticked planets can't make leaves an empty slot.</li>
+  <li><b>Read each product.</b> The number is ISK/day for one planet; the symbol compares it with the simplest product you could sell from that planet.</li>
+  <li><b>Click a product</b> to light its chain back to the planets it needs, with a how-to and nearby planets.</li>
+  <li><b>Try a planet.</b> Hover a grey planet: pink shows what it would unlock. Click it to see where to find one.</li></ol></div>
+  <div class="card"><h3>Legend</h3><div class="lg">
+  <span class="k sym better">▲</span><span>Better than selling the simplest product from that planet</span>
+  <span class="k sym same">≈</span><span>About the same (or it is the simplest product)</span>
+  <span class="k sym worse">▼</span><span>Worse: you earn less than just selling the simpler product</span>
+  <span class="k"><span class="sw" style="border-color:var(--gold);background:rgba(245,185,74,.12)"></span></span><span>#1–#3: the Plan tab's picks for your planets</span>
+  <span class="k"><span class="sw" style="border-color:var(--accent-dim);background:rgba(87,199,244,.12)"></span></span><span>The chain of the selected pick or product</span>
+  <span class="k"><span class="sw" style="border-color:var(--new);background:rgba(255,121,198,.12)"></span></span><span>Unlocked by a what-if planet you don't have</span>
+  <span class="k"><span class="sw" style="border-color:transparent;background:rgba(22,29,39,.6)"></span></span><span>Empty slot: your ticked planets can't make it</span></div>
+  <div class="est">Numbers: ISK/day per planet after 10% customs at ${marketLabel()}, ~6,000 raw/h per planet. Sample prices. Hover any product for its price and recipe.</div></div>
+  <div class="card"><h3>New to PI?</h3><a class="ilink" style="display:block;margin:4px 0" href="https://wiki.eveuniversity.org/Planetary_Industry" target="_blank" rel="noopener">EVE University: Planetary Industry ↗</a><a class="ilink" style="display:block;margin:4px 0" href="https://wiki.eveuniversity.org/Planetary_Commodities" target="_blank" rel="noopener">EVE University: PI commodities ↗</a><a class="ilink" style="display:block;margin:4px 0" href="plan.html">Plan tab: 60-second explainer</a></div>`;
+
+// ---------- panel ----------
+const iconImg = (id, cls = '') => `<img class="${cls}" src="${ic(id)}" alt="${B[id].name}" data-tip="${id}">`;
+const pImg = t => `<img src="${planetIcon(t)}" alt="${cap(t)}">`;
+function effortChips(id, planets, between) {
+  return `<div class="stats effort"><span class="st"><span class="l">Planets</span><span class="v">${planets}</span></span><span class="st"><span class="l">Haul between</span><span class="v">${between ? '1×/day' : 'none'}</span></span><span class="st"><span class="l">Market</span><span class="v">1 trip/day · ${Math.round(volDay(id) * planets).toLocaleString()} m³</span></span><span class="st"><span class="l">Restart</span><span class="v">every day</span></span></div><div class="est">${routeText()}</div>`;
+}
+function heroQ1() {
+  if (!cols().length) return `<div class="card hero"><h3>Best use of your planets</h3><div style="font-size:13px">No colonies yet. Switch to <button class="textact" data-q="best">What's the best thing to make?</button> to pick a first planet, or click any product on the map.</div></div>`;
+  if (!TOP.length) return `<div class="card hero"><h3>Best use of your planets</h3><div style="font-size:13px">Your ticked planets already make their best product. The Plan tab lists quick wins.</div></div>`;
+  const r = TOP[S.pick], it = B[r.id];
+  const todayV = r.rows.reduce((s, x) => s + value(x.today) + qwOn(x.c.name), 0), newV = value(r.id) * r.rows.length;
+  const pls = r.rows.map(x => `<span class="pi">${pImg(x.c.type)}${x.c.name} <span class="dim">(${cap(x.c.type)})</span></span>`).join(' <span class="ar">+</span> ');
+  const mids = [...treeIds(r.id)].filter(x => x !== r.id).sort((a, b) => B[a].tier - B[b].tier);
+  return `<div class="card hero">
+    <h3>Best use of your planets <span class="tag18 pick">#${S.pick + 1} pick</span></h3>
+    <div class="pick">${iconImg(r.id, 'big')}<div><div class="pname">${it.name}</div><div style="font-size:12px;margin-top:3px">${cmpChip(r.id)}</div></div></div>
+    <div class="big-isk">${sg(r.gain)} <small>ISK/day vs today</small></div>
+    <div class="story">${pls} <span class="ar">→</span> ${mids.map(x => `<span class="ii">${iconImg(x)}</span>`).join('')} <span class="ar">→</span> <b>${it.name}</b></div>
+    <div class="stats"><span class="st"><span class="l">Today</span><span class="v">${fm(todayV)}/day</span></span><span class="st"><span class="l">Making ${nm(it)}</span><span class="v pos">${fm(newV)}/day</span></span></div>
+    ${effortChips(r.id, r.rows.length, false)}
+    <div class="alts">${TOP.map((t, i) => `<button class="alt ${i === S.pick ? 'on' : ''}" data-pick="${i}"><span class="rk">#${i + 1}</span>${iconImg(t.id)}<span class="lbl"><div>${B[t.id].name}${t.rows.length > 1 ? ` <span class="dim">×${t.rows.length}</span>` : ''}</div><div class="gn">${sg(t.gain)}/day</div></span></button>`).join('')}</div>
+    <div class="est">Same picks and numbers as the Plan tab (“Most ISK”), sample prices at ${marketLabel()}, ~6,000 raw/h per planet, 10% customs.${quickWins().length ? ' Gains are on top of the quick wins.' : ''}</div>
+  </div>`;
+}
+function checklist() {
+  if (!TOP.length) return '';
+  const r = TOP[S.pick], it = B[r.id];
+  const rows = r.rows.map(x => {
+    const old0 = raws(x.today)[0], need = raws(r.id);
+    let st = `<li><span class="stop">${iconImg(x.today)}${B[x.today].name}</span> <span class="dim">(stop today's product)</span></li>`;
+    st += `<li>Extract ${need.map(p => iconImg(p) + B[p].name).join(' + ')}${need.length > 1 ? ' <span class="dim">(2 extractors)</span>' : ''}${need.includes(old0) ? ' <span class="dim">(keep the existing one)</span>' : ''}</li>`;
+    if (it.tier === 1) st += `<li>Basic factories → ${iconImg(r.id)}<b>${it.name}</b></li>`;
+    else st += `<li>Basic factories → ${it.inputs.map(q => iconImg(q.id) + B[q.id].name).join(' + ')}</li><li>Advanced factory → ${iconImg(r.id)}<b>${it.name}</b></li>`;
+    st += `<li>Launchpad → sell at ${marketLabel()} every day</li>`;
+    return `<div class="pc"><img src="${planetIcon(x.c.type)}" alt=""><div><div class="h">${x.c.name} <small>· ${cap(x.c.type)} · <span class="pos">${sg(x.d)}/day</span></small></div><ol>${st}</ol></div></div>`;
+  }).join('');
+  const used = r.rows.map(x => x.c);
+  const keep = cols().filter(c => !used.includes(c)).map(c => `<span><img src="${planetIcon(c.type)}" alt="">${c.name}: ${c.doing.split('→')[1].trim()}</span>`).join('');
+  return `<div class="card"><h3>What to do in-game</h3><div class="todo">${rows}</div>${keep ? `<div class="est" style="margin-top:10px">The other planets (see the Plan tab for their changes):</div><div class="keep">${keep}</div>` : ''}
+    <div class="qw-note">Full step-by-step checklist, quick wins and CPU/power fit: <a href="plan.html">Plan tab ↗</a></div></div>`;
+}
+function bestRow(id) {
+  const ts = oneTypes(id);
+  return `<div class="brow" data-sel="${id}">${iconImg(id)}<span>${B[id].name}</span><span class="pls">${ts.map(t => `<img src="${planetIcon(t)}" title="${cap(t)}" alt="" style="${S.have.has(t) ? '' : 'filter:grayscale(1) brightness(.5)'}">`).join('')}</span><span class="num pos" style="font-size:12px">${fm(value(id))}</span></div>`;
+}
+function bestCard() {
+  return `<div class="card"><h3>Best one-planet recipes</h3>
+    <div class="dim" style="font-size:12.5px;margin-bottom:8px">Same ranking as the Plan tab: ISK/day per planet at ${marketLabel()}, after customs. Every product on the map shows the same number. Click one to see how to make it.</div>
+    <div class="blist">${ranked().slice(0, 10).map(bestRow).join('')}</div>
+    <div class="est">Small planets = types that can make it alone (grey = you don't have it). Estimate, sample prices.</div></div>`;
+}
+function selCards() {
+  const id = S.sel, it = B[id], tc = typeCover(id), n = planetsNeeded(id);
+  const one = tc.alts.length > 0, haveOne = tc.alts.filter(t => S.have.has(t));
+  const ts = one ? tc.alts : tc.types;
+  const miss = one ? (haveOne.length ? [] : tc.alts) : tc.types.filter(t => !S.have.has(t));
+  const rows = (one ? [tc.types[0]] : tc.types).map(t => {
+    const rs = Object.keys(tc.assign).filter(k => tc.assign[k] === t).map(Number);
+    const p1s = rs.map(x => I.find(i => i.tier === 1 && i.inputs[0].id === x));
+    const p2 = [...treeIds(id)].filter(x => B[x].tier === 2 && x !== id && B[x].inputs.every(q => p1s.some(p => p.id === q.id)));
+    return `<div class="hrow">${pImg(t)}<div><b>${cap(t)}</b> <span class="${S.have.has(t) ? 'pos' : 'neg'}" style="font-size:11px">${S.have.has(t) ? '✓ you have' : '✕ find one'}</span><div class="flow">${rs.map(x => iconImg(x)).join('')}<span class="ar">→</span>${p1s.map(x => iconImg(x.id)).join('')}${p2.length ? '<span class="ar">→</span>' + p2.map(x => iconImg(x)).join('') : ''}</div></div></div>`;
+  }).join('');
+  const higher = [...treeIds(id)].filter(x => B[x].tier >= 2 && x !== id).sort((a, b) => B[a].tier - B[b].tier);
+  const fin = `<div class="fin"><span class="dim">${n > 1 ? `Ship to one factory planet${it.tier === 4 ? ' (Barren/Temperate)' : ''} →` : 'Same planet →'}</span>${higher.length && n > 1 ? `<span class="flow">${higher.map(x => iconImg(x)).join('')}<span class="ar">→</span></span>` : ''}${iconImg(id)}<b>${it.name}</b></div>`;
+  const find = miss.length ? `<div class="card"><h3>Find ${miss.map(t => an(cap(t))).join(' or ')} planet near ${Pl().home}</h3>${finder(miss)}</div>`
+    : `<div class="card"><h3>Planets</h3><div style="font-size:12.5px">You already have ${one ? `${an(cap(haveOne[0]))} planet: ${cols().filter(c => c.type === haveOne[0]).map(c => c.name).join(', ') || 'ticked'}` : 'every planet type this needs'}.</div></div>`;
+  const isTop = TOP.findIndex(t => t.id === id);
+  return `<div class="card hero">
+    <h3>How to make it</h3>
+    <div class="pick">${iconImg(id, 'big')}<div><div class="pname">${it.name}</div><div class="dim" style="font-size:12px">${COLS[it.tier + 1].t} · ${one ? `one planet: ${tc.alts.map(cap).join(' or ')}` : `${n} planets`}</div></div></div>
+    <div class="big-isk">≈ ${fm(value(id))} <small>ISK/day per planet</small></div>
+    <div style="margin:8px 0">${cmpChip(id)}</div>
+    <div class="dim" style="font-size:12.5px;margin:6px 0 8px">You need: <b style="color:var(--text)">${one ? tc.alts.map(cap).join(' or ') : tc.types.map(cap).join(', ')}</b> ${(() => { const h = ts.filter(t => S.have.has(t)); return h.length ? `(you have ${h.map(cap).join(', ')})` : '(you have none)'; })()}.</div>
+    <div class="howto">${rows}${fin}</div>
+    ${effortChips(id, n, n > 1)}
+    ${isTop >= 0 ? `<div class="est" style="color:var(--warning)">This is your #${isTop + 1} pick in “I have planets”.</div>` : ''}
+    <div class="est">Estimate · sample prices at ${marketLabel()} · ~6,000 raw/h per planet · 10% customs.</div>
+    <button class="btn" style="margin-top:10px;width:100%" data-clearsel>Clear selection</button>
+  </div>${find}`;
+}
+const panelHTML = () => addPlanetCard() + (S.q === 'have' ? heroQ1() + checklist() : S.sel ? selCards() : bestCard());
+
+// ---------- phone ----------
+function phoneToggles() {
+  return `<div class="ptog">${TYPES.map(t => `<button class="${S.have.has(t) ? 'on' : 'off'} ${S.have.has(t) && MY().length && !MY().includes(t) ? 'extra' : ''}" data-planet="${t}" aria-pressed="${S.have.has(t)}">${pImg(t)}${cap(t)}</button>`).join('')}</div>
+    <div class="pnote" style="margin-top:6px">${MY().length ? 'Ticked from your colonies. Tap a grey planet to see what it would unlock and where to find one.' : 'No colonies yet: every type is in play. Untick types you can\'t reach.'}</div>`;
+}
+function phoneStory() {
+  let id, planets;
+  if (S.q === 'have') { if (!TOP.length) return ''; const r = TOP[S.pick]; id = r.id; planets = r.rows.map(x => `<span class="ich planet">${pImg(x.c.type)}<span>${x.c.name}<small>${cap(x.c.type)}</small></span></span>`); }
+  else { id = S.sel; const tc = typeCover(id); const ts = tc.alts.length ? [tc.types[0]] : tc.types; planets = ts.map(t => `<span class="ich planet">${pImg(t)}<span>${cap(t)}<small class="${S.have.has(t) ? 'pos' : 'neg'}">${S.have.has(t) ? '✓ you have' : '✕ you need'}</small></span></span>`); }
+  const ids = [...treeIds(id)], it = B[id];
+  const verbs = { 0: 'Extractors pull raw', 1: 'Basic factory', 2: 'Advanced factory', 3: 'Advanced factory', 4: 'High-Tech plant' };
+  let h = `<div class="srow"><div class="lab"><span>Planets</span><span>${planets.length} planet${planets.length > 1 ? 's' : ''}</span></div><div class="chips">${planets.join('')}</div></div>`;
+  for (let t = 0; t < it.tier; t++) {
+    const tier = ids.filter(x => B[x].tier === t); if (!tier.length) continue;
+    h += `<div class="down"><span class="arw">↓</span>${verbs[t]}</div><div class="srow"><div class="lab"><span>${COLS[t + 1].t}</span><span>${COLS[t + 1].s}</span></div><div class="chips">${tier.map(x => `<span class="ich">${iconImg(x)}${B[x].name}</span>`).join('')}</div></div>`;
+  }
+  h += `<div class="down"><span class="arw">↓</span>${verbs[it.tier]}</div><div class="srow prod"><div class="lab"><span>${S.q === 'have' ? '#' + (S.pick + 1) + ' pick' : 'Product'} · ${COLS[it.tier + 1].t}</span><span class="pos">${S.q === 'have' ? sg(TOP[S.pick].gain) + '/day vs today' : '≈ ' + fm(value(id)) + '/day per planet'}</span></div><div class="chips"><span class="ich">${iconImg(id)}${it.name}</span></div></div>`;
+  return `<div class="storyv">${h}</div>`;
+}
+function phoneAll(v) {
+  return `<div class="tiers">${[1, 2, 3, 4].map(t => `<div><div class="thead"><span>${COLS[t + 1].t}</span><span>ISK/day per planet</span></div><div class="tgrid">${order[t].slice().sort((a, b) => value(b.id) - value(a.id)).map(it => { const c = v.cls[it.id]; return `<div class="mini ${c === 'new' ? 'new' : c === 'dim' ? 'ghost' : ''}" data-sel="${it.id}">${iconImg(it.id)}<span class="nm">${nm(it)}</span><span class="sub"><b style="color:var(--text)">${fm(value(it.id))}</b>${mapCmp(it.id).replace('class="cmp', 'style="font-size:9.5px;padding:0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" class="cmp')}</span></div>`; }).join('')}</div></div>`).join('')}</div>`;
+}
+let fullOpen = false;
+function phoneHTML(v) {
+  const wi = whatifHTML();
+  let body;
+  if (S.q === 'best' && !S.sel) body = `<section class="panel"><div class="ph"><h2>Every product</h2><span class="meta">Best first · faded = needs a planet you don't have</span></div>${phoneAll(v)}</section>`;
+  else if (S.q === 'have' && !TOP.length) body = '';
+  else body = `<section class="panel"><div class="ph"><h2>${S.q === 'have' ? 'Your best moves' : 'How it is made'}</h2><span class="meta">${S.q === 'have' ? 'Same as the Plan tab' : B[S.sel].name}</span></div>${S.q === 'have' ? `<div class="alts" style="margin:0;border-top:0">${TOP.map((t, i) => `<button class="alt ${i === S.pick ? 'on' : ''}" data-pick="${i}"><span class="rk">#${i + 1}</span>${iconImg(t.id)}<span class="lbl"><div>${B[t.id].name}${t.rows.length > 1 ? ` <span class="dim">×${t.rows.length}</span>` : ''}</div><div class="gn">${sg(t.gain)}/day</div></span></button>`).join('')}</div>` : ''}${phoneStory()}</section>`;
+  return `<p class="pnote" style="margin:0">Explore what your planet types can make. Tap a planet or product.</p>
+    <section class="panel"><div class="ph"><h2>Your planet types</h2><span class="meta">${cols().length} of 6 colonies</span></div><div class="pb">${phoneToggles()}</div><div class="whatif ${wi.on ? 'on' : ''}" style="border-bottom:0;border-top:1px solid var(--line)">${wi.h}</div></section>
+    ${body}
+    <button class="btn md fullmap-btn" data-fullmap>${fullOpen ? 'Hide full map' : 'Show full map ↔'}</button>
+    <section class="panel fullmap ${fullOpen ? 'open' : ''}"><div class="mapwrap" id="mapwrapPhone"></div></section>
+    ${(S.q === 'have' && TOP.length) || S.sel || whatifType() ? `<button class="btn md" data-open style="width:100%">${S.sel ? 'How to make ' + B[S.sel].name : whatifType() ? 'Where to put a new colony' : 'Details and in-game steps'} ›</button>` : ''}
+    <section class="panel"><div class="ph"><h2>How to use</h2></div><div class="pb pguide"><p>Tick the planets you have. Each product shows ISK/day per planet and whether it beats the simplest product on that planet. Tap a product for its recipe and the planets it needs.</p>
+      <a class="ilink" href="https://wiki.eveuniversity.org/Planetary_Industry" target="_blank" rel="noopener">EVE Uni: PI guide ↗</a><a class="ilink" href="https://wiki.eveuniversity.org/Planetary_Commodities" target="_blank" rel="noopener">PI commodities ↗</a></div></section>`;
+}
+
+// ---------- render ----------
+const deskWrap = document.getElementById('mapwrapDesk');
+deskWrap.innerHTML = mapHTML();
+const isPhone = () => matchMedia('(max-width:767px)').matches;
+// Dock the details panel only when the map panel has room for it: measured on the layout box
+// (= the map panel's full width when undocked), via ResizeObserver, not the window.
+const DOCK_AT = 1500;
+let docked = false, lastFocus = null;
+const layoutEl = document.querySelector('.layout');
+function measureDock() { const d = !isPhone() && layoutEl.clientWidth >= DOCK_AT; if (d !== docked) { docked = d; layoutEl.classList.toggle('docked', d); if (d && S.drawer === 'panel') S.drawer = null; render(); } }
+new ResizeObserver(measureDock).observe(layoutEl);
+const HINT_KEY = 'piMap.hintDismissed';
+function openDrawer(kind, trigger) { if (kind === 'panel' && docked) return; if (!S.drawer) lastFocus = trigger || document.activeElement; S.drawer = kind; }
+function closeDrawer() { S.drawer = null; render(); const f = lastFocus; lastFocus = null; if (f && document.contains(f)) f.focus(); }
+function picksHTML() {
+  if (docked || isPhone()) return '';
+  if (S.q === 'have' && TOP.length) return `<div class="picks"><span class="lbl">Your picks</span>${TOP.map((t, i) => `<button class="pickbtn ${S.drawer === 'panel' && i === S.pick ? 'on' : ''}" data-pick="${i}" data-open><span class="rk">#${i + 1}</span>${iconImg(t.id)}${B[t.id].name}<span class="gn">${sg(t.gain)}/day</span></button>`).join('')}<span class="dim" style="font-size:11px">vs today · same as the Plan tab</span></div>`;
+  if (S.q === 'best' && !S.sel) return `<div class="picks"><span class="lbl">Best one-planet recipes</span>${ranked().slice(0, 3).map(id => `<button class="pickbtn" data-sel="${id}">${iconImg(id)}${B[id].name}<span class="gn">${fm(value(id))}/day</span></button>`).join('')}</div>`;
+  return '';
+}
+function legend() {
+  if (S.q === 'have') return `<span><i style="background:var(--gold)"></i>#1–#3 Plan tab picks</span><span><i style="background:var(--path)"></i>Path of the pick</span><span><i style="background:var(--panel-2);outline:1px solid var(--line)"></i>Empty: can't make it</span><span><i style="background:var(--new)"></i>What-if unlock</span>`;
+  return `<span><b style="color:var(--text)">820k</b> ISK/day per planet</span><span><span class="cmp better">Better</span> / <span class="cmp">≈</span> / <span class="cmp worse">Worse</span> than the simplest product there</span><span><i style="background:var(--line-bright);opacity:.5"></i>Faded: needs a planet you don't have</span>`;
+}
+function render() {
+  renderCtx();
+  TOP = computeTop(); if (S.pick >= TOP.length) S.pick = 0;
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.q === S.q));
+  document.getElementById('q1sub').textContent = S.q === 'have' ? (cols().length ? 'Same picks as the Plan tab, lit on the map.' : 'You have no colonies yet.') : 'Every product, ISK/day per planet.';
+  document.getElementById('specific').innerHTML = S.q === 'have' ? 'Specific product in mind? <a class="ilink" data-gobest>Click it on the map</a>' : '';
+  const v = view();
+  if (isPhone()) {
+    document.getElementById('phone').innerHTML = phoneHTML(v);
+    if (fullOpen) { const w = document.getElementById('mapwrapPhone'); w.innerHTML = mapHTML(); paintMap(w, v); }
+  } else {
+    const wi = whatifHTML(), wel = document.getElementById('whatifDesk'); wel.className = 'whatif' + (wi.on ? ' on' : ''); wel.innerHTML = wi.h;
+    document.getElementById('side').innerHTML = docked ? panelHTML() : '';
+    let hd = false; try { hd = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+    document.getElementById('hint').innerHTML = hd ? '' : `<div class="hint">Click a planet type to filter, or a product to trace it.<button class="textact x" data-dismisshint aria-label="Dismiss hint">Got it</button></div>`;
+    document.getElementById('picks').innerHTML = picksHTML();
+    paintMap(deskWrap, v);
+  }
+  const dr = document.getElementById('drawer'), was = dr.classList.contains('open'), open = !!S.drawer;
+  dr.classList.toggle('open', open); dr.setAttribute('aria-hidden', String(!open));
+  if (open) {
+    document.getElementById('drawer-t').textContent = S.drawer === 'help' ? 'How to use the map' : S.q === 'have' && !whatifType() ? 'Best use of your planets' : S.sel ? B[S.sel].name : whatifType() ? 'Where to put a new colony' : 'Details';
+    document.getElementById('drawerBody').innerHTML = S.drawer === 'help' ? HELP() : panelHTML();
+    if (!was) dr.querySelector('[data-close]').focus();
+  } else document.getElementById('drawerBody').innerHTML = '';
+}
+function paintOnly() {
+  const v = view();
+  if (isPhone()) { const w = document.getElementById('mapwrapPhone'); if (w && fullOpen) paintMap(w, v); return; }
+  const wi = whatifHTML(), wel = document.getElementById('whatifDesk'); wel.className = 'whatif' + (wi.on ? ' on' : ''); wel.innerHTML = wi.h;
+  paintMap(deskWrap, v);
+}
+function setPilot(k, keepMarket) {
+  const p = PILOTS[k];
+  Object.assign(S, { pilot: k, hsOnly: p.hsOnly, q: p.cols.length ? 'have' : 'best', sel: null, pick: 0, hover: null });
+  if (!keepMarket) S.market = p.market;
+  S.have = new Set(p.cols.length ? have() : ALL);
+  MEMO.clear(); lsSet('piMock.pilot', MOCK_KEY[k]);
+  render();
+}
+
+// ---------- events ----------
+const tip = document.getElementById('tip'), pop = document.getElementById('pop');
+document.addEventListener('change', e => {
+  if (e.target.id === 'market') { S.market = e.target.value; lsSet('piMock.market', S.market); MEMO.clear(); render(); }
+  if (e.target.id === 'bb') { S.buyback = +e.target.value; MEMO.clear(); render(); }
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-q],[data-pick],.it,[data-planet],[data-sel],[data-clearsel],[data-fullmap],.ibtn,[data-gobest],[data-pilot],[data-hs],[data-clearwhatif],#gloss-btn,[data-help],[data-close],[data-open],[data-dismisshint]');
+  if (!e.target.closest('.ibtn,#gloss-btn')) pop.style.display = 'none';
+  if (!t) return;
+  if (t.matches('.ibtn,#gloss-btn')) { e.stopPropagation(); const r = t.getBoundingClientRect();
+    pop.innerHTML = t.id === 'gloss-btn' ? '<b>Planetary Industry</b> means a small base on a planet: <b>extractors</b> pull raw resources, <b>factories</b> turn them into products, a <b>launchpad</b> sends them to the customs office, and you sell them. Set it up once; it runs while you\'re offline.<br><br>The full 60-second explainer is on the <a href="plan.html" style="color:var(--accent)">Plan tab</a>. <a href="https://wiki.eveuniversity.org/Planetary_Industry" target="_blank" rel="noopener" style="color:var(--accent)">EVE University guide ↗</a>' : decodeURIComponent(t.dataset.info);
+    pop.style.display = 'block'; pop.style.left = Math.max(8, Math.min(r.left, innerWidth - 316)) + 'px'; pop.style.top = (r.bottom + 6) + 'px'; return; }
+  if (t.dataset.pilot) { S.drawer = null; setPilot(t.dataset.pilot); return; }
+  if ('close' in t.dataset) { closeDrawer(); return; }
+  if ('help' in t.dataset) { if (S.drawer === 'help') { closeDrawer(); return; } openDrawer('help', t); render(); return; }
+  if ('dismisshint' in t.dataset) { try { localStorage.setItem(HINT_KEY, '1'); } catch (err) {} render(); return; }
+  if ('open' in t.dataset && !t.dataset.pick) { openDrawer('panel', t); render(); return; }
+  if (t.dataset.q) { S.q = t.dataset.q; S.sel = null; }
+  else if (t.dataset.pick) { S.pick = +t.dataset.pick; S.q = 'have'; if ('open' in t.dataset) openDrawer('panel', t); }
+  else if (t.matches('.it')) { if (t.classList.contains('ghost')) return; const id = +t.dataset.id; const rk = TOP.findIndex(r => r.id === id); if (S.q === 'have' && rk >= 0) { S.pick = rk; openDrawer('panel', t); } else if (B[id].tier >= 1) { S.q = 'best'; S.sel = S.sel === id && S.drawer ? null : id; if (S.sel) openDrawer('panel', t); else S.drawer = null; } }
+  else if (t.dataset.planet) { const p = t.dataset.planet; if (S.have.has(p)) S.have.delete(p); else { S.have.add(p); if (MY().length && !MY().includes(p)) openDrawer('panel', t); } S.hover = null; }
+  else if (t.dataset.sel) { S.q = 'best'; S.sel = +t.dataset.sel; openDrawer('panel', t); }
+  else if ('clearsel' in t.dataset) { S.sel = null; if (S.drawer === 'panel') { closeDrawer(); return; } }
+  else if ('clearwhatif' in t.dataset) { extras().forEach(x => S.have.delete(x)); S.hover = null; if (S.drawer === 'panel' && !S.sel && S.q !== 'have') { closeDrawer(); return; } }
+  else if ('hs' in t.dataset) S.hsOnly = !S.hsOnly;
+  else if (t.dataset.q) {}
+  else if ('fullmap' in t.dataset) fullOpen = !fullOpen;
+  else if ('gobest' in t.dataset) { S.q = 'best'; S.sel = null; }
+  tip.style.display = 'none';
+  render();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.drawer) { e.preventDefault(); closeDrawer(); } });
+document.addEventListener('mouseover', e => {
+  const pl = e.target.closest('.pl'); const t = pl ? pl.dataset.planet : null;
+  if (t !== S.hover) { S.hover = t; paintOnly(); }
+});
+document.addEventListener('mousemove', e => {
+  const el = e.target.closest('.it:not(.ghost),[data-tip]');
+  if (!el) { tip.style.display = 'none'; return; }
+  const id = +(el.dataset.id || el.dataset.tip), it = B[id]; if (!it) return;
+  const inputs = it.inputs ? 'Made from: ' + it.inputs.map(x => x.q + '× ' + B[x.id].name).join(', ') : 'Found on: ' + it.planets.map(cap).join(', ');
+  tip.innerHTML = `<div class="tt"><img src="${ic(id)}" alt="">${it.name}</div><div class="dim">${inputs}</div><div style="margin-top:4px">Sells for ≈ ${fm(price(id))} ISK at ${marketLabel()}</div>${it.tier ? `<div class="pos">≈ ${fm(value(id))} ISK/day per planet</div><div style="margin-top:4px">${cmpChip(id)}</div>` : '<div class="dim">Raw resources: huge volume, thin market; we never recommend selling them.</div>'}`;
+  tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 300) + 'px'; tip.style.top = Math.min(e.clientY + 14, innerHeight - 140) + 'px';
+});
+let rz, wasPhone = isPhone(); addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (isPhone() !== wasPhone) { wasPhone = isPhone(); render(); } measureDock(); }, 80); });
+addEventListener('storage', e => { if (e.key === 'piMock.pilot') { const k = Object.keys(MOCK_KEY).find(x => MOCK_KEY[x] === e.newValue); if (k && k !== S.pilot) setPilot(k, true); } if (e.key === 'piMock.market' && e.newValue in MARKETS) { S.market = e.newValue; MEMO.clear(); render(); } });
+// init: ?pilot= overrides; else shared localStorage (written by every PI tab)
+const qp = new URLSearchParams(location.search).get('pilot');
+const stored = Object.keys(MOCK_KEY).find(k => MOCK_KEY[k] === lsGet('piMock.pilot'));
+setPilot(PILOTS[qp] ? qp : (stored || 'six'));
+const sm = lsGet('piMock.market'); if (!qp && sm && sm in MARKETS && sm !== S.market) { S.market = sm; MEMO.clear(); render(); }
+})();
+</script>
+</body>
+</html>

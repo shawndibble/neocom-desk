@@ -1,0 +1,42 @@
+name: SDE drift check
+
+# Compares baked public/data against live ESI. Not a PR gate: it is not one of
+# the required `validate`/`test`/`e2e` checks.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Ensure sde-drift label
+        run: gh label create sde-drift --description "Baked SDE data drifted from live ESI" --color D93F0B || true
+      - name: Find open drift issue
+        id: existing
+        run: echo "number=$(gh issue list --label sde-drift --state open --limit 1 --json number --jq '.[0].number // empty')" >> "$GITHUB_OUTPUT"
+      - name: Compare against ESI
+        run: node scripts/sde-verify.mjs --report report.json --existing "${{ steps.existing.outputs.number }}"
+      - name: Update drift issue
+        run: |
+          action=$(jq -r .plan.action report.json)
+          number=$(jq -r '.plan.number // empty' report.json)
+          jq -r '.plan.body // empty' report.json > body.md
+          case "$action" in
+            create) gh issue create --title "Baked SDE data drifted from ESI" --label sde-drift --body-file body.md ;;
+            comment) gh issue comment "$number" --body-file body.md ;;
+            close) gh issue close "$number" --comment "Latest run is clean." ;;
+          esac
+      - name: Fail on pinned drift
+        run: jq -e '[.mismatches[] | select(.pinned)] | length == 0' report.json

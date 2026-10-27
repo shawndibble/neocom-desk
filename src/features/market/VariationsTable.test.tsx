@@ -1,0 +1,291 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, within, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import '@/i18n';
+import { VariationsTable, type VariationsTableProps } from './VariationsTable';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
+import type { VariationRow } from './variations';
+import type { OrderBookSummary } from '@/engine/market/orderBook';
+
+const ROWS: VariationRow[] = [
+  { typeId: 588, name: 'Republic Fleet Rifter', tier: 'T2' },
+  { typeId: 587, name: 'Rifter', tier: 'T1' },
+  { typeId: 589, name: "Vherokior's Slasher", tier: 'Faction' },
+];
+
+function summary(bestSell: number | null, bestBuy: number | null): OrderBookSummary {
+  return { bestSell, bestBuy, spread: null, availableVolume: 0 };
+}
+
+function defaultProps(overrides: Partial<VariationsTableProps> = {}): VariationsTableProps {
+  return {
+    rows: ROWS,
+    prices: new Map(),
+    onSelect: vi.fn(),
+    onCompare: vi.fn(),
+    selfName: 'Slasher',
+    selfSummary: summary(10_000, 8_000),
+    scopeName: 'Jita',
+    ...overrides,
+  };
+}
+
+/** ItemContextMenu (wired to every row) calls useNavigate/useLocation unconditionally, so any non-empty render needs a Router ancestor. */
+function renderTable(overrides: Partial<VariationsTableProps> = {}) {
+  const actions = fakeItemActions();
+  const result = render(
+    <MemoryRouter>
+      <FakeItemActions actions={actions}>
+        <VariationsTable {...defaultProps(overrides)} />
+      </FakeItemActions>
+    </MemoryRouter>
+  );
+  return { ...result, actions };
+}
+
+describe('VariationsTable', () => {
+  it('names each row with a real Market link that selects in place on a plain click', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderTable({ onSelect });
+    const link = screen.getByRole('link', { name: 'Rifter' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
+    await user.click(link);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(587);
+  });
+
+  it('renders nothing when there are no rows', () => {
+    const { container } = render(<VariationsTable {...defaultProps({ rows: [] })} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders Name/Tier/Sell/Buy for each row and defaults to Sell ascending', () => {
+    renderTable({
+      prices: new Map([
+        [588, summary(200, 190)],
+        [587, summary(100, 90)],
+        [589, summary(300, 290)],
+      ]),
+    });
+    const rowEls = screen.getAllByRole('row').slice(1); // drop header row
+    expect(within(rowEls[0]).getByText('Rifter')).toBeInTheDocument();
+    expect(within(rowEls[0]).getByText('T1')).toBeInTheDocument();
+    expect(within(rowEls[1]).getByText('Republic Fleet Rifter')).toBeInTheDocument();
+    expect(within(rowEls[2]).getByText("Vherokior's Slasher")).toBeInTheDocument();
+  });
+
+  it('shows a loading state until a row price arrives', () => {
+    renderTable({ rows: [ROWS[0]] });
+    expect(screen.getAllByText('Loading').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows the sell-side empty state when only a buy order exists, and vice versa', () => {
+    renderTable({ rows: [ROWS[0]], prices: new Map([[588, summary(null, 90)]]) });
+    expect(screen.getByText('No sell orders')).toBeInTheDocument();
+    // Shorthand on screen (#947); the exact figure is the accessible name.
+    expect(screen.getByText('90.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+  });
+
+  it('shows the shared "no orders" fallback when neither side has an order', () => {
+    renderTable({ rows: [ROWS[0]], prices: new Map([[588, summary(null, null)]]) });
+    expect(screen.getAllByText('No orders')).toHaveLength(2);
+  });
+
+  it('re-anchors on the clicked row via onSelect, anywhere in the row', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderTable({ onSelect });
+    const rifterRow = screen.getByText('Rifter').closest('tr');
+    if (!rifterRow) throw new Error('expected a Rifter row');
+    await user.click(rifterRow);
+    expect(onSelect).toHaveBeenCalledWith(587);
+  });
+
+  it('calls onCompare when the Compare button is clicked', async () => {
+    const user = userEvent.setup();
+    const onCompare = vi.fn();
+    renderTable({ onCompare });
+    await user.click(screen.getByRole('button', { name: 'Compare' }));
+    expect(onCompare).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the Tier column when every row is a sibling fallback with no tier', () => {
+    renderTable({ rows: [{ typeId: 34, name: 'Tritanium', tier: null }] });
+    expect(screen.queryByRole('button', { name: /Tier/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Tier/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the Tier column when at least one row has a tier', () => {
+    renderTable({
+      rows: [
+        { typeId: 587, name: 'Rifter', tier: 'T1' },
+        { typeId: 34, name: 'Tritanium', tier: null },
+      ],
+    });
+    expect(screen.getByRole('button', { name: /Tier/ })).toBeInTheDocument();
+  });
+
+  it('re-sorts Sell descending on a second header click', async () => {
+    const user = userEvent.setup();
+    renderTable({
+      prices: new Map([
+        [588, summary(200, 190)],
+        [587, summary(100, 90)],
+        [589, summary(300, 290)],
+      ]),
+    });
+    await user.click(screen.getByRole('button', { name: /Sell/ }));
+    const rowEls = screen.getAllByRole('row').slice(1);
+    expect(within(rowEls[0]).getByText("Vherokior's Slasher")).toBeInTheDocument();
+  });
+
+  it('sorts by Name on header click', async () => {
+    const user = userEvent.setup();
+    renderTable();
+    await user.click(screen.getByRole('button', { name: /Name/ }));
+    const rowEls = screen.getAllByRole('row').slice(1);
+    expect(within(rowEls[0]).getByText('Republic Fleet Rifter')).toBeInTheDocument();
+    expect(within(rowEls[1]).getByText('Rifter')).toBeInTheDocument();
+    expect(within(rowEls[2]).getByText("Vherokior's Slasher")).toBeInTheDocument();
+  });
+
+  it('sorts by Buy on header click', async () => {
+    const user = userEvent.setup();
+    renderTable({
+      prices: new Map([
+        [588, summary(200, 190)],
+        [587, summary(100, 90)],
+        [589, summary(300, 290)],
+      ]),
+    });
+    await user.click(screen.getByRole('button', { name: /Buy/ }));
+    const rowEls = screen.getAllByRole('row').slice(1);
+    expect(within(rowEls[0]).getByText('Rifter')).toBeInTheDocument();
+  });
+
+  describe('row context menu (issue #147)', () => {
+    it('opens on right-click with the standard six actions plus Compare Variations', async () => {
+      renderTable();
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      row.focus();
+      fireEvent.contextMenu(row);
+
+      expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Compare Variations' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('menuitem', { name: 'Build Plan (checking…)' })
+      ).toBeInTheDocument();
+    });
+
+    it('requests the blueprint catalog when the menu opens, same as the tree', () => {
+      const { actions } = renderTable();
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      fireEvent.contextMenu(row);
+      expect(actions.requestBlueprints).toHaveBeenCalledTimes(1);
+    });
+
+    it('adds the right-clicked row to the Quickbar via Add to Quickbar', async () => {
+      const user = userEvent.setup();
+      const { actions } = renderTable();
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      fireEvent.contextMenu(row);
+      await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+      expect(actions.addToQuickbar).toHaveBeenCalledWith(587, 'Rifter');
+    });
+
+    it('shows info for the right-clicked row via Show info', async () => {
+      const user = userEvent.setup();
+      const { actions } = renderTable();
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      fireEvent.contextMenu(row);
+      await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+      expect(actions.showInfo).toHaveBeenCalledWith(587, 'Rifter');
+    });
+
+    it('triggers onCompare for the whole table via the row-level Compare Variations action', async () => {
+      const user = userEvent.setup();
+      const onCompare = vi.fn();
+      renderTable({ onCompare });
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      fireEvent.contextMenu(row);
+      await user.click(screen.getByRole('menuitem', { name: 'Compare Variations' }));
+      expect(onCompare).toHaveBeenCalledTimes(1);
+    });
+
+    it('right-click opens the menu without also selecting the row (left/right-click non-interference)', () => {
+      const onSelect = vi.fn();
+      renderTable({ onSelect });
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      fireEvent.contextMenu(row);
+      expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('left-click still selects the row while the menu is available', async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      renderTable({ onSelect });
+      const row = screen.getByText('Rifter').closest('tr');
+      if (!row) throw new Error('expected a Rifter row');
+      await user.click(row);
+      expect(onSelect).toHaveBeenCalledWith(587);
+      expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('prices each variation against the item it varies, signed, cheaper reading as a saving', () => {
+    renderTable({
+      prices: new Map([
+        [588, summary(25_000, 20_000)],
+        [587, summary(4_000, 3_000)],
+        [589, summary(null, 500)],
+      ]),
+    });
+    const table = screen.getByRole('table', { name: 'Variations' });
+    expect(within(table).getByRole('columnheader', { name: /vs Slasher/ })).toBeInTheDocument();
+    const rifter = within(table).getByText('Rifter').closest('tr');
+    const fleet = within(table).getByText('Republic Fleet Rifter').closest('tr');
+    if (!rifter || !fleet) throw new Error('expected rows');
+    expect(within(rifter).getByText('−6K')).toBeInTheDocument();
+    expect(within(fleet).getByText('+15K')).toBeInTheDocument();
+  });
+
+  it('names the item the rows vary and where they are priced', () => {
+    renderTable({ prices: new Map([[587, summary(4_000, 3_000)]]) });
+    expect(screen.getByText('This item')).toBeInTheDocument();
+    expect(screen.getByText('Priced at Jita')).toBeInTheDocument();
+  });
+
+  it('groups rows by tier and folds a tier nobody sells here, one click from open', async () => {
+    const user = userEvent.setup();
+    renderTable({
+      rows: [...ROWS, { typeId: 590, name: "Gistum's Slasher", tier: 'Faction' }],
+      prices: new Map([
+        [588, summary(25_000, 20_000)],
+        [587, summary(4_000, 3_000)],
+        [589, summary(null, 500)],
+        [590, summary(null, null)],
+      ]),
+    });
+    const table = screen.getByRole('table', { name: 'Variations' });
+    expect(within(table).getByText('Rifter')).toBeInTheDocument();
+    const faction = within(table).getByRole('button', { name: /Faction.*none sold at Jita/ });
+    expect(faction).toHaveAttribute('aria-expanded', 'false');
+    expect(within(table).queryByText("Vherokior's Slasher")).not.toBeInTheDocument();
+
+    await user.click(faction);
+    expect(within(table).getByText("Vherokior's Slasher")).toBeInTheDocument();
+  });
+});

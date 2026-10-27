@@ -1,0 +1,8 @@
+# Scope decisions — Skill-gate marker shows on bought rows and opens a train-and-plan popover
+
+_Recorded 2026-10-05._
+
+- **A bought Build Plan row shows the skill-gate marker when the cost call is "build".** Auto Build quietly buys a material no account character can install, and the row still read "Build instead" in green with no reason. The marker now sits beside the name on exactly that row (gated, and cost-only advice says build). It does not show on every gated bought row: a T2 part that is cheaper to buy anyway needs no warning, and the chip would repeat on dozens of rows. This widens the 2026-09-22 decision's surface list (`20260922-184314-skill-gate-marker-extends-to-the-build-plan.md`) by one.
+- **The make-or-buy advice stays cost-only.** `materialAdvice` is not given `accountSkills`. Passing them would flip a gated row's verdict to "buy", drop the green savings callout the pilot relies on, and change the CSV export. The gate is a separate fact shown next to the advice. It also no longer depends on Auto Build having run in this session: the old `autoBuildSkillGated` state was empty after a reload.
+- **The marker is a button that opens a popover, not a tooltip.** A tooltip may not hold interactive content (`DESIGN.md` §4). The popover is for the closest character (`bestCharacterId`) and lists each missing skill as a Skill modal link, its train time (the full schedule, prerequisites included) and an Add to Skill Plan button. The plan and clone state are that character's, not the active one's. The Skill modal still reads the active character, so its trained levels can differ when they are not the same pilot.
+- **The add-to-plan row is shared with Fit Check's Missing skills popover** (`AddToPlanBar`) so the two cannot drift.

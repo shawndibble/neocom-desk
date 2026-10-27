@@ -1,0 +1,585 @@
+// Shapes of the slim SDE JSON emitted by scripts/build-sde.mjs.
+
+import type { PlanetType } from '@/esi/endpoints';
+
+export type CharacterAttribute =
+  'charisma' | 'intelligence' | 'memory' | 'perception' | 'willpower';
+
+export interface SkillPrereq {
+  skillTypeID: number;
+  level: number;
+}
+
+/** One entry in public/data/skills.json (SkillType[]). */
+export interface SkillType {
+  typeID: number;
+  name: string;
+  description: string;
+  groupID: number;
+  groupName: string;
+  /** skillTimeConstant (dogma attr 275), 1-16 */
+  rank: number;
+  primaryAttr: CharacterAttribute;
+  secondaryAttr: CharacterAttribute;
+  prereqs: SkillPrereq[];
+  /**
+   * invTypes basePrice: the fixed price NPC stations sell the skillbook at,
+   * where it is NPC-seeded. Absent when the SDE gives 0.
+   */
+  basePrice?: number;
+  /** Highest level an Alpha clone can train; absent when Alphas cannot train it. */
+  alphaMaxLevel?: number;
+}
+
+/**
+ * public/data/masteries.json: ship typeID -> 5 tiers (mastery I-V, index 0-4)
+ * -> the skill/level pairs that tier bundles. A tier CCP hasn't published for
+ * that ship is an empty array, not a missing index — every ship in the map
+ * carries exactly 5 tiers so a caller never has to guard the array length.
+ * Built from Fuzzwork's `certMasteries.csv` + `certSkills.csv` — see
+ * `scripts/build-sde.mjs` for the join.
+ */
+export type MasteryMap = Record<string, SkillPrereq[][]>;
+
+/**
+ * One row of public/data/certificates.json (issue #2390): a CCP certificate
+ * from one of the combat groups. `levels` is its five-grade ladder (Basic,
+ * Standard, Improved, Advanced, Elite) — the same shape as a ship's Mastery
+ * tiers, graded by the same rule (`engine/tierLadder.ts`). Baked from CCP's
+ * `certificates.jsonl` by `scripts/build-sde.mjs` (`scripts/lib/certificates.mjs`).
+ */
+export interface Certificate {
+  /** CCP's certificate id. */
+  id: number;
+  name: string;
+  /** Plain text. */
+  description: string;
+  groupId: number;
+  /** English group name ("Armor", "Navigation"). */
+  groupName: string;
+  /** Exactly five grades; never an empty one (the build fails on that). */
+  levels: SkillPrereq[][];
+}
+
+/**
+ * One row of public/data/certifiedPlans.json (issue #2392): a CCP Certified
+ * Skill Plan, one of the career plans the client lists under Skill Plans ›
+ * Certified Plans. Baked from CCP's own `skillPlans.jsonl` by
+ * `scripts/build-sde.mjs` (`scripts/lib/certifiedPlans.mjs`).
+ */
+export interface CertifiedPlan {
+  /** CCP's plan id. */
+  id: number;
+  /** English name, as the client shows it ("Manufacturer"). */
+  name: string;
+  /** Plain text: the client markup and its links are stripped at bake time. */
+  description: string;
+  /** 4 Explorer, 5 Industrialist, 6 Enforcer, 7 Soldier of Fortune. */
+  careerPathId: number;
+  /** Absent on a plan open to every faction (the Industrialist plans). */
+  factionId?: number;
+  factionName?: string;
+  /** One row per skill level, in CCP's training order — prerequisites first. */
+  entries: SkillPrereq[];
+  /** CCP's skill-level milestones; each one matches one of `entries`. */
+  milestones: SkillPrereq[];
+}
+
+/**
+ * One row of public/data/skillAttributeModifiers.json: a skill that grants a
+ * PostPercent (flat "+N% per level") bonus to some item attribute.
+ * `gatingSkillTypeID` is the skill an item must itself require for the bonus
+ * to apply — not necessarily `ownerSkillTypeID`, the skill actually granting
+ * it: Sharpshooter (`ownerSkillTypeID` 3311) boosts Optimal Range on every
+ * item requiring Gunnery (`gatingSkillTypeID` 3300), without Sharpshooter
+ * itself being required. `perLevelValue` is `ownerSkillTypeID`'s own
+ * per-level design value (5, for Sharpshooter's flat 5%/level) — the
+ * effective bonus at a trained level is `perLevelValue * level`.
+ */
+export interface SkillAttributeModifier {
+  ownerSkillTypeID: number;
+  gatingSkillTypeID: number;
+  perLevelValue: number;
+}
+
+/**
+ * public/data/skillAttributeModifiers.json: modifiedAttributeID (as a string
+ * key) -> the skills that modify it. Only PostPercent-operation, skill-owned
+ * modifiers — see `scripts/build-sde.mjs`'s `skillAttributeModifiers` build.
+ */
+export type SkillAttributeModifierMap = Record<string, SkillAttributeModifier[]>;
+
+export interface BlueprintQuantity {
+  typeID: number;
+  quantity: number;
+}
+
+export interface BlueprintSkill {
+  typeID: number;
+  level: number;
+}
+
+/** One value in public/data/blueprints.json: a manufacturing blueprint or a reaction formula (issue #460). */
+export interface BlueprintType {
+  name: string;
+  /** base job time in seconds */
+  time: number;
+  materials: BlueprintQuantity[];
+  products: BlueprintQuantity[];
+  skills: BlueprintSkill[];
+  activity: 'manufacturing' | 'reaction';
+}
+
+/** public/data/blueprints.json: blueprint/formula typeID -> BlueprintType */
+export type BlueprintMap = Record<string, BlueprintType>;
+
+/** One blueprint an invention job can produce, with its base odds. */
+export interface InventionProduct {
+  /** the invented (T2) blueprint */
+  typeID: number;
+  /** runs on the invented copy, before a decryptor */
+  quantity: number;
+  /** base success chance, 0–1, before skills and decryptor */
+  probability: number;
+}
+
+/** A T1 blueprint's invention job (SDE activity 8). */
+export interface InventionRecipe {
+  /** base job time in seconds */
+  time: number;
+  /** datacores consumed per attempt */
+  materials: BlueprintQuantity[];
+  products: InventionProduct[];
+  skills: BlueprintSkill[];
+}
+
+/** The copying and invention halves of one blueprint (issue #3987). */
+export interface BlueprintCopyInvention {
+  /** base time in seconds to copy one run (SDE activity 5) */
+  copyTime?: number;
+  invention?: InventionRecipe;
+}
+
+/** A generic decryptor's effect on an invention job. */
+export interface Decryptor {
+  name: string;
+  /** scales the base chance: 1.2 is +20% */
+  probabilityMultiplier: number;
+  /** added to the invented copy's ME */
+  me: number;
+  /** added to the invented copy's TE */
+  te: number;
+  /** added to the invented copy's runs */
+  runs: number;
+}
+
+/** public/data/invention.json (see scripts/lib/invention.mjs). */
+export interface InventionData {
+  /** blueprint typeID -> its copying/invention data */
+  blueprints: Record<string, BlueprintCopyInvention>;
+  /** decryptor typeID -> its modifiers */
+  decryptors: Record<string, Decryptor>;
+}
+
+/** One value in public/data/types.json. */
+export interface TypeInfo {
+  name: string;
+  groupID: number;
+  /** m3, unpackaged (assembled) */
+  volume: number;
+  /**
+   * m3, packaged. Baked only for manufacturing material types where it
+   * differs from `volume` (issue #1085) — a hull or capital module bought
+   * off the market arrives packaged, while an ordinary mineral or component
+   * has no assembled/packaged distinction at all. Absent for every other
+   * type, and for a manufacturing material the packaged-volume probe
+   * couldn't resolve; callers fall back to `volume` for those.
+   */
+  packagedVolume?: number;
+}
+
+/** One material a type reprocesses into, per `portionSize` units of it. */
+export interface ReprocessingMaterial {
+  typeID: number;
+  quantity: number;
+}
+
+export interface ReprocessingType {
+  /**
+   * Units that reprocess together. The quantities below are per PORTION, not
+   * per unit, so a part portion refines into nothing at all — which is why
+   * this rides inside the entry rather than sitting in `types.json`, where it
+   * could be read apart from the quantities it governs (issue #537).
+   */
+  portionSize: number;
+  materials: ReprocessingMaterial[];
+  /**
+   * The reprocessing specialisation skill this type answers to (SDE
+   * attribute 790, "Reprocessing Skill"), when the SDE names one more
+   * specific than Scrapmetal Processing — every ore, ice and moon-ore type
+   * carries this; a module, ship or other item does not. Absent means
+   * Scrapmetal Processing (12196) applies, which the resolver in
+   * `engine/industry/reprocessing.ts` treats as the default rather than
+   * this bake repeating that id on every non-ore row (issue #1058).
+   */
+  specialisationSkillID?: number;
+}
+
+/**
+ * public/data/reprocessing.json: typeID -> what refining it returns.
+ *
+ * Only published types carrying a market group are baked — the one caller is
+ * the "reprocess and sell the materials" comparison on an open market order,
+ * and every type such an order can name is in that set.
+ */
+export type ReprocessingMap = Record<string, ReprocessingType>;
+
+/** public/data/types.json: typeID -> TypeInfo */
+export type TypeMap = Record<string, TypeInfo>;
+
+/**
+ * Which rack a Fitting item goes in — the same five values
+ * `engine/fittings/types.ts`'s `FittingSlotKind` uses, plus `'drone'` for
+ * anything in the Drone category. Not derivable from `TypeInfo.groupID`
+ * alone: which of the "requires a slot" dogma effects
+ * (loPower/hiPower/medPower/rigSlot/subSystem) a type carries is what decides
+ * its rack in EVE, not its group (issue #1532; `scripts/build-fitting-slots.mjs`).
+ * A type absent from this map takes no rack at all (ammo, cargo, the hull
+ * itself, ships, drone-bay-less items).
+ */
+export type FittingSlotAssignment = 'high' | 'medium' | 'low' | 'rig' | 'subsystem' | 'drone';
+
+/** public/data/fittingSlots.json: typeID (as a string key) -> its rack. */
+export type FittingSlotMap = Record<string, FittingSlotAssignment>;
+
+/**
+ * One manufacturing blueprint's fully flattened material tree — sub-builds
+ * (a material that is itself another manufacturing blueprint's product)
+ * resolved recursively at SDE-build time down to base, non-producible
+ * materials, at ME 0 (issue #819). This is an approximation, not a
+ * `computeBuildPlan`-grade cost: it ignores ME/TE, owned stock, and
+ * auto-make-or-buy, trading exact-run precision for a lookup cheap enough to
+ * run over the whole SDE at once rather than resolved live per candidate.
+ * Picking a row still opens a real Build Plan for exact numbers.
+ */
+export interface MarketWideTreeEntry {
+  blueprintTypeID: number;
+  /**
+   * Total job time in seconds for one run of the top blueprint, plus every
+   * folded-in sub-job's own time, scaled the same fractional way the
+   * material quantities are (issue #1084) — the same basis `materials`
+   * below is costed on, so `computeMarketWideRows`'s ISK/hour divides cost
+   * and time on one consistent plan rather than mixing a whole-tree cost
+   * with a top-job-only duration. Equal to the top blueprint's own time
+   * alone when the tree has no sub-builds.
+   */
+  time: number;
+  /** product units per run */
+  outputQuantity: number;
+  /** null when the product carries no Market Group (shouldn't happen — the build script only bakes sellable products). */
+  marketGroupID: number | null;
+  /** Flattened base materials for one run of the blueprint. */
+  materials: BlueprintQuantity[];
+}
+
+/** public/data/marketWideTrees.json: product typeID -> its flattened manufacturing tree. */
+export type MarketWideTreeMap = Record<string, MarketWideTreeEntry>;
+
+/** One input line of a planetary schematic. */
+export interface PiInput {
+  typeID: number;
+  quantity: number;
+  /** Carried inline: most planetary commodities are referenced by no blueprint, so types.json has no entry for them. */
+  name: string;
+}
+
+/**
+ * Which planetary factory pin runs a schematic. Derived from the SDE's own
+ * `planetSchematicsPinMap`, never from the schematic's tier: the two agree
+ * today (basic makes P1, advanced makes P2 and P3, high-tech makes P4) but
+ * that agreement is a fact about the current recipe set, not a rule, and the
+ * mapping is in the dump so there is nothing to infer.
+ */
+export type PiFactoryKind = 'basic' | 'advanced' | 'highTech';
+
+/** One planetary schematic, keyed in pi.json by the typeID it produces. */
+export interface PiSchematic {
+  schematicId: number;
+  /** Schematic name, which is also the produced item's name. */
+  name: string;
+  /** Seconds one production cycle takes. */
+  cycleTime: number;
+  /** Units produced per cycle. */
+  quantity: number;
+  /** m3 of one unit, from invTypes.volume. */
+  volume: number;
+  /** The factory pin this schematic runs in — see `PiFactoryKind`. */
+  facility: PiFactoryKind;
+  /**
+   * Planet types carrying a factory that can run this schematic, sorted
+   * alphabetically. Same strings as `PiRawResource.planetTypes`. Almost every
+   * schematic runs on all eight; the P4s do not, because the High-Tech
+   * Production Plant exists on Barren and Temperate only.
+   */
+  planetTypes: PlanetType[];
+  inputs: PiInput[];
+}
+
+/**
+ * One P0 resource: extracted straight off a planet, so no schematic produces
+ * it and no blueprint references it — which is why its name and volume ride
+ * along here instead of being looked up in types.json.
+ */
+export interface PiRawResource {
+  typeID: number;
+  name: string;
+  /** m3 of one unit, from invTypes.volume. */
+  volume: number;
+  /**
+   * Planet types whose extractors yield it, sorted alphabetically. Same
+   * strings ESI reports as `CharacterPlanet.planet_type`, so a colony matches
+   * this list directly. Which planet types, never how much — per-planet
+   * richness is scanner-only and out of scope.
+   */
+  planetTypes: PlanetType[];
+}
+
+/** Every kind of pin a colony's CPU/Powergrid budget pays for. */
+export type PiPinKind = 'extractorControlUnit' | PiFactoryKind | 'storage' | 'launchpad';
+
+/** What one pin costs a colony, and what it holds. */
+export interface PiPinSpec {
+  /** tf drawn from the colony's CPU budget (dogma `cpuLoad`, attribute 49). */
+  cpu: number;
+  /** MW drawn from the colony's Powergrid budget (dogma `powerLoad`, attribute 15). */
+  powergrid: number;
+  /** m3 the pin holds, from invTypes.capacity. Zero for pins that hold nothing. */
+  capacity: number;
+}
+
+/** What a Command Center supplies at one of its own upgrade levels. */
+export interface PiCommandCenterLevel {
+  /**
+   * The Command Center's own upgrade level, 0-5 — what ESI reports per colony
+   * as `CharacterPlanet.upgrade_level`, not the pilot's Command Center
+   * Upgrades skill. The skill caps how far a colony may be upgraded; each
+   * level is then bought per colony with ISK.
+   */
+  level: number;
+  /** tf of CPU the colony's whole pin set is budgeted against. */
+  cpu: number;
+  /** MW of Powergrid the colony's whole pin set is budgeted against. */
+  powergrid: number;
+}
+
+/**
+ * `pi-system-planets.json`: solarSystemID -> how many planets of each PI type
+ * the system holds (types it lacks are absent; systems with no PI-type planet
+ * are absent). Counts only, so planet finders can rank systems without an ESI
+ * fan-out. Shattered planets count under their base type, as in
+ * `PiData.planetTypeByTypeId`.
+ */
+export type PiSystemPlanets = Record<string, Partial<Record<PlanetType, number>>>;
+
+/**
+ * The colony budget and the pin costs it pays for — the numbers a pin-layout
+ * plan is sized against, all of them the same for every planet type.
+ */
+/**
+ * The Link type's own cost attributes (2280). A link draws CPU and Powergrid
+ * like any other pin, plus a per-km term over the distance between the two
+ * pins it joins — which is why `pi-planet-radius.json` ships alongside this.
+ */
+export interface PiLinkSpec {
+  /** Base cost, before the per-km term. */
+  cpu: number;
+  powergrid: number;
+  cpuPerKm: number;
+  powergridPerKm: number;
+  /** Applied as a power of the link's level. See `engine/pi/linkCost.ts`. */
+  cpuLevelModifier: number;
+  powergridLevelModifier: number;
+}
+
+export interface PiInfrastructure {
+  /** Per-pin CPU/Powergrid cost and capacity, one entry per `PiPinKind`. */
+  pins: Record<PiPinKind, PiPinSpec>;
+  /**
+   * Pin typeID -> its kind. Every pin is planet-type-specific — a Temperate
+   * Basic Industry Facility and a Storm one are different typeIDs at the same
+   * cost — so this is how a live colony's own `pins[]` is read: the ESI pin
+   * carries a `type_id` and nothing else that says what it is. Command
+   * Centers are absent: they supply the budget and draw nothing from it.
+   */
+  pinKindByTypeId: Record<string, PiPinKind>;
+  /**
+   * The eight Command Center typeIDs, one per planet type. Every colony has
+   * exactly one, and it is deliberately absent from `pinKindByTypeId` — a
+   * Command Center supplies the budget and draws nothing from it, so it has
+   * no cost row. It still has to be recognisable, or a reader of a live
+   * colony's pins reports the one pin every colony has as unrecognised.
+   */
+  commandCenterTypeIds: number[];
+  /**
+   * One Extractor Control Unit head's own draw, on top of the ECU's
+   * (attributes 1690/1691). A head is fitted per resource-reach, so its cost
+   * scales with how many the user places rather than being part of the ECU.
+   */
+  extractorHead: { cpu: number; powergrid: number };
+  /**
+   * CPU/Powergrid the Command Center supplies, indexed by its own upgrade
+   * level — `commandCenterUpgrades[3]` is level 3. Level 0 is the only row the
+   * SDE carries; see `scripts/build-sde.mjs` for where the rest come from and
+   * what the build asserts about them.
+   */
+  link: PiLinkSpec;
+  commandCenterUpgrades: PiCommandCenterLevel[];
+}
+
+/** public/data/pi.json: how planetary commodities are made. */
+export interface PiData {
+  /** Produced typeID -> its schematic. */
+  schematics: Record<string, PiSchematic>;
+  /** P0 resources, sorted by typeID ascending. */
+  raw: PiRawResource[];
+  /** CPU/Powergrid budget and per-pin costs — see `PiInfrastructure`. */
+  infrastructure: PiInfrastructure;
+  /**
+   * Planet typeID -> the `PlanetType` string ESI reports for a colony. Keyed
+   * by the typeID `/universe/planets/{id}` returns, which is how a planet in
+   * a system the character has no colony on is identified at all. Several
+   * typeIDs map to one planet type, and a planet whose typeID is absent
+   * (Shattered, Scorched Barren) supports no colony.
+   */
+  planetTypeByTypeId: Record<string, PlanetType>;
+}
+
+/** One skill level a Ship Tree hull or class asks for. */
+export interface ShipTreeSkill {
+  skillTypeID: number;
+  level: number;
+}
+
+/**
+ * One bonus line from a hull's traits (Fuzzwork `invTraits`). `skillTypeID`
+ * null is a role bonus (flat, not per skill level); `bonus` null is a
+ * bonus with no number ("Can use one Command Burst module").
+ */
+export interface ShipTreeTrait {
+  skillTypeID: number | null;
+  bonus: number | null;
+  /** eveUnits display name, e.g. "%" — empty when the unit has none. */
+  unit: string;
+  /** Plain text, markup stripped. */
+  text: string;
+}
+
+/**
+ * A hull's unskilled fitting numbers, straight from its dogma attributes —
+ * what the Ship Info window's Fitting tab shows before the pilot's skills.
+ * Every field is 0 when the hull has none.
+ */
+export interface ShipTreeHullStats {
+  highSlots: number;
+  medSlots: number;
+  lowSlots: number;
+  rigSlots: number;
+  /** 0 on hulls without rigs; 1 small, 2 medium, 3 large, 4 capital (attr 1547). */
+  rigSize: number;
+  turretHardpoints: number;
+  launcherHardpoints: number;
+  cpu: number;
+  powergrid: number;
+  calibration: number;
+  /** m³. */
+  droneBay: number;
+  /** Mbit/s. */
+  droneBandwidth: number;
+}
+
+/** One hull on the Ship Tree. */
+export interface ShipTreeShip {
+  typeID: number;
+  name: string;
+  factionID: number;
+  /** shipTreeGroups id — the Ship Tree class, not the inventory group. */
+  treeGroupID: number;
+  techLevel: number;
+  metaLevel: number;
+  /** The hull's own required skills (Fuzzwork `shipSkills`). */
+  required: ShipTreeSkill[];
+  traits: ShipTreeTrait[];
+  stats: ShipTreeHullStats;
+  /** invTypes description, markup stripped. */
+  description: string;
+}
+
+/** A class prerequisite; `display` false is an implicit one the game doesn't draw. */
+export interface ShipTreeClassSkill extends ShipTreeSkill {
+  display: boolean;
+}
+
+/** One Ship Tree class (Frigate, Assault Frigate, Carrier…). */
+export interface ShipTreeGroup {
+  id: number;
+  name: string;
+  description: string;
+  /** Icon basename, lower-cased: `public/images/ship-tree/class/<icon>.png`. */
+  icon: string;
+  /** Faction id -> the skills that unlock this class for that faction. */
+  prereqsByFaction: Record<string, ShipTreeClassSkill[]>;
+}
+
+/** One faction tab on the Ship Tree. */
+export interface ShipTreeFaction {
+  id: number;
+  name: string;
+  description: string;
+}
+
+/**
+ * public/data/shipTree.json — the in-game Ship Tree's contents, built from
+ * Fuzzwork's `shipTree*`, `invTraits` and `shipSkills` tables. The tree's
+ * *shape* (which class hangs off which) is not in the SDE and lives in
+ * `engine/shipTree/templates.ts`.
+ */
+export interface ShipTreeData {
+  factions: ShipTreeFaction[];
+  groups: Record<string, ShipTreeGroup>;
+  ships: ShipTreeShip[];
+}
+
+/** One attribute a mutaplasmid rolls: base value × a uniform pick in [min, max]. */
+export interface MutaplasmidAttributeRange {
+  /** Dogma attribute id. */
+  id: number;
+  /** Multiplier on the base item's own value, lowest roll. */
+  min: number;
+  /** Multiplier on the base item's own value, highest roll. */
+  max: number;
+  /** A higher value is better — CCP's per-mutaplasmid override where it gives one, else the attribute's own. */
+  highIsGood: boolean;
+}
+
+/** One mutaplasmid: the abyssal type it makes, from which bases, rolling what. */
+export interface MutaplasmidEntry {
+  /** The abyssal (mutated) type it produces. */
+  result: number;
+  /** Base module / drone type ids it applies to, ascending. */
+  bases: number[];
+  attributes: MutaplasmidAttributeRange[];
+}
+
+/**
+ * public/data/mutaplasmids.json (`scripts/lib/mutaplasmids.mjs`), from CCP's
+ * `dynamicItemAttributes.jsonl`. Read through `engine/fittings/mutaplasmids.ts`'s
+ * `mutaplasmidLookup`, not directly.
+ */
+export interface MutaplasmidData {
+  /** Dogma attribute id -> internal name (`capacitorNeed`), every attribute any mutaplasmid rolls. */
+  attributeNames: Record<string, string>;
+  /** Mutaplasmid type id -> what it does. */
+  mutaplasmids: Record<string, MutaplasmidEntry>;
+  /** Every abyssal (mutated) type id, ascending. */
+  abyssalTypeIds: number[];
+}

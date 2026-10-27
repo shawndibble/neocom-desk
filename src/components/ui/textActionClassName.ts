@@ -1,0 +1,26 @@
+import { cx } from '@/lib/cx';
+import { disabledClassName, focusRingClassName, interactiveClassName } from './controlStyles';
+
+/**
+ * The class string of a borderless, uppercase accent text action — a "Clear
+ * day", "Dismiss all", "Use detected" control that sits in a header or a row
+ * and acts (or navigates) without drawing a `Button` box around itself.
+ *
+ * Its own module, and a class helper rather than a component, for the same
+ * reason as `buttonClassName`: the one recipe has to land on a `<button>` and
+ * on a `react-router-dom` `Link` alike. `extra` carries the per-site
+ * differences (`gap-1` for a trailing icon, `justify-end`, `whitespace-nowrap`)
+ * — there is deliberately no variant prop.
+ *
+ * `min-h-9` is the 36px touch tier below `md` (DESIGN.md §3); the `md:min-h-0`
+ * lets the text height stand on a pointer.
+ */
+export function textActionClassName(extra = ''): string {
+  return cx(
+    'flex min-h-9 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline active:text-accent/75 md:min-h-0',
+    interactiveClassName,
+    focusRingClassName,
+    disabledClassName,
+    extra
+  );
+}

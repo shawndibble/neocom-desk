@@ -1,0 +1,156 @@
+/**
+ * Orchestrates the "Import from clipboard" preview: auto-detects EFT fit vs.
+ * skill-plan-paste text, resolves names, and (for EFT) prefetches the dogma
+ * data fitToSkills needs. Kept out of the dialog component so the parsing
+ * logic is unit-testable without rendering anything.
+ */
+import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
+import {
+  fitToSkills,
+  type RequiredSkill,
+  type RequiredSkillsLookup,
+} from '@/engine/import/fitToSkills';
+import { parseSkillPlanPaste } from '@/engine/import/skillPlanPaste';
+import { extractRequiredSkills } from '../dogma';
+import type { TypeDetail } from '../typeDetail';
+import type { PlanEntry } from '@/engine/types';
+import type { TypeCatalogEntry } from '../typeCatalog';
+import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
+
+export type ClipboardImportMode = 'skillPlan' | 'eftFit' | 'planXml';
+
+export interface ClipboardImportLineIssue {
+  line: number;
+  text: string;
+  reason: string;
+}
+
+export interface ClipboardImportPreview {
+  mode: ClipboardImportMode;
+  shipName?: string;
+  fitName?: string;
+  /** The `name` attribute of an imported plan-XML file's root `<plan>` element. */
+  planName?: string;
+  entries: PlanEntry[];
+  /** Unresolved item/skill names, and types whose requirements couldn't be fetched. */
+  warnings: string[];
+  /** Line-level parse errors (bad header, unrecognized line format) or per-entry plan-XML errors. */
+  errors: ClipboardImportLineIssue[];
+  /** File-level failure (too large, malformed, unsupported) before any entry could be parsed — planXml mode only. */
+  documentErrorCode?: PlanXmlDocumentErrorCode;
+}
+
+export interface ClipboardImportDeps {
+  /** Skill names only, for the skill-plan-paste path. */
+  skillByName: ReadonlyMap<string, TypeCatalogEntry>;
+  /** Ship/module/charge names, for the EFT-fit path. */
+  typeByName: ReadonlyMap<string, TypeCatalogEntry>;
+  /** Each resolved item's dogma_attributes; null when unreadable. */
+  loadType: (typeId: number) => Promise<Pick<TypeDetail, 'dogma_attributes'> | null>;
+}
+
+/** EFT fits always start with "[Ship Name, Fit Name]" — same signal parseEftFit's own header check uses. */
+export function detectMode(text: string): ClipboardImportMode {
+  return looksLikeEftFit(text) ? 'eftFit' : 'skillPlan';
+}
+
+async function previewEftFit(
+  text: string,
+  { typeByName, loadType }: ClipboardImportDeps
+): Promise<ClipboardImportPreview> {
+  const fit = parseEftFit(text);
+  const errors = fit.errors.map((e) => ({ line: e.line, text: e.text, reason: e.reason }));
+
+  // Resolve every referenced name up front so we know which typeIDs to
+  // prefetch dogma for. fitToSkills does its own (equivalent) resolution
+  // against the same typeByName and is the source of truth for "unknown
+  // item" warnings, avoiding double-reporting.
+  const names = fit.shipName
+    ? [fit.shipName, ...fit.items.map((i) => i.name)]
+    : fit.items.map((i) => i.name);
+  const resolvedIds = new Set<number>();
+  for (const name of names) {
+    const type = typeByName.get(name.toLowerCase());
+    if (type) resolvedIds.add(type.typeID);
+  }
+
+  const requiredByTypeId = new Map<number, RequiredSkill[]>();
+  const missingDogma: number[] = [];
+  await Promise.all(
+    [...resolvedIds].map(async (typeId) => {
+      const dogmaAttributes = (await loadType(typeId))?.dogma_attributes;
+      if (!dogmaAttributes) {
+        missingDogma.push(typeId);
+        requiredByTypeId.set(typeId, []);
+        return;
+      }
+      requiredByTypeId.set(typeId, extractRequiredSkills(dogmaAttributes));
+    })
+  );
+
+  const requiredSkills: RequiredSkillsLookup = (typeId) => requiredByTypeId.get(typeId) ?? [];
+  const { entries, errors: fitErrors } = fitToSkills(fit, typeByName, requiredSkills);
+
+  // Fits repeat items across multiple slots (three turrets loaded with the
+  // same unresolvable faction ammo, say), which would otherwise print the
+  // same "Unknown item" line once per slot. Dedupe by item name, keeping
+  // first-occurrence order, and note the repeat count instead.
+  const unknownItemCounts = new Map<string, number>();
+  for (const e of fitErrors) {
+    unknownItemCounts.set(e.itemName, (unknownItemCounts.get(e.itemName) ?? 0) + 1);
+  }
+  const unknownItemWarnings = [...unknownItemCounts.entries()].map(([name, count]) =>
+    count > 1 ? `Unknown item: ${name} ×${count}` : `Unknown item: ${name}`
+  );
+
+  const warnings = [
+    ...unknownItemWarnings,
+    ...missingDogma
+      .sort((a, b) => a - b)
+      .map((id) => `Requirements unknown for type #${id} (not cached — reconnect and retry)`),
+  ];
+
+  return {
+    mode: 'eftFit',
+    shipName: fit.shipName,
+    fitName: fit.fitName,
+    entries,
+    warnings,
+    errors,
+  };
+}
+
+function previewSkillPlan(
+  text: string,
+  { skillByName }: ClipboardImportDeps
+): ClipboardImportPreview {
+  const { entries, errors } = parseSkillPlanPaste(text, skillByName);
+  return {
+    mode: 'skillPlan',
+    entries,
+    warnings: [],
+    errors: errors.map((e) => ({ line: e.line, text: e.text, reason: e.reason })),
+  };
+}
+
+export async function previewClipboardImport(
+  text: string,
+  deps: ClipboardImportDeps
+): Promise<ClipboardImportPreview> {
+  return detectMode(text) === 'eftFit' ? previewEftFit(text, deps) : previewSkillPlan(text, deps);
+}
+
+/**
+ * What an Import should do with a preview. A clean parse applies without being
+ * looked at; any failed line, dropped item or unreadable file is put in front
+ * of the pilot first, since applying would silently lose it; a parse that
+ * found nothing at all has nothing to apply or show.
+ */
+export type ImportOutcome = 'apply' | 'review' | 'empty';
+
+export function importOutcome(preview: ClipboardImportPreview): ImportOutcome {
+  if (preview.documentErrorCode || preview.errors.length > 0 || preview.warnings.length > 0) {
+    return 'review';
+  }
+  return preview.entries.length === 0 ? 'empty' : 'apply';
+}

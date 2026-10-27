@@ -1,0 +1,9 @@
+# Scope decisions — Appraisal reads an EFT fit on its own paste box, not a separate Fit Value tool (issue #1026)
+
+_Recorded 2026-09-14 · issue #1026._
+
+- **An EFT fit is a fourth shape the Appraisal paste box accepts, not a tool of its own.** Iron Whales split its fit appraisal out as a separate tool; Neocom Desk does not. A fit and a pile of loose items ask the same question — what is this worth at a trade hub — and the answer is the same table, the same hub comparison, the same pricer. This rules out a "Fit Value" tab, and rules out any fit-specific column (insurance payout, per-slot breakdown) arriving on the back of this change.
+- **The hull is priced from the header line, and a loaded charge is priced separately from its module.** These are the two things a fit says that a loose-item paste cannot. Without them a pasted fit undercounts by an entire ship.
+- **A loaded charge is priced at its module line's quantity.** EFT writes eight launchers' ammo as "8", which counts launchers, and Fit Import deliberately refuses to read that as a production batch. Pricing reads it anyway, because it is the only number EFT gives and it reads as a rough refill cost. This rules out a second quantity rule for the same text in a second parser.
+- **`parseEftFit`'s parse errors are reported, never dropped.** A malformed header or an unreadable body line surfaces in the same unmatched-lines list as a typo'd item name, by source line number — the rule already settled in [20260908-164742-appraisal-prices-at-a-trade-hub-and-shares.md](./20260908-164742-appraisal-prices-at-a-trade-hub-and-shares.md). This rules out quietly falling back to the loose-item parser when a fit header is broken.
+- **Turning a pasted fit into a Build Group or Build Plan stays with Fit Import (issue #626).** Buy cost and build cost are different questions on different pages. Both read the same `parseEftFit`; neither grows the other's behaviour.

@@ -1,0 +1,86 @@
+/**
+ * The one badge choice for an Open Orders row (GLOSSARY.md's redesigned
+ * Market > Open Orders tab) — pulled out of `OpenOrdersPanel` (the row's own
+ * badge column) and `OrderDetailModal` (its verdict block), which
+ * used to each carry their own copy of this switch. Two copies "must agree"
+ * is exactly the duplication this repo's architecture rules forbid; this is
+ * the one place the mapping is written, so the row and the modal it opens
+ * can never disagree about what an order's badge says.
+ *
+ * Pure: reads only fields already computed onto `OpenOrderRow` by
+ * `openOrdersModel.ts` (`problem`, `floor`, `station`, `deepUndercut`,
+ * `expiry`, `worstScope`, `costBasis`). Formatting an ISK/percentage value
+ * for i18n stays with the caller — this only decides *which* badge and what
+ * short, already-formatted detail string (if any) goes beside it.
+ */
+import { fixed1 } from '@/lib/fixedFormat';
+import type { OrderAdviceInput } from './orderRowSummary';
+import type { OrderBadgeKind } from './OrderProblemBadge';
+
+export interface OrderBadgeChoice {
+  kind: OrderBadgeKind;
+  detail?: string;
+}
+
+/**
+ * Every `OrderBadgeKind`, in the order the legend renders them — one owner,
+ * like `ORDER_PROBLEMS` in `orderProblems.ts`, so a kind added or removed
+ * from the type cannot silently drift out of sync with what the legend
+ * lists. Lives here rather than on `OrderProblemBadge.tsx` because that file
+ * exports a component; a value export there defeats fast refresh.
+ */
+export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
+  'belowFloor',
+  'undercutStation',
+  'undercutSystem',
+  'undercutRegion',
+  'expiring',
+  'outbid',
+  'frequentlyUndercut',
+  'best',
+  'topBid',
+  'noCostBasis',
+  'notChecked',
+];
+
+/** The one badge a row wears, and the short detail beside it. Null renders no badge — never a false "best"/"noCostBasis" claim the data can't back up. */
+export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
+  switch (row.problem) {
+    case 'belowFloor': {
+      if (!row.floor) return null;
+      const pct = ((row.floor.relist - row.price) / row.floor.relist) * 100;
+      return { kind: 'belowFloor', detail: `-${fixed1(pct)}%` };
+    }
+    case 'undercutStation':
+      return { kind: 'undercutStation', detail: `-${fixed1(row.station.gapPct)}%` };
+    case 'undercutSystem':
+    case 'undercutRegion': {
+      const pct = row.deepUndercut?.worst?.gapPct;
+      return { kind: row.problem, detail: pct !== undefined ? `-${fixed1(pct)}%` : undefined };
+    }
+    case 'expiringOrStale': {
+      const days = row.expiry?.daysLeft;
+      return {
+        kind: 'expiring',
+        detail: days !== null && days !== undefined ? `${days}d` : undefined,
+      };
+    }
+    case 'outbid': {
+      const pct =
+        row.worstScope === 'station' ? row.station.gapPct : row.deepUndercut?.worst?.gapPct;
+      return { kind: 'outbid', detail: pct !== undefined ? `+${fixed1(pct)}%` : undefined };
+    }
+    case 'healthy':
+    default:
+      // Wins the healthy branch outright: a chronically beaten order must not
+      // wear a green "best price" badge. Only reachable for healthy rows —
+      // `openOrdersModel.ts` already gates `frequentlyUndercut` on that.
+      if (row.frequentlyUndercut) return { kind: 'frequentlyUndercut' };
+      // Prices never loaded: say so rather than let a green badge or silence
+      // imply nobody is cheaper.
+      if (row.competitionUnchecked) return { kind: 'notChecked' };
+      if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
+      if (row.station.bestPrice !== null) return { kind: row.isBuyOrder ? 'topBid' : 'best' };
+      return null;
+  }
+}

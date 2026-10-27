@@ -1,0 +1,323 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { OreIcon, OreLink } from './OreIcon';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  Modal,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  TextInput,
+  Checkbox,
+} from '@/components/ui';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import { combine, type JoinMemberInput } from './ledgerActions';
+import { agreedTerms } from './selection';
+import type { MoonMiningTaxRow } from './snapshot';
+import { useLedgerAction } from './useLedgerAction';
+import { LedgerActionError } from './LedgerActionError';
+import { toggleInSet } from '@/lib/sets';
+import { formatCount } from '@/lib/formatCount';
+
+export interface JoinCandidate {
+  row: MoonMiningTaxRow;
+  /** `null` when this date is still unassigned. */
+  assignment: MiningTaxAssignmentRecord | null;
+}
+
+interface JoinAssignDialogProps {
+  open: boolean;
+  onClose: () => void;
+  primary: JoinCandidate;
+  /** Every other same-system, same-character, ungrouped, assignable row — already filtered for the merge rule (an already-assigned `primary` only ever lists an unassigned candidate or one sharing its Payee and tax %). */
+  candidates: readonly JoinCandidate[];
+  /**
+   * Whether `candidates` arrives as a list to pick from or as one already
+   * chosen. `'none'` (the default) is the row-detail entry point: "join this
+   * with something", every same-system row on offer. `'all'` is the selection
+   * toolbar's Combine, where the pilot has already ticked exactly what they
+   * meant — the list becomes a confirmation they can still untick from.
+   */
+  initialSelection?: 'none' | 'all';
+  payees: readonly PayeeRecord[];
+  typeNames: ReadonlyMap<number, string>;
+  /**
+   * Prices at a given Payee's trade hub, on a given date. Resolved here
+   * rather than passed as one map, because the Payee a join settles on is
+   * decided *in* this dialog: either the terms an already-assigned member
+   * locks in, or the one the pilot picks below — and each Payee may bill at
+   * its own hub. The date varies per member too (a join's whole purpose is
+   * combining entries from *different* mined dates), so each still-unassigned
+   * member is priced at its own `entry.date`, not one shared date.
+   */
+  pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
+  busy: boolean;
+  onJoined: () => void;
+}
+
+function candidateKey(candidate: JoinCandidate): string {
+  return candidate.assignment?.id ?? `${candidate.row.entry.date}:unassigned`;
+}
+
+/**
+ * Joins the currently-open row with one or more compatible same-system entries
+ * into one combined obligation (issue #523's "join entries" — a mining
+ * session spanning midnight UTC shows up as two Mining Ledger Entries even
+ * though a corp's own billing treats it as one; issue #539 lifted the
+ * two-member cap, which was only ever in this picker — `joinAssignments` and
+ * `flatten` were N-ary from the start).
+ *
+ * Deliberately no editable value fields here (unlike `AssignDialog`): once
+ * two dates are joined each keeps its own independently hub-priced value —
+ * a blended, hand-typed total across two different ledger entries has no
+ * single obvious meaning. A correction after the fact goes through the
+ * combined entry's Edit (`EntryEditDialog`), which keeps each day's own
+ * value, not this dialog.
+ *
+ * Payee/tax % are only pickable when *neither* side is assigned yet; the
+ * moment either side already has an Assignment, joining means adopting that
+ * Assignment's Payee/tax % for the whole group (the still-unassigned side
+ * gets a fresh Assignment created against it) rather than renegotiating
+ * terms an existing obligation already settled.
+ */
+export function JoinAssignDialog({
+  open,
+  onClose,
+  primary,
+  candidates,
+  initialSelection = 'none',
+  payees,
+  typeNames,
+  pricesFor,
+  busy,
+  onJoined,
+}: JoinAssignDialogProps) {
+  const { t } = useTranslation();
+  // Lazily initialised, never re-synced: the dialog is mounted fresh on each
+  // open (the route renders it conditionally), so there is no stale-props case
+  // to reconcile.
+  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() =>
+    initialSelection === 'all' ? new Set(candidates.map(candidateKey)) : new Set()
+  );
+  const [payeeId, setPayeeId] = useState<string | null>(null);
+  const [taxPct, setTaxPct] = useState('');
+  const { pending: saving, error: saveError, run } = useLedgerAction();
+
+  const selected = candidates.filter((c) => selectedKeys.has(candidateKey(c)));
+  /**
+   * The merge rule, from the same place the selection toolbar gets it.
+   * `candidates` is pre-filtered against the *primary*, which is not enough
+   * once several can be ticked at once: when the primary is still unassigned
+   * that filter passes every assigned candidate through, so two of them on
+   * different Payees could otherwise be joined and one side's terms silently
+   * dropped.
+   */
+  const agreed = agreedTerms(
+    [primary, ...selected]
+      .map((c) => c.assignment)
+      .filter((a): a is MiningTaxAssignmentRecord => a !== null)
+  );
+  const lockedTerms = agreed.ok ? agreed.terms : null;
+  const effectivePayeeId = lockedTerms ? lockedTerms.payeeId : payeeId;
+  const effectiveTaxPct = lockedTerms ? lockedTerms.taxPct : Number(taxPct);
+  const canJoin =
+    selected.length > 0 &&
+    agreed.ok &&
+    effectivePayeeId !== undefined &&
+    effectivePayeeId !== null &&
+    Number.isFinite(effectiveTaxPct) &&
+    effectiveTaxPct >= 0 &&
+    effectiveTaxPct <= 100;
+
+  function toggle(key: string) {
+    setSelectedKeys((previous) => toggleInSet(previous, key));
+  }
+
+  function memberInput(candidate: JoinCandidate): JoinMemberInput {
+    return {
+      characterId: candidate.row.characterId,
+      date: candidate.row.entry.date,
+      solarSystemId: candidate.row.entry.solarSystemId,
+      assignment: candidate.assignment,
+      oreLines: candidate.assignment ? undefined : candidate.row.unassignedOreLines,
+      entryOreLines: candidate.row.entry.oreLines,
+    };
+  }
+
+  async function handleJoin() {
+    if (!canJoin || effectivePayeeId === null || effectivePayeeId === undefined) return;
+    const hubId = payees.find((p) => p.id === effectivePayeeId)?.hubId;
+    // A member's ore claimed since this dialog's snapshot also lands on
+    // `onJoined`: refresh rather than create a second claim on it.
+    await run(
+      () =>
+        combine(
+          [primary, ...selected].map(memberInput),
+          effectivePayeeId,
+          effectiveTaxPct,
+          // Every member of a join shares one Payee (that is the merge rule), so
+          // one hub prices the whole group — the Payee's, never the device's —
+          // but each member keeps its own mined date, hence a resolver rather
+          // than one flat map.
+          (date) => pricesFor(hubId, date)
+        ),
+      onJoined
+    );
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      dismissOnOutsidePress={false}
+      title={t('miningTax.joinTitle')}
+    >
+      <div className="space-y-3 text-sm">
+        <div className="space-y-1">
+          <p className={eyebrowClassName}>{t('miningTax.joinCandidateLabel')}</p>
+          {candidates.length === 0 ? (
+            <p className="text-xs text-text-dim">{t('miningTax.joinNoCandidatesHint')}</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {candidates.map((candidate) => (
+                <li key={candidateKey(candidate)} className="py-1">
+                  <label
+                    className={`flex cursor-pointer items-center gap-2 ${tappableRowClassName}`}
+                  >
+                    <Checkbox
+                      checked={selectedKeys.has(candidateKey(candidate))}
+                      onChange={() => toggle(candidateKey(candidate))}
+
+                      aria-label={t('miningTax.joinIncludeLabel', {
+                        date: candidate.row.entry.date,
+                      })}
+                    />
+                    <span>{candidate.row.entry.date}</span>
+                    <span className="text-xs text-text-dim">
+                      {(candidate.assignment
+                        ? candidate.assignment.oreLines
+                        : candidate.row.unassignedOreLines
+                      ).map((line, index, lines) => (
+                        <span key={line.typeId}>
+                          <OreLink typeId={line.typeId}>
+                            {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                          </OreLink>
+                          {index < lines.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {selected.length > 0 && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('miningTax.joinMemberCount', { count: selected.length + 1 })}
+            </p>
+          )}
+        </div>
+
+        {selected.length > 0 && (
+          <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
+            <ul className="divide-y divide-line text-xs">
+              {[primary, ...selected].flatMap((candidate) =>
+                (candidate.assignment
+                  ? candidate.assignment.oreLines
+                  : candidate.row.unassignedOreLines
+                ).map((line) => (
+                  <li
+                    key={`${candidate.row.entry.date}:${line.typeId}`}
+                    className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
+                  >
+                    <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
+                    <span className="w-40 shrink-0 truncate">
+                      <OreLink typeId={line.typeId}>
+                        {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                      </OreLink>
+                    </span>
+                    <span className="w-24 shrink-0 tabular-nums text-text-dim">
+                      {formatCount(line.quantity)}
+                    </span>
+                    <span className="text-text-dim">{candidate.row.entry.date}</span>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        )}
+
+        {!agreed.ok ? (
+          <p className="text-xs text-warning">{t('miningTax.combineBlocked.mixed-terms')}</p>
+        ) : lockedTerms ? (
+          <p className="text-xs text-text-dim">
+            {t('miningTax.joinLockedToExistingHint', {
+              payee: payees.find((p) => p.id === lockedTerms.payeeId)?.name ?? '',
+              pct: lockedTerms.taxPct,
+            })}
+          </p>
+        ) : (
+          selected.length > 0 && (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="min-w-0 space-y-1 sm:flex-1">
+                <p className={eyebrowClassName}>{t('miningTax.payeeLabel')}</p>
+                <Select
+                  value={payeeId ?? undefined}
+                  onValueChange={(value) => {
+                    setPayeeId(value);
+                    const chosen = payees.find((p) => p.id === value);
+                    if (chosen) setTaxPct(String(chosen.defaultTaxPct));
+                  }}
+                >
+                  <SelectTrigger aria-label={t('miningTax.payeeLabel')}>
+                    <SelectValue placeholder={t('miningTax.payeePlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {payees.map((payee) => (
+                      <SelectItem key={payee.id} value={payee.id}>
+                        {payee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 sm:w-16 sm:shrink-0">
+                <p className={eyebrowClassName}>{t('miningTax.taxPctLabel')}</p>
+                <TextInput
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={taxPct}
+                  onChange={(e) => setTaxPct(e.target.value)}
+                  aria-label={t('miningTax.taxPctLabel')}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )
+        )}
+
+        <LedgerActionError error={saveError} />
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!canJoin || saving || busy}
+            onClick={() => void handleJoin()}
+          >
+            {t('miningTax.joinConfirmAction')}
+          </Button>
+          <Button size="sm" onClick={onClose}>
+            {t('filters.cancel')}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}

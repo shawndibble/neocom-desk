@@ -1,0 +1,836 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import type { Fitting, PilotProfile } from '@/engine/fittings/types';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
+import { FittingAddPanel } from './FittingAddPanel';
+import { FittingItemActionsProvider } from './fittingItemActions';
+import { fakeItemActions } from './__fixtures__/itemActions';
+import type { FittingCatalogue } from './useFittingCatalogue';
+import type { VariantEvaluator } from './useFittingEvaluation';
+import type { FittingStats } from '@/engine/fittings/types';
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
+import { db } from '@/db';
+import { clearHullFitMemory } from './hullFitService';
+import { setDogmaEngineStatus } from './dogmaEngineStatus';
+import type { ChargeEngineStats } from './dogmaFittingEngine';
+import { fakeDogmaEngine, fakeFittingContext } from './__fixtures__/fakeDogmaEngine';
+
+const checkCandidates = vi.fn();
+const checkCharges = vi.fn();
+const compareCharges = vi.fn((): unknown[] => []);
+const chargesMissingSkills = vi.fn(() => new Set<number>());
+const engine = fakeDogmaEngine({
+  checkCandidates,
+  checkCharges,
+  compareCharges: () => compareCharges() as ChargeEngineStats[],
+  chargesMissingSkills: () => chargesMissingSkills(),
+});
+const getHubPrices = vi.fn(async () => new Map<number, { sellMin: number | null }>());
+vi.mock('@/market/prices', () => ({
+  getHubPrices: () => getHubPrices(),
+}));
+
+const fitting: Fitting = { name: 'Rifter', shipTypeId: 587, modules: [], drones: [], cargo: [] };
+const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
+
+function layer(hp: number) {
+  return {
+    hp,
+    ehp: hp * 1.5,
+    emResonance: 0.8,
+    thermalResonance: 0.7,
+    kineticResonance: 0.6,
+    explosiveResonance: 0.5,
+  };
+}
+
+function neutralStats(ehp: number): FittingStats {
+  return {
+    cpuUsed: 100,
+    cpuTotal: 400,
+    powergridUsed: 500,
+    powergridTotal: 1000,
+    calibrationUsed: 100,
+    calibrationTotal: 400,
+    droneDps: 50,
+    droneBandwidthUsed: 25,
+    droneBandwidthTotal: 50,
+    maxActiveDrones: 0,
+    droneBandwidthByType: {},
+    hardpoints: { turrets: 0, launchers: 0 },
+    droneCapacity: 75,
+    capacitor: { stable: true, stablePercentage: 62 },
+    capacitorCapacity: 1500,
+    capacitorRechargeTime: 300000,
+    shield: layer(5000),
+    armor: layer(4000),
+    hull: layer(3000),
+    targeting: {
+      maxTargetRange: 60000,
+      maxLockedTargets: 6,
+      scanResolution: 400,
+      signatureRadius: 120,
+    },
+    navigation: { maxVelocity: 250, agility: 3.5, mass: 10000000, warpSpeed: 3 },
+    unknownItemTypeIds: [],
+    applied: { weapons: [], droneControlRange: 20000 },
+    slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
+    modules: [],
+    offense: {
+      weapons: [],
+      dps: 0,
+      sustainedDps: 0,
+      volley: 0,
+      overheated: null,
+      chargelessWeaponCount: 0,
+    },
+    repair: { shield: 0, armor: 0, hull: 0 },
+    overheated: null,
+    ...neutralExtendedStats(),
+    ehp,
+  } as FittingStats;
+}
+
+const catalogue: FittingCatalogue = {
+  types: {},
+  rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium', 5: 'drone' },
+  marketTypes: [
+    { typeId: 1, name: 'Damage Control I', marketGroupId: 10, volume: 1 },
+    { typeId: 2, name: 'Damage Control II', marketGroupId: 10, volume: 1 },
+    { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20, volume: 1 },
+    { typeId: 4, name: 'Anchoring Array', marketGroupId: 30, volume: 1 },
+    { typeId: 5, name: 'Ice Harvesting Drone I', marketGroupId: 30, volume: 50 },
+  ],
+  groupsById: new Map([
+    [10, { id: 10, name: 'Damage Controls', parentId: null, hasTypes: true }],
+    [20, { id: 20, name: 'Afterburners', parentId: null, hasTypes: true }],
+    [30, { id: 30, name: 'Structure Equipment', parentId: null, hasTypes: true }],
+  ]),
+  childrenByParent: new Map(),
+  parentOf: new Map(),
+  typeIdsByGroup: new Map(),
+  variations: { types: {}, metaGroups: {} },
+};
+
+/** `ready: false` is before the ship data: no fitting context yet. */
+function renderPanel({
+  ready = true,
+  ...overrides
+}: Partial<Parameters<typeof FittingAddPanel>[0]> & { ready?: boolean } = {}) {
+  const onAdd = vi.fn();
+  const shown = overrides.catalogue === undefined ? catalogue : overrides.catalogue;
+  render(
+    <FittingAddPanel
+      fitting={fitting}
+      catalogue={catalogue}
+      target={{ kind: 'slot', slot: 'low', slotIndex: 0 }}
+      context={ready && shown !== null ? fakeFittingContext(shown, { engine, profile }) : null}
+      onAdd={onAdd}
+      {...overrides}
+    />
+  );
+  return { onAdd };
+}
+
+describe('FittingAddPanel', () => {
+  // The hull check is shared and saved per hull and skills; each test answers it afresh.
+  beforeEach(async () => {
+    clearHullFitMemory();
+    await db.hullFitCache.clear();
+    setDogmaEngineStatus('idle');
+  });
+
+  it('before ship data: search still works, but Add is disabled and the note says why', async () => {
+    const user = userEvent.setup();
+    setDogmaEngineStatus('loading');
+    renderPanel({ ready: false });
+
+    expect(screen.getByText(/Ship data is still downloading/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Search items to add'), 'II');
+
+    const result = screen.getByRole('button', { name: /Damage Control II/ });
+    expect(result).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('button', { name: /Damage Control I$/ })).not.toBeInTheDocument();
+    expect(checkCandidates).not.toHaveBeenCalled();
+  });
+
+  it('does not claim a download is under way when the engine was never asked for', () => {
+    setDogmaEngineStatus('idle');
+    renderPanel({ ready: false });
+    expect(screen.queryByText(/Ship data is still downloading/)).not.toBeInTheDocument();
+  });
+
+  it('says the ship data could not be downloaded, not that it is downloading, when it failed', () => {
+    setDogmaEngineStatus('failed');
+    renderPanel({ ready: false });
+    expect(screen.queryByText(/Ship data is still downloading/)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't download the ship data");
+  });
+
+  it('lists only what fits the chosen slot and hull, and adds on click', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: id !== 1, canFly: id !== 2, fitsResources: true }])
+      );
+    });
+    const { onAdd } = renderPanel();
+
+    // The hull check runs in the background; browsing waits for it. The
+    // skill filter starts on, hiding Damage Control II (no skills for it)
+    // until it's off.
+    // Pressed only once the hull check lands; before that it is disabled and
+    // a click does nothing (the CI flake this used to be).
+    const skillFilter = await screen.findByRole('button', { name: 'Skills', pressed: true });
+    expect(screen.queryByRole('button', { name: /Damage Control II/ })).not.toBeInTheDocument();
+    await user.click(skillFilter);
+    const dc2 = await screen.findByRole('button', { name: /Damage Control II/ });
+    expect(screen.queryByRole('button', { name: /Afterburner/ })).not.toBeInTheDocument();
+    // Damage Control I doesn't fit the hull.
+    expect(screen.queryByText('Damage Control I')).toBeNull();
+    expect(
+      within(dc2.closest('li')!).getByRole('button', { name: "Can't add: Missing skills" })
+    ).toBeInTheDocument();
+
+    await user.click(dc2);
+    expect(onAdd).toHaveBeenCalledWith(2, 'low');
+  });
+
+  describe('hover preview', () => {
+    function previewProps(afterEhp: number) {
+      const compare = vi.fn(async () => ({
+        before: neutralStats(20000),
+        after: neutralStats(afterEhp),
+      }));
+      const variants = { fitting, profile, engine, compare } as unknown as VariantEvaluator;
+      const build = vi.fn((f: Fitting, typeId: number) => ({
+        ...f,
+        modules: [{ slot: 'low' as const, slotIndex: 0, typeId, state: 'active' as const }],
+      }));
+      return { preview: { variants, build }, compare, build };
+    }
+
+    beforeEach(() => {
+      checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+        return new Map(
+          ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }])
+        );
+      });
+    });
+
+    it('shows the whole-Fitting change on hover, clears on leave, and click still adds', async () => {
+      const user = userEvent.setup();
+      const { preview, compare } = previewProps(24000);
+      const named = {
+        ...catalogue,
+        types: { 1: { name: 'Damage Control I' } } as unknown as FittingCatalogue['types'],
+      };
+      const { onAdd } = renderPanel({ preview, catalogue: named });
+
+      const dc1 = await screen.findByRole('button', { name: /Damage Control I$/ });
+      await user.hover(dc1);
+      const readout = await screen.findByRole('status');
+      expect(readout).toHaveTextContent('Adding Damage Control I');
+      expect(readout).toHaveTextContent('EHP 20,000 → 24,000');
+      expect(readout).toHaveTextContent('Fits · Can fly');
+      expect(compare).toHaveBeenCalledTimes(1);
+
+      await user.unhover(dc1);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+      await user.click(dc1);
+      expect(onAdd).toHaveBeenCalledWith(1, 'low');
+    });
+
+    it('shows the same readout on keyboard focus and clears on blur', async () => {
+      const { preview } = previewProps(24000);
+      renderPanel({ preview });
+
+      const dc1 = await screen.findByRole('button', { name: /Damage Control I$/ });
+      act(() => dc1.focus());
+      expect(await screen.findByRole('status')).toHaveTextContent('EHP 20,000 → 24,000');
+
+      act(() => dc1.blur());
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('stays off without a preview prop (touch)', async () => {
+      const user = userEvent.setup();
+      renderPanel();
+
+      await user.hover(await screen.findByRole('button', { name: /Damage Control I$/ }));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+  });
+
+  it('says when a filter hid the search matches, and one tap shows them', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: true, canFly: id !== 2, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    await screen.findByRole('button', { name: 'Skills', pressed: true });
+    await user.type(screen.getByLabelText('Search items to add'), 'Damage Control II');
+    expect(screen.queryByText('No matching items.')).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole('button', { name: '1 more hidden by filters — show it' })
+    );
+    expect(await screen.findByRole('button', { name: /Damage Control II/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
+    // The button left with the filter it lifted; focus lands in the search, not on the body.
+    expect(screen.getByLabelText('Search items to add')).toHaveFocus();
+  });
+
+  it('keeps the plain no-results wording when nothing matches at all', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: true, canFly: id !== 2, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    await screen.findByRole('button', { name: 'Skills', pressed: true });
+    await user.type(screen.getByLabelText('Search items to add'), 'zzzz');
+    expect(screen.getByText('No matching items.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
+  });
+
+  it('browses only the groups holding something that fits the hull', async () => {
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: id !== 4, canFly: true, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Damage Controls/ })).toBeInTheDocument();
+    // Structure modules never fit a ship, so their group never shows.
+    expect(screen.queryByText('Structure Equipment')).toBeNull();
+  });
+
+  it('hides modules too big for the bare hull’s CPU, powergrid or calibration, until the resource filter is off', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: id !== 4 }])
+      );
+    });
+    renderPanel({ target: null });
+
+    expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
+    expect(screen.queryByText('Structure Equipment')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'Resources' }));
+    expect(await screen.findByText('Structure Equipment')).toBeInTheDocument();
+  });
+
+  it('hides modules the hull cannot rack at all, until the hull filter is off', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: id !== 4, canFly: true, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
+    expect(screen.queryByText('Structure Equipment')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'Hull' }));
+    expect(await screen.findByText('Structure Equipment')).toBeInTheDocument();
+    // Shown with the Hull filter off, but never addable — the hull refuses it outright.
+    const anchoringArray = screen.getByRole('button', { name: /Anchoring Array/ });
+    expect(anchoringArray).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      within(anchoringArray.closest('li')!).getByRole('button', {
+        name: "Can't add: Doesn't fit this hull",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('loads a charge into every fitted module that takes it, from the Charges tab', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([501]));
+    const onLoadCharge = vi.fn();
+    const withLauncher: Fitting = {
+      ...fitting,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 400, state: 'active' },
+        { slot: 'high', slotIndex: 1, typeId: 400, state: 'active' },
+      ],
+    };
+    renderPanel({
+      fitting: withLauncher,
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          400: { name: 'Light Missile Launcher II', groupID: 1 },
+          501: { name: 'Scourge Light Missile', groupID: 2 },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([[2, [501]]]),
+      },
+      moduleResults: [
+        { state: 'active', maxState: 'active', chargeGroupIds: [2] },
+        { state: 'active', maxState: 'active', chargeGroupIds: [2] },
+      ],
+      onLoadCharge,
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    expect(screen.getByText('2× Light Missile Launcher II')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Scourge Light Missile/ }));
+    expect(onLoadCharge).toHaveBeenCalledWith(501);
+  });
+
+  it("collapses one module's charges, naming what it has loaded, and leaves the others open", async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([501, 700]));
+    // Scourge shoots, so the launcher gets the Charge Picker; the cap booster's charge doesn't.
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 501,
+        dps: 100,
+        optimal: 20_000,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: 6,
+        techLevel: 1,
+      },
+    ]);
+    renderPanel({
+      fitting: {
+        ...fitting,
+        modules: [
+          { slot: 'high', slotIndex: 0, typeId: 400, state: 'active', chargeTypeId: 501 },
+          { slot: 'medium', slotIndex: 0, typeId: 600, state: 'active' },
+        ],
+      },
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          400: { name: 'Light Missile Launcher II', groupID: 1 },
+          501: { name: 'Scourge Light Missile', groupID: 2 },
+          600: { name: 'Medium Capacitor Booster II' },
+          700: { name: 'Navy Cap Booster 400', groupID: 9 },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([
+          [2, [501]],
+          [9, [700]],
+        ]),
+      },
+      moduleResults: [
+        { state: 'active', maxState: 'active', chargeGroupIds: [2] },
+        { state: 'active', maxState: 'active', chargeGroupIds: [9] },
+      ],
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    const launcher = screen.getByRole('button', { name: /1× Light Missile Launcher II/ });
+    expect(launcher).toHaveAttribute('aria-expanded', 'true');
+    expect(launcher).toHaveAccessibleName(
+      /Light Missile Launcher II, loaded: Scourge Light Missile/
+    );
+    expect(screen.getByRole('button', { name: 'Usable' })).toBeInTheDocument();
+
+    await user.click(launcher);
+    expect(launcher).toHaveAttribute('aria-expanded', 'false');
+    // Only the header is left, and it still says what the launchers fire.
+    expect(screen.getAllByRole('button', { name: /Scourge Light Missile/ })).toEqual([launcher]);
+    expect(launcher).toHaveTextContent('Scourge Light Missile');
+    // With no weapon section open, the picker's shared controls go too.
+    expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Navy Cap Booster 400/ })).toBeInTheDocument();
+
+    await user.click(launcher);
+    expect(launcher).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  describe('Charge Picker (a weapon group)', () => {
+    // Two railguns; Lead (long range), Antimatter and two navy versions, and a locked Spike.
+    const rails: Fitting = {
+      ...fitting,
+      modules: [0, 1].map((slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId: 3090,
+        state: 'active' as const,
+        chargeTypeId: slotIndex === 0 ? 230 : undefined,
+      })),
+      cargo: [{ typeId: 238, quantity: 1000 }],
+    };
+    const railCatalogue: FittingCatalogue = {
+      ...catalogue,
+      types: {
+        3090: { name: '425mm Railgun I' },
+        230: { name: 'Lead Charge L' },
+        238: { name: 'Antimatter Charge L' },
+        21740: { name: 'Caldari Navy Antimatter Charge L' },
+        22999: { name: 'Federation Navy Antimatter Charge L' },
+        12807: { name: 'Spike L' },
+      } as unknown as FittingCatalogue['types'],
+      typeIdsByGroup: new Map([[85, [230, 238, 21740, 22999, 12807]]]),
+      variations: {
+        types: {
+          230: { parentTypeId: null, metaGroupId: 1 },
+          238: { parentTypeId: null, metaGroupId: 1 },
+          21740: { parentTypeId: 238, metaGroupId: 4 },
+          22999: { parentTypeId: 238, metaGroupId: 4 },
+          12807: { parentTypeId: 237, metaGroupId: 2 },
+        },
+        metaGroups: { 1: 'Tech I', 2: 'Tech II', 4: 'Faction' },
+      },
+    };
+    const stat = (typeId: number, dps: number, optimal: number) => ({
+      typeId,
+      dps,
+      optimal,
+      falloff: 18_000,
+      damage: { em: 0, thermal: 0.44, kinetic: 0.56, explosive: 0 },
+      roundsPerMinute: 12,
+      techLevel: typeId === 12807 ? 2 : 1,
+    });
+
+    function renderRails(onLoadCharge = vi.fn()) {
+      checkCandidates.mockImplementation(() => new Map());
+      checkCharges.mockImplementation(() => new Set([230, 238, 21740, 22999, 12807]));
+      compareCharges.mockImplementation(() => [
+        stat(230, 253, 30_000),
+        stat(238, 380, 15_000),
+        stat(21740, 437, 15_000),
+        stat(22999, 437, 15_000),
+        stat(12807, 280, 54_000),
+      ]);
+      chargesMissingSkills.mockImplementation(() => new Set([12807]));
+      getHubPrices.mockImplementation(
+        async () =>
+          new Map([
+            [230, { sellMin: 44 }],
+            [238, { sellMin: 62 }],
+            [21740, { sellMin: 500 }],
+            [22999, { sellMin: 540 }],
+          ])
+      );
+      renderPanel({
+        fitting: rails,
+        target: null,
+        catalogue: railCatalogue,
+        moduleResults: rails.modules.map(() => ({
+          state: 'active' as const,
+          maxState: 'active' as const,
+          chargeGroupIds: [85],
+        })),
+        onLoadCharge,
+      });
+      return onLoadCharge;
+    }
+
+    it('lists one row per type, with the loaded charge and the quick picks', async () => {
+      const user = userEvent.setup();
+      renderRails();
+      await user.click(screen.getByRole('tab', { name: 'Charges' }));
+
+      const picks = screen.getByRole('group', { name: 'Quick picks' });
+      // Same damage, Caldari Navy is cheaper, so it wins; Spike is locked, so Lead reaches furthest.
+      // Within 10% of the top, it's also the cheapest per minute: best value too.
+      expect(await within(picks).findAllByText('Caldari Navy Antimatter')).toHaveLength(2);
+      expect(picks).toHaveTextContent(/Max range\s*Lead/);
+      expect(screen.getByRole('button', { name: /^Antimatter, / })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Spike, .*Needs a skill/ })).toHaveTextContent(
+        'SKILL'
+      );
+    });
+
+    it("loads a faction version from its type's table, and names a strictly worse one", async () => {
+      const user = userEvent.setup();
+      const onLoadCharge = renderRails();
+      await user.click(screen.getByRole('tab', { name: 'Charges' }));
+      await within(screen.getByRole('group', { name: 'Quick picks' })).findAllByText(
+        'Caldari Navy Antimatter'
+      );
+
+      await user.click(screen.getByRole('button', { name: /^Antimatter, / }));
+      expect(screen.getByText(/Thermal 44%/)).toBeInTheDocument();
+      expect(screen.getByText(/Same as Caldari Navy, costs more/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /^Caldari Navy\b/ }));
+      expect(onLoadCharge).toHaveBeenCalledWith(21740);
+    });
+
+    it('Usable filters out locked charges; the distance slider shows only with Fighting at on', async () => {
+      const user = userEvent.setup();
+      renderRails();
+      await user.click(screen.getByRole('tab', { name: 'Charges' }));
+
+      expect(screen.queryByLabelText('Target at')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Fighting at…' }));
+      expect(screen.getByLabelText('Target at')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Usable' }));
+      expect(screen.queryByRole('button', { name: /^Spike, / })).not.toBeInTheDocument();
+    });
+  });
+
+  it('gives a cap booster its guide: how the capacitor fares on each charge', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([700]));
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 700,
+        dps: 0,
+        optimal: 0,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: null,
+        techLevel: 1,
+        cap: {
+          injection: 400,
+          gjPerSecond: 30,
+          boostsPerLoad: 3,
+          capacitor: { stable: true, stablePercentage: 55 },
+        },
+      },
+    ]);
+    renderPanel({
+      fitting: {
+        ...fitting,
+        modules: [{ slot: 'medium', slotIndex: 0, typeId: 600, state: 'active' }],
+      },
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          600: { name: 'Medium Capacitor Booster II' },
+          700: { name: 'Navy Cap Booster 400' },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([[9, [700]]]),
+      },
+      moduleResults: [{ state: 'active', maxState: 'active', chargeGroupIds: [9] }],
+    });
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    expect(
+      screen.getByRole('button', { name: /^Navy Cap Booster 400, stable at 55%, 30 GJ\/s/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Smallest stable/ })).toBeInTheDocument();
+    // The weapon picker's View/Sort controls aren't a cap booster's.
+    expect(screen.queryByRole('button', { name: 'Usable' })).not.toBeInTheDocument();
+  });
+
+  it('gives a mining laser its crystal guide, by ore family', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([60281]));
+    compareCharges.mockImplementation(() => [
+      {
+        typeId: 60281,
+        dps: 0,
+        optimal: 0,
+        falloff: 0,
+        damage: null,
+        roundsPerMinute: null,
+        techLevel: 2,
+        mining: {
+          m3PerSecond: 12.7,
+          cycleSeconds: 37.1,
+          residueChance: 0.376,
+          residueMultiplier: 1,
+          residueM3s: 4.7,
+          removedM3s: 17.4,
+        },
+      },
+    ]);
+    renderPanel({
+      fitting: {
+        ...fitting,
+        modules: [{ slot: 'high', slotIndex: 0, typeId: 17912, state: 'active' }],
+      },
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          17912: { name: 'Modulated Strip Miner II' },
+          60281: { name: 'Simple Asteroid Mining Crystal Type A II' },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([[482, [60281]]]),
+      },
+      moduleResults: [{ state: 'active', maxState: 'active', chargeGroupIds: [482] }],
+    });
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    expect(screen.getByRole('button', { name: 'What the crystal types do' })).toBeInTheDocument();
+    const simple = screen.getByRole('button', { name: /^Simple Asteroid: Veldspar/ });
+    await user.click(simple);
+    expect(
+      screen.getByRole('button', { name: /^Simple Asteroid Mining Crystal Type A II, 12\.7 m³\/s/ })
+    ).toBeInTheDocument();
+  });
+
+  it('adds any item to the cargo hold, in the quantity asked, from the Cargo tab', async () => {
+    const user = userEvent.setup();
+    const onAddCargo = vi.fn();
+    renderPanel({ target: { kind: 'cargo' }, onAddCargo });
+
+    // A cargo target opens on the Cargo tab, which searches every market item.
+    expect(screen.getByRole('tab', { name: 'Cargo', selected: true })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
+    const quantity = screen.getByLabelText('Quantity');
+    await user.clear(quantity);
+    await user.type(quantity, '3');
+    await user.click(screen.getByRole('button', { name: /Anchoring Array/ }));
+    expect(onAddCargo).toHaveBeenCalledWith(4, 3);
+  });
+
+  it('gives each Cargo tab result the List cargo row’s menu once it is in the hold', async () => {
+    const user = userEvent.setup();
+    const onAddCargo = vi.fn();
+    const actions = fakeItemActions({ names: { 4: 'Anchoring Array', 3: '1MN Afterburner II' } });
+    const holding: Fitting = { ...fitting, cargo: [{ typeId: 4, quantity: 2 }] };
+    render(
+      <MemoryRouter>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingAddPanel
+              fitting={holding}
+              catalogue={catalogue}
+              target={{ kind: 'cargo' }}
+              context={fakeFittingContext(catalogue, { engine, profile })}
+              onAdd={vi.fn()}
+              onAddCargo={onAddCargo}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' }));
+    expect(onAddCargo).toHaveBeenCalledWith(4, 1);
+
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Change quantity' }));
+    expect(actions.changeCargoQuantity).toHaveBeenCalledWith(4);
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Anchoring Array' }));
+    expect(actions.removeCargo).toHaveBeenCalledWith(4);
+  });
+
+  it('offers no quantity change or removal for a result not in the hold yet', async () => {
+    const user = userEvent.setup();
+    const actions = fakeItemActions({ names: { 3: '1MN Afterburner II' } });
+    render(
+      <MemoryRouter>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingAddPanel
+              fitting={fitting}
+              catalogue={catalogue}
+              target={{ kind: 'cargo' }}
+              context={fakeFittingContext(catalogue, { engine, profile })}
+              onAdd={vi.fn()}
+              onAddCargo={vi.fn()}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Afterburner');
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for 1MN Afterburner II' }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: /Build Plan|No blueprint options/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View blueprint in Market' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Change quantity' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
+  });
+
+  it('greys a drone the bay has no room for and says why', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }]));
+    });
+    const droneRoomFor = vi.fn(() => 0);
+    const { onAdd } = renderPanel({ target: { kind: 'drone' }, droneRoomFor });
+
+    await user.type(screen.getByLabelText('Search items to add'), 'Ice Harvesting');
+    const row = await screen.findByRole('button', { name: /Ice Harvesting Drone I/ });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      within(row.closest('li')!).getByRole('button', {
+        name: "Can't add: No room in drone bay",
+      })
+    ).toBeInTheDocument();
+    await user.click(row);
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('flags a module whose rack is full, with a triangle saying so', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: true }]));
+    });
+    const { onAdd } = renderPanel({ target: null, slotFreeFor: () => false });
+
+    await user.type(screen.getByLabelText('Search items to add'), 'Afterburner');
+    const row = await screen.findByRole('button', { name: /1MN Afterburner II/ });
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    await user.click(row);
+    expect(onAdd).not.toHaveBeenCalled();
+    expect(
+      within(row.closest('li')!).getByRole('button', {
+        name: "Can't add: No free mid slot left",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the picked slot as its in-game icon, toggling the fits-this-slot filter', async () => {
+    const user = userEvent.setup();
+    renderPanel({ target: { kind: 'slot', slot: 'low', slotIndex: 0 } });
+
+    const toggle = screen.getByRole('button', { name: 'Fits this slot' });
+    expect(toggle.querySelector('img')).toHaveAttribute('src', '/images/fitting/slot-low.png');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Fits this slot')).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('has no fits-this-slot toggle when no slot is picked', () => {
+    renderPanel({ target: null });
+    expect(screen.queryByRole('button', { name: 'Fits this slot' })).not.toBeInTheDocument();
+  });
+});

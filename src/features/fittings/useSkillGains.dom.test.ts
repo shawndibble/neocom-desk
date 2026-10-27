@@ -1,0 +1,161 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import type { FittingStats, PilotProfile } from '@/engine/fittings/types';
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
+import type { SkillGainEvaluator } from './useFittingEvaluation';
+import { useSkillGains } from './useSkillGains';
+import { fakeDogmaEngine } from './__fixtures__/fakeDogmaEngine';
+
+function layer(hp: number) {
+  return {
+    hp,
+    ehp: hp * 1.5,
+    emResonance: 0.8,
+    thermalResonance: 0.7,
+    kineticResonance: 0.6,
+    explosiveResonance: 0.5,
+  };
+}
+
+const baseStats: FittingStats = {
+  cpuUsed: 100,
+  cpuTotal: 400,
+  powergridUsed: 500,
+  powergridTotal: 1000,
+  calibrationUsed: 100,
+  calibrationTotal: 400,
+  droneDps: 0,
+  droneBandwidthUsed: 0,
+  droneBandwidthTotal: 0,
+  maxActiveDrones: 0,
+  droneBandwidthByType: {},
+  hardpoints: { turrets: 0, launchers: 0 },
+  droneCapacity: 0,
+  ehp: 20000,
+  capacitor: { stable: true, stablePercentage: 62 },
+  capacitorCapacity: 1500,
+  capacitorRechargeTime: 300000,
+  shield: layer(5000),
+  armor: layer(4000),
+  hull: layer(3000),
+  targeting: {
+    maxTargetRange: 60000,
+    maxLockedTargets: 6,
+    scanResolution: 400,
+    signatureRadius: 120,
+  },
+  navigation: { maxVelocity: 250, agility: 3.5, mass: 10000000, warpSpeed: 3 },
+  unknownItemTypeIds: [],
+  applied: { weapons: [], droneControlRange: 20000 },
+  slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
+  modules: [],
+  offense: {
+    weapons: [],
+    dps: 100,
+    sustainedDps: 100,
+    volley: 500,
+    overheated: null,
+    chargelessWeaponCount: 0,
+  },
+  repair: { shield: 0, armor: 0, hull: 0 },
+  overheated: null,
+  ...neutralExtendedStats(),
+};
+
+// 10 is maxed, 20 changes nothing, 30 and 40 help.
+const profile: PilotProfile = {
+  skillLevels: new Map([
+    [10, 5],
+    [20, 2],
+    [30, 3],
+  ]),
+  implantTypeIds: [],
+  boosterTypeIds: [],
+};
+
+function evaluator(sources: number[] = [10, 20, 30, 40]): SkillGainEvaluator {
+  return {
+    profile,
+    engine: fakeDogmaEngine(),
+    skillSources: vi.fn(async () => sources),
+    compare: vi.fn(async (skillTypeId: number) => ({
+      before: baseStats,
+      after:
+        skillTypeId === 30
+          ? { ...baseStats, ehp: 21000 }
+          : skillTypeId === 40
+            ? { ...baseStats, offense: { ...baseStats.offense, dps: 120 } }
+            : baseStats,
+    })),
+    fitting: { name: 'Fit', shipTypeId: 1, modules: [], drones: [], cargo: [] } as never,
+    compareTrained: vi.fn(async () => ({ before: baseStats, after: baseStats })),
+  };
+}
+
+describe('useSkillGains', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('lists only unmaxed skills whose next level changes the fit, each at its next level', async () => {
+    const skills = evaluator();
+    const { result } = renderHook(() => useSkillGains(skills));
+    expect(result.current.loading).toBe(true);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.gains?.map((gain) => [gain.skillTypeId, gain.toLevel])).toEqual([
+      [30, 4],
+      [40, 1],
+    ]);
+    expect(skills.compare).not.toHaveBeenCalledWith(10, expect.anything());
+    expect(skills.compare).toHaveBeenCalledWith(20, 3, expect.any(AbortSignal));
+  });
+
+  it('is idle with no evaluator', () => {
+    const { result } = renderHook(() => useSkillGains(null));
+    expect(result.current).toEqual({ gains: null, loading: false, failed: false });
+  });
+
+  it('gives each calculation an abort signal, fired when the run is dropped', async () => {
+    const skills = evaluator();
+    const { unmount } = renderHook(() => useSkillGains(skills));
+    await waitFor(() => expect(skills.compare).toHaveBeenCalledTimes(3));
+    const signal = vi.mocked(skills.compare).mock.calls[0][2];
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(signal?.aborted).toBe(false);
+    unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it('drops a run whose evaluator changed mid-way, never showing its rows', async () => {
+    const gates: (() => void)[] = [];
+    const first = evaluator();
+    first.compare = vi.fn(
+      () =>
+        new Promise<{ before: FittingStats; after: FittingStats }>((resolve) =>
+          gates.push(() => resolve({ before: baseStats, after: baseStats }))
+        )
+    );
+    const second = evaluator([40]);
+    const { result, rerender } = renderHook(({ skills }) => useSkillGains(skills), {
+      initialProps: { skills: first },
+    });
+    await waitFor(() => expect(gates.length).toBe(1));
+    rerender({ skills: second });
+    await act(async () => {
+      gates.forEach((open) => open());
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(first.compare).toHaveBeenCalledTimes(1);
+    expect(result.current.gains?.map((gain) => gain.skillTypeId)).toEqual([40]);
+  });
+
+  it('settles as failed, not loading forever, when the sources pass throws', async () => {
+    const skills = evaluator();
+    skills.skillSources = vi.fn(async () => {
+      throw new Error('engine');
+    });
+    const { result } = renderHook(() => useSkillGains(skills));
+    await waitFor(() => expect(result.current.failed).toBe(true));
+    expect(result.current.loading).toBe(false);
+  });
+});

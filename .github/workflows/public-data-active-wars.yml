@@ -1,0 +1,23 @@
+name: Public data - active wars
+
+# Publishes the open-wars list to R2 (active-wars/wars.json) every 12 h; the
+# app reads it from https://data.neocomdesk.com. Pattern and secrets:
+# public-data-job.yml.
+on:
+  schedule:
+    - cron: '17 3,15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-data-active-wars
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/public-data-job.yml
+    with:
+      script: scripts/public-data/active-wars.mjs
+    secrets: inherit

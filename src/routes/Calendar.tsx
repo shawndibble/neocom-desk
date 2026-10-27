@@ -1,0 +1,511 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Panel,
+  Spinner,
+  CachedNotice,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { loadCalendarBoard } from '@/features/character/calendarBoardData';
+import { EventDetailModal } from '@/features/character/EventDetailModal';
+import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
+import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
+import { CalendarMap, CalendarPastHint } from '@/features/character/CalendarMap';
+import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
+import { ComingUpRail } from '@/features/character/ComingUpRail';
+import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
+import {
+  useCalendarSkillPlans,
+  withCalendarSkillPlan,
+} from '@/features/character/calendarSkillPlan';
+import { KIND_LABEL } from '@/features/character/calendarKindLabels';
+import { useCalendarDensity } from '@/features/character/calendarViewPref';
+import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
+import {
+  useCalendarHiddenKinds,
+  shownKinds,
+  toggleHiddenKind,
+} from '@/features/character/calendarKindFilter';
+import { buildCharacterBoard, type CharacterBoardItemKind } from '@/engine/character/board';
+import { countsByDay, countsByKind, filterByKinds } from '@/engine/character/deadlines';
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  buildDaysFrom,
+  buildFortnightDays,
+  buildMonthGrid,
+  dayKey,
+  formatFortnightLabel,
+  formatMonthLabel,
+} from '@/lib/calendarGrid';
+import { cellOf, dayStart, type DayZone } from '@/engine/localDay';
+import { useTimeZone } from '@/lib/timeFormat';
+import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useUrlParam } from '@/lib/useUrlState';
+import type { UrlParamCodec } from '@/lib/urlState';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { CalendarSettingsForm } from '@/features/settings/CalendarSettingsForm';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { calendarCsvColumns, calendarExportEvents } from '@/features/character/calendarCsv';
+import type { CalendarRsvpResponse } from '@/esi/endpoints';
+
+/**
+ * The shown month/fortnight (ADR 0015), as a local `YYYY-MM-DD` day key —
+ * `calendarGrid.ts`'s own `dayKey`, so parsing agrees with how the grid
+ * builders already read a `Date`. `defaultKey` is "today" at codec-creation
+ * time, not a fixed constant: it must come from a `useMemo` computed once per
+ * mount (see `urlState.ts`'s codec-identity note), never recomputed inline.
+ */
+function anchorParam(defaultKey: string): UrlParamCodec<string> {
+  return {
+    // A day that does not exist (2026-02-30) is garbage, not a rollover into
+    // March — round-tripped through `dayKey` the same way `isoDateParam` does.
+    parse: (raw) => {
+      if (raw === null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return defaultKey;
+      return dayKey(parseAnchorKey(raw)) === raw ? raw : defaultKey;
+    },
+    serialize: (value) => (value === defaultKey ? null : value),
+  };
+}
+
+/** `anchorParam`'s day key back to a local `Date` — local midnight, matching `calendarGrid.ts`. */
+function parseAnchorKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/**
+ * Calendar: the Calendar Map and the Coming Up Rail, side by side.
+ *
+ * Not three tab-switched views any more. `GET /characters/{id}/calendar`
+ * returns up to 50 events *from now only* and the cache replaces its row
+ * wholesale, so a month grid spent most of its cells on days that structurally
+ * cannot hold anything — and paging backwards always said "No events this
+ * month" however busy that month had really been. The grid is now a map and
+ * the list is always beside it (see the scope decision).
+ *
+ * It also merges in every other clock the Character can read: skill-queue
+ * completions, industry job deliveries, PI extractor programs, contract and
+ * order expiries. Each source fails on its own, which is why this route no
+ * longer renders a page-wide re-login banner — a revoked calendar scope must
+ * not blank five working clocks. The filter menu names the ones that need a
+ * new login instead.
+ */
+/** How many days the phone's Day Ticker scrolls through at a time. */
+const TICKER_DAYS = 14;
+
+/** Shared shape behind both `eventsWithOverrides` and `boardSources` below — same override lookup, two different id/response fields. */
+function applyResponseOverrides<T>(
+  items: readonly T[],
+  overrides: Map<number, CalendarRsvpResponse> | undefined,
+  idOf: (item: T) => number,
+  withResponse: (item: T, response: CalendarRsvpResponse) => T
+): T[] {
+  if (!overrides || overrides.size === 0) return [...items];
+  return items.map((item) => {
+    const response = overrides.get(idOf(item));
+    return response === undefined ? item : withResponse(item, response);
+  });
+}
+
+export function Calendar() {
+  const { t } = useTranslation();
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadCalendarBoard,
+    undefined,
+    { cacheKey: 'calendar' }
+  );
+  const isNarrow = useIsNarrow();
+  // Days are cut on the Time format's clock: the pilot's own, or EVE's (UTC).
+  const zone = useTimeZone();
+
+  const density = useCalendarDensity((state) => state.value);
+  const setDensity = useCalendarDensity((state) => state.setValue);
+  const hiddenKinds = useCalendarHiddenKinds((state) => state.value);
+  const setHiddenKinds = useCalendarHiddenKinds((state) => state.setValue);
+  const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
+  const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
+  const weekStart = useCalendarWeekStart((state) => state.value);
+  useHydratedStore(
+    useCalendarDensity,
+    useCalendarHiddenKinds,
+    useCalendarSkillPlans,
+    useCalendarWeekStart
+  );
+
+  // The loader reads the choice from Dexie itself, so the write must land
+  // before the reload that reads it.
+  async function chooseSkillPlan(planId: string | null) {
+    if (activeCharacterId === null) return;
+    await setSkillPlanChoices(withCalendarSkillPlan(skillPlanChoices, activeCharacterId, planId));
+    refresh();
+  }
+
+  // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
+  const [defaultAnchorKey] = useState(() => dayKey(cellOf(Date.now(), zone)));
+  const anchorCodec = useMemo(() => anchorParam(defaultAnchorKey), [defaultAnchorKey]);
+  const [anchorKey, setAnchorKey] = useUrlParam('anchor', anchorCodec);
+  const anchor = useMemo(() => parseAnchorKey(anchorKey), [anchorKey]);
+  // The URL write goes through a router transition that may not have landed
+  // by the next click (matches Mail.tsx's `dataRef`): `step()` reads this
+  // instead of the render-scope `anchor` so two clicks before that transition
+  // commits still advance from each other rather than both stepping off the
+  // same stale month.
+  const anchorKeyRef = useRef(anchorKey);
+  useEffect(() => {
+    anchorKeyRef.current = anchorKey;
+  }, [anchorKey]);
+  function setAnchor(next: Date) {
+    const key = dayKey(next);
+    anchorKeyRef.current = key;
+    setAnchorKey(key);
+  }
+  // A selected day is a midnight on one clock; it names no day on the other,
+  // so a pick made before the Time format changed reads as no pick.
+  const [selectedDay, setSelectedDay] = useState<{ zone: DayZone; ms: number } | null>(null);
+  const selectedDayMs = selectedDay !== null && selectedDay.zone === zone ? selectedDay.ms : null;
+  const setSelectedDayMs = (ms: number | null) => setSelectedDay(ms === null ? null : { zone, ms });
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
+
+  /**
+   * RSVP responses applied locally, ahead of `data` catching up.
+   *
+   * `data` comes from `useRouteSnapshot`, a plain loader snapshot rather than
+   * a live query — patching the Dexie cache in `respondToCalendarEvent` does
+   * not by itself repaint this route. Forcing a `refresh()` instead would
+   * hit ESI live and risk reapplying its own still-propagating pre-RSVP
+   * response over what the pilot just clicked, so the override stands in
+   * for that source.
+   *
+   * Each is stamped with when it was answered (`atMs`, after the cache
+   * patch) and holds over any snapshot whose load *started* no later
+   * (`data.loadedAtMs` is taken at load start): such a snapshot read its data
+   * before the RSVP could show in it — including a reload already running,
+   * or one committing while the PUT is in flight (opening an event fetches
+   * its detail, and that cache write reloads the board). A snapshot started
+   * afterwards (manual refresh, background poll, remount) is trusted over
+   * the local guess — an override must not go on masking what ESI, another
+   * device, or another session says once fresher information arrives.
+   */
+  const [responseOverrides, setResponseOverrides] = useState<
+    ReadonlyMap<number, { response: CalendarRsvpResponse; atMs: number }>
+  >(new Map());
+  const activeOverrides = useMemo(() => {
+    if (!data) return undefined;
+    const active = new Map<number, CalendarRsvpResponse>();
+    for (const [eventId, { response, atMs }] of responseOverrides) {
+      if (data.loadedAtMs <= atMs) active.set(eventId, response);
+    }
+    return active.size > 0 ? active : undefined;
+  }, [data, responseOverrides]);
+
+  /**
+   * The instant the snapshot was assembled, threaded into everything below.
+   *
+   * Taken from the load rather than read here: every surface on this page
+   * agreeing on one instant matters more than any of them being accurate to
+   * the second, and the Data Age badge above already says how old the whole
+   * view is.
+   */
+  const nowMs = data?.loadedAtMs ?? 0;
+
+  /**
+   * Everything, with no forward window.
+   *
+   * An earlier draft capped the board at 30 days so the rail stayed short.
+   * That reproduced forwards the exact failure this page was rebuilt to fix:
+   * paging the map past the cap showed empty cells that were empty because of
+   * us, not because nothing was due. Every source here is naturally bounded
+   * (ESI returns at most 50 calendar events and 50 queue entries; jobs,
+   * contracts and orders are all small), and the rail's day grouping is what
+   * makes a long list readable.
+   */
+  const eventsWithOverrides = useMemo(
+    () =>
+      data
+        ? applyResponseOverrides(
+            data.events,
+            activeOverrides,
+            (event) => event.event_id,
+            (event, response) => ({ ...event, event_response: response })
+          )
+        : undefined,
+    [data, activeOverrides]
+  );
+
+  /**
+   * `buildCharacterBoard` reads `calendarEvents` (each keyed by `id`, a
+   * stringified event id, per `toCalendarEventSources`), a separate,
+   * already-converted array from the raw `events` above — so the override
+   * has to be applied here too, not just to `events`.
+   */
+  const boardSources = useMemo(() => {
+    if (!data) return undefined;
+    const calendarEvents = data.calendarEvents
+      ? applyResponseOverrides(
+          data.calendarEvents,
+          activeOverrides,
+          (source) => Number(source.id),
+          (source, response) => ({ ...source, response })
+        )
+      : undefined;
+    return { ...data, calendarEvents };
+  }, [data, activeOverrides]);
+
+  const board = useMemo(
+    () => (boardSources ? buildCharacterBoard({ nowMs, ...boardSources }) : []),
+    [boardSources, nowMs]
+  );
+
+  const selected = useMemo(() => shownKinds(hiddenKinds), [hiddenKinds]);
+  const visible = useMemo(() => filterByKinds(board, selected), [board, selected]);
+  const loads = useMemo(() => countsByDay(visible, zone), [visible, zone]);
+  // Counted off the unfiltered board: a kind's own count must not drop to zero
+  // just because the pilot has it switched off in the menu showing that count.
+  const counts = useMemo(() => countsByKind(board), [board]);
+
+  const railItems = useMemo(
+    () =>
+      selectedDayMs === null
+        ? visible
+        : visible.filter((item) => dayStart(item.deadlineMs, zone) === selectedDayMs),
+    [visible, selectedDayMs, zone]
+  );
+
+  /**
+   * The wide grid is week-aligned; the ticker is not.
+   *
+   * A month grid pushed into the ticker gives a phone six weeks of horizontal
+   * scroll beginning before today, which is the opposite of what the page is
+   * for. The ticker takes a rolling fortnight from the anchor instead, and the
+   * Month/Fortnight density stays a property of the grid that has densities.
+   */
+  const days = useMemo(() => {
+    // `nowMs`, not the builders' `new Date()` default: `isToday` and the
+    // `isPast` the cells derive from `nowMs` must answer to one clock, or a
+    // render straddling midnight can ring one day and hatch it at once.
+    const today = cellOf(nowMs, zone);
+    if (isNarrow) return buildDaysFrom(anchor, TICKER_DAYS, today);
+    return density === 'month'
+      ? buildMonthGrid(anchor, today, weekStart)
+      : buildFortnightDays(anchor, today, weekStart);
+  }, [anchor, density, isNarrow, nowMs, weekStart, zone]);
+
+  const events = useMemo(() => eventsWithOverrides ?? [], [eventsWithOverrides]);
+  const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? null;
+  const skyhookDetail = useMemo(() => {
+    const raid = data?.skyhookRaidDetails.find((r) => r.id === selectedSkyhookId);
+    return raid === undefined ? null : skyhookRaidDetail(raid, nowMs, t, zone);
+  }, [data, selectedSkyhookId, nowMs, t, zone]);
+
+  function goToday() {
+    setAnchor(cellOf(Date.now(), zone));
+    setSelectedDayMs(null);
+  }
+
+  function step(delta: number) {
+    const current = parseAnchorKey(anchorKeyRef.current);
+    if (isNarrow) {
+      setAnchor(addDays(current, delta * TICKER_DAYS));
+      return;
+    }
+    setAnchor(density === 'month' ? addMonths(current, delta) : addWeeks(current, delta));
+  }
+
+  // The events aren't a DataTable (the map and the rail are views over
+  // them), so the export reads `events` in ESI's order, narrowed to what the
+  // rail shows: kind filter and selected day.
+  const exportEvents = useMemo(
+    () => calendarExportEvents(events, hiddenKinds, selectedDayMs, zone),
+    [events, hiddenKinds, selectedDayMs, zone]
+  );
+  const csvColumns = useMemo(() => calendarCsvColumns(t), [t]);
+  const eventsExport = useTableExport({
+    surface: 'calendar',
+    rows: exportEvents,
+    columns: csvColumns,
+    source: 'rows',
+  });
+
+  if (!hydrated) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner label={t('common.loading')} />
+      </div>
+    );
+  }
+  if (activeCharacterId === null) return <Navigate to="/characters" replace />;
+
+  const periodLabel =
+    density === 'month' ? formatMonthLabel(anchor) : formatFortnightLabel(anchor, weekStart);
+
+  const periodControls = (
+    <div className="flex items-center gap-1.5">
+      <span className="hidden text-xs font-semibold text-text-dim md:inline">{periodLabel}</span>
+      <IconButton
+        size="md"
+        icon={<Icon.Back />}
+        label={density === 'month' ? t('calendar.prevMonth') : t('calendar.prevFortnight')}
+        onClick={() => step(-1)}
+      />
+      <Button size="md" onClick={goToday}>
+        {t('calendar.map.today')}
+      </Button>
+      <IconButton
+        size="md"
+        icon={<Icon.Descend />}
+        label={density === 'month' ? t('calendar.nextMonth') : t('calendar.nextFortnight')}
+        onClick={() => step(1)}
+      />
+      {/* Density is a property of the grid; the ticker is always a rolling fortnight. */}
+      {!isNarrow && (
+        <IconButton
+          size="md"
+          icon={<Icon.CalendarEvent />}
+          label={t('calendar.density.fortnightView')}
+          // The name stays put and `pressed` carries the state; the bubble
+          // still says what a press will do.
+          tooltip={
+            density === 'month' ? t('calendar.density.toFortnight') : t('calendar.density.toMonth')
+          }
+          pressed={density === 'fortnight'}
+          onClick={() => void setDensity(density === 'month' ? 'fortnight' : 'month')}
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-3">
+      <PageHeader
+        title={t('calendar.title')}
+        meta={data?.oldestFetchedAt ? <DataAgeBadge date={data.oldestFetchedAt} /> : undefined}
+        actions={
+          <>
+            <CalendarKindFilterMenu
+              hidden={hiddenKinds}
+              onToggle={(kind: CharacterBoardItemKind) =>
+                void setHiddenKinds(toggleHiddenKind(hiddenKinds, kind))
+              }
+              onShowAll={() => void setHiddenKinds([])}
+              counts={counts}
+              readableKinds={data?.readableKinds ?? []}
+              reauthKinds={data?.reauthKinds ?? []}
+              skillPlanChoices={data?.skillPlanChoices ?? []}
+              chosenSkillPlanId={data?.chosenSkillPlanId ?? null}
+              skillPlanError={data?.skillPlanError ?? null}
+              onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
+            />
+            <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('calendar.refresh')}
+              onClick={refresh}
+              busy={loading}
+            />
+            <PageSettingsButton pageName={t('calendar.title')} section="display">
+              <CalendarSettingsForm />
+            </PageSettingsButton>
+          </>
+        }
+      />
+
+      {loading && !data ? (
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
+        </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+      ) : (
+        <>
+          {data?.fromCache && <CachedNotice fetchedAt={data.oldestFetchedAt} />}
+          {/*
+            The page no longer gates on one scope, so a refused source has to
+            announce itself somewhere the pilot will actually look. Naming the
+            sources in a line above the panes is that place — the filter menu
+            also marks them, but nobody opens a menu they have no reason to
+            open.
+          */}
+          {(data?.reauthKinds.length ?? 0) > 0 && (
+            <p className="text-xs text-warning">
+              {t('calendar.sourcesNeedLogin', {
+                sources: data?.reauthKinds.map((kind) => t(KIND_LABEL[kind])).join(', '),
+              })}
+            </p>
+          )}
+          <div className="flex flex-col gap-3 md:flex-row md:items-start">
+            {isNarrow ? (
+              <Panel padded className="w-full">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className={eyebrowClassName}>{periodLabel}</span>
+                  {periodControls}
+                </div>
+                <CalendarDayTicker
+                  days={days}
+                  loads={loads}
+                  nowMs={nowMs}
+                  selectedDayMs={selectedDayMs}
+                  onSelectDay={setSelectedDayMs}
+                />
+                {/* The same caption the wide grid carries — the rule it teaches is not a desktop rule. */}
+                <CalendarPastHint className="mt-2" />
+              </Panel>
+            ) : (
+              <Panel
+                padded={false}
+                title={t('calendar.map.title')}
+                actions={periodControls}
+                className="w-full min-w-0 md:w-[38rem] xl:shrink-0"
+              >
+                <CalendarMap
+                  days={days}
+                  loads={loads}
+                  nowMs={nowMs}
+                  weekStart={weekStart}
+                  selectedDayMs={selectedDayMs}
+                  onSelectDay={setSelectedDayMs}
+                />
+              </Panel>
+            )}
+
+            <ComingUpRail
+              items={railItems}
+              nowMs={nowMs}
+              selectedDayMs={selectedDayMs}
+              onClearDay={() => setSelectedDayMs(null)}
+              onSelectEvent={setSelectedEventId}
+              onSelectSkyhook={setSelectedSkyhookId}
+              noKindsSelected={selected.size === 0}
+            />
+          </div>
+        </>
+      )}
+
+      <RowDetailModal detail={skyhookDetail} onClose={() => setSelectedSkyhookId(null)} />
+
+      {selectedEvent && activeCharacterId !== null && (
+        <EventDetailModal
+          characterId={activeCharacterId}
+          event={selectedEvent}
+          onClose={() => setSelectedEventId(null)}
+          onResponded={(eventId, response) => {
+            const atMs = Date.now();
+            setResponseOverrides((prev) => new Map(prev).set(eventId, { response, atMs }));
+          }}
+        />
+      )}
+    </div>
+  );
+}

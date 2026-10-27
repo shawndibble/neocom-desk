@@ -1,0 +1,28 @@
+name: Public data - market open prices
+
+# Folds the previous UTC day's last EVE Ref market-order snapshot into R2
+# (open-prices/<typeId>.json) at 00:45 UTC; the app reads it from
+# https://data.neocomdesk.com. The snapshot is listed ~23:50, but EVE Ref can lag, so
+# two later slots repeat the run: they exit early once the day is published, and the
+# merge is idempotent. GitHub may drop or delay a scheduled run, hence the spare slots.
+# Pattern and secrets: public-data-job.yml.
+on:
+  schedule:
+    - cron: '45 0 * * *'
+    - cron: '30 1 * * *'
+    - cron: '15 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-data-market-open-prices
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/public-data-job.yml
+    with:
+      script: scripts/public-data/market-open-prices.mjs
+    secrets: inherit

@@ -1,0 +1,162 @@
+/**
+ * Realized profit for a logged Production Run (issue #525): what a run's
+ * snapshotted build cost nets against what has actually sold so far, as
+ * opposed to `buildVsBuy`'s forward *estimate* against a live market price.
+ *
+ * `grossRevenue` is the sum of every confirmed sale line (a linked past
+ * wallet transaction, or the filled portion of a watched sell order) —
+ * confirmed only, never extrapolated, so a run always understates rather
+ * than overstates until every unit is accounted for.
+ *
+ * Sales tax is charged on all of `grossRevenue` (ESI deducts it from every
+ * sale regardless of how it was made), but broker fee is charged only on
+ * `brokerFeeableRevenue` — the portion confirmed via a **watched sell
+ * order**, since that is the one path this app knows for certain paid a
+ * broker fee at listing time. A linked past wallet transaction may equally
+ * have been an instant sell into a buy order, which pays no broker fee, and
+ * ESI's transaction record does not say which — so no broker fee is ever
+ * assumed there. This is a deliberate simplification (see the Production
+ * Log scope decision), not full order-level accounting.
+ */
+
+import { clamp } from '../math';
+import { brokerFee, salesTax } from '@/engine/industry/fees';
+import type { ResolvedStandings } from '@/engine/market/standings';
+
+export interface RealizedProfitInputs {
+  /** Snapshotted from the Build Plan at logging time, user-overridable. */
+  materialCost: number;
+  jobFee: number;
+  /** Confirmed units sold so far (linked transactions + watched-order fills). */
+  quantitySold: number;
+  /** Sum of quantity x unit price across every confirmed sale line. */
+  grossRevenue: number;
+  accountingLevel: number;
+  /** Portion of `grossRevenue` confirmed via a watched sell order — see module doc. */
+  brokerFeeableRevenue: number;
+  brokerRelationsLevel: number;
+  /** The character's standing toward the watched order's station owner. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
+  /** Insurance paid out on lost units (Run Loss). Untaxed proceeds; absent = 0. */
+  insurancePayout?: number;
+}
+
+export interface RealizedProfitResult {
+  totalCost: number;
+  quantitySold: number;
+  grossRevenue: number;
+  salesTax: number;
+  brokerFee: number;
+  netRevenue: number;
+  /** Insurance payout counted as proceeds, after fees. */
+  insurance: number;
+  profit: number;
+  /** Null while nothing has sold yet — a percentage of zero revenue is not a number. */
+  marginPct: number | null;
+}
+
+export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResult {
+  const totalCost = inputs.materialCost + inputs.jobFee;
+  const salesTaxAmount = salesTax(inputs.grossRevenue, inputs.accountingLevel);
+  const brokerFeeAmount = brokerFee(
+    inputs.brokerFeeableRevenue,
+    inputs.brokerRelationsLevel,
+    inputs.standing?.factionStanding,
+    inputs.standing?.corpStanding
+  );
+  const netRevenue = inputs.grossRevenue - salesTaxAmount - brokerFeeAmount;
+  const insurance = inputs.insurancePayout ?? 0;
+  const profit = netRevenue + insurance - totalCost;
+
+  return {
+    totalCost,
+    quantitySold: inputs.quantitySold,
+    grossRevenue: inputs.grossRevenue,
+    salesTax: salesTaxAmount,
+    brokerFee: brokerFeeAmount,
+    netRevenue,
+    insurance,
+    profit,
+    marginPct: inputs.grossRevenue > 0 ? (profit / inputs.grossRevenue) * 100 : null,
+  };
+}
+
+export interface SoldUnitsMarginInputs {
+  totalCost: number;
+  /** Units the run produced. */
+  quantity: number;
+  /** Confirmed units sold so far. */
+  quantitySold: number;
+  netRevenue: number;
+  /** Units written off as a Run Loss; their cost leaves `unsoldCost`. */
+  quantityLost?: number;
+}
+
+export interface SoldUnitsMargin {
+  /** Unit cost x confirmed units sold — the only cost the sold units can be charged. */
+  soldCost: number;
+  /** Net revenue less `soldCost`: provable from confirmed sales alone, unlike `realizedProfit`'s conservative headline. */
+  margin: number;
+  /** The cost still sitting in unsold units. */
+  unsoldCost: number;
+}
+
+/** A second, provable view beside `realizedProfit` (issue #1785): charges only the sold units' share of the run cost. */
+export function soldUnitsMargin(inputs: SoldUnitsMarginInputs): SoldUnitsMargin {
+  const soldUnits = Math.min(inputs.quantitySold, inputs.quantity);
+  const soldCost = inputs.quantity > 0 ? (inputs.totalCost / inputs.quantity) * soldUnits : 0;
+  return {
+    soldCost,
+    margin: inputs.netRevenue - soldCost,
+    unsoldCost:
+      inputs.totalCost -
+      soldCost -
+      lostUnitsCost(inputs.totalCost, inputs.quantity, inputs.quantityLost ?? 0),
+  };
+}
+
+function lostUnitsCost(totalCost: number, quantity: number, quantityLost: number): number {
+  if (quantity <= 0) return 0;
+  return (totalCost / quantity) * clamp(quantityLost, 0, quantity);
+}
+
+export interface RunLossInputs {
+  totalCost: number;
+  /** Units the run produced. */
+  quantity: number;
+  quantityLost: number;
+  insurancePayout: number;
+}
+
+export interface RunLossResult {
+  /** Cost of the lost units at the run's cost per unit. */
+  writtenOffCost: number;
+  insurance: number;
+  /** `writtenOffCost - insurance`; positive is a loss. Shown on its own line, never folded into Realized profit. */
+  netLoss: number;
+}
+
+/** The accounting of one Run Loss record (issue #2851). */
+export function runLoss(inputs: RunLossInputs): RunLossResult {
+  const writtenOffCost = lostUnitsCost(inputs.totalCost, inputs.quantity, inputs.quantityLost);
+  return {
+    writtenOffCost,
+    insurance: inputs.insurancePayout,
+    netLoss: writtenOffCost - inputs.insurancePayout,
+  };
+}
+
+export interface LossQuantityInputs {
+  quantity: number;
+  quantitySold: number;
+  /** Units already lost by the run's other loss records (exclude the one being edited). */
+  otherLost: number;
+  quantityLost: number;
+}
+
+/** `null` when the units are acceptable; a loss may never exceed the units still unaccounted for. */
+export function validateLossQuantity(i: LossQuantityInputs): 'invalid' | 'too-many' | null {
+  if (!Number.isInteger(i.quantityLost) || i.quantityLost <= 0) return 'invalid';
+  const unaccounted = Math.max(0, i.quantity - i.quantitySold - i.otherLost);
+  return i.quantityLost > unaccounted ? 'too-many' : null;
+}

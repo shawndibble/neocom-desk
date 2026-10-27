@@ -1,0 +1,5 @@
+# Scope decisions — Skill-gate marker extends to the Build Plan header (issue #1231)
+
+_Recorded 2026-09-22 · issue #1231._
+
+- **The account-wide skill-gate marker now also appears on a Build Plan's own top-level product**, beside its name in `PlanVerdictHero`, reusing the same `evaluateSkillGate`/`SkillGateMarker` machinery the sub-build rows and Market-Wide Opportunities already use. This reverses the 2026-09-14 decision's "Two surfaces only... not the ordinary owned-blueprint Build Plan header" clause (`docs/context/decisions/20260914-221255-skill-gate-marker-level-threshold-marker-tone-account.md`): issue #1231 found that omission let a plan nobody on the account can build (e.g. a bought T2 copy) show no warning at its own header, the one place a pilot is most likely to look first. The prior decision's other terms (active `active_skill_level`, no level-I exemption, `warning` tone, account-wide via `useAccountSkillLevels`) are unchanged — only the "which surfaces" list widens by one.

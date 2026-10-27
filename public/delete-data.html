@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delete Your Data — Neocom Desk</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        line-height: 1.6;
+        background: #0a0e14;
+        color: #e6e6e6;
+        overflow-wrap: break-word;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      h2 {
+        font-size: 1.1rem;
+        margin-top: 2rem;
+        scroll-margin-top: 1rem;
+      }
+      a {
+        color: #6cb6ff;
+      }
+      code {
+        background: #1a1f2b;
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+      }
+      ol,
+      ul {
+        padding-left: 1.4rem;
+      }
+      .updated {
+        color: #9aa4b2;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Delete Your Data — Neocom Desk</h1>
+      <p class="updated">Last updated: October 24, 2026</p>
+
+      <p>
+        Neocom Desk has no separate account or password — you log in with your EVE Online character
+        through CCP's own login. Your plans and settings sync to the server automatically while you
+        are logged in, and that synced data is deleted in one of two ways: right away with
+        <strong>Delete all data</strong>, or automatically after 90 days without a sync.
+      </p>
+
+      <h2 id="delete-all">Delete everything now</h2>
+      <ol>
+        <li>Open Neocom Desk and log in.</li>
+        <li>Go to <strong>Settings</strong> → <strong>Data &amp; storage</strong>.</li>
+        <li>
+          Under <strong>Delete all data</strong>, click <strong>Delete all</strong> and confirm.
+        </li>
+      </ol>
+      <p>
+        This deletes the synced data of every character logged in on this device from the sync
+        server, along with any Alerts when closed token the server holds for them and this device's
+        push registration, then erases everything the app stores on this device. A character whose
+        login has expired, or a deletion made while offline, cannot reach the server; that
+        character's synced data is then deleted automatically after 90 days without a sync. SRP
+        Claims and Corp Tax Book lines are the corporation's records and stay with it (<a
+          href="#corp-records"
+          >below</a
+        >).
+      </p>
+
+      <h2 id="remove-character">Remove one character from a device</h2>
+      <ol>
+        <li>Open Neocom Desk and log in.</li>
+        <li>Go to the <strong>Characters</strong> page.</li>
+        <li>
+          Find the character you want removed and click <strong>Remove {name}</strong> next to it.
+        </li>
+        <li>Confirm the removal.</li>
+      </ol>
+      <p>
+        If the character shared anything with a Community, the confirmation offers to remove its
+        shared blueprints, Fittings and Skill Plans too. Removing a character does not take it out
+        of a Community or delete its Requests and Pledges; leave the Community for that (below).
+      </p>
+
+      <h2 id="what-gets-deleted">What gets deleted, and when</h2>
+      <ul>
+        <li>
+          <strong>Alerts when closed, immediately:</strong> if you turned this on for a character,
+          the server holds an encrypted token for it that reads only its notifications and, if you
+          added them, its location (nearby alerts) and its mail headers (new-mail alerts). Turning
+          the setting off, removing the character, logging out, or
+          <strong>Delete all data</strong> deletes that token from the server and revokes it with
+          EVE. If the app cannot reach the server at that moment, the token is deleted automatically
+          after 90 days without a sync, and you can revoke it at any time in your EVE account's
+          authorized applications.
+        </li>
+        <li>
+          <strong>Corp Tax Book Automatic sync:</strong> if you turned it on for a corporation's
+          book, the server holds an encrypted, narrow-scope token for your character. Turning it off
+          in the book's settings (or the corporation's CEO revoking it), or your character losing
+          the role or leaving the corporation, deletes that token from the server and revokes it
+          with EVE. <strong>Delete all data</strong> does not reach it; it is deleted automatically
+          after 90 days without a sync, and you can revoke it at any time in your EVE account's
+          authorized applications.
+        </li>
+        <li>
+          <strong>Push notifications:</strong> if you turned them on, the server holds this device's
+          push token, its character IDs, its quiet-time window and time zone (if set) and the text
+          of the next 72 hours of alerts, plus alerts already sent for 30 days. Logging out or
+          removing the character drops the device's token; the server then deletes its registration
+          and unsent alert text the next time it runs. Sent-alert records are removed after 30 days.
+        </li>
+        <li>
+          <strong>On your device, immediately:</strong> that character's skill plans, build plans,
+          quickbar, and cached game data are deleted from local storage right away.
+        </li>
+        <li>
+          <strong>On the sync server, after 90 days:</strong> that character's synced plans, build
+          plans, quickbar, and settings stay on Firebase so that adding the character back restores
+          them. They are deleted automatically once no device has synced that character for 90 days.
+          A record you delete leaves a deletion marker for 30 days so your other devices catch up,
+          then the marker goes too.
+        </li>
+        <li>
+          <strong>Share Links, after 7 days:</strong> a Share Link's content is not tied to your
+          character and cannot be deleted from the app. It stops working after 7 days and is then
+          deleted automatically (this can take up to a day longer).
+        </li>
+      </ul>
+
+      <h2 id="communities">Communities</h2>
+      <p>
+        If a character joined a Community, the <strong>Delete all data</strong> confirmation offers
+        <strong>Also leave my Communities</strong>, ticked by default. Leaving deletes what the
+        character shared there, including its Requests and Pledges, right away. Untick it and the
+        Community keeps that data until you open <strong>Communities</strong>, pick the Community
+        and choose <strong>Leave</strong>. A Community's admin can't leave, so a Community you run
+        is skipped: hand it to another Member or delete it (which deletes it for every Member).
+        Otherwise a character no device has synced for 90 days is removed from its Communities
+        automatically, and a Community it administers is deleted.
+      </p>
+
+      <h2 id="corp-records">SRP Claims and the Corp Tax Book</h2>
+      <p>
+        These belong to the corporation, not to your character, so <strong>Delete all data</strong>
+        does not remove them, and neither does removing the character, leaving the corporation or
+        the 90-day idle clean-up. They go away like this:
+      </p>
+      <ul>
+        <li>
+          <strong>SRP Claims:</strong> a Paid or Rejected claim is deleted automatically 365 days
+          after it closes. A Pending or Approved claim stays until an officer pays or rejects it,
+          and then follows the same 365 days. The claim's entries in the corporation's SRP log (your
+          filing, with your character's name, and each officer action on it) are deleted with the
+          claim. The SRP settings and the log's other entries have no expiry; Doctrine Fits stay
+          until a Director or the CEO deletes them. The corporation's CEO, Directors and Accountants
+          can read every claim; a pilot can read only their own.
+        </li>
+        <li>
+          <strong>Corp Tax Book:</strong> what you mined, your Statements, payments, write-offs and
+          verify links have no expiry. They are deleted only when the officer who turned the book
+          on, or the corporation's CEO, deletes the whole book, which also removes the book from the
+          record of which books bill your character. The CEO, Directors, Accountants and Junior
+          Accountants can read the whole book; you can read only your own lines.
+        </li>
+      </ul>
+      <p>
+        See the <a href="/privacy.html#corp-records">Privacy Policy</a> for everything each record
+        holds and who else can read it.
+      </p>
+
+      <h2 id="without-app">Removing everything without opening the app</h2>
+      <p>
+        Uninstalling the app, or clearing its site data on your device, immediately deletes all
+        locally cached data for every character. Synced data left on the server, and any Alerts when
+        closed token, is deleted after 90 days without a sync. To delete it sooner, use
+        <strong>Delete all data</strong> above, and revoke the token yourself in your EVE account's
+        authorized applications.
+      </p>
+
+      <p>See also the <a href="/privacy.html">Privacy Policy</a>.</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,208 @@
+// Public sync API — import from '@/sync' only; UI wiring is owned by src/app.
+//
+// Also the Firebase code-splitting boundary: `planSync.ts` statically imports
+// ~160 KB gzip of firebase/{app,auth,firestore/lite,functions}, and App.tsx,
+// Layout.tsx and the SkillPlans/Industry routes all import this barrel eagerly.
+// So every export that can reach Firebase must be a thin wrapper around
+// `await import('./planSync')`, landing in its own async chunk. status.ts and
+// uid.ts touch no Firebase and stay synchronous, so the nav dot can subscribe
+// at first paint.
+
+import { setStatus } from './status';
+import { isOnline } from '@/stores/network';
+import { redactSecrets } from '@/observability/scrub';
+import { reportFailure } from '@/observability/reportFailure';
+import type { ScheduleSyncOptions } from './syncScheduler';
+
+export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
+// Types only, so neither module's runtime joins the entry chunk.
+export type { ScheduleSyncOptions } from './syncScheduler';
+export type { SyncedCollectionName } from './syncedCollections';
+export { uidForCharacter } from './uid';
+export { TOMBSTONE_TTL_MS } from './merge';
+export { clearCharacterSyncBookkeeping } from './localBookkeeping';
+// Touches Dexie only — no Firebase — so it needs no lazy-import wrapper.
+export { backfillAccountWideData } from './accountWideBackfill';
+
+/**
+ * Run a sync now. Coalesced per character and serialized globally (planSync.ts).
+ * Rejects with the sync failure (also surfaced via subscribeSyncStatus), or a
+ * chunk-load error if the driver can't load.
+ */
+export async function triggerSync(characterId: number): Promise<void> {
+  const { triggerSync } = await import('./planSync');
+  return triggerSync(characterId);
+}
+
+/**
+ * Sign out of the Firebase session this device holds (see `syncAuth.ts`).
+ * Only call it where sync is configured: the Firebase getters throw otherwise.
+ */
+export async function signOutOfSync(characterIds: readonly number[] = []): Promise<void> {
+  const { signOutOfSync } = await import('./syncAuth');
+  return signOutOfSync(characterIds);
+}
+
+/** Delete one Character's Firebase session and app (see `syncAuth.ts`). */
+export async function removeCharacterSession(characterId: number): Promise<void> {
+  const { removeCharacterSession } = await import('./syncAuth');
+  return removeCharacterSession(characterId);
+}
+
+/**
+ * Stop syncing on this page until it reloads, once any sync in flight is done
+ * (planSync.ts). Only call it where sync is configured.
+ */
+export async function haltSync(): Promise<void> {
+  const { haltSync } = await import('./planSync');
+  return haltSync();
+}
+
+/**
+ * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
+ * leaves no sync, so it is reported (unless offline before the chunk is
+ * precached) and shown as sync status "error" rather than swallowed.
+ *
+ * Name the synced collections the edit wrote — `{ collections: ['payees'] }`
+ * — and a pass shortly after a full one pulls and pushes only those
+ * (syncScheduler.ts, issue #4896). Leave them out when unsure: that is a full
+ * pass, always safe. A bare number is `debounceMs`; `priority: 'background'`
+ * is for the sweep only.
+ */
+export function scheduleSync(characterId: number, options?: number | ScheduleSyncOptions): void {
+  void import('./planSync')
+    .then((m) => m.scheduleSync(characterId, options))
+    .catch((error: unknown) => {
+      reportFailure('sync', error);
+      setStatus(characterId, {
+        state: 'error',
+        error: redactSecrets(error instanceof Error ? error.message : String(error)),
+        offline: !isOnline(),
+      });
+    });
+}
+
+/**
+ * Delete a Skill Plan locally and record a tombstone so the deletion propagates
+ * on the next sync. Use this rather than deleting the Dexie row directly, or
+ * the plan resurrects from the remote copy.
+ */
+export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
+  const { markPlanDeleted } = await import('./planSync');
+  return markPlanDeleted(characterId, planId);
+}
+
+/** Build Plan analogue of markPlanDeleted — same tombstone semantics. */
+export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
+  const { markBuildPlanDeleted } = await import('./planSync');
+  return markBuildPlanDeleted(characterId, planId);
+}
+
+/** Bulk analogue of markBuildPlanDeleted — a Build Group delete cascading to its members. */
+export async function markBuildPlansDeleted(characterId: number, planIds: string[]): Promise<void> {
+  const { markBuildPlansDeleted } = await import('./planSync');
+  return markBuildPlansDeleted(characterId, planIds);
+}
+
+/** Fitting analogue of markPlanDeleted — same tombstone semantics (issue #1538). */
+export async function markFittingDeleted(characterId: number, fittingId: string): Promise<void> {
+  const { markFittingDeleted } = await import('./planSync');
+  return markFittingDeleted(characterId, fittingId);
+}
+
+/** Pin a station for one Character only (issue #84's per-character pin state). */
+export async function setCharacterStationPin(
+  characterId: number,
+  locationId: number
+): Promise<void> {
+  const { setCharacterStationPin } = await import('./planSync');
+  return setCharacterStationPin(characterId, locationId);
+}
+
+/**
+ * Elevate a station's pin to account-wide — fanned out to every Character
+ * currently known on this device (parity-plan §5.7), each syncing under its
+ * own ownerHash.
+ */
+export async function setAccountStationPin(locationId: number): Promise<void> {
+  const { setAccountStationPin } = await import('./planSync');
+  return setAccountStationPin(locationId);
+}
+
+/** Unpin a station entirely, tombstoning its pin row for every Character it was written under. */
+export async function clearStationPin(locationId: number): Promise<void> {
+  const { clearStationPin } = await import('./planSync');
+  return clearStationPin(locationId);
+}
+
+/**
+ * Record a planet's best-to-worst resource ranking for the whole account
+ * (issue #425). Fanned out to every Character, like an account-wide pin.
+ */
+export async function setPlanetRichness(planetId: number, order: number[]): Promise<void> {
+  const { setPlanetRichness } = await import('./planSync');
+  return setPlanetRichness(planetId, order);
+}
+
+/** Forget a planet's ranking, tombstoned so it does not resurrect on sync. */
+export async function clearPlanetRichness(planetId: number): Promise<void> {
+  const { clearPlanetRichness } = await import('./planSync');
+  return clearPlanetRichness(planetId);
+}
+
+/**
+ * Delete a Production Run and every sale link/order watch attributed to it
+ * (issue #525), tombstoned so none of it resurrects on sync.
+ */
+export async function markProductionRunDeleted(characterId: number, runId: string): Promise<void> {
+  const { markProductionRunDeleted } = await import('./planSync');
+  return markProductionRunDeleted(characterId, runId);
+}
+
+/** Unlink a past sale from a Production Run, tombstoned so it does not resurrect. */
+export async function removeProductionSaleLink(characterId: number, linkId: string): Promise<void> {
+  const { removeProductionSaleLink } = await import('./planSync');
+  return removeProductionSaleLink(characterId, linkId);
+}
+
+/** Remove a Run Loss, tombstoned so it does not resurrect. */
+export async function removeProductionLoss(characterId: number, lossId: string): Promise<void> {
+  const { removeProductionLoss } = await import('./planSync');
+  return removeProductionLoss(characterId, lossId);
+}
+
+/** Stop watching an open sell order for a Production Run, tombstoned so it does not resurrect. */
+export async function removeProductionOrderWatch(
+  characterId: number,
+  watchId: string
+): Promise<void> {
+  const { removeProductionOrderWatch } = await import('./planSync');
+  return removeProductionOrderWatch(characterId, watchId);
+}
+
+/** Write a synced setting ('sync.'-prefixed key) and stamp it for LWW merging. */
+export async function setSyncedSetting(key: string, value: unknown): Promise<void> {
+  const { setSyncedSetting } = await import('./planSync');
+  return setSyncedSetting(key, value);
+}
+
+/** Delete a synced setting and propagate the deletion as a tombstone. */
+export async function deleteSyncedSetting(key: string): Promise<void> {
+  const { deleteSyncedSetting } = await import('./planSync');
+  return deleteSyncedSetting(key);
+}
+
+/** Ensure the Firebase session is signed in as this character; returns the uid. */
+export async function ensureSignedIn(characterId: number): Promise<string> {
+  const { ensureSignedIn } = await import('./syncAuth');
+  return ensureSignedIn(characterId);
+}
+
+/**
+ * Delete every remote doc one Character owns, now ("Delete all data" only —
+ * see remotePurge.ts). Throws on failure (dead refresh token, offline).
+ */
+export async function purgeCharacterRemoteData(characterId: number): Promise<void> {
+  const { purgeCharacterRemoteData } = await import('./remotePurge');
+  return purgeCharacterRemoteData(characterId);
+}

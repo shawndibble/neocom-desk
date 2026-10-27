@@ -1,0 +1,7 @@
+# Scope decisions — PI settings: buy tiers P1-P3 and corp buyback (issue #2620)
+
+_Recorded 2026-10-05 · issue #2620._
+
+- **One PI settings record, `piSettings`: hub, corp buyback percent, buy tiers.** It replaces `piMarketSourcing` and the Goal Planner's `priceHub`, so the page strip's "Sell at", the Plan rail, the Advisor and the settings form can never disagree. A legacy hub id migrates to that hub with `[1]`; `'none'` to no buying. Cadence keeps its own `piCadence` record, so old values need no migration. The Plan rail shows a summary and opens the shared form rather than keeping its own copy of any control.
+- **A corp buyback pays N% of the hub's bid, with no sales tax.** The hub stays the price basis, purchases still go at the hub's ask, and the route chip is replaced by "drop off at home". Offered rates are 80/85/90/95, default 90, as in the mockup. Ruled out: modelling a buyback's own price list.
+- **P2/P3 are bought at the lowest allowed tier that closes the gap, and only when P1 is not bought.** Buying P1 closes every gap, so a pilot who buys P1 gets the unchanged solver. A P1 no colony's planet type yields is bought as the nearest allowed ancestor in full; a P1 that stays short after the solve is bought as the same share of that ancestor, and the plan is solved again. Bought goods are hub-to-host flows (ask, import customs). A goal's own type is bought in part only to make up a shortfall. Ruled out: buying P4 and per-goal overrides.

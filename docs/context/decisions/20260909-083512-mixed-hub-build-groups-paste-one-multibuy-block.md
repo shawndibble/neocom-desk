@@ -1,0 +1,35 @@
+# Scope decisions — Mixed-hub Build Groups paste one multibuy block per hub (issue #631)
+
+_Recorded 2026-09-09 · issue #631._
+
+- **A mixed-hub Build Group is split into one multibuy list per hub, not
+  reduced to one list.** Multibuy is per-station, so a single blob for a group
+  buying at Jita and Amarr cannot be pasted anywhere. `rollUpBuildGroup` now
+  returns `shoppingByHub` — the same buy list partitioned by the hub each
+  member buys at, in first-appearance order — and the panel offers one copy
+  control per hub beside the mixture notice. The whole-group control stays
+  disabled for a mixture, because there is still no one list it could copy.
+  This replaces #626's honest dead end, not its warning: the hubs are still
+  named.
+
+- **Rejected: a "normalise this group to one hub" action.** It was the other
+  option the ticket weighed, and it loses on the ground the Build Groups
+  membership decision (`20260908-211916-build-groups-membership-on-the-plan-names-in.md`)
+  already settles — a group carries no `hubId`, and a mixture is reported,
+  never overridden. Rewriting members' hubs to make the paste tidy would
+  silently reprice every one of them, changing what the group costs to fix how
+  it copies. The hub belongs to the plan; the pilot who moved a plan meant to.
+
+- **`hubIds` is derived from the blocks rather than accumulated beside them.**
+  One fact, one writer: a hub named in the "different trade hubs" warning
+  always has a block to paste, and no drift between the two is possible.
+
+- **`overClaimed` stays group-wide, deliberately not split per hub.** It is
+  measured against the merged buy list and the whole hangar on purpose —
+  owned stock is not per-hub, so a per-hub over-claim figure would compare two
+  things that never meet.
+
+- **A hub whose materials are all owned still gets a block, and the caller
+  disables its control.** Same rule as the single-plan copy: the hub is worth
+  naming, and a button that copies an empty string is worse than one that is
+  plainly unavailable.

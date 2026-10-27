@@ -1,0 +1,6 @@
+# Scope decisions — Remaps Available drops its user override; optimizer always plans with the live EVE-derived count (issue #1412)
+
+_Recorded 2026-09-23 · issue #1412._
+
+- **No manual "Remaps available" input any more; the optimizer always plans with `remapBudget()`'s live EVE-derived count.** Rules out a hold-back control — the free-typed 0-5 field let a user request more than the optimizer (capped at `MAX_SUPPORTED_REMAPS`) ever honored, and went stale after an in-game remap since nothing re-synced it. `remapBudget(remapInfo, plan.remapCount, planStart)` (`features/skills/planner/remapAvailability.ts`) is the single source now: bonus remaps + the yearly one (still timed while on cooldown, per #1404) whenever ESI's attributes can be read.
+- **`SkillPlanRecord.remapCount` stays in the schema, reinterpreted as an offline/no-scope fallback only.** Written once at plan creation (`newPlan.ts`) from whatever `remapInfo` read at the time, never user-edited, and read back only when `remapInfo` is null (offline, or the character lacks the attributes scope) — so a plan still optimizes without ESI, just not live. No sync/Firestore migration: the field's wire shape is unchanged, only its meaning.

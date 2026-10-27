@@ -1,0 +1,174 @@
+import { describe, it, expect } from 'vitest';
+import i18n from './index';
+import {
+  projectSkillQueue,
+  projectIndustryJobs,
+  projectColonies,
+  projectCalendar,
+} from '@/engine/projection';
+import {
+  calendarCopy,
+  colonyCopy,
+  industryJobCopy,
+  skillQueueCopy,
+} from '@/features/notifications/domainCopy';
+import { HOUR_MS } from '@/lib/age';
+
+const T0 = 1_700_000_000_000;
+
+/**
+ * Matches `foregroundPoller.ts`'s own local Romanization of a skill level —
+ * duplicated here deliberately: this test's whole point is to drive the
+ * live i18next path with the same *raw* business values `projection.ts`'s
+ * Scheduled Push path receives, so it must format them the way the live
+ * path actually does rather than importing that logic (which would make
+ * the test assert the code agrees with itself).
+ */
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+
+describe('notifications.fired.* — live i18next path agrees with projection.ts', () => {
+  it('skillLevelComplete: same character/skill/level produce the same string on both paths', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 3, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
+      { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + 10 * HOUR_MS },
+    ];
+    const [row] = projectSkillQueue(
+      1,
+      'Kestrel',
+      entries,
+      new Map([[1, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
+    const live = i18n.t('notifications.fired.skillLevelComplete.body', {
+      character: 'Kestrel',
+      skill: 'Gunnery',
+      level: ROMAN[3 - 1],
+    });
+    expect(live).toEqual(row.body);
+    expect(i18n.t('notifications.fired.skillLevelComplete.title')).toEqual(row.title);
+  });
+
+  it('characterNotTraining: same character produces the same string on both paths', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 5, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(
+      1,
+      'Kestrel',
+      entries,
+      new Map([[1, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
+    const row = rows[rows.length - 1];
+    const live = i18n.t('notifications.fired.characterNotTraining.body', { character: 'Kestrel' });
+    expect(live).toEqual(row.body);
+    expect(i18n.t('notifications.fired.characterNotTraining.title')).toEqual(row.title);
+  });
+
+  it('industryJobComplete: same character/item produce the same string on both paths', () => {
+    const entries = [
+      {
+        jobId: 1,
+        blueprintTypeId: 100,
+        productTypeId: 200,
+        activityId: 1,
+        endMs: T0 + 5 * HOUR_MS,
+      },
+    ];
+    const [row] = projectIndustryJobs(
+      1,
+      'Kestrel',
+      entries,
+      new Map([[200, 'Rifter']]),
+      industryJobCopy.push,
+      T0
+    );
+    const live = i18n.t('notifications.fired.industryJobComplete.body', {
+      character: 'Kestrel',
+      item: 'Rifter',
+    });
+    expect(live).toEqual(row.body);
+    expect(i18n.t('notifications.fired.industryJobComplete.title')).toEqual(row.title);
+  });
+
+  /**
+   * The two planetary events are the exception to this file's rule, and the
+   * divergence is the point rather than drift: `projectionWording` hedges
+   * both on the push path because a reset run done in game while the app is
+   * closed falsifies them, while the live path has watched the colony go
+   * idle and says so. Pinned here — where the "both paths agree" invariant
+   * lives — so the exception cannot be quietly widened to the other four.
+   */
+  it('planetaryExtractionDone and planetaryExtractorExpiring name the same things on both paths, but only the live one asserts', () => {
+    const expiryTimeMs = T0 + 30 * HOUR_MS;
+    const colonies = [
+      {
+        planetId: 1,
+        extractors: [{ pinId: 1, expiryTimeMs, thresholdMs: 6 * HOUR_MS }],
+      },
+    ];
+    const rows = projectColonies(
+      1,
+      'Kestrel',
+      colonies,
+      new Map([[1, 'Amarr Prime III']]),
+      colonyCopy.push,
+      T0
+    );
+    const doneRow = rows.find((r) => r.eventId === 'planetaryExtractionDone');
+    const expiringRow = rows.find((r) => r.eventId === 'planetaryExtractorExpiring');
+    expect(doneRow).toBeDefined();
+    expect(expiringRow).toBeDefined();
+
+    const liveDone = i18n.t('notifications.fired.planetaryExtractionDone.body', {
+      character: 'Kestrel',
+      planet: 'Amarr Prime III',
+    });
+    expect(liveDone).toContain('has stopped');
+    expect(doneRow?.body).toContain('was due to stop');
+    // Same subject either way: only the claim about it changes.
+    for (const body of [liveDone, doneRow?.body ?? '']) {
+      expect(body).toContain('Kestrel');
+      expect(body).toContain('Amarr Prime III');
+    }
+
+    const hours = Math.round((expiryTimeMs - (expiringRow?.fireAt ?? 0)) / HOUR_MS);
+    const liveExpiring = i18n.t('notifications.fired.planetaryExtractorExpiring.body', {
+      character: 'Kestrel',
+      planet: 'Amarr Prime III',
+      hours,
+    });
+    expect(liveExpiring).toContain(`expires in under ${hours} hours`);
+    expect(expiringRow?.body).toContain(`was due to expire in under ${hours} hours`);
+  });
+
+  it('calendarEventStarting: same character and event name produce the same string on both paths', () => {
+    const entries = [{ calendarEventId: 1, startMs: T0 + 5 * HOUR_MS, title: 'Fleet Op' }];
+    const [row] = projectCalendar(1, 'Kestrel', entries, calendarCopy.push, T0);
+    const live = i18n.t('notifications.fired.calendarEventStarting.body', {
+      character: 'Kestrel',
+      event: 'Fleet Op',
+    });
+    expect(live).toEqual(row.body);
+    expect(live).toContain('Fleet Op');
+    expect(i18n.t('notifications.fired.calendarEventStarting.title')).toEqual(row.title);
+  });
+
+  /**
+   * The degraded body is shared too. A poller baseline persisted before the
+   * event title was recorded fires with no name to print, and both paths have
+   * to fall back to the same sentence — otherwise the push and the live toast
+   * for one occurrence read differently for a reason no pilot can see.
+   */
+  it('calendarEventStarting: the unnamed fallback is the same sentence on both paths', () => {
+    const entries = [{ calendarEventId: 1, startMs: T0 + 5 * HOUR_MS }];
+    const [row] = projectCalendar(1, 'Kestrel', entries, calendarCopy.push, T0);
+    const live = i18n.t('notifications.fired.calendarEventStarting.bodyUnnamed', {
+      character: 'Kestrel',
+    });
+    expect(live).toEqual(row.body);
+    expect(live).not.toContain('{{');
+  });
+});

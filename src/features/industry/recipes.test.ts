@@ -1,0 +1,607 @@
+import { describe, it, expect, vi } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import type { BlueprintMap, TypeMap } from '@/sde/types';
+import { piFixture } from '@/sde/__fixtures__/pi';
+import type { CharacterBlueprint } from '@/esi/endpoints';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type { SubBuildContext } from '@/engine/industry/subBuild';
+import type { BlueprintTierPools } from './recipes';
+
+const BLUEPRINTS: BlueprintMap = {
+  '9841': {
+    name: 'Mechanical Parts Blueprint',
+    time: 300,
+    materials: [{ typeID: 34, quantity: 20 }],
+    products: [{ typeID: 9840, quantity: 5 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  // Reinforced Carbon Fiber Reaction Formula (issue #460 follow-up): a
+  // reaction-only material with no manufacturing blueprint and no planetary
+  // schematic, the exact shape that showed no make-or-buy marker before
+  // `materialRecipe` learned a third branch for the catalog's reaction
+  // formulas.
+  '46156': {
+    name: 'Reinforced Carbon Fiber Reaction Formula',
+    time: 10800,
+    materials: [{ typeID: 16650, quantity: 200 }],
+    products: [{ typeID: 16667, quantity: 100 }],
+    skills: [],
+    activity: 'reaction',
+  },
+  // A two-hop manufacturing chain (40 <- 41 <- 42), so `buildPlanTypeIds` has
+  // something to exercise its second level of widening against: pricing a
+  // make-or-buy verdict for 41 (an expanded row's own input) needs 42's hub
+  // price too, one level beyond what a single `recipeInputTypeIds` pass reaches.
+  '9843': {
+    name: 'Isogen Blueprint',
+    time: 100,
+    materials: [{ typeID: 41, quantity: 3 }],
+    products: [{ typeID: 40, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  '9844': {
+    name: 'Nocxium Blueprint',
+    time: 50,
+    materials: [{ typeID: 42, quantity: 2 }],
+    products: [{ typeID: 41, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  // A fourth hop (43 <- 42), reachable only if the widening actually walks
+  // the whole tree rather than stopping at a fixed number of levels.
+  '9845': {
+    name: 'Zydrine Blueprint',
+    time: 25,
+    materials: [{ typeID: 43, quantity: 1 }],
+    products: [{ typeID: 42, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+};
+
+const TYPES: TypeMap = {
+  '9840': { name: 'Mechanical Parts', groupID: 334, volume: 1.5 },
+  '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '16667': { name: 'Reinforced Carbon Fiber', groupID: 428, volume: 5 },
+  '16650': { name: 'Fried Interface Circuit', groupID: 428, volume: 5 },
+};
+
+const PI = piFixture({
+  schematics: {
+    '2398': {
+      schematicId: 133,
+      name: 'Reactive Metals',
+      cycleTime: 1800,
+      quantity: 20,
+      volume: 0.19,
+      facility: 'basic',
+      planetTypes: ['barren', 'lava', 'plasma'],
+      inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
+    },
+  },
+  raw: [
+    {
+      typeID: 2267,
+      name: 'Base Metals',
+      volume: 0.005,
+      planetTypes: ['barren', 'gas', 'lava', 'plasma', 'storm'],
+    },
+  ],
+});
+
+vi.mock('@/sde/loadSde', () => ({
+  loadBlueprints: vi.fn(async () => BLUEPRINTS),
+  loadTypes: vi.fn(async () => TYPES),
+}));
+
+const { loadBlueprintCatalog } = await import('./blueprintCatalog');
+const {
+  acquisitionForLookup,
+  buildPlanTypeIds,
+  cloneBlueprintPools,
+  materialRecipe,
+  recipeInputTypeIds,
+} = await import('./recipes');
+
+const catalog = await loadBlueprintCatalog();
+
+function owned(overrides: Partial<CharacterBlueprint>): CharacterBlueprint {
+  return {
+    item_id: 1,
+    material_efficiency: 0,
+    quantity: 1,
+    runs: -1,
+    time_efficiency: 0,
+    type_id: 9841,
+    location_id: 60003760,
+    location_flag: 'Hangar',
+    ...overrides,
+  };
+}
+
+describe('materialRecipe', () => {
+  it('returns the manufacturing recipe for a material some blueprint produces', () => {
+    expect(materialRecipe(9840, { catalog, pi: PI, ownedBlueprints: [] })).toEqual({
+      method: 'manufacturing',
+      blueprint: {
+        name: 'Mechanical Parts Blueprint',
+        time: 300,
+        materials: [{ typeID: 34, quantity: 20 }],
+        products: [{ typeID: 9840, quantity: 5 }],
+        activity: 'manufacturing',
+        skills: [],
+      },
+      me: 0,
+    });
+  });
+
+  it('quotes the sub-job at the ME of the copy the character owns', () => {
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [owned({ material_efficiency: 8 })],
+    });
+    expect(recipe).toMatchObject({ me: 8 });
+  });
+
+  it('clamps a nonsense owned ME into the range the engine accepts', () => {
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [owned({ material_efficiency: 99 })],
+    });
+    expect(recipe).toMatchObject({ me: 10 });
+  });
+
+  it('quotes an unowned blueprint at the assumed ME', () => {
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      assumedMeForUnowned: 10,
+    });
+    expect(recipe).toMatchObject({ me: 10 });
+  });
+
+  it('still prefers a copy the character owns over the assumed ME', () => {
+    // The point of the setting: it fills the gap where there is no owned copy
+    // to read, and never overrides a real one — in either direction.
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [owned({ material_efficiency: 3 })],
+      assumedMeForUnowned: 10,
+    });
+    expect(recipe).toMatchObject({ me: 3 });
+  });
+
+  it('assumes ME 0 when the caller supplies none, exactly as before', () => {
+    expect(materialRecipe(9840, { catalog, pi: PI, ownedBlueprints: [] })).toMatchObject({ me: 0 });
+  });
+
+  it('clamps a nonsense assumed ME into the range the engine accepts', () => {
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      assumedMeForUnowned: 99,
+    });
+    expect(recipe).toMatchObject({ me: 10 });
+  });
+
+  it('returns the schematic for a planetary commodity', () => {
+    expect(materialRecipe(2398, { catalog, pi: PI, ownedBlueprints: [] })).toEqual({
+      method: 'planetary',
+      outputQuantity: 20,
+      inputs: [{ typeID: 2267, quantity: 3000 }],
+    });
+  });
+
+  it('returns the reaction recipe for a material a reaction formula produces, with no ME (issue #460)', () => {
+    expect(materialRecipe(16667, { catalog, pi: PI, ownedBlueprints: [] })).toEqual({
+      method: 'reaction',
+      blueprint: {
+        name: 'Reinforced Carbon Fiber Reaction Formula',
+        time: 10800,
+        materials: [{ typeID: 16650, quantity: 200 }],
+        products: [{ typeID: 16667, quantity: 100 }],
+        activity: 'reaction',
+        skills: [],
+      },
+    });
+  });
+
+  it('has no recipe for a raw planetary resource — an extractor pulls it, no schematic makes it', () => {
+    expect(materialRecipe(2267, { catalog, pi: PI, ownedBlueprints: [] })).toBeNull();
+  });
+
+  it('has no recipe for a mineral', () => {
+    expect(materialRecipe(34, { catalog, pi: PI, ownedBlueprints: [] })).toBeNull();
+  });
+
+  it('falls back to blueprints alone when pi.json is unavailable', () => {
+    const sources = { catalog, pi: null, ownedBlueprints: [] };
+    expect(materialRecipe(2398, sources)).toBeNull();
+    expect(materialRecipe(9840, sources)).toMatchObject({ method: 'manufacturing' });
+  });
+});
+
+describe('recipeInputTypeIds', () => {
+  it('collects one level of recipe inputs, deduplicated', () => {
+    const ids = recipeInputTypeIds([9840, 2398, 34], { catalog, pi: PI });
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 2267]);
+  });
+
+  it('is empty when nothing in the list is produced by anything', () => {
+    expect(recipeInputTypeIds([34], { catalog, pi: PI })).toEqual([]);
+  });
+});
+
+describe('buildPlanTypeIds', () => {
+  // A plain blueprint, not from the fixture catalog: one material (2398) is a
+  // planetary schematic's output, the other (40) is manufactured and itself
+  // heads a four-hop manufacturing chain (40 <- 41 <- 42 <- 43), and the
+  // product (9840) is manufactured by fixture blueprint 9841 — so the walk
+  // below exercises the manufacturing and planetary recipe paths, and
+  // several manufacturing hops, all at once, same as `BuildPlanDetail.tsx`'s
+  // price fetch (shared via this function, issue #453 — the Compare table
+  // widens
+  // its own fetch identically).
+  const blueprint = {
+    name: 'Widening test blueprint',
+    time: 60,
+    materials: [
+      { typeID: 2398, quantity: 1 },
+      { typeID: 40, quantity: 1 },
+    ],
+    products: [{ typeID: 9840, quantity: 1 }],
+  };
+
+  it('walks the whole recipe tree, not a fixed number of levels', () => {
+    const ids = buildPlanTypeIds(blueprint, { catalog, pi: PI });
+    // 2398 (material) -> planetary input 2267.
+    // 40 (material) -> manufacturing input 41 -> 42 -> 43, four hops deep —
+    // a `buildHere` choice can now sit at any of them (docs/context/decisions),
+    // and each one needs a hub price for its own recipe's inputs.
+    // 9840 (product) -> manufacturing input 34.
+    // Every manufactured typeID reached (9840, 40, 41, 42) also pulls in its
+    // own blueprint's typeID (9841, 9843, 9844, 9845 respectively — issue
+    // #838's Blueprint Acquisition needs a hub price for the blueprint
+    // itself, not only for what it produces). 43 and 34 are raw, no
+    // blueprint of their own; 2398/2267 are planetary, not in the
+    // manufacturing catalog at all.
+    expect(ids.sort((a, b) => a - b)).toEqual([
+      34, 40, 41, 42, 43, 2267, 2398, 9840, 9841, 9843, 9844, 9845,
+    ]);
+  });
+
+  it('skips the planetary widening when pi.json is unavailable', () => {
+    const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
+    // No pi means no schematic for 2398, so 2267 never gets added — 2398
+    // itself stays, as a plain material with nothing produced beneath it.
+    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) and its
+    // blueprint typeIDs are unaffected.
+    expect(ids.sort((a, b) => a - b)).toEqual([
+      34, 40, 41, 42, 43, 2398, 9840, 9841, 9843, 9844, 9845,
+    ]);
+  });
+});
+
+describe('acquisitionForLookup', () => {
+  const ctx: SubBuildContext = {
+    facility: FACILITY_PRESETS.npcStation,
+    rigFit: ['none', 'none', 'none'],
+    security: 'highsec',
+    systemCostIndex: 0.05,
+    adjustedPrices: {},
+    modifiers: NO_CHARACTER_MODIFIERS,
+  };
+
+  it('is a no-op — always null — when the caller never configured Blueprint Acquisition', () => {
+    const acquisitionFor = acquisitionForLookup({ catalog, pi: PI, ownedBlueprints: [] });
+    expect(acquisitionFor(9840, 5, ctx, { 34: 10 })).toBeNull();
+  });
+
+  it('is null for a typeID nothing in the SDE produces (a planetary output, or a raw material)', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: {} },
+    });
+    expect(acquisitionFor(34, 5, ctx, {})).toBeNull();
+    expect(acquisitionFor(2398, 5, ctx, {})).toBeNull();
+  });
+
+  it('resolves a manufacturing node via the BPO sell-price cascade when nothing is owned and no BPC offer exists', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toMatchObject({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 777, owned: false },
+    });
+  });
+
+  it('quotes the ME the character actually owns when it is the cheapest tier', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: -1,
+          material_efficiency: 8,
+          time_efficiency: 16,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: {} },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({ me: 8, te: 16, blueprintTypeID: 9841, line: null });
+  });
+
+  it('never searches BPC Sourcing for a reaction formula — BPO-only, even when an offer would be cheaper', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: {
+        // A suspiciously cheap offer that must never be consulted for a
+        // reaction node — reaction formulas cannot be copied at all.
+        offersFor: () => [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1 }],
+        hubPrices: { 46156: 999 },
+      },
+    });
+    const result = acquisitionFor(16667, 5, ctx, { 16650: 10 });
+    expect(result).toMatchObject({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 46156,
+      line: { unitPrice: 999, owned: false },
+    });
+  });
+
+  it('honors a pilot-forced tier override over the cheapest owned tier (issue #839)', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: -1,
+          material_efficiency: 0,
+          time_efficiency: 0,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+        {
+          item_id: 2,
+          type_id: 9841,
+          runs: 10,
+          material_efficiency: 8,
+          time_efficiency: 16,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: {
+        offersFor: () => [],
+        hubPrices: {},
+        sourcing: { 9841: { acquisitionTierOverride: { me: 8, te: 16 } } },
+      },
+    });
+    // The ME0 BPO is the cheapest tier (unlimited runs, no shortfall to buy),
+    // but the pilot pinned the ME8 BPC instead — that copy's own runs cover
+    // the 5 needed, so the line reports owned/free at the pinned tier.
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toMatchObject({
+      me: 8,
+      te: 16,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+  });
+
+  it('resolves a pilot-forced tier the character owns no matching copy of — an invisible copy, priced only by overridePrice', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: {
+        offersFor: () => [],
+        hubPrices: {},
+        sourcing: { 9841: { acquisitionTierOverride: { me: 10, te: 20 } } },
+      },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({
+      me: 10,
+      te: 20,
+      blueprintTypeID: 9841,
+      line: { unitPrice: null, owned: false },
+    });
+  });
+
+  it('pools owned copies across two branches needing the same blueprint type (issue #860) — only one branch gets the free/owned line', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      // One BPC, 5 runs — enough to fully cover only one of two branches.
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: 5,
+          material_efficiency: 6,
+          time_efficiency: 12,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+
+    // Branch A calls first — 25 parts at 5 a run is 5 runs, which the owned
+    // copy fully covers. `needed` is units, never runs.
+    const branchA = acquisitionFor(9840, 25, ctx, { 34: 10 });
+    expect(branchA).toMatchObject({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+
+    // Branch B needs the same 5 runs of the same blueprint type — the owned
+    // copy is already claimed by Branch A, so Branch B must fall back to the
+    // BPO sell-price cascade instead of also reporting itself as free.
+    const branchB = acquisitionFor(9840, 25, ctx, { 34: 10 });
+    expect(branchB).toMatchObject({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 777, owned: false },
+    });
+
+    // Branch B bought the BPO, so a third branch builds with it for free.
+    expect(acquisitionFor(9840, 25, ctx, { 34: 10 })?.line).toBeNull();
+  });
+
+  it('counts the runs a node needs, not its units, against an owned copy', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      // 2 runs: covers 10 parts at 5 a run, which a units-as-runs count would miss.
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: 2,
+          material_efficiency: 6,
+          time_efficiency: 12,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+    expect(acquisitionFor(9840, 10, ctx, { 34: 10 })?.line).toMatchObject({
+      unitPrice: 0,
+      owned: true,
+    });
+  });
+
+  it('does not pool across two different acquisitionForLookup closures (unrelated resolution passes)', () => {
+    const owned = [
+      {
+        item_id: 1,
+        type_id: 9841,
+        runs: 5,
+        material_efficiency: 6,
+        time_efficiency: 12,
+        quantity: 1,
+        location_id: 1,
+        location_flag: 'Hangar',
+      },
+    ] as const;
+    const sources = {
+      catalog,
+      pi: PI,
+      ownedBlueprints: owned,
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    };
+
+    // Two independent plan resolutions (e.g. two separate build plans) each
+    // get their own closure and must each see the full owned stock.
+    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toMatchObject({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toMatchObject({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+  });
+
+  it("cloneBlueprintPools lets two independent closures share the top-level claim without sharing each other's further claims (Group Owned Overlay, issue #860)", () => {
+    const sources = {
+      catalog,
+      pi: PI,
+      // One BPC, 10 runs — the top-level claim only takes 3, leaving 7 for
+      // whatever nested resolution each pass runs on its own.
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: 10,
+          material_efficiency: 6,
+          time_efficiency: 12,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    };
+
+    const sharedPools: BlueprintTierPools = new Map();
+    const forTopLevel = acquisitionForLookup(sources, sharedPools);
+    // The top-level product's own claim — resolved once, shared by both a
+    // real pass and a Group Owned Overlay pass.
+    const topLevel = forTopLevel(9840, 3, ctx, { 34: 10 });
+    expect(topLevel).toMatchObject({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+
+    // Two independent nested-resolution passes, each seeded from the state
+    // right after the top-level claim above (7 runs remaining) — never from
+    // each other.
+    const poolsForPassA = cloneBlueprintPools(sharedPools);
+    const poolsForPassB = cloneBlueprintPools(sharedPools);
+    const forPassA = acquisitionForLookup(sources, poolsForPassA);
+    const forPassB = acquisitionForLookup(sources, poolsForPassB);
+
+    // Pass A's own nested node claims all 7 remaining runs.
+    expect(forPassA(9840, 7, ctx, { 34: 10 })).toMatchObject({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+
+    // Pass B's own nested node needs the same 7 runs — if the pools were
+    // shared, Pass A's claim above would have already drained them and Pass
+    // B would wrongly see a shortfall. Isolated pools mean Pass B still sees
+    // its own full 7 remaining.
+    expect(forPassB(9840, 7, ctx, { 34: 10 })).toMatchObject({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+  });
+});

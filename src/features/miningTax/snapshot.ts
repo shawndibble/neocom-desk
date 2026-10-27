@@ -1,0 +1,197 @@
+/**
+ * Composes the Moon Mining Tax ledger's one page (issue #523): every tracked
+ * character's Mining Ledger Entries, joined against their Payees and
+ * Assignments, re-diffed for `needs-review` on the way in.
+ */
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import { loadAllCharacterLedgers } from './ledger';
+import { recordLedgerArrivals } from './oreArrivalLog';
+import { loadPayees } from './payees';
+import { loadAssignments } from './assignments';
+import { reconcileAssignments } from './reconcile';
+import { applySurveyConnections } from './surveyConnections';
+import { readCompressedOre } from './oreForm';
+import { repriceForOreForm } from './oreFormReprice';
+import { coalesceAssignments } from './coalesce';
+import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
+import { entryFromAssignments } from '@/engine/miningTax/assignmentEntry';
+import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
+
+export interface MoonMiningTaxRow {
+  characterId: number;
+  characterName: string;
+  entry: MiningLedgerEntry;
+  /** Assignments covering some or all of this entry's ore — 0, 1 (the common case), or 2+ for a split. */
+  assignments: MiningTaxAssignmentRecord[];
+  /** Ore this entry's assignments don't yet cover. */
+  unassignedOreLines: MiningLedgerEntry['oreLines'];
+  /** Assignments that look like one obligation stored twice over this entry — see `findDuplicateAssignmentIds`. Empty for a healthy row. */
+  duplicateAssignmentIds?: string[];
+}
+
+export interface UnclassifiedOre {
+  characterId: number;
+  characterName: string;
+  typeIds: number[];
+}
+
+export interface TrackedCharacter {
+  characterId: number;
+  characterName: string;
+}
+
+export interface MoonMiningTaxSnapshot {
+  rows: MoonMiningTaxRow[];
+  /**
+   * Every tracked character, regardless of whether it has any Mining Ledger
+   * Entries this refresh — the Characters filter and Manage Payees need the
+   * whole roster, not just whoever happens to have mined moon goo lately, or
+   * a character with zero entries this cycle is invisible to both.
+   */
+  characters: TrackedCharacter[];
+  payeesByCharacter: Map<number, PayeeRecord[]>;
+  unclassified: UnclassifiedOre[];
+  /**
+   * Tracked characters whose ledger read needed a re-login this refresh —
+   * per character, not one flag OR'd across all of them, so a single lapsed
+   * alt's obligation cannot go missing behind the other characters' data
+   * looking fine (GLOSSARY.md: "the point of the feature is not missing an
+   * alt's obligation").
+   */
+  reauthCharacters: TrackedCharacter[];
+  /** Oldest `fetchedAt` among characters with cached data — the page's Data Age badge is only as fresh as its stalest character. */
+  fetchedAt: Date | null;
+  /** True when every ledger read was cache-only (offline). */
+  fromCache: boolean;
+}
+
+export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot> {
+  // Hydrates the Ore Form setting before anything below prices or re-prices.
+  await readCompressedOre();
+  const ledgers = await loadAllCharacterLedgers();
+  // Settle up's "Ore still arriving" line reads growth between loads.
+  await recordLedgerArrivals(ledgers);
+
+  // Before reconcile, not after: reconcile's growth diff is defined per
+  // Mining Ledger Entry over the Assignments covering it, so it has to see
+  // one fused record rather than two halves of the same obligation. Needs no
+  // ledger of its own — it only ever compares stored Assignments with each
+  // other. The fresh entries are passed only so it can tell a split day from
+  // an exact duplicate (and leave an unverifiable pair alone).
+  await Promise.all(
+    ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries))
+  );
+
+  // Before reconcile too: a connected moon Survey's ore must become its own
+  // Assignment (the entry's growth collector) before reconcile folds it into
+  // an earlier moon's Assignment on the same day and system.
+  await applySurveyConnections(ledgers).catch(() => []);
+
+  await Promise.all(
+    ledgers
+      .filter((ledger) => ledger.entries.length > 0)
+      .map((ledger) => reconcileAssignments(ledger.characterId, ledger.entries))
+  );
+
+  // Not gated on a non-empty ledger: it works from stored Assignments alone.
+  await Promise.all(ledgers.map((ledger) => repriceForOreForm(ledger.characterId)));
+
+  const rows: MoonMiningTaxRow[] = [];
+  const characters: TrackedCharacter[] = ledgers.map((ledger) => ({
+    characterId: ledger.characterId,
+    characterName: ledger.characterName,
+  }));
+  const payeesByCharacter = new Map<number, PayeeRecord[]>();
+  const unclassified: UnclassifiedOre[] = [];
+  const reauthCharacters: TrackedCharacter[] = [];
+  let fetchedAt: Date | null = null;
+  let fromCache = ledgers.length > 0;
+
+  // Payees + Assignments reads are fanned out across every character at once
+  // (Dexie reads, not ESI — no fan-out cap needed) rather than one character
+  // awaited at a time, matching `ledger.ts`'s own fan-out for the ESI half.
+  const [payeesByLedger, assignmentsByLedger] = await Promise.all([
+    Promise.all(ledgers.map((ledger) => loadPayees(ledger.characterId))),
+    // Reloaded after reconcile so a fresh needs-review flip is reflected.
+    Promise.all(ledgers.map((ledger) => loadAssignments(ledger.characterId))),
+  ]);
+
+  ledgers.forEach((ledger, index) => {
+    if (ledger.needsReauth) {
+      reauthCharacters.push({
+        characterId: ledger.characterId,
+        characterName: ledger.characterName,
+      });
+    }
+    if (ledger.fetchedAt && (!fetchedAt || ledger.fetchedAt < fetchedAt))
+      fetchedAt = ledger.fetchedAt;
+    if (!ledger.fromCache) fromCache = false;
+    if (ledger.unclassifiedTypeIds.length > 0) {
+      unclassified.push({
+        characterId: ledger.characterId,
+        characterName: ledger.characterName,
+        typeIds: ledger.unclassifiedTypeIds,
+      });
+    }
+
+    payeesByCharacter.set(ledger.characterId, payeesByLedger[index]);
+    const assignments = assignmentsByLedger[index];
+
+    // One pass instead of a scan of every Assignment per entry.
+    const byDaySystem = new Map<string, MiningTaxAssignmentRecord[]>();
+    for (const a of assignments) {
+      const key = `${a.date}|${String(a.solarSystemId)}`;
+      const bucket = byDaySystem.get(key);
+      if (bucket) bucket.push(a);
+      else byDaySystem.set(key, [a]);
+    }
+
+    for (const entry of ledger.entries) {
+      const covering = byDaySystem.get(`${entry.date}|${String(entry.solarSystemId)}`) ?? [];
+      rows.push({
+        characterId: ledger.characterId,
+        characterName: ledger.characterName,
+        entry,
+        assignments: covering,
+        unassignedOreLines: computeOwnership(entry.oreLines, covering).unassigned,
+        duplicateAssignmentIds: findDuplicateAssignmentIds(entry.oreLines, covering),
+      });
+    }
+
+    // ESI only returns ~30 days, so an Assignment can outlive its entry (or
+    // its character's ledger read can fail with nothing cached). Its row
+    // stays, rebuilt from the Assignments' own stored ore, so the bill neither
+    // vanishes from the table nor drops out of the Owed balances.
+    const freshKeys = new Set(
+      ledger.entries.map((e) => entryKey(ledger.characterId, e.date, e.solarSystemId))
+    );
+    const agedOut = new Map<string, MiningTaxAssignmentRecord[]>();
+    for (const a of assignments) {
+      const key = entryKey(a.characterId, a.date, a.solarSystemId);
+      if (freshKeys.has(key)) continue;
+      const group = agedOut.get(key);
+      if (group) group.push(a);
+      else agedOut.set(key, [a]);
+    }
+    for (const covering of agedOut.values()) {
+      const { date, solarSystemId } = covering[0];
+      rows.push({
+        characterId: ledger.characterId,
+        characterName: ledger.characterName,
+        entry: entryFromAssignments(ledger.characterId, date, solarSystemId, covering),
+        assignments: covering,
+        unassignedOreLines: [],
+      });
+    }
+  });
+
+  return {
+    rows,
+    characters,
+    payeesByCharacter,
+    unclassified,
+    reauthCharacters,
+    fetchedAt,
+    fromCache,
+  };
+}

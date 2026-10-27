@@ -1,0 +1,276 @@
+import { describe, expect, it } from 'vitest';
+import type { LoadParts, LoadWarning } from './load';
+import type { FittingModule, FittingSlotKind } from './types';
+import {
+  classifyFitCurrency,
+  gameItemLookup,
+  partitionByCurrency,
+  type FitCurrency,
+  type HullSlotCounts,
+} from './fitCurrency';
+
+/** The game's names don't matter to a test that leaves none unread; with them unknown, an unread item is removed. */
+const NO_GAME_NAMES = () => false;
+
+const VEXOR: HullSlotCounts = { high: 4, medium: 4, low: 5, rig: 3 };
+
+function modules(rack: FittingSlotKind, count: number, typeId = 100): FittingModule[] {
+  return Array.from({ length: count }, (_, slotIndex) => ({
+    slot: rack,
+    slotIndex,
+    typeId,
+    state: 'active' as const,
+  }));
+}
+
+function parts(fitted: FittingModule[], unresolved: LoadWarning[] = []): LoadParts {
+  return { hullTypeId: 626, modules: fitted, drones: [], cargo: [], unresolved };
+}
+
+describe('classifyFitCurrency', () => {
+  it('a fit that loads clean and fits the hull is current', () => {
+    const fit = parts([...modules('high', 4), ...modules('medium', 4), ...modules('low', 5)]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
+  });
+
+  it('a fit naming an item the game data no longer has is out of date, naming it', () => {
+    const fit = parts(modules('high', 2), [
+      { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+      { text: 'Old Ammo', reason: 'unknown item', kind: 'unknown-item' },
+    ]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [
+        { kind: 'removed-item', name: 'Old Gun I' },
+        { kind: 'removed-item', name: 'Old Ammo' },
+      ],
+    });
+  });
+
+  it('names a removed item once however many times the fit uses it', () => {
+    const fit = parts(
+      [],
+      [
+        { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+        { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+      ]
+    );
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+    });
+  });
+
+  describe('an item the game still has, though the loader did not resolve it', () => {
+    // Real names the Workbench flagged as removed: Abyssal filaments and Agency
+    // boosters (cargo, booster section) and a mutated module (fitted in a rack).
+    const STILL_IN_GAME = [
+      'Fierce Exotic Filament',
+      'Cataclysmic Electrical Filament',
+      'Raging Gamma Filament',
+      'Agitated Exotic Filament',
+      'Calm Exotic Filament',
+      'Tranquil Exotic Filament',
+      "Agency 'Hardshell' TB5 Dose II",
+      "Agency 'Overclocker' SB3 Dose I",
+      'Large Abyssal Shield Extender',
+    ];
+    const isGameItem = gameItemLookup([...STILL_IN_GAME, 'Gila']);
+    const unknown = (text: string): LoadWarning => ({
+      text,
+      reason: 'unknown item',
+      kind: 'unknown-item',
+    });
+
+    it.each(STILL_IN_GAME)('%s is never a removed item', (name) => {
+      const fit = parts(modules('high', 2), [unknown(name)]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('a fit whose only unresolved lines are filaments, boosters and an Abyssal module is current', () => {
+      const fit = parts([], STILL_IN_GAME.map(unknown));
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('matches the game’s names ignoring case, as the loader does', () => {
+      const fit = parts([], [unknown('large abyssal SHIELD extender')]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({ current: true });
+    });
+
+    it('a name the game does not have is still a removed item beside them', () => {
+      const fit = parts([], [unknown('Fierce Exotic Filament'), unknown('Old Gun I')]);
+      expect(classifyFitCurrency(fit, VEXOR, isGameItem)).toEqual({
+        current: false,
+        reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+      });
+    });
+
+    it('a hull is judged by the loader alone, as before', () => {
+      const fit: LoadParts = {
+        hullTypeId: null,
+        unresolved: [{ text: 'Gila', reason: 'unknown ship', kind: 'unknown-ship' }],
+      };
+      expect(classifyFitCurrency(fit, null, isGameItem)).toEqual({
+        current: false,
+        reasons: [{ kind: 'unknown-hull', name: 'Gila' }],
+      });
+    });
+  });
+
+  it('a hull the game data no longer has is out of date', () => {
+    const fit: LoadParts = {
+      hullTypeId: null,
+      unresolved: [{ text: 'Old Hull', reason: 'unknown ship', kind: 'unknown-ship' }],
+    };
+    expect(classifyFitCurrency(fit, null, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [{ kind: 'unknown-hull', name: 'Old Hull' }],
+    });
+  });
+
+  it('more modules in a rack than the hull has slots is out of date, naming the rack', () => {
+    const fit = parts([...modules('high', 5), ...modules('rig', 4), ...modules('low', 5)]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [
+        { kind: 'lost-slots', rack: 'high' },
+        { kind: 'lost-slots', rack: 'rig' },
+      ],
+    });
+  });
+
+  it("the loader's own too-many-slots warning is a lost-slots reason too, once per rack", () => {
+    const fit = parts(modules('medium', 4), [
+      {
+        text: 'Warp Scrambler II',
+        reason: 'too many medium slots',
+        kind: 'too-many-slots',
+        rack: 'medium',
+      },
+      {
+        text: 'Warp Disruptor II',
+        reason: 'too many medium slots',
+        kind: 'too-many-slots',
+        rack: 'medium',
+      },
+    ]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [{ kind: 'lost-slots', rack: 'medium' }],
+    });
+  });
+
+  it("reads each warning's kind, never its displayed wording", () => {
+    const fit = parts(modules('medium', 4), [
+      { text: 'Old Gun I', reason: 'reworded', kind: 'unknown-item' },
+      { text: 'Warp Disruptor II', reason: 'reworded', kind: 'too-many-slots', rack: 'medium' },
+    ]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [
+        { kind: 'removed-item', name: 'Old Gun I' },
+        { kind: 'lost-slots', rack: 'medium' },
+      ],
+    });
+
+    const hull: LoadParts = {
+      hullTypeId: null,
+      unresolved: [{ text: 'Old Hull', reason: 'reworded', kind: 'unknown-ship' }],
+    };
+    expect(classifyFitCurrency(hull, null, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [{ kind: 'unknown-hull', name: 'Old Hull' }],
+    });
+  });
+
+  it('lists every reason: removed items first, then racks', () => {
+    const fit = parts(modules('high', 6), [
+      { text: 'Old Gun I', reason: 'unknown item', kind: 'unknown-item' },
+    ]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({
+      current: false,
+      reasons: [
+        { kind: 'removed-item', name: 'Old Gun I' },
+        { kind: 'lost-slots', rack: 'high' },
+      ],
+    });
+  });
+
+  it('never reads CPU, powergrid or calibration: an overloaded fit that fits its racks is current', () => {
+    // Ten Large Shield Extenders' worth of powergrid in four mid slots is still
+    // four modules in four slots — skills and implants decide the budget.
+    const fit = parts(modules('medium', 4, 3841));
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
+  });
+
+  it('badly written text is not out of date: the game did not change', () => {
+    const fit = parts(modules('high', 1), [
+      { line: 3, text: '%%%', reason: 'unparseable item line', kind: 'parse-error' },
+    ]);
+    expect(classifyFitCurrency(fit, VEXOR, NO_GAME_NAMES)).toEqual({ current: true });
+
+    // A missing header leaves no hull name to call removed.
+    const headerless: LoadParts = {
+      hullTypeId: null,
+      unresolved: [
+        { text: 'Gun', reason: 'invalid or missing fit header', kind: 'parse-error' },
+        { text: '', reason: 'unknown ship', kind: 'unknown-ship' },
+      ],
+    };
+    expect(classifyFitCurrency(headerless, null, NO_GAME_NAMES)).toEqual({ current: true });
+  });
+
+  it('without the hull’s slot counts, racks are not counted', () => {
+    expect(classifyFitCurrency(parts(modules('high', 8)), null, NO_GAME_NAMES)).toEqual({
+      current: true,
+    });
+  });
+
+  it('a Tech 3 cruiser’s high, mid and low racks are not counted: its subsystems set them', () => {
+    const t3: HullSlotCounts = { high: 0, medium: 0, low: 0, rig: 3 };
+    const fit = parts([
+      ...modules('subsystem', 4),
+      ...modules('high', 6),
+      ...modules('medium', 5),
+      ...modules('low', 4),
+      ...modules('rig', 3),
+    ]);
+    expect(classifyFitCurrency(fit, t3, NO_GAME_NAMES)).toEqual({ current: true });
+    // Its rigs still are.
+    expect(
+      classifyFitCurrency(parts([...modules('high', 6), ...modules('rig', 4)]), t3, NO_GAME_NAMES)
+    ).toEqual({
+      current: false,
+      reasons: [{ kind: 'lost-slots', rack: 'rig' }],
+    });
+  });
+});
+
+describe('partitionByCurrency', () => {
+  const a = { id: 'a' };
+  const b = { id: 'b' };
+  const c = { id: 'c' };
+  const outOfDate: FitCurrency = {
+    current: false,
+    reasons: [{ kind: 'removed-item', name: 'Old Gun I' }],
+  };
+
+  it('splits fits into current and out of date, keeping each side in order', () => {
+    const verdicts = new Map<string, FitCurrency>([
+      ['a', outOfDate],
+      ['b', { current: true }],
+      ['c', { current: true }],
+    ]);
+    expect(partitionByCurrency([a, b, c], verdicts)).toEqual({
+      current: [b, c],
+      outOfDate: [{ fit: a, reasons: outOfDate.reasons }],
+    });
+  });
+
+  it('a fit without a verdict counts as current', () => {
+    expect(partitionByCurrency([a, b], new Map([['b', outOfDate]]))).toEqual({
+      current: [a],
+      outOfDate: [{ fit: b, reasons: outOfDate.reasons }],
+    });
+  });
+});

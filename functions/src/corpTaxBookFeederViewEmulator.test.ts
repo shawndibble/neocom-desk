@@ -1,0 +1,987 @@
+// The moon owner's view against the Firestore emulator (issue #4512, spec #4504).
+// Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { HttpsError } from 'firebase-functions/v2/https';
+import { parseTurnOnInput } from './corpTaxBook.js';
+import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
+import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
+import {
+  getFeederStatus,
+  leaveFeeder,
+  saveFeederGrant,
+  type FeederGrantDeps,
+} from './corpTaxBookFeederGrant.js';
+import {
+  dismissFeederHistory,
+  getFeederViewAccess,
+  requestFeederRate,
+} from './corpTaxBookFeederViewCalls.js';
+import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
+import type { FeederViewSummary } from './corpTaxBookFeederView.js';
+import {
+  applyFeederPayoutPlan,
+  markFeederPayout,
+  planFeederPayouts,
+  reconcileFeederPayoutsCall,
+  recordFeederPayout,
+} from './corpTaxBookFeederPayouts.js';
+import { outgoingDonationsFromJournal } from './corpTaxBookEngine.js';
+import { createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
+import {
+  learnRefinerySystems,
+  setOwnRefineryLabel,
+  setRefineryLabel,
+} from './corpTaxBookRefineryLabels.js';
+import { mergeObservedInto, turnOnBook, type BookDeps } from './corpTaxBookStore.js';
+import { rebuildFeederView } from './corpTaxBookFeederView.js';
+import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
+
+const COLLECTOR = 98000001;
+const FEEDER = 98000002;
+const T0 = Date.parse('2026-10-18T12:00:00Z');
+const KEY = Buffer.alloc(32, 7);
+const COLLECTOR_CEO = 1;
+const PLAYER = 11; // the signed-in player
+const ALT = 12; // the Accountant alt that logs in for the mining scope
+const FEEDER_DIRECTOR = 13;
+const FEEDER_NOBODY = 14;
+const FEEDER_JUNIOR = 15;
+const COLLECTOR_JUNIOR = 16;
+
+const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+const suite = runnable ? describe : describe.skip;
+
+let db: Firestore;
+let ledger: 'ok' | 'forbidden' = 'ok';
+/** The accounting corporation's wallet journal, as ESI returns it. */
+let journalRows: unknown[] = [];
+const revoked: string[] = [];
+const identities = new Map<number, CorpIdentity>();
+
+const ok = <T>(data: T): EsiRead<T> => ({
+  kind: 'ok',
+  data,
+  fetchedAt: new Date(T0).toISOString(),
+  truncated: false,
+});
+const esi = (): SyncEsi =>
+  ({
+    observers: async () => (ledger === 'forbidden' ? { kind: 'forbidden' } : ok([4001])),
+    ledger: async () =>
+      ok([
+        {
+          character_id: 900,
+          recorded_corporation_id: 3,
+          type_id: 45490,
+          quantity: 100,
+          last_updated: '2026-10-18',
+        },
+      ]),
+    journal: async () => ok(journalRows),
+    structure: async () => ({ kind: 'unavailable' }),
+    budgetLow: () => false,
+  }) as unknown as SyncEsi;
+
+const deps = (): FeederGrantDeps => ({
+  db,
+  now: () => T0,
+  key: () => KEY,
+  verify: async (token) => {
+    const m = /^(mine|roles)-(\d+)$/.exec(token);
+    if (!m) throw new Error('bad token');
+    const id = Number(m[2]);
+    return {
+      characterId: id,
+      ownerHash: `h${id}`,
+      name: `Pilot ${id}`,
+      scopes: m[1] === 'mine' ? [...FEEDER_SYNC_SCOPES] : [ROLES_SCOPE],
+      clientId: 'c',
+    };
+  },
+  refresh: async (_c, refreshToken) => {
+    const id = Number(/^rt-(\d+)$/.exec(refreshToken)?.[1]);
+    return { accessToken: `mine-${id}`, refreshToken };
+  },
+  revoke: async (_c, refreshToken) => {
+    revoked.push(refreshToken);
+  },
+  readIdentity: async (id) => {
+    const identity = identities.get(id);
+    if (!identity) throw new Error('no identity');
+    return identity;
+  },
+  // Every type: 10 ISK buy at Jita 4-4 on the day the ledger row is dated.
+  openPrices: async () => ({
+    dates: ['2026-10-18'],
+    stations: { '60003760': { buy: [10], sell: [null] } },
+  }),
+  log: () => undefined,
+  esi: esi(),
+  lookupCorporation: async () => FEEDER,
+});
+const bookDeps = (): BookDeps => {
+  const d = deps();
+  return {
+    db,
+    now: d.now,
+    verifyToken: d.verify,
+    readIdentity: d.readIdentity,
+    openPrices: d.openPrices,
+  };
+};
+/** ESI's universe/names stand-in: player corporations are 98xxxxxx, id 5 is nobody. */
+const idCategory = async (id: number) =>
+  id === 5 ? undefined : id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character';
+const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
+const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
+const feederRecord = async () =>
+  (await collectorBook().collection('feeders').doc(String(FEEDER)).get()).data() as
+    FeederRecord | undefined;
+const pointer = async () =>
+  (await db.collection('corpTaxBookFeederOf').doc(String(FEEDER)).get()).data();
+async function reason(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (err) {
+    expect(err).toBeInstanceOf(HttpsError);
+    return String(((err as HttpsError).details as { reason?: string } | undefined)?.reason);
+  }
+  throw new Error('expected the call to fail');
+}
+
+if (runnable) {
+  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
+  db = getFirestore();
+}
+
+async function clearEmulator(): Promise<void> {
+  await fetch(
+    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
+    { method: 'DELETE' }
+  );
+}
+
+const newInvite = async () =>
+  (
+    await createFeederInvite(bookDeps(), who(COLLECTOR_CEO), {
+      corporationId: COLLECTOR,
+      accessToken: `roles-${COLLECTOR_CEO}`,
+    })
+  ).code;
+const save = (code: string, requestedRatePct?: number) =>
+  saveFeederGrant(deps(), who(PLAYER), {
+    code,
+    accessToken: `mine-${ALT}`,
+    refreshToken: `rt-${ALT}`,
+    ...(requestedRatePct !== undefined ? { requestedRatePct } : {}),
+  });
+
+const viewRef = () => collectorBook().collection('feederViews').doc(String(FEEDER));
+const summary = async () => (await viewRef().get()).data() as FeederViewSummary | undefined;
+const asDirector = { corporationId: FEEDER, accessToken: `roles-${FEEDER_DIRECTOR}` };
+
+suite('moon owner view', () => {
+  beforeEach(async () => {
+    await clearEmulator();
+    ledger = 'ok';
+    revoked.length = 0;
+    identities.clear();
+    identities.set(COLLECTOR_CEO, { corporationId: COLLECTOR, ceoId: COLLECTOR_CEO, roles: [] });
+    identities.set(FEEDER_DIRECTOR, { corporationId: FEEDER, ceoId: null, roles: ['Director'] });
+    identities.set(FEEDER_NOBODY, { corporationId: FEEDER, ceoId: null, roles: [] });
+    identities.set(COLLECTOR_JUNIOR, {
+      corporationId: COLLECTOR,
+      ceoId: COLLECTOR_CEO,
+      roles: ['Junior_Accountant'],
+    });
+    identities.set(FEEDER_JUNIOR, {
+      corporationId: FEEDER,
+      ceoId: null,
+      roles: ['Junior_Accountant'],
+    });
+    await turnOnBook(
+      bookDeps(),
+      who(COLLECTOR_CEO),
+      parseTurnOnInput({
+        corporationId: COLLECTOR,
+        accessToken: `roles-${COLLECTOR_CEO}`,
+        startDate: '2026-10-01',
+        startRatePct: 10,
+      })
+    );
+  });
+
+  it('builds the view when the first pull lands, with the grant-time rate', async () => {
+    await save(await newInvite(), 6);
+    expect(await summary()).toMatchObject({
+      schemaVersion: 1,
+      status: 'active',
+      requestedRatePct: 6,
+      effectiveRatePct: 6,
+      minedVolume: 100,
+      minedValueIsk: 1000,
+      refineryCount: 1,
+    });
+    const days = await viewRef().collection('days').get();
+    expect(days.docs.map((d) => d.id)).toEqual(['2026-10-18']);
+    expect(JSON.stringify(days.docs.map((d) => d.data()))).not.toMatch(/minerRate|margin/);
+  });
+
+  describe('feeder rollup', () => {
+    const mirror = () => collectorBook().collection('feederObserved');
+    const ROW = {
+      structureId: 4001,
+      characterId: 900,
+      recordedCorporationId: 3,
+      typeId: 45490,
+      date: '2026-10-18',
+      quantity: 100,
+      cachedAt: new Date(T0).toISOString(),
+      sourceCorporationId: FEEDER,
+    };
+    const stable = async () => {
+      const rest = { ...((await summary()) as FeederViewSummary), builtAt: 0 };
+      return rest;
+    };
+    const status = () => getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector);
+
+    it('a backfilled read and a mirror read build the same view and status', async () => {
+      await save(await newInvite(), 6);
+      const first = await stable();
+      const firstStatus = await status();
+      expect((await mirror().doc(`ready_${FEEDER}`).get()).exists).toBe(true);
+
+      // Back to a feeder from before the mirror: no documents, no marker.
+      await db.recursiveDelete(mirror());
+      expect((await mirror().get()).empty).toBe(true);
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect(await stable()).toEqual(first);
+      expect(await status()).toEqual(firstStatus);
+      expect((await mirror().doc(`ready_${FEEDER}`).get()).exists).toBe(true);
+
+      // Now served from the mirror alone.
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect(await stable()).toEqual(first);
+    });
+
+    it('follows a row that grows and one that leaves the feeder', async () => {
+      await save(await newInvite(), 6);
+      await mergeObservedInto(bookDeps(), COLLECTOR, [{ ...ROW, quantity: 150 }]);
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect((await summary())?.minedVolume).toBe(150);
+
+      // The book's own sync later records the same row without a feeder.
+      const own: Partial<typeof ROW> = { ...ROW, quantity: 200 };
+      delete own.sourceCorporationId;
+      await mergeObservedInto(bookDeps(), COLLECTOR, [own as typeof ROW]);
+      await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+      expect((await summary())?.minedVolume).toBe(0);
+    });
+  });
+
+  it('skips every write when a rebuild changes nothing (#5241)', async () => {
+    await save(await newInvite(), 6);
+    const first = await summary();
+    expect(first?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    const day = viewRef().collection('days').doc('2026-10-18');
+    const dayBefore = (await day.get()).updateTime;
+    await rebuildFeederView(bookDeps(), COLLECTOR, FEEDER);
+    expect(await summary()).toEqual(first);
+    expect((await day.get()).updateTime).toEqual(dayBefore);
+  });
+
+  it('writes no view for a refused first pull', async () => {
+    ledger = 'forbidden';
+    await reason(save(await newInvite(), 6));
+    expect((await viewRef().get()).exists).toBe(false);
+  });
+
+  it('access: a Director gets a 24h record; a junior accountant and a nobody are refused', async () => {
+    await save(await newInvite());
+    const out = await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector);
+    expect(out).toEqual({
+      collectorCorporationId: COLLECTOR,
+      expiresAt: T0 + 24 * 3_600_000,
+      canEdit: true,
+    });
+    const record = (
+      await viewRef().collection('viewers').doc(`char:${FEEDER_DIRECTOR}`).get()
+    ).data();
+    expect(record).toMatchObject({
+      uid: `char:${FEEDER_DIRECTOR}`,
+      ownerHash: `h${FEEDER_DIRECTOR}`,
+      corporationId: FEEDER,
+      canView: true,
+      expiresAt: T0 + 24 * 3_600_000,
+    });
+    // never an officers doc: that would unlock the raw book
+    expect(
+      (await collectorBook().collection('officers').doc(`char:${FEEDER_DIRECTOR}`).get()).exists
+    ).toBe(false);
+    for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY]) {
+      expect(
+        await reason(
+          getFeederViewAccess(deps(), who(id), {
+            corporationId: FEEDER,
+            accessToken: `roles-${id}`,
+          })
+        )
+      ).toBe('not-your-feeder');
+    }
+  });
+
+  it('access: rebuilds a view that is absent', async () => {
+    await save(await newInvite());
+    await viewRef().delete();
+    await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector);
+    expect((await summary())?.minedVolume).toBe(100);
+  });
+
+  it('access: refuses a corporation that never fed a book', async () => {
+    expect(await reason(getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector))).toBe(
+      'not-your-feeder'
+    );
+  });
+
+  it('request rate: records a requested entry, and an agreed rate keeps winning', async () => {
+    await save(await newInvite(), 6);
+    await requestFeederRate(deps(), who(FEEDER_DIRECTOR), { ...asDirector, pct: 7 });
+    expect(await summary()).toMatchObject({ requestedRatePct: 7, effectiveRatePct: 7 });
+    expect((await feederRecord())?.ownerRateHistory?.map((e) => e.pct)).toEqual([6, 7]);
+
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .update({
+        agreedRatePct: 9,
+        ownerRateHistory: [
+          ...((await feederRecord())?.ownerRateHistory ?? []),
+          {
+            kind: 'agreed',
+            pct: 9,
+            effectiveFrom: '2026-10-18',
+            recordedAt: '2026-10-18T00:00:00.000Z',
+          },
+        ],
+      });
+    await requestFeederRate(deps(), who(FEEDER_DIRECTOR), { ...asDirector, pct: 5 });
+    expect(await summary()).toMatchObject({
+      requestedRatePct: 5,
+      agreedRatePct: 9,
+      effectiveRatePct: 9,
+    });
+    const audit = await collectorBook().collection('audit').get();
+    expect(audit.docs.filter((d) => d.get('action') === 'feederRateRequested')).toHaveLength(2);
+  });
+
+  it('request rate: refuses someone without standing', async () => {
+    await save(await newInvite());
+    expect(
+      await reason(
+        requestFeederRate(deps(), who(FEEDER_JUNIOR), {
+          corporationId: FEEDER,
+          accessToken: `roles-${FEEDER_JUNIOR}`,
+          pct: 5,
+        })
+      )
+    ).toBe('not-your-feeder');
+  });
+
+  it('payee: the moon owner sets it, stamped and in the view, and names whom to tell (#4653)', async () => {
+    await save(await newInvite());
+    const payee = { kind: 'character' as const, id: 77 };
+    const out = await setFeederPayee(
+      deps(),
+      who(FEEDER_DIRECTOR),
+      { ...asDirector, payee, notify: true },
+      idCategory
+    );
+    // The accounting corporation's officers with book access hear about it.
+    expect(out).toEqual({ ok: true, changed: true, at: T0, recipients: [COLLECTOR_CEO] });
+    const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
+    expect(rec?.payee).toEqual(payee);
+    expect(rec?.payeeChangedAt).toBe(T0);
+    expect(rec?.payeeHistory).toEqual([{ payee, from: T0 }]);
+    expect(rec?.payeeSetBy).toEqual({ side: 'moon-owner', characterId: FEEDER_DIRECTOR, at: T0 });
+    expect(await summary()).toMatchObject({ payee, payeeSetBy: { side: 'moon-owner', at: T0 } });
+    const audit = await collectorBook().collection('audit').get();
+    const set = audit.docs.filter((d) => d.get('action') === 'feederPayeeSet');
+    expect(set).toHaveLength(1);
+    expect(set[0]!.get('detail')).toMatchObject({ payee, side: 'moon-owner' });
+  });
+
+  describe('payee from the accounting side (#4653)', () => {
+    const FEEDER_CEO = 20;
+    const PAYEE_CORP = 98000009;
+    const PAYEE_CORP_CEO = 21;
+    const ceoDeps = (): BookDeps => ({
+      ...bookDeps(),
+      corporationCeo: async (id) =>
+        id === FEEDER ? FEEDER_CEO : id === PAYEE_CORP ? PAYEE_CORP_CEO : undefined,
+    });
+    const asCollector = (id = COLLECTOR_CEO) => ({
+      corporationId: COLLECTOR,
+      accessToken: `roles-${id}`,
+      feederCorporationId: FEEDER,
+    });
+
+    it('an officer sets it; both sides stamp it the same way and the last edit wins', async () => {
+      await save(await newInvite());
+      const corp = { kind: 'corporation' as const, id: PAYEE_CORP };
+      const out = await setBookFeederPayee(
+        ceoDeps(),
+        who(COLLECTOR_CEO),
+        { ...asCollector(), payee: corp, notify: true },
+        idCategory
+      );
+      // The moon owner's CEO, the old payee (none: the corporation itself) and the new one's CEO.
+      expect(out).toEqual({
+        ok: true,
+        changed: true,
+        at: T0,
+        recipients: [FEEDER_CEO, PAYEE_CORP_CEO],
+      });
+      let rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
+      expect(rec?.payee).toEqual(corp);
+      expect(rec?.payeeChangedAt).toBe(T0);
+      expect(rec?.payeeHistory).toEqual([{ payee: corp, from: T0 }]);
+      expect(rec?.payeeSetBy).toEqual({ side: 'accounting', characterId: COLLECTOR_CEO, at: T0 });
+      expect(await summary()).toMatchObject({
+        payee: corp,
+        payeeSetBy: { side: 'accounting', at: T0 },
+      });
+
+      const player = { kind: 'character' as const, id: 77 };
+      // A client that cannot mail is told nobody's ids.
+      const quiet = await setFeederPayee(
+        deps(),
+        who(FEEDER_DIRECTOR),
+        { ...asDirector, payee: player, notify: false },
+        idCategory
+      );
+      expect(quiet).toMatchObject({ changed: true, recipients: [] });
+      // Back on the accounting side: the old payee (the player) and the new one's CEO are told.
+      const back = await setBookFeederPayee(
+        ceoDeps(),
+        who(COLLECTOR_CEO),
+        { ...asCollector(), payee: corp, notify: true },
+        idCategory
+      );
+      expect(back.recipients).toEqual([FEEDER_CEO, 77, PAYEE_CORP_CEO]);
+      rec = (await feederRecord()) as FeederRecord & { payeeHistory?: unknown[] };
+      expect(rec?.payee).toEqual(corp);
+      expect(rec?.payeeHistory).toHaveLength(3);
+      const audit = await collectorBook().collection('audit').get();
+      expect(
+        audit.docs
+          .filter((d) => d.get('action') === 'feederPayeeSet')
+          .map((d) => d.get('detail.side'))
+          .sort()
+      ).toEqual(['accounting', 'accounting', 'moon-owner']);
+    });
+
+    it('naming the standing payee writes nothing and tells nobody', async () => {
+      await save(await newInvite());
+      const out = await setBookFeederPayee(
+        ceoDeps(),
+        who(COLLECTOR_CEO),
+        { ...asCollector(), payee: { kind: 'corporation', id: FEEDER }, notify: true },
+        idCategory
+      );
+      expect(out).toEqual({ ok: true, changed: false, recipients: [] });
+      expect((await feederRecord())?.payeeChangedAt).toBeUndefined();
+    });
+
+    it('refuses a junior accountant and an id of the wrong kind', async () => {
+      await save(await newInvite());
+      const payee = { kind: 'corporation' as const, id: PAYEE_CORP };
+      expect(
+        await reason(
+          setBookFeederPayee(
+            ceoDeps(),
+            who(COLLECTOR_JUNIOR),
+            { ...asCollector(COLLECTOR_JUNIOR), payee, notify: false },
+            idCategory
+          )
+        )
+      ).toBe('role-required');
+      expect(
+        await reason(
+          setBookFeederPayee(
+            ceoDeps(),
+            who(COLLECTOR_CEO),
+            { ...asCollector(), payee: { kind: 'character', id: PAYEE_CORP }, notify: false },
+            idCategory
+          )
+        )
+      ).toBe('payee-mismatch');
+      expect((await feederRecord())?.payee).toBeUndefined();
+    });
+
+    it('refuses a moon owner that left', async () => {
+      await save(await newInvite());
+      await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+      expect(
+        await reason(
+          setBookFeederPayee(
+            ceoDeps(),
+            who(COLLECTOR_CEO),
+            { ...asCollector(), payee: { kind: 'character', id: 77 }, notify: false },
+            idCategory
+          )
+        )
+      ).toBe('feeder-ended');
+    });
+  });
+
+  it('payee: refuses an id that is not the kind it claims to be (#4621)', async () => {
+    await save(await newInvite());
+    for (const payee of [
+      { kind: 'corporation' as const, id: 77 },
+      { kind: 'character' as const, id: 98000009 },
+      { kind: 'character' as const, id: 5 },
+    ]) {
+      expect(
+        await reason(
+          setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee }, idCategory)
+        )
+      ).toBe('payee-mismatch');
+    }
+    expect((await feederRecord())?.payee).toBeUndefined();
+  });
+
+  it('payee: naming the standing payee, or its own corporation when unset, writes nothing', async () => {
+    await save(await newInvite());
+    const own = { kind: 'corporation' as const, id: FEEDER };
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee: own }, idCategory);
+    const rec = await feederRecord();
+    expect(rec?.payee).toBeUndefined();
+    expect(rec?.payeeChangedAt).toBeUndefined();
+    const audit = await collectorBook().collection('audit').get();
+    expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(0);
+  });
+
+  it('payee: the moon owner call refuses a junior, a nobody and anyone outside it', async () => {
+    await save(await newInvite());
+    const payee = { kind: 'corporation' as const, id: 98000009 };
+    // An accounting officer sets it through its own call (`setBookFeederPayee`), not this one.
+    for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY, COLLECTOR_CEO]) {
+      expect(
+        await reason(
+          setFeederPayee(
+            deps(),
+            who(id),
+            { corporationId: FEEDER, accessToken: `roles-${id}`, payee },
+            idCategory
+          )
+        )
+      ).toBe('not-your-feeder');
+    }
+    // The accounting corporation naming itself: no moon owner by that id.
+    expect(
+      await reason(
+        setFeederPayee(
+          deps(),
+          who(COLLECTOR_CEO),
+          { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}`, payee },
+          idCategory
+        )
+      )
+    ).toBe('not-your-feeder');
+    expect((await feederRecord())?.payee).toBeUndefined();
+  });
+
+  it('leave: keeps the view, writes the Previous pointer and keeps access working', async () => {
+    await save(await newInvite(), 6);
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    expect(await pointer()).toBeUndefined();
+    expect(
+      (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data()
+    ).toEqual({
+      collectorCorporationId: COLLECTOR,
+      leftAt: T0,
+      history: [{ collectorCorporationId: COLLECTOR, leftAt: T0 }],
+    });
+    // joined and left the same day: no day was ever covered
+    expect(await summary()).toMatchObject({ status: 'left', leftAt: T0, coverageFrom: null });
+    const out = await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector);
+    expect(out.collectorCorporationId).toBe(COLLECTOR);
+  });
+
+  it('keeps every accounting corporation it left, by id, across a later join and leave (#4621)', async () => {
+    const OTHER = 98000050;
+    await save(await newInvite(), 6);
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    // Joins another accounting corporation.
+    await db.collection('corps').doc(String(OTHER)).set({ active: true, corporationName: 'Other' });
+    await db
+      .collection('corps')
+      .doc(String(OTHER))
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .set({
+        corporationId: FEEDER,
+        status: 'active',
+        invitedBy: 1,
+        joinedAt: T0,
+        mode: 'normal',
+        coveragePeriods: [{ from: '2026-10-18' }],
+      });
+    await db
+      .collection('corpTaxBookFeederOf')
+      .doc(String(FEEDER))
+      .set({ collectorCorporationId: OTHER, since: T0 });
+
+    const previous = { ...asDirector, collectorCorporationId: COLLECTOR };
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), previous)).collectorCorporationId
+    ).toBe(COLLECTOR);
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector)).collectorCorporationId
+    ).toBe(OTHER);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector)).toMatchObject({
+      status: 'feeder',
+      collectorCorporationId: OTHER,
+      previousCollectorIds: [COLLECTOR],
+    });
+
+    // Leaving the second keeps the first.
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    const doc = (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data();
+    expect(doc).toMatchObject({ collectorCorporationId: OTHER, leftAt: T0 });
+    expect(doc?.history).toEqual([
+      { collectorCorporationId: COLLECTOR, leftAt: T0 },
+      { collectorCorporationId: OTHER, leftAt: T0 },
+    ]);
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), previous)).collectorCorporationId
+    ).toBe(COLLECTOR);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector)).toMatchObject({
+      status: 'none',
+      previousCollectorIds: [OTHER, COLLECTOR],
+    });
+    await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), previous);
+    expect((await feederRecord())?.viewDismissedAt).toBe(T0);
+
+    // A corporation that never handled it resolves nothing.
+    expect(
+      await reason(
+        getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), {
+          ...asDirector,
+          collectorCorporationId: 98000099,
+        })
+      )
+    ).toBe('not-your-feeder');
+  });
+
+  describe('learned refinery systems (#4650)', () => {
+    const REFINERY = 4001;
+    const learn = (characterId: number, system: number) =>
+      learnRefinerySystems(bookDeps(), who(characterId), {
+        corporationId: COLLECTOR,
+        systems: { [String(REFINERY)]: system },
+      });
+    const viewSystem = async () =>
+      (await viewRef().collection('refineries').doc(String(REFINERY)).get()).get('solarSystemId');
+
+    it("keeps the first system a miner's own ledger placed it in, on the record and the view", async () => {
+      await save(await newInvite());
+      // Someone with no row at that refinery teaches nothing.
+      await learn(901, 30000142);
+      expect((await feederRecord())?.refinerySystems).toBeUndefined();
+
+      await learn(900, 30002187);
+      expect((await feederRecord())?.refinerySystems).toEqual({ [String(REFINERY)]: 30002187 });
+      expect(await viewSystem()).toBe(30002187);
+
+      // A later report never moves it.
+      await learn(900, 30000142);
+      expect((await feederRecord())?.refinerySystems).toEqual({ [String(REFINERY)]: 30002187 });
+      const audit = await collectorBook().collection('audit').get();
+      expect(audit.docs.filter((d) => d.get('action') === 'refinerySystemLearned')).toHaveLength(1);
+    });
+  });
+
+  describe('refinery labels (#4640)', () => {
+    const REFINERY = 4001;
+    const asCollector = {
+      corporationId: COLLECTOR,
+      accessToken: `roles-${COLLECTOR_CEO}`,
+      feederCorporationId: FEEDER,
+    };
+    const stored = async () => (await feederRecord())?.refineryLabels?.[String(REFINERY)];
+    const viewLabel = async () =>
+      (await viewRef().collection('refineries').doc(String(REFINERY)).get()).get('label');
+
+    it('either side sets it, the last edit wins, and the view carries it', async () => {
+      await save(await newInvite());
+      await setRefineryLabel(bookDeps(), who(COLLECTOR_CEO), {
+        ...asCollector,
+        structureId: REFINERY,
+        label: 'Efa Tatara',
+      });
+      expect(await stored()).toMatchObject({
+        label: 'Efa Tatara',
+        side: 'accounting',
+        setBy: COLLECTOR_CEO,
+      });
+      expect(await viewLabel()).toBe('Efa Tatara');
+
+      await setOwnRefineryLabel(deps(), who(FEEDER_DIRECTOR), {
+        ...asDirector,
+        structureId: REFINERY,
+        label: 'Our Tatara',
+      });
+      expect(await stored()).toMatchObject({ label: 'Our Tatara', side: 'moon-owner' });
+      expect(await viewLabel()).toBe('Our Tatara');
+
+      await setRefineryLabel(bookDeps(), who(COLLECTOR_CEO), {
+        ...asCollector,
+        structureId: REFINERY,
+        label: 'Back again',
+      });
+      expect(await viewLabel()).toBe('Back again');
+
+      // A clear from either side drops it: the chain falls back.
+      await setOwnRefineryLabel(deps(), who(FEEDER_DIRECTOR), {
+        ...asDirector,
+        structureId: REFINERY,
+        label: null,
+      });
+      expect(await stored()).toBeUndefined();
+      expect(await viewLabel()).toBeNull();
+
+      const audit = await collectorBook().collection('audit').get();
+      expect(audit.docs.filter((d) => d.get('action') === 'refineryLabelSet')).toHaveLength(4);
+    });
+
+    it('refuses a non-officer on either side and a refinery that is not theirs', async () => {
+      await save(await newInvite());
+      expect(
+        await reason(
+          setRefineryLabel(bookDeps(), who(COLLECTOR_JUNIOR), {
+            ...asCollector,
+            accessToken: `roles-${COLLECTOR_JUNIOR}`,
+            structureId: REFINERY,
+            label: 'x',
+          })
+        )
+      ).toBe('role-required');
+      expect(
+        await reason(
+          setOwnRefineryLabel(deps(), who(FEEDER_JUNIOR), {
+            corporationId: FEEDER,
+            accessToken: `roles-${FEEDER_JUNIOR}`,
+            structureId: REFINERY,
+            label: 'x',
+          })
+        )
+      ).toBe('not-your-feeder');
+      expect(
+        await reason(
+          setRefineryLabel(bookDeps(), who(COLLECTOR_CEO), {
+            ...asCollector,
+            structureId: 9999,
+            label: 'x',
+          })
+        )
+      ).toBe('unknown-refinery');
+      expect(await stored()).toBeUndefined();
+    });
+  });
+
+  it('dismiss: refused while active, works after leaving and sticks', async () => {
+    await save(await newInvite());
+    expect(await reason(dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), asDirector))).toBe(
+      'not-ended'
+    );
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), asDirector);
+    expect(await summary()).toMatchObject({ dismissedAt: T0 });
+    expect((await feederRecord())?.viewDismissedAt).toBe(T0);
+    await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), asDirector);
+    expect((await summary())?.dismissedAt).toBe(T0);
+  });
+  // Issue #4622: the copy a miner's personal tab reads holds coverage and the read clock only.
+  const memberCopy = async () =>
+    (await collectorBook().collection('feederCoverage').doc(String(FEEDER)).get()).data();
+
+  it('member copy: the first pull writes coverage and the read clock, nothing else', async () => {
+    await save(await newInvite(), 6);
+    await setFeederPayee(
+      deps(),
+      who(FEEDER_DIRECTOR),
+      { ...asDirector, payee: { kind: 'character', id: FEEDER_DIRECTOR } },
+      idCategory
+    );
+    expect(await memberCopy()).toEqual({
+      coveragePeriods: [{ from: '2026-10-18' }],
+      lastReadWellAt: T0,
+    });
+  });
+
+  it('member copy: leaving ends the coverage there too', async () => {
+    await save(await newInvite());
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    // joined and left the same day: the one period covered nothing and is gone
+    expect(await memberCopy()).toEqual({ coveragePeriods: [], lastReadWellAt: T0 });
+  });
+});
+
+// Paying a moon owner (#4514): what the wallet journal says, read by the server, matched once.
+suite('moon owner payouts (emulator)', () => {
+  const officer = { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}` };
+  const payoutDeps = () => ({ ...bookDeps(), esi: esi() });
+  const payouts = async () =>
+    (
+      await collectorBook().collection('feeders').doc(String(FEEDER)).collection('payouts').get()
+    ).docs.map((d) => ({ id: d.id, ...d.data() }));
+  /** A corporation wallet "Give ISK" to the moon owner corporation (its payee when none is set). */
+  const giveIsk = (id: number, amount: number) => ({
+    id,
+    date: '2026-10-18T15:00:00Z',
+    ref_type: 'corporation_account_withdrawal',
+    amount: -amount,
+    first_party_id: COLLECTOR,
+    second_party_id: FEEDER,
+  });
+
+  beforeEach(async () => {
+    await clearEmulator();
+    ledger = 'ok';
+    journalRows = [];
+    identities.clear();
+    identities.set(COLLECTOR_CEO, { corporationId: COLLECTOR, ceoId: COLLECTOR_CEO, roles: [] });
+    await turnOnBook(
+      bookDeps(),
+      who(COLLECTOR_CEO),
+      parseTurnOnInput({ ...officer, startDate: '2026-10-01', startRatePct: 10 })
+    );
+    await save(await newInvite(), 6);
+  });
+
+  it('the officer call reads the journal itself, never a client list, and audits it (S3)', async () => {
+    journalRows = [giveIsk(501, 4_000_000)];
+    const input = {
+      ...officer,
+      outgoing: [{ refId: 999, division: 1, recipientId: FEEDER, amount: 9e9, at: 'x' }],
+    };
+    expect(await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), input)).toEqual({
+      attached: 0,
+      recorded: 1,
+    });
+    expect(await payouts()).toMatchObject([
+      { id: 'j1_501', amount: 4_000_000, status: 'matched', journalRef: 501 },
+    ]);
+    const audit = (await collectorBook().collection('audit').get()).docs.map((d) => d.data());
+    expect(audit).toContainEqual(
+      expect.objectContaining({ action: 'feederPayoutsReconciled', by: COLLECTOR_CEO })
+    );
+  });
+
+  it('the officer call needs a live role check', async () => {
+    expect(
+      await reason(
+        reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), {
+          corporationId: COLLECTOR,
+        })
+      )
+    ).toBe('live-check-required');
+    expect(await payouts()).toEqual([]);
+  });
+
+  it('an officer record landing between plan and write takes the journal entry: counted once (B2)', async () => {
+    const outgoing = outgoingDonationsFromJournal([giveIsk(502, 5_000_000)], 1, COLLECTOR);
+    const [plan] = await planFeederPayouts(bookDeps(), COLLECTOR, outgoing);
+    expect(plan?.createRefs).toEqual([502]);
+    await recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+      ...officer,
+      feederCorporationId: FEEDER,
+      amount: 5_000_000,
+      date: '2026-10-18',
+      method: 'donation',
+    });
+    expect(
+      await applyFeederPayoutPlan(bookDeps(), COLLECTOR, plan!, { characterId: null, name: 'x' })
+    ).toEqual({ attached: 1, recorded: 0 });
+    const rows = await payouts();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ amount: 5_000_000, status: 'matched', journalRef: 502 });
+  });
+
+  describe('payout totals on the moon owner record (#5242)', () => {
+    const totals = async () => (await feederRecord())?.payoutTotals;
+    const record = (amount: number, date = '2026-10-18', method: 'donation' | 'other' = 'other') =>
+      recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+        ...officer,
+        feederCorporationId: FEEDER,
+        amount,
+        date,
+        method,
+      });
+
+    it('adds a recorded payout, and a journal row the sync records', async () => {
+      await record(1_000_000);
+      expect(await totals()).toEqual({ count: 1, amount: 1_000_000 });
+      journalRows = [giveIsk(503, 4_000_000)];
+      await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+      expect(await totals()).toEqual({ count: 2, amount: 5_000_000 });
+    });
+
+    it('does not count a journal row twice when it confirms an officer record', async () => {
+      await record(5_000_000, '2026-10-18', 'donation');
+      journalRows = [giveIsk(504, 5_000_000)];
+      await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer);
+      expect(await totals()).toEqual({ count: 1, amount: 5_000_000 });
+    });
+
+    it('takes a payout out when it is marked "not a payout", and back in when unmarked', async () => {
+      await record(1_000_000);
+      await record(2_000_000, '2026-10-19');
+      const first = (await payouts()).find((p) => 'amount' in p && p.amount === 1_000_000);
+      const mark = (notAPayout: boolean) =>
+        markFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+          ...officer,
+          feederCorporationId: FEEDER,
+          payoutId: first!.id,
+          notAPayout,
+        });
+      await mark(true);
+      expect(await totals()).toEqual({ count: 1, amount: 2_000_000 });
+      await mark(true);
+      expect(await totals()).toEqual({ count: 1, amount: 2_000_000 });
+      await mark(false);
+      expect(await totals()).toEqual({ count: 2, amount: 3_000_000 });
+    });
+
+    it('a record with no stored totals is totalled from its payouts by the next write', async () => {
+      await record(1_000_000);
+      await collectorBook()
+        .collection('feeders')
+        .doc(String(FEEDER))
+        .update({ payoutTotals: FieldValue.delete() });
+      expect(await totals()).toBeUndefined();
+      await record(2_000_000, '2026-09-01');
+      expect(await totals()).toEqual({ count: 2, amount: 3_000_000 });
+    });
+
+    it('planning still finds a payout inside the link window, and attaches to it', async () => {
+      await recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+        ...officer,
+        feederCorporationId: FEEDER,
+        amount: 5_000_000,
+        date: '2026-10-16',
+        method: 'donation',
+      });
+      journalRows = [giveIsk(505, 5_000_000)];
+      expect(await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), officer)).toEqual({
+        attached: 1,
+        recorded: 0,
+      });
+      expect(await totals()).toEqual({ count: 1, amount: 5_000_000 });
+    });
+  });
+});

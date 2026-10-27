@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plan revision="10" name="Sample Plan" owner="{00000000-0000-0000-0000-000000000000}">
+  <entry skillID="3300" skill="Gunnery" level="4" priority="3" type="Planned">
+    <notes>Core turret skill</notes>
+  </entry>
+  <entry skillID="3327" skill="Spaceship Command" level="3" priority="2" type="Prerequisite" />
+  <entry skillID="3335" skill="Caldari Frigate" level="5" priority="1" type="Planned" />
+</plan>

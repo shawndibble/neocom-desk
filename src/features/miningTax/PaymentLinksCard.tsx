@@ -1,0 +1,129 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import type { MiningTaxPaymentLinkSource } from '@/db';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import { formatIsk } from '@/lib/isk';
+
+/** One linked transaction, resolved for display — this card itself does no lookups. */
+export interface LinkedTransaction {
+  kind: 'journal' | 'contract';
+  refId: number;
+  source: MiningTaxPaymentLinkSource;
+  /** A short line identifying the transaction (amount/date/label) — `null` when it's fallen out of the cached wallet journal/contracts (the retention gap `paymentLinks.ts` accepts). */
+  label: string | null;
+}
+
+interface PaymentLinksCardProps {
+  /**
+   * Every linked transaction, resolved for display. Absent (rather than an
+   * empty list) is not itself a reason to hide the card — that decision is
+   * the caller's (`RowDetailModal` gates on its own Assignment's status,
+   * `GroupSummaryModal` on every member being Paid), since a payment can
+   * exist with nothing linked to it yet.
+   */
+  linkedTransactions?: readonly LinkedTransaction[];
+  /** Opens the manual "Link transaction" picker (issue #540 follow-up). */
+  onLinkTransaction?: () => void;
+  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  busy: boolean;
+  /** A single Assignment's own amount/paidOn line — `RowDetailModal` passes one, `GroupSummaryModal` doesn't (no one payment record to summarize for the whole group). */
+  summary?: ReactNode;
+  /** The recorded payment, read as one sentence: "Paid 4,309,281 ISK · 2026-10-04 · auto-linked". */
+  paid?: { amount: number; paidOn: string };
+}
+
+/**
+ * The payment line on a paid entry (scope decision 20261004): what was paid,
+ * when, and whether it found its wallet transfer by itself — a sentence
+ * rather than a raw journal id with a red ✕ beside it, which read as "close
+ * this". Link and Unlink are inline text buttons: the link action in the header,
+ * Unlink at the end of each linked transaction.
+ *
+ * The linked-transactions list plus its Link/Unlink actions — shared between
+ * `RowDetailModal` (a single Assignment's payment) and `GroupSummaryModal` (a
+ * joined group's combined payment), which otherwise differed only in whether
+ * a single-record `summary` line applies. Neither modal decides *whether* to
+ * render this card; that stays theirs, since each has its own gating rule
+ * for when a payment exists to talk about.
+ */
+export function PaymentLinksCard({
+  linkedTransactions,
+  onLinkTransaction,
+  onUnlinkTransaction,
+  busy,
+  summary,
+  paid,
+}: PaymentLinksCardProps) {
+  const { t } = useTranslation();
+  const links = linkedTransactions ?? [];
+  const autoLinked = links.length > 0 && links.every((tx) => tx.source === 'auto');
+  return (
+    <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className={cx(eyebrowClassName, 'min-w-0 truncate')}>
+          {t('miningTax.paymentCardTitle')}
+        </p>
+        {onLinkTransaction && (
+          <Button size="sm" onClick={onLinkTransaction} disabled={busy}>
+            {t('miningTax.linkTransactionAction')}
+          </Button>
+        )}
+      </div>
+      {paid && (
+        <p className="text-sm tabular-nums">
+          {t('miningTax.payment.paidLine', {
+            amount: formatIsk(paid.amount, 0),
+            date: paid.paidOn,
+          })}
+          {autoLinked && (
+            <span className="text-text-dim"> · {t('miningTax.payment.autoLinked')}</span>
+          )}
+        </p>
+      )}
+      {!paid && autoLinked && (
+        <p className="text-xs text-text-dim">{t('miningTax.payment.autoLinked')}</p>
+      )}
+      {summary}
+      {links.length > 0 ? (
+        <ul className="space-y-0.5 text-xs">
+          {links.map((tx) => (
+            <li key={`${tx.kind}:${tx.refId}`} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate">
+                {tx.label === null ? (
+                  <span className="text-text-dim">
+                    {t('miningTax.payment.notCached', { id: tx.refId })}
+                  </span>
+                ) : (
+                  <Link
+                    to={
+                      tx.kind === 'journal'
+                        ? `/wallet/journal?${HIGHLIGHT_PARAM}=${tx.refId}`
+                        : `/contracts?${HIGHLIGHT_PARAM}=${tx.refId}`
+                    }
+                    className={inlineLinkClassName}
+                  >
+                    {tx.label}
+                  </Link>
+                )}
+              </span>
+              {onUnlinkTransaction && (
+                <Button size="sm" onClick={() => onUnlinkTransaction(tx)} disabled={busy}>
+                  {links.length > 1
+                    ? t('miningTax.payment.unlinkNamed', { id: tx.refId })
+                    : t('miningTax.unlinkTransactionAction')}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-text-dim">{t('miningTax.noLinkedTransactions')}</p>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,191 @@
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import {
+  isNotTrainingAlertEnabledFor,
+  useNotificationPreferences,
+} from '@/features/notifications/preferences';
+import { useTicker } from '@/lib/ticker';
+import { useTimeZone } from '@/lib/timeFormat';
+import type { FeedStore } from './feedStore';
+import { useFeedStore } from './feedStoreContext';
+import { buildView, builderEpoch, feedsOf, subscribeBuilders } from './models';
+import { OVERVIEW_TICK_MS } from './tick';
+import type { BuildContext, FeedId, KindView } from './types';
+import {
+  settingsContext,
+  viewKey,
+  type SettingsContext,
+  type ViewRequest,
+  type ViewSettings,
+} from './viewSettings';
+
+export { viewKey, type ViewRequest };
+
+const NO_FEEDS: readonly FeedId[] = [];
+
+/** The feed reads a kind builds from, as the store's per-feed state objects (identity-stable until that feed changes). */
+const feedSlice = (store: FeedStore, feedIds: readonly FeedId[]): readonly unknown[] => {
+  const feeds = store.get();
+  return feedIds.map((id) => feeds[id]);
+};
+
+const sameItems = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((item, i) => item === b[i]);
+
+interface CachedView {
+  deps: readonly unknown[];
+  view: KindView;
+}
+
+/**
+ * Built views, shared by every widget and the header summary on one store: the
+ * same request is built once per change, not once per reader. An entry is reused
+ * while its inputs (own feeds, clock, context) are identical.
+ */
+const viewCaches = new WeakMap<FeedStore, Map<string, CachedView>>();
+
+function cachedView(
+  store: FeedStore,
+  request: ViewRequest,
+  feedIds: readonly FeedId[],
+  ctx: Omit<BuildContext, 'scopeAll' | keyof SettingsContext>,
+  builders: number
+): KindView {
+  let cache = viewCaches.get(store);
+  if (!cache) viewCaches.set(store, (cache = new Map()));
+  const id = viewKey(request);
+  const deps = [
+    ...feedSlice(store, feedIds),
+    ctx.t,
+    ctx.now,
+    ctx.activeCharacterId,
+    ctx.notTrainingAlert,
+    ctx.zone,
+    builders,
+  ];
+  const hit = cache.get(id);
+  if (hit && sameItems(hit.deps, deps)) return hit.view;
+  const feeds = store.get();
+  const built = buildView(request.kind, feeds, {
+    ...ctx,
+    scopeAll: request.scopeAll,
+    ...settingsContext(request.kind, request),
+  });
+  // Only a first read still out counts: a refresh also reports `loading`, but over data that is
+  // already on screen, so the body is at its height.
+  const settling = feedIds.some((feedId) => {
+    const feed = feeds[feedId];
+    return feed?.loading === true && feed.data === null;
+  });
+  const view = settling ? { ...built, settling } : built;
+  cache.set(id, { deps, view });
+  return view;
+}
+
+/** Views for several kinds at once, rebuilt as their own feeds change and as the clock ticks. */
+export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<string, KindView> {
+  const store = useFeedStore();
+  const now = useTicker(OVERVIEW_TICK_MS);
+  const { t } = useTranslation();
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const zone = useTimeZone();
+  // A lazy builder landing (`ensureBuilders`) makes every view built before it stale.
+  const builders = useSyncExternalStore(subscribeBuilders, builderEpoch);
+  const prefs = useNotificationPreferences((state) => state.value);
+  const notTrainingAlert =
+    activeCharacterId !== null && isNotTrainingAlertEnabledFor(prefs, activeCharacterId);
+  // The requests arrive as a fresh array each render; hold the last one with the same content.
+  const signature = requests.map(viewKey).join('|');
+  const [held, setHeld] = useState({ signature, requests });
+  let stable = held.requests;
+  if (held.signature !== signature) {
+    stable = requests;
+    setHeld({ signature, requests });
+  }
+  const feedIds = useMemo(() => {
+    const ids = new Set<FeedId>();
+    for (const request of stable)
+      for (const id of feedsOf(request.kind, request) ?? NO_FEEDS) ids.add(id);
+    return [...ids];
+  }, [stable]);
+  // Re-render only when a feed these kinds read changes, not on any feed's update.
+  const last = useRef<readonly unknown[]>([]);
+  const getSlice = useCallback(() => {
+    const next = feedSlice(store, feedIds);
+    if (sameItems(last.current, next)) return last.current;
+    last.current = next;
+    return next;
+  }, [store, feedIds]);
+  const slice = useSyncExternalStore(store.subscribe, getSlice);
+  return useMemo(() => {
+    const views = new Map<string, KindView>();
+    for (const request of stable) {
+      views.set(
+        viewKey(request),
+        cachedView(
+          store,
+          request,
+          feedsOf(request.kind, request) ?? NO_FEEDS,
+          {
+            t,
+            now,
+            activeCharacterId,
+            notTrainingAlert,
+            zone,
+          },
+          builders
+        )
+      );
+    }
+    return views;
+    // `slice` is the signal that an own feed changed; the store read inside is current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert, zone, builders]);
+}
+
+/** The view for one widget. */
+export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSettings): KindView {
+  const {
+    range,
+    plexPer30Days,
+    calendarEvents,
+    raidsWhere,
+    raidsRadius,
+    profitSource,
+    trendItems,
+    trendHubs,
+    show,
+  } = settings;
+  const request = useMemo<ViewRequest>(
+    () => ({
+      kind,
+      scopeAll,
+      range,
+      plexPer30Days,
+      calendarEvents,
+      raidsWhere,
+      raidsRadius,
+      profitSource,
+      trendItems,
+      trendHubs,
+      show,
+    }),
+    [
+      kind,
+      scopeAll,
+      range,
+      plexPer30Days,
+      calendarEvents,
+      raidsWhere,
+      raidsRadius,
+      profitSource,
+      trendItems,
+      trendHubs,
+      show,
+    ]
+  );
+  const requests = useMemo(() => [request], [request]);
+  const views = useKindViews(requests);
+  return views.get(viewKey(request)) as KindView;
+}

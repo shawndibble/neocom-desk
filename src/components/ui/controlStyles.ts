@@ -1,0 +1,225 @@
+import { cx } from '@/lib/cx';
+
+/**
+ * The one control size scale, and the one field treatment.
+ *
+ * Every interactive control in the app — `Button`, `IconButton`, `FilterChip`,
+ * `TextInput`, `NativeSelect`, `SelectTrigger` — sizes itself from
+ * `controlHeightClassName` here, so a toolbar built from a single `size` value
+ * lines up by construction rather than by whoever last eyeballed it. Before
+ * this, fields were hand-written per call site and had drifted to `h-6`, `h-7`,
+ * `h-8` and `h-9` all at once, which is why a `Select` sat visibly taller than
+ * the `Button size="sm"` next to it.
+ *
+ * Internal — not re-exported from the barrel; callers reach it through the
+ * components' `size` prop.
+ */
+
+export type ControlSize = 'sm' | 'md';
+
+/**
+ * The shared interaction recipe (DESIGN.md §6c "States and motion"): every
+ * interactive primitive composes these so transition, focus and disabled
+ * behave the same everywhere instead of being re-spelled per control.
+ *
+ * - `interactiveClassName`: colour properties only, 120ms ease-out, snapping
+ *   in at 40ms while pressed (`active:duration-40`), and no transition at all
+ *   under reduced motion. Never a transform.
+ * - `focusRingClassName`: the 2px accent outline, outset, for boxed controls
+ *   and inline links.
+ * - `focusRingInsetClassName`: the same ring drawn inside the box, for
+ *   full-bleed rows, tabs and nav items (an outset ring would be clipped by
+ *   the row's neighbours or its scroller).
+ * - `disabledClassName`: `opacity-40` and `cursor-not-allowed` for both the
+ *   native attribute and `aria-disabled` (the one that keeps a tooltip able
+ *   to open).
+ */
+export const interactiveClassName =
+  'transition-[color,background-color,border-color,text-decoration-color,outline-color] duration-120 ease-out active:duration-40 motion-reduce:transition-none';
+
+export const focusRingClassName =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
+/**
+ * The active option of a menu or search picker (DESIGN.md §6c "Highlighted
+ * option"): the inset 2px accent ring, drawn only while the last input was
+ * the keyboard (`data-input` on `<html>`, `app/inputModality.ts`), so a
+ * hovering pointer keeps just the `panel-2` fill. A picker composes
+ * `activeOptionClassName` on the option it highlights; a Radix menu item
+ * composes `highlightedOptionClassName`, as the item is only highlighted
+ * while `data-highlighted` is set.
+ */
+export const activeOptionClassName =
+  'in-data-[input=keyboard]:outline-2 in-data-[input=keyboard]:-outline-offset-2 in-data-[input=keyboard]:outline-accent';
+
+export const highlightedOptionClassName =
+  'data-[highlighted]:in-data-[input=keyboard]:outline-2 data-[highlighted]:in-data-[input=keyboard]:-outline-offset-2 data-[highlighted]:in-data-[input=keyboard]:outline-accent';
+
+export const focusRingInsetClassName =
+  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
+
+/**
+ * A full-width row or list item that is itself the control: the `panel-2` hover
+ * fill, a step darker while pressed, and the shared transition. Compose the
+ * focus ring (inset for rows) separately.
+ */
+export const rowInteractiveClassName = cx('hover:bg-panel-2 active:bg-panel', interactiveClassName);
+
+export const disabledClassName =
+  'disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40';
+
+/**
+ * The selected row (DESIGN.md §6c): a 2px accent left border, a `panel-2`
+ * fill and an accent label on the row's primary cell (`dt-primary` in a
+ * `DataTable`). A real border, not a background or a shadow, so it survives
+ * forced-colours mode; hover only fills, so a hovered row never reads as the
+ * selected one. `DataTable` applies it itself for `selectedRowKey`; a hand-built
+ * list of rows uses it directly, with `aria-current="true"` on the row.
+ */
+export const selectedRowClassName =
+  'border-l-2 border-l-accent bg-panel-2 [&_.dt-primary]:text-accent';
+
+/**
+ * Heights, per DESIGN.md §3: `h-7` compact / `h-9` default for a pointer, one
+ * step up on a touch viewport so a thumb gets a 36px target. Touch means below
+ * `md` *or* a coarse primary pointer (`touch:`, see `index.css`), so a touch
+ * tablet keeps the touch tier at every width; `touch:` is declared after `md:`
+ * and wins above it, and a fine pointer renders exactly as before. `IconButton`
+ * shipped this tier first (`size-9`); it lives here now so the text
+ * controls beside it match at *both* breakpoints instead of only on desktop.
+ *
+ * `StatChip` and `DataAgeBadge` deliberately stay at a flat `h-7` — they are
+ * readouts, not targets, and growing them on a phone would only cost rows.
+ */
+export const controlHeightClassName: Record<ControlSize, string> = {
+  sm: 'h-9 md:h-7 touch:h-9',
+  md: 'h-9',
+};
+
+/**
+ * Border, fill, text and focus ring. `bg-panel-2` is DESIGN.md §1's input fill.
+ * Border is `line-bright`, not `line` — `line` is only 1.35:1 against `panel-2`,
+ * below the 3:1 floor for a visible resting edge (issue #1491). Placeholder is
+ * `text-dim`, not `text-faint` — `text-faint` is below 4.5:1 and a placeholder
+ * is the only visible prompt in some pickers.
+ */
+export const fieldBaseClassName =
+  'rounded-xs border border-line-bright bg-panel-2 text-text placeholder:text-text-dim focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40';
+
+/** A field's horizontal padding and type scale, on top of the shared height. */
+export const fieldSizeClassName: Record<ControlSize, string> = {
+  sm: `${controlHeightClassName.sm} px-2 text-xs`,
+  md: `${controlHeightClassName.md} px-3 text-sm`,
+};
+
+/**
+ * The select-shaped trigger (DESIGN.md §6c, `CaretDown` inside field chrome):
+ * field chrome at the given size, the value on the left and the chevron
+ * (`SelectChevron`) on the right, on one line. `SelectTrigger`,
+ * `MultiSelect` and `CheckboxSelect` all draw from this, so every "open a list
+ * and pick" control looks the same and none can drift from the others.
+ *
+ * The trigger is a fixed-height control, so a label a few pixels wider than
+ * the box must not wrap — two lines of text overflow the height rather than
+ * growing it. The value goes in a child `<span>` that ellipsizes; `min-w-0`
+ * is what lets it shrink at all, since a flex child defaults to
+ * `min-width: auto` and would otherwise refuse to go below its text.
+ */
+export function selectTriggerClassName(size: ControlSize): string {
+  return cx(
+    fieldBaseClassName,
+    fieldSizeClassName[size],
+    'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap [&>span]:min-w-0 [&>span]:truncate'
+  );
+}
+
+/**
+ * A full-width list row that is itself the tap target — the `<label>` wrapping
+ * a checkbox in Mining Tax's Settle Up / Link Payment / Bulk Dismiss dialogs,
+ * and the single-line pick-a-row `<button>`s in the blueprint, skill and ship
+ * pickers, the Build Group member list and the trained-skills list.
+ *
+ * Not a `ControlSize`: those rows keep their own `px-2 py-1.5 text-xs`
+ * density, and a single line of that lands at 28px — exactly `sm`'s pointer
+ * value, and exactly the "reusing a pointer size on a phone" mistake DESIGN.md
+ * §3 calls out. So this pins the touch tier's 36px on a phone and reverts to
+ * that same 28px above `md`, leaving pointer rendering pixel-identical (the
+ * `min-h-9` / `md:min-h-7` shape #1055's Balances-strip fix established).
+ * `min-h-*`, not `h-*`, so a row whose text wraps grows instead of clipping.
+ */
+export const tappableRowClassName = 'min-h-9 md:min-h-7 touch:min-h-9';
+
+/**
+ * A native checkbox or radio is 16px, and a pseudo-element on it is not an
+ * option (Firefox draws none on native form controls). Its 36px touch target
+ * is the label that wraps it instead: this is that label's class. Used where a
+ * bare control sits alone in a table cell or a card corner; a control already
+ * inside a `tappableRowClassName` label row needs nothing. The label grows the
+ * cell it sits in on touch rather than overlaying its neighbours, so no two
+ * targets can overlap (WCAG 2.5.8). `shrink-0`: as a flex item beside long
+ * text it would otherwise squeeze narrower and slide the box out of line.
+ */
+export const touchCheckboxLabelClassName =
+  'inline-flex shrink-0 items-center justify-center touch:size-9';
+
+/**
+ * A 36px-tall hit area on a coarse pointer for a small drag grip: an invisible
+ * `::before` as wide as the grip itself and 36px tall, centred on it. Only the
+ * vertical axis grows: along the row a grip's neighbour (the title, the row's
+ * ⋮ or remove button) is right beside it, while vertically a touch row is
+ * already 36px tall, so the area stays inside the grip's own row and column and
+ * can never cover a sibling control. The grip keeps `touch-none` itself.
+ */
+export const gripHitAreaClassName =
+  "touch:relative touch:before:absolute touch:before:inset-x-0 touch:before:top-1/2 touch:before:h-9 touch:before:-translate-y-1/2 touch:before:content-['']";
+
+/**
+ * The CompareDrawer's resize separator on touch: the separator itself grows to
+ * a 36px band (so it takes layout space instead of overlaying the header or the
+ * content above it) and its hairline is redrawn centred in it.
+ */
+export const resizeHandleTouchClassName =
+  "touch:h-9 touch:border-b-0 touch:relative touch:after:absolute touch:after:inset-x-0 touch:after:top-1/2 touch:after:h-px touch:after:bg-line touch:after:content-['']";
+
+/** An inline text action beside a status message — an Undo, a "jump to it". */
+export const inlineLinkClassName = cx(
+  'text-accent font-medium underline decoration-1 underline-offset-2 rounded-xs hover:decoration-2 active:text-accent/75',
+  interactiveClassName,
+  focusRingClassName
+);
+
+/**
+ * A value shown as text in a readout that opens a popover to change it —
+ * Appraisal's hold line, where the ship name opens the ship picker. Accent text
+ * with a dashed underline (DESIGN.md §6c); the popover trigger takes it as its
+ * `className`.
+ */
+export const popoverValueClassName = cx(
+  'rounded-xs text-accent underline decoration-dashed underline-offset-2 hover:decoration-solid',
+  focusRingClassName
+);
+
+/**
+ * A bordered toggle chip's on/off state, per DESIGN.md §4: `FilterChip`'s
+ * accent tint when on, the input fill with dim text when off. `FilterChip`
+ * takes it from here, and so does any hand-built toggle chip whose content
+ * `FilterChip` can't carry (an avatar, a spinner, an emblem) — Skill Compare's
+ * character picker, the Ship Tree's `FactionBar` — so the three can't drift
+ * apart again (issue #2287).
+ *
+ * `hoverable: false` drops the off state's hover for a chip that can't
+ * currently be toggled. Not for `SegmentedControl`, whose segments have no
+ * border of their own.
+ */
+export function toggleChipStateClassName(
+  selected: boolean,
+  { hoverable = true }: { hoverable?: boolean } = {}
+): string {
+  if (selected) {
+    return hoverable
+      ? 'border-accent-dim bg-accent/15 text-accent hover:bg-accent/22 active:bg-accent/28'
+      : 'border-accent-dim bg-accent/15 text-accent';
+  }
+  const off = 'border-line bg-panel-2 text-text-dim';
+  return hoverable ? `${off} hover:border-line-bright hover:text-text active:bg-panel` : off;
+}

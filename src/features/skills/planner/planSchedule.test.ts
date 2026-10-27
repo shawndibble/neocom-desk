@@ -1,0 +1,189 @@
+import { describe, expect, it } from 'vitest';
+import { computeSkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
+import type { Attributes, EngineSkill, PlanEntry } from '@/engine/types';
+import type { SkillCatalog } from '@/features/skills/skillMap';
+import type { SkillQueueEntry } from '@/esi/endpoints';
+import { schedulePlan, schedulePlanWith, type PlanScheduleInputs } from './planSchedule';
+import { DEFAULT_WHAT_IF_SELECTION } from './whatIfImplants';
+
+const A: EngineSkill = {
+  typeID: 10,
+  name: 'A',
+  rank: 1,
+  primary: 'intelligence',
+  secondary: 'memory',
+  prereqs: [],
+  alphaMaxLevel: 5,
+};
+const B: EngineSkill = { ...A, typeID: 20, name: 'B' };
+const catalog: SkillCatalog = {
+  engineSkills: new Map([A, B].map((s) => [s.typeID, s])),
+  bySkillTypeID: new Map(),
+  unlocksByTypeID: new Map(),
+};
+const ATTRIBUTES: Attributes = {
+  intelligence: 20,
+  memory: 20,
+  perception: 20,
+  willpower: 20,
+  charisma: 20,
+};
+const NOW = Date.parse('2026-09-23T12:00:00Z');
+const entry = (skillTypeID: number, targetLevel: number) =>
+  ({ skillTypeID, targetLevel }) as PlanEntry;
+
+function inputs(overrides: Partial<PlanScheduleInputs> = {}): PlanScheduleInputs {
+  return {
+    catalog,
+    trained: new Map(),
+    queueEntries: [],
+    attributes: ATTRIBUTES,
+    attributeBaseline: null,
+    implants: {},
+    cloneState: 'omega',
+    ...overrides,
+  };
+}
+
+const queued = (finishMs: number): SkillQueueEntry => ({
+  skill_id: 10,
+  queue_position: 0,
+  finished_level: 1,
+  start_date: new Date(NOW - 3_600_000).toISOString(),
+  finish_date: new Date(finishMs).toISOString(),
+  level_start_sp: 0,
+  level_end_sp: 250,
+  training_start_sp: 0,
+});
+
+describe('schedulePlan', () => {
+  it('costs the plan with its Booster and Remap Marker, as the editor does', () => {
+    const plan = {
+      entries: [entry(10, 2), entry(20, 2)],
+      markers: [1],
+      markerAttributes: [null],
+      booster: { enabled: true, bonus: 5, startsAt: null, expiresAt: NOW + 30 * 86_400_000 },
+    };
+    const got = schedulePlan(plan, inputs(), NOW);
+    const bare = schedulePlan({ ...plan, booster: undefined }, inputs(), NOW);
+    const expected = computeSkillPlanSchedule({
+      entries: plan.entries,
+      skills: catalog.engineSkills,
+      trainedSkills: new Map(),
+      attributes: ATTRIBUTES,
+      implants: {},
+      boosters: [
+        {
+          bonus: {
+            intelligence: 5,
+            memory: 5,
+            perception: 5,
+            willpower: 5,
+            charisma: 5,
+          },
+          expiresAt: new Date(plan.booster.expiresAt),
+        },
+      ],
+      markers: [1],
+      markerAttributes: [null],
+      cloneState: 'omega',
+      startDate: new Date(NOW),
+    });
+    expect(got.finish).toEqual(expected.finish);
+    expect(got.totalSeconds).toBe(expected.totalSeconds);
+    expect(got.totalSeconds).toBeLessThan(bare.totalSeconds);
+  });
+
+  it('starts where the live queue ends for skills the plan does not list', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
+    const s = schedulePlan(
+      { entries: [entry(10, 2)] },
+      inputs({ queueEntries: [{ ...queued(queueEnd), skill_id: 99 }] }),
+      NOW
+    );
+    expect(s.startDate.getTime()).toBe(queueEnd);
+    expect(s.scheduled.map((step) => `${step.skillTypeID}:${step.level}`)).toEqual([
+      '10:1',
+      '10:2',
+    ]);
+  });
+
+  it('pins a plan entry that is also the in-progress queue head to its real finish_date', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
+    const s = schedulePlan(
+      { entries: [entry(10, 2)] },
+      inputs({ queueEntries: [queued(queueEnd)] }),
+      NOW
+    );
+    // The queue's head (skill 10 level 1) is training right now and finishes
+    // at queueEnd regardless of also being a plan entry — the plan is costed
+    // as already trained to level 1 as of then, not recomputed from `now`.
+    expect(s.startDate.getTime()).toBe(queueEnd);
+    expect(s.totalSeconds).toBeGreaterThan(0);
+    expect(s.scheduled).toHaveLength(1);
+    expect(s.scheduled[0]).toMatchObject({ skillTypeID: 10, level: 2 });
+  });
+});
+
+describe('schedulePlanWith', () => {
+  // The schedule carries non-structural members; compare what the UI reads.
+  const view = (s: ReturnType<typeof schedulePlan>) =>
+    JSON.parse(
+      JSON.stringify({
+        totalSeconds: s.totalSeconds,
+        finish: s.finish,
+        scheduled: s.scheduled,
+        markersResult: s.markersResult,
+      })
+    );
+  const plan = {
+    entries: [entry(10, 2), entry(20, 2)],
+    markers: [1],
+    markerAttributes: [{ ...ATTRIBUTES, intelligence: 27 }],
+  };
+
+  it('with no override equals schedulePlan for the same inputs', () => {
+    expect(view(schedulePlanWith(plan, inputs(), NOW))).toEqual(
+      view(schedulePlan(plan, inputs(), NOW))
+    );
+    expect(view(schedulePlanWith(plan, inputs(), NOW, {}))).toEqual(
+      view(schedulePlan(plan, inputs(), NOW))
+    );
+  });
+
+  it("costs overridden entries and markers instead of the plan's own", () => {
+    const entries = [entry(20, 2), entry(10, 2)];
+    expect(view(schedulePlanWith(plan, inputs(), NOW, { entries, markers: [] }))).toEqual(
+      view(schedulePlan({ ...plan, entries, markers: [] }, inputs(), NOW))
+    );
+    expect(schedulePlanWith(plan, inputs(), NOW, { markers: [] }).totalSeconds).not.toBe(
+      schedulePlanWith(plan, inputs(), NOW).totalSeconds
+    );
+  });
+
+  it("does not carry the plan's markerAttributes when overridden to []", () => {
+    const cleared = schedulePlanWith(plan, inputs(), NOW, { markerAttributes: [] });
+    expect(view(cleared)).toEqual(
+      view(schedulePlan({ ...plan, markerAttributes: [] }, inputs(), NOW))
+    );
+    expect(cleared.totalSeconds).not.toBe(schedulePlanWith(plan, inputs(), NOW).totalSeconds);
+  });
+
+  it('overrides the what-if implants without touching the plan', () => {
+    const withImplants = {
+      ...plan,
+      whatIfImplants: {
+        kind: 'custom' as const,
+        bonuses: { intelligence: 0, memory: 0, perception: 0, willpower: 0, charisma: 0 },
+      },
+    };
+    const base = inputs({ implants: { intelligence: 4, memory: 4 } });
+    const got = schedulePlanWith(withImplants, base, NOW, {
+      whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
+    });
+    expect(view(got)).toEqual(
+      view(schedulePlan({ ...withImplants, whatIfImplants: DEFAULT_WHAT_IF_SELECTION }, base, NOW))
+    );
+    expect(got.totalSeconds).not.toBe(schedulePlanWith(withImplants, base, NOW).totalSeconds);
+  });
+});

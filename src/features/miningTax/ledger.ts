@@ -1,0 +1,190 @@
+/**
+ * Fetch + cache layer for the Moon Mining Tax ledger (issue #523): every
+ * tracked character's personal mining ledger (`GET /characters/{id}/mining/`),
+ * grouped into Mining Ledger Entries via `engine/miningTax`. Default scope is
+ * every tracked character, not the app's usual single-active-character
+ * default (GLOSSARY.md) — the point of the feature is not missing an alt's
+ * obligation — so this fans out over `db.characters` the same way
+ * `features/character/roster.ts` does, rather than reading the active
+ * Character store.
+ */
+import { db, type CharacterRecord } from '@/db';
+import { getCharacterMining } from '@/esi/endpoints';
+import {
+  conditionalPagedFetch,
+  loadPaginatedWithCacheStatus,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
+import { groupMiningYield, type MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
+import { mergeLedgerHistory } from '@/engine/miningTax/ledgerHistory';
+import type { MiningLedgerEntry, MiningLedgerRow } from '@/engine/miningTax/types';
+import { loadGasCloudTypeIds, loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
+import { loadManualIgnoredTypeIds, loadManualMoonOreTypeIds } from './typeOverrides';
+
+export const KEYS = { ledger: 'miningTax:ledger' } as const;
+
+/** One character's raw mining ledger. ESI or cache. */
+export function loadMiningLedger(characterId: number): Promise<StatusResult<MiningLedgerRow[]>> {
+  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+    getCharacterMining(characterId, options)
+  );
+  return loadPaginatedWithCacheStatus(characterId, KEYS.ledger, fetchLive, { conditional });
+}
+
+/**
+ * A character's ledger rows with the device-kept history folded in (issue
+ * #1278): ESI only returns 30 days, so each fetch is merged into the saved
+ * rows and written back. A cached copy older than the last merge is ignored —
+ * it would roll today's growing quantity back. With no cached ledger at all
+ * (a failed first load, a lost token) the saved history still shows.
+ */
+async function withLedgerHistory(
+  characterId: number,
+  cached: CachedResult<MiningLedgerRow[]> | null
+): Promise<MiningLedgerRow[]> {
+  const stored = await db.miningLedgerHistory.get(characterId);
+  if (!cached) return stored?.rows ?? [];
+  const fetchedAt = cached.fetchedAt.getTime();
+  if (stored && fetchedAt <= stored.fetchedAt) return stored.rows;
+  const rows = mergeLedgerHistory(stored?.rows ?? [], cached.data);
+  await db.miningLedgerHistory.put({ characterId, rows, fetchedAt });
+  return rows;
+}
+
+export interface CharacterMiningLedger {
+  characterId: number;
+  characterName: string;
+  entries: MiningLedgerEntry[];
+  /**
+   * type_ids ESI reported that are neither moon ore nor a recognized ordinary
+   * ore/ice — an allowlist gap (a stale SDE snapshot after a CCP patch), never
+   * silently dropped (decision doc).
+   */
+  unclassifiedTypeIds: number[];
+  /** 401/403 (or a failed refresh) on this character's ledger read. */
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+  fromCache: boolean;
+}
+
+/**
+ * Every tracked character's Mining Ledger Entries at once. Cache-first per
+ * character (same freshness window as every other ESI-backed view), fanned
+ * out at `ESI_FANOUT_CONCURRENCY` like `roster.ts`'s live mode — one entry
+ * per Character, never failing the whole read because one character's ledger
+ * call failed.
+ */
+export async function loadAllCharacterLedgers(): Promise<CharacterMiningLedger[]> {
+  const characters: CharacterRecord[] = await db.characters.toArray();
+  if (characters.length === 0) return [];
+
+  const [moonOreTypeIds, oreAndIceTypeIds, manualMoonOreOverrides, manualIgnored] =
+    await Promise.all([
+      loadMoonOreTypeIds(),
+      loadOreAndIceTypeIds(),
+      loadManualMoonOreTypeIds(),
+      loadManualIgnoredTypeIds(),
+    ]);
+  // "Tag as moon ore" (typeOverrides.ts) counts as moon ore from now on, in
+  // both sets: it groups into entries going forward, and it must stop
+  // showing up as unclassified. "Ignore" only joins the broader set — it
+  // stops being flagged, but is never grouped into a moon-mining entry,
+  // exactly like an already-recognized asteroid ore or ice type.
+  const moonOreSet = new Set([...moonOreTypeIds, ...manualMoonOreOverrides]);
+  const oreAndIceSet = new Set([...oreAndIceTypeIds, ...manualMoonOreOverrides, ...manualIgnored]);
+
+  const results: CharacterMiningLedger[] = characters.map((c) => ({
+    characterId: c.characterId,
+    characterName: c.name,
+    entries: [],
+    unclassifiedTypeIds: [],
+    needsReauth: false,
+    fetchedAt: null,
+    fromCache: true,
+  }));
+
+  await mapWithConcurrencyLimit(results, ESI_FANOUT_CONCURRENCY, async (result) => {
+    const { cached, needsReauth } = await loadMiningLedger(result.characterId);
+    result.needsReauth = needsReauth;
+    if (!cached) return;
+    result.fetchedAt = cached.fetchedAt;
+    result.fromCache = cached.fromCache;
+    result.entries = groupMiningLedger(cached.data, result.characterId, moonOreSet);
+    result.unclassifiedTypeIds = [
+      ...new Set(
+        cached.data.filter((row) => !oreAndIceSet.has(row.type_id)).map((row) => row.type_id)
+      ),
+    ].sort((a, b) => a - b);
+  });
+
+  return results;
+}
+
+export interface CharacterMiningYield {
+  characterId: number;
+  characterName: string;
+  /** Every ore/ice and gas entry, moon ore included — the Mining Yield Overview tab (issues #671, #880), unfiltered by `groupMiningLedger`'s moon-ore-only allowlist. */
+  entries: MiningYieldEntry[];
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+  fromCache: boolean;
+}
+
+/**
+ * Every tracked character's Mining Yield entries at once — the Overview
+ * tab's data (issue #671), distinct from `loadAllCharacterLedgers`'s
+ * moon-ore-only entries even though both read the same cached ledger rows
+ * (`loadMiningLedger`, so this costs no extra ESI call when the Tax tab has
+ * already loaded this refresh). Same allowlist union and fan-out shape as
+ * `loadAllCharacterLedgers`; see that function's doc for why "ignored"
+ * type_ids still count here.
+ *
+ * Gas cloud harvesting counts too (issue #880): the same ESI ledger reports
+ * it, and a pilot's total mining output is the point of this tab. Gas joins
+ * the allowlist *here only* — `loadAllCharacterLedgers` above is deliberately
+ * left reading the ore/ice set alone, so the Tax tab's moon-ore-vs-
+ * unclassified split is exactly what it was.
+ */
+export async function loadAllCharacterYields(): Promise<CharacterMiningYield[]> {
+  const characters: CharacterRecord[] = await db.characters.toArray();
+  if (characters.length === 0) return [];
+
+  const [oreAndIceTypeIds, gasCloudTypeIds, manualMoonOreOverrides, manualIgnored] =
+    await Promise.all([
+      loadOreAndIceTypeIds(),
+      loadGasCloudTypeIds(),
+      loadManualMoonOreTypeIds(),
+      loadManualIgnoredTypeIds(),
+    ]);
+  const harvestedSet = new Set([
+    ...oreAndIceTypeIds,
+    ...gasCloudTypeIds,
+    ...manualMoonOreOverrides,
+    ...manualIgnored,
+  ]);
+
+  const results: CharacterMiningYield[] = characters.map((c) => ({
+    characterId: c.characterId,
+    characterName: c.name,
+    entries: [],
+    needsReauth: false,
+    fetchedAt: null,
+    fromCache: true,
+  }));
+
+  await mapWithConcurrencyLimit(results, ESI_FANOUT_CONCURRENCY, async (result) => {
+    const { cached, needsReauth } = await loadMiningLedger(result.characterId);
+    result.needsReauth = needsReauth;
+    if (cached) {
+      result.fetchedAt = cached.fetchedAt;
+      result.fromCache = cached.fromCache;
+    }
+    const rows = await withLedgerHistory(result.characterId, cached);
+    result.entries = groupMiningYield(rows, result.characterId, harvestedSet);
+  });
+
+  return results;
+}

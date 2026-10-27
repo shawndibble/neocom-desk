@@ -1,0 +1,782 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { cleanup, render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import '@/i18n';
+import { db, type BuildPlanRecord } from '@/db';
+import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
+import { usePublicInfo } from '@/stores/publicInfo';
+import { useAuthFailure } from '@/stores/authFailure';
+import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
+import { resetRevalidationState } from '@/esi/cache';
+import { clearMarketPriceCache } from '@/market/prices';
+import { clearCostIndexCache } from '@/features/industry/marketData';
+import { useBuildGroups } from '@/features/industry/buildGroups';
+import { useAssumedMe } from '@/features/industry/assumedMe';
+import {
+  DEFAULT_FACILITY_DEFAULTS,
+  useFacilityDefaults,
+} from '@/features/industry/facilityDefaults';
+import {
+  DEFAULT_REACTION_FACILITY_DEFAULTS,
+  useReactionFacilityDefaults,
+} from '@/features/industry/reactionFacilityDefaults';
+import type { BlueprintMap, TypeMap } from '@/sde/types';
+
+// The "vs 90d" figures read market history; nothing here is about them.
+vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
+/**
+ * The boot cache warm-up starts on a 2 s timer under jsdom, so one test's
+ * run outlives it and lands in the next: a /skillqueue read it planned under
+ * `resetSession`'s scoped token hit the scopeless test's counter. The plan
+ * page reads nothing it warms.
+ */
+vi.mock('@/app/bootPrefetch', () => ({
+  scheduleBootPrefetch: () => () => {},
+  scheduleCachePrune: () => () => {},
+  scheduleLazySdeWarm: () => () => {},
+}));
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: () => ({
+    needRefresh: [false, vi.fn()],
+    offlineReady: [false, vi.fn()],
+    updateServiceWorker: vi.fn(),
+  }),
+}));
+
+// Small hand-made fixture, not the real SDE: one blueprint (Rifter, typeID
+// 638) with two priced materials (Tritanium, Mechanical Parts) and a
+// material with no hub orders (Pyerite), to exercise the unpriced-material
+// flag end to end. Three materials (not two) so materialCost/totalCost never
+// coincide with a single line total in the rendered numbers.
+const BLUEPRINTS: BlueprintMap = {
+  '638': {
+    name: 'Rifter Blueprint',
+    time: 1200,
+    materials: [
+      { typeID: 34, quantity: 100 },
+      { typeID: 35, quantity: 50 },
+      { typeID: 9840, quantity: 10 },
+    ],
+    products: [{ typeID: 587, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  // Manufactures one of the Rifter's own materials, so the materials table
+  // has both a build-able row (Mechanical Parts) and rows nothing produces
+  // (the two minerals) to tell the context menu's two Build Plan states apart.
+  '9841': {
+    name: 'Mechanical Parts Blueprint',
+    time: 300,
+    materials: [{ typeID: 34, quantity: 20 }],
+    products: [{ typeID: 9840, quantity: 5 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+};
+const TYPES: TypeMap = {
+  '587': { name: 'Rifter', groupID: 25, volume: 27289 },
+  '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
+  '9840': { name: 'Mechanical Parts', groupID: 428, volume: 0.03 },
+};
+
+vi.mock('@/sde/loadSde', () => ({
+  loadSkills: vi.fn(async () => []),
+  loadTypes: vi.fn(async () => TYPES),
+  loadBlueprints: vi.fn(async () => BLUEPRINTS),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  // The `?product=` deep link resolves through `Industry.tsx` before landing
+  // on the plan's own page (`BuildPlanContextMenu`'s "Build Plan" action),
+  // and that route loads this unconditionally for its Opportunities tab.
+  loadMarketWideTrees: vi.fn(async () => ({})),
+  // ItemDetailModal (opened via "Show info" below) loads this unconditionally.
+  loadSkillAttributeModifiers: vi.fn(async () => ({})),
+}));
+// ItemDetailModal reads the baked type-info shard first. Mocked rather than
+// fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers below.
+vi.mock('@/sde/loadTypeInfo', () => ({ loadTypeInfo: vi.fn(async () => null) }));
+
+// ItemDetailModal (opened from the plan's item menus) resolves
+// attribute ids through this dictionary. Mocked rather than fetched: the real
+// loader reads a public/data file, and `onUnhandledRequest: 'error'` rejects it.
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadAttributeDictionary: vi.fn(async () => ({
+    9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+  })),
+  loadGlobalMarkets: vi.fn(async () => []),
+  // Broker-fee standings resolution (#1238): `useTradeHubStandings` reaches
+  // `lookupNpcStation` for every Trade Hub on every render of a page that
+  // knows the active character, which imports this.
+  loadNpcStations: vi.fn(async () => []),
+}));
+
+const CHAR_ID = 91;
+const emptySkillsPayload = { skills: [], total_sp: 0, unallocated_sp: 0 };
+
+function fuzzworkHandler() {
+  return http.get('https://market.fuzzwork.co.uk/aggregates/', ({ request }) => {
+    const url = new URL(request.url);
+    const types = url.searchParams.get('types')?.split(',') ?? [];
+    const body: Record<string, unknown> = {};
+    for (const t of types) {
+      if (t === '34') body[t] = { sell: { min: '10', volume: '10', orderCount: '1' } };
+      else if (t === '9840') body[t] = { sell: { min: '50', volume: '5', orderCount: '1' } };
+      else if (t === '587') body[t] = { sell: { min: '100000', volume: '1', orderCount: '1' } };
+      else body[t] = { sell: { orderCount: '0' } }; // Pyerite: no sell orders -> unpriceable
+    }
+    return HttpResponse.json(body);
+  });
+}
+
+const server = setupServer(
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+    HttpResponse.json(emptySkillsPayload)
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+    HttpResponse.json([])
+  ),
+  http.get('https://esi.evetech.net/markets/prices', () =>
+    HttpResponse.json([
+      { type_id: 34, adjusted_price: 8 },
+      { type_id: 35, adjusted_price: 3 },
+      { type_id: 9840, adjusted_price: 20 },
+    ])
+  ),
+  http.get('https://esi.evetech.net/industry/systems', () =>
+    HttpResponse.json([
+      {
+        solar_system_id: 30000142,
+        cost_indices: [{ activity: 'manufacturing', cost_index: 0.05 }],
+      },
+      {
+        solar_system_id: 30002187,
+        cost_indices: [{ activity: 'manufacturing', cost_index: 0.002 }],
+      },
+    ])
+  ),
+  // The plan panel reconciles its security band against the system it builds
+  // in (`useDerivedSecurityBand`). Tama is lowsec, Badivefi highsec.
+  http.get('https://esi.evetech.net/universe/systems/:id', ({ params }) => {
+    const id = Number(params.id);
+    return HttpResponse.json(
+      id === 30002813
+        ? { system_id: id, name: 'Tama', security_status: 0.2825 }
+        : { system_id: id, name: 'Badivefi', security_status: 0.6587 }
+    );
+  }),
+  fuzzworkHandler()
+);
+
+function seedPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
+  return {
+    id: 'bp-1',
+    characterId: CHAR_ID,
+    name: 'Rifter run',
+    blueprintTypeID: 638,
+    runs: 1,
+    me: 0,
+    te: 0,
+    facility: 'npcStation',
+    rigLevel: 'none',
+    security: 'highsec',
+    hubId: 'jita',
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
+afterAll(() => server.close());
+
+/** The plan's inputs fold behind "Edit setup"; tests that read them open it first. */
+async function openSetup(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Edit setup' }));
+}
+
+// `useIsDesktop()` drives more than the old list/detail split (now gone) —
+// the Costs panel's own default-expanded state falls back to it too
+// (`BuildPlanDetail.tsx`'s `costsExpanded = costsOpen ?? isDesktop`). jsdom's
+// unstubbed `matchMedia` never matches, i.e. it reads as narrow, which would
+// collapse that panel by default and hide everything this file asserts on.
+const realMatchMedia = window.matchMedia;
+function stubDesktopViewport() {
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      // Every min-width breakpoint is met, and no max-width one is — a
+      // desktop is not also a phone (`useIsPhone` asks a max-width query).
+      matches: !media.includes('max-width'),
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+
+afterEach(async () => {
+  // Unmount before the handlers go; pending ESI cache loads are settled by the
+  // global afterEach in vitest.setup.dom.ts.
+  cleanup();
+  server.resetHandlers();
+  clearMarketPriceCache();
+  clearCostIndexCache();
+  window.matchMedia = realMatchMedia;
+});
+/** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
+async function resetSession() {
+  stubDesktopViewport();
+  resetRevalidationState();
+  await db.characters.clear();
+  await db.tokens.clear();
+  await db.settings.clear();
+  await db.skillPlans.clear();
+  await db.esiCache.clear();
+  await db.buildPlans.clear();
+  await db.quickbars.clear();
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  useBuildGroups.setState({ value: {}, hydrated: false });
+  // A location edit on the plan page writes these; none may leak to the next test.
+  useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
+  useReactionFacilityDefaults.setState({
+    value: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    hydrated: false,
+  });
+  usePublicInfo.setState({ byCharacterId: {} });
+  useAuthFailure.setState({ failure: null });
+
+  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.tokens.put({
+    characterId: CHAR_ID,
+    accessToken: 'access-token',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-skills.read_skillqueue.v1'],
+  });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+
+  // Every test here is about `/industry/plans/:id` (`bp-1`, `seedPlan`'s
+  // default id) directly — unlike the old `/industry` list+detail split,
+  // nothing here falls back into a plan; a test that needs a different one
+  // pushes its own path after seeding it.
+  window.history.pushState({}, '', '/industry/plans/bp-1');
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the plan page, so no test pays for the first one.
+  // A worker's first `App` render — compiling the lazy route chunks, warming
+  // jsdom and React — cost 3-6s on top of the ~1s a warm render takes, and
+  // it landed on whichever test ran first, tipping that one past the 10s test
+  // timeout under parallel load. Done here under the hook's own budget.
+  await Promise.all([routeChunks.loadIndustryPlanPage(), routeChunks.loadIndustry()]);
+  await resetSession();
+  await db.buildPlans.add(seedPlan());
+  const { unmount } = render(<App />);
+  await screen.findByRole('heading', { name: 'Rifter' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+  clearMarketPriceCache();
+  clearCostIndexCache();
+  window.matchMedia = realMatchMedia;
+}, 30_000);
+
+beforeEach(resetSession);
+
+describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
+  it('gives the facility tax input an accessible tooltip without polluting its label', async () => {
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    await openSetup(user);
+    // ME/TE are no longer pilot-set inputs (Blueprint Acquisition, issue
+    // #838): the setup chips show the resolved tier instead, with no
+    // tooltip trigger of their own.
+    expect(screen.queryByRole('button', { name: 'About ME' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About TE' })).not.toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'About facility tax' })).not.toBeInTheDocument();
+    // Facility folds behind "Override" now that the location search fills it.
+    await user.click(screen.getByRole('button', { name: /Override/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Facility' }));
+    await user.click(await screen.findByRole('option', { name: 'Raitaru' }));
+    // The facility write is a read-modify-write transaction, so the tax field
+    // appears on the render after the store reports it.
+    expect(await screen.findByLabelText('Facility tax %')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About facility tax' })).toBeInTheDocument();
+  });
+});
+
+describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
+  it('keeps Runs in the hero and the rest under Location & market', async () => {
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    await openSetup(user);
+    expect(screen.getByText('Location & market')).toBeInTheDocument();
+
+    // Runs is a field in the hero's title row, not the setup form; ME/TE are
+    // not fields at all (Blueprint Acquisition, issue #838, resolves them).
+    expect(screen.getByLabelText('Runs')).toBeInTheDocument();
+    expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
+    // Rig and facility tax belong to a player structure. The seeded plan is an
+    // NPC station, which has neither, so neither control is on screen.
+    expect(screen.queryByLabelText('Rig')).toBeNull();
+    expect(screen.queryByLabelText('Facility tax %')).toBeNull();
+    // Facility and Build system fold behind "Override" — the search box fills
+    // both, and the line under it states what the plan is set to.
+    expect(screen.getByRole('button', { name: /Override/ })).toBeInTheDocument();
+    // Security is no longer a control at all: it follows the build system.
+    expect(screen.queryByLabelText('Security')).toBeNull();
+  });
+});
+
+/**
+ * Signs in a Pilot that only the calling test uses (each test passes its own
+ * `characterId`, never one another test has used), with the queue scope granted and
+ * `queue` as its /skillqueue. Not CHAR_ID: an earlier test's background read of
+ * CHAR_ID's queue can land in `esiCache` after `resetSession` cleared it, and
+ * the next test then reads that stale empty queue as fresh instead of fetching
+ * its own (a CI flake). A row keyed to a Character no other test uses can't be poisoned by it.
+ */
+async function signInWithQueue(characterId: number, queue: unknown[]) {
+  await db.characters.put({ characterId, name: 'Pilot Queue', ownerHash: 'ohq', addedAt: 3 });
+  await db.tokens.put({
+    characterId,
+    accessToken: 'access-token-q',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-skills.read_skillqueue.v1'],
+  });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: characterId });
+  const esi = `https://esi.evetech.net/characters/${characterId}`;
+  server.use(
+    http.get(`${esi}/skills`, () => HttpResponse.json(emptySkillsPayload)),
+    http.get(`${esi}/blueprints`, () => HttpResponse.json([])),
+    http.get(`${esi}/industry/jobs`, () => HttpResponse.json([])),
+    http.get(`${esi}/skillqueue`, () => HttpResponse.json(queue))
+  );
+  await db.buildPlans.add(seedPlan({ characterId }));
+}
+
+describe('IndustryPlanPage: /skills is stale until the character logs in', () => {
+  it('applies an Industry level the queue finished in the past, which /skills omits', async () => {
+    // Base blueprint time is 1200s (20m). Industry V is -4%/level, so a
+    // credited level 5 lands at 960s (16m). ESI says past-finish_date queue
+    // entries must be applied on top of /skills, which here reports nothing.
+    await signInWithQueue(93, [
+      {
+        skill_id: 3380, // Industry
+        queue_position: 0,
+        finished_level: 5,
+        start_date: '2026-01-01T00:00:00Z',
+        finish_date: '2026-01-05T00:00:00Z',
+      },
+    ]);
+    render(<App />);
+
+    expect(await screen.findByText('16m')).toBeInTheDocument();
+    expect(screen.queryByText('20m')).not.toBeInTheDocument();
+  });
+
+  it('does not credit a paused queue entry, which carries no finish date', async () => {
+    // peterhaneve/evemon#40: an absent date is "ETA unknown", never "done".
+    await signInWithQueue(94, [{ skill_id: 3380, queue_position: 0, finished_level: 5 }]);
+    render(<App />);
+
+    expect(await screen.findByText('20m')).toBeInTheDocument();
+  });
+
+  it('skips the queue read and shows no reauth notice when the character never granted the queue scope', async () => {
+    // A character of its own, not CHAR_ID: an earlier test's background read
+    // of CHAR_ID's queue can still land after this one starts, and must not
+    // count as this character's read (a CI flake when it shared CHAR_ID).
+    const SCOPELESS_ID = 92;
+    await db.characters.put({
+      characterId: SCOPELESS_ID,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await db.tokens.put({
+      characterId: SCOPELESS_ID,
+      accessToken: 'access-token-2',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: [],
+    });
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: SCOPELESS_ID });
+    let queueRequests = 0;
+    const esi = `https://esi.evetech.net/characters/${SCOPELESS_ID}`;
+    server.use(
+      http.get(`${esi}/skills`, () => HttpResponse.json(emptySkillsPayload)),
+      http.get(`${esi}/blueprints`, () => HttpResponse.json([])),
+      http.get(`${esi}/industry/jobs`, () => HttpResponse.json([])),
+      http.get(`${esi}/skillqueue`, () => {
+        queueRequests += 1;
+        return HttpResponse.json([], { status: 403 });
+      })
+    );
+    await db.buildPlans.add(seedPlan({ characterId: SCOPELESS_ID }));
+    render(<App />);
+
+    // No queue correction applied: base blueprint time stands.
+    expect(await screen.findByText('20m')).toBeInTheDocument();
+    expect(queueRequests).toBe(0);
+    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
+  });
+});
+
+describe('IndustryPlanPage: results panel', () => {
+  it('keeps materials and time visible, but shows an empty state instead of cost/profit, when prices are unreachable (offline)', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/industry/systems', () => HttpResponse.error())
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+    expect(screen.getByText('20m')).toBeInTheDocument(); // formatDuration(1200s)
+
+    // findByText: the results panel now shows a distinct "fetching" state
+    // (#409) until the (mocked-to-fail) price fetch settles.
+    // An unreachable price source reads as "unavailable offline", not "try
+    // again shortly" — the folded summary and the panel body both say it.
+    expect((await screen.findAllByText('Prices unavailable right now')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Price data unavailable')).toBeNull();
+    expect(screen.queryByText(/Try again shortly/)).toBeNull();
+    expect(screen.queryByText('Not enough price data for a build-vs-buy verdict.')).toBeNull();
+  });
+});
+
+describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
+  it('opens Log Production already filled with the job’s quantity and cost', async () => {
+    await db.buildPlans.add(seedPlan());
+    // Active Jobs' "Log production" row action navigates here with the
+    // job's runs/cost in navigation state; the Rifter blueprint (typeID 638)
+    // makes 1 unit per run, so 4 runs -> quantity 4. `usr`: react-router's
+    // history wraps every pushed state under that key, and reads the initial
+    // entry's `location.state` from `window.history.state.usr` — a raw
+    // `pushState` without it leaves `location.state` `null`.
+    window.history.pushState(
+      { usr: { logProductionFromJob: { runs: 4, jobFee: 999 } } },
+      '',
+      '/industry/plans/bp-1'
+    );
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Qty')).toHaveValue('4');
+    expect(screen.getByLabelText('Total job cost')).toHaveValue('999');
+  });
+
+  it('multiplies runs by the blueprint’s own per-run product quantity, not just the run count', async () => {
+    // Mechanical Parts Blueprint (typeID 9841) makes 5 units per run — 2 runs
+    // must prefill quantity 10, not 2, proving the seed reads the blueprint's
+    // product quantity rather than assuming 1/run.
+    await db.buildPlans.add(seedPlan({ id: 'bp-2', blueprintTypeID: 9841 }));
+    window.history.pushState(
+      { usr: { logProductionFromJob: { runs: 2, jobFee: 500 } } },
+      '',
+      '/industry/plans/bp-2'
+    );
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Mechanical Parts' });
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Qty')).toHaveValue('10');
+  });
+
+  it('does not reopen Log Production prefilled a second time from PlanVerdictHero’s own button', async () => {
+    await db.buildPlans.add(seedPlan());
+    window.history.pushState(
+      { usr: { logProductionFromJob: { runs: 4, jobFee: 999 } } },
+      '',
+      '/industry/plans/bp-1'
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Log Production' });
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('heading', { name: 'Log Production' })).not.toBeInTheDocument();
+
+    // Two buttons share this name (the hero's own CTA and the Production
+    // Runs panel's header action) — the hero's is the one wired to the same
+    // `logRequest` bump `pendingLogProduction` used, and renders first.
+    const [heroButton] = await screen.findAllByRole('button', { name: 'Log Production' });
+    await user.click(heroButton);
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    // The plan's own (still-loading-priced) estimate, not the job's seed replayed.
+    expect(screen.queryByDisplayValue('999')).not.toBeInTheDocument();
+  });
+
+  it('opens Log Production from Active Jobs’ own row button when its match is the plan already open', async () => {
+    // Active Jobs (in the header, on every industry page including this
+    // one) can show a done job whose single matching plan is the very plan
+    // page it's rendered on — clicking "Log production" there re-navigates
+    // to the same route, which doesn't remount `IndustryPlanPage`, so this
+    // exercises the same-route re-application path rather than a fresh mount.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([
+          {
+            job_id: 1,
+            activity_id: 1,
+            blueprint_type_id: 638,
+            product_type_id: 587,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 3,
+            cost: 4500,
+            start_date: '2020-01-01T00:00:00Z',
+            end_date: '2020-01-01T01:00:00Z',
+            status: 'active',
+          },
+        ])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    // Label and text queries, and role queries only inside the dialog: every
+    // `findByRole` poll walks the whole plan page's accessibility tree, and
+    // polling for the job list and the dialog that way cost this test 3-5s
+    // under parallel load on its own.
+    await userEvent.click(await screen.findByLabelText('Show job list'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
+
+    const dialog = await waitFor(() => {
+      const open = document.querySelector<HTMLElement>('dialog[open]');
+      if (!open) throw new Error('no open dialog yet');
+      return open;
+    });
+    expect(within(dialog).getByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Qty')).toHaveValue('3');
+    expect(within(dialog).getByLabelText('Total job cost')).toHaveValue('4,500');
+  });
+});
+
+describe('IndustryPlanPage: materials row has no menu', () => {
+  it('gives a material row neither a right-click menu nor a More-actions button', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    const row = (await screen.findByText('Mechanical Parts')).closest('tr');
+    if (!row) throw new Error('expected a Mechanical Parts materials row');
+
+    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    fireEvent.contextMenu(row);
+    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('IndustryPlanPage: make-or-buy marker on materials', () => {
+  /**
+   * The row's build/buy control — a real button once a recipe is known
+   * (`MaterialsTable.tsx` unifies the old advisory marker and the build-here
+   * toggle into one icon there), or null when nothing produces the material
+   * at all. The price rationale itself lives in the control's tooltip, not
+   * its accessible name — see the individual tests below.
+   */
+  async function controlFor(name: string) {
+    const row = (await screen.findByText(name)).closest('tr');
+    if (!row) throw new Error(`expected a ${name} materials row`);
+    return within(row).queryByRole('button', { name: /^(Build|Buy) / });
+  }
+
+  it('marks a material this plan is better off building, priced against its own job', async () => {
+    // An owned ME0 BPO: nothing to buy before building, so the verdict is the
+    // job alone. Unowned and unpriced, the blueprint would leave the verdict
+    // unpriceable — no advice, the same as the plan's own total once built.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json([
+          {
+            item_id: 1,
+            type_id: 9841,
+            runs: -1,
+            material_efficiency: 0,
+            time_efficiency: 0,
+            quantity: -1,
+          },
+        ])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    // The control needs no prices to appear — only its tooltip's price
+    // rationale does, so that's what has to wait for the market snapshot.
+    const control = await screen.findByRole('button', {
+      name: 'Build instead: Mechanical Parts',
+    });
+    fireEvent.pointerMove(control);
+    const tooltip = await screen.findByRole('tooltip');
+
+    // 10 Mechanical Parts means 2 runs of 9841: 40 Tritanium at 10 = 400,
+    // plus a fee on an EIV of 320 (index 16 + SCC 12.8 + NPC tax 0.8) —
+    // 42.96 each against the hub's 50.
+    // Suggestion first, then the two prices, then what a click does — which
+    // is the opposite of the suggestion here only when the row is already
+    // built (docs/context/decisions).
+    await waitFor(() =>
+      expect(tooltip).toHaveTextContent(
+        'Suggestion: Build ItBuild 42.96/u at ME 0% · Buy 50.00/u Saves 70 on 10Click to Build'
+      )
+    );
+  });
+
+  it('quotes the sub-job at the ME of a blueprint the character owns', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json([
+          {
+            item_id: 1,
+            type_id: 9841,
+            runs: -1,
+            material_efficiency: 10,
+            time_efficiency: 20,
+            quantity: 1,
+          },
+        ])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    const control = await screen.findByRole('button', {
+      name: 'Build instead: Mechanical Parts',
+    });
+    fireEvent.pointerMove(control);
+    const tooltip = await screen.findByRole('tooltip');
+
+    // ME10 takes the same 2 runs down to 36 Tritanium: 389.6 over 10 units.
+    await waitFor(() => expect(tooltip).toHaveTextContent(/Build 38\.96\/u at ME 10%/));
+  });
+
+  it('leaves minerals with no control — nothing in the SDE produces them', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    // Wait for the row that does get a control, so this can't pass just by
+    // reading the table before it renders.
+    await screen.findByRole('button', { name: 'Build instead: Mechanical Parts' });
+
+    expect(await controlFor('Tritanium')).toBeNull();
+    expect(await controlFor('Pyerite')).toBeNull();
+  });
+
+  it('gives no price rationale when prices are unreachable — a fee-free quote would flatter every build', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/industry/systems', () => HttpResponse.error())
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    expect((await screen.findAllByText('Prices unavailable right now')).length).toBeGreaterThan(0);
+
+    // The control itself still needs no prices to offer building; only the
+    // suggestion does, and that never arrives here. The bubble is then just
+    // what a click will do — never the bare action label, which read as a
+    // recommendation rather than a description.
+    const control = await screen.findByRole('button', {
+      name: 'Build instead: Mechanical Parts',
+    });
+    fireEvent.pointerMove(control);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Click to Build');
+    expect(tooltip).not.toHaveTextContent('Suggestion:');
+  });
+});
+
+describe('IndustryPlanPage: owned-stock scope (#454)', () => {
+  it('defaults to Everywhere, and persists Selected locations to the plan', async () => {
+    const user = userEvent.setup();
+    const plan = seedPlan();
+    await db.buildPlans.add(plan);
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    // The scope lives in the Owned materials popover.
+    await user.click(screen.getByRole('button', { name: /^Owned materials/ }));
+    const select = screen.getByRole('combobox', { name: 'Owned Material Source' });
+    expect(select).toHaveTextContent('Everywhere');
+
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: 'Selected locations' }));
+    // The write is a read-modify-write transaction, so the value reaches the
+    // control on the render after the store reports it, not synchronously.
+    await waitFor(() => expect(select).toHaveTextContent('Selected locations'));
+
+    // No Characters are authenticated in this test, so there is no detected
+    // stock to choose locations from yet.
+    expect(
+      screen.getByText('No detected owned stock yet to choose locations from.')
+    ).toBeInTheDocument();
+
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toEqual({
+        mode: 'selected',
+        locations: [],
+      });
+    });
+
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: 'Everywhere' }));
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toBeUndefined();
+    });
+  });
+});
+
+describe('IndustryPlanPage: not-found handling', () => {
+  it('sends the pilot back to the index for a plan id that does not exist', async () => {
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
+  });
+
+  it("sends the pilot back to the index for another character's plan", async () => {
+    await db.characters.put({
+      characterId: 92,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await db.buildPlans.add(seedPlan({ characterId: 92 }));
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
+  });
+});
+
+describe('IndustryPlanPage: waits for the pricing-settings hydration gate (#2054)', () => {
+  it('shows a spinner instead of the plan, and never mounts it, until Assumed ME hydrates', async () => {
+    // Same reset shape `Settings.test.tsx` uses to force a store back to its
+    // pre-hydration state — `useBuildPlanPricingInputs`'s own mount effect
+    // (`buildPlanPricingInputs.ts`) re-hydrates it once the page renders.
+    useAssumedMe.setState({ value: 0, hydrated: false });
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    // One `waitFor` so the find and the assert run in the same tick: the boot
+    // screen's own spinner is also "Loading" and unmounts as the route lands.
+    await waitFor(() =>
+      expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument()
+    );
+    expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
+
+    // Resolves on its own once the (real, Dexie-backed) hydrate() call
+    // settles — nothing in the test drives it forward by hand.
+    await screen.findByRole('heading', { name: 'Rifter' });
+  });
+});

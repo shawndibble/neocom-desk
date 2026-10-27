@@ -1,0 +1,226 @@
+/**
+ * The applied-DPS graphs (issue #1546): against range and against target
+ * speed, with an optional second Fitting overlaid. Statically imports
+ * `recharts`, so — same rule as `industry/ProductionProfitChart.tsx` — this
+ * must only ever be reached through a dynamic `import()`.
+ *
+ * The overlay is told apart by form, not colour (docs/DESIGN.md: dashed
+ * against solid before reaching for a second hue): both lines are `accent`,
+ * the overlay dashed, and the key draws the dash too.
+ */
+import { scalePx } from '@/lib/fontScale';
+import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
+import {
+  ResponsiveContainer,
+  LineChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Line,
+  type TooltipContentProps,
+} from 'recharts';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { DataTable, type DataTableColumn } from '@/components/ui';
+import { STAT_EYEBROW } from './statKit';
+import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
+
+export interface AppliedDpsRow {
+  /** Metres (range graph) or m/s (speed graph). */
+  x: number;
+  primary: number;
+  overlay?: number;
+}
+
+interface AppliedDpsChartProps {
+  range: AppliedDpsRow[];
+  speed: AppliedDpsRow[];
+  /** Metres — the fixed range the speed graph is worked out at. */
+  speedAtRange: number;
+  /** The overlaid Fitting's name; absent when nothing is overlaid. */
+  overlayName?: string;
+}
+
+const STROKE = 'var(--color-accent)';
+const OVERLAY_DASH = '4 3';
+
+function formatKm(metres: number): string {
+  return fixedFormat(metres % 1000 === 0 ? 0 : 1)(metres / 1000);
+}
+
+function Swatch({ dashed, label }: { dashed: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <svg width="14" height="8" aria-hidden="true">
+        <line
+          x1="0"
+          y1="4"
+          x2="14"
+          y2="4"
+          stroke={STROKE}
+          strokeWidth="2"
+          strokeDasharray={dashed ? OVERLAY_DASH : undefined}
+        />
+      </svg>
+      {label}
+    </span>
+  );
+}
+
+function DpsTooltip({
+  active,
+  payload,
+  formatX,
+}: TooltipContentProps & { formatX: (x: number) => string }): React.ReactElement | null {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload as AppliedDpsRow | undefined;
+  if (!row) return null;
+  return (
+    <ChartTooltipShell>
+      <p className="font-semibold text-text">{formatX(row.x)}</p>
+      {payload.map((entry) => (
+        <p key={String(entry.dataKey)}>
+          {entry.name}: {fixed1(Number(entry.value))}
+        </p>
+      ))}
+    </ChartTooltipShell>
+  );
+}
+
+function Graph({
+  rows,
+  label,
+  xHeader,
+  formatX,
+  overlayName,
+}: {
+  rows: AppliedDpsRow[];
+  label: string;
+  xHeader: string;
+  formatX: (x: number) => string;
+  overlayName?: string;
+}) {
+  const { t } = useTranslation();
+  const primaryName = t('fittings.appliedDps.thisFitting');
+
+  const columns = useMemo<DataTableColumn<AppliedDpsRow>[]>(
+    () => [
+      { id: 'x', header: xHeader, render: (row) => formatX(row.x) },
+      { id: 'primary', header: primaryName, render: (row) => fixed1(row.primary) },
+      ...(overlayName === undefined
+        ? []
+        : [
+            {
+              id: 'overlay',
+              header: overlayName,
+              render: (row: AppliedDpsRow) => fixed1(row.overlay ?? 0),
+            },
+          ]),
+    ],
+    [xHeader, formatX, primaryName, overlayName]
+  );
+
+  // `role="img"` collapses its content for assistive tech, so the sr-only
+  // table is a sibling, never a child.
+  return (
+    <div className="space-y-1">
+      <h4 className={STAT_EYEBROW}>{label}</h4>
+      <div role="img" aria-label={label} className="h-48 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
+            <XAxis
+              dataKey="x"
+              type="number"
+              domain={[0, 'dataMax']}
+              tickFormatter={formatX}
+              stroke="var(--color-text-dim)"
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
+            />
+            <YAxis
+              stroke="var(--color-text-dim)"
+              tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
+              width={scalePx(40)}
+              tickFormatter={(value: number) => fixed0(value)}
+            />
+            <Tooltip content={(props) => <DpsTooltip {...props} formatX={formatX} />} />
+            <Line
+              type="monotone"
+              dataKey="primary"
+              stroke={STROKE}
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+              name={primaryName}
+            />
+            {overlayName !== undefined && (
+              <Line
+                type="monotone"
+                dataKey="overlay"
+                stroke={STROKE}
+                strokeWidth={2}
+                strokeDasharray={OVERLAY_DASH}
+                dot={false}
+                isAnimationActive={false}
+                name={overlayName}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+      <div className="sr-only">
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => String(row.x)}
+          label={label}
+          responsive="table"
+        />
+      </div>
+    </div>
+  );
+}
+
+export default function AppliedDpsChart({
+  range,
+  speed,
+  speedAtRange,
+  overlayName,
+}: AppliedDpsChartProps) {
+  const { t } = useTranslation();
+  const formatRange = useMemo(
+    () => (x: number) => t('fittings.appliedDps.km', { value: formatKm(x) }),
+    [t]
+  );
+  const formatSpeed = useMemo(
+    () => (x: number) => t('fittings.appliedDps.speed', { value: fixed0(x) }),
+    [t]
+  );
+
+  return (
+    <div className="space-y-3">
+      {overlayName !== undefined && (
+        <div className="flex flex-wrap gap-3 text-[0.6875rem] text-text-dim">
+          <Swatch dashed={false} label={t('fittings.appliedDps.thisFitting')} />
+          <Swatch dashed label={overlayName} />
+        </div>
+      )}
+      <Graph
+        rows={range}
+        label={t('fittings.appliedDps.vsRange')}
+        xHeader={t('fittings.appliedDps.rangeHeader')}
+        formatX={formatRange}
+        overlayName={overlayName}
+      />
+      <Graph
+        rows={speed}
+        label={t('fittings.appliedDps.vsSpeed', { km: formatKm(speedAtRange) })}
+        xHeader={t('fittings.appliedDps.speedHeader')}
+        formatX={formatSpeed}
+        overlayName={overlayName}
+      />
+    </div>
+  );
+}

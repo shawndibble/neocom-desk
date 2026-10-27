@@ -1,0 +1,5 @@
+# Scope decisions — BPC Sourcing remembers the Source picks
+
+_Recorded 2026-10-04._
+
+- **BPC Sourcing's Source filter is a remembered default, not URL-only state.** `sourcing.src` stays in the URL, and a device-local setting (`bpcSourcingSources`, `features/bpcContracts/bpcSourcesPref.ts`) sits behind it through `useRememberedUrlParams`, as decision `20260922-221531` lays out: a link's value wins for that view and is never stored, while a bare visit reopens the pilot's last picks. Before this, the Industry tab strip and the rail link both opened the bare path, so a pilot who added Contract BPOs and Market BPOs saw the default two again on every visit. Device-local like the Space filter beside it, not synced like the exclude defaults, which are Settings-page choices. An empty pick is never restored, for the same reason the Space filter refuses one. Rules out remembering the other `sourcing.*` fields (search text, region, ME/TE/runs, price, Distance) under this decision; each would need its own.

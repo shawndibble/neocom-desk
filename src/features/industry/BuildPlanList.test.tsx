@@ -1,0 +1,973 @@
+import { describe, it, expect, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import type { BuildPlanRecord } from '@/db';
+import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+import { BuildPlanList } from './BuildPlanList';
+import { rowStateClassName } from './planRowStyles';
+
+function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }): BuildPlanRecord {
+  return {
+    characterId: 1,
+    blueprintTypeID: 1,
+    runs: 1,
+    me: 0,
+    te: 0,
+    facility: 'npcStation',
+    rigLevel: 'none',
+    security: 'highsec',
+    hubId: 'jita',
+    updatedAt: 0,
+    ...overrides,
+  };
+}
+
+const RIFTER_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 638,
+  blueprint: {
+    name: 'Rifter Blueprint',
+    time: 1200,
+    materials: [],
+    products: [],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  productTypeID: 587,
+  productName: 'Rifter',
+  productNameLower: 'rifter',
+};
+
+const CATALOG: BlueprintCatalog = {
+  entries: [RIFTER_ENTRY],
+  byBlueprintTypeID: new Map([[RIFTER_ENTRY.blueprintTypeID, RIFTER_ENTRY]]),
+  byProductTypeID: new Map<number, BlueprintCatalogEntry>([
+    [RIFTER_ENTRY.productTypeID!, RIFTER_ENTRY],
+  ]),
+  typesById: {},
+};
+
+const EMPTY_CATALOG: BlueprintCatalog = {
+  entries: [],
+  byBlueprintTypeID: new Map(),
+  byProductTypeID: new Map(),
+  typesById: {},
+};
+
+const NOOP_COMPARE_PROPS = {
+  compareMode: false,
+  compareSelectedIds: new Set<string>(),
+  onToggleCompareMode: () => {},
+  onToggleCompareSelected: () => {},
+  onOpenCompare: () => {},
+};
+
+/** Build Groups (issue #626), inert — the tests below are about plans. */
+const NOOP_GROUP_PROPS = {
+  groups: [],
+  expandedGroupIds: new Set<string>(),
+  selectedGroupId: null,
+  onToggleGroup: () => {},
+  onSelectGroup: () => {},
+  onCreateGroup: () => {},
+  onRenameGroup: () => {},
+  onDeleteGroup: () => {},
+  onMovePlan: () => {},
+  onOpenFitImport: () => {},
+  statsByPlanId: new Map(),
+  statsByGroupId: new Map(),
+};
+
+/** The rename field must survive the menu closing: its focus hand-back would otherwise blur (and commit) it. */
+async function expectRenameFieldHeld(name: string) {
+  const field = await screen.findByRole('textbox', { name });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
+  expect(screen.getByRole('textbox', { name })).toBe(field);
+  expect(field).toHaveFocus();
+}
+
+describe('BuildPlanList', () => {
+  const PLANS = [
+    plan({ id: 'a', name: 'Merlin run', updatedAt: 300 }),
+    plan({ id: 'b', name: 'Astero', updatedAt: 100 }),
+  ];
+
+  function renderList(onCreate = () => {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={onCreate}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+      />
+    );
+  }
+
+  it('always shows the blueprint picker, with no separate "new plan" button', () => {
+    renderList();
+    expect(screen.getByRole('searchbox', { name: 'Add Build Plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New plan' })).not.toBeInTheDocument();
+  });
+
+  it('creates a plan directly from the always-visible search', async () => {
+    const onCreate = vi.fn();
+    renderList(onCreate);
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add Build Plan' }), 'Rift');
+    await userEvent.click(await screen.findByRole('button', { name: /Rifter/ }));
+
+    expect(onCreate).toHaveBeenCalledWith(RIFTER_ENTRY);
+  });
+
+  it('lists every plan with no search or sort controls', () => {
+    renderList();
+    expect(screen.getByText('Merlin run')).toBeInTheDocument();
+    expect(screen.getByText('Astero')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('explains the verdict on hover with the build and buy totals it compared', async () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            [
+              'a',
+              {
+                profit: -125_200,
+                verdict: 'build',
+                buildCost: 1_000_000,
+                buyCost: 1_500_000,
+                runs: 1,
+              },
+            ],
+          ])
+        }
+      />
+    );
+
+    await userEvent.hover(screen.getByText('Build'));
+
+    const tip = await screen.findByRole('tooltip');
+    expect(within(tip).getByRole('row', { name: /Build/ })).toHaveTextContent('1,000,000 ISK');
+    expect(within(tip).getByRole('row', { name: /Buy/ })).toHaveTextContent('1,500,000 ISK');
+  });
+
+  it('labels each figure and gives the verdict tag its costs as an accessible name (#3344)', () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            [
+              'a',
+              {
+                profit: -125_200,
+                verdict: 'build',
+                buildCost: 1_000_000,
+                buyCost: 1_500_000,
+                runs: 1,
+              },
+            ],
+          ])
+        }
+      />
+    );
+
+    const row = screen.getByText('Merlin run').closest('li') as HTMLElement;
+    for (const label of ['Profit', 'ISK/h', 'Margin', 'Verdict', 'Runs']) {
+      expect(within(row).getByText(`${label}:`, { selector: '.sr-only' })).toBeInTheDocument();
+    }
+    expect(within(row).getByRole('img', { name: /build.*1,000,000 ISK.*buy.*1,500,000 ISK/i }));
+  });
+});
+
+describe('BuildPlanList: compare mode (#453)', () => {
+  const PLANS = [
+    plan({ id: 'a', name: 'Rifter' }),
+    plan({ id: 'b', name: 'Astero' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  it('draws its heading and actions inside the panel header bar (#1625)', () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+      />
+    );
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 2 })).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: 'Compare' })).toBeInTheDocument();
+  });
+
+  it('shows no checkboxes and a "Compare" toggle when compare mode is off', () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+      />
+    );
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Compare' })).toBeInTheDocument();
+  });
+
+  it('shows a per-row checkbox and a disabled "Compare (N)" button below 2 selections', async () => {
+    const onToggleCompareSelected = vi.fn();
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        compareMode={true}
+        compareSelectedIds={new Set(['a'])}
+        onToggleCompareSelected={onToggleCompareSelected}
+      />
+    );
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+    expect(screen.getByRole('checkbox', { name: 'Select Rifter to compare' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Astero to compare' })).not.toBeChecked();
+
+    const compareButton = screen.getByRole('button', { name: 'Compare (1)' });
+    expect(compareButton).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Astero to compare' }));
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
+  });
+
+  it('enables "Compare (N)" and invokes onOpenCompare once 2+ plans are checked', async () => {
+    const onOpenCompare = vi.fn();
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        compareMode={true}
+        compareSelectedIds={new Set(['a', 'b'])}
+        onOpenCompare={onOpenCompare}
+      />
+    );
+
+    const compareButton = screen.getByRole('button', { name: 'Compare (2)' });
+    expect(compareButton).toBeEnabled();
+    await userEvent.click(compareButton);
+    expect(onOpenCompare).toHaveBeenCalled();
+  });
+});
+
+describe('BuildPlanList: build groups (#626)', () => {
+  const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker — Buzzard", order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'b', name: 'Data Analyzer II', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderGrouped(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        {...overrides}
+      />
+    );
+  }
+
+  it('collapses a group by default, hiding its members', () => {
+    renderGrouped();
+    expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
+    expect(screen.queryByText('Data Analyzer II')).not.toBeInTheDocument();
+  });
+
+  it('names the ship from the stored group name, not from whichever member sorts first', () => {
+    // Nothing marks which plan is the hull, and every ordering that could
+    // stand in for one (insertion order, newest updatedAt) names a different
+    // plan the moment a member is edited. So Fit Import puts the ship in the
+    // name and the list never derives it.
+    renderGrouped();
+    expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
+  });
+
+  it('shows the members once expanded', () => {
+    renderGrouped({ expandedGroupIds: new Set(['g1']) });
+    expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
+  });
+
+  it('shows the full group name in a tooltip when truncated (#2175)', async () => {
+    const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
+    renderGrouped({
+      groups: [{ id: 'g1', name: longName, order: 0 }],
+    });
+    await userEvent.hover(screen.getByText(longName));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longName);
+  });
+
+  it('shows no tooltip on a plan name, truncated or not', async () => {
+    const longName = 'Punisher Hull Line — bulk run for the Amarr Navy Issue reprocessing project';
+    renderGrouped({
+      plans: [plan({ id: 'a', name: longName, buildGroupId: 'g1' })],
+      expandedGroupIds: new Set(['g1']),
+    });
+    await userEvent.hover(screen.getByText(longName));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('always lists a plan that is in no group', () => {
+    renderGrouped();
+    expect(screen.getByText('Rokh')).toBeInTheDocument();
+  });
+
+  it('lists a plan whose group is gone as an ordinary ungrouped plan', () => {
+    // A group deleted here, or a sync race delivering the plan before the
+    // settings blob — either way the plan must not vanish from the list.
+    renderGrouped({ groups: [] });
+    expect(screen.getByText('Buzzard')).toBeInTheDocument();
+    expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
+  });
+
+  it('toggles a group from its caret', async () => {
+    const onToggleGroup = vi.fn();
+    renderGrouped({ onToggleGroup });
+    await userEvent.click(screen.getByRole('button', { name: /Show or hide the plans in/ }));
+    expect(onToggleGroup).toHaveBeenCalledWith('g1');
+  });
+
+  it('selects every member of a collapsed group at once in compare mode', async () => {
+    // A row checkbox only renders on a visible row, so without this a
+    // collapsed group's plans cannot be compared at all.
+    const onToggleCompareSelected = vi.fn();
+    renderGrouped({ compareMode: true, onToggleCompareSelected });
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('a');
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
+    expect(onToggleCompareSelected).not.toHaveBeenCalledWith('c');
+  });
+
+  it('leaves an already-fully-selected group alone when unticked', async () => {
+    const onToggleCompareSelected = vi.fn();
+    renderGrouped({
+      compareMode: true,
+      compareSelectedIds: new Set(['a']),
+      onToggleCompareSelected,
+    });
+    // Partly selected, so the header ticks the rest rather than clearing.
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
+    expect(onToggleCompareSelected).not.toHaveBeenCalledWith('a');
+  });
+
+  it('renames a group from its context menu, with no separate visible rename button', async () => {
+    // A second always-visible icon here shifted the Est./Verdict/Runs
+    // columns over for every group header — rename lives in the context
+    // menu now, same as a plan row's own name button.
+    renderGrouped();
+    expect(screen.queryByRole('button', { name: /^Rename group/ })).not.toBeInTheDocument();
+
+    const nameButton = screen.getByRole('button', { name: "Loru's Max Hacker — Buzzard" });
+    fireEvent.contextMenu(nameButton);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    await expectRenameFieldHeld('Rename group');
+  });
+});
+
+// What a drop *means* lives in `groupDrop.test.ts` — pure, and every branch of
+// it. Simulating a real dnd-kit drag here would be measuring jsdom's zero-sized
+// rects against a 4px activation distance, which tests the harness rather than
+// the list. So these cover the rendered contract only: the handle is there, and
+// it is deliberately not the accessibility path.
+describe('BuildPlanList: dragging a plan into a group (#627)', () => {
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderDraggable(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+  }
+
+  it('gives every plan row a drag handle', () => {
+    renderDraggable();
+    expect(screen.getAllByTestId('plan-drag-handle')).toHaveLength(2);
+  });
+
+  it('offers no handle at all until there is a group to drag into', () => {
+    // With no groups every drop resolves to the plan's own (absent) group, so
+    // a grab cursor would be advertising a move that cannot happen.
+    renderDraggable({ groups: [] });
+    expect(screen.queryByTestId('plan-drag-handle')).not.toBeInTheDocument();
+  });
+
+  it('keeps the handle out of the tab order and hidden from assistive tech', () => {
+    // Keyboard dragging would step a flat 25px per arrow press and announce
+    // raw droppable ids; the per-row menu reaches the same destinations
+    // properly, so the handle is pointer-only on purpose.
+    renderDraggable();
+    for (const handle of screen.getAllByTestId('plan-drag-handle')) {
+      expect(handle).toHaveAttribute('aria-hidden', 'true');
+      expect(handle).toHaveAttribute('tabindex', '-1');
+      // Without this a touch-drag scrolls the list instead of dragging (#408).
+      expect(handle).toHaveClass('touch-none');
+    }
+  });
+
+  it('keeps one trailing ⋮ per row and no standalone Delete or Move to group button', () => {
+    renderDraggable();
+    expect(screen.queryByRole('button', { name: /Move to group/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More actions for Rokh' })).toBeInTheDocument();
+  });
+
+  it('opens "Move to group" from the row context menu, reachable via focus + the native menu key', () => {
+    // The row's name button is a real tab stop, so Shift+F10 / the Menu key —
+    // which the browser turns into a `contextmenu` event on whatever has
+    // focus — reaches it without a mouse. Tests fake that translation the
+    // same way `ContextMenu.test.tsx` does: focus, then `fireEvent.contextMenu`.
+    renderDraggable();
+    const target = screen.getByText('Rokh');
+    target.focus();
+    fireEvent.contextMenu(target);
+    expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
+  });
+
+  it('renders no drag overlay while nothing is being dragged', () => {
+    // The overlay repeats the dragged plan's name, so an always-mounted one
+    // would put a second copy of that text in the document.
+    renderDraggable();
+    expect(screen.getAllByText('Rokh')).toHaveLength(1);
+  });
+
+  it('leaves a collapsed group its header row, the only thing a drop can land on', () => {
+    renderDraggable({ expandedGroupIds: new Set<string>() });
+    expect(screen.getByText('Buzzard fit')).toBeInTheDocument();
+    expect(screen.queryByText('Buzzard')).not.toBeInTheDocument();
+  });
+});
+
+// Covers the visible "More actions" button beside a plan row's name (WCAG
+// 2.1.1 fix for keyboard-unreachable row actions, issue #1498) and that it
+// lists the same items as the right-click menu, including the "Move to
+// group" submenu's destinations.
+describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderWithGroups(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+  }
+
+  it('gives the row a focusable "More actions" button naming the plan', () => {
+    renderWithGroups();
+    expect(screen.getByRole('button', { name: 'More actions for Rokh' })).toBeInTheDocument();
+  });
+
+  it('opens the same items from the button as from the row context menu, including group destinations', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
+
+    // Clicking the sub-trigger opens its submenu, same as a real menu.
+    await user.click(screen.getByRole('menuitem', { name: 'Move to group' }));
+    expect(await screen.findByRole('menuitem', { name: 'Buzzard fit' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
+    await user.keyboard('{Escape}{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    const target = screen.getByText('Rokh');
+    target.focus();
+    fireEvent.contextMenu(target);
+    expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('menuitem', { name: 'Move to group' }));
+    expect(await screen.findByRole('menuitem', { name: 'Buzzard fit' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
+  });
+
+  it('renames the plan from the right-click menu and keeps the field focused', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rokh' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    await expectRenameFieldHeld('Rename');
+  });
+
+  it('renames the plan from the "More actions" button', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+
+    await expectRenameFieldHeld('Rename');
+  });
+});
+
+describe('BuildPlanList: the whole row opens it', () => {
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderRows(overrides: Record<string, unknown> = {}) {
+    const onSelect = vi.fn();
+    const onSelectGroup = vi.fn();
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={onSelect}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        onSelectGroup={onSelectGroup}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+    return { onSelect, onSelectGroup };
+  }
+
+  const rowOf = (name: string) => screen.getByRole('button', { name }).closest('li')!;
+
+  it('opens the plan from a click on blank row space, once', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(rowOf('Rokh'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith('c');
+  });
+
+  it('opens the plan once from the name, not twice', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(screen.getByRole('button', { name: 'Rokh' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the group from a click on its blank header space', async () => {
+    const user = userEvent.setup();
+    const { onSelectGroup, onSelect } = renderRows();
+    await user.click(rowOf('Buzzard fit'));
+    expect(onSelectGroup).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('keeps the caret toggle separate from opening the group', async () => {
+    const user = userEvent.setup();
+    const { onSelectGroup } = renderRows();
+    await user.click(screen.getByRole('button', { name: /Show or hide the plans in Buzzard fit/ }));
+    expect(onSelectGroup).not.toHaveBeenCalled();
+  });
+
+  it('does not open the plan from the ⋮, its menu items or the drag handle', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows();
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    await user.click(screen.getAllByTestId('plan-drag-handle')[1]);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('does not open the plan from the compare checkbox', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderRows({ compareMode: true });
+    await user.click(screen.getByRole('checkbox', { name: /Rokh/ }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('renames on double-click of the name', async () => {
+    const user = userEvent.setup();
+    renderRows();
+    await user.dblClick(screen.getByRole('button', { name: 'Rokh' }));
+    expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+  });
+
+  it('does not open the plan from the click that ends a long touch press', () => {
+    const { onSelect } = renderRows();
+    const row = rowOf('Rokh');
+    fireEvent.pointerDown(row, { pointerType: 'touch' });
+    fireEvent.contextMenu(row);
+    fireEvent.click(row, { detail: 1 });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('gives the plan and group names the entity link style', () => {
+    renderRows();
+    for (const name of ['Rokh', 'Buzzard fit']) {
+      expect(screen.getByRole('button', { name })).toHaveClass(
+        'text-accent',
+        'underline',
+        'dt-primary'
+      );
+    }
+  });
+
+  it('keeps the row hover fill off a live drop target so the accent fill shows', () => {
+    // Pure class recipe: the drop state is internal to a dnd-kit drag.
+    expect(rowStateClassName(false, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(true, true)).not.toContain('hover:bg-panel-2');
+    expect(rowStateClassName(false, false)).toContain('hover:bg-panel-2');
+  });
+
+  it('marks the row as clickable with hover and pressed states', () => {
+    renderRows();
+    const row = rowOf('Rokh');
+    expect(row).toHaveClass('cursor-pointer', 'hover:bg-panel-2', 'active:bg-panel');
+  });
+});
+
+// Covers the visible "More actions" button beside a group header's name
+// (WCAG 2.1.1, issue #1498) — a smaller, one-item version of the same fix,
+// since a group header's only right-click action is Rename.
+describe('BuildPlanList: "More actions" button for a group header (#1498)', () => {
+  const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker — Buzzard", order: 0 }];
+  const PLANS = [plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' })];
+
+  function renderGrouped(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        {...overrides}
+      />
+    );
+  }
+
+  it('gives the header a focusable "More actions" button naming the group', () => {
+    renderGrouped();
+    expect(
+      screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
+    ).toBeInTheDocument();
+  });
+
+  it('opens Rename from the "More actions" button, matching the right-click menu', async () => {
+    const user = userEvent.setup();
+    renderGrouped();
+
+    await user.click(
+      screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
+    );
+    expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual([
+      'Rename',
+      'Delete group',
+    ]);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    await expectRenameFieldHeld('Rename group');
+  });
+});
+
+describe('BuildPlanList sort and owned tag', () => {
+  const PLANS = [
+    plan({ id: 'a', name: 'Merlin run' }),
+    plan({ id: 'b', name: 'Astero' }),
+    plan({ id: 'c', name: 'Bantam' }),
+  ];
+  const stat = (profit: number | null, iskPerHour: number | null, marginPct: number | null) => ({
+    profit,
+    verdict: 'build' as const,
+    runs: 1,
+    iskPerHour,
+    marginPct,
+  });
+
+  function renderSortable(
+    ownedBlueprints: React.ComponentProps<typeof BuildPlanList>['ownedBlueprints'] = []
+  ) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            ['a', stat(100, 5, 10)],
+            ['b', stat(300, 1, 30)],
+            ['c', stat(null, null, null)],
+          ])
+        }
+        ownedBlueprints={ownedBlueprints}
+      />
+    );
+  }
+
+  const order = () =>
+    screen
+      .getAllByRole('button', { name: /^(Merlin run|Astero|Bantam)$/ })
+      .map((b) => b.textContent);
+
+  it('sorts by profit on click, reverses on a second click, and returns to manual order on a third', async () => {
+    const user = userEvent.setup();
+    renderSortable();
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    expect(order()).toEqual(['Astero', 'Merlin run', 'Bantam']);
+
+    await user.click(screen.getByRole('button', { name: 'Profit, sorted descending' }));
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+
+    await user.click(screen.getByRole('button', { name: 'Profit, sorted ascending' }));
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+    expect(screen.getByRole('button', { name: 'Sort by Profit' })).toBeInTheDocument();
+  });
+
+  it('names the active sort direction and draws it with a glyph, not a text arrow', async () => {
+    const user = userEvent.setup();
+    renderSortable();
+    const header = screen.getByRole('button', { name: 'Sort by Profit' });
+    expect(header.querySelector('svg')).not.toBeNull();
+
+    await user.click(header);
+    const active = screen.getByRole('button', { name: 'Profit, sorted descending' });
+    expect(active).toHaveAttribute('aria-pressed', 'true');
+    expect(active.querySelector('svg')).not.toBeNull();
+    expect(active).not.toHaveTextContent(/[↑↓]/);
+    expect(screen.getByRole('button', { name: 'Sort by Margin' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+
+  it('offers ISK/h and Margin as further sortable columns', async () => {
+    const user = userEvent.setup();
+    renderSortable();
+    await user.click(screen.getByRole('button', { name: 'Sort by ISK/h' }));
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+    await user.click(screen.getByRole('button', { name: 'Sort by Margin' }));
+    expect(order()).toEqual(['Astero', 'Merlin run', 'Bantam']);
+  });
+
+  it('tags a picker result the pilot owns instead of showing the raw type id', async () => {
+    renderSortable([
+      {
+        item_id: 1,
+        type_id: 638,
+        runs: -1,
+        material_efficiency: 0,
+        time_efficiency: 0,
+        quantity: 1,
+        location_id: 1,
+        location_flag: 'Hangar',
+      },
+    ]);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add Build Plan' }), 'Rift');
+    const result = await screen.findByRole('button', { name: /Rifter/ });
+    expect(within(result).getByText('Owned')).toBeInTheDocument();
+    expect(result).not.toHaveTextContent('#638');
+  });
+
+  it('shows no tag on a blueprint the pilot does not own', async () => {
+    renderSortable();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add Build Plan' }), 'Rift');
+    const result = await screen.findByRole('button', { name: /Rifter/ });
+    expect(within(result).queryByText('Owned')).not.toBeInTheDocument();
+  });
+});
+
+describe('BuildPlanList: "Fix location" figures (#3348)', () => {
+  const PLANS = [plan({ id: 'a', name: 'Merlin run' }), plan({ id: 'b', name: 'Astero' })];
+  const stat = (verdict: 'build' | 'fixLocation', profit: number) => ({
+    profit,
+    verdict,
+    runs: 1,
+    iskPerHour: 5,
+    marginPct: 10,
+  });
+
+  function renderStats(statsByPlanId: React.ComponentProps<typeof BuildPlanList>['statsByPlanId']) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={statsByPlanId}
+      />
+    );
+  }
+
+  const rowOf = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+  const cellOf = (row: HTMLElement, label: string) =>
+    within(row).getByText(`${label}:`, { selector: '.sr-only' }).parentElement as HTMLElement;
+
+  it('shows readable dim figures and a warning glyph, never opacity', () => {
+    renderStats(
+      new Map([
+        ['a', stat('fixLocation', 125_000)],
+        ['b', stat('build', 300_000)],
+      ])
+    );
+
+    const row = rowOf('Merlin run');
+    for (const label of ['Profit', 'ISK/h', 'Margin']) {
+      expect(cellOf(row, label)).not.toHaveClass('opacity-50');
+    }
+    expect(cellOf(row, 'Profit').querySelector('.text-text-dim')).not.toBeNull();
+    expect(cellOf(row, 'Profit').querySelector('svg')).not.toBeNull();
+    expect(
+      within(row).getByRole('img', { name: "Profit isn't real until the build location is fixed" })
+    ).toBeInTheDocument();
+    expect(within(row).getAllByText('Fix location').length).toBeGreaterThan(0);
+
+    expect(cellOf(rowOf('Astero'), 'Profit').querySelector('svg')).toBeNull();
+  });
+
+  it('sorts "Fix location" plans last by profit, in either direction', async () => {
+    const user = userEvent.setup();
+    renderStats(
+      new Map([
+        ['a', stat('fixLocation', 900_000)],
+        ['b', stat('build', 300_000)],
+      ])
+    );
+    const order = () =>
+      screen.getAllByRole('button', { name: /^(Merlin run|Astero)$/ }).map((b) => b.textContent);
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    expect(order()).toEqual(['Astero', 'Merlin run']);
+    await user.click(screen.getByRole('button', { name: 'Profit, sorted descending' }));
+    expect(order()).toEqual(['Astero', 'Merlin run']);
+  });
+});

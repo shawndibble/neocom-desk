@@ -1,0 +1,6 @@
+# Scope decisions — Character cards gain a non-zero attention chip (issue #1793)
+
+_Recorded 2026-09-25 · issue #1793._
+
+- **Characters cards gain one extra warning-tone chip, shown only when non-zero: "Alerts N" and/or a PI "Stopped"/countdown chip, reusing `useAlertCountsByCharacter` and the roster's `piAttention`/`piSoonestExpiryMs` the table already computes.** Extends the card/table split from decision `20260909-130638` and `characterColumns.ts`'s `DEFAULT_VISIBLE_CHARACTER_COLUMNS` doc comment ("the 'needs my attention' signals, not the identity/economy stats the card view … already cover"): a healthy pilot's card stays pixel-identical to before, so the chip doesn't turn the card view into a second copy of the table, only a narrow escape hatch for "something needs you." The card's PI chip only fires for the `idle` (stopped) and `expiring-soon` attention states — `decayed`/`healthy`/`unknown` stay table-only, since those aren't "you must act now" signals.
+- **The card's PI chip shows "Stopped" or a bare countdown ("PI 59m"), not the table's "Expiring soon · 59m" combined wording.** The card chip's label is already "PI", so repeating the attention category in the value would be redundant on a narrower surface that only ever shows the urgent two states.

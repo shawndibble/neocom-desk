@@ -1,0 +1,163 @@
+/**
+ * Narrows the shared Public Contract Offers snapshot down to the blueprint
+ * copies BPC Search searches (issues #906, #907).
+ *
+ * BPC Search used to be fed by its own ingestion pipeline that applied this
+ * filter server-side, one snapshot per consumer. #906 generalized that crawl
+ * to every item type; #907 retired the blueprint-only pipeline and moved the
+ * filter here, so the same twice-hourly snapshot serves both this search and
+ * whatever else reads contract offers. The filter is pure and lives in
+ * `src/engine` rather than in the Firestore read, so it is testable without
+ * touching Firestore and so the read stays a read.
+ */
+import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+
+/** PLEX's type id — what `requestedPlex` counts, and the type a PLEX price is read for. */
+export const PLEX_TYPE_ID = 44992;
+
+/**
+ * One row of the shared snapshot: a for-sale line of a public
+ * item_exchange/auction contract, any item type. Mirrors
+ * `functions/src/publicContracts.ts`'s `PublicContractOfferRow`, which this
+ * module never imports (client and Functions are separate packages).
+ *
+ * ME/TE/runs are blueprint-only columns and are absent — not zero — on a
+ * plain item line, so a reader asks for `isBlueprintCopy` rather than
+ * inferring copy-ness from `runs`. `isBlueprintCopy` means *copy*
+ * specifically: a researched blueprint original carries ME/TE but no flag.
+ */
+export interface PublicContractOfferRow {
+  contractId: number;
+  regionId: number;
+  locationId: number;
+  typeId: number;
+  price: number;
+  buyout?: number;
+  isAuction: boolean;
+  quantity: number;
+  isBlueprintCopy?: true;
+  me?: number;
+  te?: number;
+  runs?: number;
+  /**
+   * PLEX quantity the contract's issuer wants in return, when any (issue
+   * #1080's PLEX-for-item barter) — the same value on every offer row of one
+   * contract, since it describes the requested side, not this one line. Most
+   * such contracts also have `price: 0` (a pure barter), but some ask for an
+   * ISK amount and PLEX together, in which case `price` is that real ask.
+   * Absent, not zero, when the contract asks for nothing PLEX.
+   */
+  requestedPlex?: number;
+  /**
+   * The contract's issuer wants at least one non-PLEX item in return (issue
+   * #3986) — the same on every offer row of one contract. The snapshot keeps
+   * only this yes/no, not which items, so a value comparison can leave the
+   * contract out. Absent, not false, otherwise.
+   */
+  requestsItems?: true;
+  /**
+   * For-sale lines in the contract, the same on every offer row of one
+   * contract (`functions/src/publicContracts.ts`'s `applyLineCounts`). The
+   * Items board reads only the rows of the types it searched, so this is the
+   * one place it can learn a contract is a bundle, or holds several stacks.
+   * Absent on a snapshot published before the field existed: unknown, not
+   * single-line.
+   */
+  lineCount?: number;
+  /** Epoch ms. */
+  dateExpired: number;
+}
+
+/**
+ * Distinct for-sale type IDs per contract, over every line — not only
+ * blueprint copies. A contract's whole price is one indivisible ask
+ * (issue #1076): a bundle mixing one blueprint copy with eleven plain
+ * modules is still a 12-type bundle, even though only the blueprint line
+ * ever reaches `bpcRowsFromContractOffers`'s return value, so the tally has
+ * to be built from `offers` before that filter runs, not after.
+ */
+function distinctTypeCountByContract(
+  offers: readonly PublicContractOfferRow[]
+): Map<number, number> {
+  const typesByContract = new Map<number, Set<number>>();
+  for (const offer of offers) {
+    const types = typesByContract.get(offer.contractId);
+    if (types) types.add(offer.typeId);
+    else typesByContract.set(offer.contractId, new Set([offer.typeId]));
+  }
+  const counts = new Map<number, number>();
+  for (const [contractId, types] of typesByContract) counts.set(contractId, types.size);
+  return counts;
+}
+
+/**
+ * The blueprint copies among a batch of offers, as the rows BPC Search's
+ * filter and columns already speak.
+ *
+ * ME/TE/runs fall back to 0 only because the snapshot omits a blank column
+ * where the retired blueprint-only join wrote `Number('')` — which is 0, not
+ * NaN. The two agree on every copy EVE actually issues (a copy always carries
+ * all three); the fallback is what keeps a malformed row a zeroed row rather
+ * than a NaN one that silently fails every numeric filter.
+ *
+ * `offers` must be every line of every contract the caller wants tallied
+ * correctly (issue #1076) — a contract split across two calls (e.g. one call
+ * per chunk of a chunked snapshot) tallies each half as its own single-type
+ * contract, which is wrong whenever a contract's lines straddle that split.
+ * Callers reading a chunked snapshot must accumulate every chunk's raw rows
+ * first and call this once over the whole thing.
+ */
+export function bpcRowsFromContractOffers(
+  offers: readonly PublicContractOfferRow[]
+): BpcContractRow[] {
+  return blueprintRows(offers, (offer) => offer.isBlueprintCopy === true);
+}
+
+/**
+ * The blueprint *originals* among a batch of offers (issue #1240), in the same
+ * row shape as the copies above so one table can hold both. An original is an
+ * unflagged line that still carries ME/TE: the snapshot writes those columns
+ * only when the archive holds a number, and only a blueprint does (see
+ * `PublicContractOfferRow`'s doc comment). `runs` is the `-1` unlimited
+ * sentinel `CharacterBlueprint` and `BpcOffer` already use — the snapshot
+ * drops a BPO's own `-1` rather than publish it.
+ *
+ * Same `offers` contract as `bpcRowsFromContractOffers`: every line of every
+ * contract, so the multi-type tally is right.
+ */
+export function bpoRowsFromContractOffers(
+  offers: readonly PublicContractOfferRow[]
+): BpcContractRow[] {
+  return blueprintRows(
+    offers,
+    (offer) => !offer.isBlueprintCopy && offer.me !== undefined && offer.te !== undefined
+  ).map((row) => ({ ...row, runs: -1 }));
+}
+
+function blueprintRows(
+  offers: readonly PublicContractOfferRow[],
+  keep: (offer: PublicContractOfferRow) => boolean
+): BpcContractRow[] {
+  const distinctTypeCount = distinctTypeCountByContract(offers);
+  const rows: BpcContractRow[] = [];
+  for (const offer of offers) {
+    if (!keep(offer)) continue;
+    rows.push({
+      contractId: offer.contractId,
+      regionId: offer.regionId,
+      locationId: offer.locationId,
+      typeId: offer.typeId,
+      price: offer.price,
+      ...(offer.buyout === undefined ? {} : { buyout: offer.buyout }),
+      isAuction: offer.isAuction,
+      me: offer.me ?? 0,
+      te: offer.te ?? 0,
+      runs: offer.runs ?? 0,
+      quantity: offer.quantity,
+      ...(offer.requestedPlex === undefined ? {} : { requestedPlex: offer.requestedPlex }),
+      dateExpired: offer.dateExpired,
+      isMultiType: (distinctTypeCount.get(offer.contractId) ?? 1) > 1,
+    });
+  }
+  return rows;
+}

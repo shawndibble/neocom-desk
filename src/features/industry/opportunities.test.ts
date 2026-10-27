@@ -1,0 +1,567 @@
+import { describe, expect, it } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
+import type { CharacterBlueprint } from '@/esi/endpoints';
+import {
+  toIndustryBlueprint,
+  type BlueprintCatalog,
+  type BlueprintCatalogEntry,
+} from './blueprintCatalog';
+import type { BuildResult } from '@/engine/industry/types';
+import {
+  autoRecalculates,
+  buildOpportunityCandidates,
+  computeOpportunityRow,
+  decideOpportunitiesCache,
+  opportunitiesBatchKey,
+  opportunitiesInputsKey,
+  opportunitySnapshotRequest,
+  planForOpportunityCandidate,
+  rankOpportunityRows,
+  type OpportunityCandidate,
+  type OpportunityPricingInputs,
+  type UnrankedOpportunityRow,
+} from './opportunities';
+import { recipeForLookup } from './recipes';
+import { computeBuildPlan } from './computeBuildPlan';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
+import type { MarketSnapshot } from './marketData';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+
+function catalogEntry(
+  blueprintTypeID: number,
+  activity: 'manufacturing' | 'reaction' = 'manufacturing'
+): BlueprintCatalogEntry {
+  return {
+    blueprintTypeID,
+    blueprint: {
+      name: `Blueprint ${blueprintTypeID}`,
+      time: 1200,
+      materials: [{ typeID: 34, quantity: 100 }],
+      products: [{ typeID: blueprintTypeID + 1, quantity: 1 }],
+      skills: [],
+      activity,
+    },
+    productTypeID: blueprintTypeID + 1,
+    productName: `Product ${blueprintTypeID}`,
+    productNameLower: `product ${blueprintTypeID}`,
+  };
+}
+
+function catalog(entries: BlueprintCatalogEntry[]): BlueprintCatalog {
+  const byBlueprintTypeID = new Map(entries.map((e) => [e.blueprintTypeID, e]));
+  return {
+    entries,
+    byBlueprintTypeID,
+    byProductTypeID: new Map(entries.map((e) => [e.productTypeID!, e])),
+    typesById: {},
+  };
+}
+
+function owned(typeId: number, overrides: Partial<CharacterBlueprint> = {}): CharacterBlueprint {
+  return {
+    item_id: typeId * 10,
+    type_id: typeId,
+    quantity: 1,
+    material_efficiency: 10,
+    time_efficiency: 20,
+    runs: -1,
+    location_id: 60003760,
+    location_flag: 'Hangar',
+    ...overrides,
+  };
+}
+
+describe('buildOpportunityCandidates', () => {
+  it('excludes reaction blueprints', () => {
+    const cat = catalog([catalogEntry(1, 'manufacturing'), catalogEntry(2, 'reaction')]);
+    const candidates = buildOpportunityCandidates(
+      new Map([[100, [owned(1), owned(2)]]]),
+      new Map([[100, 'Pilot']]),
+      cat
+    );
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]!.catalogEntry.blueprintTypeID).toBe(1);
+  });
+
+  it('excludes an owned blueprint the SDE catalog does not recognise', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidates = buildOpportunityCandidates(
+      new Map([[100, [owned(1), owned(999)]]]),
+      new Map([[100, 'Pilot']]),
+      cat
+    );
+    expect(candidates.map((c) => c.catalogEntry.blueprintTypeID)).toEqual([1]);
+  });
+
+  it('gives each owned blueprint entity its own candidate id, across characters', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidates = buildOpportunityCandidates(
+      new Map([
+        [100, [owned(1, { item_id: 5 })]],
+        [200, [owned(1, { item_id: 5 })]],
+      ]),
+      new Map([
+        [100, 'Alpha'],
+        [200, 'Bravo'],
+      ]),
+      cat
+    );
+    expect(new Set(candidates.map((c) => c.id)).size).toBe(2);
+  });
+});
+
+describe('planForOpportunityCandidate — plan ownership (issue #1061)', () => {
+  it('stamps the candidate owner for an unsaved pricing preview', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidate: OpportunityCandidate = {
+      id: '200:10',
+      characterId: 200,
+      characterName: 'Alt',
+      blueprint: owned(1),
+      catalogEntry: cat.byBlueprintTypeID.get(1)!,
+    };
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      candidate.characterId,
+      DEFAULT_TRADE_HUB
+    );
+    expect(plan.characterId).toBe(200);
+  });
+
+  it('stamps the row hub onto the seeded plan, so re-pricing it matches (issue #2055)', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidate: OpportunityCandidate = {
+      id: '200:10',
+      characterId: 200,
+      characterName: 'Alt',
+      blueprint: owned(1),
+      catalogEntry: cat.byBlueprintTypeID.get(1)!,
+    };
+    const amarr = { ...DEFAULT_TRADE_HUB, id: 'amarr' as const };
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      candidate.characterId,
+      amarr
+    );
+    expect(plan.hubId).toBe('amarr');
+  });
+
+  it('stamps an explicit owner onto the plan, for Add to Compare seeding the active character', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidate: OpportunityCandidate = {
+      id: '200:10',
+      characterId: 200,
+      characterName: 'Alt',
+      blueprint: owned(1),
+      catalogEntry: cat.byBlueprintTypeID.get(1)!,
+    };
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      100,
+      DEFAULT_TRADE_HUB
+    );
+    expect(plan.characterId).toBe(100);
+  });
+});
+
+describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => {
+  // Root blueprint (1) needs 100 Tritanium (34) per run; a second blueprint
+  // (900) shows Tritanium itself can be built from 10 units of a much
+  // cheaper raw input (999) — building 34 is a huge saving over buying it.
+  const rootEntry = catalogEntry(1);
+  const subEntry: BlueprintCatalogEntry = {
+    blueprintTypeID: 900,
+    blueprint: {
+      name: 'Reprocessed Ore',
+      time: 100,
+      materials: [{ typeID: 999, quantity: 10 }],
+      products: [{ typeID: 34, quantity: 50 }],
+      skills: [],
+      activity: 'manufacturing',
+    },
+    productTypeID: 34,
+    productName: 'Tritanium',
+    productNameLower: 'tritanium',
+  };
+  const cat = catalog([rootEntry, subEntry]);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: owned(1),
+    catalogEntry: rootEntry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 5000, 999: 1 },
+    hubBuyPrices: {},
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1, 999: 1 },
+    systemCostIndex: 0.05,
+  };
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [] });
+
+  function row(depth: number) {
+    return computeOpportunityRow(
+      candidate,
+      snapshot,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      NO_CHARACTER_MODIFIERS,
+      new Map(),
+      {
+        recipeFor,
+        depth,
+      },
+      DEFAULT_TRADE_HUB
+    );
+  }
+
+  it('auto-builds nothing at depth 0 — matches plain (issue #642) behavior', () => {
+    expect(row(0)?.buildHere).toEqual([]);
+  });
+
+  it('picks the cheaper-to-build material at depth 1, and its cost actually rolls into the row', () => {
+    const plain = row(0)!;
+    const auto = row(1)!;
+    expect(auto.buildHere).toEqual([34]);
+    expect(auto.result.totalCost).toBeLessThan(plain.result.totalCost);
+  });
+});
+
+describe('computeOpportunityRow — priced like a Build Plan (issue #2055)', () => {
+  const entry = catalogEntry(1);
+  const cat = catalog([entry]);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: owned(1),
+    catalogEntry: entry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 5 },
+    hubBuyPrices: {},
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1 },
+    systemCostIndex: 0.05,
+  };
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [] });
+  const goodStanding: ResolvedStandings = { factionStanding: 10, corpStanding: 10 };
+
+  function row(standing?: ResolvedStandings) {
+    return computeOpportunityRow(
+      candidate,
+      snapshot,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      NO_CHARACTER_MODIFIERS,
+      new Map(),
+      { recipeFor, depth: 0 },
+      DEFAULT_TRADE_HUB,
+      standing
+    );
+  }
+
+  it('equals a Build Plan seeded from the same candidate, hub and standing (AC1)', () => {
+    const opportunityRow = row(goodStanding)!;
+
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      opportunityRow.materialSourcing,
+      undefined,
+      candidate.characterId,
+      DEFAULT_TRADE_HUB
+    );
+    const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
+    const { result: planResult } = computeBuildPlan({
+      plan,
+      blueprint,
+      systemCostIndex: snapshot.systemCostIndex ?? 0,
+      adjustedPrices: snapshot.adjustedPrices ?? {},
+      hubPrices: snapshot.hubPrices,
+      modifiers: NO_CHARACTER_MODIFIERS,
+      standing: goodStanding,
+      blueprintAcquisition: { blueprintTypeID: candidate.blueprint.type_id, line: null },
+    });
+
+    expect(opportunityRow.result.iskPerHour).toBe(planResult!.iskPerHour);
+  });
+
+  it('gives a Character with real standings a higher ISK/hour than zero standings (AC2)', () => {
+    const zero = row(ZERO_STANDINGS)!;
+    const good = row(goodStanding)!;
+    expect(good.result.iskPerHour!).toBeGreaterThan(zero.result.iskPerHour!);
+  });
+
+  it('treats an absent standing the same as explicit zero standings', () => {
+    expect(row(undefined)!.result.iskPerHour).toBe(row(ZERO_STANDINGS)!.result.iskPerHour);
+  });
+
+  it('owned-blueprint rows include no acquisition cost regardless of Include Blueprint Cost (AC3)', () => {
+    // computeOpportunityRow never reads an Include Blueprint Cost setting —
+    // it always resolves the top-level product as owned/free, so there is no
+    // toggle capable of adding a cost line here in the first place.
+    const opportunityRow = row()!;
+    expect(
+      opportunityRow.result.materials.some((m) => m.typeID === candidate.blueprint.type_id)
+    ).toBe(false);
+  });
+});
+
+describe('opportunitiesBatchKey', () => {
+  function candidate(id: string): OpportunityCandidate {
+    return {
+      id,
+      characterId: 1,
+      characterName: 'Pilot',
+      blueprint: owned(1),
+      catalogEntry: catalogEntry(1),
+    };
+  }
+
+  const hubFor = () => DEFAULT_TRADE_HUB;
+
+  it('is independent of array order', () => {
+    const a = opportunitiesBatchKey([candidate('b'), candidate('a')], hubFor);
+    const b = opportunitiesBatchKey([candidate('a'), candidate('b')], hubFor);
+    expect(a).toBe(b);
+  });
+
+  it('changes when the hub changes', () => {
+    const jita = opportunitiesBatchKey([candidate('a')], hubFor);
+    const amarr = opportunitiesBatchKey([candidate('a')], () => ({
+      ...DEFAULT_TRADE_HUB,
+      id: 'amarr',
+    }));
+    expect(jita).not.toBe(amarr);
+  });
+
+  it('changes when the same candidate now resolves to a different hub', () => {
+    const perCharacter = opportunitiesBatchKey([candidate('a')], (characterId) =>
+      characterId === 1 ? { ...DEFAULT_TRADE_HUB, id: 'amarr' } : DEFAULT_TRADE_HUB
+    );
+    expect(perCharacter).not.toBe(opportunitiesBatchKey([candidate('a')], hubFor));
+  });
+});
+
+describe('opportunitiesInputsKey', () => {
+  const INPUTS: OpportunityPricingInputs = {
+    assumedMe: 10,
+    modifiersByCharacter: new Map([[1, NO_CHARACTER_MODIFIERS]]),
+    standingsByCharacter: new Map([[1, new Map([['jita', ZERO_STANDINGS]])]]),
+    facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    ownedByCharacter: new Map([[1, [owned(1), owned(2)]]]),
+  };
+
+  it('changes when Assumed ME changes', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({ ...INPUTS, assumedMe: 0 })
+    );
+  });
+
+  it('changes when a Character’s modifiers change', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        modifiersByCharacter: new Map([
+          [1, { ...NO_CHARACTER_MODIFIERS, manufacturingTimeImplantPct: 4 }],
+        ]),
+      })
+    );
+  });
+
+  it('changes when a Character’s standing changes (issue #2055)', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        standingsByCharacter: new Map([
+          [1, new Map([['jita', { ...ZERO_STANDINGS, corpStanding: 5 }]])],
+        ]),
+      })
+    );
+  });
+
+  it('changes when facility defaults change', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        facilityDefaults: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+          manufacturing: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing, facilityTaxPct: 5 },
+        },
+      })
+    );
+  });
+
+  it('is the same when only the reaction location changes, which no row reads', () => {
+    // Every candidate is a manufacturing blueprint, so only the manufacturing
+    // record seeds or prices a row; a Reaction Location set on some plan page
+    // must not ask for a Refresh.
+    expect(opportunitiesInputsKey(INPUTS)).toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        facilityDefaults: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+          reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction, facility: 'tatara' },
+        },
+      })
+    );
+  });
+
+  it('changes when an owned blueprint is researched', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        ownedByCharacter: new Map([[1, [owned(1, { material_efficiency: 0 }), owned(2)]]]),
+      })
+    );
+  });
+
+  it('is the same for equal inputs built as fresh objects in a different order', () => {
+    expect(opportunitiesInputsKey(INPUTS)).toBe(
+      opportunitiesInputsKey({
+        ownedByCharacter: new Map([[1, [owned(2), owned(1)]]]),
+        facilityDefaults: {
+          reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction },
+          manufacturing: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing },
+        },
+        standingsByCharacter: new Map([[1, new Map([['jita', { ...ZERO_STANDINGS }]])]]),
+        modifiersByCharacter: new Map([[1, { ...NO_CHARACTER_MODIFIERS }]]),
+        assumedMe: 10,
+      })
+    );
+  });
+});
+
+describe('decideOpportunitiesCache', () => {
+  const rows = [] as never[];
+  const entry = { inputsKey: 'me10', rows };
+
+  it('serves a large batch computed at the same inputs', () => {
+    expect(decideOpportunitiesCache(entry, 'me10', true)).toEqual({ kind: 'serve', rows });
+  });
+
+  it('asks for Refresh, not a silent recompute, when a large batch was priced at other inputs', () => {
+    expect(decideOpportunitiesCache(entry, 'me0', true)).toEqual({ kind: 'needs-refresh' });
+  });
+
+  it('computes a large batch with no cached entry (first visit, or after Refresh)', () => {
+    expect(decideOpportunitiesCache(undefined, 'me10', true)).toEqual({ kind: 'compute' });
+  });
+
+  it('always computes a small batch', () => {
+    expect(decideOpportunitiesCache(entry, 'me10', false)).toEqual({ kind: 'compute' });
+  });
+});
+
+describe('autoRecalculates', () => {
+  it('is true at or below 10, false above', () => {
+    expect(autoRecalculates(10)).toBe(true);
+    expect(autoRecalculates(11)).toBe(false);
+  });
+});
+
+describe('rankOpportunityRows', () => {
+  function buildResult(overrides: Partial<BuildResult> = {}): BuildResult {
+    return {
+      materials: [],
+      seconds: 3600,
+      jobFee: { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 0 },
+      materialCost: 0,
+      totalCost: 1_000_000,
+      buyCost: null,
+      revenue: null,
+      salesTax: null,
+      brokerFee: null,
+      netRevenue: null,
+      profit: null,
+      marginPct: null,
+      iskPerHour: null,
+      grossProfit: null,
+      grossMargin: null,
+      grossIskPerHour: null,
+      breakEvenPrice: null,
+      unpricedMaterials: [],
+      unpriceable: false,
+      recommendation: 'unknown',
+      ...overrides,
+    };
+  }
+
+  function row(id: string, iskPerHour: number | null): UnrankedOpportunityRow {
+    return {
+      candidate: {
+        id,
+        characterId: 1,
+        characterName: 'Pilot',
+        blueprint: owned(1),
+        catalogEntry: catalogEntry(1),
+      },
+      result: buildResult({ iskPerHour, totalCost: 1_000_000 }),
+      sellDepthIsk: 3_000_000,
+      hub: DEFAULT_TRADE_HUB,
+      materialSourcing: {},
+      buildHere: [],
+    };
+  }
+
+  it('sorts by ISK/hour descending and attaches order depth', () => {
+    const ranked = rankOpportunityRows([row('low', 1), row('high', 3)]);
+    expect(ranked.map((r) => r.candidate.id)).toEqual(['high', 'low']);
+    expect(ranked[0]!.orderDepth).toBe('deep');
+  });
+});
+
+describe('opportunitySnapshotRequest — where the job fee is charged', () => {
+  it('prices at the remembered build system, the one a seeded plan will name', () => {
+    // A row priced at the hub's cost index would seed a plan that quotes a
+    // different job fee the moment it is opened.
+    const request = opportunitySnapshotRequest([], DEFAULT_TRADE_HUB, catalog([]), null, {
+      ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      manufacturing: {
+        facility: 'azbel',
+        rigFit: ['none', 'none', 'none'],
+        facilityTaxPct: null,
+        buildSystemId: 30003888,
+        buildSystemName: 'Badivefi',
+      },
+    });
+    expect(request.costIndexSystemId).toBe(30003888);
+  });
+
+  it('prices at the hub when nothing names a build system', () => {
+    const request = opportunitySnapshotRequest(
+      [],
+      DEFAULT_TRADE_HUB,
+      catalog([]),
+      null,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS
+    );
+    expect('costIndexSystemId' in request).toBe(false);
+  });
+
+  it('prices at the hub when the remembered facility cannot manufacture', () => {
+    // `newBuildPlan` refuses such a record whole, so the seeded plan builds
+    // at its hub — and so must the row.
+    const request = opportunitySnapshotRequest([], DEFAULT_TRADE_HUB, catalog([]), null, {
+      ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      manufacturing: {
+        facility: 'tatara',
+        rigFit: ['none', 'none', 'none'],
+        facilityTaxPct: null,
+        buildSystemId: 30003888,
+        buildSystemName: 'Badivefi',
+      },
+    });
+    expect('costIndexSystemId' in request).toBe(false);
+  });
+});

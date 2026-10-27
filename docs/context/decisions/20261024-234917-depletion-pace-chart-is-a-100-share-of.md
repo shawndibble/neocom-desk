@@ -1,0 +1,12 @@
+# Scope decisions — Depletion pace chart is a 100% share-of-progress stacked bar
+
+_Recorded 2026-10-24. Supersedes [Depletion pace-by-ore is per-ore percent lines, not stacked m3/s](20261024-223407-depletion-pace-by-ore-is-per-ore-percent.md); the two-chart layout, shared time axis, `h-32` slot, no toggle and "none with one scan" from [Depletion by ore ends with the pace-by-ore chart](20261024-215425-depletion-by-ore-ends-with-the-pace-by.md) stand._
+
+- **The pace chart under Depletion by ore is one bar per scan interval, split into each mined ore's share of that interval's progress,** on a fixed 0 to 100% axis. Eight percent lines were messy to read; the question the chart answers is "which ore was this scan's mining spent on". An ore's progress is still the percent of its own starting total (`startVolume`) mined in the interval, so a small ore is not drowned by a big one; its share is that percent over the sum of all ores' percents, so slices sum to 100%. An interval where nothing was mined draws an empty bar.
+- **Slice order is fixed, not sorted per bar:** the depletion legend's order and colours, the first (most valuable) ore at the bottom, a 2px surface gap between slices. A fixed order lets the eye follow one ore across scans.
+- **Quiet intervals fade.** Bar opacity runs linearly from 0.35 (nothing mined) to 1 (the busiest interval), by the interval's progress: m³ mined over every ore's starting volume together. Shares alone would give a trivial scrape the same weight as a big one.
+- **The tooltip gives the interval, its length, the field mined this scan, then each active ore, largest share first, with its share and its raw "% of ore".** Idle ores are omitted. The hidden table has one column per mined ore reading "share% (raw%)", plus a Field mined column.
+- **Shares are rounded individually for display,** so a tooltip or table row may total 99 to 101%; the bars themselves are exact.
+- **Fade is relative to the busiest scan of this survey,** not an absolute scale, so the same mining fades differently in a different survey.
+- **The pace chart's top margin is 28, not the shared 20,** to fit the axis title above the bars; horizontal margins are unchanged, so the time axis still lines up with the depletion chart.
+- **The 2px gap is vertical only:** each slice is inset 1px top and bottom, so neighbouring bars touch edge to edge. The tooltip is hidden over the projected stretch after the last scan.

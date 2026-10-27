@@ -1,0 +1,573 @@
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { guarded } from '@/app/routeChunks';
+import { useTranslation } from 'react-i18next';
+import {
+  EmptyState,
+  IskAmount,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+  CachedNotice,
+} from '@/components/ui';
+import { cx } from '@/lib/cx';
+import { useNow } from '@/lib/useNow';
+import { formatMeanCount, formatVolume } from './format';
+import { loadPriceHistory } from './priceHistory';
+import {
+  filterPriceHistoryRange,
+  summarizePriceHistory,
+  movingAverage,
+  PRICE_HISTORY_RANGES,
+  type MarketHistoryPoint,
+  type PriceHistoryRange,
+} from '@/engine/market/priceHistory';
+import { normalizeCompareRegions } from '@/engine/market/priceHistoryCompare';
+import {
+  clipOpenPrices,
+  openPricePoints,
+  PRICE_SERIES_CHOICES,
+  seriesShows,
+  summarizeOpenPrices,
+  type PriceSeriesChoice,
+  type RegionOpenSeries,
+} from '@/engine/market/priceHistoryOpen';
+import { loadMarketOpenPrices, type HubOpenPrices } from './marketOpenPrices';
+import { TRADE_HUBS } from '@/market/hubs';
+import { seriesChoiceLabel } from './priceHistoryLabels';
+import { usePriceHistoryRange } from './priceHistoryRangePref';
+import { usePriceHistorySeries } from './priceHistorySeriesPref';
+import { marketIskDecimals } from '@/lib/isk';
+import type { MarketRegionEntry } from '@/sde/marketTypes';
+import type { ComparedRegionSeries } from './PriceHistoryChart';
+import { CompareRegionsPicker } from './CompareRegionsPicker';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+
+const MOVING_AVERAGE_WINDOW_DAYS = 7;
+const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;
+
+/**
+ * A 7-day window on the 7d range itself collapses to a single point —
+ * restating the hi/lo/median summary as a line rather than showing a trend.
+ * Use a shorter window there instead of hiding the line entirely.
+ */
+function movingAverageWindowDays(range: PriceHistoryRange): number {
+  return range === '7d' ? MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE : MOVING_AVERAGE_WINDOW_DAYS;
+}
+
+/**
+ * Dynamic import, not a static one: `PriceHistoryChart.tsx` statically
+ * imports Recharts, so this is the boundary that keeps the library out of
+ * the initial page bundle — it only loads once the Price History tab is
+ * actually opened.
+ */
+const LazyPriceHistoryChart = lazy(() => guarded(() => import('./PriceHistoryChart')));
+
+/** The Browser's "Compare regions" state, held in its URL (`browser.compare`). */
+export interface PriceHistoryCompare {
+  /** As read from the URL; the panel drops the primary region, repeats and anything past the cap. */
+  regionIds: readonly number[];
+  onChange: (next: number[]) => void;
+  /** Every market region, for the picker and for naming each line. */
+  regions: readonly MarketRegionEntry[];
+  /**
+   * The picker chooses every region, the primary one included: `regionIds`
+   * then holds the picks after the primary, and `onChange` receives the whole
+   * list with the primary first (the Item Detail's Market tab).
+   */
+  picksPrimary?: boolean;
+}
+
+interface PriceHistoryPanelProps {
+  regionId: number;
+  typeId: number;
+  itemName: string;
+  /** Injectable for tests, like `getOrderBook`'s `Clock` — the range filter is otherwise wall-clock-relative. */
+  now?: Date;
+  /**
+   * Absent outside the Browser (the Opportunities modals) and for an item in
+   * its own Global Market Region, where no other region holds its orders —
+   * no Compare control then, and nothing extra is ever fetched.
+   */
+  compare?: PriceHistoryCompare;
+}
+
+type RegionHistoryState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | {
+      status: 'ready';
+      points: readonly MarketHistoryPoint[];
+      /** When this series was read, if it is the saved copy; null for a live read. */
+      cachedAt: number | null;
+    };
+
+const NO_REGIONS: readonly number[] = [];
+
+function regionNameOf(regions: readonly MarketRegionEntry[] | undefined, id: number): string {
+  return regions?.find((region) => region.id === id)?.name ?? String(id);
+}
+
+/**
+ * Each compared region's full daily history, fetched only once that region is
+ * picked — one `loadPriceHistory` per region, through the same cache (until
+ * ESI's `Expires`) the primary region uses. A region that has no entry yet is
+ * still loading; a failed one is retried the next time the picks change.
+ */
+function useComparedHistories(typeId: number, regionIds: readonly number[]) {
+  const [byKey, setByKey] = useState<ReadonlyMap<string, RegionHistoryState>>(new Map());
+  const requested = useRef(new Set<string>());
+  useEffect(() => {
+    for (const regionId of regionIds) {
+      const key = `${regionId}:${typeId}`;
+      if (requested.current.has(key)) continue;
+      requested.current.add(key);
+      loadPriceHistory(regionId, typeId).then(
+        (result) =>
+          setByKey((prev) =>
+            new Map(prev).set(key, {
+              status: 'ready',
+              points: result.points,
+              cachedAt: result.fromCache ? result.fetchedAt : null,
+            })
+          ),
+        () => {
+          requested.current.delete(key);
+          setByKey((prev) => new Map(prev).set(key, { status: 'error' }));
+        }
+      );
+    }
+  }, [typeId, regionIds]);
+  return useMemo(
+    () =>
+      regionIds.map(
+        (regionId): RegionHistoryState =>
+          byKey.get(`${regionId}:${typeId}`) ?? { status: 'loading' }
+      ),
+    [byKey, regionIds, typeId]
+  );
+}
+
+/**
+ * The daily open buy/sell series for the primary region and each compared one,
+ * one read per region and item, started when the panel mounts (so only while
+ * the history is open). `loadMarketOpenPrices` never throws; a region without
+ * a series maps to `null` (and is listed in `missing`), and one still being
+ * read is in neither.
+ * The chart draws its average line for either until the series lands.
+ * A read that came back `null` is not retried for the life of the panel (and
+ * the loader holds a good answer for an hour, never a failure): a failed read
+ * simply leaves that region on its average line until the panel is reopened.
+ */
+function useOpenSeries(typeId: number, regionIds: readonly number[]) {
+  const [byKey, setByKey] = useState<ReadonlyMap<string, HubOpenPrices | null>>(new Map());
+  const requested = useRef(new Set<string>());
+  useEffect(() => {
+    for (const regionId of regionIds) {
+      const key = `${regionId}:${typeId}`;
+      if (requested.current.has(key)) continue;
+      requested.current.add(key);
+      void loadMarketOpenPrices(regionId, typeId).then((series) =>
+        setByKey((prev) => new Map(prev).set(key, series))
+      );
+    }
+  }, [typeId, regionIds]);
+  return useMemo(() => {
+    const series = new Map<number, HubOpenPrices>();
+    const missing = new Set<number>();
+    for (const regionId of regionIds) {
+      const key = `${regionId}:${typeId}`;
+      if (!byKey.has(key)) continue;
+      const stored = byKey.get(key);
+      if (stored) series.set(regionId, stored);
+      else missing.add(regionId);
+    }
+    return { series, missing };
+  }, [byKey, regionIds, typeId]);
+}
+
+function ChartFallback({ label }: { label: string }) {
+  return (
+    <div className="flex justify-center py-8">
+      <Spinner label={label} />
+    </div>
+  );
+}
+
+/** Price History tab body: fetches the region's daily history for the item, then hands it to the lazy chart. */
+export function PriceHistoryPanel({
+  regionId,
+  typeId,
+  itemName,
+  now: nowProp,
+  compare,
+}: PriceHistoryPanelProps) {
+  const { t } = useTranslation();
+  const tick = useNow();
+  const now = useMemo(() => nowProp ?? new Date(tick), [nowProp, tick]);
+  const compareIds = useMemo(
+    () => normalizeCompareRegions(compare?.regionIds ?? NO_REGIONS, regionId),
+    [compare?.regionIds, regionId]
+  );
+  const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
+  // Set only when the primary series on screen is the saved copy; its age, in ms.
+  const [primaryCachedAt, setPrimaryCachedAt] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  // Nothing is fetched for a compared region until the primary one has days
+  // to draw: an empty or failed primary shows its own state, with no chart
+  // for a comparison line to sit on.
+  const comparedHistories = useComparedHistories(
+    typeId,
+    points && points.length > 0 ? compareIds : NO_REGIONS
+  );
+  const openRegionIds = useMemo(() => [regionId, ...compareIds], [regionId, compareIds]);
+  const { series: openSeries, missing: openMissing } = useOpenSeries(typeId, openRegionIds);
+  // The window a trader reads in is a habit, not a property of the item, and
+  // this panel remounts per item — so it comes from disk. Ungated on
+  // `hydrated`, and hydrated above the early returns below so a loading or
+  // empty item still settles it: `loadPriceHistory` fetches the full daily
+  // series either way and the range only slices it, so no range costs a
+  // request the default would not have spent.
+  const range = usePriceHistoryRange((state) => state.value);
+  const setRange = usePriceHistoryRange((state) => state.setValue);
+  useHydratedStore(usePriceHistoryRange);
+  // Distinct from "no history": a thrown fetch failure (network/rate-limit/5xx)
+  // is not the same fact as ESI genuinely having nothing for this item, and
+  // folding the two into one EmptyState would misreport failures as data.
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setPoints(null);
+      setPrimaryCachedAt(null);
+      setError(false);
+      try {
+        const result = await loadPriceHistory(regionId, typeId);
+        if (!cancelled) {
+          setPoints(result.points);
+          setPrimaryCachedAt(result.fromCache ? result.fetchedAt : null);
+        }
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [regionId, typeId]);
+
+  // A compared region's saved copy dates the chart too: the oldest one wins.
+  const cachedAt = comparedHistories.reduce<number | null>(
+    (oldest, state) =>
+      state.status === 'ready' &&
+      state.cachedAt !== null &&
+      (oldest === null || state.cachedAt < oldest)
+        ? state.cachedAt
+        : oldest,
+    primaryCachedAt
+  );
+
+  if (loading) return <ChartFallback label={t('common.loading')} />;
+
+  if (error) {
+    return (
+      <EmptyState
+        title={t('market.priceHistory.errorTitle')}
+        hint={t('market.priceHistory.errorHint')}
+        className="py-8"
+      />
+    );
+  }
+
+  if (!points || points.length === 0) {
+    return (
+      <EmptyState
+        title={t('market.priceHistory.emptyTitle')}
+        hint={t('market.priceHistory.emptyHint')}
+        className="py-8"
+      />
+    );
+  }
+
+  return (
+    <>
+      {cachedAt !== null && <CachedNotice className="px-1 pt-2" fetchedAt={cachedAt} />}
+      <RangedHistory
+        points={points}
+        range={range}
+        onRangeChange={(next) => void setRange(next)}
+        itemName={itemName}
+        now={now}
+        primaryRegionId={regionId}
+        compare={compare}
+        compareIds={compareIds}
+        comparedHistories={comparedHistories}
+        openSeries={openSeries}
+        openMissing={openMissing}
+      />
+    </>
+  );
+}
+
+/**
+ * One summary figure with its name. The label is dimmed and unpunctuated
+ * rather than a `Label:` prefix — five of these sit together, and the colons
+ * read as a list of sentences instead of a readout.
+ */
+function Stat({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className={cx('flex items-baseline gap-1.5', className)}>
+      <span className="text-text-dim">{label}</span>
+      {children}
+    </span>
+  );
+}
+
+interface RangedHistoryProps {
+  points: readonly MarketHistoryPoint[];
+  range: PriceHistoryRange;
+  onRangeChange: (range: PriceHistoryRange) => void;
+  itemName: string;
+  now: Date;
+  primaryRegionId: number;
+  compare: PriceHistoryCompare | undefined;
+  /** Normalized picks, parallel to `comparedHistories`. */
+  compareIds: readonly number[];
+  comparedHistories: readonly RegionHistoryState[];
+  /** Open buy/sell series by region id (its hub station's), for the regions that have one. */
+  openSeries: ReadonlyMap<number, HubOpenPrices>;
+  /** Regions whose open read came back with no series at all. */
+  openMissing: ReadonlySet<number>;
+}
+
+/** Range control + hi/lo/median summary, both derived from the already-fetched points — neither needs the lazy chart loaded. */
+function RangedHistory({
+  points,
+  range,
+  onRangeChange,
+  itemName,
+  now,
+  primaryRegionId,
+  compare,
+  compareIds,
+  comparedHistories,
+  openSeries,
+  openMissing,
+}: RangedHistoryProps) {
+  const { t } = useTranslation();
+  const series = usePriceHistorySeries((state) => state.value);
+  const setSeries = usePriceHistorySeries((state) => state.setValue);
+  useHydratedStore(usePriceHistorySeries);
+  // Cut to the range like the ESI days; a region with no open day left in it
+  // is left out, so it keeps its average line.
+  const openPrices = useMemo<RegionOpenSeries[]>(
+    () =>
+      [...openSeries.entries()]
+        .map(([regionId, stored]) => ({
+          regionId,
+          station: TRADE_HUBS.find((hub) => hub.stationId === stored.stationId)?.stationLabel,
+          points: clipOpenPrices(openPricePoints(stored.series), range, now),
+        }))
+        .filter((o) => o.points.length > 0),
+    [openSeries, range, now]
+  );
+  const primaryOpen = useMemo(
+    () => openPrices.find((o) => o.regionId === primaryRegionId),
+    [openPrices, primaryRegionId]
+  );
+  const openSummary = useMemo(
+    () => (primaryOpen ? summarizeOpenPrices(primaryOpen.points) : null),
+    [primaryOpen]
+  );
+  const regions = compare?.regions;
+  // The summary strip stays the primary region's; compared regions only add
+  // their average line, cut to the same range.
+  const comparisons = useMemo<ComparedRegionSeries[]>(
+    () =>
+      compareIds.map((regionId, i) => {
+        const state = comparedHistories[i] ?? { status: 'loading' };
+        return {
+          regionId,
+          name: regionNameOf(regions, regionId),
+          status: state.status,
+          points: state.status === 'ready' ? filterPriceHistoryRange(state.points, range, now) : [],
+        };
+      }),
+    [compareIds, comparedHistories, regions, range, now]
+  );
+  const filtered = useMemo(() => filterPriceHistoryRange(points, range, now), [points, range, now]);
+  const summary = useMemo(() => summarizePriceHistory(filtered), [filtered]);
+  // Computed over the full unfiltered `points`, then sliced to `range` —
+  // computing it over `filtered` instead would understate the window for
+  // the first days of any range that don't have `windowDays` prior days
+  // inside the filtered slice, even though real history for them exists.
+  const filteredMovingAverage = useMemo(() => {
+    const windowDays = movingAverageWindowDays(range);
+    const fullMovingAverage = movingAverage(points, windowDays);
+    return filterPriceHistoryRange(fullMovingAverage, range, now);
+  }, [points, range, now]);
+
+  return (
+    <div>
+      {/*
+       * Stacked below `sm`, one row above it. Five figures and a select no
+       * longer share a phone-width line: on that screen the summary becomes a
+       * two-column grid and the range control takes a full-width row of its
+       * own, where it is also a full-height tap target rather than something
+       * squeezed against the last number. CSS-only, like `DataTable`'s own
+       * collapse — one markup, no duplicated branch.
+       *
+       * A grid rather than a wrapping flex row: wrapping packed four figures
+       * onto the first line and orphaned the fifth, so the labels landed at a
+       * different x on each line and the block read as ragged text instead of
+       * a readout. Fixed tracks line the labels up.
+       */}
+      {/* `pt-2` only below `sm`. Above it the row is horizontal and the range
+          select is the tallest thing in it, so `items-center` already leaves
+          the figures clear of the tab bar; stacked, they are first in the
+          column with nothing setting a height and sit flush against it. */}
+      <div className="flex flex-col gap-2 px-1 pt-2 pb-2">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:flex sm:flex-wrap sm:gap-x-4">
+          {summary ? (
+            <>
+              <Stat label={t('market.priceHistory.summaryHi')}>
+                <IskAmount value={summary.hi} decimals={marketIskDecimals(summary.hi)} />
+              </Stat>
+              <Stat label={t('market.priceHistory.summaryLo')}>
+                <IskAmount value={summary.lo} decimals={marketIskDecimals(summary.lo)} />
+              </Stat>
+              <Stat label={t('market.priceHistory.summaryMedian')}>
+                <IskAmount value={summary.median} decimals={marketIskDecimals(summary.median)} />
+              </Stat>
+              {/* Units and orders, not ISK — plain figures, so no `IskAmount`
+                  and nothing for its privacy blur to hide. */}
+              {typeof openSummary?.buyMedian === 'number' && seriesShows(series, 'buy') && (
+                <Stat label={t('market.priceHistory.summaryBuyMedian')}>
+                  <IskAmount
+                    value={openSummary.buyMedian}
+                    decimals={marketIskDecimals(openSummary.buyMedian)}
+                  />
+                </Stat>
+              )}
+              {typeof openSummary?.sellMedian === 'number' && seriesShows(series, 'sell') && (
+                <Stat label={t('market.priceHistory.summarySellMedian')}>
+                  <IskAmount
+                    value={openSummary.sellMedian}
+                    decimals={marketIskDecimals(openSummary.sellMedian)}
+                  />
+                </Stat>
+              )}
+              <Stat label={t('market.priceHistory.summaryOrdersPerDay')}>
+                <span className="tabular-nums">{formatMeanCount(summary.meanOrderCount)}</span>
+              </Stat>
+              {/* Last, and across both columns on a phone: traded volume runs
+                  to eight or nine digits where every figure beside it is four
+                  or five, so it is the one that will not share a track. */}
+              <Stat
+                label={t('market.priceHistory.summaryVolume')}
+                className="col-span-2 sm:col-auto"
+              >
+                <span className="tabular-nums">{formatVolume(summary.totalVolume)}</span>
+              </Stat>
+            </>
+          ) : (
+            // Distinct from emptyTitle above (ESI has no history at all) — this
+            // item has history, just none inside the currently selected range.
+            <span className="text-text-dim">{t('market.priceHistory.summaryNone')}</span>
+          )}
+        </div>
+        {/* The summary is a row of its own, and every control shares the one
+            row under it: each a full-width row on a phone, side by side above
+            `sm`. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          {compare && (
+            <CompareRegionsPicker
+              primaryRegionId={compare.picksPrimary ? 0 : primaryRegionId}
+              selected={compare.picksPrimary ? [primaryRegionId, ...compareIds] : compareIds}
+              required={compare.picksPrimary}
+              onChange={compare.onChange}
+              regions={compare.regions}
+              className="w-full sm:w-auto"
+            />
+          )}
+          {/* Always offered, open prices or not: outside the trade hubs the
+              legend says why Buy / Sell draws an average, and Average puts
+              every region on the same line for a fair comparison. */}
+          <Select
+            value={series}
+            onValueChange={(value) => void setSeries(value as PriceSeriesChoice)}
+          >
+            <SelectTrigger
+              size="md"
+              aria-label={t('market.priceHistory.series')}
+              className="w-full sm:w-32"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRICE_SERIES_CHOICES.map((choice) => (
+                <SelectItem key={choice} value={choice}>
+                  {seriesChoiceLabel(t, choice)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={range}
+            onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}
+          >
+            {/*
+             * `md`, not the `sm` this was: DESIGN.md §3's touch tier is the
+             * reason — `sm` resolves to 36px on a phone, a mouse-pointer size,
+             * and this control now owns a full-width row there rather than
+             * sharing a dense one. `md` gives the 36px thumb target on a phone
+             * and the default 36px to a pointer. Nothing else sits in this row,
+             * so no toolbar loses its alignment to the extra 8px.
+             */}
+            <SelectTrigger
+              size="md"
+              aria-label={t('market.priceHistory.range')}
+              className="w-full sm:w-28"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRICE_HISTORY_RANGES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {t(`market.priceHistory.range${r}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Suspense fallback={<ChartFallback label={t('common.loading')} />}>
+        <LazyPriceHistoryChart
+          points={filtered}
+          itemName={itemName}
+          movingAverage={filteredMovingAverage}
+          comparisons={comparisons}
+          primaryRegionName={regions ? regionNameOf(regions, primaryRegionId) : undefined}
+          primaryRegionId={primaryRegionId}
+          openPrices={openPrices}
+          series={series}
+          openMissing={openMissing}
+        />
+      </Suspense>
+    </div>
+  );
+}

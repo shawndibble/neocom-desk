@@ -1,0 +1,150 @@
+/**
+ * Market Browser URL state (issue #4, GLOSSARY.md round 7): the selected item
+ * and the current location are query parameters, not path segments — routes
+ * are keyed by literal path. Pure parsing/serialising only; the caller (the
+ * route) is responsible for validating a parsed id against the loaded
+ * catalogue and falling back to the default view when it doesn't resolve.
+ */
+import { ALL_REGIONS, type RegionChoice } from './locationMode';
+import type { JumpRange } from '@/engine/route/jumpRange';
+
+export interface ParsedMarketParams {
+  typeId: number | null;
+  hubId: string | null;
+  /** `'all'` for `?region=all` (All regions), which needs no catalogue check. */
+  regionId: RegionChoice | null;
+  /** A Market Group to land expanded-open on — independent of typeId/location. */
+  groupId: number | null;
+}
+
+export type MarketLocationParam =
+  { mode: 'hub'; hubId: string } | { mode: 'region'; regionId: RegionChoice };
+
+/**
+ * A positive integer query parameter, or null.
+ *
+ * Strict about what it accepts because the value comes from a URL a user can
+ * edit or a link that has outlived its build: anything else is treated as
+ * "not given" rather than coerced. Exported because ids arrive in query
+ * strings all over Market — the type being browsed, and the item a filled
+ * sell order's alert points at (`features/market/transactionHighlight.ts`).
+ */
+export function parsePositiveInt(raw: string | null): number | null {
+  if (raw === null || !/^\d+$/.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+function nonEmpty(raw: string | null): string | null {
+  return raw !== null && raw.length > 0 ? raw : null;
+}
+
+export function parseMarketParams(get: (key: string) => string | null): ParsedMarketParams {
+  return {
+    typeId: parsePositiveInt(get('type')),
+    hubId: nonEmpty(get('hub')),
+    regionId: get('region') === ALL_REGIONS ? ALL_REGIONS : parsePositiveInt(get('region')),
+    groupId: parsePositiveInt(get('group')),
+  };
+}
+
+export function buildMarketParams(
+  typeId: number | null,
+  location: MarketLocationParam
+): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (typeId !== null) params.type = String(typeId);
+  if (location.mode === 'hub') params.hub = location.hubId;
+  else params.region = String(location.regionId);
+  return params;
+}
+
+/**
+ * A bare `?group=` cross-link: no typeId, no location — the caller has
+ * neither, and Market Browser's own Location Mode default already covers it.
+ */
+export function buildMarketGroupParams(groupId: number): Record<string, string> {
+  return { group: String(groupId) };
+}
+
+/**
+ * Whether a parsed id names something real, without erroring while the
+ * catalogue it would be checked against is still loading: `null` catalogue
+ * (first load) reads as "not yet known to be invalid", matching the
+ * degrade-to-default behaviour once loading finishes and the id turns out
+ * not to exist.
+ */
+export function resolveAgainstCatalogue<T>(
+  id: number | null,
+  catalogue: readonly T[] | null,
+  matches: (item: T, id: number) => boolean
+): boolean {
+  if (id === null) return false;
+  if (catalogue === null) return true;
+  return catalogue.some((item) => matches(item, id));
+}
+
+/**
+ * Query params for a link into the Market Browser preselecting `typeId`,
+ * preserving whatever region/hub the current page is already scoped to
+ * (region wins, matching `resolveMarketLocation`'s own precedence) rather
+ * than resetting to the device's Location Mode default. A caller arriving
+ * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
+ * as opening `/market?type=…` fresh.
+ *
+ * `forcedHubId`, when given, wins over the URL entirely — the caller's own
+ * resolved hub must not be silently swapped for the browser's current
+ * location, which can price differently than what's already on screen.
+ */
+export function marketLinkParams(
+  typeId: number,
+  currentSearch: string,
+  forcedHubId?: string
+): Record<string, string> {
+  if (forcedHubId !== undefined)
+    return buildMarketParams(typeId, { mode: 'hub', hubId: forcedHubId });
+  const parsed = parseMarketParams((key) => new URLSearchParams(currentSearch).get(key));
+  if (parsed.regionId !== null)
+    return buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId });
+  if (parsed.hubId !== null) return buildMarketParams(typeId, { mode: 'hub', hubId: parsed.hubId });
+  return { type: String(typeId) };
+}
+
+/**
+ * Query params for "where's the closest one?": `typeId` over All regions,
+ * narrowed by the order book's Jump Range (`browser.jumps`, see
+ * `useBrowserFilters.ts`), which the Market Browser measures from the
+ * Current System. The Jump Range is URL-only here: the Market Browser never
+ * writes a linked filter value into the user's remembered filter default.
+ */
+export function marketNearbyParams(
+  typeId: number,
+  jumps: Exclude<JumpRange, 'any'>
+): Record<string, string> {
+  return { type: String(typeId), region: ALL_REGIONS, 'browser.jumps': jumps };
+}
+
+/** `marketLinkParams`, serialised to the `/market/browser?...` path a cross-link navigates to. */
+export function marketItemUrl(typeId: number, currentSearch: string): string {
+  return `/market/browser?${new URLSearchParams(marketLinkParams(typeId, currentSearch)).toString()}`;
+}
+
+/**
+ * The Market Browser's Location Mode precedence (GLOSSARY.md round 7/9,
+ * issue #4): a valid region param wins, then a valid hub param, then the
+ * device-local Location Mode preference. `valid` is supplied by the caller —
+ * region validity depends on the (possibly still-loading) Market Region
+ * catalogue, which this pure function has no way to reach itself. All
+ * regions (`region=all`) is valid without one.
+ */
+export function resolveMarketLocation(
+  parsed: { regionId: RegionChoice | null; hubId: string | null },
+  valid: { region: boolean; hub: boolean },
+  fallback: MarketLocationParam
+): MarketLocationParam {
+  if (parsed.regionId === ALL_REGIONS) return { mode: 'region', regionId: ALL_REGIONS };
+  if (parsed.regionId !== null && valid.region)
+    return { mode: 'region', regionId: parsed.regionId };
+  if (parsed.hubId !== null && valid.hub) return { mode: 'hub', hubId: parsed.hubId };
+  return fallback;
+}

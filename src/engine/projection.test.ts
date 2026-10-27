@@ -1,0 +1,797 @@
+import { describe, it, expect } from 'vitest';
+import {
+  PROJECTION_HORIZON_MS,
+  projectionWording,
+  projectSkillQueue,
+  projectIndustryJobs,
+  projectCorpIndustryJobs,
+  projectColonies,
+  projectCalendar,
+  projectStructureFuel,
+  projectMercenaryDens,
+  projectSkyhookRaids,
+  projectEveNotificationReinforcementExit,
+  reinforcementExitStructureIds,
+} from './projection';
+import { occurrenceKey } from './occurrenceKey';
+import { diffSkyhookRaidable } from './notificationDiffs';
+import type { NotificationFire, EveNotificationEntrySnapshot } from './notificationDiffs';
+import { SHARED_NOTIFICATION_WORDING } from './notificationWording';
+import {
+  calendarCopy,
+  colonyCopy,
+  corpIndustryJobCopy,
+  eveNotificationCopy,
+  industryJobCopy,
+  mercenaryDenReinforcedCopy,
+  skyhookRaidableCopy,
+  skillQueueCopy,
+  structureFuelCopy,
+} from '@/features/notifications/domainCopy';
+import { HOUR_MS } from '@/lib/age';
+
+const T0 = 1_700_000_000_000;
+
+describe('projectionWording', () => {
+  // A refuel falsifies the first two; a reset run falsifies the planetary
+  // pair; topping up the queue in the EVE client falsifies the last.
+  it.each([
+    'structureFuelLow',
+    'planetaryExtractionDone',
+    'planetaryExtractorExpiring',
+    'skillQueueEnding',
+    'mercenaryDenReinforced',
+    'skyhookRaidable',
+  ] as const)(
+    'hedges %s, which an ordinary in-game action can falsify before it fires',
+    (eventId) => {
+      expect(projectionWording(eventId)).toEqual('hedge');
+    }
+  );
+
+  it('asserts every other projectable event', () => {
+    const asserted: Parameters<typeof projectionWording>[0][] = [
+      'skillLevelComplete',
+      'characterNotTraining',
+      'industryJobComplete',
+      'corpIndustryJobReady',
+      'cloneJumpReady',
+      'calendarEventStarting',
+      'eveNotification',
+    ];
+    for (const eventId of asserted) {
+      expect(projectionWording(eventId)).toEqual('assert');
+    }
+  });
+});
+
+describe('projectSkillQueue', () => {
+  it('projects skillLevelComplete for every entry but the last, and characterNotTraining for the last', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 3, queuePosition: 0, finishMs: T0 + 10 * HOUR_MS },
+      { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + 20 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[1, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0].eventId).toEqual('skillLevelComplete');
+    expect(rows[0].fireAt).toEqual(T0 + 10 * HOUR_MS);
+    expect(rows[0].title).toEqual('Skill training complete');
+    expect(rows[0].body).toEqual('Kestrel finished training Gunnery III.');
+    expect(rows[1].eventId).toEqual('characterNotTraining');
+    expect(rows[1].fireAt).toEqual(T0 + 20 * HOUR_MS);
+  });
+
+  it('projects only characterNotTraining for a single-entry queue', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 5, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventId).toEqual('characterNotTraining');
+  });
+
+  it('produces no row and no error for an entry with no finish date (paused/stalled)', () => {
+    const entries = [{ skillId: 1, finishedLevel: 5, queuePosition: 0, finishMs: null }];
+    expect(() =>
+      projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0)
+    ).not.toThrow();
+    expect(projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0)).toEqual(
+      []
+    );
+  });
+
+  it('produces no rows for an empty queue', () => {
+    expect(projectSkillQueue(7, 'Kestrel', [], new Map(), skillQueueCopy.push, T0)).toEqual([]);
+  });
+
+  it('falls back to #id when a skill name is not resolved', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 3, queuePosition: 0, finishMs: T0 + 10 * HOUR_MS },
+      { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + 20 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    expect(rows[0].body).toContain('#1');
+  });
+
+  it('excludes an entry finishing exactly now and includes one finishing exactly at the horizon edge', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 1, queuePosition: 0, finishMs: T0 },
+      { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + PROJECTION_HORIZON_MS },
+    ];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    // Position 0 (fireAt === nowMs) never becomes a skillLevelComplete row (it's
+    // not the last entry, but it's also not in the future), and position 1 (the
+    // last entry, fireAt exactly at the horizon edge) is included.
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventId).toEqual('characterNotTraining');
+    expect(rows[0].fireAt).toEqual(T0 + PROJECTION_HORIZON_MS);
+  });
+
+  it('excludes an entry finishing one ms beyond the horizon', () => {
+    const entries = [
+      { skillId: 1, finishedLevel: 1, queuePosition: 0, finishMs: T0 + PROJECTION_HORIZON_MS + 1 },
+    ];
+    expect(projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0)).toEqual(
+      []
+    );
+  });
+
+  it('keys characterNotTraining by the day the queue actually goes idle (fireAt), not the projection day — the best available proxy for what the Foreground Poller will later see, though not a guarantee (see projection.ts header)', () => {
+    const finishMs = T0 + 60 * HOUR_MS; // lands on a different UTC day than T0
+    const entries = [{ skillId: 1, finishedLevel: 5, queuePosition: 0, finishMs }];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    const fire: NotificationFire = {
+      eventId: 'characterNotTraining',
+      characterId: 7,
+      skillId: null,
+      level: null,
+      finishMs: null,
+    };
+    expect(rows[0].occurrenceKey).toEqual(occurrenceKey(fire, finishMs));
+    expect(rows[0].occurrenceKey).not.toEqual(occurrenceKey(fire, T0));
+  });
+
+  it('agrees with the Foreground Poller on skillLevelComplete keys, which do not depend on nowMs', () => {
+    const entries = [
+      { skillId: 3300, finishedLevel: 4, queuePosition: 0, finishMs: T0 + 10 * HOUR_MS },
+      { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + 20 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    const fire: NotificationFire = {
+      eventId: 'skillLevelComplete',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs: T0 + 10 * HOUR_MS,
+    };
+    expect(rows[0].occurrenceKey).toEqual(occurrenceKey(fire, T0 + 999_999));
+  });
+
+  it('also projects skillQueueEnding for the last entry, at finishMs - endingLeadMs, alongside characterNotTraining', () => {
+    const finishMs = T0 + 20 * HOUR_MS;
+    const entries = [
+      {
+        skillId: 3300,
+        finishedLevel: 4,
+        queuePosition: 0,
+        finishMs,
+        endingLeadMs: 6 * HOUR_MS,
+      },
+    ];
+    const rows = projectSkillQueue(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[3300, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
+    expect(rows.map((r) => r.eventId).sort()).toEqual(['characterNotTraining', 'skillQueueEnding']);
+    const ending = rows.find((r) => r.eventId === 'skillQueueEnding');
+    expect(ending?.fireAt).toEqual(finishMs - 6 * HOUR_MS);
+    expect(ending?.title).toBeTruthy();
+    expect(ending?.body).toContain('Kestrel');
+  });
+
+  it('produces no skillQueueEnding row when the last entry carries no endingLeadMs (not yet baked, or a pre-#1410 baseline)', () => {
+    const entries = [
+      { skillId: 3300, finishedLevel: 4, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    expect(rows.map((r) => r.eventId)).toEqual(['characterNotTraining']);
+  });
+
+  it('excludes a skillQueueEnding fireAt exactly at nowMs (already due) and includes one ms later', () => {
+    const lead = HOUR_MS;
+    const dueNow = {
+      skillId: 1,
+      finishedLevel: 1,
+      queuePosition: 0,
+      finishMs: T0 + lead,
+      endingLeadMs: lead,
+    };
+    expect(
+      projectSkillQueue(7, 'Kestrel', [dueNow], new Map(), skillQueueCopy.push, T0).find(
+        (r) => r.eventId === 'skillQueueEnding'
+      )
+    ).toBeUndefined();
+
+    const oneMsLater = { ...dueNow, finishMs: T0 + lead + 1 };
+    const rows = projectSkillQueue(7, 'Kestrel', [oneMsLater], new Map(), skillQueueCopy.push, T0);
+    expect(rows.find((r) => r.eventId === 'skillQueueEnding')?.fireAt).toEqual(T0 + 1);
+  });
+
+  it('includes a skillQueueEnding fireAt exactly at the horizon edge and excludes one ms beyond it', () => {
+    const lead = HOUR_MS;
+    const atEdge = {
+      skillId: 1,
+      finishedLevel: 1,
+      queuePosition: 0,
+      finishMs: T0 + PROJECTION_HORIZON_MS + lead,
+      endingLeadMs: lead,
+    };
+    const rows = projectSkillQueue(7, 'Kestrel', [atEdge], new Map(), skillQueueCopy.push, T0);
+    expect(rows.find((r) => r.eventId === 'skillQueueEnding')?.fireAt).toEqual(
+      T0 + PROJECTION_HORIZON_MS
+    );
+
+    const beyond = { ...atEdge, finishMs: atEdge.finishMs + 1 };
+    expect(
+      projectSkillQueue(7, 'Kestrel', [beyond], new Map(), skillQueueCopy.push, T0).find(
+        (r) => r.eventId === 'skillQueueEnding'
+      )
+    ).toBeUndefined();
+  });
+
+  it('agrees with the Foreground Poller on skillQueueEnding keys, which include the threshold crossed', () => {
+    const finishMs = T0 + 20 * HOUR_MS;
+    const endingLeadMs = 6 * HOUR_MS;
+    const entries = [{ skillId: 3300, finishedLevel: 4, queuePosition: 0, finishMs, endingLeadMs }];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    const ending = rows.find((r) => r.eventId === 'skillQueueEnding');
+    const fire: NotificationFire = {
+      eventId: 'skillQueueEnding',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs,
+      thresholdMs: endingLeadMs,
+    };
+    expect(ending?.occurrenceKey).toEqual(occurrenceKey(fire, T0 + 999_999));
+    // A different lead time is a different occurrence (the re-arm case) —
+    // the key must not collide just because finishMs is unchanged.
+    expect(ending?.occurrenceKey).not.toEqual(
+      occurrenceKey({ ...fire, thresholdMs: 12 * HOUR_MS }, T0 + 999_999)
+    );
+  });
+
+  it('renders skillQueueEnding push copy under its declared hedge wording without throwing', () => {
+    // `skillQueueCopy.push` calls `assertProjectionWording('skillQueueEnding',
+    // 'hedge')` internally and throws if that ever drifts from
+    // `projectionWording`'s own mapping — this exercises that path for real,
+    // not just the wording table above.
+    const entries = [
+      {
+        skillId: 3300,
+        finishedLevel: 4,
+        queuePosition: 0,
+        finishMs: T0 + 5 * HOUR_MS,
+        endingLeadMs: HOUR_MS,
+      },
+    ];
+    expect(() =>
+      projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0)
+    ).not.toThrow();
+  });
+});
+
+describe('projectCorpIndustryJobs', () => {
+  const job = (jobId: number, endMs: number) => ({
+    jobId,
+    endMs,
+    blueprintTypeId: 10,
+    productTypeId: 20,
+    activityId: 1,
+  });
+  const project = (entries: ReturnType<typeof job>[]) =>
+    projectCorpIndustryJobs(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[20, 'Rifter']]),
+      corpIndustryJobCopy.push,
+      T0
+    );
+
+  it('projects a job ending inside the horizon, keyed like the poller', () => {
+    const rows = project([job(1, T0 + 5 * HOUR_MS)]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventId).toEqual('corpIndustryJobReady');
+    expect(rows[0].fireAt).toEqual(T0 + 5 * HOUR_MS);
+    expect(rows[0].body).toContain('Rifter');
+    expect(rows[0].occurrenceKey).toEqual(
+      occurrenceKey(
+        {
+          eventId: 'corpIndustryJobReady',
+          characterId: 7,
+          jobId: 1,
+          blueprintTypeId: 10,
+          productTypeId: 20,
+          activityId: 1,
+          endMs: T0 + 5 * HOUR_MS,
+        },
+        T0
+      )
+    );
+  });
+
+  it('skips jobs already finished (delivered or past) and past the horizon', () => {
+    expect(project([job(1, T0 - HOUR_MS), job(2, T0), job(3, T0 + 73 * HOUR_MS)])).toEqual([]);
+  });
+});
+
+describe('projectIndustryJobs', () => {
+  it('projects one row per job inside the horizon, resolving the item name', () => {
+    const entries = [
+      { jobId: 1, endMs: T0 + 5 * HOUR_MS, blueprintTypeId: 10, productTypeId: 20, activityId: 1 },
+    ];
+    const rows = projectIndustryJobs(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[20, 'Rifter']]),
+      industryJobCopy.push,
+      T0
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventId).toEqual('industryJobComplete');
+    expect(rows[0].fireAt).toEqual(T0 + 5 * HOUR_MS);
+    expect(rows[0].body).toContain('Rifter');
+  });
+
+  it('uses the blueprint type id when there is no product (e.g. research jobs)', () => {
+    const entries = [
+      {
+        jobId: 1,
+        endMs: T0 + 5 * HOUR_MS,
+        blueprintTypeId: 10,
+        productTypeId: null,
+        activityId: 5,
+      },
+    ];
+    const rows = projectIndustryJobs(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[10, 'Rifter Blueprint']]),
+      industryJobCopy.push,
+      T0
+    );
+    expect(rows[0].body).toContain('Rifter Blueprint');
+  });
+
+  it('produces no row for a job already past its end date', () => {
+    const entries = [
+      { jobId: 1, endMs: T0 - 1, blueprintTypeId: 10, productTypeId: 20, activityId: 1 },
+    ];
+    expect(projectIndustryJobs(7, 'Kestrel', entries, new Map(), industryJobCopy.push, T0)).toEqual(
+      []
+    );
+  });
+});
+
+describe('projectColonies', () => {
+  it('projects planetaryExtractionDone at the soonest extractor expiry across the colony', () => {
+    const colonies = [
+      {
+        planetId: 40000001,
+        extractors: [
+          { pinId: 1, expiryTimeMs: T0 + 30 * HOUR_MS, thresholdMs: 6 * HOUR_MS },
+          { pinId: 2, expiryTimeMs: T0 + 10 * HOUR_MS, thresholdMs: 6 * HOUR_MS },
+        ],
+      },
+    ];
+    const rows = projectColonies(
+      7,
+      'Kestrel',
+      colonies,
+      new Map([[40000001, 'Amarr III']]),
+      colonyCopy.push,
+      T0
+    );
+    const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
+    expect(extractionDone?.fireAt).toEqual(T0 + 10 * HOUR_MS);
+    expect(extractionDone?.body).toContain('Amarr III');
+  });
+
+  it('states planetaryExtractionDone as a prediction, never as an observation', () => {
+    // A pilot who restarts the programs in game before this fires gets the
+    // push anyway — nothing between here and delivery can re-check it (ADR
+    // 0010). The live path keeps SHARED_NOTIFICATION_WORDING's "has stopped",
+    // which it has actually observed.
+    const colonies = [
+      {
+        planetId: 40000001,
+        extractors: [{ pinId: 1, expiryTimeMs: T0 + HOUR_MS, thresholdMs: 6 * HOUR_MS }],
+      },
+    ];
+    const rows = projectColonies(
+      7,
+      'Kestrel',
+      colonies,
+      new Map([[40000001, 'Amarr III']]),
+      colonyCopy.push,
+      T0
+    );
+    const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
+    expect(extractionDone?.body).toContain('was due to stop');
+    expect(extractionDone?.body).not.toContain('has stopped');
+    // The headline is the whole claim on a lock screen, so it hedges too —
+    // this is the sentence the bug report actually quoted.
+    expect(extractionDone?.title).not.toEqual(
+      SHARED_NOTIFICATION_WORDING.planetaryExtractionDone.title
+    );
+    expect(extractionDone?.title.toLowerCase()).toContain('due to');
+  });
+
+  it('states planetaryExtractorExpiring as a prediction, never as an observation', () => {
+    const colonies = [
+      {
+        planetId: 40000001,
+        extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS, thresholdMs: 12 * HOUR_MS }],
+      },
+    ];
+    const rows = projectColonies(
+      7,
+      'Kestrel',
+      colonies,
+      new Map([[40000001, 'Amarr III']]),
+      colonyCopy.push,
+      T0
+    );
+    const expiring = rows.find((r) => r.eventId === 'planetaryExtractorExpiring');
+    expect(expiring?.body).toContain('was due to expire');
+    expect(expiring?.body).toContain('12 hours');
+    expect(expiring?.title).not.toEqual(
+      SHARED_NOTIFICATION_WORDING.planetaryExtractorExpiring.title
+    );
+    expect(expiring?.title.toLowerCase()).toContain('due to');
+  });
+
+  it('projects exactly one planetaryExtractorExpiring row per extractor, at its own configured lead time', () => {
+    const colonies = [
+      {
+        planetId: 40000001,
+        extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS, thresholdMs: 6 * HOUR_MS }],
+      },
+    ];
+    const rows = projectColonies(7, 'Kestrel', colonies, new Map(), colonyCopy.push, T0);
+    const expiring = rows.filter((r) => r.eventId === 'planetaryExtractorExpiring');
+    expect(expiring).toHaveLength(1);
+    expect(expiring[0].fireAt).toEqual(T0 + 20 * HOUR_MS - 6 * HOUR_MS);
+  });
+
+  it('produces no rows for a colony with no extractors', () => {
+    const colonies = [{ planetId: 40000001, extractors: [] }];
+    expect(projectColonies(7, 'Kestrel', colonies, new Map(), colonyCopy.push, T0)).toEqual([]);
+  });
+});
+
+describe('projectCalendar', () => {
+  it('projects calendarEventStarting for an event inside the horizon', () => {
+    const entries = [{ calendarEventId: 99, startMs: T0 + 5 * HOUR_MS }];
+    const rows = projectCalendar(7, 'Kestrel', entries, calendarCopy.push, T0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].eventId).toEqual('calendarEventStarting');
+    expect(rows[0].fireAt).toEqual(T0 + 5 * HOUR_MS);
+  });
+
+  it('produces no row for an event outside the horizon', () => {
+    const entries = [{ calendarEventId: 99, startMs: T0 + PROJECTION_HORIZON_MS + 1 }];
+    expect(projectCalendar(7, 'Kestrel', entries, calendarCopy.push, T0)).toEqual([]);
+  });
+
+  it('produces no row for an event the character declined', () => {
+    const entries = [
+      { calendarEventId: 99, startMs: T0 + 5 * HOUR_MS, response: 'declined' as const },
+    ];
+    expect(projectCalendar(7, 'Kestrel', entries, calendarCopy.push, T0)).toEqual([]);
+  });
+
+  it('still projects an accepted event (regression guard)', () => {
+    const entries = [
+      { calendarEventId: 99, startMs: T0 + 5 * HOUR_MS, response: 'accepted' as const },
+    ];
+    expect(projectCalendar(7, 'Kestrel', entries, calendarCopy.push, T0)).toHaveLength(1);
+  });
+});
+
+describe('projectSkyhookRaids', () => {
+  const hook = (windowStartMs: number | null, extra: object = {}) => ({
+    skyhookId: 5,
+    planetId: 40_000_001,
+    windowStartMs,
+    windowEndMs: windowStartMs === null ? null : windowStartMs + 4 * HOUR_MS,
+    unsecuredUnits: 500,
+    leadMs: 2 * HOUR_MS,
+    minUnits: 0,
+    ...extra,
+  });
+  const names = new Map([[40_000_001, 'X-7OMU IV']]);
+  const project = (entries: ReturnType<typeof hook>[], nowMs = T0) =>
+    projectSkyhookRaids(7, 'Kestrel', entries, names, skyhookRaidableCopy.push, nowMs);
+
+  it('projects a hedged warning one lead time before the window and a push at the opening', () => {
+    const rows = project([hook(T0 + 10 * HOUR_MS)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 8 * HOUR_MS, T0 + 10 * HOUR_MS]);
+    expect(new Set(rows.map((r) => r.occurrenceKey)).size).toBe(2);
+    expect(rows[1].body).toContain('X-7OMU IV');
+    expect(rows[1].body).toContain('was due');
+  });
+
+  it('keys the opening push as danger above the silo minimum and plain below it', () => {
+    const above = project([hook(T0 + 10 * HOUR_MS, { minUnits: 100 })]);
+    expect(above[1].occurrenceKey).toMatch(/:danger$/);
+    const below = project([hook(T0 + 10 * HOUR_MS, { minUnits: 1000 })]);
+    expect(below[1].occurrenceKey).toMatch(/:open$/);
+    // An unread silo is never called safe.
+    const unread = project([hook(T0 + 10 * HOUR_MS, { minUnits: 1000, unsecuredUnits: null })]);
+    expect(unread[1].occurrenceKey).toMatch(/:danger$/);
+  });
+
+  it('projects the same keys the live diff would fire with', () => {
+    const rows = project([hook(T0 + 10 * HOUR_MS)]);
+    const live = diffSkyhookRaidable(
+      7,
+      { entries: [hook(T0 + 10 * HOUR_MS)], nowMs: T0 + 9 * HOUR_MS },
+      { entries: [hook(T0 + 10 * HOUR_MS)], nowMs: T0 + 10 * HOUR_MS + 1 }
+    );
+    expect(live).toHaveLength(1);
+    expect(rows.map((r) => r.occurrenceKey)).toContain(occurrenceKey(live[0], T0));
+  });
+
+  it('projects only the opening when the warning time has passed, nothing for an open or far window', () => {
+    expect(project([hook(T0 + HOUR_MS)]).map((r) => r.fireAt)).toEqual([T0 + HOUR_MS]);
+    expect(project([hook(T0 - HOUR_MS)])).toEqual([]);
+    expect(project([hook(null)])).toEqual([]);
+    expect(project([hook(T0 + PROJECTION_HORIZON_MS + 3 * HOUR_MS)])).toEqual([]);
+  });
+});
+
+describe('projectMercenaryDens', () => {
+  const den = (reinforcedUntilMs: number | null) => ({
+    denId: 5,
+    planetId: 40_000_001,
+    reinforcedUntilMs,
+    anarchyAmount: 10,
+    anarchyLevel: 1,
+    leadMs: HOUR_MS,
+    anarchyPct: 50,
+  });
+  const names = new Map([[40_000_001, 'Efa III']]);
+  const project = (entries: ReturnType<typeof den>[], nowMs = T0) =>
+    projectMercenaryDens(7, 'Kestrel', entries, names, mercenaryDenReinforcedCopy.push, nowMs);
+
+  it('projects a hedged warning one lead time before the exit and a push at the exit', () => {
+    const rows = project([den(T0 + 10 * HOUR_MS)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 9 * HOUR_MS, T0 + 10 * HOUR_MS]);
+    expect(new Set(rows.map((r) => r.occurrenceKey)).size).toBe(2);
+    expect(rows[1].body).toContain('was due to come out of reinforcement');
+    expect(rows[1].body).toContain('Efa III');
+  });
+
+  it('projects only the exit when the warning time has already passed', () => {
+    const rows = project([den(T0 + 30 * 60_000)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 30 * 60_000]);
+  });
+
+  it('projects nothing for an unreinforced den or an exit beyond the horizon', () => {
+    expect(project([den(null)])).toEqual([]);
+    expect(project([den(T0 + PROJECTION_HORIZON_MS + 2 * HOUR_MS)])).toEqual([]);
+  });
+
+  it('keys a row like the live poll fire for the same exit', () => {
+    const [soon] = project([den(T0 + 10 * HOUR_MS)]);
+    expect(soon.occurrenceKey).toEqual(
+      occurrenceKey(
+        {
+          eventId: 'mercenaryDenReinforced',
+          characterId: 7,
+          denId: 5,
+          planetId: 40_000_001,
+          reinforcedUntilMs: T0 + 10 * HOUR_MS,
+          thresholdMs: HOUR_MS,
+          phase: 'soon',
+        },
+        T0 + 9 * HOUR_MS
+      )
+    );
+  });
+});
+
+describe('projectStructureFuel', () => {
+  it('projects structureFuelLow, hedged, at fuelExpiresMs minus the lead time', () => {
+    const entries = [
+      {
+        structureId: 111,
+        name: 'Keepstar',
+        fuelExpiresMs: T0 + 50 * HOUR_MS,
+        thresholdMs: 24 * HOUR_MS,
+      },
+    ];
+    const rows = projectStructureFuel(7, 'Kestrel', entries, structureFuelCopy.push, T0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].fireAt).toEqual(T0 + 26 * HOUR_MS);
+    expect(rows[0].body).toContain('was due to run out');
+    expect(rows[0].body).toContain('Keepstar');
+  });
+
+  it('produces no row and no error for a structure that has already run dry', () => {
+    const entries = [
+      { structureId: 111, name: 'Keepstar', fuelExpiresMs: null, thresholdMs: 24 * HOUR_MS },
+    ];
+    expect(() =>
+      projectStructureFuel(7, 'Kestrel', entries, structureFuelCopy.push, T0)
+    ).not.toThrow();
+    expect(projectStructureFuel(7, 'Kestrel', entries, structureFuelCopy.push, T0)).toEqual([]);
+  });
+});
+
+describe('projectEveNotificationReinforcementExit', () => {
+  const T_ISO = new Date(T0).toISOString();
+
+  function entry(
+    overrides: Partial<EveNotificationEntrySnapshot> = {}
+  ): EveNotificationEntrySnapshot {
+    return {
+      notificationId: 1,
+      type: 'StructureUnderAttack',
+      senderId: 1000132,
+      senderType: 'corporation',
+      // 36,000,000,000 ticks (100ns units) = 3,600,000 ms = 1 hour.
+      text: 'structureID: 111\ntimeLeft: 36000000000\n',
+      timestamp: T_ISO,
+      ...overrides,
+    };
+  }
+
+  it('projects a row at the derived reinforcement-exit instant, naming the structure', () => {
+    const names = new Map([[111, 'Keepstar']]);
+    const rows = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry()],
+      names,
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].fireAt).toEqual(T0 + HOUR_MS);
+    expect(rows[0].body).toContain('Keepstar');
+  });
+
+  it("carries the entry's raw eveType, so a push-delivered row can be muted per-type like a live one", () => {
+    const rows = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ type: 'StructureLostShields' })],
+      new Map(),
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(rows[0].eveType).toBe('StructureLostShields');
+  });
+
+  it('is skipped, without error, when timeLeft is absent', () => {
+    const args = [
+      7,
+      'Kestrel',
+      [entry({ text: 'structureID: 111\n' })],
+      new Map(),
+      eveNotificationCopy.push,
+      T0,
+    ] as const;
+    expect(() => projectEveNotificationReinforcementExit(...args)).not.toThrow();
+    expect(projectEveNotificationReinforcementExit(...args)).toEqual([]);
+  });
+
+  it('is skipped, without error, when timeLeft is unparseable', () => {
+    const rows = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: 'structureID: 111\ntimeLeft: not-a-number\n' })],
+      new Map(),
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it('is skipped when the exit falls outside the 72-hour horizon, and appears once inside it', () => {
+    const outsideTicks = (PROJECTION_HORIZON_MS + HOUR_MS) * 10_000;
+    const outside = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: `structureID: 111\ntimeLeft: ${outsideTicks}\n` })],
+      new Map(),
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(outside).toEqual([]);
+
+    const insideTicks = (PROJECTION_HORIZON_MS - HOUR_MS) * 10_000;
+    const inside = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: `structureID: 111\ntimeLeft: ${insideTicks}\n` })],
+      new Map(),
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(inside).toHaveLength(1);
+  });
+
+  it('degrades to the structure id, then a neutral phrase, when the name cannot be resolved', () => {
+    const byId = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry()],
+      new Map(),
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(byId[0].body).toContain('111');
+
+    const noId = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: 'timeLeft: 36000000000\n' })],
+      new Map(),
+      eveNotificationCopy.push,
+      T0
+    );
+    expect(noId).toHaveLength(1);
+    expect(noId[0].body).not.toContain('undefined');
+  });
+});
+
+describe('reinforcementExitStructureIds', () => {
+  const T_ISO = new Date(T0).toISOString();
+
+  function entry(
+    overrides: Partial<EveNotificationEntrySnapshot> = {}
+  ): EveNotificationEntrySnapshot {
+    return {
+      notificationId: 1,
+      type: 'StructureUnderAttack',
+      senderId: 1000132,
+      senderType: 'corporation',
+      text: 'structureID: 111\ntimeLeft: 36000000000\n',
+      timestamp: T_ISO,
+      ...overrides,
+    };
+  }
+
+  it('returns only the structure ids whose reinforcement exit falls inside the horizon — the ids the projector will actually name', () => {
+    const outsideTicks = (PROJECTION_HORIZON_MS + HOUR_MS) * 10_000;
+    const ids = reinforcementExitStructureIds(
+      [
+        entry({ notificationId: 1, text: 'structureID: 111\ntimeLeft: 36000000000\n' }),
+        entry({
+          notificationId: 2,
+          text: `structureID: 222\ntimeLeft: ${outsideTicks}\n`,
+        }),
+        entry({ notificationId: 3, text: 'structureID: 333\n' }),
+      ],
+      T0
+    );
+    expect(ids).toEqual([111]);
+  });
+});

@@ -1,0 +1,815 @@
+/**
+ * Mining Yield Overview tab (issue #671): what a pilot actually mined —
+ * ordinary belt/anomaly ore and ice, moon ore included, and harvested gas
+ * (issue #880) — across every tracked Character, as ISK/hr and a
+ * raw-vs-refined value comparison. Gas reprocesses into nothing, so it
+ * contributes a real zero to the refined side rather than a missing one. Sits
+ * beside the Tax tab (`TaxTab.tsx`) on the same route; the two read the same
+ * ESI mining ledger but group and value it for entirely different questions
+ * (see `docs/context/decisions/…-mining-yield-isk-hr-basis-is-calendar-time.md`
+ * and the vocabulary note in the issue: this is deliberately not the Tax
+ * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
+ */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { guarded } from '@/app/routeChunks';
+import { useTranslation } from 'react-i18next';
+import {
+  Button,
+  ColumnPickerMenu,
+  DataAgeBadge,
+  DataTable,
+  DataTableDenseCell,
+  EmptyState,
+  IconButton,
+  IskAmount,
+  LiveStatus,
+  NeedsConnection,
+  PageHeader,
+  Panel,
+  Spinner,
+  type DataTableColumn,
+  TabPanel,
+  CachedNotice,
+} from '@/components/ui';
+import { onReconnect } from '@/stores/network';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
+import * as Icon from '@/components/ui/icons';
+import { TableActionsMenu } from '@/components/ui/TableExport';
+import { useTableExport } from '@/components/ui/useTableExport';
+import { beginGrant } from '@/app/grantAction';
+import { useNow } from '@/lib/useNow';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { formatVolume } from '@/features/market/format';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
+import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { SecurityValue } from '@/features/assets/assetBrowserRows';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import {
+  loadMiningYieldSnapshot,
+  type MiningYieldRow,
+  type MiningYieldSnapshot,
+} from './yieldSnapshot';
+import { iskPerMinedDay } from '@/engine/miningTax/yieldRate';
+import { daysCovered, eveToday, rangeDates, rangeStartDate } from '@/engine/miningTax/yieldRange';
+import { scaleUnitPrices, scaleValuation } from '@/engine/miningTax/buybackRate';
+import { useMiningYieldRange } from './yieldRangePref';
+import { useMiningPriceBasis } from './priceBasisPref';
+import { useMiningBuybackRate } from './buybackRatePref';
+import { useMiningShowRefining } from './showRefiningPref';
+import { useMiningChartMetric } from './chartMetricPref';
+import {
+  dailyVolumePoints,
+  dailyCountPoints,
+  typeVolumeComparison,
+  typeCountComparison,
+} from './chartAggregation';
+import {
+  availableOverviewColumns,
+  DEFAULT_VISIBLE_OVERVIEW_COLUMNS,
+  useVisibleOverviewColumns,
+  visibleAvailableColumns,
+  type OverviewColumnId,
+} from './overviewColumns';
+import { oreBreakdownSummary, sumUnits } from './oreBreakdown';
+import { readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
+import {
+  BuybackRateInput,
+  ChartMetricControl,
+  SettingsSheet,
+  PriceBasisOptions,
+  RangeControl,
+  ShowRefiningToggle,
+  ValueMenu,
+} from './OverviewSettings';
+import { basisSummary } from './basisLabel';
+import { useMediaQuery } from '@/lib/useMediaQuery';
+import { YieldDetailModal } from './YieldDetailModal';
+import { yieldOverviewCsvColumns } from './yieldCsv';
+import { sumVolume, volumeDisplayMode } from './volume';
+import { VolumeDisplay } from './volumeDisplay';
+import { UnpricedIsk } from './UnpricedIsk';
+import { systemLabel } from './names';
+import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatCount } from '@/lib/formatCount';
+
+const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
+
+const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
+
+const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
+/**
+ * From `xl` the header row holds the range, chart metric and Value menu
+ * inline beside the picker; from `lg` the range alone (the rest truncated
+ * the title at 1024); below `lg` none of them (the range alone, beside the
+ * nav rail and the icon-box picker, truncated the title at 768).
+ */
+const WIDE_HEADER_QUERY = '(min-width: 80rem)';
+const MID_HEADER_QUERY = '(min-width: 64rem)';
+const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
+
+/** A row's mined m³ — units times the type's own unit volume for each ore line. */
+function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
+  return sumVolume(
+    row.entry.oreLines,
+    (line) => line.typeId,
+    (line) => line.quantity,
+    typeVolumes
+  );
+}
+
+function dateRangeLabel(dates: readonly string[]): string {
+  if (dates.length === 0) return '—';
+  const sorted = [...dates].sort();
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  return first === last ? first : `${first} – ${last}`;
+}
+
+interface OverviewTabProps {
+  /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
+  tabBar: ReactNode;
+  /** The id base the tab bar was built with, so the body is its tab panel. */
+  tabsId: string;
+}
+
+export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
+  const { t } = useTranslation();
+  const showRefining = useMiningShowRefining((state) => state.value);
+  const setShowRefining = useMiningShowRefining((state) => state.setValue);
+  // `showRefining` decides what the loader itself fetches (issue #1281), so
+  // unlike basis/buyback-rate — which only rescale already-loaded rows — it
+  // must be part of the load closure. `useRouteSnapshot` only re-runs it on
+  // an epoch bump, so toggling the switch also calls `refresh()` below.
+  const { setup: refiningSetup } = useRefiningSetup();
+  const { stationRate, taxRate } = refiningSetup;
+  const loadSnapshot = useCallback(
+    async (): Promise<MiningYieldSnapshot> =>
+      loadMiningYieldSnapshot(showRefining, await readCompressedOre(), { stationRate, taxRate }),
+    [showRefining, stationRate, taxRate]
+  );
+  const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
+    loadSnapshot,
+    undefined,
+    { cacheKey: 'miningYieldOverview' }
+  );
+  useRefreshOnOreFormChange(refresh);
+  // The load closure carries the pilot's Refining Setup, which only a refresh re-reads.
+  const seenSetup = useRef(`${stationRate}/${taxRate}`);
+  useEffect(() => {
+    const now = `${stationRate}/${taxRate}`;
+    if (seenSetup.current === now) return;
+    seenSetup.current = now;
+    refresh();
+  }, [stationRate, taxRate, refresh]);
+
+  const [characterFilter, setCharacterFilter] = useUrlParam(
+    'overview.character',
+    OVERVIEW_CHARACTER_FILTER_PARAM
+  );
+  const [detailRow, setDetailRow] = useState<MiningYieldRow | null>(null);
+  const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  const range = useMiningYieldRange((state) => state.value);
+  const setRange = useMiningYieldRange((state) => state.setValue);
+  const basis = useMiningPriceBasis((state) => state.value);
+  const setBasis = useMiningPriceBasis((state) => state.setValue);
+  const buybackRate = useMiningBuybackRate((state) => state.value);
+  const setBuybackRate = useMiningBuybackRate((state) => state.setValue);
+  const visibleColumns = useVisibleOverviewColumns((state) => state.value);
+  const setVisibleColumns = useVisibleOverviewColumns((state) => state.setValue);
+  const chartMetric = useMiningChartMetric((state) => state.value);
+  const setChartMetric = useMiningChartMetric((state) => state.setValue);
+  useHydratedStore(
+    useMiningYieldRange,
+    useMiningPriceBasis,
+    useMiningBuybackRate,
+    useMiningShowRefining,
+    useVisibleOverviewColumns,
+    useMiningChartMetric
+  );
+  const handleShowRefiningChange = useCallback(
+    (next: boolean) => {
+      void setShowRefining(next);
+      refresh();
+    },
+    [setShowRefining, refresh]
+  );
+  // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
+  // open past downtime moves its window with the day.
+  const nowMs = useNow();
+  const today = eveToday(new Date(nowMs));
+
+  const characters = data?.characters ?? [];
+  // The Characters the ledger tracks, which can be fewer than the roster: the
+  // picker's faces and "+N" follow them, matching its "· N".
+  const characterIds = useMemo(() => (data?.characters ?? []).map((c) => c.characterId), [data]);
+  const isWide = useMediaQuery(WIDE_HEADER_QUERY);
+  const isMid = useMediaQuery(MID_HEADER_QUERY);
+  const headerLayout: 'narrow' | 'mid' | 'wide' = isWide ? 'wide' : isMid ? 'mid' : 'narrow';
+  const showCharacterColumn = characters.length > 1;
+  // The reprocessing recipes are a lazy download: when they couldn't load, the
+  // refined side is left out and said to be unavailable rather than shown as zero.
+  const refiningUnavailable = showRefining && (data?.refiningUnavailable ?? false);
+  const refining = showRefining && !refiningUnavailable;
+  // The recipes are fetched again, and the refined side restored, when the connection returns.
+  useEffect(
+    () => (refiningUnavailable ? onReconnect(refresh) : undefined),
+    [refiningUnavailable, refresh]
+  );
+  const availableColumnIds = availableOverviewColumns(refining, showCharacterColumn);
+  // `id` is already known available here, so this is just "is it checked" —
+  // `visibleAvailableColumns` (below, `handleToggleColumn`'s own
+  // zero-columns guard) is for narrowing the *raw stored* list, which can
+  // hold ids that aren't available right now; this list already excludes
+  // those.
+  const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
+
+  function handleToggleColumn(id: OverviewColumnId) {
+    const next = visibleColumns.includes(id)
+      ? visibleColumns.filter((existing) => existing !== id)
+      : [...visibleColumns, id];
+    // A table with zero *rendered* columns (besides the locked Date one) is
+    // as good as no picker at all — guard against the filtered/available
+    // count, same as Characters' table-view picker.
+    if (visibleAvailableColumns(next, refining, showCharacterColumn).length === 0) return;
+    void setVisibleColumns(next);
+  }
+
+  function handleResetColumns() {
+    void setVisibleColumns(DEFAULT_VISIBLE_OVERVIEW_COLUMNS);
+  }
+
+  const characterRows = useMemo(
+    () =>
+      (data?.rows ?? []).filter(
+        (row) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(row.characterId)
+      ),
+    [data, resolvedCharacterFilter]
+  );
+  // In range, re-valued on the chosen price basis (every basis is
+  // precomputed in the snapshot, so this is a swap, never a refetch), and
+  // scaled by the buyback rate (issue #1280) — done here, once, so every
+  // downstream consumer (stat cards, charts, table, detail modal) sees
+  // already-scaled values without needing to know about the rate itself.
+  const visibleRows = useMemo(() => {
+    const start = rangeStartDate(range, today);
+    return characterRows
+      .filter((row) => row.entry.date >= start && row.entry.date <= today)
+      .map((row) => {
+        const basisRow = { ...row, ...row.byBasis[basis] };
+        return {
+          ...basisRow,
+          valuation: scaleValuation(basisRow.valuation, buybackRate),
+          materialUnitPrices: scaleUnitPrices(basisRow.materialUnitPrices, buybackRate),
+        };
+      });
+  }, [characterRows, range, today, basis, buybackRate]);
+  // Each row refines under its own Character's modifiers, so the implant
+  // note is per Character too — one for each shown miner lacking the grant.
+  const refiningCharacters = useMemo(() => {
+    if (!refining) return [];
+    const byId = new Map<number, string>();
+    for (const row of visibleRows) byId.set(row.characterId, row.characterName);
+    return [...byId].map(([characterId, characterName]) => ({ characterId, characterName }));
+  }, [refining, visibleRows]);
+  const coverage = useMemo(() => {
+    let oldestSaved: string | null = null;
+    for (const row of characterRows) {
+      if (oldestSaved === null || row.entry.date < oldestSaved) oldestSaved = row.entry.date;
+    }
+    return daysCovered(
+      visibleRows.map((row) => row.entry.date),
+      range,
+      today,
+      oldestSaved
+    );
+  }, [characterRows, visibleRows, range, today]);
+
+  const totals = useMemo(() => {
+    const typeVolumes = data?.typeVolumes ?? new Map<number, number>();
+    let rawValue = 0;
+    let refineValue = 0;
+    let volumeM3 = 0;
+    const missingVolumeTypeIds = new Set<number>();
+    const dates: string[] = [];
+    for (const row of visibleRows) {
+      rawValue += row.valuation.rawValue;
+      refineValue += row.valuation.refineValue;
+      dates.push(row.entry.date);
+      const rowVolume = entryVolume(row, typeVolumes);
+      volumeM3 += rowVolume.m3;
+      for (const typeId of rowVolume.missingTypeIds) missingVolumeTypeIds.add(typeId);
+    }
+    return {
+      rawValue,
+      refineValue,
+      volume: { m3: volumeM3, missingTypeIds: [...missingVolumeTypeIds] },
+      dates,
+      iskPerDay: iskPerMinedDay(rawValue, dates),
+    };
+  }, [visibleRows, data]);
+
+  const dailyRate: DailyRatePoint[] = useMemo(() => {
+    const byDate = new Map<string, number>();
+    for (const row of visibleRows) {
+      byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + row.valuation.rawValue);
+    }
+    // Every day of the range, mined or not, so the axis spans the whole window
+    // and a gap reads as a gap.
+    return rangeDates(range, today).map((date) => ({ date, iskValue: byDate.get(date) ?? 0 }));
+  }, [visibleRows, range, today]);
+
+  const typeComparison: TypeComparisonPoint[] = useMemo(() => {
+    const byType = new Map<number, { rawValue: number; refineValue: number }>();
+    for (const row of visibleRows) {
+      for (const line of row.valuation.lines) {
+        const existing = byType.get(line.typeId) ?? { rawValue: 0, refineValue: 0 };
+        existing.rawValue += line.rawValue;
+        existing.refineValue += line.refineValue;
+        byType.set(line.typeId, existing);
+      }
+    }
+    return [...byType.entries()].map(([typeId, values]) => ({
+      typeId,
+      typeName: data?.typeNames.get(typeId) ?? `#${typeId}`,
+      ...values,
+    }));
+  }, [visibleRows, data]);
+
+  // Only computed for whichever metric the chart-metric select is on, so
+  // switching to m³/Count never costs the other unselected metric's fold.
+  const dailyVolume = useMemo(
+    () =>
+      chartMetric === 'volume'
+        ? dailyVolumePoints(visibleRows, rangeDates(range, today), data?.typeVolumes ?? new Map())
+        : [],
+    [chartMetric, visibleRows, range, today, data]
+  );
+  const dailyCount = useMemo(
+    () => (chartMetric === 'count' ? dailyCountPoints(visibleRows, rangeDates(range, today)) : []),
+    [chartMetric, visibleRows, range, today]
+  );
+  const typeVolumeComparisonPoints = useMemo(
+    () =>
+      chartMetric === 'volume'
+        ? typeVolumeComparison(
+            visibleRows,
+            data?.typeNames ?? new Map(),
+            data?.typeVolumes ?? new Map()
+          )
+        : [],
+    [chartMetric, visibleRows, data]
+  );
+  const typeCountComparisonPoints = useMemo(
+    () =>
+      chartMetric === 'count' ? typeCountComparison(visibleRows, data?.typeNames ?? new Map()) : [],
+    [chartMetric, visibleRows, data]
+  );
+
+  function systemName(row: MiningYieldRow): string {
+    return systemLabel(data?.systemNames ?? EMPTY_NAMES, row.entry.solarSystemId);
+  }
+
+  const columnsById: Record<OverviewColumnId, DataTableColumn<MiningYieldRow>> = {
+    character: {
+      id: 'character',
+      header: t('miningTax.characterColumn'),
+      // Plain: the row opens the detail modal, which links the pilot and system (§6c).
+      render: (row) => <span>{row.characterName}</span>,
+      sortValue: (row) => row.characterName,
+    },
+    system: {
+      id: 'system',
+      header: t('miningTax.systemColumn'),
+      render: (row) => (
+        <DataTableDenseCell>
+          <span>{systemName(row)}</span>
+          <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
+        </DataTableDenseCell>
+      ),
+      sortValue: (row) => systemName(row),
+    },
+    volume: {
+      id: 'volume',
+      header: t('miningTax.overview.volumeColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => (
+        <VolumeDisplay
+          volume={entryVolume(row, data?.typeVolumes ?? new Map())}
+          typeNames={data?.typeNames ?? new Map()}
+          t={t}
+        />
+      ),
+      sortValue: (row) => entryVolume(row, data?.typeVolumes ?? new Map()).m3,
+      stackAffix: { after: ` ${t('miningTax.overview.volumeUnit')}` },
+    },
+    rawValue: {
+      id: 'rawValue',
+      header: t('miningTax.overview.rawSellValue'),
+      align: 'right',
+      className: 'whitespace-nowrap',
+      render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.rawValue} />,
+      sortValue: (row) => row.valuation.rawValue,
+      // Dense phone card's headline figure (`stackLayout="dense"` below) —
+      // this is the column that's on by default, so it's the number a
+      // reader's eye should land on first.
+      cardCorner: true,
+    },
+    total: {
+      id: 'total',
+      header: t('miningTax.overview.totalColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap',
+      render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.rawValue} />,
+      sortValue: (row) => row.valuation.rawValue,
+      stackAffix: { before: `${t('miningTax.overview.totalColumn')} ` },
+    },
+    refineValue: {
+      id: 'refineValue',
+      header: t('miningTax.overview.refineValue'),
+      align: 'right',
+      className: 'whitespace-nowrap',
+      render: (row) => <UnpricedIsk valuation={row.valuation} value={row.valuation.refineValue} />,
+      sortValue: (row) => row.valuation.refineValue,
+      // Short, dense-meta-line label ("Refined 91.6M"): the full column
+      // header ("Refined value") is right for a desktop table but repeats
+      // the word "value" the phone card has no room for.
+      stackAffix: { before: `${t('miningTax.overview.refineValueShort')} ` },
+    },
+    oreBreakdown: {
+      id: 'oreBreakdown',
+      header: t('miningTax.overview.oreBreakdownColumn'),
+      render: (row) => oreBreakdownSummary(row.entry.oreLines, data?.typeNames ?? new Map()),
+      sortValue: (row) => oreBreakdownSummary(row.entry.oreLines, data?.typeNames ?? new Map()),
+    },
+    units: {
+      id: 'units',
+      header: t('miningTax.overview.unitsColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => formatCount(sumUnits(row.entry.oreLines)),
+      sortValue: (row) => sumUnits(row.entry.oreLines),
+      stackAffix: { after: ` ${t('miningTax.overview.unitsColumn').toLowerCase()}` },
+    },
+    pricing: {
+      id: 'pricing',
+      header: t('miningTax.overview.pricingColumn'),
+      className: 'whitespace-nowrap',
+      render: (row) =>
+        // Only a gap is worth a mark; a fully priced row says nothing.
+        !row.valuation.pricedAll && (
+          <span className="text-[0.6875rem] text-warning">
+            {t('miningTax.overview.pricingPartial')}
+          </span>
+        ),
+      sortValue: (row) => (row.valuation.pricedAll ? 1 : 0),
+    },
+  };
+
+  const columns: DataTableColumn<MiningYieldRow>[] = [
+    {
+      id: 'date',
+      header: t('miningTax.dateColumn'),
+      headerTooltip: t('miningTax.dateEveHint'),
+      render: (row) => row.entry.date,
+      // Row opens its detail modal: the accent primary cell is the cue (§6c).
+      cellClassName: () => 'text-accent',
+      sortValue: (row) => row.entry.date,
+      primary: true,
+    },
+    ...activeColumnIds.map((id) => columnsById[id]),
+  ];
+
+  const overviewSort = useUrlSort(
+    'overview.sort',
+    OVERVIEW_DEFAULT_SORT,
+    columns.map((c) => c.id)
+  );
+
+  // Every column the table can offer, not just the picker's selection.
+  const csvColumns = useMemo(
+    () =>
+      yieldOverviewCsvColumns(t, {
+        showCharacter: showCharacterColumn,
+        showRefining: refining,
+        systemNames: data?.systemNames ?? new Map(),
+        typeNames: data?.typeNames ?? new Map(),
+        typeVolumes: data?.typeVolumes ?? new Map(),
+      }),
+    [t, showCharacterColumn, refining, data]
+  );
+  const overviewExport = useTableExport({
+    surface: 'mining-overview',
+    rows: visibleRows,
+    columns: csvColumns,
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Same shape as `TaxTab`: this tab owns its snapshot, so it owns the
+          header whose actions drive it. */}
+      <PageHeader
+        title={t('miningTax.title')}
+        meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+        scope={
+          characters.length > 0 && (
+            <CharacterFilterControl
+              activeCharacterId={activeCharacterId}
+              value={characterFilter}
+              onChange={setCharacterFilter}
+              characterCount={characters.length}
+              allCharacterIds={characterIds}
+            />
+          )
+        }
+        actions={
+          <>
+            {/* The header row never wraps (it has a picker), so what fits
+                decides what is inline (measured at 390/768/1024/1280):
+                everything from `xl`; the range alone, with the other view
+                settings behind the gear, from `lg`; below that the range
+                joins them. */}
+            {headerLayout === 'wide' ? (
+              <>
+                <RangeControl value={range} onChange={(next) => void setRange(next)} />
+                <ChartMetricControl
+                  value={chartMetric}
+                  onChange={(next) => void setChartMetric(next)}
+                />
+                <ValueMenu basis={basis} buybackRate={buybackRate}>
+                  <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+                  <BuybackRateInput
+                    value={buybackRate}
+                    onChange={(next) => void setBuybackRate(next)}
+                  />
+                  <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
+                </ValueMenu>
+              </>
+            ) : (
+              headerLayout === 'mid' && (
+                <RangeControl value={range} onChange={(next) => void setRange(next)} />
+              )
+            )}
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('miningTax.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+            {/* The gear takes the ⋮'s slot: last before the bell, after Refresh. */}
+            {headerLayout !== 'wide' && (
+              <SettingsSheet>
+                {headerLayout === 'narrow' && (
+                  <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                )}
+                <ChartMetricControl
+                  value={chartMetric}
+                  onChange={(next) => void setChartMetric(next)}
+                  fill
+                />
+                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+                <BuybackRateInput
+                  value={buybackRate}
+                  onChange={(next) => void setBuybackRate(next)}
+                />
+                <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
+              </SettingsSheet>
+            )}
+          </>
+        }
+      />
+      {tabBar}
+      <TabPanel tabsId={tabsId} tabId="overview" className="space-y-4">
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : (
+          <>
+            {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
+
+            {refiningUnavailable && (
+              <p className="text-xs text-warning">{t('miningTax.overview.refiningUnavailable')}</p>
+            )}
+            {/* Always mounted, so the note is announced when it appears (DESIGN.md §7). */}
+            <LiveStatus>
+              {refiningUnavailable ? t('miningTax.overview.refiningUnavailable') : null}
+            </LiveStatus>
+
+            {data && data.reauthCharacters.length > 0 && (
+              <div
+                role="alert"
+                className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+              >
+                <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
+                <ul className="space-y-1">
+                  {data.reauthCharacters.map((c) => (
+                    <li key={c.characterId} className="flex items-center justify-between gap-2">
+                      <span>
+                        {t('miningTax.reauthCharacterHint', { character: c.characterName })}
+                      </span>
+                      <NeedsConnection>
+                        <Button
+                          size="sm"
+                          onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
+                        >
+                          {t('miningTax.reauthAction')}
+                        </Button>
+                      </NeedsConnection>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="empty:hidden">
+              {refiningCharacters.map((c) => (
+                <ImplantsAssumedNote
+                  key={c.characterId}
+                  characterId={c.characterId}
+                  hint={t('miningTax.overview.refineAssumesNoImplantsHint', {
+                    character: c.characterName,
+                  })}
+                />
+              ))}
+            </div>
+
+            {visibleRows.length === 0 ? (
+              <EmptyState
+                title={t('miningTax.overview.emptyTitle')}
+                hint={t('miningTax.overview.emptyHint')}
+              />
+            ) : (
+              <>
+                <p className="text-xs text-text-dim">
+                  {/* Below `lg` the range lives in the settings sheet, so the
+                      summary names it: the page must say what span it shows. */}
+                  {headerLayout === 'narrow'
+                    ? t('miningTax.overview.rangeSummary', {
+                        range: t(`miningTax.overview.range.${range}`),
+                        summary: basisSummary(t, basis, buybackRate),
+                      })
+                    : basisSummary(t, basis, buybackRate)}
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Panel>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.totalValueStat')}</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      <IskAmount value={totals.rawValue} decimals={0} />
+                    </p>
+                    {refining && (
+                      <p className="text-[0.6875rem] text-text-dim">
+                        {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
+                        <IskAmount value={totals.refineValue} decimals={0} />
+                      </p>
+                    )}
+                  </Panel>
+                  <Panel>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.iskPerDayStat')}</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {totals.iskPerDay !== null ? (
+                        <IskAmount value={totals.iskPerDay} decimals={0} />
+                      ) : (
+                        '—'
+                      )}
+                    </p>
+                    <p className="text-[0.6875rem] text-text-dim">
+                      {t('miningTax.overview.iskPerDayBasisHint')}
+                    </p>
+                  </Panel>
+                  <Panel>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.volumeStat')}</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {volumeDisplayMode(totals.volume).kind === 'complete'
+                        ? `${formatVolume(totals.volume.m3)} m³`
+                        : volumeDisplayMode(totals.volume).kind === 'unknown'
+                          ? '—'
+                          : `≈ ${formatVolume(totals.volume.m3)} m³`}
+                    </p>
+                    {volumeDisplayMode(totals.volume).kind === 'partial' && (
+                      <p className="text-[0.6875rem] text-warning">
+                        {t('miningTax.overview.volumeStatWarning', {
+                          count: totals.volume.missingTypeIds.length,
+                        })}
+                      </p>
+                    )}
+                  </Panel>
+                  <Panel>
+                    <p className={eyebrowClassName}>{t('miningTax.overview.daysMinedStat')}</p>
+                    <p className="mt-1 text-xl font-semibold tabular-nums">
+                      {t('miningTax.overview.daysCoveredValue', {
+                        count: coverage.daysWithData,
+                        total: coverage.rangeDays,
+                      })}
+                    </p>
+                    {coverage.historyStartsInRange ? (
+                      <p className="text-[0.6875rem] text-warning">
+                        {t('miningTax.overview.historyStartsHint', {
+                          date: coverage.historyStartsInRange,
+                        })}
+                      </p>
+                    ) : (
+                      <p className="text-[0.6875rem] text-text-dim">
+                        {dateRangeLabel(totals.dates)}
+                      </p>
+                    )}
+                  </Panel>
+                </div>
+
+                {/* The charts draw their own two cards. */}
+                <Suspense
+                  fallback={
+                    <Panel padded>
+                      <div className="flex justify-center py-8">
+                        <Spinner label={t('common.loading')} />
+                      </div>
+                    </Panel>
+                  }
+                >
+                  <LazyMiningYieldCharts
+                    metric={chartMetric}
+                    dailyRate={dailyRate}
+                    dailyVolume={dailyVolume}
+                    dailyCount={dailyCount}
+                    typeComparison={typeComparison}
+                    typeVolumeComparison={typeVolumeComparisonPoints}
+                    typeCountComparison={typeCountComparisonPoints}
+                    showRefining={refining}
+                  />
+                </Suspense>
+
+                <Panel
+                  padded={false}
+                  actions={
+                    <>
+                      <ColumnPickerMenu
+                        available={availableColumnIds}
+                        visible={activeColumnIds}
+                        columnsById={columnsById}
+                        onToggle={handleToggleColumn}
+                        onReset={handleResetColumns}
+                        buttonLabel={t('miningTax.overview.columnsButton')}
+                        menuTitle={t('miningTax.overview.columnsMenuTitle')}
+                        resetLabel={t('miningTax.overview.resetColumnsAction')}
+                      />
+                      <TableActionsMenu
+                        name={t('miningTax.overviewTab')}
+                        tableExport={overviewExport}
+                      />
+                    </>
+                  }
+                >
+                  <div className="overflow-x-auto">
+                    <DataTable
+                      {...overviewExport.tableProps}
+                      columns={columns}
+                      rows={visibleRows}
+                      rowKey={(row) =>
+                        `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`
+                      }
+                      label={t('miningTax.overviewTab')}
+                      stackLayout="dense"
+                      {...overviewSort}
+                      onRowClick={(row) => setDetailRow(row)}
+                    />
+                  </div>
+                </Panel>
+              </>
+            )}
+          </>
+        )}
+
+        {detailRow && (
+          <YieldDetailModal
+            open
+            onClose={() => setDetailRow(null)}
+            row={detailRow}
+            systemName={systemName(detailRow)}
+            systemSecurity={data?.systemSecurity.get(detailRow.entry.solarSystemId) ?? null}
+            typeNames={data?.typeNames ?? new Map()}
+            typeVolumes={data?.typeVolumes ?? new Map()}
+            showRefining={refining}
+            basis={basis}
+            buybackRate={buybackRate}
+            today={today}
+          />
+        )}
+      </TabPanel>
+    </div>
+  );
+}

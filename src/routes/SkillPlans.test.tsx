@@ -1,0 +1,2033 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import '@/i18n';
+import { db, type SkillPlanRecord } from '@/db';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
+import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
+import { usePublicInfo } from '@/stores/publicInfo';
+import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
+import type { SkillType } from '@/sde/types';
+
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: () => ({
+    needRefresh: [false, vi.fn()],
+    offlineReady: [false, vi.fn()],
+    updateServiceWorker: vi.fn(),
+  }),
+}));
+
+// Real src/sync would attempt actual Firebase network calls (this repo's
+// .env carries a real dev project config). markPlanDeleted is faked down to
+// its local-delete effect only — the tombstone/remote bookkeeping is src/sync's
+// own responsibility and is covered by its own test suite.
+const markPlanDeletedMock = vi.fn(async (_characterId: number, id: string) => {
+  await db.skillPlans.delete(id);
+});
+const scheduleSyncMock = vi.fn();
+const triggerSyncMock = vi
+  .fn<(characterId: number) => Promise<void>>()
+  .mockResolvedValue(undefined);
+const subscribeSyncStatusMock = vi.fn((listener: (s: unknown) => void) => {
+  listener({ state: 'idle', lastSyncedAt: null, error: null });
+  return () => {};
+});
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
+vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
+  markPlanDeleted: (characterId: number, id: string) => markPlanDeletedMock(characterId, id),
+  scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
+  triggerSync: (characterId: number) => triggerSyncMock(characterId),
+  subscribeSyncStatus: (listener: (s: unknown) => void) => subscribeSyncStatusMock(listener),
+}));
+
+// isSyncConfigured reads import.meta.env, which is 'test' MODE in this suite
+// and would otherwise disable the scheduleSync-after-edit wiring under test.
+// Force it on so that wiring is exercised (against the mocked src/sync above,
+// never real Firebase).
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => true,
+}));
+
+// Small hand-made fixture, not the real SDE: a prereq chain (Small Hybrid
+// Turret needs Gunnery III) plus a second attribute pair (Spaceship Command)
+// and a same-pair-as-Gunnery skill (Small Projectile Turret) to exercise
+// prereq insertion, remap segmentation, and reorder-by-attribute-pair.
+const FIXTURE_SKILLS: SkillType[] = [
+  {
+    typeID: 1,
+    name: 'Gunnery',
+    description: '',
+    groupID: 10,
+    groupName: 'Gunnery',
+    rank: 1,
+    primaryAttr: 'perception',
+    secondaryAttr: 'willpower',
+    prereqs: [],
+  },
+  {
+    typeID: 2,
+    name: 'Small Hybrid Turret',
+    description: '',
+    groupID: 10,
+    groupName: 'Gunnery',
+    rank: 1,
+    primaryAttr: 'perception',
+    secondaryAttr: 'willpower',
+    prereqs: [{ skillTypeID: 1, level: 3 }],
+  },
+  {
+    typeID: 3,
+    name: 'Spaceship Command',
+    description: '',
+    groupID: 20,
+    groupName: 'Spaceship Command',
+    rank: 1,
+    primaryAttr: 'intelligence',
+    secondaryAttr: 'memory',
+    prereqs: [],
+  },
+  {
+    typeID: 4,
+    name: 'Small Projectile Turret',
+    description: '',
+    groupID: 10,
+    groupName: 'Gunnery',
+    rank: 1,
+    primaryAttr: 'perception',
+    secondaryAttr: 'willpower',
+    prereqs: [],
+  },
+];
+
+const RIFTER_TYPE_ID = 587;
+const FIXTURE_TYPES = {
+  [RIFTER_TYPE_ID]: { name: 'Rifter', groupID: 25, volume: 27_000 },
+};
+
+vi.mock('@/sde/loadSde', () => ({
+  loadSkills: vi.fn(async () => FIXTURE_SKILLS),
+  loadTypes: vi.fn(async () => FIXTURE_TYPES),
+  loadBlueprints: vi.fn(async () => ({})),
+  loadMarketWideTrees: vi.fn(async () => ({})),
+}));
+
+const CHAR_ID = 91;
+const attributesPayload = {
+  charisma: 19,
+  intelligence: 20,
+  memory: 20,
+  perception: 20,
+  willpower: 20,
+};
+const emptySkillsPayload = { skills: [], total_sp: 0, unallocated_sp: 0 };
+
+const server = setupServer(
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+    HttpResponse.json(emptySkillsPayload)
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+    HttpResponse.json(attributesPayload)
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+    HttpResponse.json([
+      { skill_id: 1, queue_position: 0, finished_level: 3 },
+      { skill_id: 3, queue_position: 1, finished_level: 1 },
+    ])
+  ),
+  // Loaded alongside attributes for the What-If Implants lens (PlanEditor);
+  // no test in this file exercises real implant bonuses, so no implants.
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/universe/types/${RIFTER_TYPE_ID}`, () =>
+    HttpResponse.json({
+      type_id: RIFTER_TYPE_ID,
+      name: 'Rifter',
+      description: '',
+      group_id: 25,
+      published: true,
+      dogma_attributes: [
+        { attribute_id: 182, value: 1.0 }, // requires Gunnery (typeID 1)...
+        { attribute_id: 277, value: 3.0 }, // ...level III
+      ],
+    })
+  )
+);
+
+function seedPlan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRecord {
+  return {
+    id: 'plan-1',
+    characterId: CHAR_ID,
+    name: 'Test plan',
+    entries: [],
+    remapCount: 0,
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
+/** Most editor-focused tests below seed a single plan and want its editor
+ * page open immediately, rather than exercising the list-click navigation
+ * that `SkillPlans CRUD` already covers. */
+function goToPlanEditor(id = 'plan-1') {
+  window.history.pushState({}, '', `/skills/plans/${id}`);
+}
+
+/**
+ * Below `lg` — where jsdom's stub `matchMedia` always lands — the plan's
+ * tools (optimize/marker actions, the what-if lens, import/export) sit in a
+ * collapsed disclosure, so the plan itself leads the page. Editor tests open
+ * it before reaching for anything inside. Doubles as the "editor is up" wait,
+ * and is a no-op once open.
+ */
+async function openPlanTools() {
+  await screen.findByText('Your entries');
+  const toggle = screen.queryByRole('button', { name: /plan tools/i });
+  if (toggle?.getAttribute('aria-expanded') === 'false') {
+    await userEvent.setup().click(toggle);
+  }
+}
+
+/**
+ * Alpha, What-if implants, Booster and Skill injectors sit one level inside
+ * Plan tools, under a closed-by-default Assumptions row. Opens it; call after
+ * `openPlanTools`.
+ */
+async function openAssumptions() {
+  const toggle = screen.getByRole('button', { name: /^assumptions/i });
+  if (toggle.getAttribute('aria-expanded') === 'false') {
+    await userEvent.setup().click(toggle);
+  }
+}
+
+/** Opens the Actions section's "Optimize" dropdown and clicks one of its mode items (#1411). */
+async function clickOptimizeMode(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name: 'Optimize' }));
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
+/**
+ * The tools-pane section a heading titles (Actions / Attributes /
+ * Import / Export). `closest('section')`, not `parentElement`: a heading
+ * shares a flex row with its section's optional right-aligned actions (the
+ * Attributes section's `DataAgeBadge`).
+ */
+function toolsSection(title: string): HTMLElement {
+  const section = screen.getByRole('heading', { name: title }).closest('section');
+  if (!section) throw new Error(`expected the "${title}" tools section`);
+  return section as HTMLElement;
+}
+
+let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
+
+async function resetSession() {
+  await db.characters.clear();
+  await db.tokens.clear();
+  await db.settings.clear();
+  await db.skillPlans.clear();
+  await db.esiCache.clear();
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  usePublicInfo.setState({ byCharacterId: {} });
+
+  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.tokens.put({
+    characterId: CHAR_ID,
+    accessToken: 'access-token',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: [],
+  });
+  await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+
+  clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+  configureClipboard(clipboardWriteText);
+
+  markPlanDeletedMock.mockClear();
+  scheduleSyncMock.mockClear();
+  triggerSyncMock.mockClear();
+  subscribeSyncStatusMock.mockClear().mockImplementation((listener: (s: unknown) => void) => {
+    listener({ state: 'idle', lastSyncedAt: null, error: null });
+    return () => {};
+  });
+
+  window.history.pushState({}, '', '/skills/plans');
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the plans page, so no test pays for the first one:
+  // a worker's first `App` render (lazy route chunks, jsdom, React warm-up) is
+  // seconds, and it landed on whichever test ran first, past its 1s findBy.
+  await Promise.all([routeChunks.loadSkillPlans(), routeChunks.loadSkillPlanEditor()]);
+  await resetSession();
+  const { unmount } = render(<App />);
+  await screen.findByRole('button', { name: 'New plan' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
+afterAll(() => server.close());
+afterEach(() => {
+  server.resetHandlers();
+  configureClipboard(null);
+});
+beforeEach(resetSession);
+
+/** Opens the "All plans" popover from the plan card. */
+async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'All plans' }));
+  return screen.findByRole('dialog', { name: 'All plans' });
+}
+
+describe('SkillPlans Optimize queue', () => {
+  const longQueue = [
+    { skill_id: 1, queue_position: 0, finished_level: 5 },
+    { skill_id: 3, queue_position: 1, finished_level: 5 },
+  ];
+
+  it('makes a remapped plan from the queue, opens it, and Undo takes it back', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({ ...attributesPayload, bonus_remaps: 2 })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json(longQueue)
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    // The button is aria-disabled until the queue loads, and a click on it does
+    // nothing — wait for it to enable. Re-queried each poll: the node can remount.
+    const optimizeQueue = () => screen.getByRole('button', { name: 'Optimize queue' });
+    await screen.findByRole('button', { name: 'Optimize queue' });
+    await waitFor(() => expect(optimizeQueue()).not.toHaveAttribute('aria-disabled', 'true'));
+    await user.click(optimizeQueue());
+
+    const stored = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      expect(all).toHaveLength(1);
+      return all;
+    });
+    expect(stored[0]!.name).toMatch(/^Skill queue · \d{4}-\d{2}-\d{2}$/);
+    expect(stored[0]!.entries).toHaveLength(2);
+    expect(stored[0]!.markers?.length).toBeGreaterThan(0);
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0]!.id}`));
+    expect(await screen.findByText(/^Made "Skill queue · /)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
+    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0);
+  });
+
+  it('is inert with an empty queue', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    // Re-queried on every poll, never held: the page can swap the button's DOM
+    // node (a remount while its inputs settle) after the first find, and a held
+    // reference then goes stale and never shows aria-disabled.
+    const optimizeQueue = () => screen.getByRole('button', { name: 'Optimize queue' });
+    await screen.findByRole('button', { name: 'Optimize queue' });
+    await waitFor(() => expect(optimizeQueue()).toHaveAttribute('aria-disabled', 'true'));
+    await user.click(optimizeQueue());
+    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0);
+  });
+});
+
+describe('SkillPlans CRUD', () => {
+  it('creates a plan and navigates straight to its editor, scheduling a sync', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+
+    const stored = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      expect(all).toHaveLength(1);
+      return all;
+    });
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`));
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('offers New plan and its other starts before any plan exists, and no All plans to open', async () => {
+    render(<App />);
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'More ways to start a plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All plans' })).not.toBeInTheDocument();
+  });
+
+  it('shows the plan edited last on the page, not the oldest', async () => {
+    await db.skillPlans.add(seedPlan({ id: 'old', name: 'Old plan', updatedAt: 1 }));
+    await db.skillPlans.add(seedPlan({ id: 'new', name: 'Newest plan', updatedAt: 2 }));
+    render(<App />);
+    const link = await screen.findByRole('link', { name: /Newest plan/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/skills/plans/new'));
+    expect(screen.queryByRole('link', { name: /Old plan/ })).not.toBeInTheDocument();
+  });
+
+  it('imports a cleanly pasted skill plan into a new plan with no dialog, and offers Undo', async () => {
+    // What GlobalPasteRouter navigates with: react-router keeps location state under `usr`.
+    window.history.replaceState(
+      { usr: { skillPlanImportText: 'Gunnery V' }, key: 'paste', idx: 0 },
+      '',
+      '/skills/plans'
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Import plan' })).not.toBeInTheDocument();
+
+    const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+    expect(stored).toHaveLength(1);
+    expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`);
+    await waitFor(async () => {
+      expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(1);
+    });
+    // Spent: a reload must not import again or make a second plan.
+    expect((window.history.state as { usr: unknown }).usr).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /undo/i }));
+    await waitFor(async () => {
+      expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(0);
+    });
+  });
+
+  it('opens the Import dialog on the preview when a pasted skill plan has a line that fails', async () => {
+    window.history.replaceState(
+      { usr: { skillPlanImportText: 'Gunnery V\nNot A Skill 4' }, key: 'paste', idx: 0 },
+      '',
+      '/skills/plans'
+    );
+    render(<App />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    expect(await within(dialog).findByText(/^Line 2:/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(within(dialog).getByRole('textbox', { name: /paste/i })).toHaveValue(
+      'Gunnery V\nNot A Skill 4'
+    );
+  });
+
+  it('renames a plan from the list, scheduling a sync', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Rename' });
+    await user.clear(input);
+    await user.type(input, 'PvP Fit{Enter}');
+
+    expect(await within(plans).findByText('PvP Fit')).toBeInTheDocument();
+    expect((await db.skillPlans.get('plan-1'))?.name).toBe('PvP Fit');
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('duplicates a plan from the list and navigates to the copy’s editor, scheduling a sync', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
+
+    const copy = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      const found = all.find((p) => p.name === 'Test plan (copy)');
+      expect(found).toBeDefined();
+      return found!;
+    });
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${copy.id}`));
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('deletes a plan via the confirmation Modal, not window.confirm', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(async () =>
+      expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0)
+    );
+    // Deletes MUST go through markPlanDeleted (records a tombstone) — a plain
+    // Dexie delete would let the remote copy resurrect it on next sync.
+    expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1');
+  });
+
+  it('cancels a delete from the confirmation Modal without deleting', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(markPlanDeletedMock).not.toHaveBeenCalled();
+  });
+
+  it('returns to the list via the back link, and via the browser’s own Back after opening a plan', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByText('Test plan'));
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/plans/plan-1');
+
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/plans');
+
+    await user.click(await screen.findByText('Test plan'));
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans: the section title survives opening a plan', () => {
+  it('keeps the Skills page title above the sub-nav in the editor, as on the list', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Skills' })).toBeInTheDocument();
+
+    await user.click(await screen.findByText('Test plan'));
+    await screen.findByText('Your entries');
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Skills' })).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans layout: side by side list + editor (#158)', () => {
+  it('shows one column at a time on narrow screens, with a back control that returns to the list', async () => {
+    // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches,
+    // so this already runs as a narrow viewport.
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    // The rail leads on a phone: the plan row and the attributes line, then the queue.
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByText('Test plan'));
+    await screen.findByText('Your entries');
+
+    // The editor's sidebar — the plan list and, below it, the plan's tools —
+    // is not built at all below `lg`: the tools move into the single column
+    // as a collapsed disclosure, and rendering the list hidden beside them
+    // would keep a live Dexie subscription alive for a pane nobody can see.
+    expect(screen.queryByRole('link', { name: 'Test plan' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /plan tools/i })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Back to plans' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+
+    expect(await screen.findByRole('region', { name: 'Attributes' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+  });
+
+  it('keeps both panes visible on desktop, with no back control', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+
+    try {
+      const user = userEvent.setup();
+      await db.skillPlans.add(seedPlan());
+      render(<App />);
+
+      await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
+      await screen.findByText('Your entries');
+
+      // `find`, not `get`: 'Your entries' first renders on the very tick the
+      // catalog arrives and `PlanEditor` replaces the loading layout, which
+      // remounts `PlanListPane` in that slot — so the list is momentarily a
+      // spinner at exactly the moment the editor appears.
+      const listPanel = (await screen.findByRole('link', { name: /^Test plan/ })).closest(
+        'section'
+      );
+      expect(listPanel).not.toHaveClass('hidden');
+      expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});
+
+describe('Skills opens on Plans', () => {
+  it('redirects /skills to the plan list, so the section lands on planning', async () => {
+    window.history.pushState({}, '', '/skills');
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+  });
+
+  it('still reaches the trained-skills view from the sub-nav', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    // The sub-nav's own link: the rail lists Skills › Trained too.
+    const subNav = await screen.findByRole('navigation', { name: 'Skills' });
+    await user.click(within(subNav).getByRole('link', { name: 'Trained' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/trained'));
+  });
+});
+
+describe('SkillPlans: current attributes beside the plan list', () => {
+  // Full labels and the remap note are the desktop rail; a phone gets one short line.
+  const original = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+  const attributesPanel = async () =>
+    (await screen.findByRole('heading', { name: 'Attributes' })).closest('section')!;
+
+  it("shows the character's attributes from ESI, not the planner's placeholder defaults", async () => {
+    // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
+    // which the pane would otherwise present as the character's own sheet.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 21,
+          intelligence: 24,
+          memory: 23,
+          perception: 22,
+          willpower: 25,
+        })
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('24')).toBeInTheDocument();
+    expect(within(panel).getByText('INT')).toBeInTheDocument();
+    expect(within(panel).getByText('25')).toBeInTheDocument();
+    expect(within(panel).getByText('21')).toBeInTheDocument();
+  });
+
+  it('adds the implant bonus on top of the base attribute, as the trained view does', async () => {
+    server.use(
+      // Attribute-enhancer implant: ESI's attribute values already include it,
+      // so the chip reads base + bonus = effective.
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json([9899])
+      ),
+      http.get('https://esi.evetech.net/universe/types/9899', () =>
+        HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 178, value: 3 }], // +3 perception
+        })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({ ...attributesPayload, perception: 23 })
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('23')).toBeInTheDocument();
+    expect(
+      within(panel).getByText('20 base + 3 implant = 23', { selector: '.sr-only' })
+    ).toBeInTheDocument();
+  });
+
+  it('says the attributes are unknown when ESI fails, rather than inventing a sheet', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.error()
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('—')).toBeInTheDocument();
+    expect(within(panel).queryByText('INT')).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: the same attributes, on the route they are costed on', () => {
+  it("shows the character's current attributes in the editor's tools pane, dated", async () => {
+    // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
+    // so this proves ESI's own read reached the editor and not the fallback
+    // sheet computeSchedule falls back to.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 21,
+          intelligence: 24,
+          memory: 23,
+          perception: 22,
+          willpower: 25,
+        })
+      )
+    );
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    const section = toolsSection('Attributes');
+    expect(await within(section).findByText('24')).toBeInTheDocument();
+    expect(within(section).getByText('INT')).toBeInTheDocument();
+    expect(within(section).getByText('25')).toBeInTheDocument();
+    expect(section.querySelector('time')).not.toBeNull();
+    // The what-if lens is not in this section: it sits in the closed Assumptions row.
+    expect(within(section).queryByLabelText('What-if implants')).toBeNull();
+    await openAssumptions();
+    expect(screen.getByLabelText('What-if implants')).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans: cached data notice', () => {
+  const HOUR = 3_600_000;
+
+  it('says nothing while every read is live', async () => {
+    render(<App />);
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    // Both reads have landed once they are saved.
+    await waitFor(async () => {
+      expect(await db.esiCache.get([CHAR_ID, 'skills'])).toBeDefined();
+      expect(await db.esiCache.get([CHAR_ID, 'skillqueue'])).toBeDefined();
+    });
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
+  });
+
+  it('dates the notice by the cached skills, not by the fresh queue read next to them', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: emptySkillsPayload,
+      // A minute over, so the shared 30 s ticker being a little behind still reads 5 h.
+      fetchedAt: Date.now() - 5 * HOUR - 60_000,
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => HttpResponse.error())
+    );
+    render(<App />);
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.getByText('Showing cached data').closest('p')).toHaveTextContent(
+      'Showing cached data · 5h ago'
+    );
+  });
+});
+
+describe('SkillPlans: sync error visibility (UX-REVIEW #10)', () => {
+  it('shows a visible "Sync error" note (not tooltip-only) when sync is in the error state', async () => {
+    subscribeSyncStatusMock.mockImplementation((listener: (s: unknown) => void) => {
+      listener({ state: 'error', lastSyncedAt: null, error: 'boom' });
+      return () => {};
+    });
+    render(<App />);
+    expect(await screen.findByText('Sync error — changes saved locally')).toBeInTheDocument();
+  });
+
+  it('shows nothing extra when sync is idle', async () => {
+    render(<App />);
+    await screen.findByText('Current skill queue');
+    expect(screen.queryByText(/sync error/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: add-skill picker', () => {
+  it('inserts prerequisites into the computed queue, dimmed, ahead of the user entry', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    // Column headers (checked below) only render at desktop widths (#114) —
+    // jsdom's matchMedia never matches by default, so mock it to desktop.
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    try {
+      render(<App />);
+
+      const search = await screen.findByRole('searchbox', { name: 'Add skill' });
+      await user.type(search, 'Small Hybrid Turret');
+      await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
+      await user.click(await screen.findByRole('button', { name: 'Level I' }));
+
+      const panel = screen.getByText('Your entries').closest('section')!;
+      const items = await within(panel).findAllByRole('listitem');
+      // No priority-band divider: every entry is Normal, a single band (#1415).
+      expect(items.map((li) => li.textContent)).toEqual([
+        expect.stringContaining('Gunnery I'),
+        expect.stringContaining('Gunnery II'),
+        expect.stringContaining('Gunnery III'),
+        expect.stringContaining('Small Hybrid Turret I'),
+      ]);
+      // The three Gunnery levels are prereqs the user didn't add directly —
+      // dimmed and tagged, positioned ahead of the one row for the entry
+      // they were needed by (#112: entry rows are one-per-entry, not
+      // one-per-level, so Small Hybrid Turret I is a single row here).
+      expect(items[0].textContent).toMatch(/prereq/i);
+      expect(items[1].textContent).toMatch(/prereq/i);
+      expect(items[2].textContent).toMatch(/prereq/i);
+      expect(items[3].textContent).not.toMatch(/prereq/i);
+
+      // Column headers label the two time columns (UX-REVIEW #9), by what
+      // each one means rather than by the jargon they used to carry.
+      expect(within(panel).getByText('Takes')).toBeInTheDocument();
+      expect(within(panel).getByText('Done by')).toBeInTheDocument();
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
+
+    const stored = await db.skillPlans.get('plan-1');
+    expect(stored?.entries).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it("shows the expanded skill's prerequisites (untrained) and unlocks inline (#18)", async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+
+    const search = await screen.findByRole('searchbox', { name: 'Add skill' });
+    await user.type(search, 'Small Hybrid Turret');
+    await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
+
+    // Small Hybrid Turret needs Gunnery III; this character has 0 SP (emptySkillsPayload).
+    const prereqsHeading = await screen.findByText('Prerequisites');
+    const prereqsSection = prereqsHeading.closest('section')!;
+    expect(within(prereqsSection).getByText('Gunnery')).toBeInTheDocument();
+    expect(within(prereqsSection).getByText('Level 3')).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'Gunnery');
+    await user.click(await screen.findByRole('button', { name: /^Gunnery/ }));
+
+    const unlocksHeading = await screen.findByText('Unlocks');
+    const unlocksSection = unlocksHeading.closest('section')!;
+    expect(within(unlocksSection).getByText('Small Hybrid Turret')).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
+  it('says no entries yet when the plan is empty', async () => {
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    expect(
+      within(panel).getByText('No entries yet. Add a skill to get started.')
+    ).toBeInTheDocument();
+  });
+
+  // #112: the merged list no longer shows a banner distinguishing "all
+  // trained" from any other populated state — with entries present it just
+  // renders their rows, with 0m durations when nothing is left to train.
+  // The equivalent honesty check is: the entry row is there (not the
+  // empty-state banner), and its duration reads zero.
+  it('renders the entry row with a zero duration, not the empty-entries banner, when every entry is already trained', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          skills: [{ skill_id: 1, trained_skill_level: 5, skillpoints_in_skill: 999_999 }],
+          total_sp: 999_999,
+          unallocated_sp: 0,
+        })
+      )
+    );
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
+    render(<App />);
+
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    expect(
+      within(panel).queryByText('No entries yet. Add a skill to get started.')
+    ).not.toBeInTheDocument();
+    // No priority-band divider (single band, #1415). Waits for the row's own duration to actually settle at zero
+    // (post the async ESI "already trained" skills fetch) rather than just
+    // for some listitem to exist, which could be a transient pre-recompute state.
+    await waitFor(() => {
+      const items = within(panel).getAllByRole('listitem');
+      expect(items).toHaveLength(1);
+      expect(items[0].textContent).toContain('Gunnery III');
+      // Exact-match: a span reading precisely "0m" only happens at zero
+      // duration (any real duration formats to something like "2h 5m"). One
+      // cell, not two: the running-total column now reads as a finish date.
+      expect(within(items[0]).getAllByText('0m')).toHaveLength(1);
+    });
+  });
+});
+
+describe('SkillPlans: /skills is stale until the character logs in', () => {
+  it('counts a level the queue finished in the past as trained, though /skills omits it', async () => {
+    // ESI: entries "that are in the past need to be applied on top of this
+    // list". Without that, the plan is computed against levels already passed.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1,
+            queue_position: 0,
+            finished_level: 3,
+            start_date: '2026-01-01T00:00:00Z',
+            finish_date: '2026-01-05T00:00:00Z',
+          },
+        ])
+      )
+    );
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
+    render(<App />);
+
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    // No priority-band divider (single band, #1415). Waits for the row's own
+    // duration to actually settle at zero (post the async ESI skillqueue fetch) rather than just for some
+    // listitem to exist, which could be a transient pre-recompute state.
+    await waitFor(() => {
+      const items = within(panel).getAllByRole('listitem');
+      expect(items).toHaveLength(1);
+      expect(within(items[0]).getAllByText('0m')).toHaveLength(1);
+    });
+  });
+
+  it('does not credit a paused queue entry, which has no finish date at all', async () => {
+    // peterhaneve/evemon#40 marked skills falsely complete this way. The
+    // default handler's entries are dateless, i.e. paused.
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
+    render(<App />);
+
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    // No priority-band divider (single band, #1415) — wait for the row itself before checking its duration, so a
+    // pre-recompute transient (with no rows/no "0m" either way) can't pass
+    // this negative assertion for the wrong reason.
+    // One row per level (reorder.ts): "Gunnery III" on an untrained character
+    // is three rows, no band divider. The seeded plan is
+    // stored unsplit, so wait for the split write rather than catching the
+    // single row it renders first.
+    await waitFor(async () =>
+      expect(await within(panel).findAllByRole('listitem')).toHaveLength(3)
+    );
+    const items = await within(panel).findAllByRole('listitem');
+    // Not credited as trained: the entry rows must show real, nonzero
+    // duration rather than the "0m" they would show if wrongly treated as done.
+    expect(within(items[0]).queryByText('0m')).not.toBeInTheDocument();
+  });
+});
+
+describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
+  const queuePanel = async () =>
+    (await screen.findByText('Current skill queue')).closest('section')!;
+
+  it('keeps a finished entry visible and tells the user to log in to apply it', async () => {
+    // ESI holds completed entries until the character next logs in, and says
+    // /skills is out of date until then. Hiding them would discard exactly
+    // the information the queue exists to carry.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1,
+            queue_position: 0,
+            finished_level: 3,
+            finish_date: '2020-01-01T00:00:00Z',
+          },
+        ])
+      )
+    );
+    render(<App />);
+
+    const panel = await queuePanel();
+    expect(await within(panel).findByText('Done')).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/1 skill finished training\. Log in to EVE to apply it\./i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows the training skill's remaining time from ESI's finish_date", async () => {
+    // CurrentQueuePanel recomputes secondsRemaining from Date.now() at render
+    // time, and formatDuration floors to whole hours — a finish_date exactly
+    // 2h out is right on that floor's boundary, so any wall-clock time spent
+    // between here and the panel's render (a real risk under CPU contention)
+    // rounds it down to "1h ...". Landing mid-hour instead gives real margin.
+    const finish = new Date(Date.now() + 2 * 3600_000 + 30 * 60_000).toISOString();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          { skill_id: 1, queue_position: 0, finished_level: 3, finish_date: finish },
+        ])
+      )
+    );
+    render(<App />);
+
+    const panel = await queuePanel();
+    expect(await screen.findByRole('region', { name: 'Training now' })).toBeInTheDocument();
+    expect(within(panel).getByText(/^2h/)).toBeInTheDocument();
+    expect(within(panel).getByText(/^left · done /)).toBeInTheDocument();
+  });
+
+  it('calls a queue with no dates paused, rather than pretending it starts now', async () => {
+    // The default fixture carries no date fields — a paused queue. Inventing
+    // a start time here is the EVEMon bug (peterhaneve/evemon#40).
+    render(<App />);
+
+    const panel = await queuePanel();
+    // Both fixture rows are paused: the group heading, then a badge per row.
+    expect(await within(panel).findByRole('heading', { name: 'Paused' })).toBeInTheDocument();
+    expect(within(panel).getAllByText('Paused')).toHaveLength(3);
+    expect(
+      within(panel).getByText(/Training is paused, so EVE reports no completion times\./i)
+    ).toBeInTheDocument();
+    expect(within(panel).queryByText(/left/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: import / export', () => {
+  it('imports the in-game skill queue (deduped) and exports the computed queue to the clipboard', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From skill queue' }));
+    const entriesPanel = screen.getByText('Your entries').closest('section')!;
+    // The entry row's name and level render as separate text nodes ("Gunnery"
+    // " " "III"), so match by regex rather than the exact string "Gunnery".
+    // Anchored so it matches the name cell itself rather than any other
+    // occurrence of the skill's name in the row.
+    expect(await within(entriesPanel).findByText(/^Gunnery\b/)).toBeInTheDocument();
+    // ESI sends one row per level trained, and that is now exactly the shape
+    // a plan keeps — the import no longer collapses them into one row.
+    // Polled: the seeded plan already shows Gunnery, so the findByText above can
+    // resolve before the import has written the stored plan.
+    await waitFor(async () => {
+      const stored = await db.skillPlans.get('plan-1');
+      expect(stored?.entries).toEqual([
+        { skillTypeID: 1, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 2 },
+        { skillTypeID: 1, targetLevel: 3 },
+        { skillTypeID: 3, targetLevel: 1 },
+      ]);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to clipboard' }));
+    expect(await screen.findByText('Copied to clipboard')).toBeInTheDocument();
+    expect(clipboardWriteText).toHaveBeenCalledWith(
+      'Gunnery I\nGunnery II\nGunnery III\nSpaceship Command I'
+    );
+  });
+
+  it('shows an inline error (no unhandled rejection) when the in-game queue import fails to parse (BUG #3)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        // Missing finished_level: parseSkillQueue throws synchronously.
+        HttpResponse.json([{ skill_id: 1, queue_position: 0 }])
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From skill queue' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid finished_level/);
+  });
+});
+
+describe('SkillPlans editor: optimize remaps', () => {
+  it('renders a savings verdict and readable remap instructions per segment', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    await clickOptimizeMode(user, 'Place remaps only');
+
+    // A savings verdict now gets its own Accept/Reject Modal, next to the
+    // button that produced it — it used to render inline, then a Panel of
+    // its own further down before that.
+    const dialog = await screen.findByRole('dialog', { name: 'Optimize remaps' });
+    // Single verdict line (UX-REVIEW #2), not the Total/Current/Savings triple.
+    expect(within(dialog).getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Total time/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Current attributes/)).not.toBeInTheDocument();
+    // Actionable per-segment instruction (UX-REVIEW #6): the plan is
+    // perception/willpower-heavy, so the remap maxes PER.
+    expect(within(dialog).getByText(/Segment 1/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)
+    ).toBeInTheDocument();
+  });
+
+  it('says no remap helps (and hides segments) when current attributes are already optimal', async () => {
+    // The optimal spread for this perception/willpower-heavy plan: the
+    // optimizer can only match it, so savings must be zero, never negative.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 17,
+          intelligence: 17,
+          memory: 17,
+          perception: 27,
+          willpower: 21,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }], remapCount: 2 })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    await clickOptimizeMode(user, 'Place remaps only');
+
+    expect(
+      await screen.findByText(
+        'No remap improves this plan in its current order \u2014 keeping current attributes. Try "Reorder only" to group similar skills first, then optimize again.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
+  });
+
+  // The reported bug. Remaps Available comes from live ESI now (#1412), not
+  // a free-typed `plan.remapCount` — and with live ESI readable, the budget
+  // can never actually be 0: even a character with no bonus remaps whose
+  // yearly remap is on cooldown still gets a `timedRemap` slot (usable once
+  // the cooldown ends, per #1404), so `placeRemaps` always has at least one
+  // remap to place. 0-remaps-to-spend can only happen on the offline/no-scope
+  // fallback — ESI attributes unreadable and the plan's stored `remapCount`
+  // itself 0 — so that's what's mocked here. The identical plan at remapCount
+  // 1 saves time (first test in this block), so "no remap improves this plan
+  // in its current order" is false, and its advice to try "Reorder only"
+  // cannot help.
+  it('says the plan has no remaps to spend, rather than blaming the plan order, at 0 Remaps Available', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.error()
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 0,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Place remaps only');
+
+    expect(
+      await screen.findByText('This plan has 0 remaps to spend, so nothing was placed.')
+    ).toBeInTheDocument();
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('No remaps to spend');
+    // Not the order-blaming verdict, and not the generic inline confirmation.
+    expect(screen.queryByText(/^No remap improves this plan/)).not.toBeInTheDocument();
+    expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
+  });
+
+  it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    await clickOptimizeMode(user, 'Place remaps only');
+    expect(await screen.findByText(/^Remapping saves/)).toBeInTheDocument();
+
+    const entriesPanel = screen.getByText('Your entries').closest('section')!;
+    // Remove enough entries to shrink the scheduled queue below the stale
+    // segment's startIndex — must not throw, and must drop the stale panel
+    // rather than render against the old (now out-of-range) schedule.
+    // The row's ⋮ menu holds Remove (#112): the item's accessible name is "Remove {skill}
+    // {level}". The level is part of the name because a
+    // plan holds one row per level, so "Gunnery III" alone would match three
+    // buttons. Removing opens a confirm Modal (#408) rather than removing
+    // immediately.
+    await user.click(
+      within(entriesPanel).getByRole('button', { name: 'More actions for Gunnery III' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Gunnery III' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => expect(screen.queryByText(/^Remapping saves/)).not.toBeInTheDocument());
+    // The rest of the app must still be usable — no crash boundary tripped.
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
+  });
+
+  it('shows an inline confirmation beside the Optimize remaps button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Place remaps only');
+
+    // Additive: the full panel result (asserted elsewhere above) still
+    // renders — this only checks the new beside-the-button confirmation.
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent(/^Saves \d+[dhm]/);
+  });
+});
+
+describe('SkillPlans editor: remap markers', () => {
+  it('adds a removable marker row and persists positions in Dexie (no schema bump)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add remap marker' }));
+    expect(await screen.findByText('Remap marker')).toBeInTheDocument();
+    // Appended after the last entry: position === entries.length, which is 4
+    // once "Gunnery III" is held as its three per-level rows.
+    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([4]));
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+
+    await user.click(screen.getByRole('button', { name: 'Remove remap marker 1' }));
+    await waitFor(() => expect(screen.queryByText('Remap marker')).not.toBeInTheDocument());
+    expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([]);
+  });
+
+  it('shows an inline confirmation beside the Add marker button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Add remap marker' }).closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Add remap marker' }));
+
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('Marker added');
+  });
+
+  it('optimize at my markers reports the current-attributes segment and a best spread per marker segment', async () => {
+    const user = userEvent.setup();
+    // Marker at entry position 1: train Gunnery I..V on current attributes,
+    // remap before Spaceship Command (int/mem).
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 5 },
+          { skillTypeID: 3, targetLevel: 3 },
+        ],
+        markers: [1],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    await user.click(screen.getByRole('button', { name: 'Optimize' }));
+    const optimizeItem = screen.getByRole('menuitem', { name: 'Use my remap markers' });
+    expect(optimizeItem).not.toHaveAttribute('aria-disabled', 'true');
+    await user.click(optimizeItem);
+
+    await screen.findByText(/^Remapping saves/);
+    expect(toolsSection('Actions')).toBeInTheDocument();
+    // Verdict line, same pattern as "optimize now".
+    expect(screen.getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    // Segment 1: leading current-attributes prefix, no remap spent.
+    expect(screen.getByText('From Gunnery I, keep current attributes')).toBeInTheDocument();
+    // Segment 2: the marker's segment gets its own best spread (int/mem-heavy).
+    expect(
+      screen.getByText(/Before Spaceship Command I, remap to INT 27 \/ MEM 21 \//)
+    ).toBeInTheDocument();
+  });
+
+  // The other half of the reported bug. "Add remap marker" appends the
+  // marker at the end of the entry list and the user drags it up; an
+  // undragged marker delimits an empty segment, which optimizeAtMarkers
+  // drops — so savings are exactly zero and no remap is ever weighed. The
+  // same plan with the marker at position 1 saves time (test above), so
+  // "remapping at these markers doesn't save time" misreads the situation.
+  it('says a marker at the end of the plan splits nothing, rather than that remapping there does not pay', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 5 },
+          { skillTypeID: 3, targetLevel: 3 },
+        ],
+        // Where "Add remap marker" puts it: after the last entry.
+        markers: [2],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Use my remap markers');
+
+    expect(
+      await screen.findByText(
+        'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
+      )
+    ).toBeInTheDocument();
+    expect(await within(toolbar).findByText('No marker splits the plan')).toBeInTheDocument();
+    expect(screen.queryByText(/^Remapping at these markers/)).not.toBeInTheDocument();
+    expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
+    // No segment list under the message: the only segment is the whole plan
+    // on current attributes, which reads as a contradiction of it.
+    expect(screen.queryByText(/^Segment 1/)).not.toBeInTheDocument();
+  });
+
+  it('states what the markers save without waiting for a click', async () => {
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 5 },
+          { skillTypeID: 3, targetLevel: 3 },
+        ],
+        markers: [1],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+
+    // Standing, not a post-click toast: a plan carrying a remap line says
+    // what that line saves the moment it is opened. The button beside it
+    // opens the Modal that accepts the spread.
+    expect(await within(toolbar).findByText(/^Saves \d+[dhm]/)).toBeInTheDocument();
+  });
+
+  it('disables "Optimize at my markers" when the plan has no markers', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    await user.click(screen.getByRole('button', { name: 'Optimize' }));
+    expect(screen.getByRole('menuitem', { name: 'Use my remap markers' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+});
+
+describe('SkillPlans editor: the remap cap is disclosed', () => {
+  // Remaps Available is derived from live ESI now (#1412), not the plan's
+  // own remapCount, so "the plan asks for N" is driven by mocking ESI's
+  // bonus_remaps (with the yearly remap left ready, off cooldown) rather
+  // than by seedPlan — `available` = bonus_remaps + 1.
+  const optimize = async (available: number) => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({ ...attributesPayload, bonus_remaps: available - 1 })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+    await clickOptimizeMode(user, 'Place remaps only');
+    await screen.findByText(/^Remapping saves|^No remap improves/);
+  };
+
+  it('says the optimizer evaluated fewer remaps than the plan allows', async () => {
+    // An answer for one remap, shown for a plan that asks for three, is the
+    // silent-degradation failure this planner keeps running into.
+    await optimize(3);
+    expect(screen.getByText(/Evaluated with 2 remaps/i)).toBeInTheDocument();
+  });
+
+  it.each([1, 2])('says nothing when the plan asks for %i remap(s)', async (available) => {
+    // Two is the cap, not a capped value: the note must not fire at the
+    // boundary itself.
+    await optimize(available);
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: plan header (#21)', () => {
+  const seedTwoSkillPlan = (remapCount = 1) =>
+    seedPlan({
+      entries: [
+        { skillTypeID: 1, targetLevel: 3 },
+        { skillTypeID: 3, targetLevel: 1 },
+      ],
+      remapCount,
+    });
+  const header = () => screen.getAllByText('Projected finish')[0].closest('section')!;
+
+  it('shows total training time, skill count, and projected finish, plus a live savings badge', async () => {
+    await db.skillPlans.add(seedTwoSkillPlan());
+    goToPlanEditor();
+    render(<App />);
+    await screen.findByText('Your entries');
+
+    // Skill count: distinct skills in the computed queue (Gunnery,
+    // Spaceship Command), matching the same set totalSeconds times.
+    expect(within(header()).getByText('2')).toBeInTheDocument();
+    expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
+    expect(within(header()).queryByText('None')).not.toBeInTheDocument();
+  });
+
+  it('omits the savings badge entirely when the plan has no remaps to spend', async () => {
+    // Otherwise the header asserts "Remap savings: None" — remapping cannot
+    // help this plan — while the Actions panel below it says the opposite:
+    // the derived remap budget shows remaps to spend. Remaps Available is
+    // live-ESI now (#1412), not plan.remapCount — and with live ESI readable
+    // the budget can never actually be 0 (a `timedRemap` slot always covers
+    // an on-cooldown yearly remap, per #1404), so 0-remaps-to-spend can only
+    // happen on the offline/no-scope fallback: ESI attributes unreadable and
+    // the plan's stored `remapCount` itself 0.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.error()
+      )
+    );
+    await db.skillPlans.add(seedTwoSkillPlan(0));
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+    // The fallback text proves attributes have finished loading (unreadable)
+    // and the "no remaps" state was reached deliberately, so the header has
+    // had its chance to render a badge and chose not to.
+    await screen.findByText(
+      "Remaps: 0 (from this plan's saved value — ESI attributes unavailable)"
+    );
+
+    expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
+    expect(within(header()).queryByText('None')).not.toBeInTheDocument();
+  });
+
+  it('omits the savings badge while a Booster is active until "Optimize remaps" supplies a real answer', async () => {
+    // Booster-aware costing can take seconds of synchronous time (a Booster
+    // expiring mid-plan defeats placeRemaps' aggregation) — far too slow to
+    // run live in a useMemo. The header must never show a number computed
+    // without the active Booster once one is on, so it shows nothing until
+    // the explicit, Booster-aware "Optimize remaps" click supplies one.
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedTwoSkillPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+    await screen.findByText('Your entries');
+
+    expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
+    await user.type(await screen.findByLabelText('Days'), '5');
+
+    await waitFor(() => {
+      expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
+    });
+
+    await clickOptimizeMode(user, 'Place remaps only');
+    await screen.findByText(/^Remapping saves|^No remap improves/);
+
+    await waitFor(() => {
+      expect(within(header()).getByText('Remap savings')).toBeInTheDocument();
+    });
+    expect(within(header()).queryByText('None')).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: remaps available from ESI', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows the cooldown hint on the editor, and prefills a new plan created from the list with bonus remaps only', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          ...attributesPayload,
+          bonus_remaps: 2,
+          accrued_remap_cooldown_date: '2027-01-15T00:00:00Z',
+        })
+      )
+    );
+    const user = userEvent.setup();
+    // Seed a plan so the editor (and its hint) is visible before creating:
+    // the hint appearing proves the ESI attributes have loaded, so the "New
+    // plan" that follows (from the list) is guaranteed to see the prefill value.
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    expect(
+      await screen.findByText('Remaps: 2 bonus now · yearly from 2027-01-15')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await openPlanTools();
+    // Not user-editable anymore, but still seeded once at creation
+    // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
+    // cooldown, so only the 2 bonus remaps count.
+    await waitFor(() =>
+      expect(screen.getByText('Remaps: 2 bonus now · yearly from 2027-01-15')).toBeInTheDocument()
+    );
+    const created = (await db.skillPlans.where('characterId').equals(CHAR_ID).toArray()).find(
+      (p) => p.name === 'Untitled plan'
+    );
+    expect(created?.remapCount).toBe(2);
+  });
+
+  it('counts the yearly remap as ready when the cooldown date is past', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          ...attributesPayload,
+          bonus_remaps: 1,
+          accrued_remap_cooldown_date: '2026-08-29T11:00:00Z',
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await openPlanTools();
+    // The cooldown date is already past, so the new plan's derived display
+    // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
+    await waitFor(() =>
+      expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument()
+    );
+  });
+});
+
+describe('SkillPlans editor: suggest reorder', () => {
+  it('previews a grouped reorder and, on accept, rewrites and persists entry order', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 }, // Gunnery (perception/willpower)
+          { skillTypeID: 3, targetLevel: 1 }, // Spaceship Command (intelligence/memory)
+          { skillTypeID: 4, targetLevel: 1 }, // Small Projectile Turret (perception/willpower)
+        ],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    await clickOptimizeMode(user, 'Reorder only');
+
+    expect(await screen.findByRole('heading', { name: 'Suggested reorder' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Accept' }));
+
+    const stored = await db.skillPlans.get('plan-1');
+    // Gunnery's three levels stay together and in order; the reorder moves
+    // the other two skills around that block.
+    expect(stored?.entries).toEqual([
+      { skillTypeID: 1, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 2 },
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 4, targetLevel: 1 },
+      { skillTypeID: 3, targetLevel: 1 },
+    ]);
+  });
+
+  it('shows an inline confirmation beside the Suggest reorder button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+          { skillTypeID: 4, targetLevel: 1 },
+        ],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Reorder only');
+
+    // Additive: the reorder-preview modal (asserted elsewhere above) still
+    // opens — this only checks the new beside-the-button confirmation.
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('Reorder suggested');
+  });
+});
+
+describe('SkillPlans editor: what-if implants and booster', () => {
+  it('recomputes training time when switching what-if implants mode', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+
+    const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
+    await within(queuePanel).findAllByRole('listitem');
+    // Scoped to PlanHeader's own "Training time" chip by its unique label,
+    // not a bare duration-shaped regex: the header also carries a Remap
+    // savings chip once a plan has savings to show, and both render
+    // duration-shaped text, so an unscoped `/^\d+[dhm]/` match is ambiguous.
+    const durationHeader = () =>
+      screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
+    const durationBefore = durationHeader().textContent;
+
+    const select = screen.getByRole('combobox', { name: 'What-if implants' });
+    expect(select).toHaveTextContent('Current');
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: '+5' }));
+
+    await waitFor(() => {
+      expect(durationHeader().textContent).not.toBe(durationBefore);
+    });
+  });
+
+  it('shows the bonus/time-left inputs only once an accelerator row exists, and flags a past expiry as expired', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    const first = render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+
+    expect(screen.queryByLabelText('Days')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
+    // `find`, not `get`: the Booster is saved on the plan now, so the row
+    // travels through Dexie and back before the time-left field exists.
+    await screen.findByLabelText('Days');
+    expect(screen.queryByText('Expired')).not.toBeInTheDocument();
+
+    // A past expiry can't be typed as time left, only reached by waiting or
+    // by a plan saved earlier — so reopen on one.
+    await db.skillPlans.update('plan-1', {
+      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: Date.now() - 60_000 }],
+    });
+    first.unmount();
+    render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+  });
+
+  it('an active (non-expired) booster reaches computeSchedule and changes training time', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+
+    const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
+    await within(queuePanel).findAllByRole('listitem');
+    // See the sibling "recomputes training time..." test above: scoped to
+    // PlanHeader's own "Training time" chip, since an unscoped duration
+    // regex can also match its Remap savings chip.
+    const durationHeader = () =>
+      screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
+    const durationBefore = durationHeader().textContent;
+
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
+    await user.type(await screen.findByLabelText('Days'), '5');
+    expect(screen.queryByText('Expired')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(durationHeader().textContent).not.toBe(durationBefore);
+    });
+  });
+
+  it('saves both lenses on the plan, so they survive a reload instead of resetting', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
+    const first = render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+5' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
+    await user.type(await screen.findByLabelText('Days'), '5');
+
+    await waitFor(async () => {
+      const stored = await db.skillPlans.get('plan-1');
+      expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
+      expect(stored?.boosters).toHaveLength(1);
+      expect(stored?.boosters?.[0]).toMatchObject({ enabled: true, bonus: 3, startsAt: null });
+      const left = (stored?.boosters?.[0].expiresAt ?? 0) - Date.now();
+      expect(left).toBeGreaterThan(5 * 24 * 60 * 60 * 1000 - 60_000);
+      expect(left).toBeLessThanOrEqual(5 * 24 * 60 * 60 * 1000);
+    });
+
+    // The reported bug: reopening the page put every control back to its
+    // default and quietly re-costed the plan.
+    first.unmount();
+    render(<App />);
+    await openPlanTools();
+    await openAssumptions();
+
+    expect(await screen.findByLabelText('Days')).toHaveValue('5');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
+    expect(screen.getByRole('button', { name: 'Remove accelerator 1' })).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: import from clipboard', () => {
+  it('previews and applies a pasted skill plan, and reports unresolvable lines', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    await user.type(textarea, 'Gunnery III\nNot A Real Skill II');
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+
+    expect(await within(dialog).findByText('Gunnery III')).toBeInTheDocument();
+    expect(within(dialog).getByText(/unknown skill: Not A Real Skill/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // "Gunnery III" is applied as one entry and split into its per-level rows
+    // by a second write, so wait for the settled list rather than whichever
+    // of the two happens to be in Dexie first.
+    await waitFor(async () =>
+      expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
+        { skillTypeID: 1, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 2 },
+        { skillTypeID: 1, targetLevel: 3 },
+      ])
+    );
+  });
+
+  it('previews and applies a pasted EFT fit, resolving required skills from ESI dogma_attributes', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    await user.click(textarea);
+    // user.type() treats [ ] { } as special key syntax — paste() takes the
+    // literal fit text as-is instead.
+    await user.paste('[Rifter, Test Fit]\n[Empty High slot]');
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+
+    // Rifter's fixture dogma requires skill typeID 1 (Gunnery) at level 3.
+    // Every item resolved, so it applies with no preview.
+    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // "Gunnery III" is applied as one entry and split into its per-level rows
+    // by a second write, so wait for the settled list rather than whichever
+    // of the two happens to be in Dexie first.
+    await waitFor(async () =>
+      expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
+        { skillTypeID: 1, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 2 },
+        { skillTypeID: 1, targetLevel: 3 },
+      ])
+    );
+  });
+
+  it('tags an already-trained skill in the preview and excludes it from the "Added N" count (UX-REVIEW #7)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          skills: [{ skill_id: 1, trained_skill_level: 5, skillpoints_in_skill: 999_999 }],
+          total_sp: 999_999,
+          unallocated_sp: 0,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    // Gunnery III: already trained to V. Spaceship Command I: not trained.
+    // The unknown line is what puts the preview up.
+    await user.type(textarea, 'Gunnery III\nSpaceship Command I\nNot A Real Skill II');
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+
+    expect(await within(dialog).findByText('Gunnery III')).toBeInTheDocument();
+    expect(within(dialog).getByText('Already trained')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    // Both entries still get applied (existing behavior) — only the confirmation count excludes the trained one.
+    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
+
+    const stored = await db.skillPlans.get('plan-1');
+    expect(stored?.entries).toEqual([
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 3, targetLevel: 1 },
+    ]);
+  });
+
+  it('says "0 added — all trained" when every parsed entry is already trained', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          skills: [{ skill_id: 1, trained_skill_level: 5, skillpoints_in_skill: 999_999 }],
+          total_sp: 999_999,
+          unallocated_sp: 0,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    await user.type(textarea, 'Gunnery III');
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
+    expect(await screen.findByText('0 added — all trained')).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: schedule timeline (#20)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("projects a plan finish date that matches the entry row's own finish (#20)", async () => {
+    // Gunnery I..V is a multi-day train at these attributes, so start and
+    // finish land on different calendar dates. #112: this is now a single
+    // aggregated entry row (Gunnery V), not five per-level rows, so its own
+    // "Done by" date is the plan's own finish.
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
+    render(<App />);
+
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    const items = await within(panel).findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+
+    const summary = screen.getAllByText('Projected finish')[0].closest('section')!;
+    const planFinishDate = within(summary)
+      .getByText('Projected finish')
+      .parentElement!.textContent!.replace('Projected finish', '')
+      .trim();
+    expect(planFinishDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // The row's own finish is the same value the Plan summary projects —
+    // one number, computed one way (#20 acceptance criterion). The separate
+    // start→finish line is gone: it restated the running total a third way
+    // and cost every row a line it couldn't spare on a phone.
+    expect(items[0].textContent).toContain(planFinishDate);
+  });
+
+  it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    await within(panel).findByText('No entries yet. Add a skill to get started.');
+    expect(within(panel).queryByText(/Finishes/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans: current skill queue panel', () => {
+  it('shows the in-game skill queue with training times, separate from any plan', async () => {
+    render(<App />);
+
+    const panel = (await screen.findByText('Current skill queue')).closest('section')!;
+    const items = await within(panel).findAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      expect.stringContaining('Gunnery III'),
+      expect.stringContaining('Spaceship Command I'),
+    ]);
+  });
+
+  // #218: the plan list/editor is what a visitor came to this page to work
+  // with; the current queue is secondary reference info and must follow it,
+  // not precede it.
+  it('renders after the plan row and attributes on a phone, not before them', async () => {
+    render(<App />);
+
+    const plan = await screen.findByRole('button', { name: 'New plan' });
+    const queuePanel = (await screen.findByText('Current skill queue')).closest('section')!;
+
+    expect(
+      plan.compareDocumentPosition(queuePanel) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+});

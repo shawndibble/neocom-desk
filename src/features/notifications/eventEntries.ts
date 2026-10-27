@@ -1,0 +1,711 @@
+/**
+ * The Event Entry catalog (issue #1285): one entry per Notification Event,
+ * and the one place that event's behaviour is declared —
+ *
+ * - `source` — which poll domain's snapshot it reads (`pollDomains/` owns
+ *   the fetching; several events can share one fetch),
+ * - `diff` — the pure engine diff that fires it (`engine/notificationDiffs.ts`),
+ * - `copy` — its live wording and click subject (`domainCopy.ts`),
+ * - `projection` — its Scheduled Push renderer, or `null` when it is only
+ *   observable by polling (ADR 0010),
+ * - `thresholds` — the per-Character threshold fields it owns
+ *   (`eventThresholdFields.ts`), or `null`,
+ * - `rowHintKey` — a delivery caveat Settings shows under its row, or `null`.
+ *
+ * Every field is required, and the catalog is keyed by `NotificationEventId`
+ * (itself derived from `events.ts`'s catalog), so a new event that lacks any
+ * part of this is a type error here rather than a silent gap. `projection` is
+ * further tied to `engine/projection.ts`'s `PROJECTABLE_EVENT_IDS` per key:
+ * a projectable event must declare one and any other must say `null`.
+ *
+ * What reads it: `pollDomains/` derives each domain's event list, diffs,
+ * renderer and push copy from the entries naming it as their `source`;
+ * `NotificationsPanel.tsx` and `notificationRows.ts` derive an event's
+ * threshold controls, row hint and Scheduled Push badge from it. The
+ * helpers it composes stay where they were — this module declares, it does
+ * not implement.
+ *
+ * Deliberately not reachable from the service worker: `sw.ts` reaches
+ * `events.ts`, `preferences.ts` and `eventSelection.ts`, none of which import
+ * this, so the SW bundle carries no diff or copy code. Keep it that way — no
+ * React, DOM, Dexie or fetch here either.
+ */
+import {
+  diffStockBelowTarget,
+  type StockAlertSnapshot,
+  type StockBelowTargetFire,
+} from '@/engine/stockTargets/stockAlert';
+import {
+  diffIncursionNearby,
+  type IncursionAlertSnapshot,
+  type IncursionNearbyFire,
+} from '@/engine/incursions/incursionAlert';
+import {
+  diffSkyhookRaidableNearby,
+  type SkyhookAlertSnapshot,
+  type SkyhookRaidableNearbyFire,
+} from '@/engine/skyhooks/skyhookAlert';
+import {
+  diffCommunityJoinRequest,
+  diffCommunityMemberJoined,
+  diffCommunityRequestPledged,
+  type CommunityAlertSnapshot,
+  type CommunityJoinRequestFire,
+  type CommunityMemberJoinedFire,
+  type CommunityRequestPledgedFire,
+} from '@/engine/communities/communityAlert';
+import {
+  SKILL_QUEUE_NOTIFICATION_DIFFS,
+  diffSpExtractionReady,
+  diffCloneJumpReady,
+  diffIndustryJobComplete,
+  diffPlanetaryExtractionDone,
+  diffPlanetaryExtractorExpiring,
+  diffNewMail,
+  diffNewCalendarEvent,
+  diffCalendarEventStarting,
+  diffContractAccepted,
+  diffContractCompleted,
+  diffContractFailed,
+  diffCourierDeliveryDue,
+  diffContractExpiring,
+  diffOrdersLapsing,
+  diffWalletBalanceChanged,
+  diffMarketOrderFilled,
+  diffMarketOrderUndercut,
+  diffEveNotification,
+  diffStructureFuelLow,
+  diffCorpIndustryJobReady,
+  diffCorpMemberJoined,
+  diffCorpMemberLeft,
+  diffCorpWalletThreshold,
+  diffPriceAlertTriggered,
+  diffShipLost,
+  type ShipLossSnapshot,
+  type ShipLostFire,
+  type NotificationFire,
+  type SpExtractionFire,
+  type CloneJumpReadyFire,
+  type IndustryJobNotificationFire,
+  type PlanetaryNotificationFire,
+  type ExtractorExpiringFire,
+  type MailNotificationFire,
+  type NewCalendarEventFire,
+  type CalendarEventStartingFire,
+  type ContractNotificationFire,
+  type WalletNotificationFire,
+  type MarketOrderNotificationFire,
+  type MarketOrderUndercutFire,
+  type OrdersLapsingFire,
+  type EveNotificationFire,
+  type StructureFuelLowFire,
+  type MercenaryDenReinforcedFire,
+  type SkyhookRaidableFire,
+  type SkyhookSnapshot,
+  diffSkyhookRaidable,
+  type MercenaryDenAnarchyFire,
+  type DenSnapshot,
+  diffMercenaryDenReinforced,
+  diffMercenaryDenAnarchy,
+  type CorpIndustryJobNotificationFire,
+  type CorpMemberJoinedFire,
+  type CorpMemberLeftFire,
+  type CorpWalletThresholdFire,
+  type PriceAlertTriggeredFire,
+  type SkillQueueSnapshot,
+  type SpExtractionSnapshot,
+  type CloneJumpSnapshot,
+  type IndustryJobSnapshot,
+  type PlanetarySnapshot,
+  type MailSnapshot,
+  type CalendarSnapshot,
+  type ContractSnapshot,
+  type WalletSnapshot,
+  type MarketOrderSnapshot,
+  type OrderUndercutSnapshot,
+  type OrderExpirySnapshot,
+  type EveNotificationSnapshot,
+  type StructureFuelSnapshot,
+  type CorpIndustryJobSnapshot,
+  type CorpRosterSnapshot,
+  type CorpWalletSnapshot,
+  type PriceAlertSnapshot,
+} from '@/engine/notificationDiffs';
+import type { NotificationCopy } from '@/engine/notificationWording';
+import type { ProjectableEventId, PushCopy } from '@/engine/projection';
+import {
+  skillQueueCopy,
+  spExtractionCopy,
+  industryJobCopy,
+  cloneJumpCopy,
+  colonyCopy,
+  mailCopy,
+  calendarCopy,
+  contractCopy,
+  walletCopy,
+  marketOrderCopy,
+  marketOrderUndercutCopy,
+  ordersLapsingCopy,
+  eveNotificationCopy,
+  structureFuelCopy,
+  mercenaryDenReinforcedCopy,
+  skyhookRaidableCopy,
+  mercenaryDenAnarchyCopy,
+  corpIndustryJobCopy,
+  corpRosterCopy,
+  corpWalletCopy,
+  priceAlertCopy,
+  stockBelowTargetCopy,
+  incursionNearbyCopy,
+  skyhookRaidableNearbyCopy,
+  type SkyhookNames,
+  shipLostCopy,
+  type ShipLostNames,
+  communityJoinRequestCopy,
+  communityMemberJoinedCopy,
+  communityRequestPledgedCopy,
+  type IncursionNames,
+  type DomainCopy,
+  type NoNames,
+  type SkillNames,
+  type ItemNames,
+  type PlanetNames,
+  type CalendarNames,
+  type MemberNames,
+} from './domainCopy';
+import type { EveNotificationNames } from './eveNotificationText';
+import type { NotificationEventId } from './events';
+import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
+
+/** Every fire any registered diff can produce. */
+export type AnyNotificationFire =
+  | NotificationFire
+  | SpExtractionFire
+  | CloneJumpReadyFire
+  | IndustryJobNotificationFire
+  | PlanetaryNotificationFire
+  | MailNotificationFire
+  | NewCalendarEventFire
+  | CalendarEventStartingFire
+  | ExtractorExpiringFire
+  | ContractNotificationFire
+  | WalletNotificationFire
+  | MarketOrderNotificationFire
+  | MarketOrderUndercutFire
+  | OrdersLapsingFire
+  | EveNotificationFire
+  | StructureFuelLowFire
+  | MercenaryDenReinforcedFire
+  | SkyhookRaidableFire
+  | MercenaryDenAnarchyFire
+  | CorpIndustryJobNotificationFire
+  | CorpMemberJoinedFire
+  | CorpMemberLeftFire
+  | CorpWalletThresholdFire
+  | PriceAlertTriggeredFire
+  | ShipLostFire
+  | StockBelowTargetFire
+  | IncursionNearbyFire
+  | SkyhookRaidableNearbyFire
+  | CommunityJoinRequestFire
+  | CommunityMemberJoinedFire
+  | CommunityRequestPledgedFire;
+
+/* -------------------------------------------------------------------------- */
+/* Snapshot sources                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A typed handle on one poll domain's snapshot: the domain in
+ * `pollDomains/` that fetches it and every entry that diffs it name the
+ * same handle, so an entry's `diff` and `copy` are checked against the
+ * snapshot and name-lookup shapes that domain actually produces.
+ */
+export interface SnapshotSource<TSnapshot, TNames> {
+  readonly id: string;
+  /** Type-only carrier for `TSnapshot`/`TNames`; never set at runtime. */
+  readonly types?: (snapshot: TSnapshot, names: TNames) => void;
+}
+
+function source<TSnapshot, TNames = NoNames>(id: string): SnapshotSource<TSnapshot, TNames> {
+  return { id };
+}
+
+export const SNAPSHOT_SOURCES = {
+  skillQueue: source<SkillQueueSnapshot, SkillNames>('skillQueue'),
+  spExtraction: source<SpExtractionSnapshot>('spExtraction'),
+  cloneJump: source<CloneJumpSnapshot>('cloneJump'),
+  industryJobs: source<IndustryJobSnapshot, ItemNames>('industryJobs'),
+  colonies: source<PlanetarySnapshot, PlanetNames>('colonies'),
+  mail: source<MailSnapshot>('mail'),
+  calendar: source<CalendarSnapshot, CalendarNames>('calendar'),
+  contracts: source<ContractSnapshot>('contracts'),
+  wallet: source<WalletSnapshot>('wallet'),
+  marketOrders: source<MarketOrderSnapshot, ItemNames>('marketOrders'),
+  marketOrderUndercut: source<OrderUndercutSnapshot, ItemNames>('marketOrderUndercut'),
+  orderExpiry: source<OrderExpirySnapshot>('orderExpiry'),
+  eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
+  structureFuel: source<StructureFuelSnapshot>('structureFuel'),
+  mercenaryDens: source<DenSnapshot, PlanetNames>('mercenaryDens'),
+  skyhooks: source<SkyhookSnapshot, PlanetNames>('skyhooks'),
+  corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
+  corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
+  corpWallet: source<CorpWalletSnapshot>('corpWallet'),
+  priceAlert: source<PriceAlertSnapshot>('priceAlert'),
+  stockTargets: source<StockAlertSnapshot>('stockTargets'),
+  kills: source<ShipLossSnapshot, ShipLostNames>('kills'),
+  incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
+  skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
+  communities: source<CommunityAlertSnapshot>('communities'),
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Entry shape                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How a projectable event reads as a Scheduled Push. The fire and names are
+ * the ones its domain's `project*` builds (`engine/projection.ts`), which for
+ * `eveNotification` is a narrower derived fire, not its poll fire.
+ */
+export interface EventProjection<TPushFire, TPushNames> {
+  readonly push: PushCopy<TPushFire, TPushNames>;
+  /**
+   * False when only some occurrences are projected (`eveNotification`: only
+   * a structure's reinforcement exit), so Settings' Scheduled Push badge —
+   * a promise about every occurrence — stays off its row.
+   */
+  readonly everyOccurrence: boolean;
+}
+
+/** The per-Character threshold fields an event owns, rendered inline under its Settings row. */
+export interface EventThresholds {
+  readonly fields: readonly [ThresholdField, ...ThresholdField[]];
+  /** A caveat shown under the controls, or null. */
+  readonly hintKey: string | null;
+  /** i18n key of the disclosure heading when the generic "Warn-ahead times" doesn't fit. */
+  readonly headingKey?: string;
+}
+
+/** One Event Entry, as written. `defineEvent` checks it against its source's types. */
+export interface NotificationEventEntry<
+  TSnapshot,
+  TFire,
+  TNames,
+  TProjection extends EventProjection<never, never> | null,
+  TThresholds extends EventThresholds | null,
+> {
+  readonly source: SnapshotSource<TSnapshot, TNames>;
+  readonly diff: (characterId: number, prev: TSnapshot | undefined, next: TSnapshot) => TFire[];
+  readonly copy: DomainCopy<TFire, TNames>;
+  readonly projection: TProjection;
+  readonly thresholds: TThresholds;
+  /** i18n key of a caveat Settings shows under this event's row whatever the Character's grants, or null. */
+  readonly rowHintKey: string | null;
+}
+
+/**
+ * Identity at runtime; at compile time it infers one entry's snapshot, fire
+ * and names types from its `source`, so `diff` and `copy` must agree with
+ * each other and with what the domain produces.
+ */
+function defineEvent<
+  TSnapshot,
+  TFire,
+  TNames,
+  TProjection extends EventProjection<never, never> | null,
+  TThresholds extends EventThresholds | null,
+>(
+  entry: NotificationEventEntry<TSnapshot, TFire, TNames, TProjection, TThresholds>
+): NotificationEventEntry<TSnapshot, TFire, TNames, TProjection, TThresholds> {
+  return entry;
+}
+
+/**
+ * An entry as the poll loop and Settings see it, its types erased. Method
+ * syntax on purpose: method parameters compare bivariantly, which is what
+ * lets every typed entry satisfy this one shape without a cast. The domain
+ * only ever hands an entry its own source's snapshot and fires
+ * (`pollDomains/`), which is what makes that sound in practice.
+ */
+export interface ErasedEventEntry {
+  readonly source: { readonly id: string };
+  diff(characterId: number, prev: unknown, next: unknown): AnyNotificationFire[];
+  readonly copy: {
+    poll(fire: unknown, characterName: string, names: unknown): NotificationCopy;
+    subjectOf?(fire: unknown): number | undefined;
+  };
+  readonly projection: ErasedProjection | null;
+  readonly thresholds: EventThresholds | null;
+  readonly rowHintKey: string | null;
+}
+
+interface ErasedProjection {
+  push(fire: unknown, characterName: string, names: unknown): NotificationCopy;
+  readonly everyOccurrence: boolean;
+}
+
+type ErasedEntryFor<K extends NotificationEventId> = ErasedEventEntry & {
+  readonly projection: K extends ProjectableEventId ? ErasedProjection : null;
+};
+
+/* -------------------------------------------------------------------------- */
+/* The catalog                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export const NOTIFICATION_EVENT_ENTRIES = {
+  skillLevelComplete: defineEvent({
+    source: SNAPSHOT_SOURCES.skillQueue,
+    diff: SKILL_QUEUE_NOTIFICATION_DIFFS.skillLevelComplete,
+    copy: skillQueueCopy,
+    projection: { push: skillQueueCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  characterNotTraining: defineEvent({
+    source: SNAPSHOT_SOURCES.skillQueue,
+    diff: SKILL_QUEUE_NOTIFICATION_DIFFS.characterNotTraining,
+    copy: skillQueueCopy,
+    projection: { push: skillQueueCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  skillQueueEnding: defineEvent({
+    source: SNAPSHOT_SOURCES.skillQueue,
+    diff: SKILL_QUEUE_NOTIFICATION_DIFFS.skillQueueEnding,
+    copy: skillQueueCopy,
+    projection: { push: skillQueueCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.skillQueueEndingLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  // Opt-in behind sync.spExtractionMonitoringEnabled, with its threshold a
+  // single account-wide setting (`Settings.tsx`), not a per-Character field.
+  spExtractionReady: defineEvent({
+    source: SNAPSHOT_SOURCES.spExtraction,
+    diff: diffSpExtractionReady,
+    copy: spExtractionCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  industryJobComplete: defineEvent({
+    source: SNAPSHOT_SOURCES.industryJobs,
+    diff: diffIndustryJobComplete,
+    copy: industryJobCopy,
+    projection: { push: industryJobCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  // The ready time uses the effective Infomorph Synchronizing level; when
+  // skills can't be loaded it falls back to level 0 (a 24h cooldown), so the
+  // alert can arrive late but never early. The Occurrence Key is the jump
+  // itself, not the ready time, so two devices that read different levels
+  // still agree on one occurrence.
+  cloneJumpReady: defineEvent({
+    source: SNAPSHOT_SOURCES.cloneJump,
+    diff: diffCloneJumpReady,
+    copy: cloneJumpCopy,
+    projection: { push: cloneJumpCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  newMail: defineEvent({
+    source: SNAPSHOT_SOURCES.mail,
+    diff: diffNewMail,
+    copy: mailCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  planetaryExtractionDone: defineEvent({
+    source: SNAPSHOT_SOURCES.colonies,
+    diff: diffPlanetaryExtractionDone,
+    copy: colonyCopy,
+    projection: { push: colonyCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  planetaryExtractorExpiring: defineEvent({
+    source: SNAPSHOT_SOURCES.colonies,
+    diff: diffPlanetaryExtractorExpiring,
+    copy: colonyCopy,
+    projection: { push: colonyCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.extractorExpiringLeadHours], hintKey: null },
+    // Delivery disclosure (issues #310/#358): bounded by the 72-hour
+    // Projection Horizon, not the Character's grants, so it shows even
+    // before authorization.
+    rowHintKey: 'settings.notifications.extractorExpiringHint',
+  }),
+  // Per Character (issue #4782): ESI has no corporation den route.
+  mercenaryDenReinforced: defineEvent({
+    source: SNAPSHOT_SOURCES.mercenaryDens,
+    diff: diffMercenaryDenReinforced,
+    copy: mercenaryDenReinforcedCopy,
+    projection: { push: mercenaryDenReinforcedCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenReinforcedLeadHours], hintKey: null },
+    rowHintKey: 'settings.notifications.mercenaryDenReinforcedHint',
+  }),
+  // Diff-based, so foreground-only: the server holds no den-scope token (ADR 0010).
+  mercenaryDenAnarchy: defineEvent({
+    source: SNAPSHOT_SOURCES.mercenaryDens,
+    diff: diffMercenaryDenAnarchy,
+    copy: mercenaryDenAnarchyCopy,
+    projection: null,
+    thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenAnarchyPercent], hintKey: null },
+    rowHintKey: 'settings.notifications.mercenaryDenAnarchyForegroundOnlyHint',
+  }),
+  marketOrderFilled: defineEvent({
+    source: SNAPSHOT_SOURCES.marketOrders,
+    diff: diffMarketOrderFilled,
+    copy: marketOrderCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  // Foreground-only, station-only (issue #1423, owner decisions #1/#2) — no
+  // Scheduled Push (needs a re-check the projector never does) and no
+  // system/region scope yet.
+  marketOrderUndercut: defineEvent({
+    source: SNAPSHOT_SOURCES.marketOrderUndercut,
+    diff: diffMarketOrderUndercut,
+    copy: marketOrderUndercutCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: 'settings.notifications.marketOrderUndercutStationOnlyHint',
+  }),
+  newCalendarEvent: defineEvent({
+    source: SNAPSHOT_SOURCES.calendar,
+    diff: diffNewCalendarEvent,
+    copy: calendarCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  calendarEventStarting: defineEvent({
+    source: SNAPSHOT_SOURCES.calendar,
+    diff: diffCalendarEventStarting,
+    copy: calendarCopy,
+    projection: { push: calendarCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  contractAccepted: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffContractAccepted,
+    copy: contractCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  contractCompleted: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffContractCompleted,
+    copy: contractCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  contractFailed: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffContractFailed,
+    copy: contractCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  courierDeliveryDue: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffCourierDeliveryDue,
+    copy: contractCopy,
+    projection: { push: contractCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.courierDeliveryDueLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  contractExpiring: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffContractExpiring,
+    copy: contractCopy,
+    projection: { push: contractCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.contractExpiringLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  ordersLapsing: defineEvent({
+    source: SNAPSHOT_SOURCES.orderExpiry,
+    diff: diffOrdersLapsing,
+    copy: ordersLapsingCopy,
+    projection: { push: ordersLapsingCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.ordersLapsingLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
+  walletBalanceChanged: defineEvent({
+    source: SNAPSHOT_SOURCES.wallet,
+    diff: diffWalletBalanceChanged,
+    copy: walletCopy,
+    projection: null,
+    thresholds: {
+      fields: [
+        THRESHOLD_FIELDS.walletFoldIntoContract,
+        THRESHOLD_FIELDS.walletBalanceChangedThresholdIsk,
+      ],
+      hintKey: 'settings.notifications.walletBalanceChangedThresholdHint',
+      headingKey: 'settings.notifications.minimumIskChangeAlert',
+    },
+    rowHintKey: null,
+  }),
+  eveNotification: defineEvent({
+    source: SNAPSHOT_SOURCES.eveNotification,
+    diff: diffEveNotification,
+    copy: eveNotificationCopy,
+    // Only a structure's reinforcement exit (issue #359) has a future
+    // instant to project; every other EVE notification is "as it happens".
+    projection: { push: eveNotificationCopy.push, everyOccurrence: false },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  structureFuelLow: defineEvent({
+    source: SNAPSHOT_SOURCES.structureFuel,
+    diff: diffStructureFuelLow,
+    copy: structureFuelCopy,
+    projection: { push: structureFuelCopy.push, everyOccurrence: true },
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.structureFuelLowDays],
+      // Issue #299: "say so in the UI, so nobody reads it as a second copy
+      // of the EVE alert."
+      hintKey: 'settings.notifications.structureFuelLowNotDuplicateHint',
+    },
+    rowHintKey: null,
+  }),
+  // Corp scope (issue #4784): a raid window is a known timestamp, so it projects.
+  skyhookRaidable: defineEvent({
+    source: SNAPSHOT_SOURCES.skyhooks,
+    diff: diffSkyhookRaidable,
+    copy: skyhookRaidableCopy,
+    projection: { push: skyhookRaidableCopy.push, everyOccurrence: true },
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.skyhookRaidableLeadHours, THRESHOLD_FIELDS.skyhookRaidableMinUnits],
+      hintKey: 'settings.notifications.skyhookRaidableMinUnitsHint',
+    },
+    rowHintKey: 'settings.notifications.skyhookRaidableHint',
+  }),
+  corpIndustryJobReady: defineEvent({
+    source: SNAPSHOT_SOURCES.corpIndustryJobs,
+    diff: diffCorpIndustryJobReady,
+    copy: corpIndustryJobCopy,
+    projection: { push: corpIndustryJobCopy.push, everyOccurrence: true },
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  corpMemberJoined: defineEvent({
+    source: SNAPSHOT_SOURCES.corpRoster,
+    diff: diffCorpMemberJoined,
+    copy: corpRosterCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  corpMemberLeft: defineEvent({
+    source: SNAPSHOT_SOURCES.corpRoster,
+    diff: diffCorpMemberLeft,
+    copy: corpRosterCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  corpWalletThreshold: defineEvent({
+    source: SNAPSHOT_SOURCES.corpWallet,
+    diff: diffCorpWalletThreshold,
+    copy: corpWalletCopy,
+    projection: null,
+    // Two independent thresholds, either of which fires (issue #299).
+    thresholds: {
+      fields: [
+        THRESHOLD_FIELDS.corpWalletBalanceFloorIsk,
+        THRESHOLD_FIELDS.corpWalletTransactionCeilingIsk,
+      ],
+      hintKey: null,
+    },
+    rowHintKey: null,
+  }),
+  priceAlertTriggered: defineEvent({
+    source: SNAPSHOT_SOURCES.priceAlert,
+    diff: diffPriceAlertTriggered,
+    copy: priceAlertCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  stockBelowTarget: defineEvent({
+    source: SNAPSHOT_SOURCES.stockTargets,
+    diff: diffStockBelowTarget,
+    copy: stockBelowTargetCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  incursionNearby: defineEvent({
+    source: SNAPSHOT_SOURCES.incursions,
+    diff: diffIncursionNearby,
+    copy: incursionNearbyCopy,
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.incursionNearbyJumps],
+      hintKey: 'settings.notifications.incursionNearbyRouteRulesHint',
+    },
+    rowHintKey: null,
+  }),
+  skyhookRaidableNearby: defineEvent({
+    source: SNAPSHOT_SOURCES.skyhooksNearby,
+    diff: diffSkyhookRaidableNearby,
+    copy: skyhookRaidableNearbyCopy,
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.skyhookRaidableNearbyJumps],
+      hintKey: 'settings.notifications.skyhookRaidableNearbyRouteRulesHint',
+    },
+    rowHintKey: null,
+  }),
+  shipLost: defineEvent({
+    source: SNAPSHOT_SOURCES.kills,
+    diff: diffShipLost,
+    copy: shipLostCopy,
+    // zKillboard is not polled server-side, so there is nothing to project.
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.shipLostMinimumIsk],
+      hintKey: 'settings.notifications.shipLostMinimumIskHint',
+    },
+    rowHintKey: null,
+  }),
+  communityJoinRequest: defineEvent({
+    source: SNAPSHOT_SOURCES.communities,
+    diff: diffCommunityJoinRequest,
+    copy: communityJoinRequestCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  communityMemberJoined: defineEvent({
+    source: SNAPSHOT_SOURCES.communities,
+    diff: diffCommunityMemberJoined,
+    copy: communityMemberJoinedCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+  communityRequestPledged: defineEvent({
+    source: SNAPSHOT_SOURCES.communities,
+    diff: diffCommunityRequestPledged,
+    copy: communityRequestPledgedCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: null,
+  }),
+} satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };
+
+const ERASED: { readonly [K in NotificationEventId]: ErasedEventEntry } =
+  NOTIFICATION_EVENT_ENTRIES;
+
+/** One event's entry, types erased — for callers that hold only an id. */
+export function eventEntry(eventId: NotificationEventId): ErasedEventEntry {
+  return ERASED[eventId];
+}

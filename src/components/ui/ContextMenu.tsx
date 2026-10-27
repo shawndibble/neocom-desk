@@ -1,0 +1,138 @@
+import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
+import type { ComponentProps } from 'react';
+import { cx } from '@/lib/cx';
+import { InlineCaret, InlineSubContent, InlineSubRoot, SidePanelSubRoot } from './inlineSubmenu';
+import { inlineTriggerProps, useInlineSub, useInlineSubmenus } from './inlineSubmenuState';
+import { usePortalContainer } from './portalContainer';
+import {
+  MENU_COLLISION_PADDING,
+  menuContentClassName,
+  menuItemClassName,
+  menuScrollClassName,
+  menuSubContentClassName,
+} from './menuStyles';
+
+/**
+ * Right-click menu. Wraps `radix-ui`'s ContextMenu — see docs/adr/0004 for
+ * why: focus movement, typeahead, roving tabindex, submenu timing and
+ * screen-reader behaviour are exactly the parts worth not hand-rolling.
+ */
+export const ContextMenu = ContextMenuPrimitive.Root;
+export const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+/** A submenu: a panel beside the menu, or — on a phone — its items in place (`inlineSubmenu.tsx`). */
+export function ContextMenuSub(props: ComponentProps<typeof ContextMenuPrimitive.Sub>) {
+  const inline = useInlineSubmenus();
+  if (inline) return <InlineSubRoot>{props.children}</InlineSubRoot>;
+  return (
+    <SidePanelSubRoot>
+      <ContextMenuPrimitive.Sub {...props} />
+    </SidePanelSubRoot>
+  );
+}
+
+export function ContextMenuContent({
+  className,
+  collisionPadding = MENU_COLLISION_PADDING,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.Content>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
+  return (
+    <ContextMenuPrimitive.Portal container={container}>
+      <ContextMenuPrimitive.Content
+        collisionPadding={collisionPadding}
+        className={cx(menuContentClassName, menuScrollClassName, className)}
+        {...props}
+      />
+    </ContextMenuPrimitive.Portal>
+  );
+}
+
+export function ContextMenuItem({
+  className,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.Item>) {
+  return <ContextMenuPrimitive.Item className={cx(menuItemClassName, className)} {...props} />;
+}
+
+export const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
+
+/** One of a set of choices, the current one ticked — as `DropdownMenuCheckboxItem` marks its own. */
+export function ContextMenuRadioItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.RadioItem>) {
+  return (
+    <ContextMenuPrimitive.RadioItem className={cx(menuItemClassName, className)} {...props}>
+      <span aria-hidden="true" className="inline-block w-3 text-center">
+        <ContextMenuPrimitive.ItemIndicator>✓</ContextMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </ContextMenuPrimitive.RadioItem>
+  );
+}
+
+export function ContextMenuSeparator({
+  className,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.Separator>) {
+  return (
+    <ContextMenuPrimitive.Separator className={cx('my-1 h-px bg-line', className)} {...props} />
+  );
+}
+
+export function ContextMenuSubTrigger({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.SubTrigger>) {
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <ContextMenuItem {...inlineTriggerProps(inline, className)} disabled={props.disabled}>
+        {children}
+        <InlineCaret open={inline.open} />
+      </ContextMenuItem>
+    );
+  }
+  return (
+    <ContextMenuPrimitive.SubTrigger
+      className={cx(menuItemClassName, 'justify-between data-[state=open]:bg-panel-2', className)}
+      {...props}
+    >
+      {children}
+      <span aria-hidden="true" className="text-text-dim">
+        ›
+      </span>
+    </ContextMenuPrimitive.SubTrigger>
+  );
+}
+
+export function ContextMenuSubContent({
+  className,
+  collisionPadding = MENU_COLLISION_PADDING,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <InlineSubContent inline={inline} className={className}>
+        {props.children}
+      </InlineSubContent>
+    );
+  }
+  return (
+    <ContextMenuPrimitive.Portal container={container}>
+      <ContextMenuPrimitive.SubContent
+        collisionPadding={collisionPadding}
+        className={cx(menuSubContentClassName, className)}
+        {...props}
+      />
+    </ContextMenuPrimitive.Portal>
+  );
+}

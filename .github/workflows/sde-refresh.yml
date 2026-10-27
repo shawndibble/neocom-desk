@@ -1,0 +1,135 @@
+name: SDE refresh
+
+# Nightly: when CCP's export and Fuzzwork's dump agree on a game build newer
+# than the baked one (scripts/sde-build.json), rebake public/data and open a
+# PR that auto-merges once CI is green. A red PR waits for a human.
+#
+# Needs secret SDE_REFRESH_TOKEN: a fine-grained token on this repo with
+# Contents and Pull requests read/write. A PR opened with GITHUB_TOKEN never
+# starts CI, so it would never merge.
+on:
+  schedule:
+    # CCP has shipped mid-morning UTC and Fuzzwork ~2 h later; this catches
+    # the previous day's build either way.
+    - cron: '30 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: sde-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        # Explicit `bash` adds pipefail, so a failing check behind `tee` fails the step.
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Require the refresh token
+        env:
+          SDE_REFRESH_TOKEN: ${{ secrets.SDE_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$SDE_REFRESH_TOKEN" ]; then
+            echo "::error::Secret SDE_REFRESH_TOKEN is not set (see this workflow's header)."
+            exit 1
+          fi
+      # No stored credentials: `npm ci` runs dependency install scripts, and
+      # only the push step below gets the token.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # sde-check.mjs reads the CCP zip through scripts/lib/ccpStaticData.mjs,
+      # which imports fflate, so the install must precede the check.
+      - name: Install dependencies
+        run: npm ci
+      - name: Check for a new game build
+        id: check
+        run: node scripts/sde-check.mjs | tee -a "$GITHUB_OUTPUT"
+      - name: Skip a build already proposed
+        id: branch
+        if: steps.check.outputs.update == 'true'
+        env:
+          BUILD: ${{ steps.check.outputs.build }}
+        run: |
+          name="sde/build-$BUILD"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          # Open, merged or closed: a closed one was turned down on purpose.
+          if [ -n "$(gh pr list --head "$name" --state all --limit 1 --json number --jq '.[0].number // empty')" ]; then
+            echo "Build $BUILD already has a PR; skipping."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Keyed by build: the CCP zip and Fuzzwork CSVs are cached under
+      # build-numbered names, and a new build never needs an old one's.
+      - if: steps.check.outputs.update == 'true' && steps.branch.outputs.exists != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .cache/sde
+          key: sde-${{ steps.check.outputs.build }}
+      - name: Rebake
+        if: steps.check.outputs.update == 'true' && steps.branch.outputs.exists != 'true'
+        run: |
+          node scripts/build-sde.mjs
+          npx prettier --write functions/src/data
+      - name: Open an auto-merging PR
+        if: steps.check.outputs.update == 'true' && steps.branch.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SDE_REFRESH_TOKEN }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          BUILD: ${{ steps.check.outputs.build }}
+          REASON: ${{ steps.check.outputs.reason }}
+        run: |
+          # Authored as the token's owner: the ruleset may hold an
+          # unattributed bot commit for an extra approval.
+          login=$(gh api user --jq .login)
+          git config user.name "$login"
+          git config user.email "$(gh api user --jq .id)+$login@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -A public/data functions/src/data scripts/sde-build.json
+          # Data only, gated by the PR's CI; the local hook would rerun lint and typecheck.
+          git commit --no-verify -m "chore(sde): rebake game data for build $BUILD"
+          git push "https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git" "HEAD:refs/heads/$BRANCH"
+          {
+            echo "Nightly SDE refresh: $REASON."
+            echo
+            echo '```'
+            git diff --stat HEAD~1 HEAD
+            echo '```'
+            echo
+            echo 'Auto-merges once CI is green. If CI fails, the new data broke something: fix it on this branch.'
+          } > body.md
+          gh pr create --base develop --head "$BRANCH" \
+            --title "chore(sde): rebake game data for build $BUILD" --body-file body.md
+          gh pr merge "$BRANCH" --auto --squash
+          # An older build's PR still open edits the same files; this one replaces it.
+          gh pr list --state open --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"sde/build-\")) | select(.headRefName != \"$BRANCH\") | .number" |
+            while read -r old; do
+              gh pr close "$old" --delete-branch --comment "Superseded by build $BUILD."
+            done
+      - name: Report a failed refresh
+        if: failure()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create sde-refresh --description "Nightly SDE refresh failed" --color D93F0B || true
+          number=$(gh issue list --label sde-refresh --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "Nightly SDE refresh failed" --label sde-refresh \
+              --body "The nightly game-data refresh failed: $RUN_URL"
+          fi

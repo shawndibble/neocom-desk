@@ -1,0 +1,9 @@
+# Scope decisions — Fittings: one list everywhere, a tap opens on a phone
+
+_Recorded 2026-10-01. Replaces the "tabbed layout is unchanged" bullet of `20260925-152418`; the rest of that decision stands._
+
+- **The New / Import / My Fittings / In-game tabs are gone everywhere.** The phone's Start screen, the editor's Fittings menu and the Compare picker now use the desktop Start screen's list: one search over the Character's saved and In-game Fittings, grouped by hull, with each row tagged Saved or In-game (`FittingStartScreen`). The tabs kept the two sources in separate lists that couldn't be searched together, two taps away. They also made the phone look nothing like the desktop.
+- **On a phone, tapping a row opens the fitting.** There is no preview: a phone has no room beside the list, and a bottom-sheet preview was considered and rejected as an extra step before the thing you came to do. New from hull and Import sit under the search, half the row each, and open the same dialogs as on desktop. Each row keeps its ⋮ menu (Rename, Delete, Compare, Export). The list scrolls with the page instead of in its own box.
+- **The editor's Fittings menu is New from a hull…, Import…, and Open a fitting….** The first two open their dialogs directly (`FittingStartDialogs`). Open a fitting… opens the list in a dialog, with no New or Import buttons, since the menu already has both, and a tap opens the fitting. My Fittings… and In-game Fittings… are replaced by Open a fitting….
+- **The Compare picker is the same list, with Import in place and no row menus.** Import swaps the list for the Load card inside the picker, with Back to return, so no dialog opens on top of another. Rows have no ⋮ because a row there is only ever picked. A picked Fitting too large for a Share Link says so above the list instead of doing nothing.
+- **Only the Start screen pops Import by itself** when a share link won't open. The two dialogs never do.

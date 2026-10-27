@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+import { applyImplantBasis, cloneSeedSet, defaultImplantBasis } from './implantBasis';
+import type { Fitting, PilotProfile } from './types';
+
+function fitting(overrides: Partial<Fitting> = {}): Fitting {
+  return {
+    name: 'Rifter',
+    shipTypeId: 587,
+    modules: [],
+    drones: [],
+    cargo: [],
+    ...overrides,
+  };
+}
+
+const cloneProfile: PilotProfile = {
+  skillLevels: new Map([[3300, 5]]),
+  implantTypeIds: [19540],
+  boosterTypeIds: [],
+};
+
+describe('defaultImplantBasis', () => {
+  it('is "clone" when the Fitting carries no implant set', () => {
+    expect(defaultImplantBasis(fitting())).toBe('clone');
+  });
+
+  it('is "fitting" when the Fitting carries a set, even an empty one', () => {
+    expect(defaultImplantBasis(fitting({ implantSet: { implants: [], boosters: [] } }))).toBe(
+      'fitting'
+    );
+  });
+});
+
+describe('applyImplantBasis', () => {
+  it('returns the clone profile unchanged on "clone" basis', () => {
+    expect(applyImplantBasis(cloneProfile, undefined, 'clone')).toEqual(cloneProfile);
+  });
+
+  it('swaps in the Fitting\'s carried implants and boosters on "fitting" basis', () => {
+    const result = applyImplantBasis(
+      cloneProfile,
+      { implants: [19151], boosters: [30006] },
+      'fitting'
+    );
+    expect(result.implantTypeIds).toEqual([19151]);
+    expect(result.boosterTypeIds).toEqual([30006]);
+    expect(result.skillLevels).toBe(cloneProfile.skillLevels);
+  });
+
+  it('reads as no implants/boosters on "fitting" basis when the Fitting carries no set', () => {
+    const result = applyImplantBasis(cloneProfile, undefined, 'fitting');
+    expect(result.implantTypeIds).toEqual([]);
+    expect(result.boosterTypeIds).toEqual([]);
+  });
+});
+
+describe('applyImplantBasis — booster side effects', () => {
+  it('carries the set’s chosen side effects with its boosters', () => {
+    const result = applyImplantBasis(
+      cloneProfile,
+      { implants: [], boosters: [9950], boosterSideEffects: [2737] },
+      'fitting'
+    );
+    expect(result.boosterSideEffects).toEqual([2737]);
+  });
+});
+
+describe('cloneSeedSet', () => {
+  it('starts a plan from the clone on "My clone" with no set of the Fitting’s own', () => {
+    expect(cloneSeedSet('clone', undefined, [1, 2])).toEqual({ implants: [1, 2], boosters: [] });
+  });
+
+  it('has no seed once the Fitting carries a set, off the clone, or with an empty clone', () => {
+    const set = { implants: [3], boosters: [] };
+    expect(cloneSeedSet('clone', set, [1])).toBeUndefined();
+    expect(cloneSeedSet('fitting', undefined, [1])).toBeUndefined();
+    expect(cloneSeedSet('clone', undefined, [])).toBeUndefined();
+  });
+});

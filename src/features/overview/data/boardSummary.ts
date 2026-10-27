@@ -1,0 +1,245 @@
+/**
+ * What each domain says in one line: a widget's note, and its list rows.
+ *
+ * A domain gets a single line to state its case. That line is not a shortened
+ * card: a card can afford three counts and let the reader weigh them, a line
+ * has to pick the one fact that decides whether to tap it. So each function here ranks the same
+ * way its `boardSeverity.ts` sibling does and prints the worst true thing —
+ * the ISK you owe over the entries nobody has assigned, the jobs waiting to be
+ * delivered over the ones still running.
+ *
+ * **Three states, never two.** A read that has not landed, a grant that has
+ * lapsed, and a genuinely quiet domain all arrive here as an empty list, and
+ * printing "Nothing running" for the first two is exactly the silence the
+ * old card board was rebuilt to remove. Every function takes its domain's nullable
+ * snapshot rather than the array inside it, so it can tell them apart at all.
+ *
+ * Strings, not keys: resolved through the caller's `t` the way
+ * `alertGroupLabel` is, because a row that returned a key would leave each
+ * call site to remember which of these need a `count` and which do not.
+ */
+import type { StockBoardData } from '@/features/stockTargets/stockBoard';
+import { formatIskCompact } from '@/lib/isk';
+import { isJobDone } from '@/features/industry/jobs';
+import {
+  needsAttentionCount,
+  notCheckedCount,
+  openOrderProblemCounts,
+} from '@/features/market/openOrdersModel';
+import type { OpenOrderRow } from '@/features/market/openOrdersModel';
+import { compareSeverity } from '@/engine/character/severity';
+import { formatCountdown } from '@/lib/duration';
+import { upcomingCommittedEvents } from '@/engine/character/calendarDeadline';
+import { extractableSp, extractorCount, isSpExtractionReady } from '@/engine/skills/spExtraction';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import { structureCounts } from './corpCards';
+import type {
+  CalendarEventsBoardData,
+  ContractsBoardData,
+  MailBoardData,
+  IndustryBoardData,
+  MiningTaxBoardData,
+  MoonChunksBoardData,
+  PlanetaryBoardData,
+  PriceAlertsBoardData,
+  SpExtractionBoardData,
+  StructuresView,
+} from './boardData';
+
+/**
+ * The narrow slice of i18next's `t` these need: a key, and interpolations that
+ * are counts or already-formatted strings.
+ */
+export type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+const CHECKING = 'overview.board.checking';
+const REAUTH = 'overview.board.reauth';
+
+/**
+ * Orders: what is below cost, else how many need work at all.
+ *
+ * `needsAttentionCount` rather than the sum of the card's three tiles — those
+ * count *problems* and an order can carry two, which is the right figure for
+ * three tiles side by side and the wrong one for a row that is telling you how
+ * many orders to go and fix.
+ */
+export function ordersSummary(
+  t: Translate,
+  rows: readonly OpenOrderRow[] | null,
+  needsReauth: boolean
+): string {
+  if (needsReauth) return t(REAUTH);
+  if (rows === null) return t(CHECKING);
+  const counts = openOrderProblemCounts(rows);
+  if (counts.belowFloor > 0) return t('overview.board.belowFloor', { count: counts.belowFloor });
+  const needsWork = needsAttentionCount(rows);
+  if (needsWork > 0) return t('overview.board.ordersMeta', { count: needsWork });
+  // "Nothing needs work" would claim a check that never ran.
+  const unchecked = notCheckedCount(rows);
+  return unchecked > 0
+    ? t('overview.board.ordersNotChecked', { count: unchecked })
+    : t('overview.board.ordersClear');
+}
+
+/** Mining tax: what is owed, else what has not been worked out yet. */
+export function miningTaxSummary(t: Translate, data: MiningTaxBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  if (data.unpaidIsk > 0)
+    return t('overview.board.miningUnpaid', { isk: formatIskCompact(data.unpaidIsk) });
+  return data.unassignedCount > 0
+    ? t('overview.board.miningUnassigned', { count: data.unassignedCount })
+    : t('overview.board.miningSettled');
+}
+
+/**
+ * Planetary: the worst reset run, named the way the card names it.
+ *
+ * Ranked by severity rather than read off the front of the list —
+ * `groupColoniesIntoBatches` orders by clock, and the batch that stopped six
+ * hours ago sorts behind one ending in three.
+ */
+export function planetarySummary(t: Translate, data: PlanetaryBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const worst = [...data.batches].sort((a, b) => compareSeverity(a.severity, b.severity))[0];
+  if (worst === undefined) return t('overview.board.noColonies');
+  return t(`overview.board.batch.${worst.kind}`, { count: worst.colonies.length });
+}
+
+/** Industry: what is waiting to be delivered, else what is still running. */
+export function industrySummary(
+  t: Translate,
+  data: IndustryBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const done = data.jobs.filter((job) => isJobDone(job, nowMs)).length;
+  if (done > 0) return t('overview.board.jobsReady', { count: done });
+  const running = data.jobs.length - done;
+  return running > 0
+    ? t('overview.board.industryRunning', { count: running })
+    : t('overview.board.industryIdle');
+}
+
+/** The soonest contract on a clock, named for the strip and the card's footer. Null when nothing qualifies. */
+export function contractsDeadlineNote(t: Translate, data: ContractsBoardData): string | null {
+  const { soonest } = data.summary;
+  if (soonest === null) return null;
+  if (soonest.kind === 'listing') return t('overview.board.contractsListingExpires');
+  const note = t(
+    soonest.overdue
+      ? 'overview.board.contractsCourierOverdue'
+      : 'overview.board.contractsCourierDue'
+  );
+  return data.route === null ? note : `${note} · ${data.route}`;
+}
+
+/** Contracts: hauls in flight and the clock on them, else a listing about to lapse, else the outstanding count, else nothing. */
+export function contractsSummary(
+  t: Translate,
+  data: ContractsBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const { inProgress, outstanding, overdue, soonest } = data.summary;
+  const parts: string[] = [];
+  if (inProgress > 0) parts.push(t('overview.board.contractsInProgress', { count: inProgress }));
+  if (overdue > 0) {
+    parts.push(t('overview.board.contractsOverdue', { count: overdue }));
+  } else if (soonest !== null) {
+    const duration = formatCountdown(Math.max(0, soonest.atMs - nowMs) / 1000);
+    parts.push(
+      t(
+        soonest.kind === 'listing'
+          ? 'overview.board.contractsListingIn'
+          : 'overview.board.contractsNextDue',
+        { duration }
+      )
+    );
+  }
+  if (parts.length === 0 && outstanding > 0) {
+    parts.push(t('overview.board.contractsOutstanding', { count: outstanding }));
+  }
+  return parts.length > 0 ? parts.join(' · ') : t('overview.board.contractsNothingDue');
+}
+
+export function comingUpSummary(
+  t: Translate,
+  data: CalendarEventsBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const next = upcomingCommittedEvents(data.events, nowMs)[0];
+  if (next === undefined) return t('overview.board.comingUpNone');
+  return t('overview.board.comingUpNext', {
+    title: next.title,
+    when: formatCountdown((next.atMs - nowMs) / 1000),
+  });
+}
+
+export function spExtractionSummary(t: Translate, data: SpExtractionBoardData): string {
+  if (data.totalSp === null) return t(CHECKING);
+  if (data.monitoring && isSpExtractionReady(data.totalSp, data.thresholdSp)) {
+    return t('overview.board.spExtractionReady', { count: extractorCount(data.totalSp) });
+  }
+  return t('overview.board.spExtractable', {
+    sp: formatCompactNumber(extractableSp(data.totalSp)),
+  });
+}
+
+export function mailSummary(t: Translate, data: MailBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  return data.unread > 0
+    ? t('overview.board.mailUnread', { count: data.unread })
+    : t('overview.board.mailNone');
+}
+
+export function priceAlertsSummary(t: Translate, data: PriceAlertsBoardData | null): string {
+  if (data === null) return t(CHECKING);
+  const crossed = data.alerts.filter((alert) => alert.crossed).length;
+  if (crossed > 0) return t('overview.board.priceAlertsCrossed', { count: crossed });
+  if (data.alerts.length > 0) {
+    return t('overview.board.priceAlertsWatching', { count: data.alerts.length });
+  }
+  return t('overview.board.priceAlertsNone');
+}
+
+export function stockBoardSummary(t: Translate, data: StockBoardData | null): string {
+  if (data === null || !data.counted) return t(CHECKING);
+  const { out, low } = data.totals;
+  if (out > 0 || low > 0) return t('overview.board.stockSummary', { out, low });
+  return t('overview.board.stockAllStocked');
+}
+
+export function structuresSummary(t: Translate, data: StructuresView | null): string {
+  if (data === null) return t(CHECKING);
+  if (data.items === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
+  const counts = structureCounts(data.items);
+  if (counts.timers > 0) return t('overview.board.structuresTimers', { count: counts.timers });
+  if (counts.lowFuel > 0) return t('overview.board.structuresLowFuel', { count: counts.lowFuel });
+  if (counts.offline > 0) return t('overview.board.structuresOffline', { count: counts.offline });
+  return t('overview.board.structuresFine', { count: data.structureCount });
+}
+
+export function moonChunksSummary(
+  t: Translate,
+  data: MoonChunksBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.chunks === null) return t(data.needsReauth ? REAUTH : 'overview.board.corpUnreadable');
+  const ready = data.chunks.filter((chunk) => chunk.detail === 'decay').length;
+  if (ready > 0) return t('overview.board.moonChunksReady', { count: ready });
+  const next = data.chunks
+    .filter((chunk) => chunk.detail === 'arrival' && chunk.deadlineMs > nowMs)
+    .sort((a, b) => a.deadlineMs - b.deadlineMs)[0];
+  if (next === undefined) return t('overview.board.moonChunksNone');
+  return t('overview.board.moonChunksNext', {
+    when: formatCountdown((next.deadlineMs - nowMs) / 1000),
+  });
+}

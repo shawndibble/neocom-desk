@@ -1,0 +1,411 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import type { PiData } from '@/sde/types';
+import type {
+  ColonyAssignment,
+  ExtractionSlot,
+  GoalPlan,
+  PlannerColony,
+} from '@/engine/pi/goalTypes';
+import type { ColonyChange } from '@/engine/pi/planDiff';
+import type { PlannerColonyRow } from './goalPlannerModel';
+import {
+  changeSteps,
+  goalAttainment,
+  planCaveats,
+  shortfallHint,
+  slotEstimate,
+  switchGainPerDay,
+  typeGapPlanetTypes,
+} from './goalPlanView';
+
+const pi = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
+) as PiData;
+
+const BASE_METALS = 2267;
+const REACTIVE_METALS = 2398;
+const AQUEOUS = 2268;
+const WATER = 3645;
+const IONIC = 2309;
+const NOBLE_GAS = 2310;
+const ELECTROLYTES = 2390;
+const COOLANT = 9832;
+const ROBOTICS = 9848;
+
+function slot(
+  p0: number,
+  p1: number,
+  source: ExtractionSlot['rateSource'] = 'measured'
+): ExtractionSlot {
+  return {
+    p0TypeId: p0,
+    p1TypeId: p1,
+    ecus: 1,
+    p0PerHour: 6000,
+    p1PerHour: 40,
+    basicFactories: 1,
+    rateSource: source,
+  };
+}
+
+function assignment(
+  planetId: number,
+  role: ColonyAssignment['role'],
+  slots: ExtractionSlot[] = []
+): ColonyAssignment {
+  return {
+    planetId,
+    role,
+    slots,
+    factories: role === 'factory' ? { advanced: 2 } : {},
+    pins: {},
+    used: { cpu: 0, powergrid: 0 },
+    budget: { cpu: 1, powergrid: 1 },
+    limitedBy: [],
+  };
+}
+
+function row(
+  planetId: number,
+  planetType: PlannerColonyRow['planetType'],
+  overrides: Partial<PlannerColonyRow> = {},
+  p0s: number[] = []
+): PlannerColonyRow {
+  const colony: PlannerColony = {
+    planetId,
+    planetType,
+    budget: { cpu: 1, powergrid: 1 },
+    newLinkCost: { cpu: 0, powergrid: 0 },
+    headsPerExtractor: 8,
+    taxRate: 0.1,
+    ratePerEcu: new Map(
+      pi.raw
+        .filter((r) => r.planetTypes.includes(planetType))
+        .map((r) => [r.typeID, { unitsPerHour: 6000, source: 'measured' as const }])
+    ),
+    current: { p0TypeIds: p0s, productTypeIds: [] },
+  };
+  return {
+    planetId,
+    systemId: 1,
+    upgradeLevel: 4,
+    planetType,
+    enabled: true,
+    colony,
+    excluded: null,
+    advice: null,
+    taxRate: 0.1,
+    taxSource: { kind: 'highsec-skill', level: 0 },
+    taxOverridden: false,
+    rateUnknown: false,
+    taxAssumed: false,
+    headsAssumed: false,
+    linkCostBorrowed: false,
+    ...overrides,
+  };
+}
+
+describe('goalAttainment', () => {
+  it('counts goals met and names the unmet ones with their fraction', () => {
+    expect(
+      goalAttainment([
+        { typeId: COOLANT, unitsPerHour: 8, fraction: 1 },
+        { typeId: ROBOTICS, unitsPerHour: 0, fraction: 0 },
+      ])
+    ).toEqual({ met: 1, total: 2, unmet: [{ typeId: ROBOTICS, fraction: 0 }] });
+  });
+
+  it('treats float dust under one as met', () => {
+    expect(goalAttainment([{ typeId: COOLANT, unitsPerHour: 8, fraction: 0.99999 }]).unmet).toEqual(
+      []
+    );
+  });
+});
+
+describe('planCaveats', () => {
+  it('names colonies whose planned rate is an estimate, and enabled colonies on an assumed customs rate', () => {
+    const rows = [
+      row(1, 'barren'),
+      row(2, 'gas', { rateUnknown: true, taxAssumed: true }),
+      row(3, 'temperate', { enabled: false, rateUnknown: true, taxAssumed: true }),
+    ];
+    const caveats = planCaveats(
+      [
+        assignment(1, 'extract', [slot(BASE_METALS, REACTIVE_METALS, 'own-mean')]),
+        assignment(2, 'extract', [slot(IONIC, ELECTROLYTES)]),
+      ],
+      rows
+    );
+    expect(caveats).toEqual({ estimatedRates: [1], assumedCustoms: [2], valuedAtAsk: [] });
+  });
+
+  it('counts a measured rate on a changed ECU count as an estimate', () => {
+    const today = row(1, 'barren', {}, [BASE_METALS]);
+    today.colony!.current.ecusByP0 = new Map([[BASE_METALS, 1]]);
+    const same = row(2, 'barren', {}, [BASE_METALS]);
+    same.colony!.current.ecusByP0 = new Map([[BASE_METALS, 1]]);
+    const caveats = planCaveats(
+      [
+        assignment(1, 'extract', [{ ...slot(BASE_METALS, REACTIVE_METALS), ecus: 2 }]),
+        assignment(2, 'extract', [slot(BASE_METALS, REACTIVE_METALS)]),
+      ],
+      [today, same]
+    );
+    expect(caveats.estimatedRates).toEqual([1]);
+  });
+
+  it('names what the plan or the Baseline sells at the ask for want of a buy order', () => {
+    const caveats = planCaveats([], [], {
+      flows: [
+        { from: 1, to: 'hub', typeId: COOLANT, tier: 2, unitsPerHour: 5 },
+        { from: 'hub', to: 1, typeId: ROBOTICS, tier: 3, unitsPerHour: 1 },
+        { from: 1, to: 2, typeId: WATER, tier: 1, unitsPerHour: 5 },
+      ],
+      baseline: new Map([
+        [1, { status: 'ok', slots: [slot(BASE_METALS, REACTIVE_METALS)], iskPerHour: 1 }],
+        [2, { status: 'nothing-fits' }],
+      ]),
+      valuedAtAsk: new Set([COOLANT, ROBOTICS, WATER, REACTIVE_METALS, ELECTROLYTES]),
+    });
+    // Robotics is bought, Water never reaches the hub, Electrolytes nobody sells.
+    expect(caveats.valuedAtAsk).toEqual([REACTIVE_METALS, COOLANT]);
+  });
+
+  it("names what Earns now sells at the ask: enabled colonies' products today", () => {
+    const advice = {} as NonNullable<PlannerColonyRow['advice']>;
+    const selling = row(1, 'barren', { advice });
+    selling.colony!.current.productTypeIds = [COOLANT];
+    const off = row(2, 'barren', { advice, enabled: false });
+    off.colony!.current.productTypeIds = [ROBOTICS];
+    const caveats = planCaveats([], [selling, off], {
+      flows: [],
+      baseline: new Map(),
+      valuedAtAsk: new Set([COOLANT, ROBOTICS]),
+    });
+    expect(caveats.valuedAtAsk).toEqual([COOLANT]);
+  });
+});
+
+describe('slotEstimate', () => {
+  it("is null for this colony's own measured program at today's ECU count", () => {
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), 1)).toBeNull();
+    // Nothing known about today: the measured rate stands.
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), undefined)).toBeNull();
+  });
+
+  it('names a borrowed rate by its source', () => {
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS, 'own-mean'), undefined)).toBe(
+      'own-mean'
+    );
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS, 'assumed'), 2)).toBe('assumed');
+  });
+
+  it('flags a measured rate the plan runs on a different ECU count', () => {
+    const doubled = { ...slot(BASE_METALS, REACTIVE_METALS), ecus: 2 };
+    expect(slotEstimate(doubled, 1)).toBe('ecus-changed');
+    expect(slotEstimate(slot(BASE_METALS, REACTIVE_METALS), 2)).toBe('ecus-changed');
+  });
+});
+
+describe('switchGainPerDay', () => {
+  const perColony = new Map([
+    [1, { status: 'ok' as const, slots: [], iskPerHour: 1500 }],
+    [2, { status: 'needs-price' as const, missing: [WATER] }],
+  ]);
+
+  it("is the colony's best-P1 Baseline over what it earns now, per day", () => {
+    expect(switchGainPerDay(1, perColony, new Map([[1, 1000]]))).toBe(500 * 24);
+  });
+
+  it('is null without a priced Baseline or a measured earning', () => {
+    expect(switchGainPerDay(2, perColony, new Map([[2, 1000]]))).toBeNull();
+    expect(switchGainPerDay(1, perColony, new Map([[1, null]]))).toBeNull();
+    expect(switchGainPerDay(3, perColony, new Map())).toBeNull();
+  });
+});
+
+describe('typeGapPlanetTypes', () => {
+  it('maps each type gap P0 to the planet types that would fix it', () => {
+    const gaps = typeGapPlanetTypes([
+      {
+        kind: 'type-gap',
+        p0TypeId: NOBLE_GAS,
+        p1TypeId: 2390,
+        unitsPerHour: 1,
+        p1UnitsPerHour: 1,
+        fixPlanetTypes: ['gas', 'ice'],
+      },
+      { kind: 'no-factory-host', facility: 'advanced' },
+    ]);
+    expect([...gaps]).toEqual([[NOBLE_GAS, ['gas', 'ice']]]);
+  });
+});
+
+describe('changeSteps', () => {
+  const plan = {
+    assignments: [
+      assignment(1, 'extract', [slot(IONIC, ELECTROLYTES)]),
+      assignment(2, 'factory', [slot(AQUEOUS, WATER)]),
+      assignment(3, 'baseline', [slot(BASE_METALS, REACTIVE_METALS)]),
+    ],
+    demand: [
+      { typeId: COOLANT, tier: 2, unitsPerHour: 8, factories: 2, source: 'made' },
+      { typeId: ELECTROLYTES, tier: 1, unitsPerHour: 40, factories: 1, source: 'made' },
+    ],
+    flows: [
+      { from: 1, to: 2, typeId: ELECTROLYTES, tier: 1, unitsPerHour: 40 },
+      { from: 2, to: 2, typeId: WATER, tier: 1, unitsPerHour: 40 },
+      { from: 2, to: 'hub', typeId: COOLANT, tier: 2, unitsPerHour: 8 },
+      { from: 3, to: 'hub', typeId: REACTIVE_METALS, tier: 1, unitsPerHour: 40 },
+    ],
+    factoryHost: { planetId: 2, reason: 'best-net' },
+  } as unknown as GoalPlan;
+
+  it('says what each colony sets up and where its output ships', () => {
+    const changes: ColonyChange[] = [
+      { verb: 'retarget', planetId: 1, from: [IONIC, NOBLE_GAS], to: [IONIC] },
+      { verb: 'convert-to-factory', planetId: 2, from: [], factories: { advanced: 2 } },
+      { verb: 'keep', planetId: 3, p0TypeIds: [BASE_METALS], notNeeded: true },
+    ];
+    const rows = [
+      row(1, 'gas', {}, [IONIC, NOBLE_GAS]),
+      row(2, 'oceanic'),
+      row(3, 'barren', {}, [BASE_METALS]),
+    ];
+    const steps = changeSteps(plan, changes, rows);
+
+    expect(steps[0]).toMatchObject({
+      planetId: 1,
+      kind: 'stop',
+      stop: [{ p0TypeId: NOBLE_GAS, ecus: 1 }],
+      extract: [{ p0TypeId: IONIC, p1TypeId: ELECTROLYTES, ecus: 1, basicFactories: 1 }],
+      // A colony-to-colony leg is new: a colony left alone only sells.
+      ships: [{ typeId: ELECTROLYTES, to: 2, isNew: true }],
+    });
+    expect(steps[1]).toMatchObject({
+      planetId: 2,
+      kind: 'host',
+      factories: [{ typeId: COOLANT, count: 2 }],
+      extract: [{ p0TypeId: AQUEOUS }],
+      ships: [{ typeId: COOLANT, to: 'hub', isNew: false }],
+    });
+    // Already running what its Baseline sells: as is, and not needed.
+    expect(steps[2]).toMatchObject({ planetId: 3, kind: 'as-is', notNeeded: true, switchTo: [] });
+  });
+
+  it('starts a colony that extracts nothing today, and adds beside what it keeps', () => {
+    const steps = changeSteps(
+      plan,
+      [
+        { verb: 'retarget', planetId: 1, from: [], to: [IONIC] },
+        { verb: 'add-extractor', planetId: 3, keep: [BASE_METALS], add: [AQUEOUS] },
+      ],
+      [row(1, 'gas'), row(3, 'barren', {}, [BASE_METALS])]
+    );
+    expect(steps.map((s) => s.kind)).toEqual(['start', 'add']);
+  });
+
+  it('lists what the factory planet removes, with how many extractors today', () => {
+    const steps = changeSteps(
+      plan,
+      [
+        {
+          verb: 'convert-to-factory',
+          planetId: 2,
+          from: [BASE_METALS],
+          factories: { advanced: 2 },
+        },
+      ],
+      [
+        row(2, 'barren', {
+          colony: {
+            ...row(2, 'barren').colony!,
+            current: {
+              p0TypeIds: [BASE_METALS],
+              productTypeIds: [],
+              ecusByP0: new Map([[BASE_METALS, 2]]),
+            },
+          },
+        }),
+      ]
+    );
+    expect(steps[0]).toMatchObject({ kind: 'host', stop: [{ p0TypeId: BASE_METALS, ecus: 2 }] });
+  });
+
+  it('reads an extractor whose P0s do not change as as-is, with its new legs marked', () => {
+    const steps = changeSteps(
+      plan,
+      [{ verb: 'keep', planetId: 1, p0TypeIds: [IONIC] }],
+      [row(1, 'gas', {}, [IONIC])]
+    );
+    expect(steps[0]).toMatchObject({
+      kind: 'as-is',
+      notNeeded: false,
+      ships: [{ typeId: ELECTROLYTES, to: 2, isNew: true }],
+    });
+  });
+
+  it('tells a not-needed colony to switch when its best P1 is not what it runs today', () => {
+    const steps = changeSteps(
+      plan,
+      [{ verb: 'keep', planetId: 3, p0TypeIds: [AQUEOUS], notNeeded: true }],
+      [row(3, 'barren', {}, [AQUEOUS])]
+    );
+    expect(steps[0]).toMatchObject({ kind: 'as-is', notNeeded: true, switchTo: [REACTIVE_METALS] });
+  });
+});
+
+describe('shortfallHint', () => {
+  it('points at a switched-off colony that would cover a type gap', () => {
+    const rows = [row(1, 'barren'), row(5, 'lava', { enabled: false })];
+    expect(
+      shortfallHint(
+        {
+          kind: 'type-gap',
+          p0TypeId: 2306,
+          p1TypeId: 2401,
+          unitsPerHour: 1,
+          p1UnitsPerHour: 1 / 150,
+          fixPlanetTypes: ['lava', 'plasma'],
+        },
+        rows,
+        false
+      )
+    ).toEqual({ kind: 'switched-off', planetIds: [5] });
+  });
+
+  it("with buying off, names the engine's re-target candidates", () => {
+    // Colony 2 yields it too but is at the ECU cap: the engine leaves it out.
+    const rows = [row(1, 'barren'), row(2, 'gas'), row(3, 'temperate')];
+    expect(
+      shortfallHint(
+        {
+          kind: 'budget-gap',
+          p0TypeId: BASE_METALS,
+          p1TypeId: REACTIVE_METALS,
+          unitsPerHour: 5000,
+          p1UnitsPerHour: 5000 / 150,
+          retargetCandidates: [1],
+        },
+        rows,
+        false
+      )
+    ).toEqual({ kind: 'retarget', planetIds: [1] });
+    expect(
+      shortfallHint(
+        {
+          kind: 'budget-gap',
+          p0TypeId: BASE_METALS,
+          p1TypeId: REACTIVE_METALS,
+          unitsPerHour: 5000,
+          p1UnitsPerHour: 5000 / 150,
+          retargetCandidates: [1, 2],
+        },
+        rows,
+        true
+      )
+    ).toEqual({ kind: 'buy' });
+  });
+});
