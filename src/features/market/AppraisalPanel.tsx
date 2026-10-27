@@ -30,6 +30,7 @@ import {
   Spinner,
   StatChip,
   TextInput,
+  Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
@@ -55,6 +56,7 @@ import { AppraisalResultActions } from './AppraisalResultActions';
 import { AppraisalSummary } from './AppraisalSummary';
 import { useAppraisalColumns } from './useAppraisalColumns';
 import { useAppraisalCopyLists } from './useAppraisalCopyLists';
+import { useAppraisalJanice } from './useAppraisalJanice';
 import { useAppraisalShare } from './useAppraisalShare';
 import type { AppraisalController } from './useAppraisal';
 
@@ -176,6 +178,11 @@ export function AppraisalPanel({
     characterId,
   });
   const { copied, copyLists, handleCopy } = useAppraisalCopyLists({ result, owned });
+  const { janice, handleOpenInJanice, dismissJanice } = useAppraisalJanice({
+    text,
+    hub,
+    pricePercent,
+  });
 
   /*
    * The percent field is a string while it is being typed. Committing on every
@@ -362,6 +369,7 @@ export function AppraisalPanel({
                 }}
                 share={{ share, handleShare, shareItemCount }}
                 copy={{ copied, copyLists, handleCopy }}
+                janice={{ janice, handleOpenInJanice, canOpen: text.trim() !== '' }}
                 characterId={characterId}
                 rowCount={rows.length}
               />
@@ -429,6 +437,14 @@ export function AppraisalPanel({
           )}
         </Panel>
       </div>
+      {janice.status === 'fetching' && <Toast message={t('market.appraisal.janiceFetching')} />}
+      {janice.status === 'failed' && (
+        <Toast
+          message={t(`market.appraisal.janiceFailed.${janice.reason}`)}
+          instance={janice}
+          onClose={dismissJanice}
+        />
+      )}
     </div>
   );
 }

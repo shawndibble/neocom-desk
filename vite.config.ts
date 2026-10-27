@@ -770,7 +770,11 @@ export default defineConfig({
           // needed. Kept to `scripts/lib/`, not all of `scripts/`, so the
           // rest of that directory's one-off tooling stays untested by
           // design, same as before.
-          include: ['src/**/*.{test,spec}.ts', 'scripts/lib/**/*.test.mjs'],
+          include: [
+            'src/**/*.{test,spec}.ts',
+            'scripts/lib/**/*.test.mjs',
+            'workers/**/*.test.mjs',
+          ],
           exclude: [...configDefaults.exclude, DOM_TS_TESTS],
         },
       },
