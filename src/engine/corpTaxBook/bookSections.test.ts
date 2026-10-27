@@ -266,7 +266,7 @@ describe('extractionBilling', () => {
       ]),
       'x'
     );
-    expect(billed).toEqual({ billed: true, statementIds: ['s1'] });
+    expect(billed).toEqual({ billed: true, statementIds: ['s1'], rollingOver: 0 });
   });
   it('is not billed while a day waits, or when there are no days', () => {
     expect(
@@ -274,6 +274,18 @@ describe('extractionBilling', () => {
     ).toBe(false);
     expect(extractionBilling(viewOf([]), 'x').billed).toBe(false);
     expect(extractionBilling(viewOf([{ status: 'dismissed' }]), 'x').billed).toBe(false);
+  });
+  it('is partly billed when some days sit on a Statement and the rest roll over', () => {
+    expect(
+      extractionBilling(
+        viewOf([
+          { status: 'on-statement', statementId: 's1', tax: 500 },
+          { status: 'unbilled', tax: 100 },
+          { status: 'not-billable', tax: 30 },
+        ]),
+        'x'
+      )
+    ).toEqual({ billed: false, statementIds: ['s1'], rollingOver: 130 });
   });
 });
 

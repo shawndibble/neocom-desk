@@ -3,6 +3,7 @@ import { Panel, StatChip, StatChips } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { moonSchedule, POPS_WINDOW_DAYS } from '@/engine/corpTaxBook/bookSections';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
+import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { useBook } from './useBook';
 import { NeedsYouQueue } from './NeedsYouQueue';
@@ -41,8 +42,13 @@ export function OverviewTab({ showMoons }: { showMoons: boolean }) {
       id: 'ready',
       title: t('corpTaxBook.moons.overview.ready'),
       rows: schedule.ready,
+      // Within a day the date alone reads as "since today": say how long ago instead.
       when: (r) =>
-        t('corpTaxBook.moons.overview.readySince', { date: shortDate(r.chunkArrivalAt) }),
+        now - Date.parse(r.chunkArrivalAt) < DAY_MS
+          ? t('corpTaxBook.moons.overview.readyAgo', {
+              ago: formatCountdown(Math.max(0, now - Date.parse(r.chunkArrivalAt)) / 1000),
+            })
+          : t('corpTaxBook.moons.overview.readySince', { date: shortDate(r.chunkArrivalAt) }),
     },
     {
       id: 'pops',

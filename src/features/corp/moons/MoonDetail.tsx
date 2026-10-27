@@ -1,6 +1,6 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -25,6 +25,7 @@ import { FullyMinedPanel } from './FullyMinedPanel';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
+import { caretColumn } from './caretColumn';
 import { Crumb, OreLine, StateWord } from './moonsParts';
 import { tapTargetClassName } from './sectionHelpers';
 import { OreLinesTable } from './OreLinesTable';
@@ -38,6 +39,7 @@ export function MoonDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
   const phone = useIsPhone();
+  const navigate = useNavigate();
   const [dismissing, setDismissing] = useState(false);
   const [linking, setLinking] = useState(false);
   const detail = extractionDetail(view, id);
@@ -68,6 +70,11 @@ export function MoonDetail({ id }: { id: string }) {
     : billedPeriods.length === 1
       ? t('corpTaxBook.moons.moon.minersHintBilled', { period: billedPeriods[0] })
       : t('corpTaxBook.moons.moon.minersHintBilledMany');
+  // Looking at an older cycle: the moon's newest one is a click away.
+  const current = detail.otherCycles.reduce<ExtractionRow | undefined>(
+    (best, c) => (c.startedAt > (best?.startedAt ?? row.startedAt) ? c : best),
+    undefined
+  );
   const minerName = (m: MinerOnMoon) =>
     names.character(view.miners.find((x) => x.id === m.minerId)?.mainCharacterId ?? 0);
   const minerColumns: DataTableColumn<MinerOnMoon>[] = [
@@ -115,12 +122,7 @@ export function MoonDetail({ id }: { id: string }) {
     {
       id: 'state',
       header: t('corpTaxBook.moons.cols.state'),
-      // The row's one link: a cycle that never fractured has no date to carry it.
-      render: (r) => (
-        <Link to={extractionLink(r.id)} className={entityLinkClassName(tapTargetClassName)}>
-          <StateWord state={r.state} />
-        </Link>
-      ),
+      render: (r) => <StateWord state={r.state} />,
     },
     {
       id: 'est',
@@ -178,9 +180,18 @@ export function MoonDetail({ id }: { id: string }) {
         }
       />
       <EntityHeader
-        label={t(
-          billing.billed ? 'corpTaxBook.moons.moon.taxBilled' : 'corpTaxBook.moons.moon.taxSoFar'
-        )}
+        label={
+          billing.rollingOver > 0
+            ? t('corpTaxBook.moons.moon.taxPartial', {
+                periods: billedPeriods.join(', '),
+                amount: isk(billing.rollingOver),
+              })
+            : t(
+                billing.billed
+                  ? 'corpTaxBook.moons.moon.taxBilled'
+                  : 'corpTaxBook.moons.moon.taxSoFar'
+              )
+        }
         value={isk(row.tax)}
         note={
           <>
@@ -281,7 +292,19 @@ export function MoonDetail({ id }: { id: string }) {
         noun={t('corpTaxBook.moons.sections.nouns.cycles')}
         empty={t('corpTaxBook.moons.moon.noOtherCycles')}
         rows={detail.otherCycles}
-        meta={<span className="text-xs text-text-dim">{t('corpTaxBook.moons.moon.pastHint')}</span>}
+        meta={
+          <span className="text-xs text-text-dim">
+            {t('corpTaxBook.moons.moon.pastHint')}
+            {current && (
+              <>
+                {' · '}
+                <Link to={extractionLink(current.id)} className={entityLinkClassName()}>
+                  {t('corpTaxBook.moons.moon.currentCycle')}
+                </Link>
+              </>
+            )}
+          </span>
+        }
         phone={phone}
         startOpen={false}
         summary={t('corpTaxBook.moons.moon.pastSummary', { count: detail.otherCycles.length })}
@@ -290,9 +313,10 @@ export function MoonDetail({ id }: { id: string }) {
           <DataTable
             stacked={table.stacked}
             label={t('corpTaxBook.moons.moon.past')}
-            columns={cycleColumns}
+            columns={[...cycleColumns, ...(table.stacked ? [] : [caretColumn<ExtractionRow>()])]}
             rows={[...shown]}
             rowKey={(r) => r.id}
+            onRowClick={(r) => navigate(extractionLink(r.id))}
             density="compact"
             stackColumns={2}
           />

@@ -226,7 +226,7 @@ export function MinerDetail({ id }: { id: string }) {
             stackEdge: 'start',
             render: (d: DayRow) =>
               canSelect(d) ? (
-                <label className={touchCheckboxLabelClassName}>
+                <label className={cx(touchCheckboxLabelClassName, 'size-6')}>
                   <Checkbox
                     aria-label={t('corpTaxBook.moons.miner.selectDay', { date: d.date })}
                     checked={selected.has(d.key)}

@@ -19,7 +19,7 @@ import { caretColumn } from './caretColumn';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline';
-import { DEFAULT_STATES } from './extractionStates';
+import { DEFAULT_STATES, FILTER_STATES } from './extractionStates';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
 import { PlaceCell } from './sectionParts';
@@ -91,6 +91,8 @@ export function ExtractionsTab() {
       id: 'state',
       header: t('corpTaxBook.moons.cols.state'),
       render: (row) => <StateWord state={row.state} />,
+      // State order (what is minable first), then the soonest chunk: the order the timeline lists them.
+      sortValue: (row) => `${FILTER_STATES.indexOf(row.state)}|${row.chunkArrivalAt}`,
     },
     {
       id: 'when',
@@ -155,7 +157,7 @@ export function ExtractionsTab() {
               rowClassName={() => 'group'}
               rowContextMenu={rowContextMenu}
               rowMoreActions={canEdit}
-              defaultSort={{ columnId: 'when', direction: 'desc' }}
+              defaultSort={{ columnId: 'state', direction: 'asc' }}
               mobileSort
               stackColumns={2}
               stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: listed.length })}

@@ -15825,7 +15825,6 @@
       "syncNow": "Sync now",
       "viewOnly": "You can view this book. Syncing it needs the Accountant role, and editing needs Director or Accountant.",
       "failed": "Couldn't load the Corp Tax Book",
-      "declared": "Declared paid, overdue paused",
       "overdueDays_one": "Overdue {{count}} day",
       "overdueDays_other": "Overdue {{count}} days",
       "overduePaused": "Paused",
@@ -15855,7 +15854,7 @@
       },
       "dayStatus": {
         "paid": "Paid",
-        "on-statement": "On a Statement",
+        "on-statement": "On Statement",
         "unbilled": "Next Statement",
         "not-billable": "Still accruing",
         "dismissed": "Dismissed",
@@ -15992,6 +15991,8 @@
         "pastSummary_other": "{{count}} other cycles",
         "taxSoFar": "Tax so far",
         "taxBilled": "Tax",
+        "currentCycle": "Open the current cycle",
+        "taxPartial": "Billed on {{periods}} · {{amount}} rolling over",
         "noOtherCycles": "No other cycles on record for this moon."
       },
       "fullyMined": {
@@ -16992,6 +16993,7 @@
         "fieldGoneIn": "Field gone in {{in}}",
         "fieldGoneUnknown": "Field gone date unknown",
         "readySince": "Ready since {{date}}",
+        "readyAgo": "Ready {{ago}} ago",
         "popsIn": "Pops in {{in}}",
         "billableThrough": "Billable through"
       },

@@ -96,9 +96,6 @@ export function MinersTab() {
               {t('corpTaxBook.moons.moreCharacters', { count: m.characterIds.length - 1 })}
             </span>
           )}
-          {m.paused && (
-            <span className="block text-xs text-warning">{t('corpTaxBook.moons.declared')}</span>
-          )}
         </span>
       ),
       sortValue: (m) => nameOf(m),
