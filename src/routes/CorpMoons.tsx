@@ -195,25 +195,16 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   );
 }
 
-/** Header and tabs stay while loading; only the body is a skeleton. */
+/**
+ * The header stays while loading; the body is a skeleton. No tabs: which ones the
+ * viewer has (Extractions only in a book with moons) is unknown until the book is.
+ */
 function MoonsLoading() {
   const { t } = useTranslation();
-  const showTabs = moonsDetail(useLocation().pathname) === null;
-  const [tab, selectTab] = usePageTab(MOONS_TABS);
-  const tabsId = useTabsId();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
       <PageHeader title={t('corp.moons.title')} />
-      {showTabs && (
-        <Tabs
-          tabsId={tabsId}
-          label={t('corpTaxBook.moons.title')}
-          value={tab}
-          onChange={(id) => selectTab(id as typeof tab)}
-          tabs={tabBarTabs(MOONS_TABS).map((x) => ({ id: x.id, label: t(x.labelKey) }))}
-        />
-      )}
       <div
         role="status"
         aria-label={t('common.loading')}

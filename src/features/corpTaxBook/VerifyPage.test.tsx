@@ -160,6 +160,29 @@ describe('VerifyPage', () => {
     expect(day.textContent?.match(/Aug 13, 2026/g)).toHaveLength(1);
   });
 
+  it('names a day once when two lines bill it, with its refinery on the line below (#5310)', async () => {
+    const base = payload();
+    const line = base.statement.lines[0]!;
+    api.read.mockResolvedValue(
+      payload({
+        statement: {
+          ...base.statement,
+          lines: [
+            { ...line, structureId: 77, tax: 1_000_000 },
+            { ...line, kind: 'late-ore', structureId: 77, tax: 500_000 },
+          ],
+        },
+      })
+    );
+    render(<VerifyPage token="tok" />);
+    const list = await screen.findByRole('list', { name: /statement lines/i });
+    const days = list.querySelectorAll(':scope > li');
+    expect(days).toHaveLength(1);
+    expect(days[0]!.textContent?.match(/Aug 13, 2026/g)).toHaveLength(1);
+    expect(days[0]!.textContent?.match(/Efa V - Moon 3/g)).toHaveLength(1);
+    expect(days[0]).toHaveTextContent('1,500,000 ISK');
+  });
+
   it('says so when nothing is credited yet', async () => {
     api.read.mockResolvedValue(payload({ payments: [], settlement: null }));
     render(<VerifyPage token="tok" />);
