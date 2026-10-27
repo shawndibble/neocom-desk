@@ -59,7 +59,7 @@ vi.mock('@/lib/useIsNarrow', () => ({ useIsNarrow: () => hookState.isPhone }));
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => !hookState.isPhone }));
 // Beta sells 1 a day, Gamma 50 — once the filter asks.
 vi.mock('./useDailySales', () => ({
-  useDailySales: (_ids: readonly number[], enabled: boolean) => ({
+  useDailySales: (_ids: readonly number[], _regionId: number, enabled: boolean) => ({
     sales: enabled
       ? new Map([
           [200, 1],

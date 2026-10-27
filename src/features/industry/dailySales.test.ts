@@ -5,7 +5,7 @@ vi.mock('@/features/market/priceHistory', () => ({ loadPriceHistory: vi.fn() }))
 import { loadPriceHistory } from '@/features/market/priceHistory';
 vi.mock('@/features/loyalty/lpStoreVolume', () => ({ loadLpStoreVolume: vi.fn() }));
 import { loadLpStoreVolume } from '@/features/loyalty/lpStoreVolume';
-import { loadDailySales, resetHubVolumes } from './dailySales';
+import { loadDailySales, resetRegionVolumes } from './dailySales';
 
 const NOW = Date.parse('2026-09-29T12:00:00Z');
 const history = (volume: number) => ({
@@ -13,52 +13,41 @@ const history = (volume: number) => ({
   fetchedAt: NOW,
 });
 
+const JITA_REGION = 10000002;
+
 beforeEach(() => {
   vi.mocked(loadPriceHistory).mockReset();
   vi.mocked(loadLpStoreVolume).mockReset();
-  resetHubVolumes();
-  // No volume objects by default: the ESI fallback path.
+  resetRegionVolumes();
+  // No volume object by default: the ESI fallback path.
   vi.mocked(loadLpStoreVolume).mockResolvedValue(null);
 });
 
 describe('loadDailySales', () => {
-  it('sums the last 30 days across every trade-hub region', async () => {
-    vi.mocked(loadPriceHistory).mockResolvedValue(history(30));
-    // Five hub regions, 30 units each, over 30 days: 5 a day.
-    expect(await loadDailySales(34, NOW)).toBeCloseTo(5);
-    expect(
-      vi
-        .mocked(loadPriceHistory)
-        .mock.calls.map(([region]) => region)
-        .sort()
-    ).toEqual([10000002, 10000030, 10000032, 10000042, 10000043]);
-  });
-
-  it('counts a region where the type has no market as no sales', async () => {
-    vi.mocked(loadPriceHistory)
-      .mockRejectedValueOnce(new EsiError(400, 'no market'))
-      .mockResolvedValue(history(30));
-    expect(await loadDailySales(34, NOW)).toBeCloseTo(4);
-  });
-
-  it('is unknown (null) when a region could not be read, rather than under-counting', async () => {
-    vi.mocked(loadPriceHistory)
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockResolvedValue(history(30));
-    expect(await loadDailySales(34, NOW)).toBeNull();
-  });
-
-  describe('from the published volume objects', () => {
-    it('sums the type across the hub regions without asking ESI', async () => {
+  describe('from the region volume object', () => {
+    it("reads the scanned hub's region only, without asking ESI", async () => {
       vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 2 });
-      expect(await loadDailySales(34, NOW)).toBe(10);
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBe(2);
+      expect(loadLpStoreVolume).toHaveBeenCalledOnce();
+      expect(loadLpStoreVolume).toHaveBeenCalledWith(JITA_REGION);
       expect(loadPriceHistory).not.toHaveBeenCalled();
     });
 
-    it('reads each region object once however many products are checked', async () => {
+    it('reads the region object once however many products are checked', async () => {
       vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
-      await Promise.all([loadDailySales(34, NOW), loadDailySales(35, NOW)]);
-      expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
+      await Promise.all([
+        loadDailySales(JITA_REGION, 34, NOW),
+        loadDailySales(JITA_REGION, 35, NOW),
+      ]);
+      expect(loadLpStoreVolume).toHaveBeenCalledOnce();
+    });
+
+    it('reads another hub region separately', async () => {
+      vi.mocked(loadLpStoreVolume).mockImplementation(async (regionId) =>
+        regionId === JITA_REGION ? { 34: 9 } : { 34: 1 }
+      );
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBe(9);
+      expect(await loadDailySales(10000043, 34, NOW)).toBe(1);
     });
 
     it('reuses a complete read for 30 minutes, then reads again', async () => {
@@ -66,40 +55,48 @@ describe('loadDailySales', () => {
       try {
         vi.setSystemTime(NOW);
         vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
-        await loadDailySales(34, NOW);
+        await loadDailySales(JITA_REGION, 34, NOW);
         vi.setSystemTime(NOW + 29 * 60_000);
-        await loadDailySales(34, NOW);
-        expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
+        await loadDailySales(JITA_REGION, 34, NOW);
+        expect(loadLpStoreVolume).toHaveBeenCalledTimes(1);
         vi.setSystemTime(NOW + 31 * 60_000);
-        await loadDailySales(34, NOW);
-        expect(loadLpStoreVolume).toHaveBeenCalledTimes(10);
+        await loadDailySales(JITA_REGION, 34, NOW);
+        expect(loadLpStoreVolume).toHaveBeenCalledTimes(2);
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('does not keep a read where an object failed to load', async () => {
-      vi.mocked(loadLpStoreVolume).mockResolvedValue(null);
+    it('does not keep a read where the object failed to load', async () => {
       vi.mocked(loadPriceHistory).mockResolvedValue(history(30));
-      await loadDailySales(34, NOW);
+      await loadDailySales(JITA_REGION, 34, NOW);
       await Promise.resolve();
-      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
-      expect(await loadDailySales(34, NOW)).toBe(5);
+      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 4 });
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBe(4);
     });
 
-    it('counts a type absent from every object as no sales', async () => {
+    it('counts a type absent from the object as no sales', async () => {
       vi.mocked(loadLpStoreVolume).mockResolvedValue({ 99: 7 });
-      expect(await loadDailySales(34, NOW)).toBe(0);
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBe(0);
+    });
+  });
+
+  describe('falling back to ESI history', () => {
+    it("reads the last 30 days of the one region's history", async () => {
+      vi.mocked(loadPriceHistory).mockResolvedValue(history(30));
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBeCloseTo(1);
+      expect(loadPriceHistory).toHaveBeenCalledOnce();
+      expect(loadPriceHistory).toHaveBeenCalledWith(JITA_REGION, 34);
     });
 
-    it('asks ESI only for a region whose object is unavailable', async () => {
-      vi.mocked(loadLpStoreVolume).mockImplementation(async (regionId) =>
-        regionId === 10000002 ? null : { 34: 1 }
-      );
-      vi.mocked(loadPriceHistory).mockResolvedValue(history(30));
-      // Four objects at 1 a day, plus Jita's 30 units over 30 days.
-      expect(await loadDailySales(34, NOW)).toBeCloseTo(5);
-      expect(vi.mocked(loadPriceHistory).mock.calls.map(([region]) => region)).toEqual([10000002]);
+    it('counts a type with no market as no sales', async () => {
+      vi.mocked(loadPriceHistory).mockRejectedValue(new EsiError(400, 'no market'));
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBe(0);
+    });
+
+    it('is unknown (null) when the region could not be read, rather than under-counting', async () => {
+      vi.mocked(loadPriceHistory).mockRejectedValue(new Error('offline'));
+      expect(await loadDailySales(JITA_REGION, 34, NOW)).toBeNull();
     });
   });
 });
