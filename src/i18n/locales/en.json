@@ -15880,8 +15880,7 @@
         "correctionCredit": "Credit by {{name}}",
         "correctionCharge": "Charge by {{name}}",
         "correctsDay": "Next Statement, for {{date}}",
-        "billedOnLead": "On the",
-        "billedOnTrail": "Statement, for {{date}}",
+        "billedOn": "On the <link/> Statement, for {{date}}",
         "openStatement": "Open the {{period}} Statement",
         "moreStatements": "+{{count}} more",
         "markNotTaxNone": "No payment to mark",
@@ -16256,7 +16255,6 @@
       },
       "statementPanel": {
         "remaining": "Remaining",
-        "billed": "Billed",
         "subtitle": "Statement · {{period}}",
         "credited": "Credited",
         "forgiven": "Forgiven",

@@ -8,7 +8,7 @@ import { StatementLines, StatementPayments } from '@/features/corpTaxBook/Statem
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
 import { useBook } from './useBook';
-import { dateTimeUtc, dateWithYear, isk, periodLabel, shortDate } from './moonsFormat';
+import { dateTimeUtc, dateWithYear, isk, iskOrDash, periodLabel, shortDate } from './moonsFormat';
 import { DueWord } from './moonsParts';
 import { minerPath } from './moonsPaths';
 
@@ -110,8 +110,6 @@ export function StatementPanel({
     Math.round((Date.parse(statement.coversThrough) - Date.parse(statement.coversFrom)) / DAY_MS) +
     1;
   const sameYear = statement.coversFrom.slice(0, 4) === statement.coversThrough.slice(0, 4);
-  // Whole ISK, and nothing under 1 ISK: a zero reads as a dash (#5247).
-  const iskOrDash = (n: number) => (n === 0 ? '—' : isk(n));
   return (
     <SlideOver
       open

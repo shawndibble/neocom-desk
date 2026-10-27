@@ -47,7 +47,7 @@ export function extractionWindowLabel(
   const days = extractionWindowDays(row.startedAt, row.chunkArrivalAt);
   // The days stay on one line: a break inside "(41 days)" leaves the "41" hanging.
   const span = t('corpTaxBook.moons.windowDays', { count: days }).replace(/ /g, '\u00a0');
-  return `${dateWithYear(row.startedAt)} - ${dateWithYear(row.chunkArrivalAt)} (${span})`;
+  return `${dateWithYear(row.startedAt)} \u2013 ${dateWithYear(row.chunkArrivalAt)} (${span})`;
 }
 
 /** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */

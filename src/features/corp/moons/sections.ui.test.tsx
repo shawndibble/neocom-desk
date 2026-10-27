@@ -122,7 +122,7 @@ describe('Moon page', () => {
   it('merges Started and Arrived into one Extraction window and drops the This extraction box', () => {
     renderBook(<MoonDetail id={MOON_ID} />);
     expect(screen.getByText('Extraction window')).toBeInTheDocument();
-    expect(screen.getByText(/\d+ \w{3} - \d+ \w{3} \(\d+ days?\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\d+ \w{3} \u2013 \d+ \w{3} \(\d+ days?\)/)).toBeInTheDocument();
     expect(screen.queryByText('This extraction')).not.toBeInTheDocument();
     expect(screen.queryByText('Chunk arrived')).not.toBeInTheDocument();
     expect(screen.queryByText('Ore from')).not.toBeInTheDocument();

@@ -85,7 +85,7 @@ describe('Miner page Statement links (#5288)', () => {
     expect(screen.getByTestId('search').textContent).toBe('');
   });
 
-  it("a ?statement= that is not this Miner's says so and leaves the URL", async () => {
+  it("a ?statement= that is not this Miner's says so and drops the param", async () => {
     renderMiner('/corp/moons/miners/g1?statement=nope');
     expect(await screen.findByText('Statement not found.')).toBeInTheDocument();
     expect(screen.getByTestId('search').textContent).toBe('');

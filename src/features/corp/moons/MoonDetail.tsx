@@ -71,10 +71,9 @@ export function MoonDetail({ id }: { id: string }) {
       ? t('corpTaxBook.moons.moon.minersHintBilled', { period: billedPeriods[0] })
       : t('corpTaxBook.moons.moon.minersHintBilledMany');
   // Looking at an older cycle: the moon's newest one is a click away.
-  const current = detail.otherCycles.reduce<ExtractionRow | undefined>(
-    (best, c) => (c.startedAt > (best?.startedAt ?? row.startedAt) ? c : best),
-    undefined
-  );
+  const current = detail.otherCycles
+    .filter((c) => c.startedAt > row.startedAt)
+    .sort((x, y) => y.startedAt.localeCompare(x.startedAt))[0];
   const minerName = (m: MinerOnMoon) =>
     names.character(view.miners.find((x) => x.id === m.minerId)?.mainCharacterId ?? 0);
   const minerColumns: DataTableColumn<MinerOnMoon>[] = [

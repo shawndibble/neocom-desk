@@ -1,7 +1,7 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -468,10 +468,11 @@ export function MinerDetail({ id }: { id: string }) {
               const st = billedOn(r.correction.id);
               const date = shortDate(r.correction.date);
               return st ? (
-                <>
-                  {t('corpTaxBook.moons.payment.billedOnLead')} {statementLink(st)}{' '}
-                  {t('corpTaxBook.moons.payment.billedOnTrail', { date })}
-                </>
+                <Trans
+                  i18nKey="corpTaxBook.moons.payment.billedOn"
+                  values={{ period: periodLabel(st.periodStart, st.periodEnd), date }}
+                  components={{ link: statementLink(st) }}
+                />
               ) : (
                 t('corpTaxBook.moons.payment.correctsDay', { date })
               );
@@ -624,11 +625,12 @@ export function MinerDetail({ id }: { id: string }) {
         }
         actions={headerActions}
       />
-      {(notice ?? statementParam.notFound) && (
-        <p role="status" className="text-xs text-text-dim">
-          {notice ?? statementParam.notFound}
-        </p>
-      )}
+      <p
+        role="status"
+        className={(notice ?? statementParam.notFound) ? 'text-xs text-text-dim' : 'sr-only'}
+      >
+        {notice ?? statementParam.notFound}
+      </p>
       {closedAt && (
         <p role="status" className="text-xs text-text-dim">
           {t('corpTaxBook.moons.miner.closedNote', { date: shortDate(closedAt.slice(0, 10)) })}

@@ -43,12 +43,14 @@ export function OverviewTab({ showMoons }: { showMoons: boolean }) {
       title: t('corpTaxBook.moons.overview.ready'),
       rows: schedule.ready,
       // Within a day the date alone reads as "since today": say how long ago instead.
-      when: (r) =>
-        now - Date.parse(r.chunkArrivalAt) < DAY_MS
+      when: (r) => {
+        const since = now - Date.parse(r.chunkArrivalAt);
+        return since < DAY_MS
           ? t('corpTaxBook.moons.overview.readyAgo', {
-              ago: formatCountdown(Math.max(0, now - Date.parse(r.chunkArrivalAt)) / 1000),
+              ago: formatCountdown(Math.max(0, since) / 1000),
             })
-          : t('corpTaxBook.moons.overview.readySince', { date: shortDate(r.chunkArrivalAt) }),
+          : t('corpTaxBook.moons.overview.readySince', { date: shortDate(r.chunkArrivalAt) });
+      },
     },
     {
       id: 'pops',

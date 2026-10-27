@@ -336,7 +336,7 @@ describe('Statements drill-down details (#5247)', () => {
     expect(within(panel).getByText('Mailed 2 times')).toBeInTheDocument();
   });
 
-  it('a ?statement= that is not on the period shows a notice and leaves the URL (replace)', async () => {
+  it('a ?statement= that is not on the period shows a notice and drops the param (replace)', async () => {
     renderAt('/corp/moons/statements/2026-08-01?statement=nope');
     expect(await screen.findByText('Statement not found.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();

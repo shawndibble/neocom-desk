@@ -1036,7 +1036,7 @@ export function periodRows(view: BookView): PeriodRow[] {
     rows.push({
       start,
       end: statements[0].periodEnd,
-      status: overdue ? 'overdue' : outstanding === 0 ? 'paid' : unmailed ? 'issued' : 'sent',
+      status: overdue ? 'overdue' : unsettled.length === 0 ? 'paid' : unmailed ? 'issued' : 'sent',
       miners: new Set(statements.map((s) => s.minerId)).size,
       billed: standing.reduce((sum, x) => sum + x.billed, 0),
       paid,
