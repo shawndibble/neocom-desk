@@ -17,7 +17,7 @@ describe('bookPartsFor', () => {
     expect(new Set(bookPartsFor('extractions', 'miner'))).toEqual(
       new Set(['core', 'ledger', 'answers'])
     );
-    expect([...bookPartsFor('miners', 'extraction')]).toEqual(['core']);
+    expect([...bookPartsFor('miners', 'extraction')]).toEqual(['core', 'ledger']);
     expect([...bookPartsFor('miners', 'moonOwner')]).toEqual(['core']);
   });
 });
