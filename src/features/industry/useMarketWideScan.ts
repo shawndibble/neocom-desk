@@ -20,6 +20,8 @@ interface UseMarketWideScanArgs {
   modifiers: CharacterModifiers;
   standing?: ResolvedStandings;
   characterIds: number[];
+  /** Whose Build Plans rows are priced as: the active Character. */
+  characterId: number | null;
   research: MarketWideResearch;
   filter: MarketWideFilterState;
   setFilter: (next: MarketWideFilterState) => void;
@@ -40,6 +42,7 @@ export function useMarketWideScan({
   modifiers,
   standing,
   characterIds,
+  characterId,
   research,
   filter,
   setFilter,
@@ -53,6 +56,7 @@ export function useMarketWideScan({
     modifiers,
     standing,
     characterIds,
+    characterId,
     research,
     filters: filter,
   });

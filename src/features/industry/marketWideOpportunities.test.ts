@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { BlueprintSourceSets } from '@/engine/industry/blueprintObtainability';
 import type { MarketWideTreeMap } from '@/sde/types';
@@ -12,14 +12,15 @@ vi.mock('@/market/prices', () => ({
   // Unreachable by default: the troll-price check is skipped, as in production.
   getAdjustedPrices: vi.fn(() => Promise.reject(new Error('offline'))),
 }));
-vi.mock('./marketData', () => ({ loadMarketSnapshot: vi.fn() }));
+// Pricing is `marketWidePlanPricing.test.ts`'s concern; the scan's is which
+// candidates survive, and that each is priced as the plan a click would open.
+vi.mock('./marketWidePlanPricing', () => ({ priceCandidatesAsPlans: vi.fn() }));
 
 import { getAdjustedPrices, getHubPrices } from '@/market/prices';
-import { loadMarketSnapshot } from './marketData';
+import { priceCandidatesAsPlans } from './marketWidePlanPricing';
 
 const PRODUCT = 500;
 const TRITANIUM = 34;
-const BX_804 = 27171;
 
 const TREES: MarketWideTreeMap = {
   [PRODUCT]: {
@@ -53,30 +54,44 @@ beforeEach(() => {
       ) as unknown as Awaited<ReturnType<typeof getHubPrices>>
     )
   );
-  vi.mocked(loadMarketSnapshot).mockResolvedValue({
-    adjustedPrices: {},
-    systemCostIndex: 0,
-  } as unknown as Awaited<ReturnType<typeof loadMarketSnapshot>>);
+  vi.mocked(priceCandidatesAsPlans).mockImplementation((candidates) =>
+    Promise.resolve(
+      candidates.map((candidate) => ({
+        productTypeID: candidate.productTypeID,
+        profit: 1,
+        marginPct: 1,
+        seconds: 3600,
+        iskPerHour: 1,
+        buildCost: 1,
+        outputQuantity: 1,
+        sellDepthIsk: candidate.sellDepthIsk,
+        me: candidate.me,
+        te: candidate.te,
+      }))
+    )
+  );
 });
 
 describe('runMarketWideScan', () => {
-  it("applies the Character's BX-80x implant to ISK/hour like every other pricing path (issue #1284)", async () => {
-    const [base] = await runMarketWideScan(
+  it("prices each survivor as the Build Plan a click would open, for the active Character at the row's ME/TE", async () => {
+    const research = { owned: [], assumedMe: 8, assumedTe: 14 };
+    const rows = await runMarketWideScan(
       DEFAULT_TRADE_HUB,
       TREES,
       CATALOG,
       NO_CHARACTER_MODIFIERS,
-      ON_MARKET
+      ON_MARKET,
+      { research, characterId: 42 }
     );
-    const [implanted] = await runMarketWideScan(
-      DEFAULT_TRADE_HUB,
-      TREES,
-      CATALOG,
-      characterModifiers({ skills: {}, implantTypeIds: [BX_804] }),
-      ON_MARKET
-    );
-    // Same profit, 4% less time.
-    expect(implanted.iskPerHour).toBeCloseTo(base.iskPerHour! / 0.96, 6);
+    expect(rows.map((row) => [row.productTypeID, row.me, row.te])).toEqual([[PRODUCT, 8, 14]]);
+    const [candidates, context] = vi.mocked(priceCandidatesAsPlans).mock.calls[0]!;
+    expect(candidates.map((c) => c.productTypeID)).toEqual([PRODUCT]);
+    expect(context).toMatchObject({
+      hub: DEFAULT_TRADE_HUB,
+      characterId: 42,
+      modifiers: NO_CHARACTER_MODIFIERS,
+      research,
+    });
   });
 
   it('ranks only products whose blueprint the pilot owns or can buy, naming the source', async () => {

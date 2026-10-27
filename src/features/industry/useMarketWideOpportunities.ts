@@ -35,6 +35,8 @@ export interface UseMarketWideOpportunitiesArgs {
   standing?: ResolvedStandings;
   /** Every Character on the account — whose blueprints, contracts and LP decide what the pilot can build. */
   characterIds: readonly number[];
+  /** Whose Build Plans rows are priced as — the active Character. Null while none is active. */
+  characterId?: number | null;
   /** The ME/TE rows are priced at, and so the one a plan opened from a row starts at (issue #5232). */
   research: MarketWideResearch;
   /**
@@ -43,7 +45,7 @@ export interface UseMarketWideOpportunitiesArgs {
    * is never shown as current.
    */
   filters: MarketWideFilters;
-  options?: Omit<MarketWideScanOptions, 'include' | 'research'>;
+  options?: Omit<MarketWideScanOptions, 'include' | 'research' | 'characterId'>;
 }
 
 export interface UseMarketWideOpportunitiesResult {
@@ -86,6 +88,7 @@ export function useMarketWideOpportunities({
   modifiers,
   standing,
   characterIds,
+  characterId = null,
   research,
   filters,
   options,
@@ -148,7 +151,12 @@ export function useMarketWideOpportunities({
           catalog,
           modifiers,
           sets,
-          { ...options, research, include: include.then((check) => check ?? (() => true)) },
+          {
+            ...options,
+            research,
+            characterId,
+            include: include.then((check) => check ?? (() => true)),
+          },
           standing
         ),
         sources,
@@ -184,7 +192,7 @@ export function useMarketWideOpportunities({
           });
         });
     },
-    [hub, trees, catalog, modifiers, options, standing, characterIds, research, keyFor]
+    [hub, trees, catalog, modifiers, options, standing, characterIds, characterId, research, keyFor]
   );
 
   // The scan in flight, or the one that ran at exactly these inputs, wins;
