@@ -60,7 +60,7 @@ describe('defaultSettings (#4059 hand-off)', () => {
     expect(defaultSettings('2026-10-01', 10)).toMatchObject({
       hubId: 'jita',
       oreForm: 'compressed',
-      graceHours: 6,
+      graceHours: 0.5,
       minimumStatement: 5_000_000,
       overdueDays: 14,
       divisions: [1],
