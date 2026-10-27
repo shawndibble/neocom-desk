@@ -1,9 +1,0 @@
-# Scope decisions — Hold the app JS on the landing page until the hero paints (issue #3950)
-
-_Recorded 2026-10-16 · issue #3950._
-
-- **On the landing paths, the built page starts the app's JS on `load`, not while parsing** (`src/app/deferredEntry.ts`, a `post` `transformIndexHtml` step in `vite.config.ts`). Vite's entry script and ~60 module preloads (~520 KB) used to start with the stylesheet the first paint waits on; on a slow phone they shared the line. The prerendered hero (#3926) covers the wait. Throttled Chrome (1.6 Mbps, 150 ms, 4× CPU), production assets: first paint 2.3–2.4 s → 0.7–0.8 s; React live 4.0 s → 4.4 s.
-- **The trade-off is accepted: the login button goes live about 0.4 s later on a slow phone.** The shell's button is `inert` until then. A 5 s backstop starts the app if `load` is slow.
-- **Every other boot is unchanged in effect.** Where the landing-shell gate did not choose the shell (a returning pilot, a deep link, the Play Store app), the loader adds the same preloads at once and the entry once the document is parsed, as the deferred module script did (returning pilot on `/overview`, same throttling: 3.5–3.8 s before, 3.5–3.6 s after).
-- **The build fails rather than ship a page that never boots** if the built HTML does not hold exactly one entry script.
-- **Started on the ship's paint, not `load`** (follow-up, 2026-10-16). PageSpeed (Lighthouse 13.5, slow CPU) showed the ship loaded at ~0.2 s but painted ~2 s later: `load` fires once it has loaded, the JS it started held the paint back, and runs split between ~75 and ~40. The loader now waits for the LCP entry of the hero's ship (load plus two frames where LCP is unsupported), a first tap or key, or the 5 s backstop. Lighthouse 13.5, CPU ×12, 5 runs: score 40–76 (mean 61) → 62–76 (mean 70); FCP never above 1.9 s. The eager ship also drops `decoding="async"`.

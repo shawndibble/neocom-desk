@@ -1,6 +1,0 @@
-# Scope decisions — Community board cache uses a boardVersion stamp (issue #5244)
-
-_Recorded 2026-10-26 · issue #5244._
-
-- **A Community's Requests board is cached per Character and Community, in memory, behind a `communities/{id}/boardVersion/current` stamp.** Opening an unchanged board reads that one doc. A moved `stamp` reads only Requests (`lastActivityAt`) and Pledges (`updatedAt`) written since the cache's newest value and merges them; a moved `reset` (set by anything that deletes a Request or Pledge, which a delta cannot show), a cache older than 15 minutes, or a failed delta reads the board whole. Callables and the sweep set the stamp with server time; a Pledger sets it beside their own Pledge write, best effort. Rules let any Member write only `stamp`/`reset` as server time, so the worst a Member can do is make others re-read. Additive only: a board with no stamp doc reads as 0 and works. Rules out a longer TTL (owner decides cache ages) and a Firestore trigger on Pledge writes (no new deployed function).
-- **Closed Requests are not limited.** The ticket's "limit closed requests" is left out: a delta already makes the reopen cheap, and a limit would hide Requests a Member can still act on.

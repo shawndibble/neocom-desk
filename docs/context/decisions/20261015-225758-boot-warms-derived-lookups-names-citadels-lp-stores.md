@@ -1,6 +1,0 @@
-# Scope decisions — Boot warms derived lookups: names, citadels, LP stores, implant types
-
-_Recorded 2026-10-15._
-
-- **A second boot-prefetch phase warms lookups derived from the cached lists.** After the list tasks, it resolves entity names (mail parties, contract parties, LP corporations), citadel names (assets, orders, clones, contracts), LP Store offers and corporation names, and implant type rows, using the page loaders so cache keys match. It reads ids from the cache, is capped (30 structures, since a citadel the Character cannot see is a 403 against ESI's error limit; 15 LP stores). Structure name rows are never pruned, so those few are permanent, runs at low concurrency, and skips on metered, Data Saver or slow links (`detailPrefetchAllowed`). Loyalty points and the raw mining ledger join the first-phase table.
-- **Not warmed: wallet-journal party names and calendar owner names.** No page resolves journal parties (only the CSV export does), and calendar owner names arrive in the event detail rows already prefetched. Corporation data (board, members, assets, wallet) is deferred to its own change: it needs the role gate (`resolveCorpReadAccess`) and a per-capability loader list.

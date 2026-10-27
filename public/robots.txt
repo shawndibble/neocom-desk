@@ -1,3 +1,0 @@
-# Every page is a client-rendered app shell; nothing here is private.
-User-agent: *
-Allow: /
