@@ -12,6 +12,7 @@ import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { resetShareLinksForTests } from '@/features/share/shareStore';
+import { JANICE_PROXY_URL } from './janice';
 import { AppraisalPanel } from './AppraisalPanel';
 import { DEFAULT_APPRAISAL_OWNED_PREF, useAppraisalOwnedPref } from './appraisalOwnedPref';
 import { useRecentAppraisals } from './appraisalRecent';
@@ -1102,6 +1103,66 @@ describe('AppraisalPanel — Copy lists', () => {
     await copy(/^Sell now/);
     expect(written).toEqual(['Cheap Widget\t7']);
     configureClipboard(null);
+  });
+});
+
+describe('AppraisalPanel — Open in Janice', () => {
+  const PASTE = 'Tritanium 5\nPyerite 2';
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  async function openInJanice() {
+    await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /^Open in Janice/ }));
+  }
+
+  it('sends the whole paste to Janice and points the new tab at the appraisal', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ url: 'https://janice.e-351.com/a/Gb7io5' })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const tab = { opener: {}, location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    renderPanel({ controller: controller({ text: PASTE, result: outcome() }) });
+    await openInJanice();
+    await waitFor(() => expect(tab.location.href).toBe('https://janice.e-351.com/a/Gb7io5'));
+    expect(open).toHaveBeenCalledWith('about:blank', '_blank');
+    expect(tab.opener).toBeNull();
+    const [, init] = fetchMock.mock.calls.find(([url]) => url === JANICE_PROXY_URL) as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(init.body as string)).toEqual({
+      text: PASTE,
+      hub: 'jita',
+      pricePercent: 90,
+    });
+  });
+
+  it('closes the tab and says so when Janice gives no link', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ error: 'nothing-parsed' }, { status: 422 }))
+    );
+    const tab = { opener: {}, location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    renderPanel({ controller: controller({ text: PASTE, result: outcome() }) });
+    await openInJanice();
+    expect(await screen.findAllByText(/couldn't read any items/)).not.toHaveLength(0);
+    expect(tab.close).toHaveBeenCalled();
+    expect(tab.location.href).toBe('');
+  });
+
+  it('is disabled when the paste box is blank', async () => {
+    renderPanel({ controller: controller({ text: '  ', result: outcome() }) });
+    await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));
+    expect(await screen.findByRole('menuitem', { name: /^Open in Janice/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });
 

@@ -11963,6 +11963,14 @@
         "refine": "Refine",
         "multibuy": "Multibuy"
       },
+      "openInJanice": "Open in Janice",
+      "janiceFetching": "Fetching your Janice URL…",
+      "janiceFailed": {
+        "failed": "Janice didn't answer, so no tab was opened. Try again in a moment.",
+        "too-large": "That paste is too large for Janice.",
+        "nothing-parsed": "Janice couldn't read any items in that paste.",
+        "rate-limited": "Too many Janice requests. Wait a minute and try again."
+      },
       "pasteTitle": "Paste",
       "pasteLabel": "Items from inventory, multibuy or a fitting",
       "pastePlaceholder": "Tritanium\t124,500\nDamage Control II\t3\nNocxium 220",
