@@ -7,7 +7,7 @@
  *   and the scheduled-sync status. Every tab's figures, the health strip, the
  *   Activity feed and the settings dialog join these.
  * - `ledger`: payments, dismissals, declarations, adjustments and write-offs.
- *   Only a Miner's balance and a Statement's state read them.
+ *   A Miner's balance, a Statement's state and an Extraction page's per-day billing read them.
  * - `answers`: guests' answers to a hand-made grouping, shown beside a Miner.
  *
  * The settings document and `meta/paid` are not slices: every read takes them fresh.
@@ -34,6 +34,8 @@ export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPa
     case 'miner':
     case 'miners':
       return new Set<BookPart>(['core', 'ledger', 'answers']);
+    // An Extraction's page says whether its days are billed, dismissed or still accruing.
+    case 'extraction':
     case 'statements':
     case 'statementPeriod':
       return new Set<BookPart>(['core', 'ledger']);
