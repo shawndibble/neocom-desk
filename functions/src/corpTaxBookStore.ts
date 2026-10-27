@@ -1155,6 +1155,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.update(ref, { surveyId: action.surveyId ?? FieldValue.delete() });
       return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };
     }
+    case 'setFullyMined': {
+      const ref = col(c, EXTRACTIONS).doc(action.extractionId);
+      await mustGet(c, ref, 'Extraction');
+      // Never written by the sync's merge-set, so a later sync keeps the flag. Clearing drops it.
+      tx.update(ref, {
+        fullyMined: action.fullyMined
+          ? { by: by, byName: c.access.characterName, at: iso }
+          : FieldValue.delete(),
+      });
+      return { detail: { extractionId: action.extractionId, fullyMined: action.fullyMined } };
+    }
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());

@@ -264,6 +264,8 @@ export interface SyncExtraction {
   oreLines?: { typeId: number; quantity: number }[];
   /** A Moon Ore Survey (Share Link id) an officer linked as the ore source when there is no notification (D13). */
   surveyId?: string;
+  /** Set by an officer once the chunk is mined out (#5257); absent when not flagged. */
+  fullyMined?: { by: number; byName: string; at: string };
 }
 
 export const extractionId = (x: Pick<SyncExtraction, 'structureId' | 'extractionStartTime'>) =>

@@ -160,6 +160,8 @@ export interface ExtractionRow {
   /** Tax recorded against this Extraction's days. */
   tax: number;
   minerCount: number;
+  /** Who flagged the chunk Fully Mined and when (#5257); absent when not flagged. */
+  fullyMined?: { by: number; byName: string; at: string };
 }
 
 export interface NeedsYouDeclaration {
@@ -662,6 +664,7 @@ function buildExtractionRows(
         minedPct,
         tax: mine.reduce((s, c) => s + (frozenByKey.get(c.key)?.tax ?? c.taxOwed), 0),
         minerCount: new Set(mine.map((c) => c.minerId)).size,
+        ...(x.fullyMined ? { fullyMined: x.fullyMined } : {}),
       };
     })
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));

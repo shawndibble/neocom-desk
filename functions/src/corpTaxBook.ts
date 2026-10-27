@@ -465,6 +465,8 @@ export type EditAction =
   | { action: 'reverseDismissal'; dismissalId: string; reason: string }
   /** Links a Moon Ore Survey (a Share Link id) as a chunk's ore source, or unlinks it with null (D13). */
   | { action: 'linkSurvey'; extractionId: string; surveyId: string | null }
+  /** Flags an Extraction Fully Mined (who and when kept) or clears it (#5257). Both are audited. */
+  | { action: 'setFullyMined'; extractionId: string; fullyMined: boolean }
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
   | { action: 'unlink'; minerId: string; characterId: number }
   | {
@@ -572,6 +574,7 @@ export function parseEditAction(data: unknown): EditAction {
     'dismissRecords',
     'reverseDismissal',
     'linkSurvey',
+    'setFullyMined',
     'setMiner',
     'unlink',
     'regroupMiner',
@@ -648,6 +651,14 @@ export function parseEditAction(data: unknown): EditAction {
         action,
         extractionId: docId(d.extractionId, 'extractionId'),
         surveyId: d.surveyId === null ? null : docId(d.surveyId, 'surveyId'),
+      };
+    case 'setFullyMined':
+      if (typeof d.fullyMined !== 'boolean')
+        throw new HttpsError('invalid-argument', 'fullyMined must be true or false');
+      return {
+        action,
+        extractionId: docId(d.extractionId, 'extractionId'),
+        fullyMined: d.fullyMined,
       };
     case 'setMiner': {
       const characterIds = [
