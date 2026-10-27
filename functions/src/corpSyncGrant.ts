@@ -503,12 +503,12 @@ export async function runScheduledCorpSyncs(
 }
 
 /**
- * syncCorpTaxBooks runs at fixed UTC clock times. The 00:30 tick lands on the default 30-minute
- * grace, so yesterday closes at 00:30 (the read is stamped after the tick starts, so
- * `lastReadWellAt >= dayClosesAt`). Changing a schedule is not a new export.
+ * syncCorpTaxBooks runs at fixed UTC clock times. The 00:35 tick lands 5 minutes after the default 30-minute
+ * grace closes yesterday (00:30), a margin so an early scheduler fire cannot miss it
+ * (`lastReadWellAt >= dayClosesAt`). Changing a schedule is not a new export.
  */
 export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
-  schedule: '30 0,6,12,18 * * *',
+  schedule: '35 0,6,12,18 * * *',
   timeZone: 'UTC',
 } as const;
 

@@ -503,7 +503,7 @@ describe('feeder view mirror', () => {
       expect(mirror.dayClosesAt('2026-06-01', g)).toBe(dayClosesAt('2026-06-01', g));
   });
 
-  it('closes a day for a read stamped at the 00:30 tick, not before', () => {
+  it('closes a day for a read stamped at the 00:35 tick (day closes 00:30), not before', () => {
     const closes = Date.parse('2026-06-02T00:30:00Z');
     const rule = (at: number) => mirror.feederBillableRule(at, mirror.BOOK_DEFAULTS.graceHours);
     expect(rule(closes + 40_000)('2026-06-01')).toBe(true);

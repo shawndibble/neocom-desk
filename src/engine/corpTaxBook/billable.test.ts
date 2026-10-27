@@ -50,9 +50,9 @@ describe('isDayBillable', () => {
 });
 
 describe('default 30-minute grace', () => {
-  it('closes the day for the 00:30 sync tick (stamped after the tick starts), not before', () => {
-    const now = '2026-07-13T00:30:40Z';
-    expect(isDayBillable('2026-07-12', { now, lastSyncedAt: '2026-07-13T00:30:35Z' })).toBe(true);
+  it('closes the day for the 00:35 sync tick (day closes 00:30), not a read at 00:29:59', () => {
+    const now = '2026-07-13T00:35:40Z';
+    expect(isDayBillable('2026-07-12', { now, lastSyncedAt: '2026-07-13T00:35:05Z' })).toBe(true);
     expect(isDayBillable('2026-07-12', { now, lastSyncedAt: '2026-07-13T00:29:59Z' })).toBe(false);
     expect(
       isDayBillable('2026-07-12', {
@@ -60,7 +60,7 @@ describe('default 30-minute grace', () => {
         lastSyncedAt: '2026-07-13T00:29:59Z',
       })
     ).toBe(false);
-    expect(lastBillableDate({ now, lastSyncedAt: '2026-07-13T00:30:35Z' })).toBe('2026-07-12');
+    expect(lastBillableDate({ now, lastSyncedAt: '2026-07-13T00:35:05Z' })).toBe('2026-07-12');
     expect(lastBillableDate({ now, lastSyncedAt: '2026-07-13T00:29:59Z' })).toBe('2026-07-11');
   });
 
