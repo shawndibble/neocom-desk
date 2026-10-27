@@ -36,7 +36,8 @@ interface MobileOwnedBlueprintListProps {
   locationLabel: (row: OwnedBlueprintRow) => string | null;
   /** Only when the rows span more than one owner — the same rule the ranked view uses. */
   showOwner: boolean;
-  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  /** Opens the plan for a row, seeded with what its ISK/hour was priced with. */
+  onStartPlan: (row: OwnedBlueprintRow, entry: BlueprintCatalogEntry) => Promise<boolean>;
 }
 
 type SortFieldId = 'blueprint' | 'iskPerHour' | 'me' | 'te' | 'runs';
@@ -83,7 +84,11 @@ export function MobileOwnedBlueprintList({
 }: MobileOwnedBlueprintListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
-  const startPlanFromRow = useRowStartPlan(onStartPlan);
+  const startPlanFromRow = useRowStartPlan(
+    (row: OwnedBlueprintRow) =>
+      row.catalogEntry ? onStartPlan(row, row.catalogEntry) : Promise.resolve(false),
+    (row) => row.catalogEntry
+  );
 
   const fieldLabel: Record<SortFieldId, string> = {
     blueprint: t('industry.ownedBlueprintsBlueprint'),
@@ -135,7 +140,7 @@ export function MobileOwnedBlueprintList({
               key={row.id}
               // A tap on the card is Start plan's action; its controls are exempt.
               onClick={(event) => {
-                if (entry && isCardOwnClick(event)) startPlanFromRow(entry);
+                if (entry && isCardOwnClick(event)) startPlanFromRow(row);
               }}
               className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] gap-x-3 border-b border-line py-3 pr-1 pl-3 last:border-b-0"
             >
@@ -214,7 +219,7 @@ export function MobileOwnedBlueprintList({
                 </span>
                 {entry && (
                   <StartPlanButton
-                    onStart={() => onStartPlan(entry)}
+                    onStart={() => onStartPlan(row, entry)}
                     compact={{ name }}
                     planKey={entry}
                   />

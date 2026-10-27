@@ -197,7 +197,8 @@ describe('OwnedBlueprintsPanel', () => {
     expect(buttons).toHaveLength(2);
     const rifterRow = screen.getByText('Rifter Blueprint').closest('tr')!;
     await user.click(within(rifterRow).getByRole('button', { name: 'Plan' }));
-    expect(onStartPlan).toHaveBeenCalledWith(RIFTER);
+    // The row's ranked pricing rides along, so the plan opens at its ISK/hour.
+    expect(onStartPlan).toHaveBeenCalledWith(RIFTER, RANKED[0]);
   });
 
   it('hides the corp toggle without corp blueprint access', async () => {

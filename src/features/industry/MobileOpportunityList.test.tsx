@@ -62,6 +62,11 @@ describe('MobileOpportunityList', () => {
     name.focus();
     await user.keyboard('{Enter}');
     expect(onStartPlan).toHaveBeenCalledTimes(1);
-    expect(onStartPlan).toHaveBeenCalledWith(catalogEntry);
+    expect(onStartPlan).toHaveBeenCalledWith(
+      catalogEntry,
+      expect.objectContaining({
+        candidate: expect.objectContaining({ catalogEntry: catalogEntry }),
+      })
+    );
   });
 });
