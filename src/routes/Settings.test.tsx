@@ -767,18 +767,21 @@ describe('Settings — Notifications (issue #170)', () => {
     });
   });
 
-  it('offers an Enable button that makes the browser request, and no request without it', async () => {
+  it('ticking Device pop-ups makes the browser request, and no request without it', async () => {
     const requestPermission = stubNotification('default');
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
 
-    const enable = await screen.findByRole('button', { name: /turn on device notifications/i });
+    const deviceBox = await screen.findByRole('checkbox', { name: 'Device pop-ups' });
     expect(requestPermission).not.toHaveBeenCalled();
-    // The toggle UI stays put at 'default' — only a denial replaces it.
-    expect(screen.getByRole('checkbox', { name: /enable notifications/i })).toBeInTheDocument();
+    // Nothing has been asked yet, so there is nothing switched on to show.
+    expect(deviceBox).not.toBeChecked();
+    expect(
+      screen.queryByRole('button', { name: /turn on device notifications/i })
+    ).not.toBeInTheDocument();
 
-    await user.click(enable);
+    await user.click(deviceBox);
     expect(requestPermission).toHaveBeenCalledTimes(1);
     // The ask is recorded, so the one-time explainer never returns for someone
     // who came to Settings instead of using it.

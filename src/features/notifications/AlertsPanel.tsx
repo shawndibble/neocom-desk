@@ -51,6 +51,7 @@ import {
   usefulChips,
 } from './dangerAlert';
 import { dismissFeedEntriesAndSync } from './feedSync';
+import { NotificationExplainer } from './NotificationExplainer';
 import { dedupeCharacterName } from './notificationBody';
 import { notificationUrlForSubject } from './notificationOptions';
 import { useNotificationPermission } from './permission';
@@ -160,6 +161,8 @@ export function AlertsPanel({ variant, onClose }: AlertsPanelRenderProps) {
           )}
         </span>
       </div>
+
+      <NotificationExplainer />
 
       {chips.length > 0 && (
         <div

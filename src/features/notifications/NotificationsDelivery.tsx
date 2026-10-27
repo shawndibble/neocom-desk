@@ -79,6 +79,7 @@ export function NotificationsDelivery({
     const { permission: outcome } = await enableWebPush();
     await setPromptState(promptStateAfterAsk(outcome));
     refreshPermission();
+    return outcome;
   }
 
   // Retry is the same call as Enable: permission is already granted, so it
@@ -161,18 +162,24 @@ export function NotificationsDelivery({
           </Link>
         </p>
       )}
-      {permission === 'default' && !installRequired && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-          <p className="min-w-0 flex-1 text-xs text-text-dim">
-            {t('settings.notifications.enableHint')}
-          </p>
-          <Button size="sm" variant="primary" onClick={() => void enableNotifications()}>
-            {t('settings.notifications.enableButton')}
-          </Button>
-        </div>
-      )}
     </>
   );
+
+  // Ticking Device pop-ups is the ask: until the browser has been asked there
+  // is nothing to have switched on, so the box reads unticked.
+  const needsGrant = permission === 'default' && !installRequired;
+  async function toggleBrowserChannel() {
+    if (needsGrant) {
+      // A denial leaves the box unticked; the blocked notice takes over.
+      if ((await enableNotifications()) === 'granted') {
+        await setDeviceNotificationPrefs(withBrowserEnabled(prefsValue, true));
+      }
+      return;
+    }
+    await setDeviceNotificationPrefs(
+      withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
+    );
+  }
 
   const masterOff = !prefsValue.masterEnabled;
   // Channel rows indent under the master switch on a phone; the line has no indent.
@@ -199,13 +206,9 @@ export function NotificationsDelivery({
             <label className={rowClassName}>
               <Checkbox
                 aria-describedby="notifications-browser-channel-hint"
-                checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
+                checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked && !needsGrant}
                 disabled={masterOff || browserBlocked}
-                onChange={() =>
-                  void setDeviceNotificationPrefs(
-                    withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
-                  )
-                }
+                onChange={() => void toggleBrowserChannel()}
               />
               {t('settings.notifications.browserChannelLabel')}
             </label>

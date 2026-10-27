@@ -52,7 +52,7 @@ describe('webPushSupport', () => {
     // Non-installed iOS Safari has no `Notification` global at all — the
     // iOS-not-installed check must win over the unsupported check, or the
     // install-required explainer never renders on the one platform it exists
-    // for (see NotificationPermissionPrompt.tsx's own comment on this).
+    // for (see NotificationExplainer.tsx's own comment on this).
     // @ts-expect-error -- test-only: real non-installed iOS Safari has no Notification global
     globalThis.Notification = undefined;
     setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');

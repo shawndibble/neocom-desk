@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect } from 'react';
-import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
-import { NotificationPermissionPrompt } from './NotificationPermissionPrompt';
+import { NotificationExplainer } from './NotificationExplainer';
 import { ALERTS_OFFER_SEEN_KEY, useAlertsOfferSeen } from './permission';
 import { beginAlertsLogin } from '@/app/loginFlow';
 
@@ -29,33 +27,13 @@ function stubNotification(permission: NotificationPermission, answer: Notificati
   return stub.requestPermission;
 }
 
-const navigateRef: { current: NavigateFunction | null } = { current: null };
-
-function CaptureNavigate() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    navigateRef.current = navigate;
-  }, [navigate]);
-  return null;
-}
-
-/** Renders past the deferral (issue #1788) by navigating to a second route first. */
-function renderPastFirstScreen() {
-  const utils = render(
-    <MemoryRouter initialEntries={['/characters']}>
-      <CaptureNavigate />
-      <NotificationPermissionPrompt />
-    </MemoryRouter>
-  );
-  navigateRef.current?.('/plans');
-  return utils;
+function renderExplainer() {
+  return render(<NotificationExplainer />);
 }
 
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
-  sessionStorage.clear();
-  navigateRef.current = null;
   vi.mocked(beginAlertsLogin).mockClear();
   useAlertsOfferSeen.setState({ value: false, hydrated: false });
   useNotificationPromptState.setState({
@@ -77,31 +55,21 @@ function goOffline(): void {
   });
 }
 
-describe('NotificationPermissionPrompt', () => {
-  // issue #1788: eligibility must wait for a second route, so it never
-  // competes with the very first screen a new player sees.
-  it('stays away on the very first screen, even once fully eligible otherwise', async () => {
+describe('NotificationExplainer', () => {
+  it('shows the explainer with Enable and Not now side by side', async () => {
     stubNotification('default', 'granted');
-    render(
-      <MemoryRouter initialEntries={['/characters']}>
-        <NotificationPermissionPrompt />
-      </MemoryRouter>
-    );
-    await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
-    expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument();
-  });
-
-  it('appears once the player has navigated to a second route', async () => {
-    stubNotification('default', 'granted');
-    renderPastFirstScreen();
+    renderExplainer();
     expect(await screen.findByText(/turn on notifications/i)).toBeInTheDocument();
     expect(screen.getByText(/skill training, mail, industry jobs/i)).toBeInTheDocument();
+    const enable = screen.getByRole('button', { name: /^enable$/i });
+    const notNow = screen.getByRole('button', { name: /not now/i });
+    expect(enable.parentElement).toBe(notNow.parentElement);
   });
 
   it('requests the real browser permission only once Enable is tapped', async () => {
     const requestPermission = stubNotification('default', 'granted');
     const user = userEvent.setup();
-    renderPastFirstScreen();
+    renderExplainer();
 
     await screen.findByText(/turn on notifications/i);
     expect(requestPermission).not.toHaveBeenCalled();
@@ -119,7 +87,7 @@ describe('NotificationPermissionPrompt', () => {
   it('does not guard the plain notification Enable while offline: it never leaves the app', async () => {
     const requestPermission = stubNotification('default', 'granted');
     const user = userEvent.setup();
-    renderPastFirstScreen();
+    renderExplainer();
 
     const enable = await screen.findByRole('button', { name: /^enable$/i });
     goOffline();
@@ -131,7 +99,7 @@ describe('NotificationPermissionPrompt', () => {
   it('persists a denial too, so the explainer never returns', async () => {
     stubNotification('default', 'denied');
     const user = userEvent.setup();
-    renderPastFirstScreen();
+    renderExplainer();
 
     await screen.findByText(/turn on notifications/i);
     await user.click(screen.getByRole('button', { name: /^enable$/i }));
@@ -146,7 +114,7 @@ describe('NotificationPermissionPrompt', () => {
   it('dismissing suppresses it permanently without asking the browser anything', async () => {
     const requestPermission = stubNotification('default', 'granted');
     const user = userEvent.setup();
-    const { unmount } = renderPastFirstScreen();
+    const { unmount } = renderExplainer();
 
     await screen.findByText(/turn on notifications/i);
     await user.click(screen.getByRole('button', { name: /not now/i }));
@@ -160,7 +128,7 @@ describe('NotificationPermissionPrompt', () => {
       value: DEFAULT_NOTIFICATION_PROMPT_STATE,
       hydrated: false,
     });
-    renderPastFirstScreen();
+    renderExplainer();
     await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
     expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument();
   });
@@ -168,20 +136,20 @@ describe('NotificationPermissionPrompt', () => {
   it('stays away before any character has ever logged in', async () => {
     await db.characters.clear();
     stubNotification('default', 'granted');
-    renderPastFirstScreen();
+    renderExplainer();
     await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
     expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument();
   });
 
   it('stays away when the browser has already answered', async () => {
     stubNotification('denied', 'denied');
-    renderPastFirstScreen();
+    renderExplainer();
     await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
     expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument();
   });
 
   it('stays away in a browser with no Notification API', async () => {
-    renderPastFirstScreen();
+    renderExplainer();
     await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
     expect(screen.queryByText(/turn on notifications/i)).not.toBeInTheDocument();
   });
@@ -190,7 +158,7 @@ describe('NotificationPermissionPrompt', () => {
     it('offers Alerts for the signed-in Character right after a grant, without asking SSO inside the permission step', async () => {
       stubNotification('default', 'granted');
       const user = userEvent.setup();
-      renderPastFirstScreen();
+      renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
       expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
@@ -201,7 +169,7 @@ describe('NotificationPermissionPrompt', () => {
     it('Turn on starts the Alerts flow for that Character and records the offer as seen', async () => {
       stubNotification('default', 'granted');
       const user = userEvent.setup();
-      renderPastFirstScreen();
+      renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
       await user.click(await screen.findByRole('button', { name: /^turn on$/i }));
@@ -212,7 +180,7 @@ describe('NotificationPermissionPrompt', () => {
     it('disables Turn on while offline, with the reason on hover, and starts nothing', async () => {
       stubNotification('default', 'granted');
       const user = userEvent.setup();
-      renderPastFirstScreen();
+      renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
       const turnOn = await screen.findByRole('button', { name: /^turn on$/i });
@@ -230,7 +198,7 @@ describe('NotificationPermissionPrompt', () => {
       vi.mocked(beginAlertsLogin).mockRejectedValueOnce(new Error('offline'));
       stubNotification('default', 'granted');
       const user = userEvent.setup();
-      renderPastFirstScreen();
+      renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
       await user.click(await screen.findByRole('button', { name: /^turn on$/i }));
@@ -243,7 +211,7 @@ describe('NotificationPermissionPrompt', () => {
     it('Not now suppresses it for good without starting the flow', async () => {
       stubNotification('default', 'granted');
       const user = userEvent.setup();
-      renderPastFirstScreen();
+      renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
       await screen.findByText(/alerts when neocom is closed/i);
@@ -258,7 +226,7 @@ describe('NotificationPermissionPrompt', () => {
     it('never shows after a denial', async () => {
       stubNotification('default', 'denied');
       const user = userEvent.setup();
-      renderPastFirstScreen();
+      renderExplainer();
 
       await user.click(await screen.findByRole('button', { name: /^enable$/i }));
       await waitFor(() =>
@@ -273,7 +241,7 @@ describe('NotificationPermissionPrompt', () => {
         key: NOTIFICATION_PERMISSION_PROMPT_KEY,
         value: { seen: true, outcome: 'granted' },
       });
-      renderPastFirstScreen();
+      renderExplainer();
       await waitFor(() => expect(useNotificationPromptState.getState().hydrated).toBe(true));
       expect(screen.queryByText(/alerts when neocom is closed/i)).not.toBeInTheDocument();
     });
