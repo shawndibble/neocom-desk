@@ -331,7 +331,7 @@ export function MinerDetail({ id }: { id: string }) {
   const daysSection = (
     title: string,
     key: 'nextStatement' | 'stillAccruing' | 'earlier',
-    hint: ReactNode,
+    meta: ReactNode,
     opts: { select: boolean; status: boolean; startOpen: boolean }
   ) => {
     const columns = dayColumns(opts.select, opts.status, phone);
@@ -343,9 +343,7 @@ export function MinerDetail({ id }: { id: string }) {
         empty={t(`corpTaxBook.moons.miner.empty.${key === 'earlier' ? 'earlier' : key}`)}
         rows={phases[key]}
         sortColumns={columns}
-        meta={
-          typeof hint === 'string' ? <span className="text-xs text-text-dim">{hint}</span> : hint
-        }
+        meta={meta}
         actions={opts.select ? dismissSelected : undefined}
         phone={phone}
         startOpen={opts.startOpen}
@@ -713,13 +711,13 @@ export function MinerDetail({ id }: { id: string }) {
       {daysSection(
         t('corpTaxBook.moons.sections.nextStatement'),
         'nextStatement',
-        t('corpTaxBook.moons.miner.daysHint'),
+        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.daysHint')}</span>,
         { select: true, status: false, startOpen: true }
       )}
       {daysSection(
         t('corpTaxBook.moons.sections.earlierDays'),
         'earlier',
-        t('corpTaxBook.moons.miner.earlierHint'),
+        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.earlierHint')}</span>,
         { select: false, status: true, startOpen: false }
       )}
       <BookSection
