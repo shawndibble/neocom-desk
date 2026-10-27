@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useAccountCharacters } from '@/features/character/useCharacters';
 import { db, type BuildPlanRecord } from '@/db';
+import { mostRecentlyUpdatedPlan } from './newBuildPlan';
 import {
   Button,
   DataTable,
@@ -61,7 +62,12 @@ import {
   unitMargin,
 } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { AUTO_RECALCULATE_MAX, hubForCharacter, type OpportunityRow } from './opportunities';
+import {
+  AUTO_RECALCULATE_MAX,
+  hubForCharacter,
+  type OpportunityPlanSeed,
+  type OpportunityRow,
+} from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { useOpportunityCandidates } from './useOpportunityCandidates';
@@ -109,7 +115,7 @@ interface OpportunitiesPanelProps {
   /** Saves the Corp projects rows' plans and opens Compare with them. */
   onAddProjectsToCompare: (plans: readonly BuildPlanRecord[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
-  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
   /**
    * The oldest blueprint fetch behind these rows, or null — reported up
    * rather than drawn here, so the route can show it beside the page title
@@ -233,6 +239,13 @@ export function OpportunitiesPanel({
     [plansByCharacter]
   );
 
+  // The same latest plan, whose price basis and build location a fresh plan starts
+  // from: rows price with the plan page's settings, not their own defaults.
+  const defaultsForCharacter = useMemo(
+    () => (characterId: number) => mostRecentlyUpdatedPlan(plansByCharacter.get(characterId)),
+    [plansByCharacter]
+  );
+
   // Each owning Character's own standings/skills (issue #2055), not just the
   // active Character's — a candidate seeded by an alt prices at that alt's
   // real broker fee, not the pilot currently viewing the panel.
@@ -254,6 +267,7 @@ export function OpportunitiesPanel({
     catalog,
     pi,
     hubForCharacter: resolveHubForCharacter,
+    defaultsForCharacter,
     facilityDefaults,
     modifiersByCharacter,
     standingsByCharacter,
@@ -370,7 +384,10 @@ export function OpportunitiesPanel({
   });
 
   // A row click is the Start plan button's action, so the product name needs no link of its own.
-  const startPlanFromRow = useRowStartPlan(onStartPlan);
+  const startPlanFromRow = useRowStartPlan(
+    (row: OpportunityRow) => onStartPlan(row.candidate.catalogEntry, row),
+    (row) => row.candidate.catalogEntry
+  );
 
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
     useVisibleOpportunitiesColumns,
@@ -545,10 +562,16 @@ export function OpportunitiesPanel({
               label={t('industry.opportunitiesLossBreakdownFor', {
                 name: row.candidate.catalogEntry.productName,
               })}
-              content={t('industry.opportunitiesLossBreakdown', {
-                cost: formatIsk(row.result.totalCost),
-                revenue: row.result.revenue !== null ? formatIsk(row.result.revenue) : unknown,
-              })}
+              content={t(
+                row.forgoneSale > 0
+                  ? 'industry.opportunitiesLossBreakdownWithStock'
+                  : 'industry.opportunitiesLossBreakdown',
+                {
+                  forgone: formatIsk(row.forgoneSale),
+                  cost: formatIsk(row.result.totalCost),
+                  revenue: row.result.revenue !== null ? formatIsk(row.result.revenue) : unknown,
+                }
+              )}
             />
           )}
         </span>
@@ -563,7 +586,7 @@ export function OpportunitiesPanel({
       width: '16ch',
       render: (row) => (
         <StartPlanButton
-          onStart={() => onStartPlan(row.candidate.catalogEntry)}
+          onStart={() => onStartPlan(row.candidate.catalogEntry, row)}
           planKey={row.candidate.catalogEntry}
         />
       ),
@@ -764,7 +787,7 @@ export function OpportunitiesPanel({
               rowKey={opportunityRowKey}
               virtualize="auto"
               label={t('industry.opportunitiesTableLabel')}
-              onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
+              onRowClick={startPlanFromRow}
               rowContextMenu={rowContextMenu}
               rowMoreActions
               {...sortProps}

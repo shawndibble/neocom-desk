@@ -256,22 +256,20 @@ export type FittingSlotMap = Record<string, FittingSlotAssignment>;
  * One manufacturing blueprint's fully flattened material tree — sub-builds
  * (a material that is itself another manufacturing blueprint's product)
  * resolved recursively at SDE-build time down to base, non-producible
- * materials, at ME 0 (issue #819). This is an approximation, not a
- * `computeBuildPlan`-grade cost: it ignores ME/TE, owned stock, and
- * auto-make-or-buy, trading exact-run precision for a lookup cheap enough to
- * run over the whole SDE at once rather than resolved live per candidate.
- * Picking a row still opens a real Build Plan for exact numbers.
+ * materials, at ME 0 (issue #819).
+ *
+ * The scan no longer prices from it: each candidate is priced as a real Build
+ * Plan (`marketWidePlanPricing.ts`). It names the candidates — product,
+ * blueprint, Market Group, output quantity — and `materials`/`time` are baked
+ * but unread.
  */
 export interface MarketWideTreeEntry {
   blueprintTypeID: number;
   /**
    * Total job time in seconds for one run of the top blueprint, plus every
    * folded-in sub-job's own time, scaled the same fractional way the
-   * material quantities are (issue #1084) — the same basis `materials`
-   * below is costed on, so `computeMarketWideRows`'s ISK/hour divides cost
-   * and time on one consistent plan rather than mixing a whole-tree cost
-   * with a top-job-only duration. Equal to the top blueprint's own time
-   * alone when the tree has no sub-builds.
+   * material quantities are (issue #1084). Equal to the top blueprint's own
+   * time alone when the tree has no sub-builds.
    */
   time: number;
   /** product units per run */

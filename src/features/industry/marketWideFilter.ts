@@ -28,7 +28,7 @@ export interface MarketWideFilterState {
   maxBuildCost: BuildCostCap;
   /** Hides rows no Character on the account has the skills to build. */
   hideSkillGated: boolean;
-  /** Hides products selling fewer than `RARELY_SOLD_PER_DAY` a day across the trade-hub regions. */
+  /** Hides products selling fewer than `RARELY_SOLD_PER_DAY` a day in the scanned hub's region. */
   hideRarelySold: boolean;
   /** The percent of daily sales ISK/day assumes the pilot sells, as `SALES_SHARE_OPTIONS` text. */
   salesShare: string;

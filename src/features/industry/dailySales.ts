@@ -1,37 +1,62 @@
 /**
- * How many of a product sell a day, for the market-wide scan's "rarely sold"
- * filter.
+ * How many of a product sell a day in the scanned hub's region, for the
+ * market-wide scan's "rarely sold" filter and ISK/day. The scan prices at one
+ * hub, so it is that hub's sales that bound what a builder can sell there —
+ * not the five trade hubs added together.
  *
- * ESI's market history is per region, and there are ~65 of them — asking
- * every region for every ranked product is thousands of requests a scan. The
- * five trade-hub regions carry nearly all player trade, so their sum stands
- * in for "across all regions". Each region's history is cached until ESI's
- * daily rollover (`loadPriceHistory`), so only the first check a day costs
- * requests.
+ * The region's units a day for every traded type is one small object the
+ * daily `public-data-lp-store` job publishes (`loadLpStoreVolume`), so a scan
+ * is one fetch rather than one per product. A region whose object can't be
+ * read falls back to ESI's history for that product (`loadPriceHistory`,
+ * cached until ESI's daily rollover).
  */
 import { averageDailyVolume } from '@/engine/industry/marketWideSanity';
-import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
 import { EsiError } from '@/esi/errors';
+import { loadLpStoreVolume, type LpStoreVolume } from '@/features/loyalty/lpStoreVolume';
 import { loadPriceHistory } from '@/features/market/priceHistory';
-import { TRADE_HUBS } from '@/market/hubs';
 
-const HUB_REGION_IDS = [...new Set(TRADE_HUBS.map((hub) => hub.regionId))];
+/** How long one complete read of a region's volume object is reused, across products and rescans. */
+const VOLUME_TTL_MS = 30 * 60_000;
+const volumeCache = new Map<number, { at: number; promise: Promise<LpStoreVolume | null> }>();
 
 /**
- * Units a day over the last 30 days, summed across the trade-hub regions. A
- * region where the type has no market (ESI 400) sold none; any other failure
- * makes the answer unknown (null) — an under-count would hide a product that
- * does sell.
+ * The region's volume object (null where unavailable), shared by a scan's
+ * products. Only a read that loaded is kept: a transient failure must not pin
+ * the region to the per-product ESI fallback for the TTL.
  */
-export async function loadDailySales(typeId: number, nowMs = Date.now()): Promise<number | null> {
-  const histories = await Promise.all(
-    HUB_REGION_IDS.map((regionId) =>
-      loadPriceHistory(regionId, typeId).then(
-        (result): readonly MarketHistoryPoint[] | null => result.points,
-        (error: unknown) => (error instanceof EsiError && error.status === 400 ? [] : null)
-      )
-    )
-  );
-  if (histories.some((history) => history === null)) return null;
-  return averageDailyVolume(histories as MarketHistoryPoint[][], nowMs);
+function loadRegionVolume(regionId: number): Promise<LpStoreVolume | null> {
+  const now = Date.now();
+  const cached = volumeCache.get(regionId);
+  if (cached && now - cached.at <= VOLUME_TTL_MS) return cached.promise;
+  const entry = { at: now, promise: loadLpStoreVolume(regionId) };
+  volumeCache.set(regionId, entry);
+  void entry.promise.then((volume) => {
+    if (volume === null && volumeCache.get(regionId) === entry) volumeCache.delete(regionId);
+  });
+  return entry.promise;
+}
+
+/** Test seam: forget the shared volume reads. */
+export function resetRegionVolumes(): void {
+  volumeCache.clear();
+}
+
+/**
+ * Units a day in `regionId` over about the last 30 days (the region's volume
+ * object, else ESI's last 30 days). A type absent from the object sold none; a
+ * type ESI says has no market (400) sold none; any other failure makes the
+ * answer unknown (null) — an under-count would hide a product that does sell.
+ */
+export async function loadDailySales(
+  regionId: number,
+  typeId: number,
+  nowMs = Date.now()
+): Promise<number | null> {
+  const volume = await loadRegionVolume(regionId);
+  if (volume) return volume[typeId] ?? 0;
+  try {
+    return averageDailyVolume([(await loadPriceHistory(regionId, typeId)).points], nowMs);
+  } catch (error) {
+    return error instanceof EsiError && error.status === 400 ? 0 : null;
+  }
 }

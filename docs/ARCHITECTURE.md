@@ -525,7 +525,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   settlement plan). `useCorpTaxBook` exposes last-synced/stale/gaps and syncs
   on visit; `useMiningLedgerAccess` says when to ask for the mining scope.
   **Scheduled sync** (issue #4068, ADR 0025): `syncCorpTaxBooks`
-  (`onSchedule`, every 6 hours) syncs and settles each opted-in corporation's
+  (`onSchedule`, 00:35/06:35/12:35/18:35 UTC) syncs and settles each opted-in corporation's
   book with the token of one opted-in book editor. The grant is
   `corpTaxBookSyncGrants/{corporationId}`: function-only (rules deny every
   client), one doc per corporation holding the holder's narrow-scope refresh
@@ -598,8 +598,8 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (`features/corp/moons/sectionParts.tsx`): a count in the title, the newest
   ten rows, "Load older" (`usePaged`), a phone fold. No inner tabs. Everything
   they group comes from the client-side `buildBookView` (ADR 0032's read models
-  are not built); the pure grouping (day phases Next Statement / Still
-  accruing / earlier, the Overview's 7-day pops window, ore lines per Miner and
+  are not built); the pure grouping (day phases Today's mining / Next
+  Statement / earlier, the Overview's 7-day pops window, ore lines per Miner and
   moon, the place line, the merged Payments and Activity ledgers) is
   `src/engine/corpTaxBook/bookSections.ts`.
   The Overview tab is `OverviewTab.tsx` (totals chips, `NeedsYouQueue`, the

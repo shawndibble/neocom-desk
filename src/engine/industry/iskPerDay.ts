@@ -19,7 +19,7 @@ export interface IskPerDayInput {
   outputQuantity: number;
   /** One job's duration; the same basis as ISK/hour. */
   jobSeconds: number;
-  /** Units traded a day across the trade-hub regions; null/undefined when unread. */
+  /** Units traded a day in the scanned hub's region; null/undefined when unread. */
   averageDailyVolume: number | null | undefined;
   /** The share of that volume the pilot is assumed to sell, in percent. */
   sharePct: number;

@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
-import type { ActivityFacilityDefaults } from './facilityDefaults';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { OpportunityCandidate, OpportunityRow } from './opportunities';
 import type { UseOpportunitiesArgs } from './useOpportunities';
 
@@ -30,7 +30,7 @@ const { useOpportunities } = await import('./useOpportunities');
 const HUB = { id: 'jita' } as unknown as TradeHub;
 const hubForCharacter = () => HUB;
 const CATALOG = {} as BlueprintCatalog;
-const FACILITY_DEFAULTS = {} as ActivityFacilityDefaults;
+const FACILITY_DEFAULTS = DEFAULT_ACTIVITY_FACILITY_DEFAULTS;
 const STOCK = { sources: [] } as unknown as UseOpportunitiesArgs['ownedStockSnapshot'];
 
 function candidate(itemId: number): OpportunityCandidate {
@@ -43,6 +43,7 @@ function argsWith(overrides: Partial<UseOpportunitiesArgs> = {}): UseOpportuniti
     catalog: CATALOG,
     pi: null,
     hubForCharacter,
+    defaultsForCharacter: () => null,
     facilityDefaults: FACILITY_DEFAULTS,
     modifiersByCharacter: new Map(),
     standingsByCharacter: new Map(),
@@ -105,5 +106,41 @@ describe('useOpportunities recompute (issue #4918)', () => {
 
     expect(result.current.loading).toBe(true);
     expect(result.current.rows).toEqual([]);
+  });
+
+  it('does not reprice when the latest-plan lookup is rebuilt but nothing a row reads changed', async () => {
+    // The same inputs throughout but the lookup: each `argsWith` builds fresh Maps.
+    const args = argsWith();
+    const { result, rerender } = renderHook(
+      (props: UseOpportunitiesArgs) => useOpportunities(props),
+      { initialProps: args }
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const requests = loadMarketSnapshots.mock.calls.length;
+
+    // Any plan write rebuilds the lookup; a rename moves no price.
+    rerender({ ...args, defaultsForCharacter: () => null });
+    await act(async () => {});
+    expect(loadMarketSnapshots).toHaveBeenCalledTimes(requests);
+  });
+
+  it('reprices when a row-relevant setting of the latest plan changes', async () => {
+    const plan = (materialPriceBasis: 'sell' | 'buy') =>
+      ({
+        hubId: 'jita',
+        materialPriceBasis,
+        facility: 'npcStation',
+        security: 'highsec',
+      }) as unknown as ReturnType<UseOpportunitiesArgs['defaultsForCharacter']>;
+    const args = argsWith({ defaultsForCharacter: () => plan('sell') });
+    const { result, rerender } = renderHook(
+      (props: UseOpportunitiesArgs) => useOpportunities(props),
+      { initialProps: args }
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const requests = loadMarketSnapshots.mock.calls.length;
+
+    rerender({ ...args, defaultsForCharacter: () => plan('buy') });
+    await waitFor(() => expect(loadMarketSnapshots.mock.calls.length).toBeGreaterThan(requests));
   });
 });

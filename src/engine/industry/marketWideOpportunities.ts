@@ -5,62 +5,22 @@
  * `classifyOrderDepth` already do the sort and depth read for the
  * ownership-based Build Opportunities panel; this module supplies the two
  * pieces that panel doesn't need: bounding a full-SDE candidate set down to
- * something worth pricing at all (`selectLiquidCandidates`), and costing a
- * candidate from its precomputed flattened material tree instead of a live
- * `computeBuildPlan` run (`computeMarketWideRows`).
+ * something worth pricing at all (`selectLiquidCandidates`), and shaping the
+ * priced candidates into ranked rows (`rankMarketWideRows`).
  *
- * `computeMarketWideRows` nets sales tax, broker fee and the job installation
- * fee through the same `fees.ts`/`jobCost.ts` primitives the owned-blueprint
- * panel's `buildVsBuy` uses. There is no owned facility here — this scan is
- * ownership-agnostic by construction — so the job fee always assumes an NPC
- * station: no job-cost bonus, the fixed 0.25% NPC tax. `MarketWideFeeInputs`
- * is the caller's own concern (this module stays pure); the feature layer
- * reads it off the hub's own system, the same "no build system of its own"
- * fallback `loadMarketSnapshot` already uses for a caller with no plan.
+ * The pricing itself is not here. A candidate is priced by the same
+ * `resolveBuildPlan` a Build Plan opened from its row runs
+ * (`features/industry/marketWidePlanPricing.ts`), so a row's profit, margin
+ * and ISK/hour cannot differ from the plan's — blueprint price, job fee,
+ * sales tax and broker fee included.
  *
  * Pure: no fetch/DOM/Dexie. The caller supplies prices already fetched.
  */
-import type { MarketWideTreeEntry } from '@/sde/types';
-import type { ResolvedStandings } from '@/engine/market/standings';
-import { brokerFee, salesTax } from './fees';
-import { jobFee } from './jobCost';
-import { materialModifier } from './materials';
 import {
   rankOpportunities,
   type OrderDepthThresholds,
   type RankedOpportunity,
 } from './opportunities';
-import { jobDurationSeconds } from './time';
-import {
-  EMPTY_RIG_FIT,
-  FACILITY_PRESETS,
-  SKILL_IDS,
-  type AdjustedPrices,
-  type BlueprintSkillRequirement,
-} from './types';
-import type { CharacterModifiers } from './characterModifiers';
-
-/**
- * NPC station, no rig, no security-band dependence — matches the ownership-
- * agnostic assumption `jobFee`'s `FACILITY_PRESETS.npcStation` call already
- * makes here. `security` only feeds a structure's rig TE bonus
- * (`rigBonusPct`), and an NPC station never has one (`structure: false`), so
- * the band picked is inert; `highsec` is chosen for readability only.
- */
-const NPC_STATION_CONTEXT = {
-  facility: FACILITY_PRESETS.npcStation,
-  rigFit: EMPTY_RIG_FIT,
-  security: 'highsec' as const,
-};
-
-/** The pricing context `computeMarketWideRows` needs beyond hub prices — one object, not three loose same-shaped `Record<number, number>` positionals. */
-export interface MarketWideFeeInputs {
-  adjustedPrices: AdjustedPrices;
-  systemCostIndex: number;
-  modifiers: CharacterModifiers;
-  /** The character's standing toward the sale hub's NPC owner. Absent/0 = standings assumed 0. */
-  standing?: ResolvedStandings;
-}
 
 /** One product's liquidity signal — the cheap, product-only price fetch that runs before any material pricing. */
 export interface LiquidityCandidate {
@@ -114,37 +74,32 @@ export function selectLiquidCandidates(
   return selected;
 }
 
-/** One liquidity-selected candidate, paired with its precomputed material tree and product price. */
-export interface MarketWideCandidate {
+/** One liquidity-selected candidate, priced by the Build Plan engine at the ME/TE a plan opened from its row starts at. */
+export interface PricedMarketWideCandidate {
   productTypeID: number;
-  tree: MarketWideTreeEntry;
-  sellPrice: number;
+  /** Net profit of one run, blueprint price and fees included. */
+  profit: number;
+  /** profit ÷ revenue × 100; null when revenue is 0 (unknown, never 0%). */
+  marginPct: number | null;
+  /** The plan's job duration — what `iskPerHour` divides by, not a wall-clock promise. */
+  seconds: number;
+  iskPerHour: number;
+  /** The plan's total cost: materials, blueprint and job fee. */
+  buildCost: number;
+  /** Units one run yields. */
+  outputQuantity: number;
   /** ISK value of sell orders for the product at the hub, from the same liquidity pass — reused for `orderDepth`, never re-fetched. */
   sellDepthIsk: number;
-  /**
-   * The top blueprint's own required-skills list (issue #1230), for the
-   * per-blueprint science/engineering time bonus (issue #1228) — looked up
-   * by the caller from the blueprint catalog via `tree.blueprintTypeID`,
-   * since the precomputed tree itself carries no skills. Applied to the
-   * whole flattened `tree.time`, the same "one lookup over the whole tree"
-   * approximation `jobFee`'s single EIV call above already makes for a
-   * multi-tier product's sub-jobs.
-   */
-  blueprintSkills?: readonly BlueprintSkillRequirement[];
-  /**
-   * The ME/TE this candidate is priced at (issue #5232): the one a plan opened
-   * from its row starts at — the owned copy's, else the assumed value. Absent
-   * reads as 0.
-   */
-  me?: number;
-  te?: number;
+  /** The ME/TE the row is priced at, seeded into the plan a click opens. */
+  me: number;
+  te: number;
 }
 
 export interface MarketWideRow extends RankedOpportunity {
   productTypeID: number;
   /** profit ÷ revenue × 100, on the same net profit `iskPerHour` uses; null when revenue is 0 (unknown, never 0%). */
   marginPct: number | null;
-  /** The whole flattened tree's skill- and TE-adjusted job time — the duration `iskPerHour` divides by, not a wall-clock promise. */
+  /** The plan's job duration — the duration `iskPerHour` divides by, not a wall-clock promise. */
   seconds: number;
   /** Net profit per unit sold (profit ÷ `outputQuantity`) — ISK/day's per-unit margin. */
   unitMargin: number;
@@ -155,104 +110,18 @@ export interface MarketWideRow extends RankedOpportunity {
   te: number;
 }
 
-/**
- * Prices every candidate from its flattened tree, at its own ME/TE, against a
- * materials price map — no `computeBuildPlan` call, per the ticket's
- * "precomputed, not resolved live" requirement. A candidate with any
- * unpriced material is excluded rather than shown at a guessed cost, the
- * same "never guessed" rule `classifyOrderDepth` follows for sell depth.
- *
- * `iskPerHour`/`buildCost` are on the same basis `buildVsBuy` uses: cost is
- * materials + the job fee, revenue nets sales tax and broker fee. One
- * `jobFee` call over the whole (already base-mineral-flattened) tree slightly
- * undercounts a multi-tier product against a real per-job build — a
- * flattened-tree limitation, not something fixable without resolving the
- * tree live.
- */
-export function computeMarketWideRows(
-  candidates: readonly MarketWideCandidate[],
-  materialPrices: ReadonlyMap<number, number>,
-  feeInputs: MarketWideFeeInputs,
+/** Ranks priced candidates by ISK/hour and classifies each one's sell-order depth. */
+export function rankMarketWideRows(
+  candidates: readonly PricedMarketWideCandidate[],
   thresholds?: OrderDepthThresholds
 ): MarketWideRow[] {
-  const { adjustedPrices, systemCostIndex, modifiers, standing } = feeInputs;
-  const { skills } = modifiers;
-  const priced: {
-    id: string;
-    productTypeID: number;
-    iskPerHour: number;
-    marginPct: number | null;
-    seconds: number;
-    unitMargin: number;
-    outputQuantity: number;
-    buildCost: number;
-    sellDepthIsk: number;
-    me: number;
-    te: number;
-  }[] = [];
-  for (const candidate of candidates) {
-    const { tree } = candidate;
-    const me = candidate.me ?? 0;
-    const te = candidate.te ?? 0;
-    // Fractional like the tree's own quantities: no per-job rounding on a flattened tree.
-    const materialModifierAtMe = materialModifier(me, NPC_STATION_CONTEXT);
-    let materialCost = 0;
-    let eiv = 0;
-    let allPriced = true;
-    for (const material of tree.materials) {
-      const price = materialPrices.get(material.typeID);
-      if (price === undefined) {
-        allPriced = false;
-        break;
-      }
-      materialCost += price * material.quantity * materialModifierAtMe;
-      // The estimated item value is ME-independent, so it stays on base quantities.
-      eiv += material.quantity * (adjustedPrices[material.typeID] ?? 0);
-    }
-    if (!allPriced || tree.time <= 0) continue;
-
-    const fee = jobFee(eiv, systemCostIndex, FACILITY_PRESETS.npcStation);
-    const buildCost = materialCost + fee.total;
-
-    const revenue = candidate.sellPrice * tree.outputQuantity;
-    const tax = salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
-    const broker = brokerFee(
-      revenue,
-      skills[SKILL_IDS.brokerRelations] ?? 0,
-      standing?.factionStanding,
-      standing?.corpStanding
-    );
-    const profit = revenue - tax - broker - buildCost;
-    // 1 run: tree.time is already the per-candidate total (not per-run). The TE
-    // is the top blueprint's, applied to the whole tree like `blueprintSkills`
-    // (docs/context/decisions/20260909-090113-assumed-te-seeds-a-plan-not-its-sub.md).
-    const seconds = jobDurationSeconds(
-      tree.time,
-      1,
-      te,
-      modifiers,
-      NPC_STATION_CONTEXT,
-      candidate.blueprintSkills
-    );
-    const iskPerHour = (profit / seconds) * 3600;
-    priced.push({
-      id: String(candidate.productTypeID),
-      productTypeID: candidate.productTypeID,
-      iskPerHour,
-      marginPct: revenue > 0 ? (profit / revenue) * 100 : null,
-      seconds,
-      unitMargin: tree.outputQuantity > 0 ? profit / tree.outputQuantity : 0,
-      outputQuantity: tree.outputQuantity,
-      buildCost,
-      sellDepthIsk: candidate.sellDepthIsk,
-      me,
-      te,
-    });
-  }
-
-  const ranked = rankOpportunities(priced, thresholds);
+  const priced = candidates.map(({ profit, ...candidate }) => ({
+    ...candidate,
+    id: String(candidate.productTypeID),
+    unitMargin: candidate.outputQuantity > 0 ? profit / candidate.outputQuantity : 0,
+  }));
   const byId = new Map(priced.map((p) => [p.id, p]));
-  return ranked.map((r) => {
+  return rankOpportunities(priced, thresholds).map((r) => {
     const { productTypeID, marginPct, seconds, unitMargin, outputQuantity, me, te } = byId.get(
       r.id
     )!;

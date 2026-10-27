@@ -41,13 +41,24 @@ describe('Miner page', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     for (const title of [
       /^Next Statement · 4/,
-      /^Still accruing · 1/,
+      /^Today's mining · 1/,
       /^Earlier days · 4/,
       /^Payments · 1/,
       /^Moons · 2/,
       /^Activity · 0/,
     ])
       expect(screen.getByText(title)).toBeInTheDocument();
+  });
+
+  it("lists Today's mining above Next Statement, then Earlier days", () => {
+    renderBook(<MinerDetail id={VARRO_ID} />);
+    const order = [/^Today's mining · /, /^Next Statement · /, /^Earlier days · /].map((re) =>
+      screen.getByText(re)
+    );
+    for (let i = 1; i < order.length; i++)
+      expect(
+        order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
   });
 
   it("opens the Statement panel from a payment's Credited to link and from an Earlier day", async () => {

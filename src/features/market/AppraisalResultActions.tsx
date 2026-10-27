@@ -2,17 +2,20 @@
 import { useTranslation } from 'react-i18next';
 import { ColumnPickerMenu, IconButton, MenuItem } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { ExternalMark } from '@/components/ui/ExternalLink';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { MAX_SNAPSHOT_ITEMS } from '@/engine/market/appraisalSnapshot';
 import type { AppraisalController } from './useAppraisal';
 import { useAppraisalColumns } from './useAppraisalColumns';
 import { useAppraisalCopyLists, COPY_LISTS } from './useAppraisalCopyLists';
+import { useAppraisalJanice } from './useAppraisalJanice';
 import { useAppraisalShare } from './useAppraisalShare';
 
 type Columns = ReturnType<typeof useAppraisalColumns>;
 type Share = ReturnType<typeof useAppraisalShare>;
 type CopyLists = ReturnType<typeof useAppraisalCopyLists>;
+type Janice = ReturnType<typeof useAppraisalJanice>;
 
 interface AppraisalResultActionsProps {
   compare: AppraisalController['compare'];
@@ -24,6 +27,7 @@ interface AppraisalResultActionsProps {
   >;
   share: Pick<Share, 'share' | 'handleShare' | 'shareItemCount'>;
   copy: Pick<CopyLists, 'copied' | 'copyLists' | 'handleCopy'>;
+  janice: Pick<Janice, 'janice' | 'handleOpenInJanice'> & { canOpen: boolean };
   characterId: number | null;
   rowCount: number;
 }
@@ -35,6 +39,7 @@ export function AppraisalResultActions({
   columns: { availableColumns, visibleColumns, optionalColumnsById, toggleColumn, tableExport },
   share: { share, handleShare, shareItemCount },
   copy: { copied, copyLists, handleCopy },
+  janice: { janice, handleOpenInJanice, canOpen },
   characterId,
   rowCount,
 }: AppraisalResultActionsProps) {
@@ -105,6 +110,13 @@ export function AppraisalResultActions({
             )}
           </MenuItem>
         ))}
+        <MenuItem
+          disabled={!canOpen || janice.status === 'fetching'}
+          onSelect={() => void handleOpenInJanice()}
+        >
+          {t('market.appraisal.openInJanice')}
+          <ExternalMark />
+        </MenuItem>
       </TableActionsMenu>
     </>
   );

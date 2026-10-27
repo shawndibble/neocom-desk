@@ -36,6 +36,7 @@ import { industryActivityOf } from '@/engine/industry/types';
 import { toIndustryBlueprint } from '@/features/industry/blueprintCatalog';
 import {
   planForOpportunityCandidate,
+  type OpportunityPlanSeed,
   type OpportunityRow,
 } from '@/features/industry/opportunities';
 import {
@@ -78,7 +79,7 @@ import type {
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
 
@@ -673,7 +674,8 @@ export function Industry() {
           row.materialSourcing,
           row.buildHere,
           activeCharacterId,
-          row.hub
+          row.hub,
+          row.defaultsFrom
         )
       )
     );
@@ -719,6 +721,41 @@ export function Industry() {
     return false;
   }
 
+  /**
+   * A click on a Ranked builds or Owned blueprints row: the plan is the one
+   * "Add to Compare" would make from it — the same blueprint, owned-materials
+   * claim and hub the row's ISK/hour was priced with — so the plan opens at
+   * the row's figures instead of an unclaimed-materials cost. A row with no
+   * pricing behind it (a corp blueprint, a row not yet ranked) opens as any
+   * other plan.
+   */
+  async function handleStartPlanFromRow(
+    entry: BlueprintCatalogEntry,
+    seed?: OpportunityPlanSeed
+  ): Promise<boolean> {
+    if (!seed || activeCharacterId === null) return handleStartPlan(entry);
+    if (startingPlanRef.current) return false;
+    startingPlanRef.current = true;
+    try {
+      const plan = planForOpportunityCandidate(
+        seed.candidate,
+        await loadActivityFacilityDefaults(),
+        seed.materialSourcing,
+        seed.buildHere,
+        activeCharacterId,
+        seed.hub,
+        seed.defaultsFrom
+      );
+      await createBuildPlans([plan]);
+      navigate(`/industry/plans/${plan.id}`);
+      return true;
+    } catch {
+      // Nothing opened; the button comes back for another try.
+    }
+    startingPlanRef.current = false;
+    return false;
+  }
+
   function exitCompare() {
     setCompareMode(false);
     setCompareSelectedIds(new Set());
@@ -731,10 +768,17 @@ export function Industry() {
     navigate(`/industry/plans/${buildPlanId}`);
   }
 
-  const marketWidePanel = catalog && (
+  // The Trade Hub a new plan starts at (the latest plan's), not a fixed default: rows price
+  // with the settings the plan page uses, and a click opens a plan with those same settings.
+  const latestPlan = mostRecentlyUpdatedPlan(plans);
+  const marketWideHub = (latestPlan && getTradeHub(latestPlan.hubId)) ?? DEFAULT_TRADE_HUB;
+  // Not mounted until the plans have loaded: the hub it prices at is the latest plan's,
+  // and a scan restored at Jita would flip when that lands.
+  const marketWidePanel = catalog && plans !== undefined && (
     <MarketWideOpportunitiesPanel
       key="market-wide"
-      hub={DEFAULT_TRADE_HUB}
+      hub={marketWideHub}
+      latestPlan={latestPlan}
       trees={marketWideTrees}
       treesFailed={marketWideTreesFailed}
       onRetryTrees={retryMarketWideTrees}
@@ -768,7 +812,7 @@ export function Industry() {
       pricingInputs={pricingInputs}
       onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
       onAddProjectsToCompare={(plans) => void handleAddProjectsToCompare(plans)}
-      onStartPlan={handleStartPlan}
+      onStartPlan={handleStartPlanFromRow}
       onDataAgeChange={setOpportunitiesDataAge}
     />
   );

@@ -63,7 +63,7 @@ describe('readBookSettings', () => {
 
   it('defaults to the book defaults when a field is absent', () => {
     expect(readBookSettings(1, { active: true, startDate: '2026-10-01' })).toMatchObject({
-      graceHours: 6,
+      graceHours: 0.5,
       hubId: 'jita',
       oreForm: 'compressed',
       divisions: [1],

@@ -1,6 +1,6 @@
 // A scheduled run that skips reading the whole book (issue #5048). The first
 // thing a scheduled sync did was read every Miner, Statement, payment, dismissal
-// and write-off: O(book) reads every 6 hours, also when nothing had changed.
+// and write-off: O(book) reads every scheduled run (4 a day), also when nothing had changed.
 //
 // What it reads them for: matching new donations, re-matching Unmatched ones, and
 // planning which Statements are settled. A run that found none of that to do

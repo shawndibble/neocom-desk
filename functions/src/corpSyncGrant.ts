@@ -502,7 +502,17 @@ export async function runScheduledCorpSyncs(
   return summary;
 }
 
-/** A synced book rests this long; under the 6-hourly schedule, so a late run never skips a slot. */
+/**
+ * syncCorpTaxBooks runs at fixed UTC clock times. The 00:35 tick lands 5 minutes after the default 30-minute
+ * grace closes yesterday (00:30), a margin so an early scheduler fire cannot miss it
+ * (`lastReadWellAt >= dayClosesAt`). Changing a schedule is not a new export.
+ */
+export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
+  schedule: '35 0,6,12,18 * * *',
+  timeZone: 'UTC',
+} as const;
+
+/** A synced book rests this long; under the 6-hour tick spacing, so a late run never skips a slot. */
 export const SYNC_REST_MS = 5 * 3_600_000;
 
 /** One doc: when the last `nextSyncAt` backfill scan ran. */

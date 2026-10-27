@@ -23,6 +23,9 @@ const inputs: MarketWideScanInputs = {
   ],
   modifiers: NO_CHARACTER_MODIFIERS,
   standing: undefined,
+  facilityDefaults: { facility: 'npcStation' },
+  lpValue: 0,
+  planSettings: null,
 };
 
 describe('marketWideScanKey', () => {
@@ -48,6 +51,9 @@ describe('marketWideScanKey', () => {
     ['owned research', { research: [{ blueprintTypeID: 10, me: 9, te: 20 }] }],
     ['modifiers', { modifiers: { ...NO_CHARACTER_MODIFIERS, manufacturingTimeImplantPct: 4 } }],
     ['standing', { standing: { factionStanding: 5, corpStanding: 0 } }],
+    ['remembered build location', { facilityDefaults: { facility: 'raitaru' } }],
+    ['LP Value', { lpValue: 1500 }],
+    ['latest plan price basis', { planSettings: { materialPriceBasis: 'buy' } }],
   ] as [string, Partial<MarketWideScanInputs>][])('changes when the %s changes', (_name, patch) => {
     expect(marketWideScanKey({ ...inputs, ...patch })).not.toBe(marketWideScanKey(inputs));
   });

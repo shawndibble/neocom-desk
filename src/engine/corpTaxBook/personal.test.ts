@@ -168,7 +168,7 @@ describe('overlayCorpBooks', () => {
   });
 
   it('is pending until an officer syncs after the grace period', () => {
-    const out = overlay([entry()], [book({ lastSyncedAt: '2026-10-18T01:00:00Z' })]);
+    const out = overlay([entry()], [book({ lastSyncedAt: '2026-10-18T00:10:00Z' })]);
     expect(out.rows).toEqual([]);
     expect(out.labels.get(`${ME}:2026-10-17:${SYSTEM}`)?.state).toBe('pending');
   });
@@ -253,8 +253,8 @@ describe('overlayCorpBooks', () => {
     const out = overlay([assigned], [book()]);
     expect(out.rows).toHaveLength(1);
     expect(out.rows[0]).toMatchObject({ state: 'conflict', taxOwed: null });
-    // Closed at 18 Oct 00:00 + 6h grace on the 17th → 14 days after 2026-10-18T06:00.
-    expect(out.rows[0].resolvesAt).toBe('2026-11-01T06:00:00.000Z');
+    // Closed at 18 Oct 00:00 + 30 min grace on the 17th → 14 days after 2026-10-18T00:30.
+    expect(out.rows[0].resolvesAt).toBe('2026-11-01T00:30:00.000Z');
   });
 
   it('resolves a conflict to the corp after 14 days', () => {

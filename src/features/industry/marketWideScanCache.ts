@@ -29,6 +29,12 @@ export interface MarketWideScanInputs {
   research: readonly { blueprintTypeID: number; me: number; te: number }[];
   modifiers: CharacterModifiers;
   standing: ResolvedStandings | undefined;
+  /** Where a new plan builds, which sets the job fee a row is priced with. */
+  facilityDefaults: unknown;
+  /** The pilot's LP Value, which prices an LP Store blueprint redemption. */
+  lpValue: number;
+  /** The latest plan's price basis and build location (`planSettings`), which a plan starts from. */
+  planSettings: unknown;
 }
 
 export function marketWideScanKey(inputs: MarketWideScanInputs): string {
@@ -43,6 +49,9 @@ export function marketWideScanKey(inputs: MarketWideScanInputs): string {
     inputs.research.map(({ blueprintTypeID, me, te }) => `${blueprintTypeID}:${me}:${te}`).sort(),
     inputs.modifiers,
     inputs.standing ?? null,
+    inputs.facilityDefaults,
+    inputs.lpValue,
+    inputs.planSettings,
   ]);
 }
 

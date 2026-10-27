@@ -39,6 +39,11 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
     <div className="sticky left-0 w-[calc(100cqw-1.5rem)] max-w-full space-y-3 p-3">
       <div className="grid gap-4 @2xl:grid-cols-3">
         <MiniList title={`${t('corpTaxBook.moons.sections.nextStatement')} · ${next.length}`}>
+          {miner.pending > 0 && (
+            <li className="text-text-dim tabular-nums">
+              {t('corpTaxBook.moons.miners.accruing', { amount: isk(miner.pending) })}
+            </li>
+          )}
           {next.slice(0, SHOWN).map((d) => (
             <li key={d.key} className={LIST_ROW}>
               <span className="min-w-0 truncate">
@@ -56,11 +61,6 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
           {adjust !== 0 && (
             <li className="text-text-dim tabular-nums">
               {t('corpTaxBook.moons.miners.statementAdjust', { amount: isk(adjust) })}
-            </li>
-          )}
-          {miner.pending > 0 && (
-            <li className="text-text-dim tabular-nums">
-              {t('corpTaxBook.moons.miners.accruing', { amount: isk(miner.pending) })}
             </li>
           )}
         </MiniList>
