@@ -14,6 +14,7 @@ import { minerDetail, type BookView, type MinerRow } from '@/engine/corpTaxBook/
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
+import { useTabsProjection } from './useTabsProjection';
 import { isk, shortDate } from './moonsFormat';
 import { OverdueWord, StandingWord } from './moonsParts';
 import { MinerExpandedRow } from './MinerExpandedRow';
@@ -33,6 +34,7 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 export function MinersTab() {
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
+  const { miners, totals, donationsBeforeBook } = useTabsProjection();
   const [dialog, setDialog] = useState<
     | { kind: 'record' | 'dismiss'; miner: MinerRow }
     | { kind: 'notTax'; miner: MinerRow; paymentId: string }
@@ -59,14 +61,14 @@ export function MinersTab() {
 
   const counts = useMemo(
     () => ({
-      members: view.miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
-      guests: view.miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
+      members: miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
+      guests: miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
     }),
-    [view.miners]
+    [miners]
   );
   const rows = useMemo(() => {
     const q = params.q.trim().toLowerCase();
-    return view.miners.filter((m) => {
+    return miners.filter((m) => {
       const inGroup = m.standing === 'guest' ? params.guests : params.members;
       if (!inGroup || !isActive(m)) return false;
       if (!q) return true;
@@ -75,13 +77,13 @@ export function MinersTab() {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
-  }, [view.miners, params, names]);
+  }, [miners, params, names]);
   // What the Non-members chip being off keeps out of the table.
   const hiddenGuests = params.guests
     ? []
-    : view.miners.filter((m) => m.standing === 'guest' && isActive(m));
+    : miners.filter((m) => m.standing === 'guest' && isActive(m));
   const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
-  const hidden = view.miners.length - view.miners.filter(isActive).length;
+  const hidden = miners.length - miners.filter(isActive).length;
 
   const columns: DataTableColumn<MinerRow>[] = [
     {
@@ -149,25 +151,21 @@ export function MinersTab() {
   return (
     <div className="space-y-4">
       <StatChips>
-        <StatChip
-          label={t('corpTaxBook.moons.chips.owed')}
-          value={isk(view.totals.owed)}
-          emphasis
-        />
+        <StatChip label={t('corpTaxBook.moons.chips.owed')} value={isk(totals.owed)} emphasis />
         <StatChip
           label={t('corpTaxBook.moons.chips.overdue')}
           value={t('corpTaxBook.moons.chips.overdueValue', {
-            amount: isk(view.totals.overdue),
-            count: view.totals.overdueCount,
+            amount: isk(totals.overdue),
+            count: totals.overdueCount,
           })}
-          {...(view.totals.overdue > 0 ? { tone: 'danger' as const } : {})}
+          {...(totals.overdue > 0 ? { tone: 'danger' as const } : {})}
         />
-        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(view.totals.unbilled)} />
-        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(view.totals.credit)} />
+        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
+        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(totals.credit)} />
       </StatChips>
-      {view.donationsBeforeBook > 0 && (
+      {donationsBeforeBook > 0 && (
         <p className="text-xs text-text-dim">
-          {t('corpTaxBook.moons.beforeBook.donations', { count: view.donationsBeforeBook })}
+          {t('corpTaxBook.moons.beforeBook.donations', { count: donationsBeforeBook })}
         </p>
       )}
       <Panel padded={false}>
@@ -210,7 +208,7 @@ export function MinersTab() {
             mobileSort
             stackSummary={t('corpTaxBook.moons.miners.summary', {
               shown: rows.length,
-              total: view.miners.length,
+              total: miners.length,
             })}
           />
         </div>

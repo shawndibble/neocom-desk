@@ -25,6 +25,12 @@ export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner' | 'statementPe
 export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPartSet {
   const route = detail ?? tab;
   switch (route) {
+    // Owed and Needs you derive from payments, declarations and dismissals, so the ledger
+    // is needed with the read-models switch off. With it on the docs stand in for payments
+    // and declarations, but the open set (unbilled days) still reads dismissals and
+    // corrections until #5260 drops the rows.
+    case 'overview':
+      return new Set<BookPart>(['core', 'ledger']);
     case 'miner':
     case 'miners':
       return new Set<BookPart>(['core', 'ledger', 'answers']);

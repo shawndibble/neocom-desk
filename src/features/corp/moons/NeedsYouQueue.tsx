@@ -6,6 +6,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import { cx } from '@/lib/cx';
 import { useBook } from './useBook';
+import { useTabsProjection } from './useTabsProjection';
 import {
   AssignDonationDialog,
   MarkNotTaxDialog,
@@ -72,11 +73,12 @@ export function NeedsYouQueue() {
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId } = ctx;
+  const { miners, needsYou } = useTabsProjection();
   const corporationName = useCorporationName();
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const close = () => setOpen(null);
-  const minerOf = (id: string) => view.miners.find((m) => m.id === id)!;
+  const minerOf = (id: string) => miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
 
   const statementPeriod = (id: string) => {
@@ -107,20 +109,17 @@ export function NeedsYouQueue() {
   };
 
   return (
-    <Panel
-      title={t('corpTaxBook.moons.needs.title', { count: view.needsYou.length })}
-      padded={false}
-    >
+    <Panel title={t('corpTaxBook.moons.needs.title', { count: needsYou.length })} padded={false}>
       {notice && (
         <p role="status" className="px-3 py-2 text-xs text-text-dim">
           {notice}
         </p>
       )}
-      {view.needsYou.length === 0 && (
+      {needsYou.length === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
       )}
       <ul className="divide-y divide-line">
-        {view.needsYou.map((item) => {
+        {needsYou.map((item) => {
           switch (item.kind) {
             case 'declaration': {
               const miner = minerOf(item.minerId);
@@ -209,8 +208,7 @@ export function NeedsYouQueue() {
                     <MinerTitle
                       // From the book as it is now: a sender who has since joined a Miner has a page.
                       minerId={
-                        view.miners.find((m) => m.characterIds.includes(item.payment.characterId))
-                          ?.id
+                        miners.find((m) => m.characterIds.includes(item.payment.characterId))?.id
                       }
                     >
                       {t('corpTaxBook.moons.needs.unmatched.title', {
@@ -221,7 +219,7 @@ export function NeedsYouQueue() {
                   }
                   body={t(
                     // From the book as it is now: a sender who has since joined a Miner is not a stranger.
-                    view.miners.some((m) => m.characterIds.includes(item.payment.characterId))
+                    miners.some((m) => m.characterIds.includes(item.payment.characterId))
                       ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
                       : 'corpTaxBook.moons.needs.unmatched.body',
                     {

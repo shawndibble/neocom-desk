@@ -51,3 +51,9 @@ describe('mergeBookParts', () => {
     expect(new Set(mergeBookParts(undefined, new Set(['core'])))).toEqual(new Set(ALL_BOOK_PARTS));
   });
 });
+
+describe('bookPartsFor the Overview (#5259)', () => {
+  it('reads core and ledger: owed and Needs you derive from payments and declarations', () => {
+    expect([...bookPartsFor('overview', null)].sort()).toEqual(['core', 'ledger']);
+  });
+});
