@@ -16095,7 +16095,7 @@
         "reversed": "reversed",
         "reverse": "Reverse",
         "activity": "Activity",
-        "activityHint": "Audit log for this Miner, newest first",
+        "activityHint": "Mail, dismissals and the audit log for this Miner, newest first",
         "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is still accruing.",
         "writtenOff": "Written off",
         "writtenOffValue_one": "{{tolerance}} · {{count}} line",

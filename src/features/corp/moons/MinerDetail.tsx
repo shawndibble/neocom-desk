@@ -150,7 +150,7 @@ export function MinerDetail({ id }: { id: string }) {
       const label = periodLabel(st.periodStart, st.periodEnd);
       return e.action === 'issueStatement' ? `${label} · ${isk(st.amount)}` : label;
     }
-    return typeof amount === 'number' ? isk(amount) : null;
+    return typeof amount === 'number' ? (amount < 0 ? signedIsk(amount) : isk(amount)) : null;
   };
   const shownFeed = feed.filter((f) => filter === 'all' || f.chip === filter);
 
@@ -814,6 +814,8 @@ export function MinerDetail({ id }: { id: string }) {
                   selected={filter === f}
                   onToggle={() => setFilter(f)}
                   count={f === 'all' ? feed.length : feed.filter((x) => x.chip === f).length}
+                  // Nothing to filter to: an empty chip is not a choice.
+                  disabled={f !== 'all' && !feed.some((x) => x.chip === f) && filter !== f}
                 />
               ))}
             </div>
