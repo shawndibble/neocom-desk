@@ -3,7 +3,9 @@ import { EsiError } from '@/esi/errors';
 
 vi.mock('@/features/market/priceHistory', () => ({ loadPriceHistory: vi.fn() }));
 import { loadPriceHistory } from '@/features/market/priceHistory';
-import { loadDailySales } from './dailySales';
+vi.mock('@/features/loyalty/lpStoreVolume', () => ({ loadLpStoreVolume: vi.fn() }));
+import { loadLpStoreVolume } from '@/features/loyalty/lpStoreVolume';
+import { loadDailySales, resetHubVolumes } from './dailySales';
 
 const NOW = Date.parse('2026-09-29T12:00:00Z');
 const history = (volume: number) => ({
@@ -11,7 +13,13 @@ const history = (volume: number) => ({
   fetchedAt: NOW,
 });
 
-beforeEach(() => vi.mocked(loadPriceHistory).mockReset());
+beforeEach(() => {
+  vi.mocked(loadPriceHistory).mockReset();
+  vi.mocked(loadLpStoreVolume).mockReset();
+  resetHubVolumes();
+  // No volume objects by default: the ESI fallback path.
+  vi.mocked(loadLpStoreVolume).mockResolvedValue(null);
+});
 
 describe('loadDailySales', () => {
   it('sums the last 30 days across every trade-hub region', async () => {
@@ -38,5 +46,34 @@ describe('loadDailySales', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValue(history(30));
     expect(await loadDailySales(34, NOW)).toBeNull();
+  });
+
+  describe('from the published volume objects', () => {
+    it('sums the type across the hub regions without asking ESI', async () => {
+      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 2 });
+      expect(await loadDailySales(34, NOW)).toBe(10);
+      expect(loadPriceHistory).not.toHaveBeenCalled();
+    });
+
+    it('reads each region object once however many products are checked', async () => {
+      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
+      await Promise.all([loadDailySales(34, NOW), loadDailySales(35, NOW)]);
+      expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
+    });
+
+    it('counts a type absent from every object as no sales', async () => {
+      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 99: 7 });
+      expect(await loadDailySales(34, NOW)).toBe(0);
+    });
+
+    it('asks ESI only for a region whose object is unavailable', async () => {
+      vi.mocked(loadLpStoreVolume).mockImplementation(async (regionId) =>
+        regionId === 10000002 ? null : { 34: 1 }
+      );
+      vi.mocked(loadPriceHistory).mockResolvedValue(history(30));
+      // Four objects at 1 a day, plus Jita's 30 units over 30 days.
+      expect(await loadDailySales(34, NOW)).toBeCloseTo(5);
+      expect(vi.mocked(loadPriceHistory).mock.calls.map(([region]) => region)).toEqual([10000002]);
+    });
   });
 });
