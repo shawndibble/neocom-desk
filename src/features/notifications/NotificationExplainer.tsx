@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
 import type { CharacterRecord } from '@/db';
@@ -10,6 +10,7 @@ import {
   shouldShowPermissionExplainer,
   shouldShowAlertsOffer,
   useAlertsOfferSeen,
+  useGrantedHere,
 } from './permission';
 import { webPushSupport } from '@/sync/webPushSupport';
 import { enableWebPush } from './webPush';
@@ -49,9 +50,9 @@ export function NotificationExplainer() {
   );
   const { value: alertsOfferSeen, setValue: setAlertsOfferSeen } = useAlertsOfferSeen();
   const nearbySupported = useAlertsNearby().supported;
-  // True only after this banner's own Enable ended in a grant, so the offer
-  // never reaches someone who saw the explainer on an earlier visit.
-  const [grantedHere, setGrantedHere] = useState(false);
+  // Set only by this explainer's own Enable, so the offer never reaches
+  // someone who saw the explainer on an earlier visit.
+  const grantedHere = useGrantedHere((state) => state.granted);
 
   const hydrated = useHydratedStore(useNotificationPromptState);
   const offerHydrated = useHydratedStore(useAlertsOfferSeen);
@@ -86,10 +87,10 @@ export function NotificationExplainer() {
   const enable = async () => {
     const { permission: outcome } = await enableWebPush();
     // Before the prompt state is saved: that save ends the explainer, and the
-    // offer must already be eligible so the slot never frees up in between.
+    // offer must already be eligible so the block never unmounts in between.
     if (outcome === 'granted') {
       refresh();
-      setGrantedHere(true);
+      useGrantedHere.setState({ granted: true });
     }
     await setValue(promptStateAfterAsk(outcome));
   };
@@ -136,11 +137,7 @@ export function NotificationExplainer() {
   );
 
   return (
-    <div
-      role="region"
-      aria-label={copy.title}
-      className="space-y-2 border-b border-line bg-panel-2 px-3.5 py-2.5"
-    >
+    <div className="space-y-2 border-b border-line bg-panel-2 px-3.5 py-2.5">
       <p className="font-medium text-text">{copy.title}</p>
       <p className="text-xs text-text-dim">{copy.body}</p>
       <div className="flex justify-end gap-2">

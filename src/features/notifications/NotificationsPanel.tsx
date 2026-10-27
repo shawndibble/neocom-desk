@@ -7,7 +7,7 @@
  *
  * - **denied**: the blocked notice and a disabled Device column. JS cannot
  *   re-request a denied grant, so a toggle here would do nothing.
- * - **default**: the toggles stay, with an Enable button above them: the
+ * - **default**: the toggles stay, with Device pop-ups reading unticked: the
  *   second chance for someone who dismissed the one-time explainer
  *   (`NotificationExplainer`). Ticking Device pop-ups is the only thing in this file
  *   that reaches the browser prompt; nothing requests permission on mount.

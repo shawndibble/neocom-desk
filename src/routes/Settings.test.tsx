@@ -793,6 +793,19 @@ describe('Settings — Notifications (issue #170)', () => {
     });
   });
 
+  it('leaves Device pop-ups unticked when the browser denies the request', async () => {
+    const requestPermission = vi.fn(async () => 'denied' as NotificationPermission);
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+    const user = userEvent.setup();
+    render(<App />);
+    await notificationsPanel();
+
+    const deviceBox = await screen.findByRole('checkbox', { name: 'Device pop-ups' });
+    await user.click(deviceBox);
+    await waitFor(() => expect(requestPermission).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('checkbox', { name: 'Device pop-ups' })).not.toBeChecked();
+  });
+
   it('shows a Retry row for a stored push failure; Retry re-registers and clears it, toggles stay on (issue #2844)', async () => {
     const user = userEvent.setup();
     stubNotification('granted');

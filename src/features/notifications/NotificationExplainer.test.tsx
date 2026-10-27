@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { NotificationExplainer } from './NotificationExplainer';
-import { ALERTS_OFFER_SEEN_KEY, useAlertsOfferSeen } from './permission';
+import { ALERTS_OFFER_SEEN_KEY, useAlertsOfferSeen, useGrantedHere } from './permission';
 import { beginAlertsLogin } from '@/app/loginFlow';
 
 vi.mock('@/app/loginFlow', () => ({ beginAlertsLogin: vi.fn(async () => undefined) }));
@@ -35,6 +35,7 @@ beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
   vi.mocked(beginAlertsLogin).mockClear();
+  useGrantedHere.setState({ granted: false });
   useAlertsOfferSeen.setState({ value: false, hydrated: false });
   useNotificationPromptState.setState({
     value: DEFAULT_NOTIFICATION_PROMPT_STATE,
@@ -164,6 +165,18 @@ describe('NotificationExplainer', () => {
       expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
       expect(screen.getByText(/Pilot One/)).toBeInTheDocument();
       expect(beginAlertsLogin).not.toHaveBeenCalled();
+    });
+
+    it('keeps the offer when the panel closes and reopens after Enable', async () => {
+      stubNotification('default', 'granted');
+      const user = userEvent.setup();
+      const { unmount } = renderExplainer();
+
+      await user.click(await screen.findByRole('button', { name: /^enable$/i }));
+      await screen.findByText(/alerts when neocom is closed/i);
+      unmount();
+      renderExplainer();
+      expect(await screen.findByText(/alerts when neocom is closed/i)).toBeInTheDocument();
     });
 
     it('Turn on starts the Alerts flow for that Character and records the offer as seen', async () => {

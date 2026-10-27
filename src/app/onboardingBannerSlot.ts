@@ -2,7 +2,7 @@
  * One bottom banner at a time (issue #1124).
  *
  * The one-time onboarding banners are `position: fixed` in the same
- * bottom corner, and a first login on a fresh device can make two or three of
+ * bottom corner, and a first login on a fresh device can make both of
  * them eligible at once — which stacked them up the viewport until they buried
  * the page content behind them on a phone. This is the shared slot they now
  * compete for: every eligible banner registers itself, and only the

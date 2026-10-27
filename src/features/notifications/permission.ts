@@ -19,6 +19,7 @@
  * deliberate user tap. Nothing here fires on mount.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { create } from 'zustand';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const NOTIFICATION_PERMISSION_PROMPT_KEY = 'notifications.permissionPrompt';
@@ -186,3 +187,10 @@ export function shouldShowAlertsOffer(state: {
     state.characterId !== null
   );
 }
+
+/**
+ * True once this session's Enable ended in a grant. Module-level rather than
+ * component state: the panel unmounts when the bell closes, and closing it
+ * right after Enable must not lose the Alerts offer.
+ */
+export const useGrantedHere = create<{ granted: boolean }>(() => ({ granted: false }));
