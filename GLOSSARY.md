@@ -100,9 +100,9 @@ here — they go one per file in `docs/context/decisions/`.
   than it asks: each line at the default **Trade Hub**'s best buy minus sales
   tax, a line with no market at the cheapest of at least three other offers.
   Contracts that ask for items, and auctions with no buyout, are left out.
-- **Billable**: A day in a **Corp Tax Book** that can go on a **Statement**: the UTC day has ended, the book's grace period (30 minutes by default) has passed, and an officer has synced after that, so no more ore can still arrive for it. Before that the day is **Still accruing** and owes nothing.
-- **Next Statement**: The **Billable** days of a **Corp Tax Book** that are not on a **Statement** yet; what the next Statement run will bill. Distinct from **Still accruing**, which is not Billable yet.
-- **Still accruing**: A **Corp Tax Book** day that is not **Billable** yet, so it owes nothing and is on no **Statement**. Shown on a Miner's page apart from **Next Statement**.
+- **Billable**: A day in a **Corp Tax Book** that can go on a **Statement**: the UTC day has ended, the book's grace period (30 minutes by default) has passed, and an officer has synced after that, so no more ore can still arrive for it. Before that the day is part of **Today's mining** and owes nothing.
+- **Next Statement**: The **Billable** days of a **Corp Tax Book** that are not on a **Statement** yet; what the next Statement run will bill. Distinct from **Today's mining**, which is not Billable yet.
+- **Today's mining**: A **Corp Tax Book** day that is not **Billable** yet, so it owes nothing and is on no **Statement**: mostly today, and yesterday too until the first sync after the grace. Shown on a Miner's page, above **Next Statement**.
 - **Blueprint Acquisition**: A Build Plan materials-table row — the
   blueprint's own type ID, distinct from the product's — priced whenever a
   buildable node isn't fully covered by an owned **BPO**. It takes whichever

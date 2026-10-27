@@ -598,8 +598,8 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (`features/corp/moons/sectionParts.tsx`): a count in the title, the newest
   ten rows, "Load older" (`usePaged`), a phone fold. No inner tabs. Everything
   they group comes from the client-side `buildBookView` (ADR 0032's read models
-  are not built); the pure grouping (day phases Next Statement / Still
-  accruing / earlier, the Overview's 7-day pops window, ore lines per Miner and
+  are not built); the pure grouping (day phases Today's mining / Next
+  Statement / earlier, the Overview's 7-day pops window, ore lines per Miner and
   moon, the place line, the merged Payments and Activity ledgers) is
   `src/engine/corpTaxBook/bookSections.ts`.
   The Overview tab is `OverviewTab.tsx` (totals chips, `NeedsYouQueue`, the
