@@ -22,8 +22,8 @@ import { TRADE_HUBS } from '@/market/hubs';
 
 const HUB_REGION_IDS = [...new Set(TRADE_HUBS.map((hub) => hub.regionId))];
 
-/** How long one read of the five volume objects serves every product in a scan. */
-const VOLUMES_TTL_MS = 5 * 60_000;
+/** How long one read of the five volume objects is reused, across products and across rescans. */
+const VOLUMES_TTL_MS = 30 * 60_000;
 let volumesRead: { at: number; promise: Promise<(LpStoreVolume | null)[]> } | null = null;
 
 /** The hub regions' volume objects (null where one is unavailable), shared by a scan's products. */

@@ -61,6 +61,15 @@ describe('loadDailySales', () => {
       expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
     });
 
+    it('reuses the read for 30 minutes, then reads again', async () => {
+      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
+      await loadDailySales(34, NOW);
+      await loadDailySales(34, NOW + 29 * 60_000);
+      expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
+      await loadDailySales(34, NOW + 31 * 60_000);
+      expect(loadLpStoreVolume).toHaveBeenCalledTimes(10);
+    });
+
     it('counts a type absent from every object as no sales', async () => {
       vi.mocked(loadLpStoreVolume).mockResolvedValue({ 99: 7 });
       expect(await loadDailySales(34, NOW)).toBe(0);
