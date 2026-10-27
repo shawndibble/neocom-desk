@@ -52,11 +52,8 @@ describe('mergeBookParts', () => {
   });
 });
 
-describe('bookPartsFor the Overview and the read models switch (#5259)', () => {
-  it('reads core only with the switch off, as before', () => {
-    expect([...bookPartsFor('overview', null, false)]).toEqual(['core']);
-  });
-  it('adds the ledger with the switch on: the open set still reads dismissals and corrections', () => {
-    expect([...bookPartsFor('overview', null, true)].sort()).toEqual(['core', 'ledger']);
+describe('bookPartsFor the Overview (#5259)', () => {
+  it('reads core and ledger: owed and Needs you derive from payments and declarations', () => {
+    expect([...bookPartsFor('overview', null)].sort()).toEqual(['core', 'ledger']);
   });
 });
