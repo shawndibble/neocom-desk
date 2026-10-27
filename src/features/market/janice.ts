@@ -8,7 +8,13 @@ import type { TradeHub } from '@/market/hubs';
 /** The deployed proxy Worker. Public by design; the Janice key lives in the Worker. */
 export const JANICE_PROXY_URL = 'https://janice.neocomdesk.com';
 
-export type JaniceFailure = 'too-large' | 'nothing-parsed' | 'rate-limited' | 'failed';
+export type JaniceFailure =
+  'too-large' | 'nothing-parsed' | 'rate-limited' | 'popup-blocked' | 'failed';
+
+/** Where an appraisal link may point: the tab is only ever sent to Janice. */
+const JANICE_APPRAISAL_PREFIX = 'https://janice.e-351.com/a/';
+
+const REQUEST_TIMEOUT_MS = 20_000;
 
 export type JaniceResult = { ok: true; url: string } | { ok: false; reason: JaniceFailure };
 
@@ -30,11 +36,16 @@ export async function requestJaniceAppraisal({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, hub: hub.id, pricePercent }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const body: unknown = await res.json().catch(() => null);
     const record =
       body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-    if (res.ok && typeof record.url === 'string' && record.url.startsWith('https://')) {
+    if (
+      res.ok &&
+      typeof record.url === 'string' &&
+      record.url.startsWith(JANICE_APPRAISAL_PREFIX)
+    ) {
       return { ok: true, url: record.url };
     }
     const reason = KNOWN_FAILURES.find((known) => known === record.error);

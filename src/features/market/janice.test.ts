@@ -46,9 +46,12 @@ describe('requestJaniceAppraisal', () => {
       reason: 'failed',
     });
     expect(await call(new Error('offline')).result).toEqual({ ok: false, reason: 'failed' });
-    expect(await call(Response.json({ url: 'javascript:alert(1)' })).result).toEqual({
-      ok: false,
-      reason: 'failed',
-    });
+    for (const url of [
+      'javascript:alert(1)',
+      'https://evil.example/a/x',
+      'https://janice.e-351.com.evil.example/a/x',
+    ]) {
+      expect(await call(Response.json({ url })).result).toEqual({ ok: false, reason: 'failed' });
+    }
   });
 });

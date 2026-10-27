@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { TradeHub } from '@/market/hubs';
 import { requestJaniceAppraisal, type JaniceFailure } from './janice';
 
@@ -21,20 +21,31 @@ export function useAppraisalJanice({
   pricePercent: number;
 }) {
   const [janice, setJanice] = useState<JaniceState>({ status: 'idle' });
+  // State lags a render behind a quick second click; a ref does not.
+  const inFlight = useRef(false);
 
   async function handleOpenInJanice() {
-    if (janice.status === 'fetching' || text.trim() === '') return;
+    if (inFlight.current || text.trim() === '') return;
     const tab = window.open('about:blank', '_blank');
-    if (tab) tab.opener = null;
+    if (!tab) {
+      // A window opened after the request is blocked just the same, so stop here.
+      setJanice({ status: 'failed', reason: 'popup-blocked' });
+      return;
+    }
+    tab.opener = null;
+    inFlight.current = true;
     setJanice({ status: 'fetching' });
-    const result = await requestJaniceAppraisal({ text, hub, pricePercent });
-    if (result.ok) {
-      if (tab) tab.location.href = result.url;
-      else window.open(result.url, '_blank', 'noopener,noreferrer');
-      setJanice({ status: 'idle' });
-    } else {
-      tab?.close();
-      setJanice({ status: 'failed', reason: result.reason });
+    try {
+      const result = await requestJaniceAppraisal({ text, hub, pricePercent });
+      if (result.ok) {
+        tab.location.href = result.url;
+        setJanice({ status: 'idle' });
+      } else {
+        tab.close();
+        setJanice({ status: 'failed', reason: result.reason });
+      }
+    } finally {
+      inFlight.current = false;
     }
   }
 

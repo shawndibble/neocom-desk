@@ -76,6 +76,22 @@ describe('janice proxy', () => {
     expect((await res.json()).error).toBe('too-large');
   });
 
+  it('refuses an oversized body by its Content-Length before reading it', async () => {
+    const req = post(valid);
+    const big = new Request(req, {
+      headers: { ...Object.fromEntries(req.headers), 'content-length': String(MAX_BODY_BYTES * 2) },
+    });
+    const res = await handleRequest(big, { JANICE_API_KEY: 'k' }, janiceOk());
+    expect(res.status).toBe(413);
+  });
+
+  it('fails early when the API key secret is missing', async () => {
+    const fetchFn = janiceOk();
+    const res = await handleRequest(post(valid), {}, fetchFn);
+    expect(res.status).toBe(500);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('rejects an unknown hub and an out-of-range percent', async () => {
     const env = { JANICE_API_KEY: 'k' };
     expect((await handleRequest(post({ ...valid, hub: 'nowhere' }), env, janiceOk())).status).toBe(

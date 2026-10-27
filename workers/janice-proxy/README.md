@@ -6,7 +6,8 @@ Janice's API needs a key per caller, and a key shipped in the browser bundle of
 a public repo is a leaked key, so the key lives only in this Worker.
 
 Guards (the key is shared): only our origins, 10 requests a minute per IP
-(`LIMITER` in `wrangler.toml`), and bodies over 50 KB are refused.
+(`LIMITER` in `wrangler.toml`), and a paste over 50 KB is refused (a larger request body is turned away by
+its `Content-Length` before it is read).
 
 ## Setup (Shawn)
 

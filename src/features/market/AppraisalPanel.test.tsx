@@ -1156,6 +1156,16 @@ describe('AppraisalPanel — Open in Janice', () => {
     expect(tab.location.href).toBe('');
   });
 
+  it('stops before the request when the browser blocks the new tab', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    renderPanel({ controller: controller({ text: PASTE, result: outcome() }) });
+    await openInJanice();
+    expect(await screen.findAllByText(/blocked the new tab/)).not.toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url]) => url === JANICE_PROXY_URL)).toHaveLength(0);
+  });
+
   it('is disabled when the paste box is blank', async () => {
     renderPanel({ controller: controller({ text: '  ', result: outcome() }) });
     await userEvent.click(screen.getByRole('button', { name: /Appraisal/ }));

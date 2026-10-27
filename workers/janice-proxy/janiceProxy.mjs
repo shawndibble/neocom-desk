@@ -3,14 +3,12 @@
 
 export const JANICE_ORIGIN = 'https://janice.e-351.com';
 export const MAX_BODY_BYTES = 50 * 1024;
-export const ALLOWED_ORIGINS = [
-  'https://neocomdesk.com',
-  'https://www.neocomdesk.com',
-  'https://dev.neocomdesk.com',
-  'http://localhost:5173',
-];
+export const ALLOWED_ORIGINS = ['https://neocomdesk.com', 'https://dev.neocomdesk.com'];
 
-/** Janice market ids by Trade Hub id (GET /api/rest/v2/markets). */
+/**
+ * Janice market ids by Trade Hub id (GET /api/rest/v2/markets). Keep the keys
+ * in step with TRADE_HUBS in src/market/hubs.ts; a Worker can't import from src.
+ */
 export const HUB_MARKETS = {
   jita: 2,
   amarr: 115,
@@ -53,6 +51,11 @@ export async function handleRequest(request, env, fetchFn = fetch) {
     if (!success) return fail(429, 'rate-limited', origin);
   }
 
+  // Refuse an oversized body before buffering it; the text is measured again below.
+  if (Number(request.headers.get('content-length')) > MAX_BODY_BYTES + 1024) {
+    return fail(413, 'too-large', origin);
+  }
+
   let input;
   try {
     input = await request.json();
@@ -70,6 +73,8 @@ export async function handleRequest(request, env, fetchFn = fetch) {
   ) {
     return fail(400, 'bad-request', origin);
   }
+
+  if (!env.JANICE_API_KEY) return fail(500, 'not-configured', origin);
 
   const url = new URL('/api/rest/v2/appraisal', JANICE_ORIGIN);
   url.search = new URLSearchParams({
