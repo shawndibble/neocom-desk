@@ -85,6 +85,27 @@ describe('janice proxy', () => {
     expect(res.status).toBe(413);
   });
 
+  it('stops a chunked body with no Content-Length once it passes the cap', async () => {
+    const chunk = new TextEncoder().encode('a'.repeat(MAX_BODY_BYTES));
+    const body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(chunk);
+        controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+    const req = new Request('https://proxy.example/', {
+      method: 'POST',
+      headers: { origin: ORIGIN },
+      body,
+      duplex: 'half',
+    });
+    const fetchFn = janiceOk();
+    const res = await handleRequest(req, { JANICE_API_KEY: 'k' }, fetchFn);
+    expect(res.status).toBe(413);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('fails early when the API key secret is missing', async () => {
     const fetchFn = janiceOk();
     const res = await handleRequest(post(valid), {}, fetchFn);

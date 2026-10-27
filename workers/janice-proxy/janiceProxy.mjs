@@ -30,6 +30,30 @@ function respond(status, body, origin) {
 
 const fail = (status, error, origin) => respond(status, { error }, origin);
 
+/**
+ * The request body as text, or null once it passes `limit` bytes. Read as a
+ * stream so a chunked body with no Content-Length is stopped too, instead of
+ * being buffered whole first.
+ */
+async function readCapped(request, limit) {
+  if (Number(request.headers.get('content-length')) > limit) return null;
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(await new Blob(chunks).arrayBuffer());
+}
+
 export async function handleRequest(request, env, fetchFn = fetch) {
   const requestOrigin = request.headers.get('origin');
   const origin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : null;
@@ -51,14 +75,11 @@ export async function handleRequest(request, env, fetchFn = fetch) {
     if (!success) return fail(429, 'rate-limited', origin);
   }
 
-  // Refuse an oversized body before buffering it; the text is measured again below.
-  if (Number(request.headers.get('content-length')) > MAX_BODY_BYTES + 1024) {
-    return fail(413, 'too-large', origin);
-  }
-
+  const raw = await readCapped(request, MAX_BODY_BYTES + 1024);
+  if (raw === null) return fail(413, 'too-large', origin);
   let input;
   try {
-    input = await request.json();
+    input = JSON.parse(raw);
   } catch {
     return fail(400, 'bad-request', origin);
   }
