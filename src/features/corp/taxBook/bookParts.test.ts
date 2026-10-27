@@ -51,3 +51,12 @@ describe('mergeBookParts', () => {
     expect(new Set(mergeBookParts(undefined, new Set(['core'])))).toEqual(new Set(ALL_BOOK_PARTS));
   });
 });
+
+describe('bookPartsFor the Overview and the read models switch (#5259)', () => {
+  it('reads core only with the switch off, as before', () => {
+    expect([...bookPartsFor('overview', null, false)]).toEqual(['core']);
+  });
+  it('adds the ledger with the switch on: the open set still reads dismissals and corrections', () => {
+    expect([...bookPartsFor('overview', null, true)].sort()).toEqual(['core', 'ledger']);
+  });
+});

@@ -12,6 +12,8 @@
  *
  * The settings document and `meta/paid` are not slices: every read takes them fresh.
  */
+import { CORP_BOOK_READ_MODELS } from './readModelSwitch';
+
 export const ALL_BOOK_PARTS = ['core', 'ledger', 'answers'] as const;
 export type BookPart = (typeof ALL_BOOK_PARTS)[number];
 
@@ -22,9 +24,17 @@ export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 /** What a page asks for: a tab id, or a detail page below it. */
 export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner' | 'statementPeriod';
 
-export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPartSet {
+export function bookPartsFor(
+  tab: string,
+  detail: BookDetailKind | null,
+  readModels: boolean = CORP_BOOK_READ_MODELS
+): BookPartSet {
   const route = detail ?? tab;
   switch (route) {
+    // The Overview's docs stand in for the payments and declarations, but its open set
+    // (unbilled days) still reads dismissals and corrections until #5260 drops the rows.
+    case 'overview':
+      return new Set<BookPart>(readModels ? ['core', 'ledger'] : ['core']);
     case 'miner':
     case 'miners':
       return new Set<BookPart>(['core', 'ledger', 'answers']);

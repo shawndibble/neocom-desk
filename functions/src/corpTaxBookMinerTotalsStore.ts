@@ -13,6 +13,7 @@ import {
   type TotalsPlan,
 } from './corpTaxBookMinerTotals.js';
 import { reconcileMoonDocs } from './corpTaxBookMoonDocsStore.js';
+import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
 
 type Data = Record<string, unknown>;
 
@@ -24,13 +25,13 @@ const sub = (db: Firestore, corporationId: number, name: string) =>
 /** Firestore's `in` operator takes at most 30 values. */
 const IN_LIMIT = 30;
 
-const withId = (d: { id: string; data: () => Data | undefined }): Data => ({
+export const withId = (d: { id: string; data: () => Data | undefined }): Data => ({
   ...d.data(),
   id: d.id,
 });
 
 /** The book-wide records every Miner's totals read: small collections, one read each. */
-async function loadRules(db: Firestore, corporationId: number) {
+export async function loadRules(db: Firestore, corporationId: number) {
   const [bookDoc, dismissals, declarations, extractions] = await Promise.all([
     book(db, corporationId).get(),
     sub(db, corporationId, 'dismissals').get(),
@@ -234,6 +235,14 @@ export async function verifyMinerTotals(
     return undefined;
   });
   const moonMismatches = moonPlan?.mismatches ?? [];
+  // The Overview and Miners tab docs (#5259) are rebuilt in the same pass, and never fail the check.
+  const readModelPlan = await reconcileReadModels(db, corporationId, now()).catch(async (e) => {
+    console.error('read models verify failed', e instanceof Error ? e.message : e);
+    await invalidateReadModels(db, corporationId).catch(() => undefined);
+    return undefined;
+  });
+  // Not a health flag: a doc also goes stale as an Extraction ages out of its window, so a repair is routine.
+  const readModelRepairs = readModelPlan?.mismatches.length ?? 0;
   const at = now();
   const health = sub(db, corporationId, 'meta').doc(HEALTH_DOC);
   await health.set({
@@ -249,6 +258,7 @@ export async function verifyMinerTotals(
     overlaps: overlaps.slice(0, MAX_LISTED),
     moonDocMismatchCount: moonMismatches.length,
     moonDocMismatches: moonMismatches.slice(0, MAX_LISTED),
+    readModelRepairCount: readModelRepairs,
     ...(plan.mismatches.length > 0 || moonMismatches.length > 0 ? { lastMismatchAt: at } : {}),
   });
   if (plan.mismatches.length > 0 || overlaps.length > 0 || moonMismatches.length > 0) {
