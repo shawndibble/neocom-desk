@@ -33,7 +33,7 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 
 const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
 
-/** The expanded row survives Open page then Back: kept for the tab session, never required. */
+/** Keeps the open row across Open page then Back; sessionStorage, best-effort. */
 function readOpenMiner(corporationId: number): string | null {
   try {
     return sessionStorage.getItem(OPEN_MINER_KEY + corporationId);

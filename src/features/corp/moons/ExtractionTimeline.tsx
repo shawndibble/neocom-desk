@@ -81,7 +81,6 @@ export function ExtractionTimeline({
 }: {
   rows: readonly ExtractionRow[];
   states: ReadonlySet<ExtractionState>;
-  /** The state filter, drawn on the card's title row. */
   filter?: ReactNode;
 }) {
   const { t } = useTranslation();

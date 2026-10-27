@@ -911,8 +911,7 @@
   .dt-stacked.dt-stack-dense td.dt-meta {
     order: 1;
     display: inline;
-    /* A column's table width (`w-24`) or alignment means nothing inline: it
-       left a gap between the date and the next `·` field. */
+    /* Inline field: a column's table width/align would leave a gap before the next `·`. */
     width: auto;
     text-align: left;
     padding: 0;

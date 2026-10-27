@@ -195,9 +195,10 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   );
 }
 
-/** The page header and tabs stay put while the book loads; only the body is a skeleton. */
-function MoonsLoading({ showTabs }: { showTabs: boolean }) {
+/** Header and tabs stay while loading; only the body is a skeleton. */
+function MoonsLoading() {
   const { t } = useTranslation();
+  const showTabs = moonsDetail(useLocation().pathname) === null;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
@@ -247,7 +248,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     return () => setMoonsTabsHidden(false);
   }, [decided, unchosen]);
 
-  if (state.status === 'loading') return <MoonsLoading showTabs={open === null} />;
+  if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -338,8 +339,7 @@ export function CorpMoons() {
   const { t } = useTranslation();
   const access = useCorpAccess();
   const { ledger } = useCorpTaxBook({ autoSync: false });
-  const { pathname } = useLocation();
-  if (access.state === 'unknown') return <MoonsLoading showTabs={moonsDetail(pathname) === null} />;
+  if (access.state === 'unknown') return <MoonsLoading />;
   if (access.state !== 'ready') {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">

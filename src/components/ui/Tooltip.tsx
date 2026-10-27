@@ -248,9 +248,8 @@ export function Tooltip({
   }
 
   /**
-   * A tooltip on a menu item (a disabled item's reason) sits above the menu in Radix's layer
-   * stack, so Escape would close only it. Close it ourselves, then re-send the key once so the
-   * menu closes too; the tooltip is gone by then, so the re-sent key cannot come back here.
+   * A menu item's tooltip sits above the menu in Radix's layer stack, so Escape would close only
+   * it. Close it, then re-send Escape once (tooltip gone, so no loop) to close the menu too.
    */
   function handleEscape() {
     if (!triggerRef.current?.closest('[role="menu"]')) return;

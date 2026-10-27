@@ -147,12 +147,11 @@ export function MinerDetail({ id }: { id: string }) {
         ? detail?.statements.find((x) => x.id === statementId)
         : undefined;
     if (st) {
-      return e.action === 'issueStatement' ? (
+      return (
         <>
-          {statementLink(st)} · {isk(st.amount)}
+          {statementLink(st)}
+          {e.action === 'issueStatement' && <> · {isk(st.amount)}</>}
         </>
-      ) : (
-        statementLink(st)
       );
     }
     return typeof amount === 'number' ? (amount < 0 ? signedIsk(amount) : isk(amount)) : null;

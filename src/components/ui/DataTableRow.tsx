@@ -195,9 +195,8 @@ function DataTableRowImpl<T>({
               // to itself.
               if (event.target !== event.currentTarget) return;
               if (rowContextMenu && isContextMenuKey(event)) {
-                // The row menu's trigger listens for `contextmenu`; a keyboard has no pointer
-                // to fire one at a position, so send it at the row's corner. A row with no
-                // menu leaves the event unprevented and the browser's own key action runs.
+                // Row menu trigger listens for `contextmenu`; a keyboard has no pointer, so send
+                // one at the row's corner. No menu: event stays unprevented, browser default runs.
                 const box = event.currentTarget.getBoundingClientRect();
                 const sent = new MouseEvent('contextmenu', {
                   bubbles: true,

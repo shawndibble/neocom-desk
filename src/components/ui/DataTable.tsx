@@ -147,12 +147,13 @@ export function DataTable<T>({
     expandableRow?.initialKey ?? null
   );
   const onExpandedChangeRef = useRef(expandableRow?.onExpandedChange);
+  const reportedKey = useRef(expandedRowKey);
   useEffect(() => {
     onExpandedChangeRef.current = expandableRow?.onExpandedChange;
-  });
-  useEffect(() => {
+    if (reportedKey.current === expandedRowKey) return;
+    reportedKey.current = expandedRowKey;
     onExpandedChangeRef.current?.(expandedRowKey);
-  }, [expandedRowKey]);
+  });
   const isPhone = useIsPhone();
   // Card width: the caller's say where it has one, else the viewport's. The
   // `.dt-stacked` rules (src/styles/index.css) key off the class this sets.

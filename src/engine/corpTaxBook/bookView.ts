@@ -1033,7 +1033,7 @@ export function statementDetail(view: BookView, statementId: string): StatementD
   return {
     ...standing,
     // Billed − Outstanding, as the Statements table shows, so the panel never differs by 1 ISK.
-    credited: standing.paid - writtenOff,
+    credited: Math.max(0, standing.paid - writtenOff),
     forgiven: wholeIsk(settlement?.forgiven ?? 0),
     writtenOff,
     remaining: standing.outstanding,
