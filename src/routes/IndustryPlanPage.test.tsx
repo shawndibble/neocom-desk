@@ -463,7 +463,7 @@ describe('IndustryPlanPage: results panel', () => {
 describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
   it('opens Log Production already filled with the job’s quantity and cost', async () => {
     await db.buildPlans.add(seedPlan());
-    // Active Jobs' "Log production…" row action navigates here with the
+    // Active Jobs' "Log production" row action navigates here with the
     // job's runs/cost in navigation state; the Rifter blueprint (typeID 638)
     // makes 1 unit per run, so 4 runs -> quantity 4. `usr`: react-router's
     // history wraps every pushed state under that key, and reads the initial
@@ -526,7 +526,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
   it('opens Log Production from Active Jobs’ own row button when its match is the plan already open', async () => {
     // Active Jobs (in the header, on every industry page including this
     // one) can show a done job whose single matching plan is the very plan
-    // page it's rendered on — clicking "Log production…" there re-navigates
+    // page it's rendered on — clicking "Log production" there re-navigates
     // to the same route, which doesn't remount `IndustryPlanPage`, so this
     // exercises the same-route re-application path rather than a fresh mount.
     server.use(
@@ -556,7 +556,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
     // polling for the job list and the dialog that way cost this test 3-5s
     // under parallel load on its own.
     await userEvent.click(await screen.findByLabelText('Show job list'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Log production…' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     const dialog = await waitFor(() => {
       const open = document.querySelector<HTMLElement>('dialog[open]');

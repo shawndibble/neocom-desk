@@ -98,28 +98,37 @@ export interface MinedRow {
   key: string;
   characterId: number;
   structureId: number;
+  /** The ore; null on a view built before #5261. */
+  typeId: number | null;
   volume: number;
-  valueIsk: number;
 }
 
-/** Mined per character and refinery over the covered days, biggest value first. All of it, none capped. */
+/** Mined per character, refinery and ore over the covered days, most first. All of it, none capped. */
 export function minedRows(days: readonly FeederViewDay[]): MinedRow[] {
   const byKey = new Map<string, MinedRow>();
   for (const day of days)
     for (const line of day.lines) {
-      const key = `${line.characterId}:${line.structureId}`;
+      const typeId = line.typeId ?? null;
+      const key = `${line.characterId}:${line.structureId}:${typeId ?? ''}`;
       const row = byKey.get(key) ?? {
         key,
         characterId: line.characterId,
         structureId: line.structureId,
+        typeId,
         volume: 0,
-        valueIsk: 0,
       };
-      row.volume += line.volume;
-      row.valueIsk += line.valueIsk;
+      row.volume += line.quantity ?? line.volume;
       byKey.set(key, row);
     }
-  return [...byKey.values()].sort((a, b) => b.valueIsk - a.valueIsk || a.key.localeCompare(b.key));
+  return [...byKey.values()].sort((a, b) => b.volume - a.volume || a.key.localeCompare(b.key));
+}
+
+export function oreTypeIdsOf(days: readonly FeederViewDay[]): number[] {
+  return [
+    ...new Set(
+      days.flatMap((d) => d.lines.flatMap((l) => (l.typeId === undefined ? [] : [l.typeId])))
+    ),
+  ];
 }
 
 export function characterIdsOf(days: readonly FeederViewDay[]): number[] {

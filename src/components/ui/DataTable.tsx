@@ -1,6 +1,7 @@
 import {
   Fragment,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -142,7 +143,17 @@ export function DataTable<T>({
   const [groupExpanded, setGroupExpanded] = useState<Record<string, boolean>>({});
   // At most one row open at a time (see `DataTableExpandableRow`) — a single
   // key, not a set.
-  const [expandedRowKey, setExpandedRowKey] = useState<string | number | null>(null);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | number | null>(
+    expandableRow?.initialKey ?? null
+  );
+  const onExpandedChangeRef = useRef(expandableRow?.onExpandedChange);
+  const reportedKey = useRef(expandedRowKey);
+  useEffect(() => {
+    onExpandedChangeRef.current = expandableRow?.onExpandedChange;
+    if (reportedKey.current === expandedRowKey) return;
+    reportedKey.current = expandedRowKey;
+    onExpandedChangeRef.current?.(expandedRowKey);
+  });
   const isPhone = useIsPhone();
   // Card width: the caller's say where it has one, else the viewport's. The
   // `.dt-stacked` rules (src/styles/index.css) key off the class this sets.

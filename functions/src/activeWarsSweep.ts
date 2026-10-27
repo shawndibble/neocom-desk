@@ -1,9 +1,8 @@
 /**
  * The active-wars sweep: reads ESI's war list and the wars it holds open. The
  * planning is `activeWars.ts`; this is the fetching, with `read`, `write` and
- * `fetchImpl` injected so it runs against fakes. Free of Firestore and firebase-admin, so both
- * `syncActiveWars` (activeWarsJob.ts) and the GitHub Actions runner
- * (publicDataActiveWars.ts) use it.
+ * `fetchImpl` injected so it runs against fakes. Free of Firestore and firebase-admin, so the GitHub Actions
+ * runner (publicDataActiveWars.ts) can use it.
  */
 import { info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import {

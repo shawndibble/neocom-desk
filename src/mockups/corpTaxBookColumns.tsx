@@ -17,7 +17,7 @@ export function caretColumn<T>(): DataTableColumn<T> {
 
 const DAY_STATUS_TONE: Record<DayLine['status'], string> = {
   'On Aug Statement': 'text-danger',
-  'Not on a Statement yet': 'text-text',
+  'Next Statement': 'text-text',
   'Not Billable yet': 'text-text-dim',
   Dismissed: 'text-text-dim line-through decoration-text-faint',
   Paid: 'text-success',

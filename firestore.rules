@@ -244,14 +244,9 @@ service cloud.firestore {
     // either: R2 is their only store (ADR 0019, issue #4270). Their rules are
     // gone too, so the implicit deny covers the orphaned collections.
 
-    // Route Safety's lawless (insurgency) systems (issue #2870): one doc,
-    // `lawless`, written only by the syncLawlessSystems scheduled function
-    // (admin privileges). Public EVE data, so the same rule as the market
-    // collections above: read by any signed-in client, never client-written.
-    match /systemConditions/{docId} {
-      allow read: if request.auth != null;
-      allow write: if false;
-    }
+    // `systemConditions` holds only the backend's own state docs (the R2 publish markers),
+    // all read and written with admin privileges. The lawless and active-wars docs are gone:
+    // both lists are R2 objects (issue #5072), so the implicit deny covers the collection.
     // EVE Workbench fits are not in Firestore: each hull is a static object
     // in Cloudflare R2 (decision
     // 20261018-232147-eve-workbench-fits-live-in-r2). The workbenchFits rule
@@ -570,7 +565,7 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders']
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
           && isOfficer();
         allow write: if false;
       }

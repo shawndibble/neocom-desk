@@ -135,32 +135,62 @@ describe('MinersTab', () => {
     expect(screen.getByText(/1 non-member hidden · .* owed/)).toBeInTheDocument();
   });
 
-  it('the row ⋮ offers the actions the Miner page holds; Send reminder says why it is inert', async () => {
+  it('the row ⋮ holds Record payment, Dismiss tax and Mark not tax; the last says why it is inert', async () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
     const menu = await screen.findByRole('menu');
-    for (const name of ['Record payment…', 'Dismiss tax…', 'Show info']) {
+    for (const name of ['Show info', 'Record payment', 'Dismiss tax']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
-    // No Statement issued in this book: the item stays, inert.
-    expect(within(menu).getByRole('menuitem', { name: 'Send reminder' })).toHaveAttribute(
+    // Show info, then the three real actions: nothing else.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
+    // No payment in this book: the item stays, inert.
+    expect(within(menu).getByRole('menuitem', { name: 'Mark not tax' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
+    expect(within(menu).queryByRole('menuitem', { name: 'Send reminder' })).not.toBeInTheDocument();
+  });
+
+  it('a row opens in place to its Statement days with one Open page link; the click does not navigate', async () => {
+    renderBook(<MinersTab />);
+    expect(screen.queryByRole('link', { name: 'Open page' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Pilot 1'));
+    const link = await screen.findByRole('link', { name: 'Open page' });
+    expect(link).toHaveAttribute('href', '/corp/moons/miners/solo%3A1');
+    expect(screen.getByText(/Next Statement · 1/)).toBeInTheDocument();
   });
 });
 
 describe('MinersTab row menu dialogs', () => {
-  it('Record payment… and Dismiss tax… open their dialogs from the ⋮', async () => {
+  it('Record payment and Dismiss tax open their dialogs from the ⋮', async () => {
     renderBook(<MinersTab />);
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dismiss tax…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dismiss tax' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('Record payment dialog', () => {
+  it('asks no reason and records with an amount alone', async () => {
+    renderBook(<MinersTab />);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/Reason/)).not.toBeInTheDocument();
+    const amount = within(dialog).getByRole('textbox', { name: 'Amount' });
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '1000');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
+    await waitFor(() => expect(editBook).toHaveBeenCalled());
+    const sent = editBook.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(sent).toMatchObject({ action: 'recordPayment', amount: 1000 });
+    expect(sent).not.toHaveProperty('note');
   });
 });
 

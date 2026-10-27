@@ -55,15 +55,15 @@ export const RefineryLabels: Story = {
         ...d,
         lines: [
           ...d.lines,
-          { characterId: 2, structureId: 12, volume: 40_000, valueIsk: 4_000_000 },
-          { characterId: 3, structureId: 13, volume: 25_000, valueIsk: 2_500_000 },
+          { characterId: 2, structureId: 12, typeId: 45490, volume: 40_000, quantity: 40_000 },
+          { characterId: 3, structureId: 13, typeId: 45492, volume: 25_000, quantity: 25_000 },
         ],
       })),
     },
   },
 };
 
-/** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change…. */
+/** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change. */
 export const PayeeSet: Story = {
   args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
 };

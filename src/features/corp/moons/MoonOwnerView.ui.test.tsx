@@ -72,7 +72,7 @@ describe('MoonOwnerView', () => {
   it('asks for a different rate through a dialog', async () => {
     const { onRequestRate } = view();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Ask for a different rate…' }));
+    await user.click(screen.getByRole('button', { name: 'Ask for a different rate' }));
     const field = screen.getByLabelText('Rate you ask for (%)');
     await user.clear(field);
     await user.type(field, '7');
@@ -82,7 +82,7 @@ describe('MoonOwnerView', () => {
 
   it('hides the ask link from a non-officer', () => {
     view({}, { canEdit: false });
-    expect(screen.queryByRole('button', { name: 'Ask for a different rate…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ask for a different rate' })).toBeNull();
   });
 
   it('says no rate is set and owes nothing in ISK', () => {

@@ -263,9 +263,9 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
-    await chooseSoldMenuItem(user, 'Delete production run…');
+    await chooseSoldMenuItem(user, 'Delete production run');
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 
@@ -280,9 +280,9 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
-    await chooseSoldMenuItem(user, 'Delete production run…');
+    await chooseSoldMenuItem(user, 'Delete production run');
     const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
@@ -307,7 +307,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Sold…' }));
+    await user.click(await screen.findByRole('button', { name: 'Sold' }));
     await waitFor(() => screen.getByRole('button', { name: 'Link' }));
     await user.click(screen.getByRole('button', { name: 'Link' }));
 
@@ -401,7 +401,7 @@ describe('ProductionRunsPanel', () => {
     renderPanel(null);
     await expandRuns(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Sold…' }));
+    await user.click(await screen.findByRole('button', { name: 'Sold' }));
 
     // Already linked to another run — the picker must not offer it again.
     await waitFor(() => {
@@ -421,7 +421,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
     await chooseSoldMenuItem(user, 'Watch Open Order');
     await waitFor(() => screen.getByRole('button', { name: 'Watch' }));
@@ -463,7 +463,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
     await chooseSoldMenuItem(user, 'Manual / Private Sale');
     const dialog = await screen.findByRole('dialog', { name: 'Manual / Private Sale' });
@@ -485,7 +485,7 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
     await chooseSoldMenuItem(user, 'Manual / Private Sale');
     const dialog = await screen.findByRole('dialog', { name: 'Manual / Private Sale' });
@@ -508,9 +508,9 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
-    await chooseSoldMenuItem(user, 'Mark as lost…');
+    await chooseSoldMenuItem(user, 'Mark as lost');
     const dialog = await screen.findByRole('dialog', { name: 'Mark as lost' });
     const units = within(dialog).getByLabelText('Units lost');
     await user.clear(units);
@@ -533,9 +533,9 @@ describe('ProductionRunsPanel', () => {
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
-    await screen.findByRole('button', { name: 'Sold…' });
+    await screen.findByRole('button', { name: 'Sold' });
 
-    await chooseSoldMenuItem(user, 'Mark as lost…');
+    await chooseSoldMenuItem(user, 'Mark as lost');
     const dialog = await screen.findByRole('dialog', { name: 'Mark as lost' });
     const units = within(dialog).getByLabelText('Units lost');
     await user.clear(units);
@@ -565,7 +565,7 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
     await screen.findByText('2 lost');
 
-    await chooseSoldMenuItem(user, 'Remove loss…');
+    await chooseSoldMenuItem(user, 'Remove loss');
     const dialog = await screen.findByRole('dialog', { name: 'Remove loss' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove loss' }));
 

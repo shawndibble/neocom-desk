@@ -27,7 +27,7 @@ import { isk, newId } from './moonsFormat';
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs text-text-dim">{text}</span>
+      <span className="block text-xs text-text-dim">{text}</span>
       {children}
     </label>
   );
@@ -42,8 +42,11 @@ interface ShellProps {
   run: () => Promise<void>;
   /** A destructive confirm (§6c): the confirm button is `danger`, not `primary`. */
   danger?: boolean;
-  /** The "logged under your name" footer note; off where no reason is asked. */
-  showLogged?: boolean;
+  /**
+   * The "logged under your name" footer note: `true` says it is logged with the reason the
+   * dialog asks for, `'plain'` is for a dialog that asks for none, `false` drops the note.
+   */
+  showLogged?: boolean | 'plain';
   children: ReactNode;
 }
 
@@ -104,7 +107,13 @@ export function DialogShell({
           </p>
         )}
         {showLogged && (
-          <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</p>
+          <p className="text-xs text-text-dim">
+            {t(
+              showLogged === 'plain'
+                ? 'corpTaxBook.moons.dialogs.loggedPlain'
+                : 'corpTaxBook.moons.dialogs.logged'
+            )}
+          </p>
         )}
       </div>
     </Modal>
@@ -167,6 +176,7 @@ export function RecordPaymentDialog({
   minerName,
   defaultAmount,
   statementId,
+  statementLabel,
   onRecorded,
 }: {
   open: boolean;
@@ -175,13 +185,14 @@ export function RecordPaymentDialog({
   minerName: string;
   defaultAmount: number;
   statementId?: string;
+  /** The pinned Statement's period, so the dialog says where the payment goes first. */
+  statementLabel?: string;
   onRecorded?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const { edit, names } = useBook();
-  const [amount, setAmount] = useState(String(Math.round(defaultAmount)));
+  const [amount, setAmount] = useState(defaultAmount >= 1 ? String(Math.round(defaultAmount)) : '');
   const [payer, setPayer] = useState(String(miner.mainCharacterId));
-  const [note, setNote] = useState('');
   const value = Number(amount);
   return (
     <DialogShell
@@ -189,7 +200,8 @@ export function RecordPaymentDialog({
       onClose={onClose}
       title={t('corpTaxBook.moons.dialogs.record.title', { name: minerName })}
       confirmLabel={t('corpTaxBook.moons.dialogs.record.confirm', { amount: isk(value || 0) })}
-      canConfirm={value > 0 && note.trim().length > 0}
+      canConfirm={value > 0}
+      showLogged="plain"
       run={async () => {
         await edit({
           action: 'recordPayment',
@@ -198,7 +210,6 @@ export function RecordPaymentDialog({
           characterId: Number(payer),
           amount: value,
           at: new Date().toISOString(),
-          note: note.trim(),
           ...(statementId ? { statementId } : {}),
         });
         await onRecorded?.();
@@ -226,10 +237,14 @@ export function RecordPaymentDialog({
           />
         </Label>
       )}
-      <Label text={t('corpTaxBook.moons.dialogs.record.note')}>
-        <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
-      </Label>
-      <Effect>{t('corpTaxBook.moons.dialogs.record.effect', { name: minerName })}</Effect>
+      <Effect>
+        {statementId && statementLabel
+          ? t('corpTaxBook.moons.dialogs.record.effectPinned', {
+              name: minerName,
+              period: statementLabel,
+            })
+          : t('corpTaxBook.moons.dialogs.record.effect', { name: minerName })}
+      </Effect>
     </DialogShell>
   );
 }
@@ -332,6 +347,7 @@ export function AssignDonationDialog({
       title={t('corpTaxBook.moons.dialogs.assign.title')}
       confirmLabel={t('corpTaxBook.moons.dialogs.assign.confirm', { amount: isk(payment.amount) })}
       canConfirm={minerId !== ''}
+      showLogged="plain"
       run={async () => {
         await edit({ action: 'assignPayment', paymentId: payment.id, minerId });
       }}

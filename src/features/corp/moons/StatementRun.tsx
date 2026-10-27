@@ -27,7 +27,7 @@ import {
 } from '@/features/corpTaxBook/StatementMailPreview';
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
-import { isk, periodLabel, shortDate } from './moonsFormat';
+import { isk, periodLabel } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
 
@@ -243,16 +243,7 @@ export function StatementRun() {
     : t('corpTaxBook.moons.run.titleNone');
 
   return (
-    <Panel
-      title={title}
-      meta={
-        view.billableThrough && (
-          <span className="text-xs text-text-dim">
-            {t('corpTaxBook.moons.run.billableThrough', { date: shortDate(view.billableThrough) })}
-          </span>
-        )
-      }
-    >
+    <Panel title={title}>
       {nothingToDo ? (
         <p className="text-sm text-text-dim">{t('corpTaxBook.moons.run.nothing')}</p>
       ) : (

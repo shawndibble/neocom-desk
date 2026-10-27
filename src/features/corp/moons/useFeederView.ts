@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { resolveNames } from '@/features/character/names';
+import { loadTypeNames } from '@/features/character/typeNames';
 import {
   loadFeederView,
   type FeederView,
   type FeederViewAccess,
 } from '../taxBook/feederViewClient';
-import { characterIdsOf, payeeIdOf } from '../taxBook/feederViewModel';
+import { characterIdsOf, oreTypeIdsOf, payeeIdOf } from '../taxBook/feederViewModel';
 
 export type FeederViewLoad =
   | { state: 'loading' }
@@ -18,6 +19,8 @@ export type FeederViewLoad =
       names: (characterId: number) => string;
       /** A resolved name, or undefined: the refinery label chain skips what is unknown. */
       nameOf: (id: number) => string | undefined;
+      /** An ore's name, or undefined while unresolved. */
+      typeName: (typeId: number) => string | undefined;
     };
 
 /**
@@ -49,7 +52,10 @@ export function useFeederView(
               ...view.refineries.flatMap((r) => (r.solarSystemId == null ? [] : [r.solarSystemId])),
             ]
           : [];
-        const resolved = await resolveNames(ids).catch(() => new Map<number, string>());
+        const [resolved, oreNames] = await Promise.all([
+          resolveNames(ids).catch(() => new Map<number, string>()),
+          loadTypeNames(view ? oreTypeIdsOf(view.days) : []).catch(() => new Map<number, string>()),
+        ]);
         if (!cancelled)
           setLoad({
             state: 'ready',
@@ -57,6 +63,7 @@ export function useFeederView(
             view,
             names: (id) => resolved.get(id) ?? `#${id}`,
             nameOf: (id) => resolved.get(id),
+            typeName: (id) => oreNames.get(id),
           });
       } catch (e) {
         if (!cancelled)

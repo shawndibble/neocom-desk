@@ -1,5 +1,5 @@
 /**
- * "Add from my Fittings…" and "Paste EFT…": a Director's way to a Doctrine Fit. Either source
+ * "Add from my Fittings" and "Paste EFT": a Director's way to a Doctrine Fit. Either source
  * becomes the engine's snapshot, shown as hull and counts before it is added; unresolved EFT lines
  * are listed, never dropped quietly. The corp keeps its own copy, so a later edit to the source
  * Fitting changes nothing. Mounted only while open, so each opening starts blank.

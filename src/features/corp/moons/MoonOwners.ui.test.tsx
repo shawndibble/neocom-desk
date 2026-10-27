@@ -267,11 +267,11 @@ describe('MoonOwnerDetail', () => {
       [feeder(ASH, { agreedRatePct: 8 })],
       `/corp/moons/moon-owners/${ASH}`
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Set rate…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Set rate' }));
     const field = screen.getByLabelText('Rate (%)');
     await userEvent.clear(field);
     await userEvent.type(field, '9');
-    await userEvent.click(screen.getByRole('button', { name: 'Set rate' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)!);
     expect(setFeederRate).toHaveBeenCalledWith(7, BOOK, ASH, 9);
     expect(reload).toHaveBeenCalled();
   });
@@ -282,11 +282,11 @@ describe('MoonOwnerDetail', () => {
       [feeder(ASH, { agreedRatePct: 8 })],
       `/corp/moons/moon-owners/${ASH}`
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Set rate…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Set rate' }));
     const field = screen.getByLabelText('Rate (%)');
     await userEvent.clear(field);
     await userEvent.type(field, '101');
-    expect(screen.getByRole('button', { name: 'Set rate' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)).toBeDisabled();
   });
 
   it('settles otherwise with a note', async () => {
@@ -295,7 +295,7 @@ describe('MoonOwnerDetail', () => {
       [feeder(ASH, { agreedRatePct: 8 })],
       `/corp/moons/moon-owners/${ASH}`
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Settled otherwise…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Settled otherwise' }));
     await userEvent.click(screen.getByRole('checkbox'));
     await userEvent.type(screen.getByLabelText('Note (optional)'), 'Fuel');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -359,7 +359,7 @@ const paid = (id: string, amount: number, over: Partial<BookFeeder['payouts'][nu
 });
 
 describe('Paying a moon owner', () => {
-  it('lists the pay list by what is owed and offers Pay… only where something is', async () => {
+  it('lists the pay list by what is owed and offers Pay only where something is', async () => {
     renderBook(<MoonOwnersTab />, [
       // 1000 ore at 100 ISK: 8% is 8,000 less 7,000 paid = 1,000 owed.
       feeder(ASH, { agreedRatePct: 8, payouts: [paid('a', 7000)] }),
@@ -375,7 +375,7 @@ describe('Paying a moon owner', () => {
     expect(within(table).getAllByRole('button', { name: /^Pay / })).toHaveLength(2);
   });
 
-  it('has no Pay… for a moon owner with no rate or settled otherwise', () => {
+  it('has no Pay for a moon owner with no rate or settled otherwise', () => {
     renderBook(<MoonOwnersTab />, [
       feeder(ASH),
       feeder(CIN, {
@@ -443,7 +443,7 @@ describe('Paying a moon owner', () => {
       [feeder(ASH, { agreedRatePct: 8 })],
       `/corp/moons/moon-owners/${ASH}`
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Add a payment…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a payment' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('button', { name: "I've sent it" })).toBeDisabled();
     await userEvent.type(within(dialog).getByLabelText('Amount you sent'), '1234');
@@ -463,7 +463,7 @@ describe('Paying a moon owner', () => {
       [feeder(ASH, { agreedRatePct: 8 })],
       `/corp/moons/moon-owners/${ASH}`
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Pay…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pay' }));
     await userEvent.click(screen.getByRole('button', { name: "I've sent it" }));
     expect(recordFeederPayout).toHaveBeenCalledWith(
       7,

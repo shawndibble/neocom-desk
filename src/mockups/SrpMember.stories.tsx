@@ -28,7 +28,7 @@ import { CLAIMS, LOST_SHIPS, SRP_PARAMS, SRP_PHONE } from './srpMemberFixtures';
  * - **Default**: File a claim (paste a killmail link, optional Fleet or FC),
  *   then "Or pick a lost ship" behind a grant prompt for the opt-in
  *   killmail scope. My claims shows all four states; a Rejected row carries
- *   its reason and Re-file… (once).
+ *   its reason and Re-file (once).
  * - **Lost ships**: after the scope grant: one-tap File, Claimed rows,
  *   "Too old" past 30 days.
  * - **Blocked and errors**: a Not covered hull blocks filing with a message;
@@ -147,7 +147,7 @@ const empty = at('empty');
 const notSetUp = at('notSetUp');
 const refile = at('refile');
 
-/** @summary 1 · Default: file a claim (paste link, scope grant prompt for the lost-ships list) and My claims in all four states, Rejected with reason and Re-file…. New components: LostShipsList (prompt state). */
+/** @summary 1 · Default: file a claim (paste link, scope grant prompt for the lost-ships list) and My claims in all four states, Rejected with reason and Re-file. New components: LostShipsList (prompt state). */
 export const Default: Story = {};
 /** @summary 1 · Default, phone. */
 export const DefaultPhone: Story = { ...phone };

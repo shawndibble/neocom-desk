@@ -18,7 +18,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   const [openedAt] = useState(() => Date.now());
   const { status } = sync;
   const items: AttentionItem[] = [];
-  const syncing = sync.run.phase === 'syncing';
   const [showing, setShowing] = useState(false);
   const [shown, setShown] = useState(false);
 
@@ -59,22 +58,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.unratedDetail')}</p>,
     });
   }
-  const billable = (
-    <p className="flex items-center gap-1.5">
-      {view.billableThrough
-        ? t('corpTaxBook.moons.health.billableThrough', { date: shortDate(view.billableThrough) })
-        : t('corpTaxBook.moons.health.noBillable')}
-      <InfoTooltip
-        label={t('common.aboutLabel', { label: t('corpTaxBook.moons.health.billableLabel') })}
-        content={t('corpTaxBook.moons.health.billableHint', { hours: view.input.graceHours })}
-      />
-    </p>
-  );
-  const syncAction = canEdit ? (
-    <Button size="sm" onClick={() => void sync.sync()} disabled={syncing}>
-      {syncing ? t('corpTaxBook.moons.syncing') : t('corpTaxBook.moons.syncNow')}
-    </Button>
-  ) : undefined;
   // A visit that found no refinery to read is not "Synced": say what the book needs instead.
   // A book that collects for moon owners needs none of its own (decision 20261020-205040).
   const noRefineries =
@@ -88,7 +71,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       tone: 'warning',
       title: t('corpTaxBook.moons.health.noRefineries'),
       detail: <p>{t('corpTaxBook.moons.health.noRefineriesDetail')}</p>,
-      action: syncAction,
     });
   } else if (status.kind === 'never') {
     items.push({
@@ -96,25 +78,18 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       tone: 'warning',
       title: t('corpTaxBook.moons.health.never'),
       detail: <p>{t('corpTaxBook.moons.health.neverDetail')}</p>,
-      action: syncAction,
     });
-  } else {
+  } else if (status.kind === 'stale') {
+    // A fresh sync says nothing here: its age sits beside the page title.
     items.push({
       id: 'sync',
-      tone: status.kind === 'stale' ? 'warning' : 'info',
-      title: t(
-        status.kind === 'stale'
-          ? 'corpTaxBook.moons.health.stale'
-          : 'corpTaxBook.moons.health.synced',
-        {
-          age: formatAge(status.ageMs, t),
-          name: status.scheduled
-            ? t('corpTaxBook.moons.scheduledBy', { name: status.byName })
-            : status.byName,
-        }
-      ),
-      detail: billable,
-      action: syncAction,
+      tone: 'warning',
+      title: t('corpTaxBook.moons.health.stale', {
+        age: formatAge(status.ageMs, t),
+        name: status.scheduled
+          ? t('corpTaxBook.moons.scheduledBy', { name: status.byName })
+          : status.byName,
+      }),
     });
   }
   if (sync.run.phase === 'failed') {
@@ -190,7 +165,7 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
           )}
         </p>
       )}
-      {plain ? (
+      {items.length === 0 ? null : plain ? (
         <div className="space-y-1 text-xs text-text-dim" role="status">
           {items.map((item) => (
             <div key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">

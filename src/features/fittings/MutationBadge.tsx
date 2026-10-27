@@ -9,7 +9,7 @@ import { useUnknownMutation, useUnknownMutationTip, type MutableItem } from './u
 
 /**
  * The List row's flag after the item's name: a module, or a drone type's
- * units. Drones have no "Mutate…", so `fixable={false}` leaves the fix out of the tip.
+ * units. Drones have no "Mutate", so `fixable={false}` leaves the fix out of the tip.
  */
 export function MutationBadge({
   items,

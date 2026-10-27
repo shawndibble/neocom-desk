@@ -232,8 +232,8 @@ describe('HaulingItemDetail — listing', () => {
     expect(actions.requestBlueprints).toHaveBeenCalled();
     for (const name of [
       'Add to Quickbar',
-      'Set price alert…',
-      'Set stock target…',
+      'Set price alert',
+      'Set stock target',
       'Show info',
       'Open market in EVE',
       'Add to Compare',

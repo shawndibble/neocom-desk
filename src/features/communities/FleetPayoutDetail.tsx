@@ -63,7 +63,7 @@ function MemberView({
 
 /**
  * One Fleet Payout's side panel. The boss gets every Share with a paid toggle,
- * the progress and Remove payout…; a listed Member gets their own Share and
+ * the progress and Remove payout; a listed Member gets their own Share and
  * the boss's name. The server enforces who may read and write; this only
  * decides what to show.
  */

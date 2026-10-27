@@ -176,7 +176,7 @@ export async function confirmOwnership(characterId: number, ownerHash: string): 
 
 /**
  * Ensure *some* session for reads whose rule is only `request.auth != null`
- * (the lawless systems list, share links). Now each character has its own
+ * (share links, market data). Now each character has its own
  * session, so this is that character's own.
  */
 export function ensureAnySession(characterId: number): Promise<string> {

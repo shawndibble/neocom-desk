@@ -1,6 +1,6 @@
 /**
- * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Extractions,
- * Miners and Statements as path-segment tabs (ADR 0015), the moon and Miner
+ * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
+ * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
  * pages below their tabs, settings behind the header's gear and the audit log
  * behind Activity.
  *
@@ -19,6 +19,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   EmptyState,
   IconButton,
   LoadFailedState,
@@ -31,8 +32,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
+import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
-import { formatAge } from '@/lib/age';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { bookPartsFor } from '@/features/corp/taxBook/bookParts';
@@ -49,10 +50,12 @@ import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
 import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
 import { MinerDetail } from '@/features/corp/moons/MinerDetail';
 import { MinersTab } from '@/features/corp/moons/MinersTab';
+import { OverviewTab } from '@/features/corp/moons/OverviewTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
+import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDetail';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
@@ -93,20 +96,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const detail = moonsDetail(pathname);
-  const status = sync.status;
-  const meta =
-    status.kind === 'never' ? (
-      <span className="text-xs text-text-dim">{t('corpTaxBook.moons.neverSynced')}</span>
-    ) : (
-      <span className="text-xs text-text-dim">
-        {t('corpTaxBook.moons.syncedBy', {
-          age: formatAge(status.ageMs, t),
-          name: status.scheduled
-            ? t('corpTaxBook.moons.scheduledBy', { name: status.byName })
-            : status.byName,
-        })}
-      </span>
-    );
   // A corporation with no refineries of its own has nothing for Extractions to show.
   if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
     return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
@@ -117,7 +106,19 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         <>
           <PageHeader
             title={t('corp.moons.title')}
-            meta={meta}
+            meta={
+              sync.status.kind !== 'never' ? (
+                <DataAgeBadge
+                  date={new Date(sync.status.at)}
+                  note={t('corpTaxBook.moons.health.syncedBy', {
+                    name: sync.status.scheduled
+                      ? t('corpTaxBook.moons.scheduledBy', { name: sync.status.byName })
+                      : sync.status.byName,
+                  })}
+                  alwaysVisible
+                />
+              ) : undefined
+            }
             actions={
               <span className="flex items-center gap-1">
                 {tab === 'moon-owners' && canEdit && hasMoonOwners && (
@@ -131,10 +132,10 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
                 </Button>
                 {sync.ledger.state === 'ready' && (
                   <IconButton
-                    icon={<Icon.Refresh />}
+                    icon={sync.run.phase === 'syncing' ? <Spinner /> : <Icon.Refresh />}
                     label={t('corpTaxBook.moons.syncNow')}
                     onClick={() => void sync.sync()}
-                    disabled={sync.run.phase === 'syncing'}
+                    busy={sync.run.phase === 'syncing'}
                   />
                 )}
                 <IconButton
@@ -158,15 +159,17 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             </p>
           )}
           <BookHealthStrip sync={sync} />
+          {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
           {tab === 'statements' && <StatementsTab />}
           {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
         </>
       )}
-      {detail?.kind === 'extraction' && <MoonDetail id={detail.id} />}
-      {detail?.kind === 'miner' && <MinerDetail id={detail.id} />}
+      {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+      {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
       {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
+      {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
       {view && settingsOpen && (
         <BookSettingsDialog
           open
@@ -192,6 +195,39 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   );
 }
 
+/** Header and tabs stay while loading; only the body is a skeleton. */
+function MoonsLoading() {
+  const { t } = useTranslation();
+  const showTabs = moonsDetail(useLocation().pathname) === null;
+  const [tab, selectTab] = usePageTab(MOONS_TABS);
+  const tabsId = useTabsId();
+  const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
+  return (
+    <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+      <PageHeader title={t('corp.moons.title')} />
+      {showTabs && (
+        <Tabs
+          tabsId={tabsId}
+          label={t('corpTaxBook.moons.title')}
+          value={tab}
+          onChange={(id) => selectTab(id as typeof tab)}
+          tabs={tabBarTabs(MOONS_TABS).map((x) => ({ id: x.id, label: t(x.labelKey) }))}
+        />
+      )}
+      <div
+        role="status"
+        aria-label={t('common.loading')}
+        className="space-y-3"
+        data-testid="moons-loading"
+      >
+        <span className={cx(bar, 'h-8 w-1/3')} />
+        <span className={cx(bar, 'h-40 w-full')} />
+        <span className={cx(bar, 'h-24 w-full')} />
+      </div>
+    </div>
+  );
+}
+
 function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const { t } = useTranslation();
   const sync = useCorpTaxBook();
@@ -201,7 +237,8 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     () => bookPartsFor(tab, moonsDetail(pathname)?.kind ?? null),
     [tab, pathname]
   );
-  const book = useCorpBook(sync, wanted);
+  const open = moonsDetail(pathname);
+  const book = useCorpBook(sync, wanted, { minerId: open?.kind === 'miner' ? open.id : undefined });
   const { state } = book;
   // The rail and the page title list Moons' tabs only once a book mode is chosen.
   const unchosen = state.status === 'off';
@@ -211,13 +248,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     return () => setMoonsTabsHidden(false);
   }, [decided, unchosen]);
 
-  if (state.status === 'loading') {
-    return (
-      <div className="flex justify-center p-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
+  if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -308,13 +339,7 @@ export function CorpMoons() {
   const { t } = useTranslation();
   const access = useCorpAccess();
   const { ledger } = useCorpTaxBook({ autoSync: false });
-  if (access.state === 'unknown') {
-    return (
-      <div className="flex justify-center p-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
+  if (access.state === 'unknown') return <MoonsLoading />;
   if (access.state !== 'ready') {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">

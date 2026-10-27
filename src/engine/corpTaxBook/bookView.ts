@@ -13,6 +13,7 @@ import {
   isBeforeBook,
   type Allocation,
   type DismissalCredit,
+  type PaymentCredit,
   type RecordedWriteOff,
   type TaxPayment,
 } from './allocation';
@@ -30,7 +31,7 @@ import {
   type ExtractionState,
   type LearnedChunkRate,
 } from './extraction';
-import { overdueStatus, type Declaration } from './overdue';
+import { overdueStatus, type Declaration, type OverdueState } from './overdue';
 import {
   draftStatement,
   frozenDayRate,
@@ -48,6 +49,7 @@ import type { TaxRate } from './rates';
 import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
+import { wholeIsk } from './wholeIsk';
 
 export interface BookViewInput {
   corporationId: number;
@@ -87,7 +89,7 @@ export interface BookViewInput {
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
    * A moon owner's prices by raw type id (#4621): the server's rule for the moon owner's own
-   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay… and that page owe one figure.
+   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay and that page owe one figure.
    * Absent: `pricesOn`.
    */
   moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;
@@ -159,6 +161,8 @@ export interface ExtractionRow {
   /** Tax recorded against this Extraction's days. */
   tax: number;
   minerCount: number;
+  /** Who flagged the chunk Fully Mined and when (#5257); absent when not flagged. */
+  fullyMined?: { by: number; byName: string; at: string };
 }
 
 export interface NeedsYouDeclaration {
@@ -270,6 +274,81 @@ function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
   };
 }
 
+/** What the next Statement would bill one Miner, in full: the draft every figure below it reads. */
+export function minerDraft(
+  input: BookViewInput,
+  minerId: string,
+  statements: readonly Statement[],
+  charges: readonly DayCharge[],
+  billableThrough: string | undefined
+): StatementDraft {
+  return draftStatement({
+    minerId,
+    startDate: input.startDate,
+    period: { start: input.startDate, end: billableThrough ?? input.startDate },
+    charges,
+    adjustments: input.adjustments,
+    issued: statements,
+    paidStatementIds: input.paidStatementIds,
+    dismissals: input.dismissals,
+    billableThrough,
+    final: true,
+  });
+}
+
+/** Tax on days that are not Billable yet: not dismissed, not on a Statement, after the last Billable day. */
+export function pendingTax(
+  input: BookViewInput,
+  charges: readonly DayCharge[],
+  billedKeys: ReadonlySet<string>,
+  billableThrough: string | undefined
+): number {
+  return charges
+    .filter(
+      (c) =>
+        !activeDismissalFor(c, input.dismissals) &&
+        !billedKeys.has(c.key) &&
+        (billableThrough === undefined || c.date > billableThrough)
+    )
+    .reduce((sum, c) => sum + c.taxOwed, 0);
+}
+
+/** The Miner ids a view lists, in order: groupings, then the ids days, Statements and payments name. */
+export function minerIdsOf(input: BookViewInput, charges: readonly DayCharge[]): Set<string> {
+  const minerIds = new Set<string>(input.miners.map((m) => m.id));
+  for (const c of charges) minerIds.add(c.minerId);
+  for (const s of input.statements) minerIds.add(s.minerId);
+  for (const p of input.payments) if (p.minerId) minerIds.add(p.minerId);
+  return minerIds;
+}
+
+/** Each character's latest recorded corporation, from the ledger rows. */
+export function latestCorporationOf(
+  entries: readonly ObservedMiningEntry[]
+): Map<number, { date: string; corp: number }> {
+  const latest = new Map<number, { date: string; corp: number }>();
+  for (const e of entries) {
+    const held = latest.get(e.characterId);
+    if (!held || e.date >= held.date)
+      latest.set(e.characterId, { date: e.date, corp: e.recordedCorporationId });
+  }
+  return latest;
+}
+
+/** Member while a character is in the corporation now; left if it was; else a guest. */
+export function standingOf(
+  characterIds: readonly number[],
+  latestCorp: ReadonlyMap<number, { corp: number }>,
+  input: Pick<BookViewInput, 'corporationId' | 'memberIds'>
+): MinerStanding {
+  const corps = characterIds.map((cid) => latestCorp.get(cid)?.corp);
+  const wasMember = corps.some((c) => c === input.corporationId);
+  const isMember = input.memberIds
+    ? characterIds.some((cid) => input.memberIds!.has(cid))
+    : wasMember;
+  return isMember ? 'member' : wasMember ? 'left' : 'guest';
+}
+
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
   // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
@@ -293,17 +372,8 @@ export function buildBookView(input: BookViewInput): BookView {
     graceHours: input.graceHours,
   });
 
-  const minerIds = new Set<string>(input.miners.map((m) => m.id));
-  for (const c of charges) minerIds.add(c.minerId);
-  for (const s of input.statements) minerIds.add(s.minerId);
-  for (const p of input.payments) if (p.minerId) minerIds.add(p.minerId);
-
-  const latestCorp = new Map<number, { date: string; corp: number }>();
-  for (const e of input.entries) {
-    const held = latestCorp.get(e.characterId);
-    if (!held || e.date >= held.date)
-      latestCorp.set(e.characterId, { date: e.date, corp: e.recordedCorporationId });
-  }
+  const minerIds = minerIdsOf(input, charges);
+  const latestCorp = latestCorporationOf(input.entries);
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
@@ -333,18 +403,7 @@ export function buildBookView(input: BookViewInput): BookView {
       startDate: input.startDate,
     });
     const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
-    const draft = draftStatement({
-      minerId: id,
-      startDate: input.startDate,
-      period: { start: input.startDate, end: billableThrough ?? input.startDate },
-      charges: mine,
-      adjustments: input.adjustments,
-      issued: statements,
-      paidStatementIds: input.paidStatementIds,
-      dismissals: input.dismissals,
-      billableThrough,
-      final: true,
-    });
+    const draft = minerDraft(input, id, statements, mine, billableThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
@@ -431,26 +490,14 @@ export function buildBookView(input: BookViewInput): BookView {
       }
     }
     const unbilled = draftLines.reduce((sum, l) => sum + l.tax, 0);
-    const pending = mine
-      .filter(
-        (c) =>
-          !activeDismissalFor(c, input.dismissals) &&
-          !billedBy.has(c.key) &&
-          (billableThrough === undefined || c.date > billableThrough)
-      )
-      .reduce((sum, c) => sum + c.taxOwed, 0);
+    const pending = pendingTax(input, mine, new Set(billedBy.keys()), billableThrough);
     const lastPaid = payments
       .filter((p) => p.amount - (p.notTaxAmount ?? 0) > 0)
       .map((p) => p.at)
       .sort()
       .at(-1);
 
-    const corps = characterIds.map((cid) => latestCorp.get(cid)?.corp);
-    const wasMember = corps.some((c) => c === input.corporationId);
-    const isMember = input.memberIds
-      ? characterIds.some((cid) => input.memberIds!.has(cid))
-      : wasMember;
-    const standing: MinerStanding = isMember ? 'member' : wasMember ? 'left' : 'guest';
+    const standing = standingOf(characterIds, latestCorp, input);
 
     const row: MinerRow = {
       id,
@@ -544,6 +591,50 @@ export function measurable(x: SyncExtraction) {
   };
 }
 
+/** The fields of an Extraction's row that need no ledger day: its state, dates, make-up and estimate. */
+export type ExtractionRowBase = Omit<ExtractionRow, 'minedPct' | 'tax' | 'minerCount'>;
+
+type ExtractionRowInput = Pick<
+  BookViewInput,
+  'now' | 'structureExpiryHours' | 'chunkM3PerHour' | 'surveyOreLines'
+>;
+
+/** One Extraction's row without the ledger-derived fields; the same rows the Overview schedule reads. */
+export function extractionRowBase(
+  x: SyncExtraction,
+  input: ExtractionRowInput,
+  todayPrices: ReadonlyMap<number, number>,
+  chunkRates: ReadonlyMap<number, LearnedChunkRate>
+): ExtractionRowBase & { fracturedAt?: string } {
+  const ex = toEngineExtraction(x);
+  const expiryHours = input.structureExpiryHours[String(x.structureId)];
+  const status = extractionStatus(ex, input.now, { expiryHours });
+  // Source order (D13): the ExtractionStarted notification, then a linked Survey.
+  const notified = x.oreLines ?? [];
+  const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
+  const oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
+  const estimatedValue = oreLines.length
+    ? oreLines.reduce((sum, l) => sum + l.quantity * (todayPrices.get(l.typeId) ?? 0), 0)
+    : null;
+  return {
+    id: ex.id,
+    structureId: x.structureId,
+    moonId: x.moonId,
+    state: status.state,
+    startedAt: ex.startedAt,
+    chunkArrivalAt: ex.chunkArrivalAt,
+    ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
+    ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
+    ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
+    oreSource: notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
+    oreLines,
+    ...(surveyed.length > 0
+      ? { chunkRate: chunkRateFor(chunkRates.get(x.structureId), input.chunkM3PerHour) }
+      : {}),
+    estimatedValue,
+  };
+}
+
 function buildExtractionRows(
   input: BookViewInput,
   charges: readonly DayCharge[],
@@ -554,21 +645,14 @@ function buildExtractionRows(
   const todayPrices = input.pricesOn(today).prices;
   return input.extractions
     .map((x): ExtractionRow => {
+      const base = extractionRowBase(x, input, todayPrices, chunkRates);
       const ex = toEngineExtraction(x);
       const expiryHours = input.structureExpiryHours[String(x.structureId)];
-      const status = extractionStatus(ex, input.now, { expiryHours });
-      // Source order (D13): the ExtractionStarted notification, then a linked Survey.
-      const notified = x.oreLines ?? [];
-      const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
-      const oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
-      const estimatedValue = oreLines.length
-        ? oreLines.reduce((sum, l) => sum + l.quantity * (todayPrices.get(l.typeId) ?? 0), 0)
-        : null;
       let minedPct: number | null = null;
-      if (status.fracturedAt && oreLines.length) {
+      if (base.fracturedAt && base.oreLines.length) {
         const mined = minedDuringExtraction(ex, input.entries, { expiryHours });
-        const total = oreLines.reduce((s, l) => s + l.quantity, 0);
-        const got = oreLines.reduce(
+        const total = base.oreLines.reduce((s, l) => s + l.quantity, 0);
+        const got = base.oreLines.reduce(
           (s, l) =>
             s + Math.min(l.quantity, mined.find((m) => m.typeId === l.typeId)?.quantity ?? 0),
           0
@@ -577,25 +661,11 @@ function buildExtractionRows(
       }
       const mine = charges.filter((c) => c.extractionId === ex.id);
       return {
-        id: ex.id,
-        structureId: x.structureId,
-        moonId: x.moonId,
-        state: status.state,
-        startedAt: ex.startedAt,
-        chunkArrivalAt: ex.chunkArrivalAt,
-        ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
-        ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
-        ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
-        oreSource:
-          notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
-        oreLines,
-        ...(surveyed.length > 0
-          ? { chunkRate: chunkRateFor(chunkRates.get(x.structureId), input.chunkM3PerHour) }
-          : {}),
-        estimatedValue,
+        ...base,
         minedPct,
         tax: mine.reduce((s, c) => s + (frozenByKey.get(c.key)?.tax ?? c.taxOwed), 0),
         minerCount: new Set(mine.map((c) => c.minerId)).size,
+        ...(x.fullyMined ? { fullyMined: x.fullyMined } : {}),
       };
     })
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));
@@ -650,6 +720,8 @@ export interface MinerDetail {
   days: DayRow[];
   payments: (TaxPayment & { credited: number })[];
   statements: Statement[];
+  /** Which Statement each payment's money went to (#5288), one entry per payment and Statement. */
+  paymentCredits: PaymentCredit[];
   /** Tolerance write-offs, derived from `allocatePayments` (amounts are not stored). */
   toleranceWriteOffs: { statementId: string; amount: number }[];
   /** Lines recorded after payment, never billed (D22). */
@@ -681,6 +753,7 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
       .map((p) => ({ ...p, credited: p.amount - Math.min(p.notTaxAmount ?? 0, p.amount) }))
       .sort((a, b) => b.at.localeCompare(a.at)),
     statements: [...inner.statements].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
+    paymentCredits: inner.allocation.paymentCredits,
     toleranceWriteOffs: inner.allocation.writeOffs,
     lateWriteOffs: inner.draft.writtenOff.map((w) => ({
       chargeKey: w.chargeKey,
@@ -707,8 +780,8 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
 export interface ExtractionDetail {
   row: ExtractionRow;
   miners: { minerId: string; units: number; value: number; tax: number }[];
-  /** Earlier cycles at the same refinery and moon, newest first. */
-  past: ExtractionRow[];
+  /** The moon's other cycles, newer and older, newest first. */
+  otherCycles: ExtractionRow[];
 }
 
 export function extractionDetail(view: BookView, id: string): ExtractionDetail | undefined {
@@ -727,14 +800,8 @@ export function extractionDetail(view: BookView, id: string): ExtractionDetail |
   return {
     row,
     miners: [...byMiner].map(([minerId, v]) => ({ minerId, ...v })).sort((a, b) => b.tax - a.tax),
-    past: view.extractions
-      .filter(
-        (x) =>
-          x.id !== id &&
-          x.structureId === row.structureId &&
-          x.moonId === row.moonId &&
-          x.startedAt < row.startedAt
-      )
+    otherCycles: view.extractions
+      .filter((x) => x.id !== id && x.structureId === row.structureId && x.moonId === row.moonId)
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
   };
 }
@@ -850,6 +917,128 @@ export interface PeriodRow {
   paid: number;
   outstanding: number;
   issuedAt: string | null;
+  /** Statements on the period (one per miner), and how many of them were mailed at least once. */
+  statements: number;
+  mailed: number;
+  /** The earliest due date among its unsettled, unpaused Statements; null when none is. */
+  dueAt: string | null;
+  /** When every unsettled Statement is paused by a declaration: the earliest pause end; else null. */
+  pausedUntil: string | null;
+}
+
+/** A period with Statements: sent, overdue or paid. Open, ready, closed and rollover rows have none. */
+export const isIssuedPeriod = (r: { statements: number }) => r.statements > 0;
+
+/** What the book recorded about a Statement's mail; `stopped` wins over the sent count. */
+export interface StatementMail {
+  kind: 'sent' | 'not-mailed' | 'stopped';
+  count: number;
+}
+
+/** One miner's Statement on a period page. */
+export interface PeriodStatementRow {
+  statement: Statement;
+  billed: number;
+  paid: number;
+  outstanding: number;
+  settled: boolean;
+  overdue: boolean;
+  /** When it goes (or went) overdue; null once settled. */
+  dueAt: string | null;
+  /** Where its Overdue clock stands; a declaration pauses it. */
+  state: OverdueState;
+  /** While paused: when the pause ends on its own. */
+  pausedUntil?: string;
+  mail: StatementMail;
+}
+
+/**
+ * Billed, paid and outstanding as whole ISK, where Billed - Paid - Outstanding is always 0 (#5247).
+ * Less than 1 ISK credited is not a payment: the whole amount stays outstanding.
+ */
+function shownFigures(amount: number, remaining: number, credited: number) {
+  const billed = wholeIsk(amount);
+  const outstanding = wholeIsk(credited) === 0 ? billed : Math.min(billed, wholeIsk(remaining));
+  return { billed, outstanding, paid: billed - outstanding };
+}
+
+function statementStanding(view: BookView, s: Statement): PeriodStatementRow {
+  const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
+  const settled = settlement?.settled ?? false;
+  const status = settled
+    ? undefined
+    : overdueStatus({
+        issuedAt: s.issuedAt,
+        settled: false,
+        now: view.input.now,
+        declarations: view.input.declarations.filter((d) => d.statementId === s.id),
+        overdueDays: view.input.overdueDays,
+      });
+  const count = s.mailsSent ?? 0;
+  const shown = settled
+    ? shownFigures(s.amount, 0, s.amount)
+    : shownFigures(s.amount, settlement?.remaining ?? s.amount, settlement?.credited ?? 0);
+  return {
+    statement: s,
+    ...shown,
+    settled,
+    overdue: status?.state === 'overdue',
+    dueAt: status?.overdueAt ?? null,
+    state: status?.state ?? 'settled',
+    ...(status?.pausedUntil ? { pausedUntil: status.pausedUntil } : {}),
+    mail: {
+      kind: s.remindersStopped ? 'stopped' : count > 0 ? 'sent' : 'not-mailed',
+      count,
+    },
+  };
+}
+
+/** The Statements of one issued period, one per miner; undefined when the period has none. */
+export function periodStatements(
+  view: BookView,
+  periodStart: string
+): PeriodStatementRow[] | undefined {
+  const statements = view.input.statements.filter((s) => s.periodStart === periodStart);
+  return statements.length === 0 ? undefined : statements.map((s) => statementStanding(view, s));
+}
+
+/** One Statement's panel (#5286): its standing plus every payment credited to it. */
+export interface StatementDetail extends PeriodStatementRow {
+  /** Payments, dismissals and officer write-offs credited to it. */
+  credited: number;
+  /** What officer write-offs forgave of it (part of `credited`). */
+  forgiven: number;
+  /** The shortfall the tolerance wrote off. */
+  writtenOff: number;
+  remaining: number;
+  /** The part of each Tax Payment that went to this Statement, oldest first. */
+  payments: { id: string; amount: number; at: string; source: 'donation' | 'manual' }[];
+}
+
+/** One Statement with its figures and payments; undefined when the book holds no such Statement. */
+export function statementDetail(view: BookView, statementId: string): StatementDetail | undefined {
+  const statement = view.input.statements.find((s) => s.id === statementId);
+  if (!statement) return undefined;
+  const miner = view.internals.byMiner.get(statement.minerId);
+  const settlement = miner?.allocation.byStatement.get(statement.id);
+  const payments = (miner?.allocation.paymentCredits ?? [])
+    .filter((c) => c.statementId === statement.id && wholeIsk(c.amount) >= 1)
+    .flatMap((c) => {
+      const p = miner?.payments.find((x) => x.id === c.paymentId);
+      return p ? [{ id: p.id, amount: wholeIsk(c.amount), at: p.at, source: p.source }] : [];
+    })
+    .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+  const standing = statementStanding(view, statement);
+  const writtenOff = wholeIsk(settlement?.writtenOff ?? 0);
+  return {
+    ...standing,
+    // Billed − Outstanding, as the Statements table shows, so the panel never differs by 1 ISK.
+    credited: Math.max(0, standing.paid - writtenOff),
+    forgiven: wholeIsk(settlement?.forgiven ?? 0),
+    writtenOff,
+    remaining: standing.outstanding,
+    payments,
+  };
 }
 
 /**
@@ -894,6 +1083,9 @@ function ownPeriodBilling(
   return { miners, billed, rolled, rolledAmount };
 }
 
+const earliest = (dates: readonly (string | null | undefined)[]) =>
+  dates.filter((d): d is string => !!d).sort()[0] ?? null;
+
 export function periodRows(view: BookView): PeriodRow[] {
   const byStart = new Map<string, Statement[]>();
   for (const s of view.input.statements) {
@@ -901,36 +1093,26 @@ export function periodRows(view: BookView): PeriodRow[] {
   }
   const rows: PeriodRow[] = [];
   for (const [start, statements] of byStart) {
-    let paid = 0;
-    let outstanding = 0;
-    let overdue = false;
-    let unmailed = false;
-    for (const s of statements) {
-      const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
-      if (
-        !settlement?.settled &&
-        overdueStatus({
-          issuedAt: s.issuedAt,
-          settled: false,
-          now: view.input.now,
-          declarations: view.input.declarations.filter((d) => d.statementId === s.id),
-          overdueDays: view.input.overdueDays,
-        }).state === 'overdue'
-      )
-        overdue = true;
-      if ((s.mailsSent ?? 0) === 0) unmailed = true;
-      paid += settlement?.credited ?? 0;
-      outstanding += settlement && !settlement.settled ? settlement.remaining : 0;
-    }
+    const standing = statements.map((s) => statementStanding(view, s));
+    const unsettled = standing.filter((x) => !x.settled);
+    const unpaused = unsettled.filter((x) => x.state !== 'paused');
+    const paid = standing.reduce((sum, x) => sum + x.paid, 0);
+    const outstanding = standing.reduce((sum, x) => sum + x.outstanding, 0);
+    const overdue = standing.some((x) => x.overdue);
+    const unmailed = standing.some((x) => x.mail.count === 0);
     rows.push({
       start,
       end: statements[0].periodEnd,
-      status: overdue ? 'overdue' : outstanding === 0 ? 'paid' : unmailed ? 'issued' : 'sent',
+      status: overdue ? 'overdue' : unsettled.length === 0 ? 'paid' : unmailed ? 'issued' : 'sent',
       miners: new Set(statements.map((s) => s.minerId)).size,
-      billed: statements.reduce((s, x) => s + x.amount, 0),
+      billed: standing.reduce((sum, x) => sum + x.billed, 0),
       paid,
       outstanding,
       issuedAt: statements.map((s) => s.issuedAt).sort()[0],
+      statements: statements.length,
+      mailed: standing.filter((x) => x.mail.count > 0).length,
+      dueAt: earliest(unpaused.map((x) => x.dueAt)),
+      pausedUntil: unpaused.length === 0 ? earliest(unsettled.map((x) => x.pausedUntil)) : null,
     });
   }
   const ready = nextRunPeriod(view);
@@ -972,6 +1154,10 @@ export function periodRows(view: BookView): PeriodRow[] {
       paid: 0,
       outstanding: 0,
       issuedAt: null,
+      statements: 0,
+      mailed: 0,
+      dueAt: null,
+      pausedUntil: null,
     });
   };
   // Every period with unbilled days, not only the next one; a Statement still

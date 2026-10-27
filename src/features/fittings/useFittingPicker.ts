@@ -1,5 +1,5 @@
 /**
- * The "Compare with…" side of `FittingStartScreen`: the same ways in as the
+ * The "Compare with" side of `FittingStartScreen`: the same ways in as the
  * workspace (Import, saved and In-game Fittings), but a chosen Fitting is
  * handed back as a Fitting Share Code instead of being opened in the editor.
  * My Fittings already carries a code; every other source needs one round of

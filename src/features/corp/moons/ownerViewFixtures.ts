@@ -52,15 +52,17 @@ export function fixtureView(over: Partial<FeederViewSummary> = {}): FeederView {
     days: [
       {
         date: '2026-10-01',
-        billable: true,
-        pct: 8,
-        dueIsk: 0,
-        valueIsk: 0,
         lines: [
-          { characterId: 1, structureId: 10, volume: 810_000, valueIsk: 81_204_000 },
-          { characterId: 2, structureId: 10, volume: 590_000, valueIsk: 58_960_000 },
-          { characterId: 3, structureId: 11, volume: 1_520_000, valueIsk: 152_430_000 },
-          { characterId: 4, structureId: 11, volume: 458_000, valueIsk: 45_800_000 },
+          { characterId: 1, structureId: 10, typeId: 45490, volume: 810_000, quantity: 810_000 },
+          { characterId: 2, structureId: 10, typeId: 45490, volume: 590_000, quantity: 590_000 },
+          {
+            characterId: 3,
+            structureId: 11,
+            typeId: 45492,
+            volume: 1_520_000,
+            quantity: 1_520_000,
+          },
+          { characterId: 4, structureId: 11, typeId: 45492, volume: 458_000, quantity: 458_000 },
         ],
       },
     ],

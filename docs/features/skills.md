@@ -165,7 +165,7 @@ Behaviors:
 
 ## 4. Compare (drawer over Trained, `compare/SkillCompareDrawer.tsx`)
 
-Not a page or a tab: opened by "Compare with…" in the Trained header (tier-2 `IconButton visibleLabel`). A right `SlideOver` on desktop, a full-height `Modal placement="sheet-full"` on a phone. `/skills/compare` redirects to `/skills/trained` (`legacyPaths.ts`, dropping `groupColumn`) and a Trained opened with `?ids=` opens the drawer on that selection. Decision: `20261014-082107-skills-compare-is-a-drawer-over-trained-not.md`.
+Not a page or a tab: opened by "Compare with" in the Trained header (tier-2 `IconButton visibleLabel`). A right `SlideOver` on desktop, a full-height `Modal placement="sheet-full"` on a phone. `/skills/compare` redirects to `/skills/trained` (`legacyPaths.ts`, dropping `groupColumn`) and a Trained opened with `?ids=` opens the drawer on that selection. Decision: `20261014-082107-skills-compare-is-a-drawer-over-trained-not.md`.
 
 - Toolbar: Saved menu (Popover), table export (`TableActionsMenu`, only when >1 Character loaded), Refresh (forces refetch, disabled while refreshing), data-age badge (oldest selected).
 - "Characters to compare": toggle chip per roster Character (avatar, name, per-character spinner while loading). Opening with nothing picked seeds the active Character (once per opening). Closing the drawer clears `ids`/`comparisonId`/`baseline` from the URL; a Trained opened with `?ids=` or `?comparisonId=` opens the drawer. Selection in URL `?ids=`; `comparisonId`, `baseline`, `differingOnly` (default on) also URL params. Unknown ids in a hand-edited URL are pruned once the roster loads. Quick successive toggles accumulate (`latestIds`) rather than overwriting each other while the URL catches up.

@@ -128,7 +128,7 @@ describe('Templates in the info panel', () => {
       target: { value: 'Bring a hauler' },
     });
     await openMenu(user);
-    await user.click(await screen.findByRole('menuitem', { name: 'Save current as template…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Save current as template' }));
 
     const dialog = await screen.findByRole('dialog');
     const save = within(dialog).getByRole('button', { name: 'Save template' }) as HTMLButtonElement;
@@ -154,7 +154,7 @@ describe('Templates in the info panel', () => {
       target: { value: 'New notes' },
     });
     await openMenu(user);
-    await user.click(await screen.findByRole('menuitem', { name: 'Save current as template…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Save current as template' }));
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText('Name'), 'talidal belt');
     await user.click(within(dialog).getByRole('button', { name: 'Replace template' }));
@@ -170,7 +170,7 @@ describe('Templates in the info panel', () => {
     const user = userEvent.setup();
     render(<SurveyInfoEditor characterId={7} survey={SURVEY} moon />);
     await openMenu(user);
-    await user.click(await screen.findByRole('menuitem', { name: 'Manage templates…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Manage templates' }));
     const dialog = await screen.findByRole('dialog');
 
     await user.click(within(dialog).getAllByRole('button', { name: 'Rename' })[1]);
@@ -199,7 +199,7 @@ describe('Templates in the info panel', () => {
     render(<SurveyInfoEditor characterId={7} survey={SURVEY} moon />);
     await openMenu(user);
     expect(await screen.findByText('No templates yet')).toBeTruthy();
-    expect(screen.queryByRole('menuitem', { name: 'Manage templates…' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Manage templates' })).toBeNull();
   });
 });
 

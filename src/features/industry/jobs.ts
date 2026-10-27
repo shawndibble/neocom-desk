@@ -170,10 +170,10 @@ export function secondsRemaining(job: Pick<IndustryJob, 'end_date'>, nowMs: numb
   return Math.max(0, (Date.parse(job.end_date) - nowMs) / 1000);
 }
 
-/** Activity ids issue #1787's "Log production…" row action applies to — the only two that produce an item at all. */
+/** Activity ids issue #1787's "Log production" row action applies to — the only two that produce an item at all. */
 const LOGGABLE_PRODUCTION_ACTIVITIES = new Set([1, 11]);
 
-/** Whether a job's row can offer "Log production…": done, manufacturing/reaction, and it actually produced something (research/copying/invention jobs have no product). */
+/** Whether a job's row can offer "Log production": done, manufacturing/reaction, and it actually produced something (research/copying/invention jobs have no product). */
 export function canLogProductionFromJob(
   job: Pick<IndustryJob, 'activity_id' | 'product_type_id' | 'end_date'>,
   nowMs: number

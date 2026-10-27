@@ -172,7 +172,7 @@ describe('Skills', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Compare with…' }));
+    await user.click(await screen.findByRole('button', { name: 'Compare with' }));
 
     const drawer = await screen.findByRole('dialog', { name: 'Compare skills' });
     expect(

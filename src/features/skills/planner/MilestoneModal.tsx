@@ -1,6 +1,6 @@
 /**
  * Plan Milestone (GLOSSARY.md) naming modal: the one small form shared by
- * "Add milestone…" and "Rename" — seeded with the existing name on rename,
+ * "Add milestone" and "Rename" — seeded with the existing name on rename,
  * blank on add. One instance is reused across every row (PlanEditor holds a
  * single `milestoneModal` state), so re-seeding on every open transition
  * matters — otherwise a second row would inherit whatever the first one was

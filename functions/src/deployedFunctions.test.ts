@@ -15,16 +15,13 @@ const DEPLOYED = [
   'corpTaxBookCall',
   'dailyHousekeeping',
   'dispatchProjections',
-  'finalizeCorpTaxBookRemovals',
   'mintFirebaseToken',
   'mutamarketEstimate',
   'pollEveNotifications',
   // Firestore triggers (issue #5121): community alerts pushed on the backend's own write.
   'pushCommunityAlert',
   'pushCommunityPledge',
-  'syncActiveWars',
   'syncCorpTaxBooks',
-  'syncLawlessSystems',
   'syncPublicContractOffers',
 ];
 

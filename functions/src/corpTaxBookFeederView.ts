@@ -140,19 +140,21 @@ export interface FeederViewSummary {
   contentHash?: string;
 }
 
+/**
+ * One ore a character mined at one refinery on one day. The moon owner sees what the in-game
+ * ledger shows: ore and quantity, never an ISK value or the accounting side's rate or due (#5261).
+ */
 export interface FeederViewDayLine {
   characterId: number;
   structureId: number;
+  typeId: number;
+  /** Same as `quantity`; older clients read it. */
   volume: number;
-  valueIsk: number;
+  quantity: number;
 }
 
 export interface FeederViewDay {
   date: string;
-  billable: boolean;
-  pct: number | null;
-  dueIsk: number;
-  valueIsk: number;
   lines: FeederViewDayLine[];
 }
 
@@ -368,15 +370,16 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     if (!day) dayMap.set(r.date, (day = { value: 0, unpriced: false, lines: new Map() }));
     day.value += value;
     if (unit <= 0) day.unpriced = true;
-    const key = `${r.characterId}:${r.structureId}`;
+    const key = `${r.characterId}:${r.structureId}:${r.typeId}`;
     const line = day.lines.get(key) ?? {
       characterId: r.characterId,
       structureId: r.structureId,
+      typeId: r.typeId,
       volume: 0,
-      valueIsk: 0,
+      quantity: 0,
     };
     line.volume += r.quantity;
-    line.valueIsk += value;
+    line.quantity += r.quantity;
     day.lines.set(key, line);
   }
 
@@ -384,7 +387,6 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     [...dayMap].map(([date, d]) => ({ date, value: d.value })),
     { coveragePeriods: record.coveragePeriods, ownerRateHistory: history, modeChanges, isBillable }
   );
-  const dueByDay = new Map(accrual.byDay.map((d) => [d.date, d.due]));
   let unpricedDays = 0;
   const days: FeederViewDay[] = [...dayMap]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -393,12 +395,9 @@ export function buildFeederView(input: FeederViewInput): FeederView {
       if (billable && d.unpriced) unpricedDays += 1;
       return {
         date,
-        billable,
-        pct: effectiveOwnerRatePct(history, date) ?? null,
-        dueIsk: dueByDay.get(date) ?? 0,
-        valueIsk: d.value,
         lines: [...d.lines.values()].sort(
-          (a, b) => a.characterId - b.characterId || a.structureId - b.structureId
+          (a, b) =>
+            a.characterId - b.characterId || a.structureId - b.structureId || a.typeId - b.typeId
         ),
       };
     });

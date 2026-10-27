@@ -12,6 +12,8 @@ export type DscanRole =
   'capitals' | 'industrial' | 'transport' | 'support' | 'dps' | 'drones' | 'structures';
 
 export interface DscanTypeInfo {
+  /** Lets a hull be filed by its own id when its group is shared with combat ships. */
+  typeId?: number;
   groupId: number;
   categoryId: number;
 }
@@ -56,8 +58,18 @@ const STRUCTURE_CATEGORIES = new Set([65, 23]); // Upwell structure, Starbase
 
 /** Carrier, Dreadnought, Supercarrier, Titan, Force Auxiliary, Lancer Dreadnought. */
 export const CAPITAL_GROUPS: ReadonlySet<number> = new Set([547, 485, 659, 30, 1538, 4594]);
-/** Exhumer, Mining Barge, Industrial Command Ship, Capital Industrial, Expedition Frigate. */
-const INDUSTRIAL_GROUPS = new Set([543, 463, 941, 883, 1283]);
+/**
+ * Exhumer, Mining Barge, Industrial Command Ship, Capital Industrial, Expedition
+ * Frigate, Expedition Command Ship.
+ */
+const INDUSTRIAL_GROUPS = new Set([543, 463, 941, 883, 1283, 4902]);
+/**
+ * ORE builds no combat ship, but these hulls share a group with combat ones, so
+ * the group alone files them as damage: Venture, Venture Consortium Issue
+ * (Frigate), Pioneer, Pioneer Consortium Issue, Perseverance (Destroyer),
+ * Outrider (Command Destroyer). `ORE hulls` in the tests fails on a new one.
+ */
+const ORE_HULL_TYPES = new Set([32880, 89648, 89240, 89647, 91174, 89649]);
 /** Industrial, Deep Space Transport, Blockade Runner, Freighter, Jump Freighter. */
 const TRANSPORT_GROUPS = new Set([28, 380, 1202, 513, 902]);
 /**
@@ -68,8 +80,8 @@ const TRANSPORT_GROUPS = new Set([28, 380, 1202, 513, 902]);
 const SUPPORT_GROUPS = new Set([832, 1527, 540, 1534, 833, 906, 541, 894, 893, 898, 830]);
 /** Customs Office (category 46, so not covered by the structure categories). */
 const STRUCTURE_GROUPS = new Set([1025]);
-/** Capsule, Shuttle: ships, but no part of a fleet. */
-const NOT_A_FLEET_GROUPS = new Set([29, 31]);
+/** Capsule, Shuttle, Prototype Exploration Ship, Yacht: ships, but no part of a fleet. */
+const NOT_A_FLEET_GROUPS = new Set([29, 31, 1022, 5087]);
 
 const ORDER: readonly DscanRole[] = [
   'capitals',
@@ -88,7 +100,8 @@ const ORDER: readonly DscanRole[] = [
  */
 export function roleOfType(info: DscanTypeInfo | undefined, typeName: string): DscanRole | null {
   if (info === undefined) return /\bwreck$/i.test(typeName.trim()) ? 'structures' : null;
-  const { groupId, categoryId } = info;
+  const { typeId, groupId, categoryId } = info;
+  if (typeId !== undefined && ORE_HULL_TYPES.has(typeId)) return 'industrial';
   if (CAPITAL_GROUPS.has(groupId)) return 'capitals';
   if (INDUSTRIAL_GROUPS.has(groupId)) return 'industrial';
   if (TRANSPORT_GROUPS.has(groupId)) return 'transport';

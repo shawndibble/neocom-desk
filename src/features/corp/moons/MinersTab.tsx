@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -15,13 +14,13 @@ import { minerDetail, type BookView, type MinerRow } from '@/engine/corpTaxBook/
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
-import { caretColumn } from './caretColumn';
+import { useTabsProjection } from './useTabsProjection';
 import { isk, shortDate } from './moonsFormat';
-import { minerPath } from './moonsPaths';
 import { OverdueWord, StandingWord } from './moonsParts';
-import { NeedsYouQueue } from './NeedsYouQueue';
+import { MinerExpandedRow } from './MinerExpandedRow';
 import { MinerRowMenu } from './MinerRowMenu';
-import { ReasonDialog, RecordPaymentDialog } from './BookDialogs';
+import { useCards } from './sectionHelpers';
+import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 
 const PARAMS = {
   q: textParam(),
@@ -32,23 +31,49 @@ const PARAMS = {
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
 const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
 
+const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
+
+/** Keeps the open row across Open page then Back; sessionStorage, best-effort. */
+function readOpenMiner(corporationId: number): string | null {
+  try {
+    return sessionStorage.getItem(OPEN_MINER_KEY + corporationId);
+  } catch {
+    return null;
+  }
+}
+
+function writeOpenMiner(corporationId: number, id: string | null) {
+  try {
+    if (id === null) sessionStorage.removeItem(OPEN_MINER_KEY + corporationId);
+    else sessionStorage.setItem(OPEN_MINER_KEY + corporationId, id);
+  } catch {
+    // Blocked storage: the row just closes after a visit elsewhere.
+  }
+}
+
 export function MinersTab() {
   const { t } = useTranslation();
-  const { view, names, edit, canEdit } = useBook();
-  const [dialog, setDialog] = useState<{ kind: 'record' | 'dismiss'; miner: MinerRow } | null>(
-    null
-  );
-  const [notice, setNotice] = useState<string | null>(null);
+  const { view, names, edit, canEdit, corporationId } = useBook();
+  const { miners, totals, donationsBeforeBook } = useTabsProjection();
+  const [dialog, setDialog] = useState<
+    | { kind: 'record' | 'dismiss'; miner: MinerRow }
+    | { kind: 'notTax'; miner: MinerRow; paymentId: string }
+    | null
+  >(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
-  const navigate = useNavigate();
+  const [tableRef, cards] = useCards();
+  // Read once; a stored miner the list no longer holds opens nothing and is cleared on mount.
+  const [openMiner] = useState(() => {
+    const id = readOpenMiner(corporationId);
+    return id !== null && miners.some((m) => m.id === id) ? id : null;
+  });
   const rowContextMenu = useCallback(
     (m: MinerRow, tr: ReactElement) => (
       <MinerRowMenu
         miner={m}
         onRecord={(miner) => run(() => setDialog({ kind: 'record', miner }))}
         onDismiss={(miner) => run(() => setDialog({ kind: 'dismiss', miner }))}
-        onNotice={setNotice}
-        onOpenChange={(open) => open && setNotice(null)}
+        onNotTax={(miner, paymentId) => run(() => setDialog({ kind: 'notTax', miner, paymentId }))}
         onCloseAutoFocus={onCloseAutoFocus}
       >
         {tr}
@@ -61,14 +86,14 @@ export function MinersTab() {
 
   const counts = useMemo(
     () => ({
-      members: view.miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
-      guests: view.miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
+      members: miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
+      guests: miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
     }),
-    [view.miners]
+    [miners]
   );
   const rows = useMemo(() => {
     const q = params.q.trim().toLowerCase();
-    return view.miners.filter((m) => {
+    return miners.filter((m) => {
       const inGroup = m.standing === 'guest' ? params.guests : params.members;
       if (!inGroup || !isActive(m)) return false;
       if (!q) return true;
@@ -77,13 +102,13 @@ export function MinersTab() {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
-  }, [view.miners, params, names]);
+  }, [miners, params, names]);
   // What the Non-members chip being off keeps out of the table.
   const hiddenGuests = params.guests
     ? []
-    : view.miners.filter((m) => m.standing === 'guest' && isActive(m));
+    : miners.filter((m) => m.standing === 'guest' && isActive(m));
   const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
-  const hidden = view.miners.length - view.miners.filter(isActive).length;
+  const hidden = miners.length - miners.filter(isActive).length;
 
   const columns: DataTableColumn<MinerRow>[] = [
     {
@@ -92,14 +117,11 @@ export function MinersTab() {
       primary: true,
       render: (m) => (
         <span className="block min-w-0">
-          <span className="text-accent">{nameOf(m)}</span>
+          <span className="font-semibold">{nameOf(m)}</span>
           {m.characterIds.length > 1 && (
             <span className="block text-xs text-text-dim">
               {t('corpTaxBook.moons.moreCharacters', { count: m.characterIds.length - 1 })}
             </span>
-          )}
-          {m.paused && (
-            <span className="block text-xs text-warning">{t('corpTaxBook.moons.declared')}</span>
           )}
         </span>
       ),
@@ -122,7 +144,7 @@ export function MinersTab() {
     {
       id: 'overdue',
       header: t('corpTaxBook.moons.cols.overdue'),
-      render: (m) => <OverdueWord days={m.overdueDays} />,
+      render: (m) => <OverdueWord days={m.overdueDays} paused={m.paused} />,
       sortValue: (m) => m.overdueDays ?? -1,
     },
     {
@@ -139,7 +161,9 @@ export function MinersTab() {
       align: 'right',
       className: 'tabular-nums',
       phoneHidden: true,
-      render: (m) => (m.credit ? <span className="text-isk-pos">{isk(m.credit)}</span> : '—'),
+      // isk() rounds: a sub-ISK remainder is no credit, not a green 0.
+      render: (m) =>
+        Math.round(m.credit) > 0 ? <span className="text-isk-pos">{isk(m.credit)}</span> : '—',
     },
     {
       id: 'paid',
@@ -147,43 +171,32 @@ export function MinersTab() {
       render: (m) => (m.lastPaidAt ? shortDate(m.lastPaidAt) : '—'),
       sortValue: (m) => m.lastPaidAt ?? '',
     },
-    caretColumn<MinerRow>(() => canEdit),
   ];
 
   return (
     <div className="space-y-4">
       <StatChips>
-        <StatChip
-          label={t('corpTaxBook.moons.chips.owed')}
-          value={isk(view.totals.owed)}
-          emphasis
-        />
+        <StatChip label={t('corpTaxBook.moons.chips.owed')} value={isk(totals.owed)} emphasis />
         <StatChip
           label={t('corpTaxBook.moons.chips.overdue')}
           value={t('corpTaxBook.moons.chips.overdueValue', {
-            amount: isk(view.totals.overdue),
-            count: view.totals.overdueCount,
+            amount: isk(totals.overdue),
+            count: totals.overdueCount,
           })}
-          {...(view.totals.overdue > 0 ? { tone: 'danger' as const } : {})}
+          {...(totals.overdue > 0 ? { tone: 'danger' as const } : {})}
         />
-        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(view.totals.unbilled)} />
-        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(view.totals.credit)} />
+        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
+        <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(totals.credit)} />
       </StatChips>
-      <NeedsYouQueue />
-      {notice && (
-        <p role="status" className="text-xs text-text-dim">
-          {notice}
-        </p>
-      )}
-      {view.donationsBeforeBook > 0 && (
+      {donationsBeforeBook > 0 && (
         <p className="text-xs text-text-dim">
-          {t('corpTaxBook.moons.beforeBook.donations', { count: view.donationsBeforeBook })}
+          {t('corpTaxBook.moons.beforeBook.donations', { count: donationsBeforeBook })}
         </p>
       )}
       <Panel padded={false}>
         <div className="flex flex-wrap items-center gap-2 p-3">
           <SearchInput
-            className="min-w-40 flex-1"
+            className="min-w-56 flex-1"
             value={params.q}
             onChange={(e) => setParams({ q: e.target.value })}
             placeholder={t('corpTaxBook.moons.miners.search')}
@@ -202,13 +215,20 @@ export function MinersTab() {
             count={counts.guests}
           />
         </div>
-        <div className="overflow-x-auto">
+        <div ref={tableRef} className="@container overflow-x-auto">
           <DataTable
             label={t('corpTaxBook.moons.tabs.miners')}
             columns={columns}
             rows={rows}
             rowKey={(m) => m.id}
-            onRowClick={(m) => navigate(minerPath(m.id))}
+            expandableRow={{
+              renderDetail: (m) => <MinerExpandedRow miner={m} />,
+              leadingIcon: true,
+              initialKey: openMiner,
+              onExpandedChange: (key) =>
+                writeOpenMiner(corporationId, key === null ? null : String(key)),
+            }}
+            stacked={cards}
             rowClassName={() => 'group'}
             rowContextMenu={rowContextMenu}
             rowMoreActions={canEdit}
@@ -216,7 +236,7 @@ export function MinersTab() {
             mobileSort
             stackSummary={t('corpTaxBook.moons.miners.summary', {
               shown: rows.length,
-              total: view.miners.length,
+              total: miners.length,
             })}
           />
         </div>
@@ -244,6 +264,20 @@ export function MinersTab() {
           statementId={openStatementId(view, dialog.miner.id)}
         />
       )}
+      {dialog?.kind === 'notTax' &&
+        (() => {
+          const payment = view.internals.byMiner
+            .get(dialog.miner.id)
+            ?.payments.find((p) => p.id === dialog.paymentId);
+          return payment ? (
+            <MarkNotTaxDialog
+              open
+              onClose={() => setDialog(null)}
+              payment={payment}
+              fromName={names.character(payment.characterId)}
+            />
+          ) : null;
+        })()}
       {dialog?.kind === 'dismiss' && (
         <ReasonDialog
           open

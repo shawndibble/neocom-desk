@@ -443,7 +443,7 @@ describe('FittingRackList with the editor’s item actions', () => {
     await waitFor(() => expect(actions.openVariations).toHaveBeenCalledWith('high', 0));
   });
 
-  it('opens the module dialog’s Mutation from a "Mutate…" menu entry, only for a module that can be mutated', async () => {
+  it('opens the module dialog’s Mutation from a "Mutate" menu entry, only for a module that can be mutated', async () => {
     const without = fakeItemActions({ names });
     const { unmount } = renderList(without);
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
@@ -451,7 +451,7 @@ describe('FittingRackList with the editor’s item actions', () => {
       pointerType: 'mouse',
     });
     await screen.findByRole('menuitem', { name: 'Move up' });
-    expect(screen.queryByRole('menuitem', { name: 'Mutate…' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Mutate' })).toBeNull();
     unmount();
 
     const actions = fakeItemActions({ names }, { canMutate: (typeId) => typeId === 10 });
@@ -460,7 +460,7 @@ describe('FittingRackList with the editor’s item actions', () => {
       button: 0,
       pointerType: 'mouse',
     });
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Mutate…' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Mutate' }));
     await waitFor(() => expect(actions.openMutation).toHaveBeenCalledWith('high', 0));
   });
 

@@ -396,7 +396,7 @@ describe('Industry: Build Plan CRUD', () => {
     await user.click(
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     // Nothing is deleted until the confirm modal (which names the plan) is accepted.
     let confirm = await screen.findByRole('dialog', { name: 'Delete Build Plan' });
     expect(within(confirm).getByText(/"Rifter run"/)).toBeInTheDocument();
@@ -408,7 +408,7 @@ describe('Industry: Build Plan CRUD', () => {
     await user.click(
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const escDialog = await screen.findByRole('dialog', { name: 'Delete Build Plan' });
     // The menu's close can leave focus outside the dialog; Escape needs it inside.
     within(escDialog).getByRole('button', { name: 'Cancel' }).focus();
@@ -420,7 +420,7 @@ describe('Industry: Build Plan CRUD', () => {
     await user.click(
       within(originalRow).getByRole('button', { name: 'More actions for Rifter run' })
     );
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     confirm = await screen.findByRole('dialog', { name: 'Delete Build Plan' });
     await user.click(within(confirm).getByRole('button', { name: 'Delete' }));
     // handleDelete is fire-and-forget from the click handler (Industry.tsx),

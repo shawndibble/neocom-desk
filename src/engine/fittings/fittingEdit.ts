@@ -243,7 +243,7 @@ export interface ChargeLoad {
    * the charge didn't come out of the hold.
    */
   fromCargo?: boolean;
-  /** Just this module (an Alt-drop, "Load into…") or these (a weapon group), rather than every one that takes it. */
+  /** Just this module (an Alt-drop, "Load into") or these (a weapon group), rather than every one that takes it. */
   only?: ModuleAt | readonly ModuleAt[];
 }
 

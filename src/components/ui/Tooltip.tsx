@@ -109,6 +109,8 @@ interface TooltipProps {
   openOnTap?: boolean;
   /** Extra classes merged onto the trigger element, e.g. `w-full` so a full-width trigger stays full-width. */
   className?: string;
+  /** Preferred side of the trigger (`top` default; Radix still flips it on a collision). `bottom` for a trigger in a stack of rows, so the bubble does not cover the row above. */
+  side?: 'top' | 'bottom';
 }
 
 /**
@@ -133,7 +135,13 @@ interface TooltipProps {
  * something dismisses it: a tap outside, a scroll, Escape, or another tap on
  * an `openOnTap` trigger.
  */
-export function Tooltip({ content, children, openOnTap = false, className = '' }: TooltipProps) {
+export function Tooltip({
+  content,
+  children,
+  openOnTap = false,
+  className = '',
+  side = 'top',
+}: TooltipProps) {
   // Off inside a row menu, whose touch-and-hold is the menu's (see `tooltipHold.ts`).
   const holdOpens = useContext(TooltipHoldContext);
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -239,6 +247,19 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
     setTouchOpen(false);
   }
 
+  /**
+   * A menu item's tooltip sits above the menu in Radix's layer stack, so Escape would close only
+   * it. Close it, then re-send Escape once (tooltip gone, so no loop) to close the menu too.
+   */
+  function handleEscape() {
+    if (!triggerRef.current?.closest('[role="menu"]')) return;
+    forceClose();
+    setTimeout(
+      () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+      0
+    );
+  }
+
   /** The browser took the gesture over (a scroll, usually) — no touchend is coming. */
   function handleTouchCancel() {
     touchDragged.current = true;
@@ -316,8 +337,10 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
         {hasContent && (
           <TooltipPrimitive.Portal container={container}>
             <TooltipPrimitive.Content
+              side={side}
               sideOffset={4}
               collisionPadding={8}
+              onEscapeKeyDown={handleEscape}
               className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
             >
               {content}

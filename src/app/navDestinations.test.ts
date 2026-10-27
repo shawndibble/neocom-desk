@@ -32,6 +32,7 @@ const NO_CORP_VIEWS = {
 };
 
 const MOONS_TAB_PATHS = [
+  '/corp/moons/overview',
   '/corp/moons/extractions',
   '/corp/moons/miners',
   '/corp/moons/statements',

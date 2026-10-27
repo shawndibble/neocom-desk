@@ -12,7 +12,7 @@ import { isk } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.pay.${key}`;
 
-/** "Pay…" a moon owner: Settle up's shell with one row, no per-entry ticks. */
+/** "Pay" a moon owner: Settle up's shell with one row, no per-entry ticks. */
 export function PayMoonOwnerDialog({
   ownerName,
   payee,

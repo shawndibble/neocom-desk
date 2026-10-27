@@ -16,6 +16,12 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import {
+  loadStampContext,
+  restampStructures,
+  stampBook,
+  stampRows,
+} from './corpTaxBookExtractionStamp.js';
 import { backfillObservedUpdatedAt } from './corpTaxBookObservedBackfill.js';
 import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
 import {
@@ -86,6 +92,10 @@ import { SRP_COLLECTIONS } from './srpTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
+import { editScope } from './corpTaxBookMinerTotals.js';
+import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
+import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
+import { refreshReadModels } from './corpTaxBookReadModelsStore.js';
 import {
   fail,
   requireLiveRoles,
@@ -459,6 +469,8 @@ export async function reclaimBook(deps: BookDeps, caller: Caller, call: BookCall
 // --- Sync ------------------------------------------------------------------
 
 const CHUNK = 200;
+/** The Extraction fields that decide which days its window covers. */
+const WINDOW_FIELDS = ['chunkArrivalTime', 'naturalDecayTime', 'laserFiredAt', 'cancelledAt'];
 const obsId = (r: ObservedRow) => `${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`;
 
 export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput) {
@@ -474,9 +486,16 @@ export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput)
 export async function mergeObservedInto(
   deps: BookDeps,
   corporationId: number,
-  rows: readonly ObservedRow[]
+  incoming: readonly ObservedRow[],
+  /** Extractions the same sync is about to write, so a row placed by them is stamped now. */
+  extractions: readonly MirrorExtraction[] = [],
+  /** Collects the pulls whose rows changed; a caller that passes it refreshes their moon docs itself. */
+  touched?: Set<string>
 ): Promise<number> {
+  // Each row carries the Extraction covering its day (ADR 0032): a merge replaces the whole row, so it must stamp.
+  const rows = stampRows(incoming, await loadStampContext(deps.db, corporationId, extractions));
   let observedChanged = 0;
+  const pulls = touched ?? new Set<string>();
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
     const col = sub(deps.db, corporationId, OBSERVED);
@@ -487,6 +506,7 @@ export async function mergeObservedInto(
       const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
       const { changed } = mergeObservedRows(existing, chunk);
       const last = new Map(changed.map((r) => [observedRowKey(r), r]));
+      for (const r of last.values()) if (r.extractionId !== undefined) pulls.add(r.extractionId);
       for (const row of last.values()) {
         // `updatedAt` is what an officer's client reads a delta by (bookDeltaCache.ts):
         // `cachedAt` is the ESI response's time, not this write's.
@@ -506,6 +526,7 @@ export async function mergeObservedInto(
     });
   }
   await writeBilledByPointers(deps, corporationId, rows);
+  if (touched === undefined) await refreshMoonDocs(deps.db, corporationId, pulls);
   return observedChanged;
 }
 
@@ -556,22 +577,48 @@ export async function syncBookAs(
     );
   }
 
-  const observedChanged = await mergeObservedInto(deps, input.corporationId, input.observed);
+  const touchedPulls = new Set<string>();
+  const observedChanged = await mergeObservedInto(
+    deps,
+    input.corporationId,
+    input.observed,
+    input.extractions,
+    touchedPulls
+  );
   // Old rows carry no `updatedAt`, which a client's delta read needs (#5243). Best effort.
   await backfillObservedUpdatedAt(deps.db, input.corporationId, deps.now).catch((e) =>
     console.error('observed backfill failed', e instanceof Error ? e.message : e)
   );
 
   const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
+  const corrected = new Set<number>();
   for (const x of input.extractions) {
     const id = `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
     const fields: Data = { ...x, id };
     for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
+    const held = (await extractions.doc(id).get()).data();
+    if (!held || WINDOW_FIELDS.some((f) => fields[f] !== undefined && fields[f] !== held[f]))
+      corrected.add(x.structureId);
+    // A new Extraction, or one whose make-up or dates moved, changes its moon doc (ADR 0032).
+    if (
+      !held ||
+      Object.keys(fields).some((k) => JSON.stringify(fields[k]) !== JSON.stringify(held[k]))
+    )
+      touchedPulls.add(id);
     await extractions.doc(id).set(fields, { merge: true });
   }
+  // A new or corrected Extraction moves which rows its window covers (ADR 0032). Best effort, like the pass below.
+  await restampStructures(deps.db, input.corporationId, [...corrected]).catch((e) =>
+    console.error('extraction restamp failed', e instanceof Error ? e.message : e)
+  );
+  await stampBook(deps.db, input.corporationId, deps.now).catch((e) =>
+    console.error('extraction stamp backfill failed', e instanceof Error ? e.message : e)
+  );
 
   const payments = sub(deps.db, input.corporationId, PAYMENTS);
   let donationsAdded = 0;
+  /** Miners a new donation was matched to: their totals move (ADR 0032). */
+  const paidMiners = new Set<string>();
   for (const dn of input.donations) {
     const id = `j${dn.division}_${dn.refId}`;
     const data: Data = {
@@ -590,6 +637,7 @@ export async function syncBookAs(
       // create(): a re-synced donation never overwrites an officer's "not tax" mark.
       await payments.doc(id).create(data);
       donationsAdded += 1;
+      if (dn.minerId !== undefined) paidMiners.add(dn.minerId);
     } catch (err) {
       if ((err as { code?: number }).code !== 6) throw err;
     }
@@ -620,6 +668,12 @@ export async function syncBookAs(
       }
     );
   });
+  if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
+  // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
+  await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
+  // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
+  if (donationsAdded > 0 || input.extractions.length > 0)
+    await refreshReadModels(deps.db, input.corporationId, deps.now());
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
@@ -1101,6 +1155,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.update(ref, { surveyId: action.surveyId ?? FieldValue.delete() });
       return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };
     }
+    case 'setFullyMined': {
+      const ref = col(c, EXTRACTIONS).doc(action.extractionId);
+      await mustGet(c, ref, 'Extraction');
+      // Never written by the sync's merge-set, so a later sync keeps the flag. Clearing drops it.
+      tx.update(ref, {
+        fullyMined: action.fullyMined
+          ? { by: by, byName: c.access.characterName, at: iso }
+          : FieldValue.delete(),
+      });
+      return { detail: { extractionId: action.extractionId, fullyMined: action.fullyMined } };
+    }
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
@@ -1509,6 +1574,40 @@ export async function editBook(deps: BookDeps, caller: Caller, call: BookCall, a
   return editBookAs(deps, access, call, action);
 }
 
+/** Rebuilds the moon docs an edit changed; an expiry change or a regroup rebuilds every pull. */
+async function refreshMoonDocsAfterEdit(
+  db: Firestore,
+  corporationId: number,
+  action: EditAction
+): Promise<void> {
+  try {
+    if (action.action === 'linkSurvey') {
+      await refreshMoonDocs(db, corporationId, [action.extractionId]);
+    } else if (action.action === 'issueStatement') {
+      const days = (parseStatement(action.statement).lines as unknown as Data[]).flatMap((l) =>
+        typeof l.structureId === 'number' && typeof l.date === 'string'
+          ? [{ structureId: l.structureId, date: l.date }]
+          : []
+      );
+      await refreshMoonDocs(db, corporationId, await pullsOfDays(db, corporationId, days));
+    } else if (
+      (action.action === 'updateSettings' && action.patch.structureExpiryHours) ||
+      action.action === 'setMiner' ||
+      action.action === 'unlink' ||
+      action.action === 'regroupMiner'
+    ) {
+      const snap = await sub(db, corporationId, EXTRACTIONS).get();
+      await refreshMoonDocs(
+        db,
+        corporationId,
+        snap.docs.map((d) => d.id)
+      );
+    }
+  } catch (e) {
+    console.error('moon docs refresh failed', e instanceof Error ? e.message : e);
+  }
+}
+
 /** An edit once the caller is established; the scheduled sync passes `via` (ADR 0025). */
 export async function editBookAs(
   deps: BookDeps,
@@ -1518,7 +1617,7 @@ export async function editBookAs(
   via?: string
 ) {
   const ref = bookRef(deps.db, call.corporationId);
-  return deps.db.runTransaction(async (tx) => {
+  const result = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.get('active') !== true)
       fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
@@ -1534,6 +1633,27 @@ export async function editBookAs(
     appendAudit(tx, deps, call.corporationId, actorOf(access, via), action.action, outcome.detail);
     return outcome.result ?? {};
   });
+  // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
+  await refreshAfterEvent(deps.db, call.corporationId, editScope(action));
+  // Statements freeze a pull's tax, and a survey link or expiry changes its doc (ADR 0032). Best effort.
+  await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
+  // The same edits move the Overview and Miners tab docs (ADR 0032). Best effort.
+  const scope = editScope(action);
+  if (
+    scope.all ||
+    scope.minerIds.length + scope.statementIds.length + scope.paymentIds.length > 0 ||
+    action.action === 'linkSurvey'
+  )
+    await refreshReadModels(deps.db, call.corporationId, deps.now());
+  // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
+  if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
+    await restampStructures(
+      deps.db,
+      call.corporationId,
+      Object.keys(action.patch.structureExpiryHours).map(Number)
+    ).catch((e) => console.error('expiry restamp failed', e instanceof Error ? e.message : e));
+  }
+  return result;
 }
 
 /**
@@ -1566,6 +1686,8 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
+  await refreshAfterEvent(deps.db, corporationId, [minerId]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
@@ -1593,6 +1715,8 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
+  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** The added character itself declines, signed in as itself. */
@@ -1663,6 +1787,18 @@ export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
  * that the player did it, never anything else.
  */
 export async function claimPayment(
+  deps: BookDeps,
+  caller: Caller,
+  corporationId: number,
+  paymentId: string
+) {
+  const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId);
+  await refreshAfterEvent(deps.db, corporationId, [claimed.minerId]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
+  return claimed;
+}
+
+async function claimPaymentTx(
   deps: BookDeps,
   caller: Caller,
   corporationId: number,

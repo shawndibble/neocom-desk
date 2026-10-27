@@ -603,12 +603,12 @@ function RowDetail({ open }: { open: boolean }) {
           <p className="text-text-dim">
             Your own record differs from the book on quantity and rate.
           </p>
-          <Button size="sm">Compare with the book…</Button>
+          <Button size="sm">Compare with the book</Button>
         </div>
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button variant="primary">Settle up…</Button>
+          <Button variant="primary">Settle up</Button>
           <div className="flex">
-            <Button className="rounded-r-none">Edit…</Button>
+            <Button className="rounded-r-none">Edit</Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <IconButton
@@ -618,15 +618,15 @@ function RowDetail({ open }: { open: boolean }) {
                 />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>Link a wallet payment…</DropdownMenuItem>
-                <DropdownMenuItem>Link a transaction…</DropdownMenuItem>
+                <DropdownMenuItem>Link a wallet payment</DropdownMenuItem>
+                <DropdownMenuItem>Link a transaction</DropdownMenuItem>
                 <DropdownMenuItem>Mark as paid</DropdownMenuItem>
-                <DropdownMenuItem>Combine with another day…</DropdownMenuItem>
-                <DropdownMenuItem>Split between Payees…</DropdownMenuItem>
+                <DropdownMenuItem>Combine with another day</DropdownMenuItem>
+                <DropdownMenuItem>Split between Payees</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Copy pricing as text</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-danger">Unassign…</DropdownMenuItem>
+                <DropdownMenuItem className="text-danger">Unassign</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

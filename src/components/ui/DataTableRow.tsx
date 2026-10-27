@@ -68,6 +68,11 @@ export interface DataTableRowProps<T> {
   remeasure: ((node: HTMLTableRowElement) => void) | undefined;
 }
 
+/** The ContextMenu key or Shift+F10: the keyboard's right-click. */
+function isContextMenuKey(event: { key: string; shiftKey: boolean }): boolean {
+  return event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
+}
+
 /**
  * One body row (plus its detail row when expanded), memoized so a table-level
  * re-render — a scroll tick of the virtualizer, another row's selection, a
@@ -183,12 +188,26 @@ function DataTableRowImpl<T>({
           : undefined
       }
       onKeyDown={
-        clickable
+        clickable || rowContextMenu
           ? (event) => {
               // Only the row's own keys: a focused control inside it (a
               // tooltip trigger, a button, a checkbox) keeps its Enter/Space
               // to itself.
               if (event.target !== event.currentTarget) return;
+              if (rowContextMenu && isContextMenuKey(event)) {
+                // Row menu trigger listens for `contextmenu`; a keyboard has no pointer, so send
+                // one at the row's corner. No menu: event stays unprevented, browser default runs.
+                const box = event.currentTarget.getBoundingClientRect();
+                const sent = new MouseEvent('contextmenu', {
+                  bubbles: true,
+                  cancelable: true,
+                  clientX: box.left + 8,
+                  clientY: box.top + box.height / 2,
+                });
+                if (!event.currentTarget.dispatchEvent(sent)) event.preventDefault();
+                return;
+              }
+              if (!clickable) return;
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
               onActivate(row, key);

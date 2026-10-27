@@ -38,7 +38,7 @@ interface ChargeLoadingParams {
 export interface LoadChargeOptions {
   /** Out of the Fitting's cargo: debited, and what it replaces goes back. */
   fromCargo?: boolean;
-  /** Only this module (an Alt-drop, "Load into…"), or these (a weapon group). */
+  /** Only this module (an Alt-drop, "Load into"), or these (a weapon group). */
   only?: ModuleAt | readonly ModuleAt[];
 }
 

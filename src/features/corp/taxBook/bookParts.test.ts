@@ -17,7 +17,7 @@ describe('bookPartsFor', () => {
     expect(new Set(bookPartsFor('extractions', 'miner'))).toEqual(
       new Set(['core', 'ledger', 'answers'])
     );
-    expect([...bookPartsFor('miners', 'extraction')]).toEqual(['core']);
+    expect([...bookPartsFor('miners', 'extraction')]).toEqual(['core', 'ledger']);
     expect([...bookPartsFor('miners', 'moonOwner')]).toEqual(['core']);
   });
 });
@@ -49,5 +49,11 @@ describe('mergeBookParts', () => {
 
   it('keeps the everything marker', () => {
     expect(new Set(mergeBookParts(undefined, new Set(['core'])))).toEqual(new Set(ALL_BOOK_PARTS));
+  });
+});
+
+describe('bookPartsFor the Overview (#5259)', () => {
+  it('reads core and ledger: owed and Needs you derive from payments and declarations', () => {
+    expect([...bookPartsFor('overview', null)].sort()).toEqual(['core', 'ledger']);
   });
 });

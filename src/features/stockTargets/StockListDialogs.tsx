@@ -117,7 +117,7 @@ export function DeleteStockListDialog({
 }
 
 /**
- * "Add items…": search the market catalogue for one item at a time, give it a
+ * "Add items": search the market catalogue for one item at a time, give it a
  * quantity, Add. The dialog stays open for the next item, saying what was
  * added, so building a market list is a run of search-type-Enter.
  */
@@ -226,7 +226,7 @@ export function AddStockItemDialog({
 }
 
 /**
- * "Paste a list…": one item per line with the quantity to keep listed, in
+ * "Paste a list": one item per line with the quantity to keep listed, in
  * any format the Appraisal reads (an inventory copy, `Name x 40`, `40 Name`).
  * A pasted item already on the list takes the new quantity.
  */

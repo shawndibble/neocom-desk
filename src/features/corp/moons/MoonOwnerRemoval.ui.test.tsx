@@ -109,19 +109,19 @@ describe('the removal strip', () => {
   });
 });
 
-describe('Remove from this book…', () => {
+describe('Remove from this book', () => {
   it('is offered on an active moon owner to an officer who may edit', async () => {
     const onRemove = vi.fn();
     page(detail(), { onRemove });
-    await userEvent.click(screen.getByRole('button', { name: 'Remove from this book…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from this book' }));
     expect(onRemove).toHaveBeenCalledOnce();
   });
 
   it('is not offered to a viewer, or while a removal is already pending', () => {
     page(detail());
-    expect(screen.queryByRole('button', { name: 'Remove from this book…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove from this book' })).toBeNull();
     page(pending(), { onRemove: () => {} });
-    expect(screen.queryByRole('button', { name: 'Remove from this book…' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove from this book' })).toBeNull();
   });
 });
 

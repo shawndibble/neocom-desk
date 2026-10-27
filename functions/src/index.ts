@@ -25,8 +25,6 @@ import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js'
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
 import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
-import { runSyncActiveWars } from './activeWarsJob.js';
-import { runSyncLawlessSystems } from './marketHistoryJob.js';
 import { runSyncPublicContractOffers } from './snapshotJobs.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
@@ -55,6 +53,7 @@ import {
   purgeFiredProjections,
   writeDeviceRegistration,
 } from './projectionStore.js';
+import { isHourlyTick } from './dispatchProjections.js';
 import { pollServerEvents } from './serverEventPoll.js';
 import { createRegistrationReader } from './registrationReader.js';
 import { ALERTS_POLL_STATS_KEYS, SERVER_POLL_STATS_KEYS, createRunStats } from './runStats.js';
@@ -155,6 +154,7 @@ import {
   startFeederRemoval,
 } from './corpTaxBookFeederRemoval.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
+import { verifyAllMinerTotals } from './corpTaxBookMinerTotalsStore.js';
 import {
   claimPayment,
   confirmGrouping,
@@ -404,6 +404,7 @@ alertsAction('registerDevice', async (request) => {
 // secret (base64, 32 bytes): `firebase functions:secrets:set ALERTS_TOKEN_KEY`.
 // Nothing here logs or returns a token; firestore.rules denies `alertGrants`.
 const ALERTS_TOKEN_KEY = defineSecret('ALERTS_TOKEN_KEY');
+const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
 
 function alertGrantDeps(): AlertGrantDeps {
   return {
@@ -454,9 +455,9 @@ export const alertsCall = onCall<unknown>(
 
 /**
  * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
- * GLOSSARY.md round 45). Runs every 5 minutes, matching the Foreground
- * Poller's own cadence (`POLL_INTERVAL_MS`). One of this deployment's two
- * Cloud Scheduler jobs — `dailyHousekeeping` below is the other.
+ * GLOSSARY.md round 45). Runs every 15 minutes. One of this deployment's few
+ * Cloud Scheduler jobs, so other periodic work rides its tick instead of
+ * owning a job (each job past the free three costs $0.10 a month).
  *
  * Holds no EVE token and makes no ESI call: every row already carries
  * rendered title/body text, uploaded by a device that read the real data
@@ -466,12 +467,21 @@ export const alertsCall = onCall<unknown>(
  *
  * The same tick polls the server-pushed price alerts and ship losses (issue
  * #5121, ADR 0027): public Fuzzwork and zKillboard reads, still no EVE token, rather than a scheduled job of its own.
+ *
+ * The hourly tick (`isHourlyTick`) also ends every corp tax book removal whose 24 hours are up
+ * (`finalizeDueRemovals`, issue #5072; it was `finalizeCorpTaxBookRemovals`, its own hourly job).
+ * That is why this function holds the feeder-view secrets.
  */
 export const dispatchProjections = onSchedule(
   // The server-pushed events' zKillboard reads are paced and stop after 5
   // minutes (serverEventPoll.ts), so the tick can outlast the default minute;
   // the projection dispatch runs alongside and is unaffected by them.
-  { schedule: 'every 15 minutes', timeoutSeconds: 540, maxInstances: 1 },
+  {
+    schedule: 'every 15 minutes',
+    timeoutSeconds: 540,
+    maxInstances: 1,
+    secrets: FEEDER_VIEW_SECRETS,
+  },
   async () => {
     const db = firestore();
     const messaging = getMessaging();
@@ -504,6 +514,15 @@ export const dispatchProjections = onSchedule(
       logError('Server event poll failed', { error: String(polled.reason) });
     // One line per tick, counts only: query `jsonPayload.message="Server event poll finished"`.
     else logInfo('Server event poll finished', { ...polled.value, ...serverStats.snapshot() });
+    // Last, so a slow poll cannot starve the dispatch; its own failure is logged, not thrown.
+    if (isHourlyTick(Date.now())) {
+      try {
+        const summary = await bookVersioned(() => finalizeDueRemovals(corpSyncDeps()));
+        logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
+      } catch (error) {
+        logError('finalizeCorpTaxBookRemovals failed', { error: String(error) });
+      }
+    }
   }
 );
 
@@ -888,8 +907,6 @@ function corpSyncDeps(): CorpSyncDeps {
 function r2OpenPrices(typeId: number): Promise<unknown | null> {
   return createR2Get(r2ConfigOrThrow())(openPricesR2Key(typeId));
 }
-const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
-
 // Proven by the signed-in Character AND the grant's own access token, which must be
 // for that same Character; the corporation and its roles are read with the grant.
 corpTaxBookAction('saveCorpTaxBookSyncGrantCallable', (request) =>
@@ -1013,16 +1030,6 @@ corpTaxBookAction('forceCorpTaxBookRemovalCallable', (request) =>
     parseRemovalLinkCall(request.data),
     esiCorporationCeoLookup()
   )
-);
-
-/** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
-export const finalizeCorpTaxBookRemovals = onSchedule(
-  { schedule: 'every 1 hours', secrets: FEEDER_VIEW_SECRETS, maxInstances: 1 },
-  () =>
-    bookVersioned(async () => {
-      const summary = await finalizeDueRemovals(corpSyncDeps());
-      logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
-    })
 );
 
 // Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
@@ -1358,6 +1365,25 @@ export const dailyHousekeeping = onSchedule(
           },
         },
         {
+          // Shadow-mode verifier for the Miner running totals (#5255, ADR 0032): recomputes each
+          // book's totals, flags and repairs any drift. Inside the daily job, not a new function.
+          name: 'verifyMinerTotals',
+          run: async () => {
+            const { books, failed, truncated } = await bookVersioned(() =>
+              verifyAllMinerTotals(firestore(), Date.now)
+            );
+            if (failed > 0 || truncated) {
+              logWarn('Miner totals verifier incomplete, continues next run', {
+                books,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('Miner totals verifier done', { books, failed, truncated });
+            }
+          },
+        },
+        {
           name: 'sweepSrpClaims',
           run: async () => {
             const { deleted, failed, truncated } = await sweepSrpClaims(firestore(), Date.now());
@@ -1375,43 +1401,6 @@ export const dailyHousekeeping = onSchedule(
       ],
       logError
     )
-);
-
-/**
- * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
- * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
- * 15 minutes (CCP caches it for 10; cost: it was every 10) and stores the
- * lawless system ids for the app to read. A failed fetch writes nothing: the doc just ages, and the app
- * hides the badge once `updatedAt` passes its staleness limit. An unchanged
- * list is not rewritten each run (issue #4272): only when it changes or the
- * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
- *
- * Another Cloud Scheduler job past the free three, like the jobs above.
- */
-export const syncLawlessSystems = onSchedule(
-  { schedule: 'every 15 minutes' },
-  runSyncLawlessSystems
-);
-
-/**
- * syncActiveWars: the War banner's data (`systemConditions/activeWars`). ESI
- * cannot list one corporation's wars, so this keeps every war that is still
- * running and the app picks its own out of the list. Twice a day: a new
- * declaration also reaches a pilot sooner through their Alerts, and a war has
- * a 24-hour wait before it starts, so 12 hours is a fine cadence for the
- * pilot who had no alerts on.
- *
- * Each run reads new war ids, re-reads the wars it holds, and spends the rest
- * of its allowance seeding backward from the newest id (`activeWars.ts`), so the
- * first runs fill in about a year of history. ESI gives `/wars/{id}` 3,600
- * tokens per 15 minutes; a run stops short of emptying that window. It can be
- * run again by hand from Cloud Scheduler to seed faster.
- *
- * Another Cloud Scheduler job past the free three, like the jobs above.
- */
-export const syncActiveWars = onSchedule(
-  { schedule: 'every 12 hours', timeoutSeconds: 540, maxInstances: 1 },
-  runSyncActiveWars
 );
 
 /**
@@ -1464,10 +1453,10 @@ export const syncActiveWars = onSchedule(
  * write restructured (incremental chunk commits, or the join split by region)
  * rather than a config bump. `rowCount` is the early warning for that too.
  *
- * It is the third of the deployment's Cloud Scheduler jobs, alongside
- * `dispatchProjections` and `dailyHousekeeping` — back inside the 3 free
- * per billing account ADR 0013 budgeted against, now that the blueprint-only
- * sync it briefly ran beside is gone.
+ * One of the deployment's five Cloud Scheduler jobs (this, `dispatchProjections`,
+ * `dailyHousekeeping`, `pollEveNotifications`, `syncCorpTaxBooks`); issue #5072 retired
+ * the wars and lawless syncs and folded the removals finalizer into `dispatchProjections`.
+ * Each job past the free three costs $0.10 a month.
  */
 export const syncPublicContractOffers = onSchedule(
   {

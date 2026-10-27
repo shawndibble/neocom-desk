@@ -116,7 +116,7 @@ describe('StockTab', () => {
     seed([]);
     renderTab();
     expect(await screen.findByText('No markets yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'New market…' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New market' })).toBeInTheDocument();
   });
 
   it('opens the only market directly, worst first, with how to restock each item', async () => {
