@@ -1,7 +1,7 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -30,6 +30,7 @@ import {
   type MinerMoon,
 } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
+import { wholeIsk } from '@/engine/corpTaxBook/wholeIsk';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -39,7 +40,7 @@ import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
-import { isk, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
+import { isk, iskOrDash, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
@@ -49,6 +50,7 @@ import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { moonLabel, tapTargetClassName } from './sectionHelpers';
 import { StatementPanel } from './StatementPanel';
+import { useStatementParam } from './useStatementParam';
 import { oldestOpenStatement, useMinerReminder } from './statementMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
@@ -76,8 +78,6 @@ export function MinerDetail({ id }: { id: string }) {
   const { view, names, edit, canEdit, corporationId, data } = ctx;
   const phone = useIsPhone();
   const detail = minerDetail(view, id);
-  const [params, setParams] = useSearchParams();
-  const openStatementId = params.get('statement');
   const audit = useBookAudit();
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -93,8 +93,8 @@ export function MinerDetail({ id }: { id: string }) {
   >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const reminder = useMinerReminder(id, setNotice);
-
   const statementIds = useMemo(() => new Set(detail?.statements.map((s) => s.id)), [detail]);
+  const statementParam = useStatementParam(detail !== undefined, (sid) => statementIds.has(sid));
   const paymentIds = useMemo(() => new Set(detail?.payments.map((p) => p.id)), [detail]);
   const minerAudit = useMemo(
     () =>
@@ -150,7 +150,7 @@ export function MinerDetail({ id }: { id: string }) {
       const label = periodLabel(st.periodStart, st.periodEnd);
       return e.action === 'issueStatement' ? `${label} · ${isk(st.amount)}` : label;
     }
-    return typeof amount === 'number' ? isk(amount) : null;
+    return typeof amount === 'number' ? (amount < 0 ? signedIsk(amount) : isk(amount)) : null;
   };
   const shownFeed = feed.filter((f) => filter === 'all' || f.chip === filter);
 
@@ -201,7 +201,7 @@ export function MinerDetail({ id }: { id: string }) {
       aria-label={t('corpTaxBook.moons.payment.openStatement', {
         period: periodLabel(st.periodStart, st.periodEnd),
       })}
-      onClick={() => setParams({ statement: st.id })}
+      onClick={() => statementParam.open(st.id)}
     >
       {periodLabel(st.periodStart, st.periodEnd)}
     </button>
@@ -226,7 +226,7 @@ export function MinerDetail({ id }: { id: string }) {
             stackEdge: 'start',
             render: (d: DayRow) =>
               canSelect(d) ? (
-                <label className={touchCheckboxLabelClassName}>
+                <label className={cx(touchCheckboxLabelClassName, 'size-6')}>
                   <Checkbox
                     aria-label={t('corpTaxBook.moons.miner.selectDay', { date: d.date })}
                     checked={selected.has(d.key)}
@@ -362,27 +362,39 @@ export function MinerDetail({ id }: { id: string }) {
     );
   };
 
-  /** The Statement a correction line was billed on, as its period; undefined while it waits for the next one. */
-  const billedOn = (adjustmentId: string) => {
-    const st = detail.statements.find((x) => x.lines.some((l) => l.adjustmentId === adjustmentId));
-    return st ? periodLabel(st.periodStart, st.periodEnd) : undefined;
-  };
+  /** The Statement a correction line was billed on; undefined while it waits for the next one. */
+  const billedOn = (adjustmentId: string) =>
+    detail.statements.find((x) => x.lines.some((l) => l.adjustmentId === adjustmentId));
 
   const paymentCredited = (payment: Payment) => {
+    // Only Statements the payment put at least 1 ISK on; a fraction is not a credit (#5247).
     const credited = detail.paymentCredits
-      .filter((c) => c.paymentId === payment.id)
-      .flatMap((c) => statementOf(c.statementId) ?? []);
+      .filter((c) => c.paymentId === payment.id && wholeIsk(c.amount) >= 1)
+      .flatMap((c) => {
+        const st = statementOf(c.statementId);
+        return st ? [{ st, amount: c.amount }] : [];
+      });
+    const hidden = credited.slice(2);
     return (
       <span className="text-xs">
         {credited.length > 0 ? (
-          <span className="inline-flex flex-wrap items-center gap-x-2">
-            {credited.slice(0, 2).map((st) => (
-              <span key={st.id}>{statementLink(st)}</span>
-            ))}
-            {credited.length > 2 && (
-              <span className="text-text-dim">
-                {t('corpTaxBook.moons.payment.moreStatements', { count: credited.length - 2 })}
+          <span className="flex flex-col">
+            {credited.slice(0, 2).map(({ st, amount }) => (
+              <span key={st.id}>
+                {statementLink(st)}
+                <span className="text-text-dim"> · {isk(amount)}</span>
               </span>
+            ))}
+            {hidden.length > 0 && (
+              <Tooltip
+                content={hidden
+                  .map(({ st }) => periodLabel(st.periodStart, st.periodEnd))
+                  .join(', ')}
+              >
+                <span tabIndex={0} className="w-fit text-text-dim">
+                  {t('corpTaxBook.moons.payment.moreStatements', { count: hidden.length })}
+                </span>
+              </Tooltip>
             )}
           </span>
         ) : (
@@ -452,14 +464,19 @@ export function MinerDetail({ id }: { id: string }) {
       render: (r) =>
         r.kind === 'correction' ? (
           <span className="text-xs text-text-dim">
-            {billedOn(r.correction.id)
-              ? t('corpTaxBook.moons.payment.billedOn', {
-                  date: shortDate(r.correction.date),
-                  period: billedOn(r.correction.id),
-                })
-              : t('corpTaxBook.moons.payment.correctsDay', {
-                  date: shortDate(r.correction.date),
-                })}
+            {(() => {
+              const st = billedOn(r.correction.id);
+              const date = shortDate(r.correction.date);
+              return st ? (
+                <Trans
+                  i18nKey="corpTaxBook.moons.payment.billedOn"
+                  values={{ period: periodLabel(st.periodStart, st.periodEnd), date }}
+                  components={{ link: statementLink(st) }}
+                />
+              ) : (
+                t('corpTaxBook.moons.payment.correctsDay', { date })
+              );
+            })()}
           </span>
         ) : (
           paymentCredited(r.payment)
@@ -608,11 +625,12 @@ export function MinerDetail({ id }: { id: string }) {
         }
         actions={headerActions}
       />
-      {notice && (
-        <p role="status" className="text-xs text-text-dim">
-          {notice}
-        </p>
-      )}
+      <p
+        role="status"
+        className={(notice ?? statementParam.notFound) ? 'text-xs text-text-dim' : 'sr-only'}
+      >
+        {notice ?? statementParam.notFound}
+      </p>
       {closedAt && (
         <p role="status" className="text-xs text-text-dim">
           {t('corpTaxBook.moons.miner.closedNote', { date: shortDate(closedAt.slice(0, 10)) })}
@@ -630,13 +648,13 @@ export function MinerDetail({ id }: { id: string }) {
               : undefined
         }
         facts={[
-          { label: t('corpTaxBook.moons.miner.paid'), value: isk(paidTotal) },
-          { label: t('corpTaxBook.moons.chips.credit'), value: isk(row.credit) },
+          { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
+          { label: t('corpTaxBook.moons.chips.credit'), value: iskOrDash(row.credit) },
           {
             label: t('corpTaxBook.moons.chips.unbilled'),
             value: (
               <span className="inline-flex items-center gap-1">
-                {isk(row.unbilled)}
+                {iskOrDash(row.unbilled)}
                 <InfoTooltip
                   label={t('corpTaxBook.moons.chips.unbilled')}
                   content={t('corpTaxBook.moons.miner.unbilledTip', { pending: isk(row.pending) })}
@@ -645,7 +663,7 @@ export function MinerDetail({ id }: { id: string }) {
               </span>
             ),
           },
-          { label: t('corpTaxBook.moons.chips.pending'), value: isk(row.pending) },
+          { label: t('corpTaxBook.moons.chips.pending'), value: iskOrDash(row.pending) },
           // Nothing written off, nothing to say: the fact would be a row of zeros.
           ...(toleranceTotal === 0 && detail.lateWriteOffs.length === 0
             ? []
@@ -720,7 +738,7 @@ export function MinerDetail({ id }: { id: string }) {
             <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
               {t('corpTaxBook.moons.miner.sum', {
                 billed: isk(billedTotal),
-                written: isk(toleranceTotal),
+                written: iskOrDash(toleranceTotal),
                 settled: isk(billedTotal - toleranceTotal - row.owed),
                 owed: isk(row.owed),
               })}
@@ -798,6 +816,8 @@ export function MinerDetail({ id }: { id: string }) {
                   selected={filter === f}
                   onToggle={() => setFilter(f)}
                   count={f === 'all' ? feed.length : feed.filter((x) => x.chip === f).length}
+                  // Nothing to filter to: an empty chip is not a choice.
+                  disabled={f !== 'all' && !feed.some((x) => x.chip === f) && filter !== f}
                 />
               ))}
             </div>
@@ -872,6 +892,11 @@ export function MinerDetail({ id }: { id: string }) {
           minerName={name}
           defaultAmount={row.owed}
           statementId={openStatement?.id}
+          statementLabel={
+            openStatement
+              ? periodLabel(openStatement.periodStart, openStatement.periodEnd)
+              : undefined
+          }
         />
       )}
       {dialog?.kind === 'dismiss' && (
@@ -916,11 +941,11 @@ export function MinerDetail({ id }: { id: string }) {
           }}
         />
       )}
-      {openStatementId && statementOf(openStatementId) && (
+      {statementParam.openId && (
         <StatementPanel
-          key={openStatementId}
-          statementId={openStatementId}
-          onClose={() => setParams({})}
+          key={statementParam.openId}
+          statementId={statementParam.openId}
+          onClose={statementParam.close}
           showMinerLink={false}
         />
       )}

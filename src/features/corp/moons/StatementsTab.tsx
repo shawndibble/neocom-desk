@@ -2,23 +2,26 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DataTable, InfoTooltip, Panel, type DataTableColumn } from '@/components/ui';
-import { periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
+import { isIssuedPeriod, periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
+import { wholeIsk } from '@/engine/corpTaxBook/wholeIsk';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { DueWord } from './moonsParts';
 import { statementPeriodPath } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { StatementRun } from './StatementRun';
-
-/** A period with Statements: sent, overdue or paid. Open, ready, closed and rollover rows have none. */
-const isIssued = (r: PeriodRow) => r.statements > 0;
+import { useCards } from './sectionHelpers';
 
 export function StatementsTab() {
   const { t } = useTranslation();
   const { view } = useBook();
   const navigate = useNavigate();
+  const [tableRef, cards] = useCards();
   const rows = useMemo(() => periodRows(view), [view]);
-  const tolerance = [...view.internals.byMiner.values()].flatMap((m) => m.allocation.writeOffs);
+  // Under 1 ISK left over is nothing to report (#5247).
+  const tolerance = [...view.internals.byMiner.values()]
+    .flatMap((m) => m.allocation.writeOffs)
+    .filter((w) => wholeIsk(w.amount) >= 1);
   const late = [...view.internals.byMiner.values()].flatMap((m) => m.draft.writtenOff);
 
   const columns: DataTableColumn<PeriodRow>[] = [
@@ -38,7 +41,9 @@ export function StatementsTab() {
               ? 'text-xs font-semibold text-warning uppercase'
               : r.status === 'overdue'
                 ? 'text-xs font-semibold text-danger uppercase'
-                : 'text-xs text-text-dim uppercase'
+                : r.status === 'paid'
+                  ? 'text-xs font-semibold text-success uppercase'
+                  : 'text-xs text-text-dim uppercase'
           }
         >
           {t(`corpTaxBook.moons.periodStatus.${r.status}`)}
@@ -77,17 +82,22 @@ export function StatementsTab() {
     {
       id: 'mailed',
       header: t('corpTaxBook.moons.cols.mailed'),
+      headerTooltip: t('corpTaxBook.moons.periods.mailedTip'),
       align: 'right',
       className: 'tabular-nums',
       render: (r) =>
-        r.statements
-          ? t('corpTaxBook.moons.periods.mailedOf', { sent: r.mailed, total: r.statements })
-          : '—',
+        r.statements ? (
+          <span className={r.mailed < r.statements ? 'font-semibold text-warning' : undefined}>
+            {t('corpTaxBook.moons.periods.mailedOf', { sent: r.mailed, total: r.statements })}
+          </span>
+        ) : (
+          '—'
+        ),
     },
     {
       id: 'due',
       header: t('corpTaxBook.moons.cols.due'),
-      render: (r) => <DueWord dueAt={r.dueAt} now={view.input.now} />,
+      render: (r) => <DueWord dueAt={r.dueAt} now={view.input.now} pausedUntil={r.pausedUntil} />,
     },
     {
       id: 'issued',
@@ -95,7 +105,7 @@ export function StatementsTab() {
       render: (r) => (r.issuedAt ? shortDate(r.issuedAt) : '—'),
     },
     // Only an issued period has Statements to open; the rest carry no caret (hidden = no caret).
-    caretColumn<PeriodRow>((r) => !isIssued(r)),
+    ...(cards ? [] : [caretColumn<PeriodRow>((r) => !isIssuedPeriod(r))]),
   ];
 
   return (
@@ -113,23 +123,26 @@ export function StatementsTab() {
         }
         padded={false}
       >
-        <DataTable
-          label={t('corpTaxBook.moons.periods.title')}
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.start}
-          onRowClick={(r) => navigate(statementPeriodPath(r.start))}
-          rowClickable={isIssued}
-          density="compact"
-          stackColumns={2}
-        />
+        <div ref={tableRef} className="@container overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.periods.title')}
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.start}
+            onRowClick={(r) => navigate(statementPeriodPath(r.start))}
+            rowClickable={isIssuedPeriod}
+            density="compact"
+            stacked={cards}
+            stackColumns={2}
+          />
+        </div>
         {(tolerance.length > 0 || late.length > 0) && (
           <div className="flex items-start gap-2 border-t border-line px-3 py-2 text-xs text-text-dim">
             <div className="space-y-0.5">
               {tolerance.length > 0 && (
                 <p>
                   {t('corpTaxBook.moons.periods.writeOffsTolerance', {
-                    tolerance: isk(tolerance.reduce((s, w) => s + w.amount, 0)),
+                    tolerance: isk(tolerance.reduce((s, w) => s + wholeIsk(w.amount), 0)),
                     count: tolerance.length,
                   })}
                 </p>

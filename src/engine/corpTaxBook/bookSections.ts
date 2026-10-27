@@ -182,7 +182,11 @@ export function minersOnMoon(view: BookView, extractionId: string): MinerOnMoon[
 export function extractionBilling(
   view: BookView,
   extractionId: string
-): { billed: boolean; statementIds: string[] } {
+): {
+  billed: boolean;
+  statementIds: string[];
+  /** Tax on days still waiting for a Statement while others are already on one. */ rollingOver: number;
+} {
   const days = [...view.internals.byMiner.values()].flatMap((inner) =>
     inner.days.filter((d) => d.extractionId === extractionId)
   );
@@ -192,7 +196,14 @@ export function extractionBilling(
   ];
   // A moon whose days were all dismissed was never billed: one day has to sit on a Statement.
   const onStatement = days.some((d) => d.status === 'on-statement' || d.status === 'paid');
-  return { billed: onStatement && !open, statementIds };
+  const waiting = days
+    .filter((d) => d.status === 'unbilled' || d.status === 'not-billable')
+    .reduce((sum, d) => sum + d.tax, 0);
+  return {
+    billed: onStatement && !open,
+    statementIds,
+    rollingOver: onStatement && open ? waiting : 0,
+  };
 }
 
 /**

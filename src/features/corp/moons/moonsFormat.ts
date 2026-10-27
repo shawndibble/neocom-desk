@@ -6,6 +6,9 @@ import type { TFunction } from 'i18next';
 
 export const isk = (value: number) => formatIsk(Math.round(value));
 
+/** A whole-ISK figure, or a dash when it is nothing (under 1 ISK): a zero is not a number worth printing. */
+export const iskOrDash = (value: number) => (Math.abs(value) < 1 ? '—' : isk(value));
+
 /** A refinery shown before (or without) its name: a placeholder, never written as one. */
 export const refineryPlaceholder = (id: number | string) => `Refinery ${id}`;
 
@@ -44,7 +47,7 @@ export function extractionWindowLabel(
   const days = extractionWindowDays(row.startedAt, row.chunkArrivalAt);
   // The days stay on one line: a break inside "(41 days)" leaves the "41" hanging.
   const span = t('corpTaxBook.moons.windowDays', { count: days }).replace(/ /g, '\u00a0');
-  return `${dateWithYear(row.startedAt)} - ${dateWithYear(row.chunkArrivalAt)} (${span})`;
+  return `${dateWithYear(row.startedAt)} \u2013 ${dateWithYear(row.chunkArrivalAt)} (${span})`;
 }
 
 /** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */

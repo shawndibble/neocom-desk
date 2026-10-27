@@ -176,6 +176,7 @@ export function RecordPaymentDialog({
   minerName,
   defaultAmount,
   statementId,
+  statementLabel,
   onRecorded,
 }: {
   open: boolean;
@@ -184,11 +185,13 @@ export function RecordPaymentDialog({
   minerName: string;
   defaultAmount: number;
   statementId?: string;
+  /** The pinned Statement's period, so the dialog says where the payment goes first. */
+  statementLabel?: string;
   onRecorded?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const { edit, names } = useBook();
-  const [amount, setAmount] = useState(String(Math.round(defaultAmount)));
+  const [amount, setAmount] = useState(defaultAmount >= 1 ? String(Math.round(defaultAmount)) : '');
   const [payer, setPayer] = useState(String(miner.mainCharacterId));
   const value = Number(amount);
   return (
@@ -234,7 +237,14 @@ export function RecordPaymentDialog({
           />
         </Label>
       )}
-      <Effect>{t('corpTaxBook.moons.dialogs.record.effect', { name: minerName })}</Effect>
+      <Effect>
+        {statementId && statementLabel
+          ? t('corpTaxBook.moons.dialogs.record.effectPinned', {
+              name: minerName,
+              period: statementLabel,
+            })
+          : t('corpTaxBook.moons.dialogs.record.effect', { name: minerName })}
+      </Effect>
     </DialogShell>
   );
 }

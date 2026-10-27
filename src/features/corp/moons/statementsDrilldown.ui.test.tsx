@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import '@/i18n';
 import {
   buildBookView,
@@ -81,10 +81,20 @@ const verdict: OfficerVerdict = {
 };
 
 function PeriodRoute() {
-  return <StatementPeriodDetail periodStart={useParams().start ?? ''} />;
+  const { search } = useLocation();
+  return (
+    <>
+      <output data-testid="search">{search}</output>
+      <StatementPeriodDetail periodStart={useParams().start ?? ''} />
+    </>
+  );
 }
 
-function renderAt(path: string, canView = false, opts: { settleFirst?: boolean } = {}) {
+function renderAt(
+  path: string,
+  canView = false,
+  opts: { settleFirst?: boolean; extra?: Partial<BookViewInput> } = {}
+) {
   const first = buildBookView(input());
   const plan = planStatementRun(first, nextRunPeriod(first)!);
   const [a, b] = plan.lines.map((l) => ({
@@ -112,6 +122,7 @@ function renderAt(path: string, canView = false, opts: { settleFirst?: boolean }
             ],
           }
         : {}),
+      ...opts.extra,
     })
   );
   render(
@@ -160,6 +171,8 @@ describe('Statements drill-down (#5285)', () => {
     const sep = within(table).getByText('Sep 2026').closest('tr')!;
     await userEvent.click(within(sep).getByText('Sep 2026'));
     expect(screen.getByRole('table', { name: 'All periods' })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Statements' })).toBeNull();
+    expect(within(sep).queryByText('Aug 2026')).toBeNull();
   });
 
   it('the period page lists each miner with mail state; Stopped hides the sent mark', () => {
@@ -168,7 +181,9 @@ describe('Statements drill-down (#5285)', () => {
     expect(within(table).getByText('Pilot 1')).toBeInTheDocument();
     expect(within(table).getByText('Pilot 2')).toBeInTheDocument();
     expect(within(table).getByText('Sent ×2')).toBeInTheDocument();
-    expect(within(table).getByText('Stopped')).toBeInTheDocument();
+    expect(within(table).getByText('Stopped')).toHaveAttribute('tabindex', '0');
+    const stoppedRow = within(table).getByText('Pilot 2').closest('tr')!;
+    expect(within(stoppedRow).queryByText(/^Sent/)).toBeNull();
     expect(within(table).getAllByText(/days late/).length).toBeGreaterThan(0);
   });
 
@@ -236,8 +251,8 @@ describe('Statement panel (#5286)', () => {
   it('a row click opens the panel with the Statement figures, lines and mail state', async () => {
     const panel = await openFirst();
     expect(within(panel).getByText('Remaining')).toBeInTheDocument();
-    expect(within(panel).getAllByText('Billed')).toHaveLength(2);
-    expect(within(panel).getByText('Sent 2 times')).toBeInTheDocument();
+    expect(within(panel).getAllByText('Billed')).toHaveLength(1);
+    expect(within(panel).getByText('Mailed 2 times')).toBeInTheDocument();
     expect(within(panel).getByRole('list', { name: 'Statement lines' })).toBeInTheDocument();
     expect(within(panel).getByText(/No payments have been credited/)).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: 'Open Miner page' })).toBeInTheDocument();
@@ -270,5 +285,92 @@ describe('Statement panel (#5286)', () => {
     const panel = await openFirst('/corp/moons/statements/2026-08-01', true);
     expect(within(panel).queryByRole('button', { name: 'Copy verify link' })).toBeNull();
     expect(within(panel).getByRole('link', { name: 'Open Miner page' })).toBeInTheDocument();
+  });
+});
+
+describe('Statements drill-down details (#5247)', () => {
+  it('a Statement paused by a declaration reads Paused, not days late', () => {
+    renderAt('/corp/moons/statements/2026-08-01', false, {
+      extra: {
+        now: '2026-09-30T14:00:00Z',
+        declarations: [
+          {
+            id: 'd1',
+            statementId: '2026-08-01_solo:2',
+            kind: 'contract',
+            at: '2026-09-25T00:00:00Z',
+          },
+        ],
+      },
+    });
+    const table = screen.getByRole('table', { name: 'Statements' });
+    const row = within(table).getByText('Pilot 2').closest('tr')!;
+    expect(within(row).getByText(/^Paused · until/)).toBeInTheDocument();
+    expect(within(row).queryByText(/days late/)).toBeNull();
+  });
+
+  it('the Statements tab totals equal the period page totals', () => {
+    renderAt('/corp/moons/statements');
+    const row = within(screen.getByRole('table', { name: 'All periods' }))
+      .getByText('Aug 2026')
+      .closest('tr')!;
+    const tab = within(row)
+      .getAllByRole('cell')
+      .map((c) => c.textContent);
+    cleanup();
+    renderAt('/corp/moons/statements/2026-08-01');
+    const chips = document.body.textContent ?? '';
+    // Billed, Paid, Outstanding as the tab row shows them (cells 3 to 5).
+    expect(chips).toContain(`Billed${tab[3]}`);
+    expect(chips).toContain(`Outstanding${tab[5]}`);
+  });
+
+  it('a settled Statement panel says Paid under Due and keeps remaining at nothing', async () => {
+    renderAt('/corp/moons/statements/2026-08-01', false, { settleFirst: true });
+    await userEvent.click(
+      within(screen.getByRole('table', { name: 'Statements' })).getByText('Pilot 1')
+    );
+    const panel = await screen.findByRole('dialog');
+    expect(within(panel).getByText('Due').nextSibling).toHaveTextContent('Paid');
+    expect(within(panel).getByText('Credited')).toBeInTheDocument();
+    expect(within(panel).getByText('Mailed 2 times')).toBeInTheDocument();
+  });
+
+  it('a ?statement= that is not on the period shows a notice and drops the param (replace)', async () => {
+    renderAt('/corp/moons/statements/2026-08-01?statement=nope');
+    expect(await screen.findByText('Statement not found.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('search').textContent).toBe('');
+  });
+
+  it('the panel lists the Covers window and the payment credited to it, in whole ISK', async () => {
+    renderAt('/corp/moons/statements/2026-08-01', false, {
+      extra: {
+        payments: [
+          {
+            id: 'p1',
+            minerId: 'solo:1',
+            characterId: 1,
+            amount: 1_000,
+            at: '2026-09-02T10:04:00Z',
+            source: 'donation',
+          },
+        ],
+      },
+    });
+    await userEvent.click(
+      within(screen.getByRole('table', { name: 'Statements' })).getByText('Pilot 1')
+    );
+    const panel = await screen.findByRole('dialog');
+    expect(within(panel).getByText(/ – 31 Aug 2026 · \d+ days/)).toBeInTheDocument();
+    expect(within(panel).getByText('+1,000 ISK')).toBeInTheDocument();
+  });
+
+  it('a view-only user gets a caret on the clickable period page row', () => {
+    renderAt('/corp/moons/statements/2026-08-01', true);
+    const row = within(screen.getByRole('table', { name: 'Statements' }))
+      .getByText('Pilot 1')
+      .closest('tr')!;
+    expect(row.querySelector('svg')).not.toBeNull();
   });
 });

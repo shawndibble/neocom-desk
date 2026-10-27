@@ -21,10 +21,20 @@ export interface StatementLinesSource {
   refineryNames?: Record<string, string>;
 }
 
+/** Formats a date for the page it sits on; the verify page's own is the default. */
+type DateFormat = (value: string) => string;
+
 /** The mined days of one Statement with every ore's price, and the billed total (shared by the verify page and the officer's Statement panel). */
-export function StatementLines({ statement }: { statement: StatementLinesSource }) {
+export function StatementLines({
+  statement,
+  formatDate,
+}: {
+  statement: StatementLinesSource;
+  formatDate?: DateFormat;
+}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
+  const fmt: DateFormat = formatDate ?? ((v) => shortDate(v, locale));
   const rows = useMemo(() => verifyRows(statement.lines), [statement.lines]);
   const [oreNames, setOreNames] = useState<ReadonlyMap<number, string>>(new Map());
   useEffect(() => {
@@ -46,41 +56,55 @@ export function StatementLines({ statement }: { statement: StatementLinesSource 
       ? undefined
       : (statement.refineryNames?.[String(id)] ?? t('corpTaxBook.verify.refinery', { id }));
   const hub = TRADE_HUBS.find((h) => h.id === statement.hubId)?.systemName ?? statement.hubId;
+  const minedMeta = t('corpTaxBook.verify.minedMeta', {
+    hub,
+    form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
+  });
+  // The panel is narrow at any viewport width: the meta moves under the title by the
+  // container's width, not the viewport's.
   return (
-    <Panel
-      title={t('corpTaxBook.verify.mined')}
-      meta={
-        <span className="text-xs text-text-dim max-md:basis-full">
-          {t('corpTaxBook.verify.minedMeta', {
-            hub,
-            form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
-          })}
-        </span>
-      }
-      padded={false}
-      wrapMeta
-    >
-      <ul aria-label={t('corpTaxBook.verify.linesLabel')} className="divide-y divide-line">
-        {rows.map((r) => (
-          <MinedDay
-            key={r.key}
-            row={r}
-            oreNames={oreNames}
-            refineryName={refinery(r.structureId)}
-            locale={locale}
-          />
-        ))}
-      </ul>
-      <p className="border-t border-line px-3 py-2 text-right text-sm tabular-nums">
-        {t('corpTaxBook.verify.billed')}{' '}
-        <span className="font-semibold">{isk(statement.amount)}</span>
-      </p>
-    </Panel>
+    <div className="@container">
+      <Panel
+        title={t('corpTaxBook.verify.mined')}
+        meta={<span className="hidden text-xs text-text-dim @md:inline">{minedMeta}</span>}
+        padded={false}
+      >
+        <p className="border-b border-line px-3 py-2 text-xs text-text-dim @md:hidden">
+          {minedMeta}
+        </p>
+        <ul aria-label={t('corpTaxBook.verify.linesLabel')} className="divide-y divide-line">
+          {rows.map((r, i) => (
+            <MinedDay
+              key={r.key}
+              row={r}
+              oreNames={oreNames}
+              // Named once, then only when the refinery changes from the day above.
+              refineryName={
+                i > 0 && rows[i - 1].structureId === r.structureId
+                  ? undefined
+                  : refinery(r.structureId)
+              }
+              formatDate={fmt}
+            />
+          ))}
+        </ul>
+        <p className="border-t border-line px-3 py-2 text-right text-sm tabular-nums">
+          {t('corpTaxBook.verify.billed')}{' '}
+          <span className="font-semibold">{isk(statement.amount)}</span>
+        </p>
+      </Panel>
+    </div>
   );
 }
 
 /** The payments credited to a Statement, or the line saying none have been. */
-export function StatementPayments({ payments }: { payments: VerifyPayload['payments'] }) {
+export function StatementPayments({
+  payments,
+  formatDate,
+}: {
+  payments: VerifyPayload['payments'];
+  formatDate?: DateFormat;
+}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   return (
@@ -92,7 +116,7 @@ export function StatementPayments({ payments }: { payments: VerifyPayload['payme
           {payments.map((p) => (
             <li key={p.id} className="flex justify-between gap-3 px-3 py-2 text-sm tabular-nums">
               <span>
-                {shortDate(p.at, locale)}
+                {(formatDate ?? ((v) => shortDate(v, locale)))(p.at)}
                 <span className="block text-xs text-text-dim">
                   {t(`corpTaxBook.verify.source.${p.source}`)}
                 </span>
@@ -120,16 +144,20 @@ function MinedDay({
   row: r,
   oreNames,
   refineryName,
-  locale,
+  formatDate,
 }: {
   row: VerifyRow;
   oreNames: ReadonlyMap<number, string>;
   refineryName: string | undefined;
-  locale: string;
+  formatDate: DateFormat;
 }) {
   const { t } = useTranslation();
+  // The day header already says the day, and the panel header says prices are the day's own:
+  // an ore line only speaks up when its price came from somewhere else.
+  const priceSource = (source: VerifyRow['ores'][number]['source']) =>
+    source && source !== 'saved' ? t(`miningTax.detail.breakdown.source.${source}`) : undefined;
   const segments = metaSegments([
-    shortDate(r.date, locale),
+    formatDate(r.date),
     refineryName,
     r.kind === 'late-ore' && t('corpTaxBook.verify.lateOre'),
     r.taxPct === undefined ? undefined : `${r.taxPct}%`,
@@ -161,7 +189,7 @@ function MinedDay({
           {r.ores.map((o) => (
             <li
               key={o.typeId}
-              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 @md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
             >
               <span>
                 {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {formatCount(o.quantity)}
@@ -169,15 +197,11 @@ function MinedDay({
               <span className="text-right tabular-nums">
                 {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}
               </span>
-              <span className="col-span-2 text-xs text-text-dim md:col-span-1 md:text-right">
-                {metaSegments([
-                  shortDate(r.date, locale),
-                  o.source &&
-                    (o.source === 'saved'
-                      ? t('corpTaxBook.verify.priceSaved')
-                      : t(`miningTax.detail.breakdown.source.${o.source}`)),
-                ]).join(' · ')}
-              </span>
+              {priceSource(o.source) && (
+                <span className="col-span-2 text-xs text-text-dim @md:col-span-1 @md:text-right">
+                  {priceSource(o.source)}
+                </span>
+              )}
             </li>
           ))}
         </ul>

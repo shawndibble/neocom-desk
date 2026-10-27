@@ -154,12 +154,7 @@ const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 export type MinerStanding = 'Member' | 'Guest' | 'Left corp';
 
 export type DayStatus =
-  | 'On Aug Statement'
-  | 'Not on a Statement yet'
-  | 'Not Billable yet'
-  | 'Dismissed'
-  | 'Paid'
-  | 'Written off';
+  'On Aug Statement' | 'Next Statement' | 'Not Billable yet' | 'Dismissed' | 'Paid' | 'Written off';
 
 export interface DayLine {
   id: number;
@@ -231,11 +226,11 @@ const inMonth = (row: DayLine, month: string) => row.date.endsWith(month);
 /** Varro Kestane's days (miner detail), newest first. */
 export const VARRO_DAYS: DayLine[] = [
   line(1, '18 Oct', ...EFA5, 'Lysa Kestane', 'Zeolites', 38_400, 10, 'Not Billable yet'),
-  line(2, '17 Oct', ...EFA5, 'Varro Kestane', 'Sylvite', 52_100, 10, 'Not on a Statement yet'),
-  line(3, '17 Oct', ...EFA5, 'Varro Kestane', 'Zeolites', 61_900, 10, 'Not on a Statement yet'),
+  line(2, '17 Oct', ...EFA5, 'Varro Kestane', 'Sylvite', 52_100, 10, 'Next Statement'),
+  line(3, '17 Oct', ...EFA5, 'Varro Kestane', 'Zeolites', 61_900, 10, 'Next Statement'),
   line(4, '11 Oct', ...KAM2, 'Lysa Kestane', 'Bitumens', 44_250, 10, 'Dismissed'),
-  line(5, '26 Sep', ...EFA5, 'Varro Kestane', 'Sylvite', 82_000, 10, 'Not on a Statement yet'),
-  line(6, '25 Sep', ...EFA5, 'Lysa Kestane', 'Zeolites', 91_500, 10, 'Not on a Statement yet'),
+  line(5, '26 Sep', ...EFA5, 'Varro Kestane', 'Sylvite', 82_000, 10, 'Next Statement'),
+  line(6, '25 Sep', ...EFA5, 'Lysa Kestane', 'Zeolites', 91_500, 10, 'Next Statement'),
   line(
     7,
     '4 Sep',
@@ -244,7 +239,7 @@ export const VARRO_DAYS: DayLine[] = [
     'Sylvite',
     70_300,
     10,
-    'Not on a Statement yet',
+    'Next Statement',
     'Region-wide (Jita)'
   ),
   line(8, '28 Aug', ...EFA7, 'Varro Kestane', 'Cobaltite', 71_300, 10, 'On Aug Statement'),
@@ -312,12 +307,8 @@ export function varroLedger(notTax: number) {
   const credited = sum(payments.map((p) => p.amount - (p.notTax ?? 0)));
   const augBilled = taxOf(augLines);
   const owed = augBilled - credited - toleranceWriteOff;
-  const sepLines = VARRO_DAYS.filter(
-    (r) => r.status === 'Not on a Statement yet' && inMonth(r, 'Sep')
-  );
-  const octBillable = VARRO_DAYS.filter(
-    (r) => r.status === 'Not on a Statement yet' && inMonth(r, 'Oct')
-  );
+  const sepLines = VARRO_DAYS.filter((r) => r.status === 'Next Statement' && inMonth(r, 'Sep'));
+  const octBillable = VARRO_DAYS.filter((r) => r.status === 'Next Statement' && inMonth(r, 'Oct'));
   const pending = VARRO_DAYS.filter((r) => r.status === 'Not Billable yet');
   const sepNew = taxOf(sepLines);
   return {
@@ -427,10 +418,10 @@ export const TAMSIN_AUG: DayLine[] = [
   line(105, '13 Aug', ...EFA5, 'Tamsin Holloway', 'Zeolites', 70_200, 15, 'On Aug Statement'),
 ];
 const TAMSIN_SEP = [
-  line(106, '26 Sep', ...EFA5, 'Tamsin Holloway', 'Sylvite', 58_400, 15, 'Not on a Statement yet'),
+  line(106, '26 Sep', ...EFA5, 'Tamsin Holloway', 'Sylvite', 58_400, 15, 'Next Statement'),
 ];
 const TAMSIN_OCT = [
-  line(107, '17 Oct', ...EFA5, 'Tamsin Holloway', 'Zeolites', 66_100, 15, 'Not on a Statement yet'),
+  line(107, '17 Oct', ...EFA5, 'Tamsin Holloway', 'Zeolites', 66_100, 15, 'Next Statement'),
 ];
 const TAMSIN_PENDING = [
   line(108, '18 Oct', ...EFA5, 'Tamsin Holloway', 'Sylvite', 34_800, 15, 'Not Billable yet'),

@@ -414,7 +414,7 @@ const minerColumns: DataTableColumn<Miner>[] = [
   },
   {
     id: 'unbilled',
-    header: 'Not on a Statement yet',
+    header: 'Next Statement',
     align: 'right',
     className: 'tabular-nums',
     render: (row) => (row.unbilled ? isk(row.unbilled) : '—'),
@@ -446,7 +446,7 @@ function MinersF({ chip, dialog }: { chip?: QueueItem[]; dialog?: MinersDialog }
           value={`${isk(MINER_TOTALS.overdue)} · ${MINER_TOTALS.overdueCount} Miners`}
           tone="danger"
         />
-        <StatChip label="Not on a Statement yet" value={isk(MINER_TOTALS.unbilled)} />
+        <StatChip label="Next Statement" value={isk(MINER_TOTALS.unbilled)} />
         <StatChip label="Credit held" value={isk(MINER_TOTALS.credit)} />
       </StatChips>
       <NeedsYouQueue />
@@ -495,7 +495,7 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
     header: '',
     className: 'w-8',
     render: (row) =>
-      row.status === 'Not on a Statement yet' || row.status === 'Not Billable yet' ? (
+      row.status === 'Next Statement' || row.status === 'Not Billable yet' ? (
         <label className={touchCheckboxLabelClassName}>
           <Checkbox
             aria-label={`Select ${row.date} ${row.ore}`}
@@ -532,7 +532,7 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
         <StatChip label="Owed" value={isk(ledger.owed)} tone="danger" emphasis />
         <StatChip label="Overdue since" value="15 Sep · 33 days" tone="danger" />
         <StatChip
-          label="Not on a Statement yet"
+          label="Next Statement"
           value={isk(VARRO.unbilled)}
           tooltip={`Sep 2026, not sent yet: ${isk(VARRO.sepNew)}. Oct 2026 so far, Billable through 17 Oct: ${isk(VARRO.octNew)}. 18 Oct (${isk(VARRO.pending)}) is not Billable yet.`}
           tooltipGlyph="info"

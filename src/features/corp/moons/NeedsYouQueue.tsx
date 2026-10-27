@@ -18,7 +18,7 @@ import { minerPath } from './moonsPaths';
 import { mailTarget, useCorporationName } from './statementMailing';
 
 /** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
-const secondaryActionClassName = plainTextActionClassName('min-h-9 md:min-h-0');
+const secondaryActionClassName = plainTextActionClassName('min-h-9 md:min-h-6');
 
 function QueueCard({
   tone,
