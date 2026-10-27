@@ -4,7 +4,7 @@ Three connected surfaces plus background machinery:
 
 - **Alerts page** `/alerts` (no rail row or phone tab; reached from the header bell with its unread badge, and Ctrl K): the record of every alert this device fired or received, grouped by type, device-wide across Characters. Glossary: Alert, Notification Feed.
 - **Settings > Notifications** `/settings/notifications` (Settings rail group "Alerts"): what may fire, per Character, per event, per channel; master switch, channel gates, permission prompt/enable, thresholds.
-- **Browser permission explainer** (one-time banner) `NotificationPermissionPrompt`.
+- **Browser permission explainer** (one-time block at the top of the bell's alerts panel) `NotificationExplainer`.
 - **Machinery**: Foreground Poller (5 min, open app), Scheduled Push (Projection uploaded to Firebase, delivered by FCM to the service worker), server-pushed events (community, price alerts, ship lost; ADR 0027; nearby, ADR 0028; new mail, ADR 0029), app-icon badge, Web Push registration, feed sync.
 
 User goal: be told about the in-game things that matter (queues finishing, jobs, mail, structure attacks, price crossings), on a pop-up and/or in an in-app list, for every Character, without a server holding EVE tokens (ADR `docs/adr/0010-scheduled-push-without-server-side-tokens.md`, ADR 0009 push replaces periodic background sync).
@@ -25,7 +25,7 @@ Code: `src/routes/Alerts.tsx`; `src/features/notifications/*` (see below); `src/
 | Event catalog          | 25 Notification Events                                                                                                     | `events.ts`                                                                              |
 | EVE notification types | 29 allow-listed types in 6 families, per type per channel                                                                  | `eventSelection.ts:301`                                                                  |
 | Thresholds             | 7 per-Character values                                                                                                     | `eventThresholdFields.ts`                                                                |
-| Permission prompt      | Explainer banner + Enable button in Settings                                                                               | `NotificationPermissionPrompt.tsx`, `permission.ts`, `webPush.ts`                        |
+| Permission prompt      | Bell-panel explainer + Settings' Device pop-ups checkbox                                                                   | `NotificationExplainer.tsx`, `permission.ts`, `webPush.ts`                               |
 | Foreground Poller      | Diff 17 domains every 5 min                                                                                                | `foregroundPoller.ts`, `pollDomains/`                                                    |
 | Scheduled Push         | 72 h Projection upload; OS push with app closed                                                                            | `projectionRebuild.ts`, `projectionUpload.ts`, `deviceRegistration.ts`, `pushHandler.ts` |
 | Server-pushed events   | Community, price alert, ship lost pushed by the backend (no EVE token)                                                     | `serverEvents.ts`, `serverEventCopy.ts`, `functions/src/serverEvent*.ts`                 |
@@ -180,7 +180,7 @@ ADR 0027, decision `20261025-073433-server-pushed-events-community-triggers-poll
 
 ## Permission explainer
 
-`NotificationPermissionPrompt` shows a fixed banner (role=alert) once per device when: preferences hydrated, not previously `seen`, at least one Character, `Notification.permission` is `default` (or iOS not installed), the player has left the first screen of their first-ever session (`firstScreen.ts`, issue #1788: route change, session flag in Dexie `notifications.hasCompletedASession`), and it wins the onboarding banner slot (`useOnboardingBannerSlot('notifications')`). Buttons: Dismiss (stores `seen: true`), and Enable (hidden when iOS install required), which calls `enableWebPush()`: requests permission; on grant registers the device (lazy-imported Firebase chunk so startup never statically reaches Firebase, `bootImportGraph.test.ts`); stores outcome via `promptStateAfterAsk`. Dexie key `notifications.permissionPrompt`.
+`NotificationExplainer` (rendered at the top of `AlertsPanel`, so it first appears the first time the bell is opened) shows once per device when: preferences hydrated, not previously `seen`, at least one Character, and `Notification.permission` is `default` (or iOS not installed). Settings' Device pop-ups checkbox is the other ask: ticking it while permission is `default` runs the same enable flow and also records `seen`. Buttons: Dismiss (stores `seen: true`), and Enable (hidden when iOS install required), which calls `enableWebPush()`: requests permission; on grant registers the device (lazy-imported Firebase chunk so startup never statically reaches Firebase, `bootImportGraph.test.ts`); stores outcome via `promptStateAfterAsk`. Dexie key `notifications.permissionPrompt`.
 
 ## Synced vs local preferences (`syncedPreferences.ts`)
 

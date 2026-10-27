@@ -15,10 +15,11 @@
  *   stored outcome is never a substitute for it.
  *
  * `requestNotificationPermission` is called from exactly one place — the
- * explainer's Enable button and Settings' Enable button, both of which are a
- * deliberate user tap. Nothing here fires on mount.
+ * explainer's Enable button and Settings' Device pop-ups checkbox, both of
+ * which are a deliberate user tap. Nothing here fires on mount.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { create } from 'zustand';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const NOTIFICATION_PERMISSION_PROMPT_KEY = 'notifications.permissionPrompt';
@@ -100,16 +101,8 @@ export function shouldShowPermissionExplainer(state: {
    * appearing on the one platform AC1 exists for.
    */
   installRequired: boolean;
-  /**
-   * True once the player has moved past the very first screen of their very
-   * first session (issue #1788) — `hasCharacter` alone goes true the instant
-   * a first character exists, which for a first-time player can be the very
-   * first screen they ever land on. See `firstScreen.ts`.
-   */
-  hasLeftFirstScreen: boolean;
 }): boolean {
-  if (!state.hydrated || state.seen || !state.hasCharacter || !state.hasLeftFirstScreen)
-    return false;
+  if (!state.hydrated || state.seen || !state.hasCharacter) return false;
   // 'granted'/'denied' mean the browser has already been asked on this origin,
   // and a denied grant can never be re-requested from JS — an explainer whose
   // Enable button would do nothing is worse than no explainer. The
@@ -194,3 +187,10 @@ export function shouldShowAlertsOffer(state: {
     state.characterId !== null
   );
 }
+
+/**
+ * True once this session's Enable ended in a grant. Module-level rather than
+ * component state: the panel unmounts when the bell closes, and closing it
+ * right after Enable must not lose the Alerts offer.
+ */
+export const useGrantedHere = create<{ granted: boolean }>(() => ({ granted: false }));

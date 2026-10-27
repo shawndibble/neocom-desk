@@ -1,8 +1,8 @@
 /**
  * One bottom banner at a time (issue #1124).
  *
- * The three one-time onboarding banners are `position: fixed` in the same
- * bottom corner, and a first login on a fresh device can make two or three of
+ * The one-time onboarding banners are `position: fixed` in the same
+ * bottom corner, and a first login on a fresh device can make both of
  * them eligible at once — which stacked them up the viewport until they buried
  * the page content behind them on a phone. This is the shared slot they now
  * compete for: every eligible banner registers itself, and only the
@@ -21,10 +21,10 @@ import { create } from 'zustand';
  * Highest priority first. Corp grant leads because it is the rarest and most
  * perishable — it is offered at the moment a Character becomes a Director and
  * (by design, GLOSSARY.md round 42) never again for that scope set. Install
- * comes last: it is the least urgent of the three and is about the device
+ * comes last: it is the least urgent and is about the device
  * rather than anything the user just did.
  */
-export const ONBOARDING_BANNER_PRIORITY = ['corp-grant', 'notifications', 'install'] as const;
+export const ONBOARDING_BANNER_PRIORITY = ['corp-grant', 'install'] as const;
 
 export type OnboardingBannerId = (typeof ONBOARDING_BANNER_PRIORITY)[number];
 

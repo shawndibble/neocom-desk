@@ -14,26 +14,20 @@ beforeEach(() => {
 describe('selectVisibleBanner', () => {
   it('returns null when nothing is eligible', () => {
     expect(selectVisibleBanner({})).toBeNull();
-    expect(
-      selectVisibleBanner({ 'corp-grant': false, notifications: false, install: false })
-    ).toBeNull();
+    expect(selectVisibleBanner({ 'corp-grant': false, install: false })).toBeNull();
   });
 
   it('returns the only eligible banner regardless of its priority', () => {
     expect(selectVisibleBanner({ install: true })).toBe('install');
-    expect(selectVisibleBanner({ notifications: true })).toBe('notifications');
     expect(selectVisibleBanner({ 'corp-grant': true })).toBe('corp-grant');
   });
 
   it('returns the highest-priority banner when several are eligible', () => {
-    expect(selectVisibleBanner({ install: true, notifications: true })).toBe('notifications');
-    expect(selectVisibleBanner({ install: true, notifications: true, 'corp-grant': true })).toBe(
-      'corp-grant'
-    );
+    expect(selectVisibleBanner({ install: true, 'corp-grant': true })).toBe('corp-grant');
   });
 
   it('follows the declared priority order', () => {
-    expect([...ONBOARDING_BANNER_PRIORITY]).toEqual(['corp-grant', 'notifications', 'install']);
+    expect([...ONBOARDING_BANNER_PRIORITY]).toEqual(['corp-grant', 'install']);
   });
 });
 
@@ -55,32 +49,32 @@ describe('useOnboardingBannerSlot', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
     expect(install.result.current).toBe(true);
 
-    const notifications = renderHook(() => useOnboardingBannerSlot('notifications', true));
+    const corpGrant = renderHook(() => useOnboardingBannerSlot('corp-grant', true));
 
-    expect(notifications.result.current).toBe(true);
+    expect(corpGrant.result.current).toBe(true);
     expect(install.result.current).toBe(false);
   });
 
   it('hands the slot to the next claimant once the winner stops being eligible', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
-    const notifications = renderHook(
-      ({ eligible }) => useOnboardingBannerSlot('notifications', eligible),
+    const corpGrant = renderHook(
+      ({ eligible }) => useOnboardingBannerSlot('corp-grant', eligible),
       { initialProps: { eligible: true } }
     );
     expect(install.result.current).toBe(false);
 
-    act(() => notifications.rerender({ eligible: false }));
+    act(() => corpGrant.rerender({ eligible: false }));
 
-    expect(notifications.result.current).toBe(false);
+    expect(corpGrant.result.current).toBe(false);
     expect(install.result.current).toBe(true);
   });
 
   it('releases the slot when the winning banner unmounts', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
-    const notifications = renderHook(() => useOnboardingBannerSlot('notifications', true));
+    const corpGrant = renderHook(() => useOnboardingBannerSlot('corp-grant', true));
     expect(install.result.current).toBe(false);
 
-    act(() => notifications.unmount());
+    act(() => corpGrant.unmount());
 
     expect(install.result.current).toBe(true);
   });

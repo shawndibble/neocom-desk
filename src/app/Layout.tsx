@@ -39,7 +39,6 @@ import { useLockedRoutes } from './useGrantedScopes';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { GlobalPasteRouter } from './GlobalPasteRouter';
-import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
 import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext';
@@ -484,7 +483,6 @@ export const Layout = memo(function Layout() {
           <KeyboardShortcuts />
           <GlobalPasteRouter />
           <CommandPaletteHost />
-          <NotificationPermissionPrompt />
           {/*
         In the shell rather than in `App`, unlike the reload prompt: it is
         about the *active Character*, so it belongs inside

@@ -13323,8 +13323,6 @@
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
-      "enableHint": "This device hasn't granted notification permission yet.",
-      "enableButton": "Turn on device notifications",
       "masterSwitchLabel": "Enable notifications",
       "searchPlaceholder": "Search events or characters",
       "noResults": "No matching events or characters",
