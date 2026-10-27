@@ -3,7 +3,7 @@
  * seen on 18 Oct 2026 14:00 EVE. Every name is invented.
  *
  * One story throughout: an officer synced the book at 12:00 (2h ago), so the
- * Billable rule (day end + 6h grace passed AND a sync after that) makes every
+ * Billable rule (day end + 30 min grace passed AND a sync after that) makes every
  * day through 17 Oct Billable and 18 Oct not yet. The Aug 2026 Statements
  * went out on 1 Sep (due 15 Sep). The Sep 2026 Statements are NOT sent yet:
  * the run in the Statements tab is about to send them, and Oct is still open.

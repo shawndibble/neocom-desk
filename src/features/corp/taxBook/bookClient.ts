@@ -9,6 +9,7 @@
  * a change.
  */
 import type { CallableAction } from '../../../../functions/src/callableManifest';
+import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
@@ -380,7 +381,7 @@ function settingsFrom(d: Record<string, unknown>): BookSettings {
     structureExpiryHours: (d.structureExpiryHours as Record<string, number> | undefined) ?? {},
     hubId: typeof d.hubId === 'string' ? d.hubId : 'jita',
     oreForm: d.oreForm === 'raw' ? 'raw' : 'compressed',
-    graceHours: num(d.graceHours, 6),
+    graceHours: num(d.graceHours, DEFAULT_GRACE_HOURS),
     minimumStatement: num(d.minimumStatement, 5_000_000),
     overdueDays: num(d.overdueDays, 14),
     cadence: (d.cadence as StatementCadence | undefined) ?? { kind: 'monthly' },

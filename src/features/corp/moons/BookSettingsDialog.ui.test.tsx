@@ -99,6 +99,25 @@ describe('BookSettingsDialog tabs', () => {
     expect(screen.getByRole('textbox', { name: 'Grace after day end (hours)' })).toHaveValue('12');
   });
 
+  it('takes a decimal grace: 0.5 hours (and 0,5) save as 0.5', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    const grace = screen.getByRole('textbox', { name: 'Grace after day end (hours)' });
+    await user.clear(grace);
+    await user.type(grace, '0,5');
+    expect(grace).toHaveValue('0,5');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook).toHaveBeenCalledWith(
+      7,
+      98000000,
+      expect.objectContaining({
+        action: 'updateSettings',
+        patch: expect.objectContaining({ graceHours: 0.5 }),
+      })
+    );
+  });
+
   it('has one save model: Save commits a filled rate and the settings, then reports it', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();

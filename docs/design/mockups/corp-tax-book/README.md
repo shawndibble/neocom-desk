@@ -2,7 +2,7 @@
 
 Issue #4056 (epic #4055). Source: `src/mockups/CorpTaxBookFinal.stories.tsx` (data in `corpTaxBookFixtures.ts`, officer dialogs in `corpTaxBookDialogs.tsx`, the member's tab and the verify page in `corpTaxBookMember.tsx`). Story ids are `mockups-corptaxbookfinal--<step>`, with `-phone` for the 390 variant. Built on option A with C's timeline, Needs you cards and Statement run, B's mail preview (now a dialog) and B's verify layout. Sample data; the ticket text wins over the picture.
 
-One story throughout: today is 18 Oct 2026 14:00 EVE and an officer synced the book at 12:00 (2h ago), so every day through 17 Oct is Billable (day end + 6h grace passed, then a sync) and 18 Oct is not. The Aug 2026 Statements went out on 1 Sep (due 15 Sep); the Sep 2026 Statements are about to be sent; Oct is open. Figures that show in several places (Miners table, Needs you, mail, verify page) are derived from the same lines and payments.
+One story throughout: today is 18 Oct 2026 14:00 EVE and an officer synced the book at 12:00 (2h ago), so every day through 17 Oct is Billable (day end + 30 min grace passed, then a sync) and 18 Oct is not. The Aug 2026 Statements went out on 1 Sep (due 15 Sep); the Sep 2026 Statements are about to be sent; Oct is open. Figures that show in several places (Miners table, Needs you, mail, verify page) are derived from the same lines and payments.
 
 New components (dashed, labelled): ExtractionTimeline, NeedsYouQueue, StatementRun, StatementMailPreview, MailQueueChip (with its phone percent badge), CorpBookDiff, CorpBookSyncNote. The personal tab is today's Tax tab (real `OwedBalances`, `PriceBreakdownCard` and `AttentionStrip`; Open and History tables; same columns and row detail) with new `StatusPill` values.
 

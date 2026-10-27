@@ -16209,7 +16209,7 @@
         },
         "noRefineries": "This corporation has no refineries the book can read",
         "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Donations still sync, but no mining is recorded until one is readable.",
-        "billableHint": "Day end + {{hours}}h grace, then a sync. The book warns here once nobody has synced for about 3 days.",
+        "billableHint": "Day end + {{hours}} h grace, then a sync. The book warns here once nobody has synced for about 3 days.",
         "hiddenLabel": "hidden from members",
         "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
         "showToMembers": "Show to members now"

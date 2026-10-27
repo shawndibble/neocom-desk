@@ -86,6 +86,7 @@ import {
   parseSaveCorpSyncGrantInput,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
+  SYNC_CORP_TAX_BOOKS_SCHEDULE,
   saveCorpSyncGrant,
   type CorpSyncDeps,
 } from './corpSyncGrant.js';
@@ -1060,14 +1061,14 @@ corpTaxBookAction('revokeCorpTaxBookSyncGrantCallable', (request) =>
 );
 
 /**
- * syncCorpTaxBooks (issue #4068, ADR 0025): every 6 hours, syncs and settles each
+ * syncCorpTaxBooks (issue #4068, ADR 0025): at 00:30, 06:30, 12:30 and 18:30 UTC, syncs and settles each
  * opted-in corporation's Corp Tax Book with its grant holder's token. Never issues
  * a Statement or sends mail. Deploy is manual:
  * `firebase deploy --only functions:syncCorpTaxBooks`.
  */
 export const syncCorpTaxBooks = onSchedule(
   {
-    schedule: 'every 6 hours',
+    ...SYNC_CORP_TAX_BOOKS_SCHEDULE,
     secrets: FEEDER_VIEW_SECRETS,
     timeoutSeconds: 540,
     maxInstances: 1,

@@ -13,8 +13,8 @@ import { useBook } from './useBook';
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
 
 /**
- * The book's "Automatic sync" (ADR 0025, issue #4068): who holds the 6-hourly
- * scheduled sync, when it last ran, and the opt-in and revoke controls. Any book
+ * The book's "Automatic sync" (ADR 0025, issue #4068): who holds the scheduled
+ * sync, when it last ran, and the opt-in and revoke controls. Any book
  * editor can turn it on for their own Character (one holder per corporation, so
  * a new opt-in replaces the old); the holder can turn it off, and so can the CEO
  * for anyone. Turning it on sends the user to EVE to authorize the narrow scopes;

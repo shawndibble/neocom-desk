@@ -99,7 +99,7 @@ export function canRebillFrom(
 export const BOOK_DEFAULTS = {
   hubId: 'jita',
   oreForm: 'compressed',
-  graceHours: 6,
+  graceHours: 0.5,
   minimumStatement: 5_000_000,
   overdueDays: 14,
   divisions: [1],

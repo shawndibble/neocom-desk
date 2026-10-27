@@ -11,6 +11,6 @@ describe('dayEndTime', () => {
   });
 
   it('falls back to the default grace when the book has none', () => {
-    expect(dayEndTime(Number.NaN)).toBe('06:00');
+    expect(dayEndTime(Number.NaN)).toBe('00:30');
   });
 });
