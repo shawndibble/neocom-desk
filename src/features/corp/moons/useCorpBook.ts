@@ -8,6 +8,10 @@
  * Reads go through the officer rules, so it verifies the Character first
  * (`verifyOfficer`, access token only, ADR 0023). A reload after every edit
  * is the caller's: Firestore here is the `lite` build, with no listeners.
+ *
+ * `options.minerId` names the Miner whose page is open. With `CORP_BOOK_READ_MODELS` on, the
+ * book is then that Miner's read-model slice (#5258, `readMinerBookData`) instead of the whole
+ * ledger; off, it is ignored and nothing changes.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
@@ -40,9 +44,11 @@ import {
 } from '@/features/miningTax/pricing';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
+import { withMinerTotals, type HeaderTotals } from '@/engine/corpTaxBook/minerScope';
 import {
   mergeBookData,
   readBookData,
+  readMinerBookData,
   verifyOfficer,
   type BookData,
   type BookSettings,
@@ -50,6 +56,7 @@ import {
 } from '../taxBook/bookClient';
 import { ALL_BOOK_PART_SET, missingBookParts, type BookPartSet } from '../taxBook/bookParts';
 import { forgetObservedCopy } from '../taxBook/observedStore';
+import { CORP_BOOK_READ_MODELS } from '../taxBook/readModelSwitch';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
 
@@ -86,6 +93,8 @@ type Fetched =
       data: BookData;
       pricesOn: BookViewInput['pricesOn'];
       moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
+      /** Set when the book is one Miner's read-model slice (#5258), not the whole book. */
+      scope?: { minerId: string; totals?: HeaderTotals };
     };
 
 export type CorpBookState =
@@ -146,8 +155,10 @@ async function failedFetch(
  */
 export function useCorpBook(
   sync: CorpTaxBookSync,
-  wanted: BookPartSet = ALL_BOOK_PART_SET
+  wanted: BookPartSet = ALL_BOOK_PART_SET,
+  options: { minerId?: string } = {}
 ): CorpBook {
+  const scopedMiner = CORP_BOOK_READ_MODELS ? options.minerId : undefined;
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
@@ -186,23 +197,33 @@ export function useCorpBook(
           setFetched({ status: 'off', verdict });
           return;
         }
-        let data = await readBookData(characterId, corporationId, wantedRef.current);
-        // The page moved on while this read ran: take the slices it now wants.
-        const late = data ? missingBookParts(wantedRef.current, data.parts) : undefined;
-        if (data && late && late.size > 0) {
-          const more = await readBookData(characterId, corporationId, late);
-          if (more) data = mergeBookData(data, more);
+        let data: BookData | null;
+        let scope: { minerId: string; from: string; totals?: HeaderTotals } | undefined;
+        if (scopedMiner !== undefined) {
+          const miner = await readMinerBookData(characterId, corporationId, scopedMiner);
+          data = miner?.data ?? null;
+          if (miner) scope = { minerId: scopedMiner, from: miner.from, totals: miner.totals };
+        } else {
+          data = await readBookData(characterId, corporationId, wantedRef.current);
+          // The page moved on while this read ran: take the slices it now wants.
+          const late = data ? missingBookParts(wantedRef.current, data.parts) : undefined;
+          if (data && late && late.size > 0) {
+            const more = await readBookData(characterId, corporationId, late);
+            if (more) data = mergeBookData(data, more);
+          }
         }
         if (cancelled) return;
         if (!data?.settings.active) {
           setFetched({ status: 'off', verdict });
           return;
         }
-        // Prices for every ore on every day it was mined, at the book's hub and Ore Form.
-        const typeIds = new Set<number>(data.observed.map((r) => r.typeId));
+        // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
+        // slice prices only its open window: a day on a Statement is frozen and needs no price.
+        const priced = scope ? data.observed.filter((r) => r.date >= scope.from) : data.observed;
+        const typeIds = new Set<number>(priced.map((r) => r.typeId));
         for (const x of data.state.extractions)
           for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
-        const dates = new Set<string>(data.observed.map((r) => r.date));
+        const dates = new Set<string>(priced.map((r) => r.date));
         const loadedOn = utcNow().slice(0, 10);
         dates.add(loadedOn);
         const prices = await loadDatedUnitPricesByHub(
@@ -217,6 +238,7 @@ export function useCorpBook(
           status: 'loaded',
           verdict,
           data,
+          ...(scope ? { scope: { minerId: scope.minerId, totals: scope.totals } } : {}),
           // A page left open past midnight asks for a day it never priced: use the last loaded one.
           pricesOn: (date) => {
             const day = priceDay(prices, data.settings.hubId, date);
@@ -234,7 +256,7 @@ export function useCorpBook(
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, attempt, finishedAt]);
+  }, [characterId, corporationId, attempt, finishedAt, scopedMiner]);
 
   // A page that wants slices the book was opened without reads just those.
   useEffect(() => {
@@ -332,7 +354,7 @@ export function useCorpBook(
     if (fetched.status !== 'loaded' || corporationId === null) return null;
     const { data } = fetched;
     const s = data.settings;
-    return buildBookView({
+    const built = buildBookView({
       corporationId,
       now,
       startDate: s.startDate,
@@ -362,6 +384,9 @@ export function useCorpBook(
       memberIds,
       surveyOreLines,
     });
+    return fetched.scope
+      ? withMinerTotals(built, fetched.scope.minerId, fetched.scope.totals)
+      : built;
   }, [fetched, now, corporationId, memberIds, surveyOreLines]);
 
   // Names, resolved after the figures so the tables never wait on them.
@@ -458,7 +483,10 @@ export function useCorpBook(
 
   const state: CorpBookState =
     fetched.status === 'loaded'
-      ? view && missingBookParts(wanted, fetched.data.parts).size === 0
+      ? // A book read for another page's scope is not this page's: wait for the right one.
+        view &&
+        fetched.scope?.minerId === scopedMiner &&
+        missingBookParts(wanted, fetched.data.parts).size === 0
         ? {
             status: 'ready',
             verdict: fetched.verdict,
