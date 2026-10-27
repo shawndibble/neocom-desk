@@ -28,6 +28,7 @@ import { loadPi } from '@/sde/loadSde';
 import type { MarketWideTreeEntry } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadBpcContractRows, offersForRegion } from './buildPlanPricingInputs';
+import { loadLatestBuildPlan } from './buildPlanStore';
 import {
   blueprintTypeIdsIn,
   loadBlueprintPurchaseOffers,
@@ -88,10 +89,12 @@ export async function priceCandidatesAsPlans(
     (candidate) => catalog.byBlueprintTypeID.get(candidate.tree.blueprintTypeID) ?? null
   );
 
-  const [facilityDefaults, pi, bpcRows] = await Promise.all([
+  const [facilityDefaults, pi, bpcRows, latestPlan] = await Promise.all([
     loadActivityFacilityDefaults(),
     loadPi().catch(() => null),
     loadBpcContractRows().catch(() => null),
+    // A new plan starts its price basis (and hub) from the Character's latest plan.
+    characterId === null ? null : loadLatestBuildPlan(characterId).catch(() => null),
   ]);
   const typeIds = new Set<number>();
   for (const entry of entries) {
@@ -139,7 +142,7 @@ export async function priceCandidatesAsPlans(
     const entry = entries[index];
     if (!entry) return;
     const plan: BuildPlanRecord = {
-      ...newBuildPlan(characterId ?? 0, entry, null, null, facilityDefaults, {
+      ...newBuildPlan(characterId ?? 0, entry, null, latestPlan, facilityDefaults, {
         me: candidate.me,
         te: candidate.te,
         runs: 1,

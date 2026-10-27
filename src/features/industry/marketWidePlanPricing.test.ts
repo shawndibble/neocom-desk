@@ -22,7 +22,9 @@ vi.mock('./blueprintPurchaseOffers', async (importOriginal) => ({
 }));
 vi.mock('./inventionSources', () => ({ loadInventionMarket: vi.fn(() => Promise.resolve(null)) }));
 vi.mock('./marketData', () => ({ loadMarketSnapshot: vi.fn() }));
+vi.mock('./buildPlanStore', () => ({ loadLatestBuildPlan: vi.fn() }));
 
+import { loadLatestBuildPlan } from './buildPlanStore';
 import { loadBlueprintPurchaseOffers, type BlueprintOffersLookup } from './blueprintPurchaseOffers';
 import { loadBpcContractRows } from './buildPlanPricingInputs';
 import { loadActivityFacilityDefaults } from './facilityDefaults';
@@ -96,6 +98,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(loadActivityFacilityDefaults).mockResolvedValue(DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
   vi.mocked(loadBpcContractRows).mockResolvedValue([]);
+  vi.mocked(loadLatestBuildPlan).mockResolvedValue(null);
   // The blueprint is on sale by default, so a candidate prices.
   vi.mocked(loadBlueprintPurchaseOffers).mockResolvedValue(offerAt(400_000));
   vi.mocked(loadMarketSnapshot).mockResolvedValue({

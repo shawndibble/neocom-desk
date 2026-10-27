@@ -15,6 +15,8 @@ import type { ResolvedStandings } from '@/engine/market/standings';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import { useLpValue } from '@/features/loyalty/lpValue';
+import { useFacilityDefaults } from './facilityDefaults';
 import { loadBlueprintSourceSets } from './blueprintSourceSets';
 import { loadMarketWideProductFacts } from './marketWideProductFacts';
 import {
@@ -94,6 +96,9 @@ export function useMarketWideOpportunities({
   options,
 }: UseMarketWideOpportunitiesArgs): UseMarketWideOpportunitiesResult {
   const [state, setState] = useState<ScanState>(NEVER_RUN);
+  // Both move a row's price, so a scan made before they changed is not this one.
+  const facilityDefaults = useFacilityDefaults((value) => value.value);
+  const lpValue = useLpValue((value) => value.value);
 
   const keyFor = useCallback(
     (scanFilters: MarketWideFilters) =>
@@ -112,8 +117,10 @@ export function useMarketWideOpportunities({
         })),
         modifiers,
         standing,
+        facilityDefaults,
+        lpValue,
       }),
-    [hub.id, characterIds, research, modifiers, standing]
+    [hub.id, characterIds, research, modifiers, standing, facilityDefaults, lpValue]
   );
   const key = useMemo(() => keyFor(filters), [keyFor, filters]);
   // A scan this session ran, at these inputs, and the prices still hold.
