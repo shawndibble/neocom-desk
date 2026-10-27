@@ -61,13 +61,30 @@ describe('loadDailySales', () => {
       expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
     });
 
-    it('reuses the read for 30 minutes, then reads again', async () => {
-      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
+    it('reuses a complete read for 30 minutes, then reads again', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(NOW);
+        vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
+        await loadDailySales(34, NOW);
+        vi.setSystemTime(NOW + 29 * 60_000);
+        await loadDailySales(34, NOW);
+        expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
+        vi.setSystemTime(NOW + 31 * 60_000);
+        await loadDailySales(34, NOW);
+        expect(loadLpStoreVolume).toHaveBeenCalledTimes(10);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not keep a read where an object failed to load', async () => {
+      vi.mocked(loadLpStoreVolume).mockResolvedValue(null);
+      vi.mocked(loadPriceHistory).mockResolvedValue(history(30));
       await loadDailySales(34, NOW);
-      await loadDailySales(34, NOW + 29 * 60_000);
-      expect(loadLpStoreVolume).toHaveBeenCalledTimes(5);
-      await loadDailySales(34, NOW + 31 * 60_000);
-      expect(loadLpStoreVolume).toHaveBeenCalledTimes(10);
+      await Promise.resolve();
+      vi.mocked(loadLpStoreVolume).mockResolvedValue({ 34: 1 });
+      expect(await loadDailySales(34, NOW)).toBe(5);
     });
 
     it('counts a type absent from every object as no sales', async () => {

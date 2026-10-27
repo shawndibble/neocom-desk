@@ -22,34 +22,44 @@ import { TRADE_HUBS } from '@/market/hubs';
 
 const HUB_REGION_IDS = [...new Set(TRADE_HUBS.map((hub) => hub.regionId))];
 
-/** How long one read of the five volume objects is reused, across products and across rescans. */
+/** How long one complete read of the five volume objects is reused, across products and across rescans. */
 const VOLUMES_TTL_MS = 30 * 60_000;
-let volumesRead: { at: number; promise: Promise<(LpStoreVolume | null)[]> } | null = null;
+let hubVolumesCache: { at: number; promise: Promise<(LpStoreVolume | null)[]> } | null = null;
 
-/** The hub regions' volume objects (null where one is unavailable), shared by a scan's products. */
-function loadHubVolumes(now: number): Promise<(LpStoreVolume | null)[]> {
-  if (!volumesRead || now - volumesRead.at > VOLUMES_TTL_MS) {
-    volumesRead = {
-      at: now,
-      promise: Promise.all(HUB_REGION_IDS.map((regionId) => loadLpStoreVolume(regionId))),
-    };
+/**
+ * The hub regions' volume objects (null where one is unavailable), shared by a
+ * scan's products. Only a read where every object loaded is kept: a transient
+ * failure must not pin a region to the per-product ESI fallback for the TTL.
+ */
+function loadHubVolumes(): Promise<(LpStoreVolume | null)[]> {
+  const now = Date.now();
+  if (!hubVolumesCache || now - hubVolumesCache.at > VOLUMES_TTL_MS) {
+    const promise = Promise.all(HUB_REGION_IDS.map((regionId) => loadLpStoreVolume(regionId)));
+    const entry = { at: now, promise };
+    hubVolumesCache = entry;
+    void promise.then((volumes) => {
+      if (hubVolumesCache === entry && volumes.some((volume) => volume === null)) {
+        hubVolumesCache = null;
+      }
+    });
   }
-  return volumesRead.promise;
+  return hubVolumesCache.promise;
 }
 
 /** Test seam: forget the shared volume read. */
 export function resetHubVolumes(): void {
-  volumesRead = null;
+  hubVolumesCache = null;
 }
 
 /**
- * Units a day over the last 30 days, summed across the trade-hub regions. A
+ * Units a day over about the last 30 days (a hub's volume object, else ESI's
+ * last 30 days), summed across the trade-hub regions. A
  * type absent from a region's volume object sold none there; a region where
  * ESI says the type has no market (400) sold none; any other failure makes the
  * answer unknown (null) — an under-count would hide a product that does sell.
  */
 export async function loadDailySales(typeId: number, nowMs = Date.now()): Promise<number | null> {
-  const volumes = await loadHubVolumes(nowMs);
+  const volumes = await loadHubVolumes();
   let perDay = 0;
   const unread: number[] = [];
   volumes.forEach((volume, index) => {

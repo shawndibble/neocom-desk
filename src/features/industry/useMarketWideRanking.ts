@@ -62,7 +62,7 @@ export function useMarketWideRanking({
   // Always fetched: ISK/day needs every ranked row's volume, not only the filter's.
   const dailySales = useDailySales(rowTypeIds, hasRun);
   // Daily sales reads the published volume objects, not ESI history, so this
-  // is the scan's one per-product ESI request.
+  // is normally the scan's one per-product ESI request.
   const vs90dTargets = useMemo(
     () => (hasRun ? rowTypeIds.map((typeId) => ({ hubId: hub.id, typeId })) : []),
     [hasRun, rowTypeIds, hub.id]
