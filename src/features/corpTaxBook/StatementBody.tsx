@@ -46,36 +46,39 @@ export function StatementLines({ statement }: { statement: StatementLinesSource 
       ? undefined
       : (statement.refineryNames?.[String(id)] ?? t('corpTaxBook.verify.refinery', { id }));
   const hub = TRADE_HUBS.find((h) => h.id === statement.hubId)?.systemName ?? statement.hubId;
+  const minedMeta = t('corpTaxBook.verify.minedMeta', {
+    hub,
+    form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
+  });
+  // The panel is narrow at any viewport width: the meta moves under the title by the
+  // container's width, not the viewport's.
   return (
-    <Panel
-      title={t('corpTaxBook.verify.mined')}
-      meta={
-        <span className="text-xs text-text-dim max-md:basis-full">
-          {t('corpTaxBook.verify.minedMeta', {
-            hub,
-            form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
-          })}
-        </span>
-      }
-      padded={false}
-      wrapMeta
-    >
-      <ul aria-label={t('corpTaxBook.verify.linesLabel')} className="divide-y divide-line">
-        {rows.map((r) => (
-          <MinedDay
-            key={r.key}
-            row={r}
-            oreNames={oreNames}
-            refineryName={refinery(r.structureId)}
-            locale={locale}
-          />
-        ))}
-      </ul>
-      <p className="border-t border-line px-3 py-2 text-right text-sm tabular-nums">
-        {t('corpTaxBook.verify.billed')}{' '}
-        <span className="font-semibold">{isk(statement.amount)}</span>
-      </p>
-    </Panel>
+    <div className="@container">
+      <Panel
+        title={t('corpTaxBook.verify.mined')}
+        meta={<span className="hidden text-xs text-text-dim @md:inline">{minedMeta}</span>}
+        padded={false}
+      >
+        <p className="border-b border-line px-3 py-2 text-xs text-text-dim @md:hidden">
+          {minedMeta}
+        </p>
+        <ul aria-label={t('corpTaxBook.verify.linesLabel')} className="divide-y divide-line">
+          {rows.map((r) => (
+            <MinedDay
+              key={r.key}
+              row={r}
+              oreNames={oreNames}
+              refineryName={refinery(r.structureId)}
+              locale={locale}
+            />
+          ))}
+        </ul>
+        <p className="border-t border-line px-3 py-2 text-right text-sm tabular-nums">
+          {t('corpTaxBook.verify.billed')}{' '}
+          <span className="font-semibold">{isk(statement.amount)}</span>
+        </p>
+      </Panel>
+    </div>
   );
 }
 
@@ -161,7 +164,7 @@ function MinedDay({
           {r.ores.map((o) => (
             <li
               key={o.typeId}
-              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
+              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 @md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
             >
               <span>
                 {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {formatCount(o.quantity)}
@@ -169,7 +172,7 @@ function MinedDay({
               <span className="text-right tabular-nums">
                 {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}
               </span>
-              <span className="col-span-2 text-xs text-text-dim md:col-span-1 md:text-right">
+              <span className="col-span-2 text-xs text-text-dim @md:col-span-1 @md:text-right">
                 {metaSegments([
                   shortDate(r.date, locale),
                   o.source &&
