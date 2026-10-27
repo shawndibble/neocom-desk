@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CheckboxSelect, FilterChip, Panel, RowCaret, Tooltip } from '@/components/ui';
@@ -76,9 +77,12 @@ export function ExtractionStateFilter({
 export function ExtractionTimeline({
   rows,
   states,
+  filter,
 }: {
   rows: readonly ExtractionRow[];
   states: ReadonlySet<ExtractionState>;
+  /** The state filter, drawn on the card's title row. */
+  filter?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { view } = useBook();
@@ -91,6 +95,7 @@ export function ExtractionTimeline({
   return (
     <Panel
       title={t('corpTaxBook.moons.timeline.title')}
+      actions={filter}
       meta={
         <span className="hidden text-xs text-text-dim sm:inline">
           {t('corpTaxBook.moons.timeline.hint')}

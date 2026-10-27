@@ -574,6 +574,23 @@ describe('DataTable', () => {
       expect(firstRow).toHaveFocus();
     });
 
+    it('opens the row menu on Shift+F10 and the ContextMenu key', async () => {
+      renderTable({
+        rowContextMenu: (row, tr) => (
+          <ContextMenu key={row.id}>
+            <ContextMenuTrigger asChild>{tr}</ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem>Copy {row.item}</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ),
+      });
+      const [, firstRow] = screen.getAllByRole('row');
+      firstRow.focus();
+      fireEvent.keyDown(firstRow, { key: 'F10', shiftKey: true });
+      expect(await screen.findByRole('menuitem', { name: 'Copy Tritanium' })).toBeInTheDocument();
+    });
+
     it('leaves rows non-focusable when no context menu is wired up', () => {
       renderTable();
       const [, firstRow] = screen.getAllByRole('row');
@@ -737,6 +754,17 @@ describe('DataTable', () => {
 
       await user.click(cells[0]);
       expect(screen.queryByText('Detail for Tritanium')).not.toBeInTheDocument();
+    });
+
+    it('opens the initialKey row and reports the open row as it changes', async () => {
+      const user = userEvent.setup();
+      const onExpandedChange = vi.fn();
+      renderTable({
+        expandableRow: { ...expandableRow, initialKey: 2, onExpandedChange },
+      });
+      expect(screen.getByText('Detail for Pyerite')).toBeInTheDocument();
+      await user.click(screen.getAllByRole('cell')[0]);
+      expect(onExpandedChange).toHaveBeenLastCalledWith(1);
     });
 
     it('keeps a right-aligned first column right-aligned beside the leading caret', () => {

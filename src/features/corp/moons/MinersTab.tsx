@@ -31,6 +31,26 @@ const PARAMS = {
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
 const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
 
+const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner';
+
+/** The expanded row survives Open page then Back: kept for the tab session, never required. */
+function readOpenMiner(): string | null {
+  try {
+    return sessionStorage.getItem(OPEN_MINER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeOpenMiner(id: string | null) {
+  try {
+    if (id === null) sessionStorage.removeItem(OPEN_MINER_KEY);
+    else sessionStorage.setItem(OPEN_MINER_KEY, id);
+  } catch {
+    // Blocked storage: the row just closes after a visit elsewhere.
+  }
+}
+
 export function MinersTab() {
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
@@ -199,6 +219,8 @@ export function MinersTab() {
             expandableRow={{
               renderDetail: (m) => <MinerExpandedRow miner={m} />,
               leadingIcon: true,
+              initialKey: readOpenMiner(),
+              onExpandedChange: (key) => writeOpenMiner(key === null ? null : String(key)),
             }}
             stacked={cards}
             rowClassName={() => 'group'}

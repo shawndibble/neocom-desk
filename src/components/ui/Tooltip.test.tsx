@@ -554,6 +554,29 @@ describe('Tooltip tap-to-open', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
+  it('re-sends Escape after closing a tooltip inside a menu, so the menu closes too', () => {
+    vi.useFakeTimers();
+    render(
+      <div role="menu">
+        <Tooltip content="Why not." openOnTap>
+          <button type="button">Item</button>
+        </Tooltip>
+      </div>
+    );
+    const trigger = screen.getByRole('button', { name: 'Item' });
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    const seen = vi.fn();
+    document.addEventListener('keydown', seen);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(seen).toHaveBeenCalledTimes(1);
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+    document.removeEventListener('keydown', seen);
+    expect(seen).toHaveBeenCalledTimes(2);
+  });
+
   it('does not reveal when the browser cancels the touch, e.g. to scroll', () => {
     vi.useFakeTimers();
     render(

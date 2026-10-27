@@ -247,6 +247,18 @@ export function Tooltip({
     setTouchOpen(false);
   }
 
+  /**
+   * A tooltip on a menu item (a disabled item's reason) sits above the menu in Radix's layer
+   * stack, so Escape would close only it. Re-send the key once it is gone so the menu closes too.
+   */
+  function handleEscape() {
+    if (!triggerRef.current?.closest('[role="menu"]')) return;
+    setTimeout(
+      () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+      0
+    );
+  }
+
   /** The browser took the gesture over (a scroll, usually) — no touchend is coming. */
   function handleTouchCancel() {
     touchDragged.current = true;
@@ -327,6 +339,7 @@ export function Tooltip({
               side={side}
               sideOffset={4}
               collisionPadding={8}
+              onEscapeKeyDown={handleEscape}
               className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
             >
               {content}
