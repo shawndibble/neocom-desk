@@ -38,9 +38,9 @@ describe('deployed functions', () => {
     expect(source).not.toMatch(/^export const \w*Srp\w* =/m);
   });
 
-  it('runs syncCorpTaxBooks at 00:30, 06:30, 12:30 and 18:30 UTC (yesterday closes at 00:30)', () => {
+  it('runs syncCorpTaxBooks at 00:35, 06:35, 12:35 and 18:35 UTC (yesterday closes at 00:30)', () => {
     expect(SYNC_CORP_TAX_BOOKS_SCHEDULE).toEqual({
-      schedule: '30 0,6,12,18 * * *',
+      schedule: '35 0,6,12,18 * * *',
       timeZone: 'UTC',
     });
     const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
