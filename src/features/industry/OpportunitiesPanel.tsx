@@ -61,7 +61,12 @@ import {
   unitMargin,
 } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { AUTO_RECALCULATE_MAX, hubForCharacter, type OpportunityRow } from './opportunities';
+import {
+  AUTO_RECALCULATE_MAX,
+  hubForCharacter,
+  type OpportunityPlanSeed,
+  type OpportunityRow,
+} from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { useOpportunityCandidates } from './useOpportunityCandidates';
@@ -109,7 +114,7 @@ interface OpportunitiesPanelProps {
   /** Saves the Corp projects rows' plans and opens Compare with them. */
   onAddProjectsToCompare: (plans: readonly BuildPlanRecord[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
-  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
   /**
    * The oldest blueprint fetch behind these rows, or null — reported up
    * rather than drawn here, so the route can show it beside the page title
@@ -370,7 +375,10 @@ export function OpportunitiesPanel({
   });
 
   // A row click is the Start plan button's action, so the product name needs no link of its own.
-  const startPlanFromRow = useRowStartPlan(onStartPlan);
+  const startPlanFromRow = useRowStartPlan(
+    (row: OpportunityRow) => onStartPlan(row.candidate.catalogEntry, row),
+    (row) => row.candidate.catalogEntry
+  );
 
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
     useVisibleOpportunitiesColumns,
@@ -563,7 +571,7 @@ export function OpportunitiesPanel({
       width: '16ch',
       render: (row) => (
         <StartPlanButton
-          onStart={() => onStartPlan(row.candidate.catalogEntry)}
+          onStart={() => onStartPlan(row.candidate.catalogEntry, row)}
           planKey={row.candidate.catalogEntry}
         />
       ),
@@ -764,7 +772,7 @@ export function OpportunitiesPanel({
               rowKey={opportunityRowKey}
               virtualize="auto"
               label={t('industry.opportunitiesTableLabel')}
-              onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
+              onRowClick={startPlanFromRow}
               rowContextMenu={rowContextMenu}
               rowMoreActions
               {...sortProps}

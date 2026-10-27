@@ -298,7 +298,13 @@ describe('OpportunitiesPanel', () => {
       const onStartPlan = vi.fn(() => Promise.resolve(false));
       const { row } = await renderWithRow(1000, { onStartPlan });
       fireEvent.click(within(row).getByText('Widget Alpha'));
-      expect(onStartPlan).toHaveBeenCalledWith(entry(1000, 'Widget Alpha'));
+      // Seeded with the row, so the plan opens at what the row was priced with.
+      expect(onStartPlan).toHaveBeenCalledWith(
+        entry(1000, 'Widget Alpha'),
+        expect.objectContaining({
+          candidate: expect.objectContaining({ catalogEntry: entry(1000, 'Widget Alpha') }),
+        })
+      );
     });
 
     it('the row checkbox does not start a plan', async () => {
@@ -319,7 +325,13 @@ describe('OpportunitiesPanel', () => {
       const onStartPlan = vi.fn(() => Promise.resolve(false));
       const { row } = await renderWithRow(1000, { onStartPlan });
       fireEvent.click(within(row).getByRole('button', { name: 'Plan' }));
-      expect(onStartPlan).toHaveBeenCalledWith(entry(1000, 'Widget Alpha'));
+      // Seeded with the row, so the plan opens at what the row was priced with.
+      expect(onStartPlan).toHaveBeenCalledWith(
+        entry(1000, 'Widget Alpha'),
+        expect.objectContaining({
+          candidate: expect.objectContaining({ catalogEntry: entry(1000, 'Widget Alpha') }),
+        })
+      );
     });
   });
 

@@ -24,6 +24,8 @@ import {
 } from './opportunities';
 import { recipeForLookup } from './recipes';
 import { computeBuildPlan } from './computeBuildPlan';
+import { resolveBuildPlan } from './resolveBuildPlan';
+import type { DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { MarketSnapshot } from './marketData';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -314,6 +316,76 @@ describe('computeOpportunityRow — priced like a Build Plan (issue #2055)', () 
     expect(
       opportunityRow.result.materials.some((m) => m.typeID === candidate.blueprint.type_id)
     ).toBe(false);
+  });
+});
+
+describe('a plan opened from a row prices the row', () => {
+  const entry = catalogEntry(1);
+  const cat = catalog([entry]);
+  const ownedCopy = owned(1);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: ownedCopy,
+    catalogEntry: entry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 500 },
+    hubBuyPrices: {},
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1 },
+    systemCostIndex: 0.05,
+  };
+  // The pilot already holds most of the Tritanium the build needs.
+  const stock = new Map([[34, { quantity: 90 }]]) as unknown as DetectedOwnedStockMap;
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
+  const row = computeOpportunityRow(
+    candidate,
+    snapshot,
+    DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    NO_CHARACTER_MODIFIERS,
+    stock,
+    { recipeFor, depth: 0 },
+    DEFAULT_TRADE_HUB
+  )!;
+
+  const profitOf = (plan: ReturnType<typeof planForOpportunityCandidate>) =>
+    resolveBuildPlan(
+      plan,
+      {
+        catalog: cat,
+        pi: null,
+        ownedBlueprints: [ownedCopy],
+        assumedMe: 0,
+        modifiers: NO_CHARACTER_MODIFIERS,
+        bpcOffersFor: () => [],
+      },
+      { snapshot }
+    ).result!.profit;
+
+  it('is the row’s figure when seeded with the row’s owned-materials claim', () => {
+    const seeded = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      row.materialSourcing,
+      row.buildHere,
+      candidate.characterId,
+      row.hub
+    );
+    expect(profitOf(seeded)).toBe(row.result.profit);
+  });
+
+  it('reads lower when opened without the claim — the mismatch a click used to cause', () => {
+    const unclaimed = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      candidate.characterId,
+      row.hub
+    );
+    expect(profitOf(unclaimed)!).toBeLessThan(row.result.profit!);
   });
 });
 

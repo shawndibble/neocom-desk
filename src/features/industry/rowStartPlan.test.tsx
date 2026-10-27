@@ -169,7 +169,10 @@ describe('phone cards: tap runs Start plan, controls are exempt', () => {
     fireEvent.click(screen.getByRole('button', { name: /More actions/ }));
     expect(onStartPlan).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Widget Alpha'));
-    expect(onStartPlan).toHaveBeenCalledWith(entry);
+    expect(onStartPlan).toHaveBeenCalledWith(
+      entry,
+      expect.objectContaining({ candidate: expect.objectContaining({ catalogEntry: entry }) })
+    );
   });
 
   const owned = (catalogEntry: BlueprintCatalogEntry | null, id: string): OwnedBlueprintRow =>

@@ -52,7 +52,7 @@ import { groupIdentical, identicalBlueprintKey } from './identicalBlueprints';
 import { ORDER_DEPTH_TONE, stockCoverage, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
 import { vs90dReadout } from './vs90d';
-import type { OpportunityRow } from './opportunities';
+import type { OpportunityPlanSeed, OpportunityRow } from './opportunities';
 import { MobileSortToolbar } from './MobileSortToolbar';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useUrlSort } from '@/lib/useUrlState';
@@ -67,7 +67,7 @@ interface MobileOpportunityListProps {
   /** Seeds the ticked cards' rows into Build Plan Compare. */
   onCompare: (rows: readonly OpportunityRow[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
-  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
   onViewHistory: (typeId: number, itemName: string, regionId: number) => void;
   /** Account-wide skill gate for a row's product (issue #1231). */
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
@@ -203,7 +203,10 @@ export function MobileOpportunityList({
 }: MobileOpportunityListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
-  const startPlanFromRow = useRowStartPlan(onStartPlan);
+  const startPlanFromRow = useRowStartPlan(
+    (row: OpportunityRow) => onStartPlan(row.candidate.catalogEntry, row),
+    (row) => row.candidate.catalogEntry
+  );
   const fields = sortFields(t);
 
   const { sort, onSortChange: setSort } = useUrlSort(
@@ -250,7 +253,7 @@ export function MobileOpportunityList({
               aria-current={selected ? 'true' : undefined}
               // A tap on the card is Start plan's action; its controls are exempt.
               onClick={(event) => {
-                if (isCardOwnClick(event)) startPlanFromRow(row.candidate.catalogEntry);
+                if (isCardOwnClick(event)) startPlanFromRow(row);
               }}
               className={cx(
                 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] border-b border-line pr-1 last:border-b-0',
@@ -274,7 +277,7 @@ export function MobileOpportunityList({
                     <button
                       type="button"
                       className={entityLinkClassName('text-sm font-semibold break-words text-left')}
-                      onClick={() => startPlanFromRow(row.candidate.catalogEntry)}
+                      onClick={() => startPlanFromRow(row)}
                     >
                       {productName}
                     </button>

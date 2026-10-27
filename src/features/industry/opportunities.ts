@@ -231,6 +231,17 @@ export interface UnrankedOpportunityRow {
   buildHere: number[];
 }
 
+/**
+ * What a plan opened from a row starts with: the owned blueprint that was
+ * priced, the owned-materials claim and build-here picks it was priced with,
+ * and its hub. Without it the plan reverts to an unclaimed-materials cost the
+ * instant it opens and reads thousands of ISK/hour below the row.
+ */
+export type OpportunityPlanSeed = Pick<
+  UnrankedOpportunityRow,
+  'candidate' | 'materialSourcing' | 'buildHere' | 'hub'
+>;
+
 export interface OpportunityRow extends UnrankedOpportunityRow {
   orderDepth: OrderDepthLevel;
   /** The product's latest price vs its 90-day median at `hub`, in percent (`priceVsMedianPct`); null when blank, absent while still being read. */

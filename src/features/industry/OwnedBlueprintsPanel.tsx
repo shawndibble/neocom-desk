@@ -38,7 +38,7 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 import { useCorpOwnedBlueprints } from './corpOwnedBlueprints';
 import { numericCell } from './format';
 import { OWNED_DEFAULT_SORT, OWNED_SORT_KEY } from './opportunitiesUrl';
-import type { OpportunityRow } from './opportunities';
+import type { OpportunityPlanSeed, OpportunityRow } from './opportunities';
 import {
   OWNED_BLUEPRINT_SORT_VALUE,
   buildOwnedBlueprintRows,
@@ -101,7 +101,7 @@ interface OwnedBlueprintsPanelProps {
   meta: ReactNode;
   /** Ranked pricing's progress / manual Refresh — the ISK/hour column fills from it. */
   pricingActions: ReactNode;
-  onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
+  onStartPlan: (entry: BlueprintCatalogEntry, seed?: OpportunityPlanSeed) => Promise<boolean>;
 }
 
 export function OwnedBlueprintsPanel({
@@ -232,8 +232,19 @@ export function OwnedBlueprintsPanel({
     columns: csvColumns,
   });
 
+  // The plan a row opens is seeded with what its ISK/hour was priced with, so the two agree.
+  const seedById = useMemo(
+    () => new Map(rankedRows.map((row) => [row.candidate.id, row] as const)),
+    [rankedRows]
+  );
+  const startRowPlan = (row: OwnedBlueprintRow, entry: BlueprintCatalogEntry) =>
+    onStartPlan(entry, seedById.get(row.id));
   // A row click is the Start plan button's action (a blueprint with no catalog entry has none).
-  const startPlanFromRow = useRowStartPlan(onStartPlan);
+  const startPlanFromRow = useRowStartPlan(
+    (row: OwnedBlueprintRow) =>
+      row.catalogEntry ? startRowPlan(row, row.catalogEntry) : Promise.resolve(false),
+    (row) => row.catalogEntry
+  );
 
   const columns: DataTableColumn<OwnedBlueprintRow>[] = [
     {
@@ -341,7 +352,7 @@ export function OwnedBlueprintsPanel({
       render: (row) => {
         const entry = row.catalogEntry;
         return entry ? (
-          <StartPlanButton onStart={() => onStartPlan(entry)} planKey={entry} />
+          <StartPlanButton onStart={() => startRowPlan(row, entry)} planKey={entry} />
         ) : null;
       },
     },
@@ -505,7 +516,7 @@ export function OwnedBlueprintsPanel({
               rows={filteredRows}
               locationLabel={locationLabel}
               showOwner={showOwner}
-              onStartPlan={onStartPlan}
+              onStartPlan={startRowPlan}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -515,7 +526,7 @@ export function OwnedBlueprintsPanel({
                 rows={filteredRows}
                 rowKey={ownedRowKey}
                 onRowClick={(row) => {
-                  if (row.catalogEntry) startPlanFromRow(row.catalogEntry);
+                  if (row.catalogEntry) startPlanFromRow(row);
                 }}
                 rowClickable={(row) => Boolean(row.catalogEntry)}
                 virtualize="auto"
