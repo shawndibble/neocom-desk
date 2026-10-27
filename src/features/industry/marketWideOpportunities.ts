@@ -5,20 +5,11 @@
  *
  * Phase 1 fetches only product sell prices (cheap: one batched call over
  * every candidate's product typeID) and runs `selectLiquidCandidates` to
- * bound the set by liquidity floor + top-N per Market Group. Phase 2 fetches
- * material prices for only the survivors' flattened trees, then
- * `computeMarketWideRows` prices and ranks them. `getHubPrices` chunks large
+ * bound the set by liquidity floor + top-N per Market Group. Phase 2 prices
+ * only the survivors, each as the Build Plan a click on its row would create
+ * (`priceCandidatesAsPlans`), then ranks them. `getHubPrices` chunks large
  * type-id lists internally, the same batching Build Opportunities' own
  * snapshot fetch relies on.
- *
- * The job-fee inputs (adjusted prices, system cost index) are fetched through
- * `loadMarketSnapshot` with an *empty* type-id list rather than a new export
- * off `marketData.ts`'s private cache: an empty list costs `getHubPrices` no
- * request at all, so this reads the already-cached adjusted-price/cost-index
- * response every other caller on this route shares. No build system of its
- * own exists for a market-wide scan, so it reads the hub's own system's
- * index — the same fallback `loadMarketSnapshot` already documents for a
- * caller with no plan (LP store, planetary plans).
  */
 import { getAdjustedPrices, getHubPrices } from '@/market/prices';
 import { reliableSellPrice } from '@/engine/industry/marketWideSanity';
@@ -35,15 +26,13 @@ import { clampMe, TE_MAX } from '@/engine/industry/efficiency';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
-import { loadMarketSnapshot } from './marketData';
 import {
-  computeMarketWideRows,
+  rankMarketWideRows,
   selectLiquidCandidates,
   type LiquidityCandidate,
-  type MarketWideCandidate,
-  type MarketWideFeeInputs,
   type MarketWideRow,
 } from '@/engine/industry/marketWideOpportunities';
+import { priceCandidatesAsPlans, type MarketWidePlanCandidate } from './marketWidePlanPricing';
 
 /**
  * Sell-order ISK a product must carry at the hub to be considered at all
@@ -83,6 +72,8 @@ export function researchFor(
 export interface MarketWideScanOptions {
   /** Prices each row at the ME/TE a plan opened from it would use. Absent: ME/TE 0. */
   research?: MarketWideResearch;
+  /** Whose Build Plans the rows are priced as, and whose blueprints `research.owned` are. */
+  characterId?: number | null;
   liquidityFloorIsk?: number;
   topNPerMarketGroup?: number;
   /**
@@ -187,49 +178,31 @@ export async function runMarketWideScan(
   const liquid = selectLiquidCandidates(liquidityCandidates, floorIsk, topN);
   if (liquid.length === 0) return [];
 
-  // Independent of phase 2's material-price fetch below — kicked off
-  // alongside it rather than after, so the two round trips overlap. Started
-  // only once something has actually cleared liquidity, so a scan that ends
-  // here doesn't spend it for nothing.
-  const feeInputs = loadMarketSnapshot(hub, [], hub.systemId, 'manufacturing');
-
-  const materialTypeIds = new Set<number>();
-  for (const candidate of liquid) {
-    for (const material of trees[String(candidate.productTypeID)]!.materials) {
-      materialTypeIds.add(material.typeID);
-    }
-  }
-  const materialAggregates = await getHubPrices(hub, [...materialTypeIds]);
-  const materialPrices = new Map<number, number>();
-  for (const [typeId, aggregate] of materialAggregates) {
-    if (aggregate.sellMin !== null) materialPrices.set(typeId, aggregate.sellMin);
-  }
-
   // Every candidate here already passed the liquidity filter, so `sellPrice`
-  // and `sellVolume` are non-null by construction.
-  const marketWideCandidates: MarketWideCandidate[] = liquid.map((candidate) => {
+  // and `sellVolume` are non-null by construction. Each is priced as the
+  // Build Plan a click on its row would create (`marketWidePlanPricing.ts`).
+  const planCandidates: MarketWidePlanCandidate[] = liquid.map((candidate) => {
     const tree = trees[String(candidate.productTypeID)]!;
     return {
       productTypeID: candidate.productTypeID,
       tree,
       sellPrice: candidate.sellPrice!,
       sellDepthIsk: candidate.sellPrice! * candidate.sellVolume!,
-      blueprintSkills: catalog.byBlueprintTypeID.get(tree.blueprintTypeID)?.blueprint.skills,
-      ...(options.research ? researchFor(tree.blueprintTypeID, options.research) : {}),
+      ...(options.research
+        ? researchFor(tree.blueprintTypeID, options.research)
+        : { me: 0, te: 0 }),
     };
   });
-
-  // Same dead-ESI fallback as `computeOpportunityRow`: degrade the job-fee
-  // term toward 0 rather than drop every row.
-  const snapshot = await feeInputs;
-  const feeContext: MarketWideFeeInputs = {
-    adjustedPrices: snapshot.adjustedPrices ?? {},
-    systemCostIndex: snapshot.systemCostIndex ?? 0,
-    modifiers,
-    standing,
-  };
-
-  const rows = computeMarketWideRows(marketWideCandidates, materialPrices, feeContext);
+  const rows = rankMarketWideRows(
+    await priceCandidatesAsPlans(planCandidates, {
+      hub,
+      catalog,
+      modifiers,
+      standing,
+      characterId: options.characterId ?? null,
+      research: options.research,
+    })
+  );
   return rows.map((row) => ({
     ...row,
     productName: catalog.typesById[String(row.productTypeID)]?.name ?? `#${row.productTypeID}`,

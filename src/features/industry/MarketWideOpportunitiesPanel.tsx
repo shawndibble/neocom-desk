@@ -141,6 +141,7 @@ export function MarketWideOpportunitiesPanel({
     modifiers,
     standing,
     characterIds,
+    characterId: activeCharacterId,
     research,
     filter,
     setFilter,

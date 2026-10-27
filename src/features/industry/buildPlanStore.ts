@@ -23,6 +23,7 @@ import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
 import type { MaterialSourcing } from '@/engine/industry/types';
 import { applySourcingPatch } from '@/engine/industry/sourcingEdits';
+import { mostRecentlyUpdatedPlan } from './newBuildPlan';
 
 /** Any Build Plan field a patch may change — never its identity or owner. */
 export type BuildPlanFields = Partial<Omit<BuildPlanRecord, 'id' | 'characterId' | 'updatedAt'>>;
@@ -72,6 +73,12 @@ function syncOwnersOf(plans: readonly BuildPlanRecord[]): void {
 }
 
 /** Adds new plans in one write. One sync per owning Character, not one per plan. */
+/** The Character's most recently updated plan — what a new plan starts its hub and price basis from — or null. */
+export async function loadLatestBuildPlan(characterId: number): Promise<BuildPlanRecord | null> {
+  const plans = await db.buildPlans.where('characterId').equals(characterId).toArray();
+  return mostRecentlyUpdatedPlan(plans);
+}
+
 export async function createBuildPlans(plans: readonly BuildPlanRecord[]): Promise<void> {
   if (plans.length === 0) return;
   await db.buildPlans.bulkAdd([...plans]);
