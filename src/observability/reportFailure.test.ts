@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { captureException } from '@sentry/react';
 import {
+  isClosedDatabaseEvent,
   addFailureTag,
   annotateFailure,
   reportFailure,
@@ -72,6 +73,15 @@ describe('reportFailure', () => {
     reportFailure('sync', new AggregateError([net, net], 'x (and 1 more)'));
     expect(captureException).not.toHaveBeenCalled();
     reportFailure('sync', new AggregateError([net, new Error('real')], 'x (and 1 more)'));
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips unauthenticated follow-ons of a network failure, but not on their own', () => {
+    const net = Object.assign(new Error('x'), { code: 'auth/network-request-failed' });
+    const unauth = Object.assign(new Error('y'), { code: 'unauthenticated' });
+    reportFailure('sync', new AggregateError([net, unauth], 'x (and 1 more)'));
+    expect(captureException).not.toHaveBeenCalled();
+    reportFailure('sync', new AggregateError([unauth, unauth], 'y (and 1 more)'));
     expect(captureException).toHaveBeenCalledTimes(1);
   });
 
@@ -154,5 +164,15 @@ describe('tagAnnotatedEvent', () => {
     const event = { tags: { a: 'b' } };
     expect(tagAnnotatedEvent(event, Object.assign(new Error('x'), { code: 'c' }))).toBe(event);
     expect(tagAnnotatedEvent(event, undefined)).toBe(event);
+  });
+});
+
+describe('isClosedDatabaseEvent', () => {
+  it('matches only an event whose exception is a DatabaseClosedError', () => {
+    expect(
+      isClosedDatabaseEvent({ exception: { values: [{ type: 'DatabaseClosedError' }] } })
+    ).toBe(true);
+    expect(isClosedDatabaseEvent({ exception: { values: [{ type: 'TypeError' }] } })).toBe(false);
+    expect(isClosedDatabaseEvent({})).toBe(false);
   });
 });

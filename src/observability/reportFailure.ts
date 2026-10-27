@@ -25,8 +25,13 @@ const NETWORK_CODES = new Set([
 export function isNetworkFailure(error: unknown): boolean {
   if (!isOnline()) return true;
   // A pass that failed in several places at once: network only if every one was.
-  if (error instanceof AggregateError)
-    return error.errors.length > 0 && error.errors.every(isNetworkFailure);
+  if (error instanceof AggregateError) {
+    if (error.errors.length === 0) return false;
+    // Firestore rejects the requests that follow a failed token refresh as
+    // `unauthenticated`: the same dropped connection, one step later.
+    const anyNetwork = error.errors.some(isNetworkFailure);
+    return error.errors.every((e) => isNetworkFailure(e) || (anyNetwork && isUnauthenticated(e)));
+  }
   if (
     error instanceof TypeError &&
     /^(failed to fetch|networkerror|network request failed|load failed)/i.test(error.message)
@@ -44,6 +49,11 @@ export function isNetworkFailure(error: unknown): boolean {
   )
     return true;
   return status === 0;
+}
+
+function isUnauthenticated(error: unknown): boolean {
+  const { code } = (error ?? {}) as { code?: unknown };
+  return typeof code === 'string' && code.replace(/^[a-z]+\//, '') === 'unauthenticated';
 }
 
 /**
@@ -136,4 +146,16 @@ export function reportFailure(
 /** Tests only. */
 export function resetReportedFailures(): void {
   lastReported.clear();
+}
+
+/**
+ * `beforeSend`'s filter for the `DatabaseClosedError` a blocked upgrade causes
+ * on purpose: `db.ts` closes the connection, every pending read rejects, and
+ * `upgradeBlockedReport` has already sent the one report that carries the
+ * versions. The rejections add no diagnosis, only a duplicate issue.
+ */
+export function isClosedDatabaseEvent(event: {
+  exception?: { values?: { type?: string }[] };
+}): boolean {
+  return event.exception?.values?.some((v) => v.type === 'DatabaseClosedError') ?? false;
 }
