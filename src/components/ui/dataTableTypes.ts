@@ -169,6 +169,10 @@ export interface DataTableExpandableRow<T> {
    * with a ⋮ keeps one trailing control.
    */
   leadingIcon?: boolean;
+  /** Row open on first render; lets a page restore it after navigating away. */
+  initialKey?: string | number | null;
+  /** Told the open row's key (null when none) whenever it changes. */
+  onExpandedChange?: (key: string | number | null) => void;
 }
 
 /**

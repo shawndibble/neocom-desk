@@ -24,7 +24,7 @@ vi.mock('@/components/ui', async (importOriginal) => {
 });
 vi.mock('./ExtractionTimeline', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./ExtractionTimeline')>()),
-  ExtractionTimeline: () => null,
+  ExtractionTimeline: ({ filter }: { filter?: React.ReactNode }) => <>{filter}</>,
 }));
 vi.mock('./LinkSurveyDialog', () => ({ LinkSurveyDialog: () => <div>link survey dialog</div> }));
 vi.mock('./BookDialogs', () => ({

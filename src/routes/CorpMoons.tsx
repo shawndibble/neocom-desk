@@ -32,6 +32,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
+import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
@@ -194,6 +195,39 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   );
 }
 
+/** Header and tabs stay while loading; only the body is a skeleton. */
+function MoonsLoading() {
+  const { t } = useTranslation();
+  const showTabs = moonsDetail(useLocation().pathname) === null;
+  const [tab, selectTab] = usePageTab(MOONS_TABS);
+  const tabsId = useTabsId();
+  const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
+  return (
+    <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+      <PageHeader title={t('corp.moons.title')} />
+      {showTabs && (
+        <Tabs
+          tabsId={tabsId}
+          label={t('corpTaxBook.moons.title')}
+          value={tab}
+          onChange={(id) => selectTab(id as typeof tab)}
+          tabs={tabBarTabs(MOONS_TABS).map((x) => ({ id: x.id, label: t(x.labelKey) }))}
+        />
+      )}
+      <div
+        role="status"
+        aria-label={t('common.loading')}
+        className="space-y-3"
+        data-testid="moons-loading"
+      >
+        <span className={cx(bar, 'h-8 w-1/3')} />
+        <span className={cx(bar, 'h-40 w-full')} />
+        <span className={cx(bar, 'h-24 w-full')} />
+      </div>
+    </div>
+  );
+}
+
 function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const { t } = useTranslation();
   const sync = useCorpTaxBook();
@@ -214,13 +248,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     return () => setMoonsTabsHidden(false);
   }, [decided, unchosen]);
 
-  if (state.status === 'loading') {
-    return (
-      <div className="flex justify-center p-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
+  if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {
     return (
       <div className="mx-auto max-w-6xl p-4">
@@ -311,13 +339,7 @@ export function CorpMoons() {
   const { t } = useTranslation();
   const access = useCorpAccess();
   const { ledger } = useCorpTaxBook({ autoSync: false });
-  if (access.state === 'unknown') {
-    return (
-      <div className="flex justify-center p-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
-  }
+  if (access.state === 'unknown') return <MoonsLoading />;
   if (access.state !== 'ready') {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">

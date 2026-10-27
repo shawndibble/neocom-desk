@@ -42,7 +42,7 @@ export function AuditLine({
   entry: AuditEntry;
   subject?: AuditSubject;
   /** What the entry is about, when the page does not already say it (a Statement's period and amount). */
-  context?: string | null;
+  context?: ReactNode;
 }) {
   const { t } = useTranslation();
   const why = detailLine(a, t);

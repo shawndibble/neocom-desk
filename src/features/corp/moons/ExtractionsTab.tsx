@@ -141,8 +141,11 @@ export function ExtractionsTab() {
           tooltipGlyph="info"
         />
       </StatChips>
-      <ExtractionStateFilter rows={rows} states={states} onToggle={toggleState} />
-      <ExtractionTimeline rows={rows} states={states} />
+      <ExtractionTimeline
+        rows={rows}
+        states={states}
+        filter={<ExtractionStateFilter rows={rows} states={states} onToggle={toggleState} />}
+      />
       <Panel title={t('corpTaxBook.moons.tabs.extractions')} padded={false}>
         {listed.length === 0 ? (
           <EmptyState title={t('corpTaxBook.moons.extractionsNoneShown')} />

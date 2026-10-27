@@ -1029,11 +1029,13 @@ export function statementDetail(view: BookView, statementId: string): StatementD
     })
     .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
   const standing = statementStanding(view, statement);
+  const writtenOff = wholeIsk(settlement?.writtenOff ?? 0);
   return {
     ...standing,
-    credited: wholeIsk(settlement?.credited ?? 0),
+    // Billed − Outstanding, as the Statements table shows, so the panel never differs by 1 ISK.
+    credited: Math.max(0, standing.paid - writtenOff),
     forgiven: wholeIsk(settlement?.forgiven ?? 0),
-    writtenOff: wholeIsk(settlement?.writtenOff ?? 0),
+    writtenOff,
     remaining: standing.outstanding,
     payments,
   };

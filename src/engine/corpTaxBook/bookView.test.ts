@@ -860,9 +860,32 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
     expect(row.billed - row.paid - row.outstanding).toBe(0);
     const detail = statementDetail(view, fractional.id)!;
     expect(detail.remaining).toBe(0);
+    expect(detail.credited + detail.writtenOff + detail.remaining).toBe(row.billed);
     expect(detail.payments).toEqual([
       { id: 'p1', amount: 1_000_000, at: '2026-09-02T00:00:00Z', source: 'donation' },
     ]);
+  });
+
+  it('panel Credited plus written off and remaining is Billed (whole ISK, never off by 1)', () => {
+    const fractional = { ...a, amount: 1000.6 };
+    const view = buildBookView({
+      ...base,
+      statements: [fractional],
+      payments: [
+        {
+          id: 'p1',
+          minerId: a.minerId,
+          characterId: 1,
+          amount: 400.3,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    const row = periodStatements(view, '2026-08-01')![0];
+    const detail = statementDetail(view, fractional.id)!;
+    expect(detail.credited + detail.writtenOff + detail.remaining).toBe(row.billed);
+    expect(detail.credited).toBe(401);
   });
 
   it('lists only payments that put at least 1 ISK on the Statement', () => {

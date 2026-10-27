@@ -1,5 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -140,15 +140,19 @@ export function MinerDetail({ id }: { id: string }) {
     [queue, statementIds, detail, minerAudit]
   );
   // The Statement (period and amount) or payment amount an entry is about.
-  const auditContext = (e: AuditEntry): string | null => {
+  const auditContext = (e: AuditEntry): ReactNode => {
     const { statementId, amount } = e.detail;
     const st =
       typeof statementId === 'string'
         ? detail?.statements.find((x) => x.id === statementId)
         : undefined;
     if (st) {
-      const label = periodLabel(st.periodStart, st.periodEnd);
-      return e.action === 'issueStatement' ? `${label} · ${isk(st.amount)}` : label;
+      return (
+        <>
+          {statementLink(st)}
+          {e.action === 'issueStatement' && <> · {isk(st.amount)}</>}
+        </>
+      );
     }
     return typeof amount === 'number' ? (amount < 0 ? signedIsk(amount) : isk(amount)) : null;
   };
