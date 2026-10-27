@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { DAY_MS } from '@/lib/age';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SlideOver, StatChip, StatChips, textActionClassName } from '@/components/ui';
@@ -7,8 +8,7 @@ import { StatementLines, StatementPayments } from '@/features/corpTaxBook/Statem
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
 import { useBook } from './useBook';
-import { shortDate } from '@/features/corpTaxBook/statementFormat';
-import { isk, periodLabel } from './moonsFormat';
+import { dateTimeUtc, dateWithYear, isk, periodLabel, shortDate } from './moonsFormat';
 import { DueWord } from './moonsParts';
 import { minerPath } from './moonsPaths';
 
@@ -29,10 +29,13 @@ function mailText(d: StatementDetail, t: (key: string, opts?: Record<string, unk
   const sent = statement.mailsSent ?? 0;
   const parts = [
     sent === 0
-      ? t(k('notMailed'))
+      ? t('corpTaxBook.moons.statementPeriod.notMailed')
       : statement.lastMailedAt
-        ? t(k('mailSentLast'), { count: sent, date: shortDate(statement.lastMailedAt) })
-        : t(k('mailSent'), { count: sent }),
+        ? t(k('mailedLast'), {
+            what: t(k('mailed'), { count: sent }),
+            date: dateTimeUtc(statement.lastMailedAt),
+          })
+        : t(k('mailed'), { count: sent }),
   ];
   const manual = statement.manualRemindersSent ?? 0;
   if (manual > 0) parts.push(t(k('manualReminders'), { count: manual }));
@@ -103,13 +106,24 @@ export function StatementPanel({
     structureIds.map((id) => [String(id), names.refinery(id)])
   );
   const credited = detail.credited - detail.forgiven;
+  const days =
+    Math.round((Date.parse(statement.coversThrough) - Date.parse(statement.coversFrom)) / DAY_MS) +
+    1;
+  const sameYear = statement.coversFrom.slice(0, 4) === statement.coversThrough.slice(0, 4);
+  // Whole ISK, and nothing under 1 ISK: a zero reads as a dash (#5247).
+  const iskOrDash = (n: number) => (n === 0 ? '—' : isk(n));
   return (
     <SlideOver
       open
       onClose={onClose}
       closeOnBack={false}
       title={name}
-      subtitle={periodLabel(statement.periodStart, statement.periodEnd)}
+      subtitle={t(k('subtitle'), {
+        period: periodLabel(statement.periodStart, statement.periodEnd),
+      })}
+      returnFocusFallback={() =>
+        document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(statementId)}"]`)
+      }
     >
       <div className="space-y-4">
         <StatChips>
@@ -121,14 +135,13 @@ export function StatementPanel({
           />
         </StatChips>
         <dl className="space-y-1">
-          <Fact label={t(k('billed'))}>{isk(detail.billed)}</Fact>
-          <Fact label={t(k('credited'))}>{isk(credited)}</Fact>
+          <Fact label={t(k('credited'))}>{iskOrDash(credited)}</Fact>
           {detail.forgiven > 0 && <Fact label={t(k('forgiven'))}>{isk(detail.forgiven)}</Fact>}
           {detail.writtenOff > 0 && (
             <Fact label={t(k('writtenOff'))}>{isk(detail.writtenOff)}</Fact>
           )}
           <Fact label={t(k('issued'))}>
-            {shortDate(statement.issuedAt)}
+            {dateWithYear(statement.issuedAt)}
             {statement.issuedBy !== undefined && (
               <span className="block text-xs text-text-dim">
                 {t(k('issuedBy'), { name: names.character(statement.issuedBy) })}
@@ -136,7 +149,13 @@ export function StatementPanel({
             )}
           </Fact>
           <Fact label={t(k('covers'))}>
-            {periodLabel(statement.coversFrom, statement.coversThrough)}
+            {t(k('coversRange'), {
+              from: sameYear
+                ? shortDate(statement.coversFrom)
+                : `${shortDate(statement.coversFrom)} ${statement.coversFrom.slice(0, 4)}`,
+              through: `${shortDate(statement.coversThrough)} ${statement.coversThrough.slice(0, 4)}`,
+              count: days,
+            })}
           </Fact>
           <Fact label={t(k('due'))}>
             {detail.settled ? (
@@ -152,8 +171,8 @@ export function StatementPanel({
             <span className="font-mono">{statement.code}</span>
           </Fact>
         </dl>
-        <StatementLines statement={{ ...statement, refineryNames }} />
-        <StatementPayments payments={detail.payments} />
+        <StatementLines statement={{ ...statement, refineryNames }} formatDate={shortDate} />
+        <StatementPayments payments={detail.payments} formatDate={shortDate} />
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {canEdit && <CopyVerifyLink statementId={statement.id} />}
           {showMinerLink && (

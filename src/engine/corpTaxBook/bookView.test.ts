@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildBookView,
   extractionDetail,
+  isIssuedPeriod,
   minerDetail,
   nextRunPeriod,
   paymentCode,
@@ -791,6 +792,144 @@ describe('statementDetail (#5286)', () => {
     expect(statementDetail(view, issued.id)).toMatchObject({
       state: 'paused',
       pausedUntil: '2026-10-04T00:00:00.000Z',
+    });
+  });
+});
+
+describe('Statement standings read as whole ISK and Due skips paused ones (#5247)', () => {
+  const base = input({
+    entries: [entry(1, '2026-08-10', 10_000), entry(2, '2026-08-11', 10_000)],
+    now: '2026-09-30T00:00:00Z',
+    lastSyncedAt: '2026-09-30T00:00:00Z',
+  });
+  const first = buildBookView(base);
+  const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+  const [a, b] = plan.lines.map((l) => ({
+    ...statementForLine(first, plan, l),
+    issuedAt: '2026-09-01T00:00:00Z',
+  }));
+
+  it('a paused Statement does not set the period Due; the pause end shows when all are paused', () => {
+    const declare = (id: string) => ({
+      id: `d-${id}`,
+      statementId: id,
+      kind: 'contract' as const,
+      at: '2026-09-25T00:00:00Z',
+    });
+    const one = buildBookView({ ...base, statements: [a, b], declarations: [declare(a.id)] });
+    expect(periodRows(one).find((r) => r.start === '2026-08-01')).toMatchObject({
+      dueAt: '2026-09-15T00:00:00.000Z',
+      pausedUntil: null,
+    });
+    const both = buildBookView({
+      ...base,
+      statements: [a, b],
+      declarations: [declare(a.id), declare(b.id)],
+    });
+    expect(periodRows(both).find((r) => r.start === '2026-08-01')).toMatchObject({
+      dueAt: null,
+      pausedUntil: '2026-10-09T00:00:00.000Z',
+    });
+  });
+
+  it('an unsettled Statement with no settlement still owes its whole amount', () => {
+    const view = buildBookView({ ...base, statements: [a] });
+    const row = periodStatements(view, '2026-08-01')![0];
+    expect(row.outstanding).toBe(statementDetail(view, a.id)!.remaining);
+    expect(row.outstanding).toBe(a.amount);
+  });
+
+  it('shows whole ISK: Billed - Paid - Outstanding is 0 and a sub-ISK left-over is not owed', () => {
+    const fractional = { ...a, amount: 1_000_000.6 };
+    const view = buildBookView({
+      ...base,
+      statements: [fractional],
+      payments: [
+        {
+          id: 'p1',
+          minerId: a.minerId,
+          characterId: 1,
+          amount: 1_000_000,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    const row = periodStatements(view, '2026-08-01')![0];
+    expect(row).toMatchObject({ billed: 1_000_001, paid: 1_000_001, outstanding: 0 });
+    expect(row.billed - row.paid - row.outstanding).toBe(0);
+    const detail = statementDetail(view, fractional.id)!;
+    expect(detail.remaining).toBe(0);
+    expect(detail.payments).toEqual([
+      { id: 'p1', amount: 1_000_000, at: '2026-09-02T00:00:00Z', source: 'donation' },
+    ]);
+  });
+
+  it('lists only payments that put at least 1 ISK on the Statement', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [a],
+      payments: [
+        {
+          id: 'p1',
+          minerId: a.minerId,
+          characterId: 1,
+          amount: a.amount + 0.4,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    expect(statementDetail(view, a.id)!.payments.map((p) => p.id)).toEqual(['p1']);
+    expect(isIssuedPeriod({ statements: 1 })).toBe(true);
+    expect(isIssuedPeriod({ statements: 0 })).toBe(false);
+  });
+
+  it('panel arithmetic: credited, forgiven and written off add up to billed minus remaining', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [a],
+      payments: [
+        {
+          id: 'p1',
+          minerId: a.minerId,
+          characterId: 1,
+          amount: a.amount - 150_000 - 50_000,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+      writeOffs: [
+        { id: 'w1', minerId: a.minerId, amount: 150_000, at: '2026-09-10T00:00:00Z', reason: 'x' },
+      ],
+    });
+    const d = statementDetail(view, a.id)!;
+    expect(d.forgiven).toBe(150_000);
+    expect(d.writtenOff).toBe(50_000);
+    expect(d.remaining).toBe(0);
+    expect(d.credited - d.forgiven + d.forgiven + d.writtenOff + d.remaining).toBe(d.billed);
+  });
+
+  it('a sub-ISK credit is not a payment: nothing paid, all of it outstanding', () => {
+    const fractional = { ...a, amount: 1_000_000.6 };
+    const view = buildBookView({
+      ...base,
+      statements: [fractional],
+      payments: [
+        {
+          id: 'p1',
+          minerId: a.minerId,
+          characterId: 1,
+          amount: 0.4,
+          at: '2026-09-02T00:00:00Z',
+          source: 'donation',
+        },
+      ],
+    });
+    expect(periodStatements(view, '2026-08-01')![0]).toMatchObject({
+      billed: 1_000_001,
+      paid: 0,
+      outstanding: 1_000_001,
     });
   });
 });

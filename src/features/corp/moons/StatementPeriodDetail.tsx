@@ -1,5 +1,4 @@
 import { useState, type ReactElement } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -13,18 +12,21 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import {
+  isIssuedPeriod,
   periodRows,
   periodStatements,
   type PeriodStatementRow,
 } from '@/engine/corpTaxBook/bookView';
 import { tabPath } from '@/lib/pageTabs';
 import { RecordPaymentDialog } from './BookDialogs';
+import { caretColumn } from './caretColumn';
 import { StatementRowMenu } from './StatementRowMenu';
 import { useBook } from './useBook';
 import { MOONS_TABS } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { Crumb, DueWord } from './moonsParts';
 import { useCards } from './sectionHelpers';
+import { useStatementParam } from './useStatementParam';
 import { StatementPanel } from './StatementPanel';
 
 const STATEMENTS_PATH = tabPath(MOONS_TABS, 'statements');
@@ -34,7 +36,9 @@ function MailWord({ mail }: { mail: PeriodStatementRow['mail'] }) {
   if (mail.kind === 'stopped') {
     return (
       <Tooltip content={t('corpTaxBook.moons.statementPeriod.stoppedTip', { count: mail.count })}>
-        <span className="text-warning">{t('corpTaxBook.moons.statementPeriod.stopped')}</span>
+        <span tabIndex={0} className="text-warning">
+          {t('corpTaxBook.moons.statementPeriod.stopped')}
+        </span>
       </Tooltip>
     );
   }
@@ -59,25 +63,28 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [tableRef, cards] = useCards();
   const minerOf = (r: PeriodStatementRow) => view.miners.find((m) => m.id === r.statement.minerId);
-  const recordingMiner = recording ? minerOf(recording) : undefined;
-  const rowContextMenu = (r: PeriodStatementRow, tr: ReactElement) => {
+  const nameOf = (r: PeriodStatementRow) => {
     const miner = minerOf(r);
-    return (
-      <StatementRowMenu
-        row={r}
-        minerName={miner ? names.character(miner.mainCharacterId) : r.statement.minerId}
-        onRecord={(row) => run(() => setRecording(row))}
-        onNotice={setNotice}
-        onCloseAutoFocus={onCloseAutoFocus}
-      >
-        {tr}
-      </StatementRowMenu>
-    );
+    return miner ? names.character(miner.mainCharacterId) : r.statement.minerId;
   };
-  const [params, setParams] = useSearchParams();
-  const openId = params.get('statement');
+  const recordingMiner = recording ? minerOf(recording) : undefined;
+  const rowContextMenu = (r: PeriodStatementRow, tr: ReactElement) => (
+    <StatementRowMenu
+      row={r}
+      minerName={nameOf(r)}
+      onRecord={(row) => run(() => setRecording(row))}
+      onNotice={setNotice}
+      onCloseAutoFocus={onCloseAutoFocus}
+    >
+      {tr}
+    </StatementRowMenu>
+  );
   const statements = periodStatements(view, periodStart);
-  const period = periodRows(view).find((r) => r.start === periodStart && r.statements > 0);
+  const period = periodRows(view).find((r) => r.start === periodStart && isIssuedPeriod(r));
+  const statementParam = useStatementParam(
+    statements !== undefined,
+    (id) => statements?.some((r) => r.statement.id === id) ?? false
+  );
   if (!statements || !period) {
     return (
       <div className="space-y-4">
@@ -86,10 +93,6 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
       </div>
     );
   }
-  const nameOf = (r: PeriodStatementRow) => {
-    const miner = view.miners.find((m) => m.id === r.statement.minerId);
-    return miner ? names.character(miner.mainCharacterId) : r.statement.minerId;
-  };
   const columns: DataTableColumn<PeriodStatementRow>[] = [
     {
       id: 'miner',
@@ -126,7 +129,13 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
     {
       id: 'due',
       header: t('corpTaxBook.moons.cols.due'),
-      render: (r) => <DueWord dueAt={r.dueAt} now={view.input.now} />,
+      render: (r) => (
+        <DueWord
+          dueAt={r.dueAt}
+          now={view.input.now}
+          pausedUntil={r.state === 'paused' ? r.pausedUntil : null}
+        />
+      ),
       sortValue: (r) => r.dueAt ?? '',
     },
     {
@@ -135,7 +144,12 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
       render: (r) => <MailWord mail={r.mail} />,
       sortValue: (r) => r.mail.kind,
     },
+    // A view-only user has no ⋮ at the row's end: the caret says the row opens.
+    ...(!canEdit && !cards ? [caretColumn<PeriodStatementRow>()] : []),
   ];
+  const unpaid = statements.filter((r) => !r.settled);
+  const overdueCount = unpaid.filter((r) => r.state === 'overdue').length;
+  const pausedCount = unpaid.filter((r) => r.state === 'paused').length;
   return (
     <div className="space-y-4">
       <Crumb to={STATEMENTS_PATH} label={t('corpTaxBook.moons.tabs.statements')} />
@@ -157,20 +171,43 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
         }
       />
       <StatChips>
-        <StatChip label={t('corpTaxBook.moons.cols.billed')} value={isk(period.billed)} />
-        <StatChip label={t('corpTaxBook.moons.cols.paid')} value={isk(period.paid)} />
         <StatChip
           label={t('corpTaxBook.moons.cols.outstanding')}
-          value={isk(period.outstanding)}
+          value={period.outstanding ? isk(period.outstanding) : '—'}
           emphasis
         />
+        <StatChip label={t('corpTaxBook.moons.cols.billed')} value={isk(period.billed)} />
+        <StatChip
+          label={t('corpTaxBook.moons.cols.paid')}
+          value={period.paid ? isk(period.paid) : '—'}
+        />
       </StatChips>
-      {notice && (
-        <p role="status" className="text-xs text-text-dim">
-          {notice}
-        </p>
-      )}
-      <Panel padded={false}>
+      <p className="text-xs text-text-dim">
+        {[
+          t('corpTaxBook.moons.statementPeriod.unpaidOf', {
+            unpaid: unpaid.length,
+            total: statements.length,
+          }),
+          overdueCount > 0
+            ? t('corpTaxBook.moons.statementPeriod.overdueCount', { count: overdueCount })
+            : null,
+          pausedCount > 0
+            ? t('corpTaxBook.moons.statementPeriod.pausedCount', { count: pausedCount })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
+      <p
+        role="status"
+        className={(notice ?? statementParam.notFound) ? 'text-xs text-text-dim' : 'sr-only'}
+      >
+        {notice ?? statementParam.notFound}
+      </p>
+      <Panel
+        title={t('corpTaxBook.moons.statementPeriod.listTitle', { count: statements.length })}
+        padded={false}
+      >
         <div ref={tableRef} className="@container overflow-x-auto">
           <DataTable
             label={t('corpTaxBook.moons.tabs.statements')}
@@ -184,13 +221,17 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
             mobileSort
             stacked={cards}
             stackColumns={2}
-            onRowClick={(r) => setParams({ statement: r.statement.id })}
-            selectedRowKey={openId}
+            onRowClick={(r) => statementParam.open(r.statement.id)}
+            selectedRowKey={statementParam.selectedId}
           />
         </div>
       </Panel>
-      {openId && statements.some((r) => r.statement.id === openId) && (
-        <StatementPanel key={openId} statementId={openId} onClose={() => setParams({})} />
+      {statementParam.openId && (
+        <StatementPanel
+          key={statementParam.openId}
+          statementId={statementParam.openId}
+          onClose={statementParam.close}
+        />
       )}
       {recording && recordingMiner && (
         <RecordPaymentDialog
@@ -200,6 +241,10 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
           minerName={names.character(recordingMiner.mainCharacterId)}
           defaultAmount={recording.outstanding}
           statementId={recording.statement.id}
+          statementLabel={periodLabel(
+            recording.statement.periodStart,
+            recording.statement.periodEnd
+          )}
         />
       )}
     </div>

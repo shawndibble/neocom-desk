@@ -124,9 +124,27 @@ export function Crumb({ to, label }: { to: string; label: string }) {
   );
 }
 
-/** A Statement's due date; once past, the days late, in danger. `now` is the book's clock. */
-export function DueWord({ dueAt, now }: { dueAt: string | null; now: string }) {
+/**
+ * A Statement's due date; once past, the days late, in danger. `now` is the book's clock.
+ * While a declaration pauses the Overdue clock (`pausedUntil`), no due date or lateness shows.
+ */
+export function DueWord({
+  dueAt,
+  now,
+  pausedUntil,
+}: {
+  dueAt: string | null;
+  now: string;
+  pausedUntil?: string | null;
+}) {
   const { t } = useTranslation();
+  if (pausedUntil) {
+    return (
+      <span className="whitespace-nowrap text-text-dim">
+        {t('corpTaxBook.moons.statementPeriod.pausedUntil', { date: shortDate(pausedUntil) })}
+      </span>
+    );
+  }
   if (dueAt === null) return <span className="text-text-dim">—</span>;
   const elapsed = Date.parse(now) - Date.parse(dueAt);
   if (elapsed < 0) return <span className="whitespace-nowrap">{shortDate(dueAt)}</span>;

@@ -6,6 +6,9 @@ import type { TFunction } from 'i18next';
 
 export const isk = (value: number) => formatIsk(Math.round(value));
 
+/** A whole-ISK figure, or a dash when it is nothing (under 1 ISK): a zero is not a number worth printing. */
+export const iskOrDash = (value: number) => (Math.abs(value) < 1 ? '—' : isk(value));
+
 /** A refinery shown before (or without) its name: a placeholder, never written as one. */
 export const refineryPlaceholder = (id: number | string) => `Refinery ${id}`;
 

@@ -49,6 +49,7 @@ import type { TaxRate } from './rates';
 import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
+import { wholeIsk } from './wholeIsk';
 
 export interface BookViewInput {
   corporationId: number;
@@ -854,9 +855,14 @@ export interface PeriodRow {
   /** Statements on the period (one per miner), and how many of them were mailed at least once. */
   statements: number;
   mailed: number;
-  /** The earliest due date among its unsettled Statements; null when none is unsettled. */
+  /** The earliest due date among its unsettled, unpaused Statements; null when none is. */
   dueAt: string | null;
+  /** When every unsettled Statement is paused by a declaration: the earliest pause end; else null. */
+  pausedUntil: string | null;
 }
+
+/** A period with Statements: sent, overdue or paid. Open, ready, closed and rollover rows have none. */
+export const isIssuedPeriod = (r: { statements: number }) => r.statements > 0;
 
 /** What the book recorded about a Statement's mail; `stopped` wins over the sent count. */
 export interface StatementMail {
@@ -881,6 +887,16 @@ export interface PeriodStatementRow {
   mail: StatementMail;
 }
 
+/**
+ * Billed, paid and outstanding as whole ISK, where Billed - Paid - Outstanding is always 0 (#5247).
+ * Less than 1 ISK credited is not a payment: the whole amount stays outstanding.
+ */
+function shownFigures(amount: number, remaining: number, credited: number) {
+  const billed = wholeIsk(amount);
+  const outstanding = wholeIsk(credited) === 0 ? billed : Math.min(billed, wholeIsk(remaining));
+  return { billed, outstanding, paid: billed - outstanding };
+}
+
 function statementStanding(view: BookView, s: Statement): PeriodStatementRow {
   const settlement = view.internals.byMiner.get(s.minerId)?.allocation.byStatement.get(s.id);
   const settled = settlement?.settled ?? false;
@@ -894,11 +910,12 @@ function statementStanding(view: BookView, s: Statement): PeriodStatementRow {
         overdueDays: view.input.overdueDays,
       });
   const count = s.mailsSent ?? 0;
+  const shown = settled
+    ? shownFigures(s.amount, 0, s.amount)
+    : shownFigures(s.amount, settlement?.remaining ?? s.amount, settlement?.credited ?? 0);
   return {
     statement: s,
-    billed: s.amount,
-    paid: settlement?.credited ?? 0,
-    outstanding: settlement && !settled ? settlement.remaining : 0,
+    ...shown,
     settled,
     overdue: status?.state === 'overdue',
     dueAt: status?.overdueAt ?? null,
@@ -940,18 +957,19 @@ export function statementDetail(view: BookView, statementId: string): StatementD
   const miner = view.internals.byMiner.get(statement.minerId);
   const settlement = miner?.allocation.byStatement.get(statement.id);
   const payments = (miner?.allocation.paymentCredits ?? [])
-    .filter((c) => c.statementId === statement.id)
+    .filter((c) => c.statementId === statement.id && wholeIsk(c.amount) >= 1)
     .flatMap((c) => {
       const p = miner?.payments.find((x) => x.id === c.paymentId);
-      return p ? [{ id: p.id, amount: c.amount, at: p.at, source: p.source }] : [];
+      return p ? [{ id: p.id, amount: wholeIsk(c.amount), at: p.at, source: p.source }] : [];
     })
     .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+  const standing = statementStanding(view, statement);
   return {
-    ...statementStanding(view, statement),
-    credited: settlement?.credited ?? 0,
-    forgiven: settlement?.forgiven ?? 0,
-    writtenOff: settlement?.writtenOff ?? 0,
-    remaining: settlement?.remaining ?? statement.amount,
+    ...standing,
+    credited: wholeIsk(settlement?.credited ?? 0),
+    forgiven: wholeIsk(settlement?.forgiven ?? 0),
+    writtenOff: wholeIsk(settlement?.writtenOff ?? 0),
+    remaining: standing.outstanding,
     payments,
   };
 }
@@ -998,6 +1016,9 @@ function ownPeriodBilling(
   return { miners, billed, rolled, rolledAmount };
 }
 
+const earliest = (dates: readonly (string | null | undefined)[]) =>
+  dates.filter((d): d is string => !!d).sort()[0] ?? null;
+
 export function periodRows(view: BookView): PeriodRow[] {
   const byStart = new Map<string, Statement[]>();
   for (const s of view.input.statements) {
@@ -1006,6 +1027,8 @@ export function periodRows(view: BookView): PeriodRow[] {
   const rows: PeriodRow[] = [];
   for (const [start, statements] of byStart) {
     const standing = statements.map((s) => statementStanding(view, s));
+    const unsettled = standing.filter((x) => !x.settled);
+    const unpaused = unsettled.filter((x) => x.state !== 'paused');
     const paid = standing.reduce((sum, x) => sum + x.paid, 0);
     const outstanding = standing.reduce((sum, x) => sum + x.outstanding, 0);
     const overdue = standing.some((x) => x.overdue);
@@ -1015,17 +1038,14 @@ export function periodRows(view: BookView): PeriodRow[] {
       end: statements[0].periodEnd,
       status: overdue ? 'overdue' : outstanding === 0 ? 'paid' : unmailed ? 'issued' : 'sent',
       miners: new Set(statements.map((s) => s.minerId)).size,
-      billed: statements.reduce((s, x) => s + x.amount, 0),
+      billed: standing.reduce((sum, x) => sum + x.billed, 0),
       paid,
       outstanding,
       issuedAt: statements.map((s) => s.issuedAt).sort()[0],
       statements: statements.length,
       mailed: standing.filter((x) => x.mail.count > 0).length,
-      dueAt:
-        standing
-          .map((x) => x.dueAt)
-          .filter((d): d is string => d !== null)
-          .sort()[0] ?? null,
+      dueAt: earliest(unpaused.map((x) => x.dueAt)),
+      pausedUntil: unpaused.length === 0 ? earliest(unsettled.map((x) => x.pausedUntil)) : null,
     });
   }
   const ready = nextRunPeriod(view);
@@ -1070,6 +1090,7 @@ export function periodRows(view: BookView): PeriodRow[] {
       statements: 0,
       mailed: 0,
       dueAt: null,
+      pausedUntil: null,
     });
   };
   // Every period with unbilled days, not only the next one; a Statement still
