@@ -15,8 +15,8 @@
  *   stored outcome is never a substitute for it.
  *
  * `requestNotificationPermission` is called from exactly one place — the
- * explainer's Enable button and Settings' Enable button, both of which are a
- * deliberate user tap. Nothing here fires on mount.
+ * explainer's Enable button and Settings' Device pop-ups checkbox, both of
+ * which are a deliberate user tap. Nothing here fires on mount.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { create } from 'zustand';

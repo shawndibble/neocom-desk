@@ -16,6 +16,8 @@ _Recorded 2026-10-27._
   removed, and asking from Settings also ends the bell explainer. Every other
   device-notification change stays in Settings > Notifications.
 - **The "Alerts when closed" offer follows a grant inside the same block.**
+  This supersedes ADR 0020's "same banner slot" wording; the offer still waits
+  for this block's own Enable.
   iOS Safari outside an installed PWA gets the "install first" copy with no
   Enable button.
 - **The Install Prompt is unchanged:** it already waits for five page visits
