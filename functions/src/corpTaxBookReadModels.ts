@@ -101,12 +101,14 @@ export function buildReadModels(records: BookRecords, now: number): ReadModels {
     for (const p of counted)
       if (p.amount - (p.notTaxAmount ?? 0) > 0 && (lastPaidAt === null || p.at > lastPaidAt))
         lastPaidAt = p.at;
+    // The allocation's own order, so the float sum equals the client's.
     let owed = 0;
+    for (const settlement of allocation.byStatement.values())
+      if (!settlement.settled) owed += settlement.remaining;
     const unsettled: MinerListEntry['unsettled'] = [];
     for (const s of statements) {
       const settlement = allocation.byStatement.get(s.id);
       if (!settlement || settlement.settled) continue;
-      owed += settlement.remaining;
       unsettled.push({
         id: s.id,
         issuedAt: s.issuedAt,

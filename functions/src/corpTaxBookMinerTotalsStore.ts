@@ -13,7 +13,7 @@ import {
   type TotalsPlan,
 } from './corpTaxBookMinerTotals.js';
 import { reconcileMoonDocs } from './corpTaxBookMoonDocsStore.js';
-import { reconcileReadModels } from './corpTaxBookReadModelsStore.js';
+import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
 
 type Data = Record<string, unknown>;
 
@@ -236,8 +236,9 @@ export async function verifyMinerTotals(
   });
   const moonMismatches = moonPlan?.mismatches ?? [];
   // The Overview and Miners tab docs (#5259) are rebuilt in the same pass, and never fail the check.
-  const readModelPlan = await reconcileReadModels(db, corporationId, now()).catch((e) => {
+  const readModelPlan = await reconcileReadModels(db, corporationId, now()).catch(async (e) => {
     console.error('read models verify failed', e instanceof Error ? e.message : e);
+    await invalidateReadModels(db, corporationId).catch(() => undefined);
     return undefined;
   });
   // Not a health flag: a doc also goes stale as an Extraction ages out of its window, so a repair is routine.

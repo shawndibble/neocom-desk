@@ -671,8 +671,9 @@ export async function syncBookAs(
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
-  // Payments and Extractions moved the Overview and Miners tab docs (ADR 0032). Best effort.
-  await refreshReadModels(deps.db, input.corporationId, deps.now());
+  // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
+  if (donationsAdded > 0 || input.extractions.length > 0)
+    await refreshReadModels(deps.db, input.corporationId, deps.now());
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 

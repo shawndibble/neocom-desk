@@ -8,6 +8,8 @@ import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { loadRules, withId } from './corpTaxBookMinerTotalsStore.js';
 import type { BookRecords } from './corpTaxBookMinerTotals.js';
 import {
+  MINER_LIST_DOC,
+  OVERVIEW_DOC,
   READ_MODELS,
   buildReadModels,
   planReadModels,
@@ -60,7 +62,18 @@ export async function reconcileReadModels(
   return plan;
 }
 
-/** Brings the docs in line after rows or an edit moved them. Best effort. */
+/** Removes both docs so a client falls back to the whole-book view instead of trusting stale ones. */
+export async function invalidateReadModels(db: Firestore, corporationId: number): Promise<void> {
+  const batch = db.batch();
+  for (const id of [MINER_LIST_DOC, OVERVIEW_DOC])
+    batch.delete(sub(db, corporationId, READ_MODELS).doc(id));
+  await batch.commit();
+}
+
+/**
+ * Brings the docs in line after rows or an edit moved them. Best effort, but a rebuild that
+ * fails (a doc past 1 MiB, say) deletes the docs: a missing doc is a fallback, a stale one is wrong.
+ */
 export async function refreshReadModels(
   db: Firestore,
   corporationId: number,
@@ -70,5 +83,6 @@ export async function refreshReadModels(
     await reconcileReadModels(db, corporationId, now);
   } catch (e) {
     console.error('read models refresh failed', e instanceof Error ? e.message : e);
+    await invalidateReadModels(db, corporationId).catch(() => undefined);
   }
 }
