@@ -41,6 +41,7 @@ import {
 import { useRowStartPlan } from './rowStartPlan';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
+import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { MarketWideDayRow, MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideScan } from './useMarketWideScan';
@@ -67,6 +68,8 @@ interface MarketWideOpportunitiesPanelProps {
   modifiers: CharacterModifiers;
   /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
   activeCharacterId: number | null;
+  /** The active Character's latest plan, whose settings the rows are priced with. */
+  latestPlan?: BuildPlanRecord | null;
   /**
    * Resolves true once it has opened the new plan (see `StartPlanButton`).
    * `research` is the ME/TE the row was priced at: the plan starts there, so
@@ -97,6 +100,7 @@ export function MarketWideOpportunitiesPanel({
   catalog,
   modifiers,
   activeCharacterId,
+  latestPlan = null,
   onStartPlan,
   ownedBlueprints,
   assumedMe,
@@ -142,6 +146,7 @@ export function MarketWideOpportunitiesPanel({
     standing,
     characterIds,
     characterId: activeCharacterId,
+    latestPlan,
     research,
     filter,
     setFilter,

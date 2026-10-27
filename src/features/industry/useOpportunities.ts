@@ -22,6 +22,8 @@
  * calls) so every branch below is exactly one `setState` call, matching this
  * codebase's `react-hooks/set-state-in-effect` rule.
  */
+import type { BuildPlanRecord } from '@/db';
+import { startingLocation } from './newBuildPlan';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   NO_CHARACTER_MODIFIERS,
@@ -68,6 +70,8 @@ export interface UseOpportunitiesArgs {
   pi: PiData | null;
   /** The Trade Hub each candidate's owning Character would price at (issue #2055) — `hubForCharacter`'s resolution, not a hard-coded default. */
   hubForCharacter: (characterId: number) => TradeHub;
+  /** Each candidate's owning Character's latest plan — the price basis and build location a new plan starts from, which rows price with so they use the plan page's settings. */
+  defaultsForCharacter: (characterId: number) => BuildPlanRecord | null;
   facilityDefaults: ActivityFacilityDefaults;
   /** Each candidate's owning Character's own skills/implants (issue #2055) — absent reads as `NO_CHARACTER_MODIFIERS`. */
   modifiersByCharacter: ReadonlyMap<number, CharacterModifiers>;
@@ -110,6 +114,7 @@ export function useOpportunities({
   catalog,
   pi,
   hubForCharacter,
+  defaultsForCharacter,
   facilityDefaults,
   modifiersByCharacter,
   standingsByCharacter,
@@ -120,6 +125,12 @@ export function useOpportunities({
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
 
+  // Read through a ref: the lookup is rebuilt on every plan write, but only a
+  // change to what rows read off it (`inputsKey`) should reprice a batch.
+  const defaultsRef = useRef(defaultsForCharacter);
+  useEffect(() => {
+    defaultsRef.current = defaultsForCharacter;
+  });
   const candidatesRef = useRef(candidates);
   useEffect(() => {
     candidatesRef.current = candidates;
@@ -144,8 +155,19 @@ export function useOpportunities({
         standingsByCharacter,
         facilityDefaults,
         ownedByCharacter,
+        defaultsByCharacter: new Map(
+          candidates.map((c) => [c.characterId, defaultsForCharacter(c.characterId)] as const)
+        ),
       }),
-    [assumedMe, modifiersByCharacter, standingsByCharacter, facilityDefaults, ownedByCharacter]
+    [
+      assumedMe,
+      modifiersByCharacter,
+      standingsByCharacter,
+      facilityDefaults,
+      ownedByCharacter,
+      candidates,
+      defaultsForCharacter,
+    ]
   );
 
   useEffect(() => {
@@ -198,9 +220,23 @@ export function useOpportunities({
       // Grouped by hub (issue #2055's "batched per Character/hub, not per
       // row"): one snapshot request per distinct hub the batch's owning
       // Characters resolve to, not one shared hard-coded default.
-      const hubGroups = groupCandidatesByHub(currentCandidates, hubForCharacter);
+      const hubGroups = groupCandidatesByHub(
+        currentCandidates,
+        hubForCharacter,
+        (characterId) =>
+          startingLocation('manufacturing', facilityDefaults, defaultsRef.current(characterId))
+            .buildSystemId
+      );
       const requests = hubGroups.map((group) =>
-        opportunitySnapshotRequest(group.candidates, group.hub, catalog, pi, facilityDefaults)
+        opportunitySnapshotRequest(
+          group.candidates,
+          group.hub,
+          catalog,
+          pi,
+          facilityDefaults,
+          // One build system per group, so any member's latest plan names it.
+          defaultsRef.current(group.candidates[0]!.characterId)
+        )
       );
       const snapshots = await Promise.all(loadMarketSnapshots(requests));
       if (cancelled) return;
@@ -239,7 +275,8 @@ export function useOpportunities({
               depth: 0,
             },
             hub,
-            tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id)
+            tradeHubStanding(standingsByCharacter.get(candidate.characterId) ?? new Map(), hub.id),
+            defaultsRef.current(candidate.characterId)
           );
           if (row) unranked.push(row);
         }

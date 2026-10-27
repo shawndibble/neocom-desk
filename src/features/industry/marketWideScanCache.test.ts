@@ -25,6 +25,7 @@ const inputs: MarketWideScanInputs = {
   standing: undefined,
   facilityDefaults: { facility: 'npcStation' },
   lpValue: 0,
+  planSettings: null,
 };
 
 describe('marketWideScanKey', () => {
@@ -52,6 +53,7 @@ describe('marketWideScanKey', () => {
     ['standing', { standing: { factionStanding: 5, corpStanding: 0 } }],
     ['remembered build location', { facilityDefaults: { facility: 'raitaru' } }],
     ['LP Value', { lpValue: 1500 }],
+    ['latest plan price basis', { planSettings: { materialPriceBasis: 'buy' } }],
   ] as [string, Partial<MarketWideScanInputs>][])('changes when the %s changes', (_name, patch) => {
     expect(marketWideScanKey({ ...inputs, ...patch })).not.toBe(marketWideScanKey(inputs));
   });

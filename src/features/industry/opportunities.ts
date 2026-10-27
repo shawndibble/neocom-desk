@@ -20,6 +20,10 @@ import {
 } from './blueprintCatalog';
 import { buildPlanTypeIds } from './recipes';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
+import { materialPricesFor } from './priceBasis';
+import { planOwnedStockSale } from '@/engine/industry/ownedStockSale';
+import { profitOnBasis } from '@/engine/industry/profitBasis';
+import { SKILL_IDS } from '@/engine/industry/types';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { takeEveryOffer } from '@/engine/industry/ownedStockOffer';
@@ -106,16 +110,23 @@ export interface OpportunityHubGroup {
  */
 export function groupCandidatesByHub(
   candidates: readonly OpportunityCandidate[],
-  hubFor: (characterId: number) => TradeHub
+  hubFor: (characterId: number) => TradeHub,
+  /**
+   * The build system each owning Character's rows are charged a job fee at.
+   * A snapshot carries one system's cost index, so two Characters at one hub
+   * who build in different systems are different groups.
+   */
+  buildSystemFor: (characterId: number) => number | undefined = () => undefined
 ): OpportunityHubGroup[] {
-  const byHubId = new Map<TradeHub['id'], OpportunityHubGroup>();
+  const byKey = new Map<string, OpportunityHubGroup>();
   for (const candidate of candidates) {
     const hub = hubFor(candidate.characterId);
-    const group = byHubId.get(hub.id);
+    const key = `${hub.id}|${buildSystemFor(candidate.characterId) ?? ''}`;
+    const group = byKey.get(key);
     if (group) group.candidates.push(candidate);
-    else byHubId.set(hub.id, { hub, candidates: [candidate] });
+    else byKey.set(key, { hub, candidates: [candidate] });
   }
-  return [...byHubId.values()];
+  return [...byKey.values()];
 }
 
 /** One request, one hub, every candidate's materials+product unioned — the "bounded, batched" pricing the ticket asks for. */
@@ -124,7 +135,9 @@ export function opportunitySnapshotRequest(
   hub: TradeHub,
   catalog: BlueprintCatalog,
   pi: PiData | null,
-  facilityDefaults: ActivityFacilityDefaults
+  facilityDefaults: ActivityFacilityDefaults,
+  /** The latest plan a new plan would start its build location from when none is remembered. */
+  defaultsFrom?: BuildPlanRecord | null
 ): MarketSnapshotRequest {
   const typeIds = new Set<number>();
   for (const candidate of candidates) {
@@ -135,7 +148,7 @@ export function opportunitySnapshotRequest(
   // remembered one, through the same resolution `newBuildPlan` uses — so a
   // row and the plan "Add to Compare" makes from it quote the same fee. Half
   // a pair builds at the hub, as it does on a plan.
-  const location = startingLocation('manufacturing', facilityDefaults);
+  const location = startingLocation('manufacturing', facilityDefaults, defaultsFrom);
   return {
     hub,
     typeIds: [...typeIds],
@@ -199,7 +212,13 @@ export function planForOpportunityCandidate(
   /** Auto-picked build-vs-buy materials (issue #652) carried onto the seeded plan verbatim. */
   buildHere: readonly number[] | undefined,
   ownerCharacterId: number,
-  hub: TradeHub
+  hub: TradeHub,
+  /**
+   * The owner's latest plan, which a plan made on the plan page starts its
+   * price basis and (when no location is remembered) build location from.
+   * Rows price with it, so they use the settings the plan page does.
+   */
+  defaultsFrom: BuildPlanRecord | null = null
 ) {
   const { blueprint } = candidate;
   // A BPC prices at its own remaining runs; a BPO (runs === -1, unlimited)
@@ -209,10 +228,17 @@ export function planForOpportunityCandidate(
   // run-count normalization beyond that).
   const runs = pricedRuns(blueprint);
   return {
-    ...newBuildPlan(ownerCharacterId, candidate.catalogEntry, blueprint, null, facilityDefaults, {
-      runs,
-      ...(buildHere !== undefined && buildHere.length > 0 ? { buildHere: [...buildHere] } : {}),
-    }),
+    ...newBuildPlan(
+      ownerCharacterId,
+      candidate.catalogEntry,
+      blueprint,
+      defaultsFrom,
+      facilityDefaults,
+      {
+        runs,
+        ...(buildHere !== undefined && buildHere.length > 0 ? { buildHere: [...buildHere] } : {}),
+      }
+    ),
     hubId: hub.id,
     materialSourcing,
   };
@@ -229,6 +255,10 @@ export interface UnrankedOpportunityRow {
   materialSourcing: MaterialSourcingMap;
   /** Materials the auto make-or-buy depth pass (issue #652) chose to build; empty at depth 0. Reused verbatim by `planForOpportunityCandidate` for the same reason as `materialSourcing`. */
   buildHere: number[];
+  /** The owner's latest plan this row took its price basis and build location from; reused by `planForOpportunityCandidate` so the plan opened from the row starts at the same settings. */
+  defaultsFrom: BuildPlanRecord | null;
+  /** ISK the owned stock this job uses would net if sold, charged against `result.profit` (the plan hero's sell-value basis); 0 when none is charged. */
+  forgoneSale: number;
 }
 
 /**
@@ -239,7 +269,7 @@ export interface UnrankedOpportunityRow {
  */
 export type OpportunityPlanSeed = Pick<
   UnrankedOpportunityRow,
-  'candidate' | 'materialSourcing' | 'buildHere' | 'hub'
+  'candidate' | 'materialSourcing' | 'buildHere' | 'hub' | 'defaultsFrom'
 >;
 
 export interface OpportunityRow extends UnrankedOpportunityRow {
@@ -253,6 +283,56 @@ export interface OpportunityAutoBuildOptions {
   recipeFor: (typeID: number) => MaterialRecipe | null;
   /** 0-3; 0 reproduces issue #642's plain behavior (nothing auto-built). */
   depth: number;
+}
+
+/**
+ * The figures a Build Plan's hero shows by default, on `result`: owned
+ * materials are charged at what they would sell for (instant sale into buy
+ * orders), so profit reads as what building earns over just selling them. The
+ * plan page does this through the same `planOwnedStockSale` and
+ * `profitOnBasis`; with nothing owned, or an owned material with no price, the
+ * plan's own figure stands, as it does there. Only the headline figures move:
+ * cost columns keep the plan's own `totalCost`.
+ */
+function onPlanHeroBasis(
+  result: BuildResult,
+  input: {
+    snapshot: MarketSnapshot;
+    modifiers: CharacterModifiers;
+    standing: ResolvedStandings | undefined;
+    productQuantity: number;
+    productUnitPrice: number | null;
+  }
+): { result: BuildResult; forgone: number } {
+  const { snapshot, modifiers, standing } = input;
+  const sale = planOwnedStockSale(
+    result.materials,
+    snapshot,
+    'instant',
+    modifiers.skills,
+    standing
+  );
+  if (sale.ownedUnits === 0 || sale.unpriced.length > 0) return { result, forgone: 0 };
+  const figures = profitOnBasis('sellValue', {
+    result,
+    ownedSellNet: sale.net,
+    productQuantity: input.productQuantity,
+    productUnitPrice: input.productUnitPrice,
+    accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+    brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
+    factionStanding: standing?.factionStanding,
+    corpStanding: standing?.corpStanding,
+  });
+  return {
+    result: {
+      ...result,
+      profit: figures.profit,
+      marginPct: figures.marginPct,
+      iskPerHour: figures.iskPerHour,
+      breakEvenPrice: figures.breakEvenPrice,
+    },
+    forgone: sale.net,
+  };
 }
 
 /**
@@ -281,7 +361,9 @@ export function computeOpportunityRow(
   autoBuild: OpportunityAutoBuildOptions,
   /** The Trade Hub this candidate's owning Character would price at (issue #2055) — `hubForCharacter`'s resolution, batched per hub by the caller. */
   hub: TradeHub,
-  standing?: ResolvedStandings
+  standing?: ResolvedStandings,
+  /** The owner's latest plan: where a plan made on the plan page starts its price basis and build location. */
+  defaultsFrom: BuildPlanRecord | null = null
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
   const materialSourcing = ownedMaterialSourcing(candidate.catalogEntry.blueprint.materials, stock);
@@ -291,8 +373,11 @@ export function computeOpportunityRow(
     materialSourcing,
     undefined,
     candidate.characterId,
-    hub
+    hub,
+    defaultsFrom
   );
+  // Materials are bought at the side of the market the plan's basis names, as on the plan page.
+  const materialPrices = materialPricesFor(snapshot, basePlan.materialPriceBasis);
 
   const systemCostIndex = snapshot.systemCostIndex ?? 0;
   const adjustedPrices = snapshot.adjustedPrices ?? {};
@@ -311,7 +396,7 @@ export function computeOpportunityRow(
         facilityTaxPct: basePlan.facilityTaxPct,
         systemCostIndex,
         adjustedPrices,
-        materialPrices: snapshot.hubPrices,
+        materialPrices,
         modifiers,
       },
     }),
@@ -324,6 +409,7 @@ export function computeOpportunityRow(
     systemCostIndex,
     adjustedPrices,
     hubPrices: snapshot.hubPrices,
+    materialPrices,
     modifiers,
     standing,
     recipeFor: autoBuild.recipeFor,
@@ -334,11 +420,27 @@ export function computeOpportunityRow(
 
   const productTypeID = candidate.catalogEntry.productTypeID;
   const sellPrice = productTypeID !== null ? snapshot.hubPrices[productTypeID] : undefined;
+  const { result: planResult, forgone } = onPlanHeroBasis(result, {
+    snapshot,
+    modifiers,
+    standing,
+    productQuantity: (blueprint.products[0]?.quantity ?? 0) * plan.runs,
+    productUnitPrice: sellPrice ?? null,
+  });
   const sellVolume = productTypeID !== null ? snapshot.hubSellVolumes[productTypeID] : undefined;
   const sellDepthIsk =
     sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
 
-  return { candidate, result, sellDepthIsk, hub, materialSourcing, buildHere };
+  return {
+    candidate,
+    result: planResult,
+    sellDepthIsk,
+    hub,
+    materialSourcing,
+    buildHere,
+    defaultsFrom,
+    forgoneSale: forgone,
+  };
 }
 
 /** Sorts and classifies through the tested engine module, then re-attaches each row's own candidate/result. */
@@ -412,6 +514,28 @@ export interface OpportunityPricingInputs {
    * on every ESI refresh, which would ask for Refresh on nearly every visit.
    */
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
+  /** Each owning Character's latest plan, whose price basis and build location rows start from — as a new plan does. */
+  defaultsByCharacter: ReadonlyMap<number, BuildPlanRecord | null>;
+}
+
+/**
+ * What a row reads off the latest plan a new plan starts from: its hub, price
+ * basis and build location. Not its name, runs or timestamps, so a plan edit
+ * that moves no price doesn't read as repriced. One list, for every key that
+ * must notice these settings changing.
+ */
+export function planSettings(plan: BuildPlanRecord | null) {
+  return (
+    plan && {
+      hubId: plan.hubId,
+      materialPriceBasis: plan.materialPriceBasis ?? null,
+      facility: plan.facility,
+      rigFit: plan.rigFit ?? null,
+      facilityTaxPct: plan.facilityTaxPct ?? null,
+      security: plan.security,
+      buildSystemId: plan.buildSystemId ?? null,
+    }
+  );
 }
 
 /** JSON with object keys sorted, so equal values built in a different key order serialize the same. */
@@ -436,6 +560,9 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
       ([characterId, byHub]) =>
         [characterId, [...byHub.entries()].sort(([a], [b]) => a.localeCompare(b))] as const
     );
+  const defaults = [...inputs.defaultsByCharacter.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([characterId, plan]) => [characterId, planSettings(plan)]);
   return stableSerialize({
     assumedMe: inputs.assumedMe,
     modifiers,
@@ -443,6 +570,7 @@ export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string
     // Only the manufacturing record: every candidate is a manufacturing
     // blueprint, so a Reaction Location set on some plan page changes no row.
     facilityDefaults: inputs.facilityDefaults.manufacturing,
+    defaults,
     research,
   });
 }

@@ -33,6 +33,8 @@ export interface MarketWideScanInputs {
   facilityDefaults: unknown;
   /** The pilot's LP Value, which prices an LP Store blueprint redemption. */
   lpValue: number;
+  /** The latest plan's price basis and build location (`planSettings`), which a plan starts from. */
+  planSettings: unknown;
 }
 
 export function marketWideScanKey(inputs: MarketWideScanInputs): string {
@@ -49,6 +51,7 @@ export function marketWideScanKey(inputs: MarketWideScanInputs): string {
     inputs.standing ?? null,
     inputs.facilityDefaults,
     inputs.lpValue,
+    inputs.planSettings,
   ]);
 }
 

@@ -15,6 +15,8 @@ import type { ResolvedStandings } from '@/engine/market/standings';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import type { BuildPlanRecord } from '@/db';
+import { planSettings } from './opportunities';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useFacilityDefaults } from './facilityDefaults';
 import { loadBlueprintSourceSets } from './blueprintSourceSets';
@@ -39,6 +41,8 @@ export interface UseMarketWideOpportunitiesArgs {
   characterIds: readonly number[];
   /** Whose Build Plans rows are priced as — the active Character. Null while none is active. */
   characterId?: number | null;
+  /** That Character's latest plan, whose hub, price basis and build location rows start from. */
+  latestPlan?: BuildPlanRecord | null;
   /** The ME/TE rows are priced at, and so the one a plan opened from a row starts at (issue #5232). */
   research: MarketWideResearch;
   /**
@@ -91,6 +95,7 @@ export function useMarketWideOpportunities({
   standing,
   characterIds,
   characterId = null,
+  latestPlan = null,
   research,
   filters,
   options,
@@ -119,8 +124,9 @@ export function useMarketWideOpportunities({
         standing,
         facilityDefaults,
         lpValue,
+        planSettings: planSettings(latestPlan),
       }),
-    [hub.id, characterIds, research, modifiers, standing, facilityDefaults, lpValue]
+    [hub.id, characterIds, research, modifiers, standing, facilityDefaults, lpValue, latestPlan]
   );
   const key = useMemo(() => keyFor(filters), [keyFor, filters]);
   // A scan this session ran, at these inputs, and the prices still hold.
