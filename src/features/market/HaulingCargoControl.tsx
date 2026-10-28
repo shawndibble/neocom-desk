@@ -146,7 +146,7 @@ interface CargoPickerBodyProps {
   hasCargo: boolean;
 }
 
-function CargoPickerBody({ characterId, onPick, onClear, hasCargo }: CargoPickerBodyProps) {
+export function CargoPickerBody({ characterId, onPick, onClear, hasCargo }: CargoPickerBodyProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<CargoTab>('ship');
   const [working, setWorking] = useState(false);

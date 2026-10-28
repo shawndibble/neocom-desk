@@ -42,6 +42,8 @@ export interface AppraisalController {
    * directly instead of racing the state update.
    */
   appraiseText: (next: string) => void;
+  /** The text that was priced; empty until the first Appraise, and again after Clear. */
+  submitted: string;
   /** Null until the first Appraise, and again after Clear. */
   result: AppraisalOutcome | null;
   /** The same pile priced at all 5 Trade Hubs. Null and set together with `result`. */
@@ -160,6 +162,7 @@ export function useAppraisal(
     text,
     setText,
     appraiseText,
+    submitted,
     result,
     compare,
     loading,

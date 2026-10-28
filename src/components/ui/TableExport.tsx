@@ -140,6 +140,7 @@ export function TableActionsMenu<T>({
   label: labelOverride,
   triggerText,
   showLabel,
+  onCloseAutoFocus,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
@@ -152,6 +153,8 @@ export function TableActionsMenu<T>({
   triggerText?: string;
   /** Tier 2: an export-only trigger shows "Export" beside the download icon from `md` up. */
   showLabel?: boolean;
+  /** From `useOpenAfterMenu`, for a child item that opens a dialog. */
+  onCloseAutoFocus?: (event: Event) => void;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
@@ -215,7 +218,7 @@ export function TableActionsMenu<T>({
             />
           )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" onCloseAutoFocus={onCloseAutoFocus}>
           <MenuKindContext.Provider value="dropdown">
             {exportOnly ? (
               <ExportTableItems tableExport={tableExport} onDone={onDone} />
