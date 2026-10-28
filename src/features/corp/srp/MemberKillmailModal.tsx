@@ -6,7 +6,7 @@ import { Pill } from '@/components/ui/Pill';
 import { repaymentHidden, shipFitValue } from '@/engine/srpAppraisal';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { DoctrinePreview } from '../srpTypes';
+import type { DoctrineCheckRecord, DoctrinePreview } from '../srpTypes';
 import { basisText } from './srpClaimText';
 import { esiKillmailLink } from './srpMemberModel';
 import {
@@ -22,7 +22,8 @@ interface Props {
   canFile: boolean;
   busy: boolean;
   previewDoctrine: (killmail: string) => Promise<DoctrinePreview>;
-  onFile: () => void;
+  /** With the doctrine check the modal read, so filing need not read it again. */
+  onFile: (check?: DoctrineCheckRecord) => void;
   onClose: () => void;
 }
 
@@ -99,7 +100,12 @@ export function MemberKillmailModal({
             {t('srpKillmail.close')}
           </Button>
           {fileable && (
-            <Button variant="primary" className="w-full sm:w-auto" disabled={busy} onClick={onFile}>
+            <Button
+              variant="primary"
+              className="w-full sm:w-auto"
+              disabled={busy}
+              onClick={() => onFile(ready?.check)}
+            >
               {t('srpKillmail.file')}
             </Button>
           )}

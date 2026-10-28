@@ -4,7 +4,7 @@
  * pilot's payout, the officer's appraisal comparison). The modals around it are
  * `MemberKillmailModal` and `OfficerKillmailModal`.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -16,6 +16,7 @@ import { formatPercentDifference, percentDifference, shipFitValue } from '@/engi
 import type { Killmail } from '@/esi/endpoints';
 import type { DoctrineCheckRecord } from '../srpTypes';
 import { fitGroups, offDoctrineCount, type FitMark, type FitSlot } from './killmailFit';
+import { loadFittingSlots } from '@/sde/loadSde';
 import { useKillmailRead } from './useKillmailRead';
 import { useDoctrineTypeNames } from './useDoctrineTypeNames';
 
@@ -133,6 +134,23 @@ function slotLabel(t: ReturnType<typeof useTranslation>['t'], slot: FitSlot): st
   }
 }
 
+/** The SDE's rack for each module type; null once a read failed (the list then shows every slot item). */
+function useRackLookup(): ((typeId: number) => string | undefined) | null | undefined {
+  const [slots, setSlots] = useState<Record<string, string> | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    loadFittingSlots().then(
+      (map) => !cancelled && setSlots(map as Record<string, string>),
+      () => !cancelled && setSlots(null)
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (slots === undefined || slots === null) return slots;
+  return (typeId) => slots[String(typeId)];
+}
+
 function Fit({
   killmail,
   check,
@@ -143,7 +161,8 @@ function Fit({
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  if (killmail === 'loading') return <Spinner size="sm" delayMs={200} />;
+  const rackOf = useRackLookup();
+  if (killmail === 'loading' || rackOf === undefined) return <Spinner size="sm" delayMs={200} />;
   if (killmail === 'failed' || killmail === null) {
     return (
       <p role="status" className="text-xs text-warning">
@@ -151,7 +170,7 @@ function Fit({
       </p>
     );
   }
-  const groups = fitGroups(killmail.victim.items ?? [], check);
+  const groups = fitGroups(killmail.victim.items ?? [], check, rackOf ?? undefined);
   const checked = check !== undefined && check.status !== 'not-checked';
   return (
     <div className="space-y-2">

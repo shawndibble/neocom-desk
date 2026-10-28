@@ -58,7 +58,8 @@ function extras(check: DoctrineCheckRecord | undefined, rigs: boolean): Map<numb
  */
 export function fitGroups(
   items: readonly FitItem[],
-  check: DoctrineCheckRecord | undefined
+  check: DoctrineCheckRecord | undefined,
+  rackOf?: (typeId: number) => string | undefined
 ): FitGroup[] {
   const checked = check !== undefined && check.status !== 'not-checked';
   const extraModules = extras(check, false);
@@ -68,6 +69,8 @@ export function fitGroups(
     const slot = slotOfFlag(it.flag);
     const count = (it.quantity_destroyed ?? 0) + (it.quantity_dropped ?? 0);
     if (slot === null || count < 1) continue;
+    // A slot flag also holds the module's loaded charge: only a type that fits the rack is a module.
+    if (rackOf && slot !== 'drone' && rackOf(it.item_type_id) !== slot) continue;
     const counts = bySlot.get(slot) ?? new Map<number, number>();
     counts.set(it.item_type_id, (counts.get(it.item_type_id) ?? 0) + count);
     bySlot.set(slot, counts);

@@ -3,11 +3,12 @@ import { claimValuesOf, parseClaimValuesInput } from './srpClaimValues.js';
 import type { SrpKillmailSource } from './srpKillmail.js';
 import type { DoctrineFit } from './srpTypes.js';
 
+// 405 is a high-slot module, 421 a mid-slot one and 4395 a rig in the SDE's fitting racks.
 const PRICES = new Map([
   [10, 100],
-  [1, 10],
-  [2, 5],
-  [3, 2],
+  [405, 10],
+  [421, 5],
+  [4395, 2],
 ]);
 const source = {
   jitaValue: async (items: ReadonlyMap<number, number>) => {
@@ -26,14 +27,15 @@ const victim = {
   corporationId: 2,
   shipTypeId: 10,
   items: [
-    { item_type_id: 1, flag: 27, quantity_destroyed: 2 },
-    { item_type_id: 2, flag: 5, quantity_destroyed: 50 }, // cargo
+    { item_type_id: 405, flag: 27, quantity_destroyed: 1 },
+    { item_type_id: 405, flag: 28, quantity_destroyed: 1 },
+    { item_type_id: 421, flag: 5, quantity_destroyed: 50 }, // cargo
   ],
 };
 const doctrine: DoctrineFit = {
   id: 'd',
   name: 'Fleet Hull',
-  snapshot: { hullTypeId: 10, name: 'x', modules: [1, 1, 2], rigs: [3] },
+  snapshot: { hullTypeId: 10, name: 'x', modules: [405, 405, 421], rigs: [4395] },
   createdBy: 1,
   createdAt: 0,
 };
@@ -55,7 +57,7 @@ describe('claimValuesOf', () => {
     });
   });
   it('is null where a type has no price', async () => {
-    const odd = { ...victim, items: [{ item_type_id: 99, flag: 27, quantity_destroyed: 1 }] };
+    const odd = { ...victim, items: [{ item_type_id: 405, flag: 27, quantity_destroyed: 1 }] };
     expect((await claimValuesOf(source, odd, undefined)).fitValue).toBeNull();
   });
 });

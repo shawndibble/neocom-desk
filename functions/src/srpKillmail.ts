@@ -131,10 +131,10 @@ export function appraisalItems(victim: {
 }
 
 // ESI inventory flags: racks are 8 flags each from LoSlot0 11, MedSlot0 19, HiSlot0 27, RigSlot0 92,
-// SubSystem0 125; DroneBay 87, FighterBay 158. Cargo (5) and hangars are not "ship and fit".
+// SubSystem0 125; DroneBay 87. Cargo (5) and hangars are not "ship and fit".
 const FIT_RACK_BASES = [11, 19, 27, 92, 125] as const;
 const isFitFlag = (flag: number): boolean =>
-  flag === 87 || flag === 158 || FIT_RACK_BASES.some((base) => flag >= base && flag < base + 8);
+  flag === 87 || FIT_RACK_BASES.some((base) => flag >= base && flag < base + 8);
 
 function addFitItems(into: Map<number, number>, items: readonly KillmailItem[]): void {
   for (const item of items) {

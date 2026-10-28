@@ -4,6 +4,7 @@
 import { fail, type Caller } from './actorAuth.js';
 import type { BookCall } from './corpTaxBook.js';
 import { readDoctrines } from './srpDoctrineRead.js';
+import { fittedFromKillmail } from './srpDoctrineCheck.js';
 import {
   doctrineItems,
   shipFitItems,
@@ -13,13 +14,19 @@ import {
 import { authorizeSrpOfficer, claimRef, softJita, type SrpFileDeps } from './srpStore.js';
 import type { DoctrineFit, SrpClaimValues } from './srpTypes.js';
 
-/** The pure half: appraise the victim's hull and fit, and the doctrine's whole list, if any. */
+/**
+ * Appraises the victim's hull and its fitted modules and rigs (the same parts a Doctrine Fit lists,
+ * so the comparison is like for like: no charges or drones), and the doctrine's list, if any.
+ */
 export async function claimValuesOf(
   source: SrpKillmailSource,
   victim: EsiKillmail['victim'],
   doctrine: DoctrineFit | undefined
 ): Promise<SrpClaimValues> {
-  const { hull, fit } = shipFitItems(victim);
+  const { hull } = shipFitItems(victim);
+  const fitted = fittedFromKillmail(victim);
+  const fit = new Map<number, number>();
+  for (const id of [...fitted.modules, ...fitted.rigs]) fit.set(id, (fit.get(id) ?? 0) + 1);
   const [hullValue, fitValue, doctrineValue] = await Promise.all([
     softJita(source, hull),
     softJita(source, fit),

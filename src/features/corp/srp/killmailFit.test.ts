@@ -57,6 +57,15 @@ describe('fitGroups', () => {
   });
 });
 
+describe('fitGroups with a rack lookup', () => {
+  it('leaves out a loaded charge sitting in a slot flag, and keeps drones', () => {
+    const rackOf = (id: number) => ({ 1: 'high', 2: 'medium', 3: 'low', 4: 'rig' })[id];
+    const groups = fitGroups([...ITEMS, item(99, 27, 400)], undefined, rackOf);
+    expect(groups[0]!.lines).toEqual([{ typeId: 1, count: 2, mark: null }]);
+    expect(groups.at(-1)!.slot).toBe('drone');
+  });
+});
+
 describe('offDoctrineCount', () => {
   it('counts extra modules and rigs', () => {
     expect(offDoctrineCount(off([1, 3], [4]))).toBe(3);
