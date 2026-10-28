@@ -154,19 +154,14 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
-  it('opens the LP Store from a loyalty row, with the corporation name as plain text and an ⓘ for Show Info (issue #4694)', async () => {
+  it('opens the LP Store from a loyalty row, with the corporation name as plain text and no ⓘ (issue #5417)', async () => {
     render(<App />);
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     // The row's click is the store (DESIGN §6c): the name inside it is no link.
     expect(screen.queryByRole('link', { name: 'Caldari Navy' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'LP Store' })).not.toBeInTheDocument();
 
-    // The ⓘ opens Show Info over the Wallet, without the row's navigation.
-    fireEvent.click(screen.getByRole('button', { name: 'Show info for Caldari Navy' }));
-    await waitFor(() =>
-      expect(new URLSearchParams(window.location.search).get('info')).toBe('corporation-1000167')
-    );
-    expect(window.location.pathname).not.toMatch(/lp-store/);
+    expect(screen.queryByRole('button', { name: /Show info for/ })).toBeNull();
 
     fireEvent.click(screen.getByText('Caldari Navy').closest('tr') as HTMLElement);
     await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
