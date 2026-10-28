@@ -25,14 +25,7 @@ import {
 } from './improveGroups';
 import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
-import {
-  overageOf,
-  PAIR_LIMIT,
-  RESOURCES,
-  STAT_TOLERANCE,
-  usedOf,
-  type Resource,
-} from './makeItFit';
+import { overageOf, PAIR_LIMIT, RESOURCES, usedOf, type Resource } from './makeItFit';
 import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
@@ -93,7 +86,7 @@ export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
  * powergrid or calibration; `capStable` a stable capacitor turned unstable;
- * `keepsStats` Cheaper lost more than 5% of damage, tank or speed; `spend`
+ * `keepsStats` Cheaper lost more than 10% of damage, tank or speed; `spend`
  * it costs more than the total budget or extra-spend cap allows.
  */
 export type Guardrail = 'budget' | 'capStable' | 'keepsStats' | 'spend';
@@ -120,6 +113,8 @@ export interface ImproveCandidate {
   toTypeId: number;
   at: ModuleAt[];
   pairedWith?: ImproveCandidate;
+  /** Replaces a fitted module the pilot cannot fly yet: accepted even when it scores worse on the goal. */
+  fixesUnflyable?: boolean;
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
@@ -369,6 +364,9 @@ function scoreOf(
   }
 }
 
+/** Cheaper may give up this much damage, tank or speed: a bit worse for a lot less ISK is the point. */
+const CHEAPER_TOLERANCE = 0.1;
+
 /** The first Guardrail `after` breaks, or null. */
 function brokenGuardrail(
   goal: ImproveGoal,
@@ -384,7 +382,7 @@ function brokenGuardrail(
       [before.ehp, after.ehp],
       [before.navigation.maxVelocity, after.navigation.maxVelocity],
     ];
-    if (kept.some(([b, a]) => b > 0 && (b - a) / b > STAT_TOLERANCE)) return 'keepsStats';
+    if (kept.some(([b, a]) => b > 0 && (b - a) / b > CHEAPER_TOLERANCE)) return 'keepsStats';
   }
   return null;
 }
@@ -513,6 +511,8 @@ export function improveCandidates(
   const tiers: ImproveCandidate[][] = [[], [], [], []];
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
+    // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
+    const unflyable = o.pool?.flyable ? !o.pool.flyable(slot, fromTypeId) : false;
     const from = groupOf(fromTypeId);
     const job = jobOf(from);
     const guardsJob = job !== null && !scored.includes(job);
@@ -533,10 +533,22 @@ export function improveCandidates(
       if (guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1) return;
       seen.add(typeId);
       taken[tier]++;
-      tiers[tier].push({ fromTypeId, toTypeId: typeId, at });
+      tiers[tier].push(
+        unflyable
+          ? { fromTypeId, toTypeId: typeId, at, fixesUnflyable: true }
+          : { fromTypeId, toTypeId: typeId, at }
+      );
     };
     for (const member of getVariations(index, fromTypeId).members) {
       offer(0, member.typeId, groupOf(member.typeId));
+    }
+    // Variants first, then the same group, then the goal's groups: each only when the last found none.
+    if (o.pool && unflyable) {
+      if (taken[0] === 0 && from !== undefined && o.reach === 'upgrade')
+        for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
+      if (taken[0] + taken[1] === 0 && o.reach !== 'rework')
+        for (const group of reworkGroups(o.goal, sides))
+          for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
     }
     // The other side's tank modules are freed: they take the chosen side's modules whatever the Reach.
     const otherSide = from === undefined ? null : sideOf(from);
@@ -584,6 +596,8 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
   return [...options].sort((a, b) => {
     const ap = a.iskDelta === null;
     const bp = b.iskDelta === null;
+    const af = a.candidate.fixesUnflyable === true;
+    if (af !== (b.candidate.fixesUnflyable === true)) return af ? -1 : 1;
     if (ap !== bp) return ap ? 1 : -1;
     if (Math.abs(a.score - b.score) > 1e-9) return b.score - a.score;
     return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
@@ -727,12 +741,13 @@ export async function findImprovements({
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return;
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
-    if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
+    const fix = candidate.fixesUnflyable === true;
+    if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return;
     const option: ImproveOption = {
       candidate,
       fitting: swapped,
       after,
-      score,
+      score: score ?? 0,
       iskDelta,
       destroysRigs,
       lost: lostStats(before, after),
@@ -741,7 +756,9 @@ export async function findImprovements({
       spendCap !== null &&
       iskDelta !== null &&
       (mode === 'buy' ? (fitTotal ?? 0) + iskDelta : iskDelta) > spendCap;
-    const guardrail = brokenGuardrail(goal, before, after, target) ?? (overSpend ? 'spend' : null);
+    // Flying it beats keeping the stats: only the fit's resources and the spend still bind.
+    const broken = brokenGuardrail(goal, before, after, target);
+    const guardrail = (fix && broken !== 'budget' ? null : broken) ?? (overSpend ? 'spend' : null);
     if (guardrail) rejected.push({ ...option, guardrail });
     else kept.push(option);
   }
