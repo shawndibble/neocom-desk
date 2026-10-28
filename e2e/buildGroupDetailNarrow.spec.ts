@@ -128,7 +128,8 @@ test.describe('Build Group detail — buy-materials table on a phone', () => {
     const { display, cells } = await readRow(page, TRITANIUM);
     expect(display).toBe('table-row');
     const visible = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
-    expect(visible).toEqual(['Material', 'Qty', 'Owned', 'Still to buy']);
+    // The trailing blank cell is the row's More actions button.
+    expect(visible).toEqual(['Material', 'Qty', 'Owned', 'Still to buy', '']);
 
     // The six-digit case: Qty still holds its own figure without clipping it.
     const qty = cellFor(cells, 'Qty');
@@ -165,6 +166,7 @@ test.describe('Build Group detail — buy-materials table on a phone', () => {
       'Volume',
       'Owned',
       'Still to buy',
+      '',
     ]);
   });
 });
