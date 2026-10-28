@@ -1,3 +1,4 @@
+import { NO_CHANNEL_OFF } from './channelOff';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -41,7 +42,7 @@ function context(over: Partial<EventRowContext> = {}): EventRowContext {
     ]),
     capabilitiesByCharacterId: new Map(),
     prefsValue: useNotificationPreferences.getState().value,
-    browserBlocked: false,
+    channelOff: NO_CHANNEL_OFF,
     visibleCharacterIds: null,
     forceExpanded: false,
     isDesktop: true,
@@ -480,5 +481,46 @@ describe('NotificationEventList Apply to all', () => {
     render(<Harness ids={['skillLevelComplete']} />);
     await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
     expect(screen.queryByRole('button', { name: /Apply to all/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('NotificationEventList with a channel off', () => {
+  const deviceOff = { browser: 'deviceToggleOff', feed: null } as const;
+  const alertsOff = { browser: null, feed: 'alertsToggleOff' } as const;
+
+  it('greys the Device column but keeps its ticks, and leaves Alerts live', () => {
+    render(<Harness ids={['skillLevelComplete']} over={{ channelOff: deviceOff }} />);
+    const device = screen.getByRole('checkbox', {
+      name: 'Skill level complete for every character, device notifications',
+    });
+    expect(device).toBeDisabled();
+    expect(device).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Skill level complete for every character, Alerts list',
+      })
+    ).toBeEnabled();
+  });
+
+  it('greys the Alerts column but keeps its ticks', () => {
+    render(<Harness ids={['skillLevelComplete']} over={{ channelOff: alertsOff }} />);
+    const alerts = screen.getByRole('checkbox', {
+      name: 'Skill level complete for every character, Alerts list',
+    });
+    expect(alerts).toBeDisabled();
+    expect(alerts).toBeChecked();
+  });
+
+  it('greys D in an opened event, keeps the tick and does not toggle it', async () => {
+    const user = userEvent.setup();
+    render(<Harness ids={['skillLevelComplete']} over={{ channelOff: deviceOff }} />);
+    await user.click(screen.getByRole('button', { name: 'Skill level complete' }));
+    const chip = screen.getByRole('checkbox', {
+      name: 'Skill level complete, Beta Pilot, device notifications',
+    });
+    expect(chip).toHaveAttribute('aria-disabled', 'true');
+    expect(chip).toBeChecked();
+    await user.click(chip);
+    expect(chip).toBeChecked();
   });
 });

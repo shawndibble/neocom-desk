@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { useState, type ReactNode } from 'react';
@@ -25,6 +26,7 @@ import {
   RowActionsMenu,
   RowCaret,
   SegmentedControl,
+  Checkbox,
   Select,
   SelectContent,
   SelectItem,
@@ -52,6 +54,8 @@ import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
 import { MyOrderMark } from '@/features/market/marketOrderCells';
 import { cx } from '@/lib/cx';
 import { OfflineStrip } from '@/app/OfflineBanner';
+import { MissingGrantBadge } from '@/features/notifications/ScheduledPushBadge';
+import { ChannelOffTip } from '@/features/notifications/ChannelOffTip';
 
 const SAMPLE_ROWS = [
   { id: 1, name: 'Rifter' },
@@ -188,6 +192,21 @@ export function InteractionGrammar() {
               <Icon.NavCommunities aria-label={k('samples.communityMark')} role="img" />
             </span>
           </Tooltip>
+        </Cue>
+        <Cue rule={k('rules.missingGrantMark')}>
+          <MissingGrantBadge labelKey="settings.notifications.missingGrantBadge.base" />
+        </Cue>
+        <Cue rule={k('rules.channelOff')}>
+          <ChannelOffTip reason="deviceToggleOff">
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                checked
+                disabled
+                onChange={() => {}}
+                aria-label={k('samples.channelOffLabel')}
+              />
+            </label>
+          </ChannelOffTip>
         </Cue>
         <Cue rule={k('rules.figureHistory')}>
           <button

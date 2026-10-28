@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Checkbox, Tooltip } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import type { NotificationChannel } from './eventSelection';
+import type { ChannelOffReason } from './channelOff';
 
 /**
  * One event's checkbox for one delivery channel. Its accessible name names
@@ -26,6 +27,7 @@ export function ChannelCheckbox({
   checked,
   onToggle,
   caption,
+  channelOff = null,
 }: {
   channel: NotificationChannel;
   eventLabel: string;
@@ -41,8 +43,15 @@ export function ChannelCheckbox({
    * clickable and does nothing, which reads as a click that did not register.
    */
   caption?: string;
+  /**
+   * The channel itself is off (issue #5330): greyed with its tick kept, unlike a
+   * missing scope, which shows the box unticked because nothing can happen there.
+   */
+  channelOff?: ChannelOffReason | null;
 }) {
   const { t } = useTranslation();
+  const off = channelOff !== null;
+  const usable = enabled && !off;
   const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
   const checkbox = (
     <label
@@ -59,11 +68,11 @@ export function ChannelCheckbox({
         // Tooltip trigger in the hover/touch path). `preventDefault` on click
         // blocks the toggle instead, before `onChange` fires.
         onClick={(event) => {
-          if (!enabled) event.preventDefault();
+          if (!usable) event.preventDefault();
         }}
-        aria-disabled={enabled ? undefined : true}
+        aria-disabled={usable ? undefined : true}
         aria-label={label}
-        className={enabled ? undefined : 'cursor-not-allowed! opacity-40'}
+        className={usable ? undefined : 'cursor-not-allowed! opacity-40'}
       />
       {caption !== undefined && (
         <span aria-hidden="true" className="font-mono text-[0.625rem] text-text-dim">
@@ -72,13 +81,15 @@ export function ChannelCheckbox({
       )}
     </label>
   );
-  if (enabled) return checkbox;
-  const hint =
+  if (usable) return checkbox;
+  const unavailableHint =
     disabledReason === 'capability'
       ? t('settings.notifications.corpCapabilityHint')
       : missingPermissionLabel !== undefined
         ? t('settings.notifications.needsPermission', { permission: missingPermissionLabel })
         : t('settings.notifications.reauthHint');
+  // A missing scope or role is the Character's own fault and wins over the channel being off.
+  const hint = enabled ? t(`settings.notifications.channelOff.${channelOff}`) : unavailableHint;
   return (
     <Tooltip content={hint} openOnTap>
       {checkbox}

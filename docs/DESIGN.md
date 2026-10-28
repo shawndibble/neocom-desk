@@ -996,6 +996,10 @@ sliding in from the left (200ms; none under reduced motion).
 The per-row action stays. Ticks belong to the context they were made in and
 clear when it changes (a different Character).
 
+**A closed-app delivery mark that needs a step.** The broadcast mark on a Notification Event row (`ScheduledPushBadge`) says the event reaches a closed app. When it needs a grant no Character on the device has (Alerts when closed, with mail or location for those events), the same mark turns `danger` red with a slash through it, and its tooltip names the step. The slash means the colour is never the only signal. It turns back to the normal mark once the grant exists. One meaning: "cannot reach a closed app yet, and here is the step".
+
+**A channel that is off.** A Device or Alerts checkbox whose channel cannot work right now (browser permission not granted, the Device toggle off, the Alerts list toggle off) is greyed, keeps the tick the user left, and its tooltip says why and where to fix it (`ChannelOffTip`). The whole column and the D and A boxes of an opened event go together, from one check (`channelOffReasons`). Nothing is cleared: turning the channel back on brings every tick back live.
+
 **New since last time.** A row that was not there on the previous look (Pilot Lookup's Local list, `NewArrivalTag`) carries the word "New" as small plain text after its name, with a count line above the list. It is not a box, so it does not read as clickable; amber only stresses it on a row that is already a threat, and the word carries the meaning without the colour.
 
 **Menu item that opens a dialog.** A menu item that opens a dialog opens it

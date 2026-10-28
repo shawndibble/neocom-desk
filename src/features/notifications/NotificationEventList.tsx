@@ -203,7 +203,7 @@ function TopicTable({
     );
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
-      <ChannelColumnHeadings pinned />
+      <ChannelColumnHeadings pinned channelOff={context.channelOff} />
       {topic.id === 'corp' && (
         <div className="space-y-1 border-b border-line bg-panel/60 px-3 py-1.5 text-[0.6875rem] text-text-dim">
           <p>{t('settings.notifications.corpEventBestEffortHint')}</p>
