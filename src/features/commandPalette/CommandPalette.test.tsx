@@ -311,6 +311,24 @@ describe('CommandPalette', () => {
     expect(pageOptions[0]).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('moves the highlight with Tab and Shift+Tab, and Enter then opens it', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    const input = await screen.findByRole('combobox');
+    await user.type(input, 'settings');
+    const options = screen.getAllByRole('option');
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    await user.tab();
+    expect(input).toHaveFocus();
+    expect(options[1]).toHaveAttribute('aria-selected', 'true');
+    await user.tab({ shift: true });
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
   it('marks a locked page and still navigates to it', async () => {
     const user = userEvent.setup();
     renderShell();
