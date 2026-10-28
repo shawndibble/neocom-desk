@@ -183,9 +183,11 @@ export interface TableRowModel {
   to?: string;
   /**
    * The row opens a modal with these facts instead of linking away (DESIGN §6c
-   * "Widget rows"). A row has `to` or `detail`, never both.
+   * "Widget rows"). A row has `to`, `detail` or `info`, never two.
    */
   detail?: RowDetailModel;
+  /** The row is an item: it opens that type's Show info (the app-wide Item Detail). Never with `to` or `detail`. */
+  info?: { typeId: number };
 }
 
 /** What a widget row's modal shows: plain data, drawn by the widget shell. */

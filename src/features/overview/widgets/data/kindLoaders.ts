@@ -358,6 +358,8 @@ export interface SurveyWidgetData {
   location: string | null;
   /** The survey read as a series of scans; null while there is nothing to read. */
   summary: SurveySummary | null;
+  /** Raw type id by ore name as the scanner printed it, for the rows' Show info. */
+  oreTypeIds?: ReadonlyMap<string, number>;
   fetchedAt: Date | null;
 }
 
@@ -389,11 +391,13 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
     { loadOrePrices },
     { countedScans, summarizeSurvey },
     { priceScans },
+    { loadTypes, loadOreAndIceTypeIds },
   ] = await Promise.all([
     import('@/market/hubs'),
     import('@/features/survey/orePrices'),
     import('@/engine/survey/series'),
     import('@/engine/survey/pricing'),
+    import('@/sde/loadSde'),
   ]);
   await useSurveyPriceHub.getState().hydrate();
   const hub = getTradeHub(useSurveyPriceHub.getState().value) ?? DEFAULT_TRADE_HUB;
@@ -402,10 +406,17 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
     scans.flatMap((s) => s.rocks.map((r) => r.ore)),
     hub
   );
+  const [types, oreIds] = await Promise.all([loadTypes(), loadOreAndIceTypeIds()]);
+  const oreTypeIds = new Map<string, number>();
+  for (const id of oreIds) {
+    const name = types[String(id)]?.name;
+    if (name !== undefined) oreTypeIds.set(name, id);
+  }
   return {
     hasSurvey: true,
     location: survey.info?.location?.name ?? null,
     summary: summarizeSurvey(priceScans(scans, prices), prices),
+    oreTypeIds,
     fetchedAt: new Date(),
   };
 }

@@ -365,7 +365,7 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
           : UNKNOWN,
       ];
       if (showUnits) cells.push(ore.units === null ? UNKNOWN : formatCompactNumber(ore.units));
-      return { key: String(typeId), cells, tone: 'clear' as DeadlineSeverity };
+      return { key: String(typeId), cells, tone: 'clear' as DeadlineSeverity, info: { typeId } };
     }),
   };
 

@@ -316,6 +316,7 @@ describe('training', () => {
       { at: finish, note: 'overview.board.nextSkill', severity: 'clear', to: '/skills/plans' },
     ]);
     expect(view.rows[0].title).toContain('Gunnery');
+    expect(view.table?.rows[0]?.info).toEqual({ typeId: 3300 });
   });
 
   it('warns about an idle queue only where the not-training alert is on', () => {
