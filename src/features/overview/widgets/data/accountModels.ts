@@ -122,7 +122,7 @@ function latestMail(t: Translate, now: number, data: MailBoardData): NumberSecon
   };
 }
 
-const mail: Builder = (feeds, { t, now }) => {
+const mail: Builder = (feeds, { t, now, activeCharacterId }) => {
   const feed = feeds.mail;
   const data = feed?.data ?? null;
   const to = '/mail';
@@ -146,7 +146,12 @@ const mail: Builder = (feeds, { t, now }) => {
       value: ageText(t, now, item.atMs),
       tone: 'watch',
     })),
-    table: mailTable(t, data.inbox ?? data.recent, (atMs) => ageText(t, now, atMs)),
+    table: mailTable(
+      t,
+      data.inbox ?? data.recent,
+      (atMs) => ageText(t, now, atMs),
+      activeCharacterId
+    ),
     summary: mailSummary(t, data),
   };
 };

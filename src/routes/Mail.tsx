@@ -21,6 +21,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { markMailReadOnEsi } from '@/features/character/mail';
 import { useMailScopeSwitch } from '@/features/character/useMailScopeSwitch';
+import { useMailOpenParam, type MailOpenTarget } from '@/features/character/useMailOpenParam';
 import {
   loadAllMailSnapshot,
   loadMailSnapshot,
@@ -58,6 +59,8 @@ const MAIL_FILTER_PARAMS = { search: SEARCH_PARAM, hideRead: HIDE_READ_PARAM };
 
 interface MailViewProps {
   scope: CharacterFilterValue;
+  /** The mail a widget row linked to; it opens once its row has loaded. */
+  openTarget: MailOpenTarget | null;
   /**
    * The This/All picker (with per-Character unread), given the names "All"
    * leaves out (no mail grant, not synced) and whether the scope's mail is
@@ -67,7 +70,7 @@ interface MailViewProps {
 }
 
 /** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
-function MailView({ scope, scopeControl }: MailViewProps) {
+function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   const { t } = useTranslation();
   const isAll = scope === 'all';
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -233,6 +236,29 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     setComposeKind(null);
     void refetchOwnerHeaders(ownerId);
   }
+
+  // `?open=` opens that mail as a row click would, once its row has loaded.
+  // Adjusted during render, not in an effect: the selection is plain state.
+  const [openedFor, setOpenedFor] = useState<MailOpenTarget | null>(null);
+  const openWanted = openTarget;
+  if (openWanted !== null && openedFor !== openWanted) {
+    const row = rows.find(
+      (r) =>
+        r.header.mail_id === openWanted.mailId &&
+        r.ownerId === (openWanted.ownerId ?? activeCharacterId)
+    );
+    if (row) {
+      setOpenedFor(openWanted);
+      selectMail({ ownerId: row.ownerId, mailId: row.header.mail_id });
+      markLocalRead(row.key);
+    }
+  }
+  useEffect(() => {
+    if (openedFor === null || !selectedRow || selectedRow.header.is_read) return;
+    void markMailReadOnEsi(selectedRow.ownerId, selectedRow.header.mail_id);
+    // Once per opened target; later selections go through `openRow`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openedFor]);
 
   const { body, bodyText, bodyRetryRef, readerHeadingRef, retry } = useMailBody(
     selected,
@@ -546,6 +572,7 @@ export function Mail() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const { scope, scopeHydrated, characterCount, unreadByCharacter, changeScope } =
     useMailScopeSwitch();
+  const openTarget = useMailOpenParam();
 
   if (!scopeHydrated) {
     return (
@@ -558,6 +585,7 @@ export function Mail() {
     <MailView
       key={scope}
       scope={scope}
+      openTarget={openTarget}
       // Always the control, so the header's one-line lock never flips; with one
       // Character (`characterCount` 1) it renders nothing.
       scopeControl={({ missingNames, loading }) => (
