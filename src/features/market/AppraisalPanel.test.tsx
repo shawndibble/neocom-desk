@@ -45,6 +45,7 @@ function controller(overrides: Partial<AppraisalController> = {}): AppraisalCont
     text: '',
     setText: vi.fn(),
     appraiseText: vi.fn(),
+    submitted: '',
     result: null,
     compare: null,
     loading: false,
