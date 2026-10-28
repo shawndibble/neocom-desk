@@ -113,6 +113,7 @@ import {
   type HaulMode,
 } from './haulingData';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { VIRTUALIZE_THRESHOLD } from '@/components/ui/DataTable';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /**
@@ -524,6 +525,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       anyEnd,
       cards,
       compact,
+      windowed: tableRows.length > VIRTUALIZE_THRESHOLD,
       lineOf,
       suggestedProfitOf,
       overrides,
