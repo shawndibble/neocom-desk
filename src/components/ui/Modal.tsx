@@ -17,7 +17,7 @@ import { RowTappableContext } from './tooltipHold';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { useSheetSwipe } from './useSheetSwipe';
 
-export type ModalPlacement = 'center' | 'sheet' | 'sheet-full' | 'wide' | 'media';
+export type ModalPlacement = 'center' | 'sheet' | 'sheet-full' | 'medium' | 'wide' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -81,6 +81,7 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
     dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
     heightClass: 'h-dvh max-h-dvh',
   },
+  medium: { dialogClass: 'm-auto w-full max-w-3xl', heightClass: 'h-fit max-h-[85vh]' },
   wide: {
     dialogClass: 'm-auto w-full max-w-[min(64rem,100vw)]',
     heightClass: 'h-fit max-h-[85vh]',
