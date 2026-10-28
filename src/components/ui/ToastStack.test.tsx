@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ToastStack } from './ToastStack';
 
@@ -28,5 +28,12 @@ describe('ToastStack', () => {
     render(<ToastStack items={items} undoLabel="Undo" onUndo={vi.fn()} onClose={onClose} />);
     await userEvent.click(screen.getAllByRole('button', { name: /close/i })[1]);
     expect(onClose).toHaveBeenCalledExactlyOnceWith('b');
+  });
+
+  it('Escape on a focused entry closes only that entry', () => {
+    const onClose = vi.fn();
+    render(<ToastStack items={items} undoLabel="Undo" onUndo={vi.fn()} onClose={onClose} />);
+    fireEvent.keyDown(screen.getAllByRole('button', { name: 'Undo' })[0], { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledExactlyOnceWith('a');
   });
 });

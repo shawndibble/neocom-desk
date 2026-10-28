@@ -19,7 +19,7 @@ export interface DeferredCommit {
  * lost; a committing id stays in `hiddenIds` until its write settles, so the
  * row can't flash back between the toast and the write.
  */
-export function useDeferredCommits(cap: number = DEFERRED_COMMIT_CAP) {
+export function useDeferredCommits() {
   const [items, setItems] = useState<readonly DeferredCommit[]>([]);
   const [settling, setSettling] = useState<ReadonlySet<string>>(new Set());
   const itemsRef = useRef(items);
@@ -28,6 +28,8 @@ export function useDeferredCommits(cap: number = DEFERRED_COMMIT_CAP) {
     setSettling((prev) => new Set(prev).add(item.id));
     try {
       await item.commit();
+    } catch {
+      // A failed write leaves the row in place: it reappears when `settling` clears.
     } finally {
       setSettling((prev) => {
         const next = new Set(prev);
@@ -59,12 +61,12 @@ export function useDeferredCommits(cap: number = DEFERRED_COMMIT_CAP) {
     (item: DeferredCommit) => {
       if (itemsRef.current.some((i) => i.id === item.id)) return;
       const next = [...itemsRef.current, item];
-      const pushedOut = next.slice(0, Math.max(0, next.length - cap));
+      const pushedOut = next.slice(0, Math.max(0, next.length - DEFERRED_COMMIT_CAP));
       itemsRef.current = next.slice(pushedOut.length);
       setItems(itemsRef.current);
       for (const old of pushedOut) void run(old);
     },
-    [cap, run]
+    [run]
   );
 
   const undo = useCallback((id: string) => {
