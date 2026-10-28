@@ -34,6 +34,8 @@ import {
   PACKAGED_VOLUME_CONTROL_TYPE_ID,
   REPROCESSING_SPECIALISATION_MAX,
   REPROCESSING_SPECIALISATION_MIN,
+  STATION_TAKE_EXCEPTIONS_MAX,
+  STATION_TAKE_EXCEPTIONS_MIN,
   SHIP_TREE_CLASSES_MAX,
   SHIP_TREE_CLASSES_MIN,
   SHIP_TREE_FACTIONS_MAX,
@@ -602,6 +604,23 @@ export function runSanityChecks({
   }
   console.log(`  solar systems: ${solarSystems.length}`);
   console.log(`  npc stations: ${npcStations.length}`);
+  {
+    const takes = npcStations.filter((s) => s.reprocessingStationsTake !== undefined);
+    console.log(`  stations with a non-default reprocessing take: ${takes.length}`);
+    const outOfRange = takes.filter(
+      (s) => !(s.reprocessingStationsTake > 0 && s.reprocessingStationsTake < 0.05)
+    );
+    if (
+      takes.length < STATION_TAKE_EXCEPTIONS_MIN ||
+      takes.length > STATION_TAKE_EXCEPTIONS_MAX ||
+      outOfRange.length > 0
+    ) {
+      console.error(
+        `  FAIL: ${takes.length} stations with a non-default reprocessing take (plausible ${STATION_TAKE_EXCEPTIONS_MIN}-${STATION_TAKE_EXCEPTIONS_MAX}), ${outOfRange.length} outside (0, 0.05)`
+      );
+      process.exitCode = 1;
+    }
+  }
   console.log(
     `  jump graph: ${Object.keys(solarSystemJumps).length} systems, ` +
       `${Object.values(solarSystemJumps).filter((a) => a.length > 0).length} with stargates, ` +

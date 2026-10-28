@@ -176,6 +176,10 @@ export const MASTERY_SHIPS_MAX = 700;
 // lands at 0, not slightly off (issue #2392).
 export const CERTIFIED_PLANS_MIN = 25;
 export const CERTIFIED_PLANS_MAX = 80;
+// Stations whose reprocessing take is not the usual 5%, as counted against the
+// same build: 119 of 5,210, all 2.5%. A renamed column lands at 0, not slightly off.
+export const STATION_TAKE_EXCEPTIONS_MIN = 50;
+export const STATION_TAKE_EXCEPTIONS_MAX = 300;
 // Basic agents, NPC corporations (CCP's deleted ones left out) and factions in
 // CCP's export on 2026-10-28 (build 3654997): 8,775, 280 and 27. A broken
 // filter (a renamed `agent` field) lands at 0, not slightly off. Caldari Navy

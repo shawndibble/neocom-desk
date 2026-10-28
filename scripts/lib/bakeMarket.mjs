@@ -10,7 +10,11 @@ import {
 import { npcCorporations } from './lpCorporations.mjs';
 import { marketTypeEntry } from './marketTypeVolumes.mjs';
 import { bakeOreAndIceTypeIds } from './oreTypeIds.mjs';
-import { npcCorpFactions, stationOwnerFields } from './stationOwners.mjs';
+import {
+  npcCorpFactions,
+  stationOwnerFields,
+  stationReprocessingFields,
+} from './stationOwners.mjs';
 
 export async function bakeMarket({ raw, types, packagedVolumeByType, groups, typeMap }) {
   // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
@@ -315,6 +319,8 @@ export async function bakeMarket({ raw, types, packagedVolumeByType, groups, typ
       // Owner corporation and its faction (issue #1675), so broker-fee
       // standings resolve from the snapshot with no ESI call.
       Object.assign(entry, stationOwnerFields(r[h.corporationID], factionByCorp));
+      // The station's own reprocessing take, where it is not the usual 5%.
+      Object.assign(entry, stationReprocessingFields(r[h.reprocessingStationsTake]));
       npcStations.push(entry);
     }
     npcStations.sort((a, b) => a.id - b.id);
