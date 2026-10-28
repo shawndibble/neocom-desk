@@ -210,7 +210,7 @@ describe('Ship Info window', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       "Couldn't open this hull in the editor."
     );
-    expect(screen.getByTestId('location')).toHaveTextContent(/^\/ships\/tree$/);
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/ships\/tree(\?ship=\d+)?$/);
     expect(within(dialog).getByRole('button', { name: 'Simulate' })).toBeEnabled();
   });
 
