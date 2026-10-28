@@ -85,6 +85,15 @@ export const Wide: Story = {
   },
 };
 
+/** @summary `page`: a whole page as a layer over another; full screen on a phone, 72rem or 95% wide and tall from `md`. */
+export const Page: Story = {
+  args: {
+    placement: 'page',
+    title: 'Corporation store',
+    children: <p className="p-4 text-sm">The page's content scrolls inside the layer.</p>,
+  },
+};
+
 /** @summary `media`: an enlarged image, sized to its content up to 95% of the viewport. */
 export const Media: Story = {
   args: {
