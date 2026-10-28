@@ -4,8 +4,10 @@
  * panel scroll-lengths away.
  */
 import { formatCount } from '@/lib/formatCount';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { Button, DataTable, EmptyState, Panel } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -18,6 +20,7 @@ import { ownedStockOffer } from '@/engine/industry/ownedStockOffer';
 import { unmaskCount } from '@/lib/numberMask';
 import type { PiData } from '@/sde/types';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
+import { buildItemMenuProps } from './buildItemMenuProps';
 import type { BuildGroup } from './buildGroups';
 import { DepthPriceLine } from './DepthPriceLine';
 import { formatVolume } from './format';
@@ -71,6 +74,14 @@ export function GroupMaterialsPanel({
   onOwnedStockScopeChange,
 }: GroupMaterialsPanelProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  // Stable: `DataTable` memoizes its rows on `rowContextMenu`.
+  const rowContextMenu = useMemo(() => {
+    const { itemMenuFor } = buildItemMenuProps(catalog, (typeId) =>
+      navigate(bpcSourcingHref(typeId))
+    );
+    return (material: BuyMaterialRow, tr: ReactElement) => itemMenuFor(material.typeID, tr);
+  }, [catalog, navigate]);
 
   // Every type any member's whole tree can show, not only each blueprint's
   // own materials: the buy table lists sub-build leaves
@@ -301,6 +312,8 @@ export function GroupMaterialsPanel({
             <div className="overflow-x-auto">
               <DataTable
                 {...buyMaterialsExport.tableProps}
+                rowContextMenu={rowContextMenu}
+                rowMoreActions
                 columns={buyMaterialColumns}
                 rows={buyRows}
                 rowKey={(material) => material.typeID}

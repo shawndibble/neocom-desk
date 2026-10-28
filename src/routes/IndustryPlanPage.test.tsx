@@ -569,16 +569,16 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
   });
 });
 
-describe('IndustryPlanPage: materials row has no menu', () => {
-  it('gives a material row neither a right-click menu nor a More-actions button', async () => {
+describe('IndustryPlanPage: materials row menu', () => {
+  it('gives a material row the item menu on right-click and a More-actions button', async () => {
     await db.buildPlans.add(seedPlan());
     render(<App />);
     const row = (await screen.findByText('Mechanical Parts')).closest('tr');
     if (!row) throw new Error('expected a Mechanical Parts materials row');
 
-    expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: /More actions/ })).toBeInTheDocument();
     fireEvent.contextMenu(row);
-    expect(screen.queryByRole('menuitem', { name: /Quickbar|Show info/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 });
 

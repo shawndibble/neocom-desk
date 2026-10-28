@@ -5,6 +5,8 @@ import en from './locales/en.json';
 const ALLOWED_PHRASES = [
   'Compare Variations',
   'Build Plan',
+  'BPC Sourcing',
+  'BPC',
   'Skill Plan',
   'PI Plan',
   'Market',
