@@ -13,6 +13,7 @@
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { LpStoreRow } from './lpOffersSnapshot.js';
+import type { StoredDemand } from './marketHistoryVolume.js';
 import type {
   StoredTypeOpenPrices,
   TypeDay,
@@ -23,6 +24,7 @@ import type {
 export const LP_STORE_OFFERS_R2_KEY = 'lp-store-offers/snapshot.json';
 export const OPEN_PRICES_R2_PREFIX = 'open-prices/';
 export const LP_STORE_VOLUME_R2_PREFIX = 'lp-store-volume/';
+export const HAULING_DEMAND_R2_PREFIX = 'hauling-demand/';
 
 /** Rewritten once a day; five minutes keeps a fresh publish visible soon after. */
 const LP_HEADERS = {
@@ -63,6 +65,27 @@ export async function publishLpStoreVolumeToR2(
   put: R2Put
 ): Promise<void> {
   await put(lpStoreVolumeR2Key(regionId), gzipSync(JSON.stringify(volume)), LP_HEADERS);
+}
+
+export function haulingDemandR2Key(regionId: number): string {
+  return `${HAULING_DEMAND_R2_PREFIX}${regionId}.json`;
+}
+
+/**
+ * One hub region's demand object (issue #5344): `{ lastSyncedAt, asOf, days, types }`,
+ * where `types` maps a type id to its `StoredDemand` tuple. Read back by the hauling scan.
+ */
+export async function publishHaulingDemandToR2(
+  regionId: number,
+  demand: {
+    lastSyncedAt: number;
+    asOf: string;
+    days: number;
+    types: Record<number, StoredDemand>;
+  },
+  put: R2Put
+): Promise<void> {
+  await put(haulingDemandR2Key(regionId), gzipSync(JSON.stringify(demand)), LP_HEADERS);
 }
 
 export interface MergeFn {

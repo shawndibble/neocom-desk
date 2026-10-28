@@ -4,6 +4,7 @@ import {
   HAULING_THRESHOLDS,
   buildBuyLadder,
   buildSellLadder,
+  demandFromAggregate,
   estimateSale,
   hubLadders,
   haulingFlags,
@@ -407,5 +408,55 @@ describe('thresholds', () => {
       mostDaysMin: 20,
       burstsMin: 8,
     });
+  });
+});
+
+describe('demandFromAggregate', () => {
+  // The same points and aggregate as functions/src/marketHistoryVolume.test.ts folds.
+  const TODAY = '2026-10-15';
+  const point = (
+    date: string,
+    volume: number,
+    highest: number,
+    lowest: number,
+    orderCount: number
+  ): MarketHistoryPoint => ({
+    date,
+    volume,
+    highest,
+    lowest,
+    orderCount,
+    average: (highest + lowest) / 2,
+  });
+  const POINTS = [
+    point('2026-10-14', 10, 120, 100, 4),
+    point('2026-10-13', 30, 110, 90, 6),
+    point('2026-10-12', 20, 130, 100, 2),
+    point('2026-10-10', 0, 500, 1, 9),
+    point('2026-10-06', 50, 100, 80, 8),
+    point('2026-09-05', 999, 1, 1, 1),
+  ];
+  const AGGREGATE = {
+    volume: 110,
+    daysWithTrades: 4,
+    orderSum: 20,
+    recentSalePrice: 110,
+    latestDay: { date: '2026-10-14', highest: 120, lowest: 100 },
+  };
+
+  it('gives the summarizeDemand answer for the same daily points', () => {
+    expect(demandFromAggregate(AGGREGATE)).toEqual(summarizeDemand(POINTS, TODAY));
+  });
+
+  it('reads no trades as rarely, with no price', () => {
+    expect(
+      demandFromAggregate({
+        volume: 0,
+        daysWithTrades: 0,
+        orderSum: 0,
+        recentSalePrice: null,
+        latestDay: null,
+      })
+    ).toEqual(summarizeDemand([], TODAY));
   });
 });
