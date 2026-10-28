@@ -56,6 +56,20 @@ export const SheetFull: Story = {
   },
 };
 
+/** @summary `medium`: two columns that outgrow `center` but not `wide` (max-w-3xl). */
+export const Medium: Story = {
+  args: {
+    placement: 'medium',
+    title: 'Hurricane Fleet Issue',
+    children: (
+      <div className="grid grid-cols-2 gap-4 p-4 text-sm">
+        <span>Killmail facts</span>
+        <span>Fit</span>
+      </div>
+    ),
+  },
+};
+
 /** @summary `wide`: multi-column content such as a comparison matrix. */
 export const Wide: Story = {
   args: {
