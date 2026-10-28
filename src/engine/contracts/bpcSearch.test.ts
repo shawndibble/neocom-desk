@@ -320,6 +320,7 @@ describe('lpOfferToSearchRow', () => {
       locationName: null,
       space: null,
       systemId: null,
+      stationName: null,
     });
   });
 
