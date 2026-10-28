@@ -168,7 +168,7 @@ export function SetWaypoints({
             )}
             {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
             {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
-            <Tooltip content={blockedReason}>{sendButton}</Tooltip>
+            <Tooltip content={lacksScope ? null : blockedReason}>{sendButton}</Tooltip>
           </div>
         )}
       </div>
