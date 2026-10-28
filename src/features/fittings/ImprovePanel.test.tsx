@@ -268,7 +268,7 @@ describe('ImprovePanel', () => {
       ...option(12, { cpuUsed: before.cpuTotal + 40 }),
       guardrail: 'budget',
     } as RejectedOption;
-    renderPanel(search(done({ flyableBlocked: [stuck] })));
+    renderPanel(search(done({ flyableBlocked: [stuck], flyableOverrun: [stuck] })));
     expect(screen.getByText('Make Flyable')).toBeInTheDocument();
     expect(
       screen.getByText(/Needs 40 more CPU, and no module or rig swap frees it/)

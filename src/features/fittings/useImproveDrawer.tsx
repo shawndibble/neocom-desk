@@ -249,6 +249,8 @@ export function useImproveDrawer({
     });
   }
 
+  const profile = workspace.profile;
+
   function applyWithImplants(fix: RejectedOption, implantSet: FittingImplantSet) {
     if (!fitting) return;
     const applied = { ...applyImproveCandidate(fitting, fix.candidate), implantSet };
@@ -268,7 +270,7 @@ export function useImproveDrawer({
       catalogue={catalogue}
       onApply={apply}
       renderFlyableImplants={
-        fitting && workspace.profile
+        fitting && profile
           ? (fix, label) => (
               <FlyableImplants
                 fix={fix}
@@ -276,7 +278,7 @@ export function useImproveDrawer({
                 open={isOpen}
                 implants={{
                   fitting,
-                  profile: workspace.profile!,
+                  profile,
                   basis: workspace.implantBasis,
                   onChange: workspace.setImplantSet,
                 }}

@@ -752,8 +752,10 @@ export function overSpendCap(
   iskDelta: number | null,
   extra = 0
 ): boolean {
-  if (spendCap === null || iskDelta === null) return false;
-  return (mode === 'buy' ? (fitTotal ?? 0) + iskDelta + extra : iskDelta + extra) > spendCap;
+  if (spendCap === null || (iskDelta === null && extra === 0)) return false;
+  // An unpriced change adds nothing it can be charged, but the implants bought with it still count.
+  const spent = (iskDelta ?? 0) + extra;
+  return (mode === 'buy' ? (fitTotal ?? 0) + spent : spent) > spendCap;
 }
 
 /** Fixes over budget that get a compensation search, and the bundles kept for each. */
@@ -764,10 +766,10 @@ const FLYABLE_PER_FIX = 3;
  * The module and rig swaps that could pay for `fix` when it overruns the fit:
  * called with the fit as the fix leaves it. Absent: no compensation is tried.
  */
-export type FlyableCompensators = (fitting: Fitting, fix: ImproveCandidate) => readonly FitSwap[];
+export type FlyableCompensators = (fix: ImproveCandidate) => readonly FitSwap[];
 
 /** How many module changes a candidate makes, the paired ones included. */
-export const changeCount = (candidate: ImproveCandidate): number =>
+const changeCount = (candidate: ImproveCandidate): number =>
   1 + (candidate.pairedWith ? changeCount(candidate.pairedWith) : 0);
 
 /** `fix` with each swap chained behind it as a paired change, so one Apply makes them all. */
@@ -785,7 +787,7 @@ function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCand
 }
 
 /** Fewest changes first, then the cheaper; an unpriced bundle after every priced one. */
-export function rankFlyable<T extends ImproveOption>(options: readonly T[]): T[] {
+function rankFlyable<T extends ImproveOption>(options: readonly T[]): T[] {
   return [...options].sort((a, b) => {
     const changes = changeCount(a.candidate) - changeCount(b.candidate);
     if (changes !== 0) return changes;
@@ -826,13 +828,13 @@ export async function findImprovements({
   let stopped = false;
 
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
-  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats) {
+  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats): boolean {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
-    if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return;
+    if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     const fix = candidate.fixesUnflyable === true;
-    if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return;
+    if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return false;
     const option: ImproveOption = {
       candidate,
       fitting: swapped,
@@ -849,6 +851,7 @@ export async function findImprovements({
     // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
     if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
     else (fix ? flyable : kept).push(option);
+    return true;
   }
 
   for (const candidate of candidates) {
@@ -923,7 +926,7 @@ export async function findImprovements({
         stopped = true;
         break;
       }
-      const swaps = compensators(seed.fitting, seed.candidate);
+      const swaps = compensators(seed.candidate);
       if (swaps.length === 0) continue;
       let found: Awaited<ReturnType<typeof findFitSwaps>>;
       try {
@@ -936,13 +939,18 @@ export async function findImprovements({
           isCancelled,
         });
       } catch {
+        // A failed search leaves the fix greyed with its reason; it must not end the whole search.
         continue;
       }
       if (isCancelled?.()) return null;
       if (found.options.length === 0) continue;
-      flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
-      for (const option of found.options.slice(0, FLYABLE_PER_FIX))
-        take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after);
+      // The fix leaves its greyed row only once a bundle took its place (a rule break can drop them all).
+      const taken = found.options
+        .slice(0, FLYABLE_PER_FIX)
+        .map((option) =>
+          take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
+        );
+      if (taken.some(Boolean)) flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
     }
   }
 

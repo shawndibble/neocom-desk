@@ -747,7 +747,12 @@ export function ImprovePanel({
   }
 
   /** A fix that cannot be applied as it stands: greyed, with what it needs and why nothing covers it. */
-  function blockedRow(option: RejectedOption, own: FittingStats, fitTotal: number | null) {
+  function blockedRow(
+    option: RejectedOption,
+    own: FittingStats,
+    fitTotal: number | null,
+    searched: boolean
+  ) {
     const short = RESOURCES.filter((resource) => overageOf(option.after, resource) > 0).map(
       (resource) =>
         t('fittings.improve.flyableShort', {
@@ -767,7 +772,7 @@ export function ImprovePanel({
             <span className="block font-medium">{swapLabel(option)}</span>
             <span className="block text-xs">{t('fittings.improve.unflyable')}</span>
             <span className="text-warning block text-xs">
-              {option.guardrail === 'budget'
+              {option.guardrail === 'budget' && searched
                 ? t('fittings.improve.flyableNoCover', { short: short.join(', ') })
                 : brokeText(t, option, settings, fitTotal)}
             </span>
@@ -1366,7 +1371,12 @@ export function ImprovePanel({
                 {state.result.flyableBlocked.length > 0 && (
                   <ul className="space-y-1">
                     {state.result.flyableBlocked.map((option) =>
-                      blockedRow(option, state.before, state.fitTotal)
+                      blockedRow(
+                        option,
+                        state.before,
+                        state.fitTotal,
+                        state.result.flyableOverrun.includes(option)
+                      )
                     )}
                   </ul>
                 )}

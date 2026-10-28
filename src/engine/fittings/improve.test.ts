@@ -611,6 +611,10 @@ describe('overSpendCap', () => {
 
   it('never blocks without a cap or a price', () => {
     expect(overSpendCap('buy', null, 900, 50, 1e9)).toBe(false);
-    expect(overSpendCap('buy', 10, 900, null, 1e9)).toBe(false);
+    expect(overSpendCap('buy', 10, 900, null, 0)).toBe(false);
+  });
+
+  it('still charges the implants of an unpriced change', () => {
+    expect(overSpendCap('refit', 100, 900, null, 150)).toBe(true);
   });
 });

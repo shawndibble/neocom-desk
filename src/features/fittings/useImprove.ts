@@ -587,7 +587,7 @@ export function useImprove(
             mode,
             spendCap,
             fitTotal,
-            compensators: (_fitting, fix) =>
+            compensators: (fix) =>
               compensation.filter(
                 (swap) =>
                   !fix.at.some((at) => at.slot === swap.slot && at.slotIndex === swap.slotIndex)
