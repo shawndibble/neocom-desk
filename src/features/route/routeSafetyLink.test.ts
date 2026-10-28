@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { legPinsParam, pinFirstLeg, routeToHref } from './routeSafetyLink';
+import { legPinsParam, pinFirstLeg, routeStopsHref, routeToHref } from './routeSafetyLink';
 
 describe('legPinsParam', () => {
   const codec = legPinsParam();
@@ -52,5 +52,19 @@ describe('routeToHref', () => {
 
   it('names the start when the count is measured from somewhere else', () => {
     expect(routeToHref(30000142, 30002187)).toBe('/travel/route?from=30002187&stops=30000142');
+  });
+});
+
+describe('routeStopsHref', () => {
+  it('lists the stops in order, with no preference by default', () => {
+    expect(routeStopsHref(null, [30000142, { systemId: 30002187, stationId: 60008494 }])).toBe(
+      '/travel/route?stops=30000142%2C30002187%3A60008494'
+    );
+  });
+
+  it('carries the preference the count was worked out under', () => {
+    expect(routeStopsHref(null, [30000142, 30002187], 'shortest')).toBe(
+      '/travel/route?pref=shortest&stops=30000142%2C30002187'
+    );
   });
 });

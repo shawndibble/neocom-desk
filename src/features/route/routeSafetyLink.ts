@@ -116,10 +116,12 @@ export function routeToHref(
 /** Route Safety from `fromId` through `stops` in order: the saved route the Overview widget links back to. */
 export function routeStopsHref(
   fromId: number | null,
-  stops: readonly (number | StopRef)[]
+  stops: readonly (number | StopRef)[],
+  preference?: RoutePreferenceKind | null
 ): string {
   const params = new URLSearchParams();
   if (fromId !== null) params.set('from', String(fromId));
+  if (preference != null) params.set('pref', ROUTE_PARAMS.pref.serialize(preference) ?? '');
   const serialized = ROUTE_PARAMS.stops.serialize(
     stops.map((stop) => (typeof stop === 'number' ? { systemId: stop, stationId: null } : stop))
   );
