@@ -473,6 +473,7 @@ function FittingsPage() {
   const editor = (
     <FittingEditorPanes
       view={view}
+      onViewChange={addMode === 'sheet' ? undefined : (next) => void setView(next)}
       fitting={fitting}
       stats={stats}
       moduleResults={moduleResults}

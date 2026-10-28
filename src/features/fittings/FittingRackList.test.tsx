@@ -54,6 +54,27 @@ function statsWith(cpuUsed: number): FittingStats {
 }
 
 describe('FittingRackList', () => {
+  it('shows the Ring | List switch in place of its own title', () => {
+    const { rerender } = render(<FittingRackList fitting={fitting} stats={statsWith(90)} />);
+    expect(screen.getByRole('heading', { name: 'List' })).toBeTruthy();
+
+    rerender(
+      <EditableRackList
+        fitting={fitting}
+        stats={statsWith(90)}
+        moduleResults={null}
+        catalogue={null}
+        context={null}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+        titleSwitch={<button type="button">Switch</button>}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Switch' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'List' })).toBeNull();
+  });
+
   it('states the overage in words and flashes once when it goes over budget', () => {
     const { rerender, container } = render(
       <FittingRackList fitting={fitting} stats={statsWith(90)} />

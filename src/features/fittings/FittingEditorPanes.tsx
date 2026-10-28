@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, Panel, SegmentedControl } from '@/components/ui';
 import { moveModule, droneTotals } from '@/engine/fittings/fittingEdit';
 import { MakeItFitContext } from './makeItFitContext';
 import { DroneSection } from './FittingDroneSection';
@@ -18,6 +18,8 @@ type RackListProps = ComponentProps<typeof FittingRackList>;
 
 interface FittingEditorPanesProps {
   view: FittingView;
+  /** Present on desktop and tablet: the Ring | List switch then sits in the panel's header. Absent on the phone, whose tab bar switches. */
+  onViewChange?: (view: FittingView) => void;
   fitting: RackListProps['fitting'];
   stats: RackListProps['stats'];
   moduleResults: RackListProps['moduleResults'];
@@ -45,6 +47,7 @@ interface FittingEditorPanesProps {
 /** The editor column: the Ring or the List (per `view`), the drones panel beside the Ring, and the fighters panel. */
 export function FittingEditorPanes({
   view,
+  onViewChange,
   fitting,
   stats,
   moduleResults,
@@ -67,6 +70,24 @@ export function FittingEditorPanes({
   onOpenMakeItFit,
 }: FittingEditorPanesProps) {
   const { t } = useTranslation();
+  // The switch replaces the panel's visible title, so the heading stays for screen readers.
+  const titleSwitch = onViewChange && (
+    <span className="flex min-w-0 items-center pl-2">
+      <h2 className="sr-only">
+        {t(view === 'ring' ? 'fittings.ring.title' : 'fittings.list.title')}
+      </h2>
+      <SegmentedControl
+        label={t('fittings.view.label')}
+        size="sm"
+        value={view}
+        onChange={onViewChange}
+        options={[
+          { value: 'ring', label: t('fittings.view.ring') },
+          { value: 'list', label: t('fittings.view.list') },
+        ]}
+      />
+    </span>
+  );
   const body =
     view === 'ring' ? (
       <div className="min-w-0 space-y-3">
@@ -89,6 +110,7 @@ export function FittingEditorPanes({
             target?.kind === 'slot' ? { rack: target.slot, index: target.slotIndex } : null
           }
           actions={addButton}
+          titleSwitch={titleSwitch}
           droneButton={
             dronesShown ? (
               <Button
@@ -131,6 +153,7 @@ export function FittingEditorPanes({
         onSelectTarget={onSelectTarget}
         unusableModuleKeys={unusableModuleKeys}
         actions={addButton}
+        titleSwitch={titleSwitch}
       />
     );
 
