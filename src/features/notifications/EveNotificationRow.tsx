@@ -10,6 +10,8 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AggregateRow } from './AggregateRow';
+import { ChannelOffTip } from './ChannelOffTip';
+import { EveNotificationBadge } from './ScheduledPushBadge';
 import { EVENT_ROW_GRID, DEVICE_CELL, ALERTS_CELL } from './ChannelColumns';
 import { eveTypeLabel } from './eveTypeLabel';
 import { PermissionNote } from './PermissionNote';
@@ -71,6 +73,7 @@ export function EveNotificationRow({
     <>
       <AggregateRow
         label={t(eventLabelKey(eventId))}
+        labelAccessory={<EveNotificationBadge />}
         characters={context.characters}
         availability={availability}
         readValue={(id, channel) =>
@@ -80,7 +83,7 @@ export function EveNotificationRow({
           void broadcastEventChannelPref(ids, currentValue(), eventId, channel)
         }
         onToggleOne={(id, channel) => toggleEventChannelPref(id, currentValue(), eventId, channel)}
-        browserBlocked={context.browserBlocked}
+        channelOff={context.channelOff}
         visibleCharacterIds={context.visibleCharacterIds}
         // Never opened by a search: its chips are not what a search is after.
         forceExpanded={false}
@@ -103,29 +106,33 @@ export function EveNotificationRow({
                     <span className={`${eyebrowClassName} md:col-start-1`}>{familyLabel}</span>
                     {NOTIFICATION_CHANNELS.map((channel, index) => (
                       <div key={channel} className={index === 0 ? DEVICE_CELL : ALERTS_CELL}>
-                        <SelectionCheckbox
-                          state={selectionStateForAllCharactersEveTypes(
-                            applicableIds,
-                            types,
-                            eveTypes,
-                            channel
-                          )}
-                          disabled={
-                            applicableIds.length === 0 ||
-                            (channel === 'browser' && context.browserBlocked)
-                          }
-                          onToggle={() =>
-                            void broadcastAllEveTypesChannelPref(
+                        <ChannelOffTip reason={context.channelOff[channel]}>
+                          <SelectionCheckbox
+                            state={selectionStateForAllCharactersEveTypes(
                               applicableIds,
-                              currentValue(),
                               types,
+                              eveTypes,
                               channel
-                            )
-                          }
-                          label={t(`settings.notifications.selectAllCharactersFamily.${channel}`, {
-                            family: familyLabel,
-                          })}
-                        />
+                            )}
+                            disabled={
+                              applicableIds.length === 0 || context.channelOff[channel] !== null
+                            }
+                            onToggle={() =>
+                              void broadcastAllEveTypesChannelPref(
+                                applicableIds,
+                                currentValue(),
+                                types,
+                                channel
+                              )
+                            }
+                            label={t(
+                              `settings.notifications.selectAllCharactersFamily.${channel}`,
+                              {
+                                family: familyLabel,
+                              }
+                            )}
+                          />
+                        </ChannelOffTip>
                       </div>
                     ))}
                   </div>
@@ -137,6 +144,18 @@ export function EveNotificationRow({
                           key={type}
                           tone="type"
                           label={typeLabel}
+                          labelAccessory={
+                            // Only the missing-grant mark, and only where Device is ticked: a hundred rows of marks would drown the page.
+                            applicableIds.some((id) =>
+                              isEveTypeEnabledFor(
+                                characterEveTypePrefs(prefsValue, id),
+                                type,
+                                'browser'
+                              )
+                            ) ? (
+                              <EveNotificationBadge onlyWhenMissing />
+                            ) : undefined
+                          }
                           characters={context.characters}
                           availability={availability}
                           readValue={(id, channel) =>
@@ -152,7 +171,7 @@ export function EveNotificationRow({
                           onToggleOne={(id, channel) =>
                             toggleEveTypeChannelPref(id, currentValue(), type, channel)
                           }
-                          browserBlocked={context.browserBlocked}
+                          channelOff={context.channelOff}
                           visibleCharacterIds={context.visibleCharacterIds}
                           forceExpanded={false}
                           // Always inline, even on a phone: a sheet over the Topic page loses the Back button.

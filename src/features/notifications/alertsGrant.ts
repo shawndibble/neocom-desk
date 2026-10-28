@@ -152,6 +152,11 @@ export async function recordAlertsGrantScopes(
   await recordExtra('mail', result?.mailGrants);
 }
 
+/** {@link readAlertsGrants}, live. Empty until loaded. */
+export function useAlertsGrants(): Record<number, AlertsGrantRecord> {
+  return useLiveQuery(readAlertsGrants, []) ?? {};
+}
+
 /** The server told us, or a poll learned, that this Character's grant is dead. */
 export async function markAlertsNeedReauth(characterId: number): Promise<void> {
   await writeGrants((grants) => {

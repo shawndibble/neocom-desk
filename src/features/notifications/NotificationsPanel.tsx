@@ -39,6 +39,8 @@ import { filterNotificationEvents } from './notificationSearch';
 import { useSeenEveTypesStore } from './seenEveTypes';
 import { refreshAppBadge } from './appBadge';
 import { useNotificationPermission, notificationsBlocked } from './permission';
+import { channelOffReasons } from './channelOff';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
@@ -205,7 +207,11 @@ export function NotificationsPanel() {
     scopesByCharacterId,
     capabilitiesByCharacterId,
     prefsValue,
-    browserBlocked,
+    channelOff: channelOffReasons({
+      permission,
+      installRequired: webPushSupport() === 'requires-install',
+      prefsValue,
+    }),
     visibleCharacterIds: filterResult?.characterIds ?? null,
     // A search that names Characters opens every row to show just those chips.
     forceExpanded: filterResult?.characterIds != null,

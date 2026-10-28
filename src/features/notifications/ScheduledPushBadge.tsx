@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
-import { useAlertsMail, useAlertsNearby } from './alertsGrant';
+import { isSyncConfigured } from '@/app/syncStatus';
+import { useAlertsGrants, useAlertsMail, useAlertsNearby } from './alertsGrant';
 
 /**
  * The "arrives with the app closed" mark on a Scheduled Push event's row, or on
@@ -38,21 +39,67 @@ export function ScheduledPushBadge({
 }
 
 /**
- * The same mark on a nearby event's row (ADR 0028), shown once some Character
- * on this device has an Alerts Grant that carries the location: only then can
- * the server push it to a closed app.
+ * The mark's other state (issue #5330): the row's event needs a grant no
+ * Character on this device has, so it cannot reach a closed app yet. Danger
+ * colour plus a slash, so the colour is never the only signal; the tooltip
+ * names the step.
  */
-export function NearbyPushBadge() {
-  const { characterIds } = useAlertsNearby();
-  return characterIds.length > 0 ? <ScheduledPushBadge kind="nearby" /> : null;
+export function MissingGrantBadge({ labelKey }: { labelKey: string }) {
+  const { t } = useTranslation();
+  const label = t(labelKey);
+  return (
+    <Tooltip content={label} openOnTap>
+      <span role="img" aria-label={label} className="relative shrink-0 text-danger">
+        <ScheduledPush size={ICON_SIZE.sm} />
+        <svg
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+        >
+          <path d="M2 14 L14 2" />
+        </svg>
+      </span>
+    </Tooltip>
+  );
 }
 
 /**
- * The same mark on the new-mail row (ADR 0029), shown once some Character on
- * this device has an Alerts Grant that carries the mail scope: only then can the
- * server push mail to a closed app.
+ * The same mark on a nearby event's row (ADR 0028): the normal mark once some
+ * Character on this device has an Alerts Grant that carries the location, the
+ * missing-grant mark while none does. Nothing while the server does not take
+ * the scope, since there is then no step to take.
  */
+export function NearbyPushBadge() {
+  const { supported, characterIds } = useAlertsNearby();
+  if (characterIds.length > 0) return <ScheduledPushBadge kind="nearby" />;
+  return supported ? (
+    <MissingGrantBadge labelKey="settings.notifications.missingGrantBadge.nearby" />
+  ) : null;
+}
+
+/** The same two states on the new-mail row (ADR 0029), for the mail scope. */
 export function MailPushBadge() {
-  const { characterIds } = useAlertsMail();
-  return characterIds.length > 0 ? <ScheduledPushBadge kind="mail" /> : null;
+  const { supported, characterIds } = useAlertsMail();
+  if (characterIds.length > 0) return <ScheduledPushBadge kind="mail" />;
+  return supported ? (
+    <MissingGrantBadge labelKey="settings.notifications.missingGrantBadge.mail" />
+  ) : null;
+}
+
+/**
+ * The mark on an EVE notification row: every type reaches a closed app only
+ * through an active Alerts Grant (ADR 0020). `onlyWhenMissing` is for the
+ * ~100 type rows, which carry no mark today: they show the missing-grant mark
+ * and nothing else, so the page does not gain a column of normal marks.
+ */
+export function EveNotificationBadge({ onlyWhenMissing = false }: { onlyWhenMissing?: boolean }) {
+  const grants = useAlertsGrants();
+  if (!isSyncConfigured()) return null;
+  const hasActive = Object.values(grants).some((grant) => grant.status === 'active');
+  if (hasActive) return onlyWhenMissing ? null : <ScheduledPushBadge kind="server" />;
+  return <MissingGrantBadge labelKey="settings.notifications.missingGrantBadge.base" />;
 }
