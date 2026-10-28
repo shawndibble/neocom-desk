@@ -19,12 +19,11 @@
  *   nextLevel(chain): { level, needs, short } | null
  *   agentAccess(chain, agentLevel): { open, needs, short, blockedBy }
  *   bestLink(chain), blockingLink(chain)         the bold link; the -2.0 veto
- *   AGENT_LEVELS, AGENT_LEVEL_STANDING, AGENT_BLOCK_STANDING
+ *   AGENT_LEVELS, AGENT_LEVEL_STANDING, AGENT_BLOCK_STANDING, asAgentLevel(level)
  *
  * At NPC stations (stationFees.ts)
  *   reprocessingTaxPct(stationTakePct, effectiveCorpStanding): percent
  *   brokerFeeComparison(brokerRelationsLevel, baseFaction, baseCorp): { atZeroPct, atYoursPct, savingPct }
- *   DEFAULT_STATION_TAKE_PCT, ZERO_REPROCESSING_TAX_STANDING
  */
 export * from './agentAccess';
 export * from './chain';

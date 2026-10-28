@@ -25,8 +25,8 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold. Stated in
   Costs & revenue as "Buying <product> instead", not in the **Verdict Hero**.
-- **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. When one exists it wins over the **Requested rate**. Player-facing: "your rate" or "their rate".
 - **Agent access**: Which mission agent levels a pilot's NPC standings open, shown on an NPC faction's or corporation's info modal as five pips (levels 1 to 5, the standing each needs underneath) and what the next level takes. Level 1 is always open; levels 2 to 5 need 1.0, 3.0, 5.0 and 7.0 of the best effective standing in the **Standing chain**, and none of them is open while any link is at -2.0 or lower. On an agent's modal it answers "Can you use this agent?" for that agent's own level. Storyline, research and COSMOS agents follow other rules and are not covered.
+- **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. When one exists it wins over the **Requested rate**. Player-facing: "your rate" or "their rate".
 - **Alert**: One fired Notification Event as it appears in the Notification
   Feed and in the bell panel, grouped by _type_ (the EVE notification type, or
   the event id otherwise). A danger type nobody has acknowledged also raises

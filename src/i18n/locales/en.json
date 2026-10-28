@@ -11046,6 +11046,7 @@
       "accessNeeds": "Needs {{standing}}",
       "accessBlocked": "Blocked"
     },
+    "standingsFeesNote": "Broker fees use your standing with each Trade Hub's owning corporation and faction. Other NPC stations use their own owner, and agents never count.",
     "standingsUnavailableHint": "Your standings aren't saved on this device yet. They load once ESI answers.",
     "standingsEmptyTitle": "No standings yet",
     "standingsEmptyHint": "EVE lists a standing once you have earned or lost one with a faction, corporation or agent.",
@@ -14242,7 +14243,6 @@
     "ageValue": "{{years}}y {{months}}m",
     "taxRate": "Tax",
     "allianceSince": "since {{date}}",
-    "npcCorporation": "NPC corporation",
     "playerCorporation": "Player corporation",
     "warEligible": "War eligible",
     "website": "Website",
@@ -14264,7 +14264,7 @@
     "noAlliance": "No alliance",
     "period": "{{start}} – {{end}}",
     "periodOngoing": "{{start}} – now",
-    "npcAgent": "NPC agent",
+    "npcAgent": "Agent",
     "npcAgentHint": "An agent run by CCP, not a player. There's no killboard or employment history to show.",
     "npc": {
       "kind": {
@@ -14278,7 +14278,7 @@
         "title": "Your standing",
         "baseAndSkills": "Base {{base}}, {{effective}} with your skills",
         "highest": "Agents use your highest: {{name}}.",
-        "blocked": "{{name}} is at {{standing}}: at −2.0 or lower it blocks level 2+ agents.",
+        "blocked": "{{name}} is at {{standing}}: at -2.0 or lower it blocks level 2+ agents.",
         "unavailable": "Your standing couldn't be read."
       },
       "access": {
@@ -14290,7 +14290,7 @@
         "levelOneOpen": "Level 1 needs no standing, open",
         "next": "Level {{level}} needs {{needs}}: {{short}} more.",
         "all": "Every agent level is open.",
-        "blocked": "Only level 1 agents stay open while a standing is at −2.0 or lower.",
+        "blocked": "Only level 1 agents stay open while a standing is at -2.0 or lower.",
         "agentFree": "Yes. Level 1 agents need no standing.",
         "agentYes": "Yes. Level {{level}} needs {{needs}}; you have {{have}}.",
         "agentNo": "Not yet. Level {{level}} needs {{needs}}; you have {{have}}.",

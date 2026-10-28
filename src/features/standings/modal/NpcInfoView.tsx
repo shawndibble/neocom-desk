@@ -16,7 +16,8 @@ import {
   WhereBlock,
 } from './NpcInfoBlocks';
 import type { NpcInfoTarget, OwnerTarget } from './npcInfoLoaders';
-import { accessModel, asAgentLevel, standingModel } from './npcInfoModel';
+import { asAgentLevel } from '@/engine/standings';
+import { accessModel, standingModel } from './npcInfoModel';
 import {
   useChainData,
   useKnownRows,
@@ -44,9 +45,11 @@ export default function NpcInfoView({ kind, id }: NpcInfoTarget) {
     () => (data ? standingModel(data.chain, data.nameOf, data.skills !== null) : null),
     [data]
   );
+  // Access is gated by the standing the pilot's skills lift: with skills unknown it
+  // has no honest answer (the standing card still shows the base numbers).
   const access = useMemo(
     () =>
-      data
+      data?.skills
         ? accessModel(data.chain, data.agent ? asAgentLevel(data.agent.level) : null, data.nameOf)
         : null,
     [data]

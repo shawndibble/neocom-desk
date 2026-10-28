@@ -27,15 +27,17 @@ export function npcCorporationLookup(
   };
 }
 
+/** `withAgents`: the pilot holds a standing with an agent, so the (large) agents file is worth reading. */
 export async function loadNpcStandingsReference(
-  characterId: number
+  characterId: number,
+  withAgents: boolean
 ): Promise<NpcStandingsReference> {
   const [skills, corporations, agents] = await Promise.all([
     loadStandingSkills(characterId).catch(() => null),
     Promise.all([loadNpcCorporationsFile(), loadCorporationFactions()])
       .then(([file, factions]) => npcCorporationLookup(file, factions))
       .catch(() => null),
-    loadAgents().catch(() => null),
+    withAgents ? loadAgents().catch(() => null) : null,
   ]);
   return { skills: skills?.social ?? null, corporations, agents };
 }

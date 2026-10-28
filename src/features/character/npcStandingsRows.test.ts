@@ -42,6 +42,7 @@ const names = new Map([
 const owners = new Set([CALDARI, NAVY]);
 
 const SKILLS = { connections: 5, criminalConnections: 0, diplomacy: 0 };
+const UNTRAINED = { connections: 0, criminalConnections: 0, diplomacy: 0 };
 const reference: NpcStandingsReference = {
   skills: SKILLS,
   corporations: {
@@ -146,13 +147,10 @@ describe('buildNpcStandingRows', () => {
       expect(row(STORYLINE_AGENT).effective).toBeNull();
     });
 
-    it('is null on every row when skills are unknown, and access then reads base', () => {
+    it('is null on every row when skills are unknown, and so is access: base standing would understate it', () => {
       const unknown = buildNpcStandingRows(entries, names, owners, { ...reference, skills: null });
       expect(unknown.every((r) => r.effective === null)).toBe(true);
-      // Caldari 2.5 and the Navy's 5.0: the best, 5.0, opens level 4 (it would be 6.0 with skills).
-      expect(row(NAVY, unknown).accessLevel).toBe(4);
-      // Ishukone 1.0 and Caldari 2.5: level 2 where skills lift Caldari to 4.0 and level 3.
-      expect(row(ISHUKONE, unknown).accessLevel).toBe(2);
+      expect(unknown.every((r) => r.accessLevel === null && r.agentAccess === null)).toBe(true);
     });
   });
 
@@ -211,7 +209,7 @@ describe('buildNpcStandingRows', () => {
         [{ from_id: AGENT_L3, from_type: 'agent', standing: 1 }],
         names,
         owners,
-        { ...reference, skills: null }
+        { ...reference, skills: UNTRAINED }
       );
       expect(short[0].agentAccess).toMatchObject({ open: false, needs: 3, blockedBy: null });
     });
@@ -228,7 +226,7 @@ describe('buildNpcStandingRows', () => {
         ],
         names,
         owners,
-        { ...reference, skills: null }
+        { ...reference, skills: UNTRAINED }
       );
       expect(row(AGENT_L3, blocked).agentAccess).toMatchObject({
         open: false,
@@ -248,11 +246,9 @@ describe('buildNpcStandingRows', () => {
   it('keeps to base standings when no reference could be read', () => {
     const bare = buildNpcStandingRows(entries, names, owners, NO_NPC_STANDINGS_REFERENCE);
     expect(bare.every((r) => r.belongsTo === null && r.effective === null)).toBe(true);
-    expect(bare.filter((r) => r.kind !== 'faction').every((r) => r.accessLevel === null)).toBe(
-      true
-    );
-    // A faction stands alone, so its access reads from base (2.5 opens level 2).
-    expect(row(CALDARI, bare).accessLevel).toBe(2);
+    expect(bare.every((r) => r.accessLevel === null)).toBe(true);
+    // No skills to lift it: even a faction's access stays unknown.
+    expect(row(CALDARI, bare).accessLevel).toBeNull();
   });
 });
 

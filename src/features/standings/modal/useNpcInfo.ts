@@ -10,12 +10,14 @@ import { useKeyedLoad, type AsyncLoad } from '@/lib/useAsyncLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   loadChainData,
+  loadCorporationFaction,
   loadFactionFacts,
   loadKnownRows,
   loadLoyalty,
   loadStationsModel,
   loadWhereRows,
   type ChainData,
+  type CorporationFaction,
   type FactionFacts,
   type KnownRows,
   type NpcInfoTarget,
@@ -46,8 +48,9 @@ export function useStationsModel(
   owner: OwnerTarget | null,
   chain: ChainData | null | undefined
 ): AsyncLoad<StationsModel> {
+  const characterId = useCharacterId();
   const loader = useCallback(() => loadStationsModel(owner!, chain!), [owner, chain]);
-  return useKeyedLoad(owner && chain ? targetKey(owner) : null, loader);
+  return useKeyedLoad(owner && chain ? `${characterId}-${targetKey(owner)}` : null, loader);
 }
 
 export function useWhereRows(target: NpcInfoTarget): AsyncLoad<WhereRow[]> {
@@ -87,4 +90,10 @@ export function useLoyalty(corporationId: number | null): AsyncLoad<LoyaltyModel
 export function useFactionFacts(factionId: number): AsyncLoad<FactionFacts | null> {
   const loader = useCallback(() => loadFactionFacts(factionId), [factionId]);
   return useKeyedLoad(String(factionId), loader);
+}
+
+/** The faction an NPC corporation belongs to, for its header. */
+export function useCorporationFaction(corporationId: number): AsyncLoad<CorporationFaction | null> {
+  const loader = useCallback(() => loadCorporationFaction(corporationId), [corporationId]);
+  return useKeyedLoad(String(corporationId), loader);
 }

@@ -9,6 +9,11 @@ export type AgentLevel = 1 | 2 | 3 | 4 | 5;
 
 export const AGENT_LEVELS: readonly AgentLevel[] = [1, 2, 3, 4, 5];
 
+/** The level in an agent file row, when it is one the game has (1-5). */
+export function asAgentLevel(level: number): AgentLevel | null {
+  return AGENT_LEVELS.find((candidate) => candidate === level) ?? null;
+}
+
 /** The standing a level needs; level 1 needs none. */
 export const AGENT_LEVEL_STANDING: Readonly<Record<AgentLevel, number | null>> = {
   1: null,

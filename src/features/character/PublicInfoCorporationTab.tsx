@@ -34,6 +34,7 @@ import { killFigures, type StatTileItem } from '@/features/travel/zkillFigures';
 import { corporationAge, corporationTaxPercent } from './corporationInfo';
 import { loadPublicAllianceHistory, type PublicCorporationInfo } from './publicInfoData';
 import { loadStationName } from './stations';
+import { useEntityName } from './useEntityName';
 import { AllianceLink, PlaceLink } from '@/features/entities';
 import { PersonLink } from './PublicInfoParts';
 import {
@@ -65,6 +66,8 @@ export default function PublicInfoCorporationTab({
   const { t } = useTranslation();
   const corporationId = data.corporation_id;
   const [now] = useState(() => new Date());
+  // A player corporation enlisted in Faction Warfare carries the faction it fights for.
+  const factionName = useEntityName(data.faction_id);
 
   const key = String(corporationId);
   const loadStats = useCallback(() => fetchCorporationStats(corporationId), [corporationId]);
@@ -201,6 +204,12 @@ export default function PublicInfoCorporationTab({
                     <PlaceLink id={data.home_station_id}>{stationName}</PlaceLink>
                   )}
                 </dd>
+              </>
+            )}
+            {data.faction_id !== undefined && (
+              <>
+                <dt className={termClassName}>{t('publicInfo.faction')}</dt>
+                <dd>{factionName ?? `#${data.faction_id}`}</dd>
               </>
             )}
             {data.shares !== undefined && (

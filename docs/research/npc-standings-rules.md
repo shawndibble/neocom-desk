@@ -1,6 +1,6 @@
 # EVE NPC standings: rules for agents, NPC corporations and factions
 
-Researched 2026-10-28. Read-only research; nothing in the repo was touched.
+Researched 2026-10-28.
 
 Source tiers used:
 

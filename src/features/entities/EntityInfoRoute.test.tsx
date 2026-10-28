@@ -256,6 +256,21 @@ describe('EntityInfoRoute', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('reopens a Place Info or Skill modal the same way when Back returns to its entry', async () => {
+    renderAt('/contacts?tab=a');
+    fireEvent.click(screen.getByRole('link', { name: 'Jita IV - Moon 4' }));
+    await waitFor(() =>
+      expect(usePlaceInfoModalStore.getState().request).toEqual({ id: 60003760 })
+    );
+    act(() => void probe.navigate('/mail'));
+    await waitFor(() => expect(usePlaceInfoModalStore.getState().request).toBeNull());
+    act(() => void probe.navigate(-1));
+    await waitFor(() =>
+      expect(usePlaceInfoModalStore.getState().request).toEqual({ id: 60003760 })
+    );
+    expect(probe.search).toBe('?tab=a&info=place-60003760');
+  });
+
   it('strips info on a tab switch within the page', async () => {
     renderAt('/market/browser?info=character-1');
     await screen.findByRole('dialog');

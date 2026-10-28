@@ -5,20 +5,11 @@
  */
 import { brokerFeePct } from '@/engine/industry/fees';
 
-/**
- * The station take (percent of the refined value) at 5,091 of the 5,210 NPC
- * stations; 119 take 2.5. For a station whose own take the app does not hold.
- */
-export const DEFAULT_STATION_TAKE_PCT = 5;
-
 /** Each point of standing takes this share off the take. Linear is inferred, not CCP-published (MEDIUM). */
 const TAKE_REDUCTION_PER_STANDING = 0.15;
 
-/** The standing at which the tax reaches zero (6.67). */
-export const ZERO_REPROCESSING_TAX_STANDING = 1 / TAKE_REDUCTION_PER_STANDING;
-
 /**
- * Reprocessing tax, percent: `take * max(0, 1 - standing / 6.6667)`. `standing`
+ * Reprocessing tax, percent: `take * max(0, 1 - standing / 6.6667)`, zero at 6.67. `standing`
  * is the station-owner corporation's effective standing. A negative standing
  * pays the plain take: no surcharge is documented, so none is invented.
  */

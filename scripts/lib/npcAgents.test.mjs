@@ -41,6 +41,15 @@ describe('bakeAgents', () => {
     ]);
   });
 
+  it('leaves out an agent whose level is not 1 to 5, which the app has no rule for', () => {
+    const odd = [
+      character(3000010, 'Level Zero', 1000002, basic(0, 24)),
+      character(3000011, 'Level Six', 1000002, basic(6, 24)),
+      character(3000012, 'Level Two', 1000002, basic(2, 24)),
+    ];
+    expect(bakeAgents(odd, DIVISIONS).agents.map((row) => row[0])).toEqual([3000012]);
+  });
+
   it('names the divisions the kept agents use, and no others', () => {
     expect(bakeAgents(characters, DIVISIONS).divisions).toEqual({
       22: 'Distribution',

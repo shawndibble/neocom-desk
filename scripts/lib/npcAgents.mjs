@@ -42,6 +42,8 @@ export function bakeAgents(npcCharacters, divisionRecords) {
       typeof name !== 'string' ||
       name === '' ||
       !Number.isInteger(agent.level) ||
+      agent.level < 1 ||
+      agent.level > 5 ||
       !isId(agent.divisionID) ||
       !isId(character.corporationID) ||
       !isId(character.locationID)

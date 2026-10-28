@@ -9,6 +9,9 @@ const loadStationName = vi.fn();
 vi.mock('./stations', () => ({
   loadStationName: (id: number) => loadStationName(id),
 }));
+vi.mock('./useEntityName', () => ({
+  useEntityName: (id: number | undefined) => (id === 500001 ? 'Caldari State' : null),
+}));
 vi.mock('@/lib/zkillboard', () => ({
   fetchCorporationStats: vi.fn(async () => null),
   corporationZkillUrl: () => '',
@@ -34,10 +37,10 @@ const CORP = {
   home_station_id: HOME_STATION,
 } as unknown as PublicCorporationInfo;
 
-function renderTab() {
+function renderTab(data: PublicCorporationInfo = CORP) {
   return render(
     <MemoryRouter>
-      <PublicInfoCorporationTab data={CORP} allianceId={null} />
+      <PublicInfoCorporationTab data={data} allianceId={null} />
     </MemoryRouter>
   );
 }
@@ -56,5 +59,20 @@ describe('PublicInfoCorporationTab home station', () => {
     renderTab();
     expect(await screen.findByText(`#${HOME_STATION}`)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: `#${HOME_STATION}` })).toBeNull();
+  });
+});
+
+describe('PublicInfoCorporationTab faction', () => {
+  it('shows the faction a player corporation fights for (Faction Warfare), by name', () => {
+    loadStationName.mockResolvedValue(null);
+    renderTab({ ...CORP, faction_id: 500001 });
+    expect(screen.getByText('Faction')).toBeInTheDocument();
+    expect(screen.getByText('Caldari State')).toBeInTheDocument();
+  });
+
+  it('shows no faction row for a corporation with none', () => {
+    loadStationName.mockResolvedValue(null);
+    renderTab();
+    expect(screen.queryByText('Faction')).toBeNull();
   });
 });

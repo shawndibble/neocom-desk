@@ -173,10 +173,34 @@ export interface FactionFacts {
   description: string;
 }
 
-/** The faction's name and description; null when ESI's faction list could not be read. */
+/**
+ * The faction's name and description from ESI's faction list; when that could
+ * not be read, the name alone from the baked NPC-corporation file. Null when
+ * neither knows the id.
+ */
 export async function loadFactionFacts(factionId: number): Promise<FactionFacts | null> {
-  const faction = (await loadFactions())?.find((candidate) => candidate.faction_id === factionId);
-  return faction ? { name: faction.name, description: faction.description } : null;
+  const [factions, index] = await Promise.all([
+    loadFactions(),
+    loadNpcCorporations().catch(() => null),
+  ]);
+  const faction = factions?.find((candidate) => candidate.faction_id === factionId);
+  if (faction) return { name: faction.name, description: faction.description };
+  const name = index?.factionName(factionId);
+  return name === undefined ? null : { name, description: '' };
+}
+
+export interface CorporationFaction {
+  id: number;
+  name: string;
+}
+
+/** The faction an NPC corporation belongs to (ESI's corporation record rarely says); null when it has none. */
+export async function loadCorporationFaction(
+  corporationId: number
+): Promise<CorporationFaction | null> {
+  const [factions, index] = await Promise.all([loadCorporationFactions(), loadNpcCorporations()]);
+  const id = factions.get(corporationId);
+  return id === undefined ? null : { id, name: index.factionName(id) ?? `#${id}` };
 }
 
 export type KnownRows =

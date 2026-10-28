@@ -9,7 +9,6 @@ import type { StandingSkills } from '../standingSkills';
 import {
   accessModel,
   agentWhereRows,
-  asAgentLevel,
   corporationWhereRows,
   factionWhereRows,
   knownAgentRows,
@@ -140,12 +139,6 @@ describe('accessModel', () => {
   it('never asks anything of a level 1 agent', () => {
     const model = accessModel(chainOf([faction(-5)]), 1, nameOf);
     expect(model.verdict).toMatchObject({ kind: 'agent', open: true, needs: null });
-  });
-});
-
-describe('asAgentLevel', () => {
-  it('accepts 1 to 5 only', () => {
-    expect([0, 1, 5, 6].map(asAgentLevel)).toEqual([null, 1, 5, null]);
   });
 });
 

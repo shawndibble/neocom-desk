@@ -4,6 +4,7 @@ import {
   AGENT_BLOCK_STANDING,
   AGENT_LEVEL_STANDING,
   agentAccess,
+  asAgentLevel,
   blockingLink,
   bestLink,
   highestAccessLevel,
@@ -163,5 +164,11 @@ describe('agentAccess', () => {
 
   it('is closed with no links above level 1', () => {
     expect(agentAccess({ criminal: false, links: [] }, 2)).toMatchObject({ open: false, short: 1 });
+  });
+});
+
+describe('asAgentLevel', () => {
+  it('accepts 1 to 5 only', () => {
+    expect([0, 1, 5, 6].map(asAgentLevel)).toEqual([null, 1, 5, null]);
   });
 });

@@ -19,7 +19,8 @@
  * wherever it's opened. Its corporation and alliance come from the live
  * affiliation `loadPilotProfile` resolves, and the Corporation and Alliance
  * tabs follow those ids, not the cached public record's, so the two agree.
- * The dialog is `wide` for every request: each tab is a full profile now.
+ * The dialog is `wide`: each tab is a full profile now. The NPC views below are the
+ * exception: `medium` (a full-height sheet on a phone).
  *
  * A link inside the modal that changes page (Open in Fittings) closes it: `info`
  * leaves the URL, which `EntityInfoRoute` turns into a cleared request. Back from

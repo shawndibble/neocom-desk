@@ -49,7 +49,7 @@ describe('loadNpcStandingsReference', () => {
   });
 
   it('gathers skills, corporations and agents', async () => {
-    const reference = await loadNpcStandingsReference(91);
+    const reference = await loadNpcStandingsReference(91, true);
     expect(skillsMock).toHaveBeenCalledWith(91);
     expect(reference.skills).toEqual(social);
     expect(reference.corporations?.factions.get(1000035)).toBe(500001);
@@ -60,15 +60,21 @@ describe('loadNpcStandingsReference', () => {
     skillsMock.mockRejectedValue(new Error('offline'));
     corporationsMock.mockRejectedValue(new Error('offline'));
     agentsMock.mockRejectedValue(new Error('offline'));
-    expect(await loadNpcStandingsReference(91)).toEqual({
+    expect(await loadNpcStandingsReference(91, true)).toEqual({
       skills: null,
       corporations: null,
       agents: null,
     });
   });
 
+  it('leaves the agents file unread when the pilot holds no agent standing', async () => {
+    const reference = await loadNpcStandingsReference(91, false);
+    expect(agentsMock).not.toHaveBeenCalled();
+    expect(reference.agents).toBeNull();
+  });
+
   it('reads unknown skills as null, not as untrained', async () => {
     skillsMock.mockResolvedValue(null);
-    expect((await loadNpcStandingsReference(91)).skills).toBeNull();
+    expect((await loadNpcStandingsReference(91, true)).skills).toBeNull();
   });
 });

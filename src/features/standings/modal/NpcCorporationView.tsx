@@ -9,15 +9,15 @@ import { EveMarkupText } from '@/components/EveMarkupText';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Eyebrow } from '@/components/ui';
 import { FactionLink } from '@/features/entities';
-import { useEntityName } from '@/features/character/useEntityName';
-import { statusWordClassName, websiteUrl } from '@/features/character/publicInfoStyles';
+import { websiteUrl } from '@/features/character/publicInfoStyles';
 import type { PublicCorporationInfo } from '@/features/character/publicInfoData';
 import { corporationLogoUrl } from '@/lib/eveImages';
 import NpcInfoView from './NpcInfoView';
+import { useCorporationFaction } from './useNpcInfo';
 
 export default function NpcCorporationView({ data }: { data: PublicCorporationInfo }) {
   const { t } = useTranslation();
-  const factionName = useEntityName(data.faction_id);
+  const faction = useCorporationFaction(data.corporation_id).data;
   const website = websiteUrl(data.url);
   const description = data.description?.trim() ?? '';
   return (
@@ -33,10 +33,7 @@ export default function NpcCorporationView({ data }: { data: PublicCorporationIn
         />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="text-text-dim">[{data.ticker}]</p>
-          <p className={`${statusWordClassName} text-text-dim`}>{t('publicInfo.npcCorporation')}</p>
-          {data.faction_id !== undefined && (
-            <FactionLink id={data.faction_id}>{factionName ?? `#${data.faction_id}`}</FactionLink>
-          )}
+          {faction && <FactionLink id={faction.id}>{faction.name}</FactionLink>}
         </div>
         {website && <ExternalLink href={website}>{t('publicInfo.website')}</ExternalLink>}
       </div>

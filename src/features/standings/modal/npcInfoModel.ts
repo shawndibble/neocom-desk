@@ -8,7 +8,6 @@ import type { CharacterStandingEntry } from '@/engine/market/standings';
 import {
   AGENT_LEVELS,
   AGENT_LEVEL_STANDING,
-  DEFAULT_STATION_TAKE_PCT,
   NO_SOCIAL_SKILLS,
   agentAccess,
   bestLink,
@@ -146,11 +145,6 @@ export function accessModel(
   };
 }
 
-/** The agent level in an agent file row, when it is one the game has (1-5). */
-export function asAgentLevel(level: number): AgentLevel | null {
-  return AGENT_LEVELS.find((candidate) => candidate === level) ?? null;
-}
-
 // --- At their stations ---
 
 export interface StationFeeRow {
@@ -214,7 +208,13 @@ function reprocessingRow(
 export function stationsModel(input: StationsInput): StationsModel {
   const { chain, standings, skills } = input;
   const social = skills?.social ?? NO_SOCIAL_SKILLS;
-  const baseOf = (id: number) => standings.find((entry) => entry.from_id === id)?.standing ?? 0;
+  // Through `standingsFromEsi`, so the base is the base whichever way ESI's number reads.
+  const standingOf = (id: number) => {
+    const entry = standings.find((candidate) => candidate.from_id === id);
+    return entry
+      ? standingsFromEsi(entry.standing, chain.criminal, social)
+      : { base: 0, effective: 0 };
+  };
   const rows: StationFeeRow[] = [];
   const broker = (place: string, factionBase: number, corporationBase: number) => {
     if (!skills) return;
@@ -238,14 +238,14 @@ export function stationsModel(input: StationsInput): StationsModel {
   } else {
     const facts = factionStationFacts(input.id, input.stations);
     for (const hub of facts.tradeHubs) {
-      const corporationBase = baseOf(hub.ownerCorporationId);
-      broker(hub.stationLabel, baseOf(input.id), corporationBase);
+      const owner = standingOf(hub.ownerCorporationId);
+      broker(hub.stationLabel, standingOf(input.id).base, owner.base);
+      // A Trade Hub's station is always in the snapshot it was found in.
       const hubStation = facts.stations.find((station) => station.id === hub.stationId);
-      const take = hubStation
-        ? stationReprocessingTake(hubStation)
-        : DEFAULT_STATION_TAKE_PCT / 100;
-      const effective = standingsFromEsi(corporationBase, chain.criminal, social).effective;
-      rows.push(reprocessingRow(take, effective, hub.stationLabel));
+      if (!hubStation) continue;
+      rows.push(
+        reprocessingRow(stationReprocessingTake(hubStation), owner.effective, hub.stationLabel)
+      );
     }
   }
   return {

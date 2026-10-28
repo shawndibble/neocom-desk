@@ -13,12 +13,14 @@
  * Nothing here guesses. An agent the agents data leaves out (storyline,
  * faction warfare, research...) has no known corporation or level, so it has
  * no Belongs to, no Access and no With skills. Skills that could not be read
- * leave With skills empty and Access on base standings.
+ * leave With skills and Access empty: access is gated by the standing the
+ * skills lift, so a base-standing answer would understate it.
  */
 import type { CharacterStandingEntry } from '@/engine/market/standings';
 import {
   NO_SOCIAL_SKILLS,
   agentAccess,
+  asAgentLevel,
   highestAccessLevel,
   type AgentAccess,
   type AgentLevel,
@@ -46,14 +48,14 @@ export interface NpcStandingRow {
   id: number;
   name: string;
   kind: NpcStandingKind;
-  /** The standing ESI reports (assumed base: `ESI_STANDINGS_ARE_BASE`). */
+  /** The base standing (ESI's, unless `ESI_STANDINGS_ARE_BASE` is flipped). */
   base: number;
   /** With the pilot's skills; null when skills or the row's chain are unknown. */
   effective: number | null;
   belongsTo: NpcBelongsTo | null;
-  /** The highest agent level the chain's best standing opens; null when the chain is unknown. */
+  /** The highest agent level the chain's best standing opens; null when the chain or the skills are unknown. */
   accessLevel: AgentLevel | null;
-  /** Agent rows only: whether this agent is open now; null for the rest and for an agent with no known level. */
+  /** Agent rows only: whether this agent is open now; null for the rest, for an agent with no known level and when skills are unknown. */
   agentAccess: AgentAccess | null;
   usedForFees: boolean;
 }
@@ -114,6 +116,7 @@ export function buildNpcStandingRows(
     .map((entry): NpcStandingRow => {
       const kind = KIND[entry.from_type];
       const agent = kind === 'agent' ? agents?.agentById(entry.from_id) : undefined;
+      const agentLevel = agent ? asAgentLevel(agent.level) : null;
       // A corporation's or agent's faction link needs the corporation data and an
       // agent's corporation needs the agents data. Without them the chain is
       // unknown, never a shorter one that would understate access.
@@ -142,11 +145,11 @@ export function buildNpcStandingRows(
         id: entry.from_id,
         name: names.get(entry.from_id) ?? agent?.name ?? `#${entry.from_id}`,
         kind,
-        base: entry.standing,
+        base: own?.base ?? entry.standing,
         effective: skills && own ? own.effective : null,
         belongsTo: belongsTo(kind, entry.from_id, agent, reference),
-        accessLevel: chain ? highestAccessLevel(chain) : null,
-        agentAccess: chain && agent ? agentAccess(chain, agent.level as AgentLevel) : null,
+        accessLevel: chain && skills ? highestAccessLevel(chain) : null,
+        agentAccess: chain && skills && agentLevel ? agentAccess(chain, agentLevel) : null,
         usedForFees: kind !== 'agent' && feeOwners.has(entry.from_id),
       };
     })
@@ -167,7 +170,7 @@ function belongsTo(
   if (kind === 'agent' && agent) {
     return {
       name: corporations?.corporationName(agent.corporationId) ?? `#${agent.corporationId}`,
-      level: agent.level as AgentLevel,
+      level: asAgentLevel(agent.level) ?? undefined,
       division: agents?.divisionName(agent.divisionId),
     };
   }

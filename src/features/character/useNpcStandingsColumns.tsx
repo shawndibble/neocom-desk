@@ -110,10 +110,13 @@ export function useNpcStandingsColumns() {
           }
           return row.accessLevel === null ? <EmptyCell /> : <AccessPips level={row.accessLevel} />;
         },
+        // One scale for every kind: the agent level you can use (0 when you cannot).
         sortValue: (row) =>
           row.kind === 'agent'
             ? row.agentAccess
-              ? Number(row.agentAccess.open)
+              ? row.agentAccess.open
+                ? (row.belongsTo?.level ?? 1)
+                : 0
               : undefined
             : (row.accessLevel ?? undefined),
         stackAffix: { before: `${t('contacts.standings.columnAccess')} ` },

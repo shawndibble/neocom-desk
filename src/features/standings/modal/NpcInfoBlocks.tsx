@@ -193,7 +193,7 @@ export function AccessBlock({ model }: { model: AccessModel }) {
               aria-hidden="true"
               className={cx(
                 'h-2 w-full',
-                open ? 'bg-accent' : 'bg-line',
+                open ? 'bg-accent' : 'bg-line-bright',
                 own && 'outline-2 outline-offset-2 outline-accent'
               )}
             />
@@ -221,22 +221,24 @@ function FeeRow({ row }: { row: StationFeeRow }) {
       : row.place === null
         ? t('publicInfo.npc.stations.reprocessing')
         : t('publicInfo.npc.stations.reprocessingAt', { place: row.place });
+  // What the figures show, so a saving of floating-point dust reads as none.
+  const saving = Number(format(row.savingPct));
   const amount = `${approx}${format(Math.abs(row.savingPct))}%`;
   return (
     <div className="flex items-baseline gap-3">
       <dt className="text-text-dim">{label}</dt>
       <dd className="ml-auto tabular-nums">
-        {row.savingPct !== 0 && (
+        {saving !== 0 && (
           <>
             <s className="text-text-dim">{format(row.atZeroPct)}%</s>{' '}
           </>
         )}
         {approx}
         {format(row.atYoursPct)}%
-        {row.savingPct > 0 && (
+        {saving > 0 && (
           <span className="text-success"> {t('publicInfo.npc.stations.saves', { amount })}</span>
         )}
-        {row.savingPct < 0 && (
+        {saving < 0 && (
           <span className="text-danger"> {t('publicInfo.npc.stations.costs', { amount })}</span>
         )}
       </dd>

@@ -99,10 +99,14 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   const fetchState = useCallback(
     async (force: boolean) => {
       try {
-        const [{ entries, fetchedAt, fromCache, available }, reference] = await Promise.all([
-          loadCharacterStandingsResult(characterId, { force }),
-          loadNpcStandingsReference(characterId),
-        ]);
+        const { entries, fetchedAt, fromCache, available } = await loadCharacterStandingsResult(
+          characterId,
+          { force }
+        );
+        const reference = await loadNpcStandingsReference(
+          characterId,
+          entries.some((entry) => entry.from_type === 'agent')
+        );
         const names = await resolveNames(entries.map((entry) => entry.from_id)).catch(
           () => new Map<number, string>()
         );
@@ -230,6 +234,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
             />
           }
         />
+        <p className="text-xs text-text-dim">{t('contacts.standingsFeesNote')}</p>
         <Panel padded={false}>
           {rows.length === 0 ? (
             <EmptyState

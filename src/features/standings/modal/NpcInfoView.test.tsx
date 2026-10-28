@@ -378,7 +378,7 @@ describe('NpcInfoView, a vetoed chain', () => {
     )!;
     expect(
       within(standing).getByText(
-        'Caldari Navy is at -2.50: at −2.0 or lower it blocks level 2+ agents.'
+        'Caldari Navy is at -2.50: at -2.0 or lower it blocks level 2+ agents.'
       )
     ).toBeInTheDocument();
     const access = screen.getByRole('heading', { name: 'Agent access' }).closest('section')!;
@@ -387,7 +387,7 @@ describe('NpcInfoView, a vetoed chain', () => {
     ).toBeInTheDocument();
     expect(
       within(access).getByText(
-        'Only level 1 agents stay open while a standing is at −2.0 or lower.'
+        'Only level 1 agents stay open while a standing is at -2.0 or lower.'
       )
     ).toBeInTheDocument();
   });

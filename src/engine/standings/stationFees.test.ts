@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { brokerFeePct } from '@/engine/industry/fees';
-import {
-  DEFAULT_STATION_TAKE_PCT,
-  ZERO_REPROCESSING_TAX_STANDING,
-  brokerFeeComparison,
-  reprocessingTaxPct,
-} from './stationFees';
+import { brokerFeeComparison, reprocessingTaxPct } from './stationFees';
 
 describe('reprocessingTaxPct', () => {
   it.each([
@@ -31,13 +26,9 @@ describe('reprocessingTaxPct', () => {
     expect(reprocessingTaxPct(2.5, -10)).toBe(2.5);
   });
 
-  it('has a usual 5% take for a station whose own is unknown', () => {
-    expect(DEFAULT_STATION_TAKE_PCT).toBe(5);
-    expect(reprocessingTaxPct(DEFAULT_STATION_TAKE_PCT, 0)).toBe(5);
-  });
-
   it('reaches zero at 6.67', () => {
-    expect(ZERO_REPROCESSING_TAX_STANDING).toBeCloseTo(6.6667, 4);
+    expect(reprocessingTaxPct(5, 6.67)).toBeCloseTo(0, 2);
+    expect(reprocessingTaxPct(5, 6.6667)).toBeCloseTo(0, 3);
   });
 });
 

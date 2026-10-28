@@ -110,6 +110,9 @@ describe('ContactsStandings header', () => {
     renderTab();
 
     expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Broker fees use your standing with each Trade Hub/)
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
     expect(screen.getByText(/just now|ago/i)).toBeInTheDocument();
     expect(loadMock).toHaveBeenCalledWith(91, { force: false });
@@ -235,12 +238,13 @@ describe('ContactsStandings table', () => {
     expect(screen.getByText('Needs 3.00')).toBeInTheDocument();
   });
 
-  it("leaves With skills empty when the pilot's skills are unknown", async () => {
+  it("leaves With skills and Access empty when the pilot's skills are unknown", async () => {
     referenceMock.mockResolvedValue({ ...REFERENCE, skills: null });
     renderTab();
     const corp = (await screen.findByText('Caldari Navy Corp')).closest('tr') as HTMLElement;
     expect(within(corp).getByText('5.00')).toBeInTheDocument();
-    expect(within(corp).getByText('—')).toBeInTheDocument();
+    // With skills and Access: a base-standing answer would understate what the skills lift.
+    expect(within(corp).getAllByText('—')).toHaveLength(2);
   });
 
   it('leaves an agent the agents data does not know with no belongs to and no access', async () => {
