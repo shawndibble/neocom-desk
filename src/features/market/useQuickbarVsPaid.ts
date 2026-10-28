@@ -33,15 +33,22 @@ function latestSell(
   return null;
 }
 
+const NONE: ReadonlyMap<number, VsPaid> = new Map();
+
 export function useQuickbarVsPaid(
   characterId: number | null,
   typeIds: readonly number[],
   hub: TradeHub
 ): ReadonlyMap<number, VsPaid> {
-  const [result, setResult] = useState<ReadonlyMap<number, VsPaid>>(new Map());
-  const key = typeIds.join(',');
+  const [loaded, setLoaded] = useState<{
+    scope: string;
+    map: ReadonlyMap<number, VsPaid>;
+  } | null>(null);
+  // Sorted: a reorder must not reload the wallet.
+  const key = [...typeIds].sort((a, b) => a - b).join(',');
   const ids = useMemo(() => (key === '' ? [] : key.split(',').map(Number)), [key]);
   const stationId = hub.stationId;
+  const scope = `${characterId}:${stationId}:${key}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -67,15 +74,17 @@ export function useQuickbarVsPaid(
           }
         }
       } catch {
+        // A decoration: any read failure means no chip, never an error.
         out.clear();
       }
-      if (!cancelled) setResult(out);
+      if (!cancelled) setLoaded({ scope, map: out });
     }
     void run();
     return () => {
       cancelled = true;
     };
-  }, [characterId, ids, stationId]);
+  }, [characterId, ids, stationId, scope]);
 
-  return result;
+  // Never show the previous character's figures while this one loads.
+  return loaded?.scope === scope ? loaded.map : NONE;
 }

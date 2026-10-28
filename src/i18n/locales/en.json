@@ -12231,8 +12231,9 @@
       },
       "addItem": "Add {{name}} to Quickbar",
       "vsPaid": {
-        "label": "{{name}} is {{percent}} against what you paid",
-        "tooltip": "vs paid: {{price}} now against {{paid}} average paid per unit, before fees. Covers the {{units}} units you still hold."
+        "label": "against what you paid for {{name}}",
+        "tooltip_one": "vs paid: {{price}} now against {{paid}} paid for the {{units}} unit you still hold, before fees.",
+        "tooltip_other": "vs paid: {{price}} now against {{paid}} average paid per unit, before fees. Covers the {{units}} units you still hold."
       }
     },
     "priceAlert": {

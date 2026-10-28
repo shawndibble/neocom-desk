@@ -100,21 +100,17 @@ describe('QuickbarList price against paid', () => {
       items: two,
       vsPaid: new Map([[34, { percent: 50, paid: 4, price: 6, units: 100 }]]),
     });
-    expect(screen.getByLabelText('Tritanium is +50% against what you paid')).toHaveTextContent(
-      '+50%'
-    );
-    expect(screen.queryByLabelText(/Pyerite is/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^\+50%/)).toBeInTheDocument();
+    expect(screen.getAllByText(/against what you paid/)).toHaveLength(1);
   });
 
   it('shows a negative figure with its minus sign', () => {
     renderList({ vsPaid: new Map([[34, { percent: -12, paid: 5, price: 4.4, units: 10 }]]) });
-    expect(screen.getByLabelText('Tritanium is -12% against what you paid')).toHaveTextContent(
-      '-12%'
-    );
+    expect(screen.getByText(/^-12%/)).toBeInTheDocument();
   });
 
   it('shows no chip without a basis', () => {
     renderList();
-    expect(screen.queryByLabelText(/against what you paid/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/against what you paid/)).not.toBeInTheDocument();
   });
 });

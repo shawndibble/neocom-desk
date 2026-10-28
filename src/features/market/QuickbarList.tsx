@@ -21,14 +21,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
-import {
-  IconButton,
-  MenuItem,
-  RowActionsMenu,
-  RowMoreActions,
-  Tooltip,
-  TypeIcon,
-} from '@/components/ui';
+import { IconButton, MenuItem, RowActionsMenu, RowMoreActions, TypeIcon } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,
@@ -126,29 +120,26 @@ function QuickbarRow({ item, vsPaid, selected, onSelect, onRemove }: QuickbarRow
         </div>
         {vsPaid && (
           // Hidden below the list's own width, so the name keeps its room first.
-          <Tooltip
-            className="hidden @[15rem]:inline-flex"
+          <HintText
+            className={cx(
+              'hidden shrink-0 font-semibold tabular-nums @[15rem]:inline',
+              vsPaid.percent > 0 && 'text-success',
+              vsPaid.percent < 0 && 'text-danger',
+              vsPaid.percent === 0 && 'text-text-dim'
+            )}
             content={t('market.quickbar.vsPaid.tooltip', {
               price: formatIskAuto(vsPaid.price),
               paid: formatIskAuto(vsPaid.paid),
+              count: vsPaid.units,
               units: formatCount(vsPaid.units),
             })}
           >
-            <span
-              aria-label={t('market.quickbar.vsPaid.label', {
-                name: item.name,
-                percent: formatPercent(vsPaid.percent),
-              })}
-              className={cx(
-                'shrink-0 font-semibold tabular-nums',
-                vsPaid.percent > 0 && 'text-success',
-                vsPaid.percent < 0 && 'text-danger',
-                vsPaid.percent === 0 && 'text-text-dim'
-              )}
-            >
-              {formatPercent(vsPaid.percent)}
+            {formatPercent(vsPaid.percent)}
+            <span className="sr-only">
+              {' '}
+              {t('market.quickbar.vsPaid.label', { name: item.name })}
             </span>
-          </Tooltip>
+          </HintText>
         )}
         <RowMoreActions />
       </li>
