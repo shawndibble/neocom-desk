@@ -3,7 +3,7 @@
  * react-router `<Link>` with its own URL, so a plain click navigates in-app
  * and middle-click / Ctrl+click open a new tab with no extra code:
  *
- * - `CharacterLink`, `CorporationLink`, `AllianceLink`, `SkillLink` point at
+ * - `CharacterLink`, `CorporationLink`, `AllianceLink`, `FactionLink`, `SkillLink` point at
  *   the *current* page plus `?info=<kind>-<id>`; `EntityInfoRoute` opens the
  *   Show Info / Skill modal from that param.
  * - `ItemInfoLink` opens an item's Item Detail (Show info) the same way
@@ -79,6 +79,13 @@ export const CorporationLink = forwardRef<HTMLAnchorElement, EntityLinkProps & {
 export const AllianceLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { id: number }>(
   function AllianceLink({ id, ...rest }, ref) {
     return <InfoLink {...rest} ref={ref} entity={{ kind: 'alliance', id }} />;
+  }
+);
+
+/** An NPC faction's name, opening its Show Info (the standings, its corporations and stations). */
+export const FactionLink = forwardRef<HTMLAnchorElement, EntityLinkProps & { id: number }>(
+  function FactionLink({ id, ...rest }, ref) {
+    return <InfoLink {...rest} ref={ref} entity={{ kind: 'faction', id }} />;
   }
 );
 

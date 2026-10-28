@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { getEntityInfoNavigator } from './entityInfoNavigator';
 
-export type PublicInfoKind = 'character' | 'corporation' | 'alliance';
+export type PublicInfoKind = 'character' | 'corporation' | 'alliance' | 'faction';
 
 export interface PublicInfoRequest {
   kind: PublicInfoKind;

@@ -20,7 +20,7 @@ import { useSkillDetailModalStore, openSkillDetailModal } from '@/stores/skillDe
 import { openItemInfo, useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 import { EntityInfoRoute } from './EntityInfoRoute';
-import { CharacterLink, PlaceLink, SkillLink, SystemLink } from './EntityLink';
+import { CharacterLink, FactionLink, PlaceLink, SkillLink, SystemLink } from './EntityLink';
 
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -109,6 +109,26 @@ describe('EntityInfoRoute', () => {
 
     act(() => void probe.navigate(-1));
     await waitFor(() => expect(usePlaceInfoModalStore.getState().request).toBeNull());
+  });
+
+  it('a FactionLink opens a faction request through the URL, and Back clears it', async () => {
+    // No modal mounted: this is the URL-to-store seam alone.
+    render(
+      <MemoryRouter initialEntries={['/contacts?tab=standings']}>
+        <EntityInfoRoute />
+        <Probe />
+        <FactionLink id={500001}>Caldari State</FactionLink>
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: 'Caldari State' });
+    expect(link).toHaveAttribute('href', '/contacts?tab=standings&info=faction-500001');
+    fireEvent.click(link);
+    await waitFor(() =>
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'faction', id: 500001 })
+    );
+    act(() => void probe.navigate(-1));
+    await waitFor(() => expect(usePublicInfoModalStore.getState().request).toBeNull());
+    expect(probe.search).toBe('?tab=standings');
   });
 
   it('shows no modal without info', () => {
@@ -221,6 +241,19 @@ describe('EntityInfoRoute', () => {
     act(() => void probe.navigate('/mail?tab=a&info=character-1'));
     await waitFor(() => expect(probe.search).toBe('?tab=a'));
     expect(probe.pathname).toBe('/mail');
+  });
+
+  it('keeps info when Back returns to an entry that has it, after leaving the page', async () => {
+    renderAt('/contacts?tab=a');
+    fireEvent.click(screen.getByRole('link', { name: 'Pilot One' }));
+    await screen.findByRole('dialog');
+    act(() => void probe.navigate('/mail'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    act(() => void probe.navigate(-1));
+    await waitFor(() => expect(probe.pathname).toBe('/contacts'));
+    expect(probe.search).toBe('?tab=a&info=character-1');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('strips info on a tab switch within the page', async () => {

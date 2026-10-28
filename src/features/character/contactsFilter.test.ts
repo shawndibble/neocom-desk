@@ -8,6 +8,7 @@ import {
   contactCountsByStanding,
   contactCountsByKind,
   contactKind,
+  contactPublicInfoKind,
   contactTypeLabelKey,
   filterContacts,
   standingCategory,
@@ -160,6 +161,13 @@ describe('contactKind', () => {
   it('never reads an alliance or faction id as an NPC', () => {
     expect(contactKind(contact(500001, 'faction', 0))).toBe('faction');
     expect(contactKind(contact(1000125, 'alliance', 0))).toBe('alliance');
+  });
+
+  it('opens Show Info for a character, corporation or alliance contact, never a faction', () => {
+    expect(contactPublicInfoKind(contact(1, 'character', 0))).toBe('character');
+    expect(contactPublicInfoKind(contact(2, 'corporation', 0))).toBe('corporation');
+    expect(contactPublicInfoKind(contact(3, 'alliance', 0))).toBe('alliance');
+    expect(contactPublicInfoKind(contact(500001, 'faction', 0))).toBeNull();
   });
 
   it('lets the NPCs chip hide NPCs without hiding players or player corps', () => {

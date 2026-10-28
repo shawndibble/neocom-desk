@@ -3,6 +3,7 @@ export {
   AllianceLink,
   CharacterLink,
   CorporationLink,
+  FactionLink,
   ItemInfoLink,
   PlaceLink,
   SkillLink,

@@ -18,7 +18,7 @@
  * instead of pushing, so a single Close or Back always returns to the page.
  */
 import { useCallback, useEffect, useRef } from 'react';
-import { useLocation, useNavigate, type Location } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
 import { entityInfoHref, parseEntityInfo, withoutEntityInfo } from '@/lib/entityInfo';
 import { usePageLeave } from '@/lib/usePageLeave';
 import { registerEntityInfoNavigator } from '@/stores/entityInfoNavigator';
@@ -71,16 +71,19 @@ export function EntityInfoRoute() {
   // A tab switch keeps the search, so `info` would outlive the page the modal
   // was opened on (the modals close on a page change): strip it. A redirect
   // is not a page change (`usePageLeave`), so a cold `/market?info=type-34`
-  // keeps its modal through the landing on `/market/browser`.
+  // keeps its modal through the landing on `/market/browser`. Back or Forward
+  // onto an entry that has `info` is the pilot returning to that modal (from a
+  // Route Safety link inside it, say), so that entry keeps it.
+  const navigationType = useNavigationType();
   usePageLeave(
     useCallback(
       (left: Location) => {
-        if (parseEntityInfo(left.search) === null) return;
+        if (navigationType === 'POP' || parseEntityInfo(left.search) === null) return;
         navigate(`${left.pathname}${withoutEntityInfo(left.search)}${left.hash}`, {
           replace: true,
         });
       },
-      [navigate]
+      [navigate, navigationType]
     )
   );
 
@@ -94,7 +97,14 @@ export function EntityInfoRoute() {
     const item = useItemInfoModalStore.getState();
     const place = usePlaceInfoModalStore.getState();
     // Only the modal `info` names stays open.
-    if (kind !== 'character' && kind !== 'corporation' && kind !== 'alliance') publicInfo.clear();
+    if (
+      kind !== 'character' &&
+      kind !== 'corporation' &&
+      kind !== 'alliance' &&
+      kind !== 'faction'
+    ) {
+      publicInfo.clear();
+    }
     if (kind !== 'skill') skill.clear();
     if (kind !== 'type') item.clear();
     if (kind !== 'place') place.clear();
