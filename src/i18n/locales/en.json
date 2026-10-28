@@ -11935,7 +11935,7 @@
         "title": "Trip",
         "jumps_one": "{{count}} jump ({{preference}})",
         "jumps_other": "{{count}} jumps ({{preference}})",
-        "laneJumps": "{{lane}} · {{jumps}}",
+        "laneLead": "{{lane}} · ",
         "cargoValue": "Cargo value",
         "cargoValueAfter": "→ {{value}} with the fill",
         "m3": "{{m3}} m³",
