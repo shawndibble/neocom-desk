@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import {
   MenuItem,
   MenuSeparator,
@@ -351,4 +352,82 @@ describe('linksKeepBrowserMenu: a link in the row keeps the browser link menu (D
   });
 
   // Touch-and-hold is checked in the browser: jsdom's pointer events carry no pointerType.
+});
+
+describe('row menu hints', () => {
+  const plainRow = (
+    <RowActionsMenu name="Row" items={<MenuItem>Show info</MenuItem>}>
+      <div>
+        Row
+        <RowMoreActions />
+      </div>
+    </RowActionsMenu>
+  );
+
+  beforeEach(() => {
+    useHintCounts.setState({ value: {}, hydrated: true });
+    resetSessionHints();
+  });
+
+  it('adds the right-click tip to the first three ⋮ opens, never the right-click menu', async () => {
+    const user = userEvent.setup();
+    // The hint on the ⋮ is its own subject below; spend it first.
+    useHintCounts.setState({ value: { rowHint: 1 }, hydrated: true });
+    render(plainRow);
+    const more = screen.getByRole('button', { name: 'More actions for Row' });
+
+    for (let open = 1; open <= 3; open++) {
+      await user.click(more);
+      expect(await screen.findByText('Tip: right-click any row')).toBeInTheDocument();
+      await user.keyboard('{Escape}');
+    }
+    expect(hintSeenCount(useHintCounts.getState().value, 'rowMenuTip')).toBe(3);
+
+    await user.click(more);
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    fireEvent.contextMenu(screen.getByText('Row'));
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByText(/Tip: right-click any row/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the tip off until the counts have loaded', async () => {
+    const user = userEvent.setup();
+    useHintCounts.setState({ value: {}, hydrated: false });
+    render(plainRow);
+    await user.click(screen.getByRole('button', { name: 'More actions for Row' }));
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByText('Tip: right-click any row')).not.toBeInTheDocument();
+  });
+
+  it('hints once, on the first ⋮ only, and Got it ends it for good', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        {plainRow}
+        {plainRow}
+      </>
+    );
+    const hint = await screen.findByText('Tip: right-click any row to open its actions');
+    expect(screen.getAllByText('Tip: right-click any row to open its actions')).toHaveLength(1);
+    expect(hint).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
+    expect(hintSeenCount(useHintCounts.getState().value, 'rowHint')).toBe(1);
+  });
+
+  it('does not hint again once seen, or in a session that already showed a hint', () => {
+    useHintCounts.setState({ value: { rowHint: 1 }, hydrated: true });
+    const { unmount } = render(plainRow);
+    expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
+    unmount();
+
+    useHintCounts.setState({ value: {}, hydrated: true });
+    expect(claimSessionHint('goTo')).toBe(true);
+    render(plainRow);
+    expect(screen.queryByText(/to open its actions/)).not.toBeInTheDocument();
+  });
 });

@@ -1,5 +1,5 @@
 import { useNavBadges } from './navBadges';
-import { Fragment, memo, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,14 @@ import { Button, IconButton, Tooltip } from '@/components/ui';
 import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import {
+  claimSessionHint,
+  hintSeenCount,
+  recordHintSeen,
+  useHintCounts,
+  useSessionHintShown,
+} from '@/lib/hintFlags';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import {
   focusRingClassName,
   focusRingInsetClassName,
@@ -44,9 +52,32 @@ const RAIL_GROUPS = railGroups();
  * filter for the page underneath. The chord is printed on it, which is how
  * the shortcut gets learned.
  */
+const GO_TO_HINT = 'goTo';
+
+/**
+ * A one-time "New" cue on the Go to button (§6c "Hints"): until the palette is
+ * first opened, by this button or by the chord. Not on a phone, where the rail
+ * is not what a pilot sees; and not in a session that showed another hint.
+ */
+function useGoToNudge(): boolean {
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const hydrated = useHintCounts((state) => state.hydrated);
+  const seen = useHintCounts((state) => hintSeenCount(state.value, GO_TO_HINT) > 0);
+  const paletteOpen = useCommandPalette((state) => state.open);
+  const holdsHint = useSessionHintShown(GO_TO_HINT);
+  useEffect(() => {
+    if (isDesktop && hydrated && !seen) claimSessionHint(GO_TO_HINT);
+  }, [isDesktop, hydrated, seen]);
+  useEffect(() => {
+    if (paletteOpen && holdsHint) recordHintSeen(GO_TO_HINT);
+  }, [paletteOpen, holdsHint]);
+  return holdsHint && !seen;
+}
+
 function GoToButton() {
   const { t } = useTranslation();
   const chord = commandPaletteDisplayKey(APPLE);
+  const nudge = useGoToNudge();
   return (
     <button
       type="button"
@@ -60,6 +91,11 @@ function GoToButton() {
     >
       <Icon.GoTo aria-hidden="true" size={Icon.ICON_SIZE.sm} />
       <span>{t('nav.goTo')}</span>
+      {nudge && (
+        <span className="rounded-xs bg-accent px-1 text-[0.625rem] font-semibold tracking-widest text-accent-contrast uppercase">
+          {t('nav.goToNew')}
+        </span>
+      )}
       <kbd className="ml-auto rounded-xs border border-line px-1 font-sans text-[0.625rem]">
         {chord}
       </kbd>
