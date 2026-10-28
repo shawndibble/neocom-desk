@@ -144,7 +144,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
     () =>
       props.mode === 'single'
         ? [
-            { id: 'day', header: t('wallet.date'), render: (r) => r.day },
+            { id: 'day', header: t('wallet.date'), stickyStart: true, render: (r) => r.day },
             {
               id: 'total',
               header: t('wallet.netWorth.total'),
@@ -152,7 +152,7 @@ export default function NetWorthChart(props: NetWorthChartProps) {
             },
           ]
         : [
-            { id: 'day', header: t('wallet.date'), render: (r) => r.day },
+            { id: 'day', header: t('wallet.date'), stickyStart: true, render: (r) => r.day },
             ...props.lines.map((line) => ({
               id: lineKey(line.characterId),
               header: line.name,

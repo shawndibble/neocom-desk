@@ -418,6 +418,8 @@ function MetricChartPair({
     () => [
       {
         id: 'date',
+        stickyStart: true,
+        stickyStartOnPanel: true,
         header: t('miningTax.overview.dateColumn'),
         render: (point) => formatDateTick(point.date),
       },
@@ -433,6 +435,8 @@ function MetricChartPair({
     () => [
       {
         id: 'date',
+        stickyStart: true,
+        stickyStartOnPanel: true,
         header: t('miningTax.overview.dateColumn'),
         render: (point) => formatDateTick(point.date),
       },
@@ -448,6 +452,8 @@ function MetricChartPair({
     () => [
       {
         id: 'type',
+        stickyStart: true,
+        stickyStartOnPanel: true,
         header: t('miningTax.overview.typeColumn'),
         render: (point) => point.typeName,
       },
@@ -472,6 +478,8 @@ function MetricChartPair({
     () => [
       {
         id: 'type',
+        stickyStart: true,
+        stickyStartOnPanel: true,
         header: t('miningTax.overview.typeColumn'),
         render: (point) => point.typeName,
       },

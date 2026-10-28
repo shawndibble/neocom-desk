@@ -70,6 +70,7 @@ export function IskBreakdownPanel({
     () => [
       {
         id: 'refType',
+        stickyStart: true,
         header: t('wallet.journalBreakdownRefType'),
         render: (row) => (
           <span className="block min-w-0">

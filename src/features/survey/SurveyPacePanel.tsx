@@ -54,7 +54,12 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
   const label = t('survey.chartRate');
   const columns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
     () => [
-      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
+      {
+        id: 'from',
+        header: t('survey.tableFrom'),
+        stickyStart: true,
+        render: (i) => formatEveClock(i.from),
+      },
       { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
       {
         id: 'rate',
@@ -154,7 +159,12 @@ export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
   const pace = useMemo(() => paceShareSeries(summary), [summary]);
   const columns = useMemo<DataTableColumn<PaceInterval>[]>(
     () => [
-      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
+      {
+        id: 'from',
+        header: t('survey.tableFrom'),
+        stickyStart: true,
+        render: (i) => formatEveClock(i.from),
+      },
       { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
       {
         id: 'progress',

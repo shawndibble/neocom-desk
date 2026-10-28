@@ -86,6 +86,7 @@ export function OfferDetail({
     () => [
       {
         id: 'name',
+        stickyStart: true,
         header: t('loyaltyStore.materialColName'),
         primary: true,
         sortValue: (material) =>
