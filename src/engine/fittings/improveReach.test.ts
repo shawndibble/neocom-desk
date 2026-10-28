@@ -221,6 +221,49 @@ describe('candidate budgets', () => {
   });
 });
 
+describe('a fitted module the pilot cannot fly', () => {
+  const f = fit([['medium', 0, 6]]);
+  const offered = (
+    flyable: (id: number) => boolean,
+    reach: CandidateOptions['reach'] = 'upgrade'
+  ) =>
+    improveCandidates(f.modules, index, rackOf, {
+      ...base,
+      reach,
+      pool: { ...base.pool!, flyable: (_slot, id) => flyable(id) },
+    }).filter((c) => c.fromTypeId === 6);
+
+  it('is replaced by a flyable variant, tagged as a fix, and nothing wider', () => {
+    const list = offered((id) => id !== 6);
+    expect(list.map((c) => [c.toTypeId, c.fixesUnflyable])).toEqual([[7, true]]);
+  });
+
+  it('falls back to the same group when no variant is flyable, whatever the Reach', () => {
+    const list = offered((id) => id !== 6 && id !== 7);
+    expect(list.map((c) => [c.toTypeId, c.fixesUnflyable])).toEqual([[8, true]]);
+  });
+
+  it('keeps a fix when more than the cap of other candidates come first', () => {
+    const many = fit([
+      ['medium', 0, 6],
+      ['low', 0, 11],
+    ]);
+    const list = improveCandidates(many.modules, index, rackOf, {
+      ...base,
+      goal: 'reach',
+      reach: 'rework',
+      limit: 1,
+      pool: { ...base.pool!, flyable: () => true, pilotCanFly: (_slot, id) => id !== 11 },
+    });
+    expect(list.map((c) => [c.fromTypeId, c.fixesUnflyable])).toEqual([[11, true]]);
+  });
+
+  it('leaves a flyable module’s candidates untagged', () => {
+    const list = offered(() => true);
+    expect(list.map((c) => [c.toTypeId, c.fixesUnflyable])).toEqual([[7, undefined]]);
+  });
+});
+
 describe('empty slots', () => {
   it('fills the first empty slot of each rack from the goal’s groups, always', () => {
     const f = fit([

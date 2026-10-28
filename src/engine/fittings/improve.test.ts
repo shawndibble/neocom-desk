@@ -225,6 +225,31 @@ describe('findImprovements goals', () => {
   });
 });
 
+describe('findImprovements replacing an unflyable module', () => {
+  const fix = (fromTypeId: number, toTypeId: number): ImproveCandidate => ({
+    ...candidate(fromTypeId, toTypeId),
+    fixesUnflyable: true,
+  });
+
+  it('accepts a swap that scores worse on the goal, ranked ahead of real gains', async () => {
+    const table = { 1: { dps: 50 }, 2: { dps: 10 }, 3: { dps: 70 }, 4: { dps: 60 } };
+    const result = await search('damage', table, [candidate(1, 3), candidate(1, 4), fix(1, 2)]);
+    expect(toIds(result.tradeOffs)).toEqual([2]);
+    expect(toIds(result.noDownside)).toEqual([3, 4]);
+    const [gain, , repair] = result.noDownside.concat(result.tradeOffs);
+    expect(rankImproveOptions([gain!, repair!]).map((o) => o.candidate.toTypeId)).toEqual([2, 3]);
+  });
+
+  it('ignores the capacitor and Cheaper stat guardrails, but not the fit’s CPU', async () => {
+    const table = { 1: {}, 2: { capUnstable: true, dps: -50 }, 3: { cpu: 999 } };
+    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3)], { 1: 100, 2: 500 });
+    expect(toIds(result.noDownside.concat(result.tradeOffs))).toEqual([2]);
+    expect(result.rejected.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
+      [3, 'budget'],
+    ]);
+  });
+});
+
 describe('findImprovements guardrails', () => {
   it('rejects a swap that puts the fit over CPU', async () => {
     const table = { 1: { cpu: 50 }, 2: { cpu: 150, dps: 50 } };
@@ -240,13 +265,13 @@ describe('findImprovements guardrails', () => {
     expect(result.rejected[0].guardrail).toBe('capStable');
   });
 
-  it('Cheaper keeps damage, tank and speed each within 5%', async () => {
+  it('Cheaper keeps damage, tank and speed each within 10%', async () => {
     const table = {
       1: {},
-      // Damage 100 → 90: 10% down.
-      2: { dps: -10 },
-      // Damage 100 → 97: within 5%, a trade-off.
-      3: { dps: -3 },
+      // Damage 100 → 85: 15% down.
+      2: { dps: -15 },
+      // Damage 100 → 92: within 10%, a trade-off.
+      3: { dps: -8 },
     };
     const result = await search('cheaper', table, [candidate(1, 2), candidate(1, 3)], {
       1: 1000,
