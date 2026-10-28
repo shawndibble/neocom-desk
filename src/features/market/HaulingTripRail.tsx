@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { FILL_BATCH_CAP, type HaulingFillStopReason } from '@/engine/market/haulingFillStop';
 import { holdsCapacityM3, holdsUsedM3, type TripPlan } from '@/engine/market/haulingPlan';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import { ROUTE_PREFERENCE_LABEL_KEYS } from '@/features/route/routePreferences';
 import { formatIsk, formatIskCompactSigned } from '@/lib/isk';
 import { useStickyClearance } from '@/lib/useStickyClearance';
@@ -153,9 +154,20 @@ export function HaulingTripSummary({
     <div className="flex flex-col gap-4">
       {laneLabel !== null && (
         <p className="text-xs text-text-dim">
-          {jumpsText
-            ? t('market.hauling.rail.laneJumps', { lane: laneLabel, jumps: jumpsText })
-            : laneLabel}
+          {jumpsText && toSystemId !== null ? (
+            <>
+              {t('market.hauling.rail.laneLead', { lane: laneLabel })}
+              <JumpsLink
+                systemId={toSystemId}
+                fromId={fromSystemId}
+                preference={knownJumps?.preference}
+              >
+                {jumpsText}
+              </JumpsLink>
+            </>
+          ) : (
+            laneLabel
+          )}
         </p>
       )}
 
