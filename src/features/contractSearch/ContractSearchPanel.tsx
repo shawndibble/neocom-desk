@@ -76,7 +76,8 @@ import {
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
 import { isItemsSearchActive } from '@/features/contractSearch/itemsSearchActive';
 import { useEarlyOffers, useOfferIndex } from '@/features/contractSearch/useIndexedOffers';
-import { useBelowMarket } from '@/features/contractSearch/belowMarketData';
+import { useBelowMarket, useBelowMarketSide } from '@/features/contractSearch/belowMarketData';
+import type { BelowMarketContract } from '@/engine/contracts/belowMarket';
 import { BelowMarketResults } from '@/features/contractSearch/BelowMarketResults';
 import {
   MAX_SUMMARY_CONTRACTS,
@@ -186,6 +187,8 @@ const ITEMS_FILTER_PARAMS = {
   'items.type': optionalIdParam(),
   /** Below market (#3989): one row per contract, valued at the hub. */
   'items.belowMarket': boolParam(),
+  /** Below market: also list contracts valued only through other contracts' asks (#5427). */
+  'items.bmOther': boolParam(),
 };
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
 
@@ -675,11 +678,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     [selectedTypeId, shownRows, plexPrice]
   );
 
+  const belowMarketSide = useBelowMarketSide((state) => state.value);
+  useHydratedStore(useBelowMarketSide);
+  const includeOther = itemsParams['items.bmOther'];
   const belowMarketState = useBelowMarket(
     rows,
     mode === 'items' && belowMarket && !awaitingRows,
-    activeCharacterId,
-    plexPrice
+    plexPrice,
+    belowMarketSide,
+    includeOther
   );
   /**
    * The bar's filters at contract grain: every field but quantity and type is
@@ -1065,6 +1072,10 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   state={belowMarketState}
                   contracts={belowMarketRows}
                   lastSyncedAt={lastSyncedAt}
+                  side={belowMarketSide}
+                  onSideChange={(side) => void useBelowMarketSide.getState().setValue(side)}
+                  includeOther={includeOther}
+                  onIncludeOtherChange={(next) => setItemsParams({ 'items.bmOther': next })}
                   typeNames={typeNames}
                   offerLocations={offerLocations}
                   offerJumps={offerJumps}
@@ -1162,9 +1173,23 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           bpcCheck={selectedBpcCheck}
           flag={flagFor(selectedRow)}
           flagMultiple={itemFlagMultiple}
+          {...(belowMarket && belowMarketState.status === 'ready'
+            ? {
+                defaultPriceSide: belowMarketState.side,
+                otherValue: otherValueOf(belowMarketState.contracts, selectedRow.contractId),
+              }
+            : {})}
           onClose={() => setSelectedRow(null)}
         />
       )}
     </>
   );
+}
+
+/** The board's estimate from other contracts for the contract the slide-over opened on, when it has one. */
+function otherValueOf(contracts: readonly BelowMarketContract[], contractId: number) {
+  const contract = contracts.find((c) => c.contractId === contractId);
+  return contract && contract.other > 0
+    ? { value: contract.other, lines: contract.otherLines }
+    : null;
 }

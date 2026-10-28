@@ -31,15 +31,13 @@ function bpc(over: Partial<PublicContractOfferRow> = {}): PublicContractOfferRow
   return offer({ typeId: GILA_BP, isBlueprintCopy: true, me: 10, te: 20, runs: 1, ...over });
 }
 
-/** No tax unless a test sets one, so the arithmetic below reads plainly. */
 function pricing(over: Partial<BelowMarketPricing> = {}): BelowMarketPricing {
   return {
-    bestBuy: new Map([
+    prices: new Map([
       [RIFTER, 1_000],
       [DC2, 500],
       [GILA_BP, 1_000_000_000],
     ]),
-    salesTaxPct: 0,
     plexPrice: null,
     isAbyssalType: (typeId) => typeId === ABYSSAL,
     ...over,
@@ -55,19 +53,37 @@ describe('belowMarketContracts', () => {
     const [result] = belowMarketContracts(rows, pricing());
     expect(result).toMatchObject({
       contractId: 1,
-      value: 4_000,
+      market: 4_000,
+      pricedLines: 2,
+      other: 0,
+      otherLines: 0,
       asking: 1_500,
       profit: 2_500,
       lines: 2,
-      source: { kind: 'market' },
     });
   });
 
-  it('subtracts sales tax from market-valued lines', () => {
-    const rows = [offer({ quantity: 10, price: 5_000 })];
-    const [result] = belowMarketContracts(rows, pricing({ salesTaxPct: 7.5 }));
-    expect(result?.value).toBeCloseTo(9_250);
-    expect(result?.profit).toBeCloseTo(4_250);
+  it('takes no fees off the hub price', () => {
+    const [result] = belowMarketContracts([offer({ quantity: 10, price: 5_000 })], pricing());
+    expect(result).toMatchObject({ market: 10_000, profit: 5_000 });
+  });
+
+  it('prices whichever side of the book the map holds; a type with no order on that side is unpriced', () => {
+    const rows = [
+      offer({ typeId: RIFTER, quantity: 1, price: 100 }),
+      offer({ typeId: DC2, quantity: 1, price: 100 }),
+    ];
+    const sell = pricing({
+      prices: new Map<number, number | null>([
+        [RIFTER, 1_200],
+        [DC2, null],
+      ]),
+    });
+    expect(belowMarketContracts(rows, sell)[0]).toMatchObject({
+      market: 1_200,
+      pricedLines: 1,
+      lines: 2,
+    });
   });
 
   it('leads with the most valuable line', () => {
@@ -125,13 +141,13 @@ describe('belowMarketContracts', () => {
     const [result] = belowMarketContracts(
       rows,
       pricing({
-        bestBuy: new Map([
+        prices: new Map([
           [RIFTER, 1_000],
           [ABYSSAL, 1_000_000],
         ]),
       })
     );
-    expect(result?.value).toBe(1_000);
+    expect(result).toMatchObject({ market: 1_000, pricedLines: 1, lines: 2 });
   });
 
   describe('items with no market', () => {
@@ -145,8 +161,44 @@ describe('belowMarketContracts', () => {
         offer({ contractId: 1, typeId: NO_MARKET, quantity: 5, price: 100 }),
         ...others(3, 50),
       ];
+      const [result] = belowMarketContracts(rows, pricing(), { includeOther: true }).filter(
+        (c) => c.contractId === 1
+      );
+      expect(result).toMatchObject({
+        market: 0,
+        other: 250,
+        otherLines: 1,
+        otherOfferCount: 3,
+        profit: 150,
+      });
+    });
+
+    it('never lets other contracts into profit, and does not list a contract valued only by them', () => {
+      const rows = [
+        offer({ contractId: 1, typeId: NO_MARKET, quantity: 5, price: 100 }),
+        ...others(3, 50),
+      ];
+      expect(belowMarketContracts(rows, pricing()).some((c) => c.contractId === 1)).toBe(false);
+    });
+
+    it('splits a contract of market lines and comparable-priced lines; profit ignores other', () => {
+      const rows = [
+        offer({ contractId: 1, typeId: RIFTER, quantity: 3, price: 1_000 }),
+        offer({ contractId: 1, typeId: NO_MARKET, quantity: 5, price: 1_000 }),
+        offer({ contractId: 1, typeId: NO_MARKET, quantity: 1, price: 1_000 }),
+        ...others(3, 50),
+      ];
       const [result] = belowMarketContracts(rows, pricing()).filter((c) => c.contractId === 1);
-      expect(result).toMatchObject({ value: 250, source: { kind: 'offers', offerCount: 3 } });
+      expect(result).toMatchObject({
+        market: 3_000,
+        pricedLines: 1,
+        lines: 3,
+        other: 300,
+        otherLines: 2,
+        otherOfferCount: 3,
+        asking: 1_000,
+        profit: 2_000,
+      });
     });
 
     it('values the line at zero with fewer than three other offers', () => {
@@ -154,7 +206,11 @@ describe('belowMarketContracts', () => {
         offer({ contractId: 1, typeId: NO_MARKET, quantity: 5, price: 1 }),
         ...others(2, 50),
       ];
-      expect(belowMarketContracts(rows, pricing()).some((c) => c.contractId === 1)).toBe(false);
+      expect(
+        belowMarketContracts(rows, pricing(), { includeOther: true }).some(
+          (c) => c.contractId === 1
+        )
+      ).toBe(false);
     });
 
     it('never counts the contract being valued as its own comparable', () => {
@@ -164,8 +220,10 @@ describe('belowMarketContracts', () => {
         offer({ contractId: 1, typeId: NO_MARKET, quantity: 2, price: 2 }),
         ...others(3, 50),
       ];
-      const [result] = belowMarketContracts(rows, pricing()).filter((c) => c.contractId === 1);
-      expect(result).toMatchObject({ value: 100, source: { kind: 'offers', offerCount: 3 } });
+      const [result] = belowMarketContracts(rows, pricing(), { includeOther: true }).filter(
+        (c) => c.contractId === 1
+      );
+      expect(result).toMatchObject({ other: 100, otherOfferCount: 3 });
     });
 
     it('ignores multi-type contracts, auctions, PLEX asks, barters and item asks as comparables', () => {
@@ -180,7 +238,7 @@ describe('belowMarketContracts', () => {
         offer({ contractId: 7, typeId: NO_MARKET, price: 20 }),
         offer({ contractId: 8, typeId: NO_MARKET, price: 20 }),
       ];
-      const result = belowMarketContracts(rows, pricing({ plexPrice: 1 }));
+      const result = belowMarketContracts(rows, pricing({ plexPrice: 1 }), { includeOther: true });
       expect(result.some((c) => c.contractId === 1)).toBe(false);
     });
 
@@ -193,9 +251,11 @@ describe('belowMarketContracts', () => {
         // Different ME: not the same thing.
         bpc({ contractId: 5, runs: 10, me: 0, price: 10 }),
       ];
-      const [result] = belowMarketContracts(rows, pricing()).filter((c) => c.contractId === 1);
-      // Others at 50, 70, 100 ISK/run; cheapest 50 × 3 runs.
-      expect(result).toMatchObject({ value: 150, source: { kind: 'offers', offerCount: 3 } });
+      const [result] = belowMarketContracts(rows, pricing(), { includeOther: true }).filter(
+        (c) => c.contractId === 1
+      );
+      // Others at 50, 70, 100 ISK/run; cheapest 50 × 3 runs. Never the original's 1B book.
+      expect(result).toMatchObject({ market: 0, pricedLines: 0, other: 150, otherOfferCount: 3 });
     });
 
     it('does not count a contract that also sells the original as a copy comparable', () => {
@@ -206,7 +266,11 @@ describe('belowMarketContracts', () => {
         bpc({ contractId: 4, price: 50 }),
         offer({ contractId: 4, typeId: GILA_BP, me: 10, te: 20 }),
       ];
-      expect(belowMarketContracts(rows, pricing()).some((c) => c.contractId === 1)).toBe(false);
+      expect(
+        belowMarketContracts(rows, pricing(), { includeOther: true }).some(
+          (c) => c.contractId === 1
+        )
+      ).toBe(false);
     });
 
     it('names the weakest comparable count when lines mix market and offer values', () => {
@@ -220,8 +284,26 @@ describe('belowMarketContracts', () => {
         bpc({ contractId: 22, price: 50 }),
       ];
       const [result] = belowMarketContracts(rows, pricing()).filter((c) => c.contractId === 1);
-      expect(result?.source).toEqual({ kind: 'offers', offerCount: 3 });
+      expect(result?.otherOfferCount).toBe(3);
     });
+  });
+});
+
+describe('include contracts valued from other contracts', () => {
+  it('adds other to profit and marks the contract', () => {
+    const others = Array.from({ length: 3 }, (_, i) =>
+      offer({ contractId: 100 + i, typeId: NO_MARKET, price: 50 * (i + 1) })
+    );
+    const rows = [
+      offer({ contractId: 1, typeId: RIFTER, quantity: 1, price: 1_000 }),
+      offer({ contractId: 1, typeId: NO_MARKET, quantity: 1, price: 1_000 }),
+      ...others,
+    ];
+    expect(belowMarketContracts(rows, pricing()).some((c) => c.contractId === 1)).toBe(false);
+    const [result] = belowMarketContracts(rows, pricing(), { includeOther: true }).filter(
+      (c) => c.contractId === 1
+    );
+    expect(result).toMatchObject({ market: 1_000, other: 50, profit: 50, includesOther: true });
   });
 });
 
