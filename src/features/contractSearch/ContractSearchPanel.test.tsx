@@ -2461,7 +2461,9 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     const user = userEvent.setup();
     renderWithRouter(['/?items.belowMarket=1']);
     await screen.findByRole('table', { name: 'Below-market contracts' });
-    await user.click(screen.getByRole('button', { name: 'Buy orders' }));
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('combobox', { name: 'Value at' }));
+    await user.click(await screen.findByRole('option', { name: 'Buy orders' }));
     // Tritanium in Domain falls to 100 × 4k − 500k < 0 and drops out.
     await waitFor(() => {
       const table = screen.getByRole('table', { name: 'Below-market contracts' });
@@ -2494,9 +2496,8 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
         expect(screen.queryByRole('status', { name: /Pricing/ })).not.toBeInTheDocument()
       );
       expect(screen.queryByRole('table', { name: 'Below-market contracts' })).toBeNull();
-      await user.click(
-        screen.getByRole('button', { name: 'Include contracts valued from other contracts' })
-      );
+      await user.click(screen.getByRole('button', { name: 'Filters' }));
+      await user.click(screen.getByRole('button', { name: 'Include Other' }));
       const table = await screen.findByRole('table', { name: 'Below-market contracts' });
       const [, body] = within(table).getAllByRole('rowgroup');
       const [only] = within(body).getAllByRole('row');

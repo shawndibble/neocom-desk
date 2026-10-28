@@ -20,6 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
+import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -41,6 +42,11 @@ import {
   ProgressBar,
   RegionSelect,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   StatChips,
@@ -207,6 +213,13 @@ interface ContractSearchFilterBarProps {
   itemFlagMultiple: number;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
+  /** Below market on: its two valuation controls join the filters. They write their own settings at once, not into the draft. */
+  belowMarket?: {
+    side: PriceSide;
+    onSideChange: (side: PriceSide) => void;
+    includeOther: boolean;
+    onIncludeOtherChange: (next: boolean) => void;
+  };
 }
 
 function ContractSearchFilterBar({
@@ -216,6 +229,7 @@ function ContractSearchFilterBar({
   currentSystem,
   itemFlagMultiple,
   actions,
+  belowMarket,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
   // Counted off the controls, not off the parsed engine filter: a half-typed
@@ -293,6 +307,7 @@ function ContractSearchFilterBar({
               <FilterChip
                 key={kind}
                 label={t(`contractSearch.saleKind.${kind}`)}
+                size="md"
                 selected={draft.saleKind === kind}
                 onToggle={() =>
                   setDraft({ ...draft, saleKind: draft.saleKind === kind ? null : kind })
@@ -303,6 +318,7 @@ function ContractSearchFilterBar({
           <FilterField label={t('contractSearch.excludeLabel')}>
             <CheckboxSelect
               label={t('contractSearch.excludeLabel')}
+              size="md"
               className="w-44"
               options={[
                 { value: 'auctions' as const, label: t('contractSearch.hideAuctions') },
@@ -330,6 +346,7 @@ function ContractSearchFilterBar({
           {/* A filter, not a view control: it sits in the funnel as Market Browser's Hide bait sells does. */}
           <FilterChip
             label={t('contractSearch.filterHideOverpriced')}
+            size="md"
             tooltip={t('contractSearch.filterHideOverpricedHint', {
               times: itemFlagMultiple,
             })}
@@ -344,6 +361,34 @@ function ContractSearchFilterBar({
           </FilterField>
           {/* Writes its own setting straight away — not part of this draft, see `currentSystem.ts`. */}
           <CurrentSystemPicker current={currentSystem} />
+          {belowMarket && (
+            <>
+              <FilterField label={t('contractSearch.belowMarket.sideLabel')}>
+                <Select
+                  value={belowMarket.side}
+                  onValueChange={(next) => belowMarket.onSideChange(next as PriceSide)}
+                >
+                  <SelectTrigger
+                    aria-label={t('contractSearch.belowMarket.sideLabel')}
+                    className="w-36"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sell">{t('contractSearch.belowMarket.sideSell')}</SelectItem>
+                    <SelectItem value="buy">{t('contractSearch.belowMarket.sideBuy')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterChip
+                label={t('contractSearch.belowMarket.includeOther')}
+                size="md"
+                selected={belowMarket.includeOther}
+                onToggle={() => belowMarket.onIncludeOtherChange(!belowMarket.includeOther)}
+                tooltip={t('contractSearch.belowMarket.includeOtherTooltip')}
+              />
+            </>
+          )}
         </>
       )}
     </FilterBar>
@@ -935,6 +980,16 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 regionOptions={regionOptions}
                 currentSystem={currentSystem}
                 itemFlagMultiple={itemFlagMultiple}
+                belowMarket={
+                  belowMarket
+                    ? {
+                        side: belowMarketSide,
+                        onSideChange: (side) => void useBelowMarketSide.getState().setValue(side),
+                        includeOther,
+                        onIncludeOtherChange: (next) => setItemsParams({ 'items.bmOther': next }),
+                      }
+                    : undefined
+                }
                 actions={
                   <>
                     {/* A view control, not a filter: it changes the rows and columns at once (§4b). */}
@@ -1073,9 +1128,6 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   contracts={belowMarketRows}
                   lastSyncedAt={lastSyncedAt}
                   side={belowMarketSide}
-                  onSideChange={(side) => void useBelowMarketSide.getState().setValue(side)}
-                  includeOther={includeOther}
-                  onIncludeOtherChange={(next) => setItemsParams({ 'items.bmOther': next })}
                   typeNames={typeNames}
                   offerLocations={offerLocations}
                   offerJumps={offerJumps}
