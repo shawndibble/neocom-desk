@@ -117,6 +117,8 @@ export function useAppraisalColumns({
     },
     {
       id: 'item',
+      stickyStart: true,
+      stickyStartOnPanel: true,
       header: t('market.appraisal.columnItem'),
       primary: true,
       // A priced line is nearly always followed by "…and what is the book

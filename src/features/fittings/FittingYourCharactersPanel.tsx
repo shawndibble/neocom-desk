@@ -41,6 +41,7 @@ export function FittingYourCharactersPanel({ rows }: { rows: readonly CharacterG
   const columns: DataTableColumn<CharacterGapRow>[] = [
     {
       id: 'name',
+      stickyStart: true,
       header: t('fittings.yourCharacters.character'),
       render: (row) => row.name,
       sortValue: (row) => row.name.toLowerCase(),

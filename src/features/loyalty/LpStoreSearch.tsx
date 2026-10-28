@@ -91,6 +91,8 @@ export function LpStoreSearch({
   const columns: DataTableColumn<ItemSearchStore>[] = [
     {
       id: 'store',
+      stickyStart: true,
+      stickyStartOnPanel: true,
       header: t('loyaltyStore.search.colStore'),
       primary: true,
       render: (store) => <StoreCell store={store} search={search} />,
