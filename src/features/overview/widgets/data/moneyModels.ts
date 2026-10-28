@@ -497,6 +497,7 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
           vs90dCell(alert.vs90d),
         ],
         tone: alert.crossed ? 'warning' : 'clear',
+        info: { typeId: alert.typeId },
       };
     }),
   };

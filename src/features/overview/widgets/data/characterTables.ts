@@ -73,6 +73,7 @@ export function trainingTable(
           : UNKNOWN,
       ],
       tone: 'clear',
+      info: { typeId: entry.skill_id },
     });
     if (finish !== null) previousFinish = finish;
   }

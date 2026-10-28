@@ -326,6 +326,7 @@ describe('miningYield', () => {
     expect(view.chart.values).toHaveLength(7);
     expect(view.chart.values.at(-1)).toBe(700);
     expect(view.rows[0]!.title).toBe('Veldspar');
+    expect(view.table?.rows[0]?.info).toEqual({ typeId: 1 });
   });
 
   it('filters to the header Character unless scoped to all', () => {
@@ -748,6 +749,17 @@ describe('survey', () => {
     summary: summary(),
     fetchedAt: new Date(NOW),
     ...over,
+  });
+
+  it('opens Show info on each ore row, by the ore name resolved to its type id', () => {
+    const view = buildView(
+      'survey',
+      { survey: ok(data({ oreTypeIds: new Map([['Veldspar', 1230]]) })) },
+      ctx()
+    );
+    expect(view.table?.rows.map((r) => r.info)).toEqual([{ typeId: 1230 }]);
+    const unresolved = buildView('survey', { survey: ok(data()) }, ctx());
+    expect(unresolved.table?.rows[0]?.info).toBeUndefined();
   });
 
   it('reads from its own feed and links to the Mining Survey tab', () => {
