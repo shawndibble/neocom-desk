@@ -33,6 +33,8 @@ interface Props {
   /** Names the Skill Plan Add to plan creates when the Character has none yet. */
   fittingName: string;
   catalogue: FittingCatalogue | null;
+  /** Opens the stats column's What to train, for the "See all" link; absent: no link. */
+  onShowWhatToTrain?: () => void;
 }
 
 export function ImproveTrain({ goal, characterId, ...rest }: Props) {
@@ -49,6 +51,7 @@ function Train({
   characterId,
   fittingName,
   catalogue,
+  onShowWhatToTrain,
 }: Props & { characterId: number }) {
   const { t } = useTranslation();
   const sort = TRAIN_SORT[goal]!;
@@ -98,36 +101,47 @@ function Train({
     scheduleEntriesFor?.([{ skillTypeID: skillTypeId, targetLevel: level }]) ?? null;
 
   const rows = (
-    <ul className="m-0 list-none p-0 text-xs">
-      {skills.slice(0, FREE_ROWS_SHOWN).map((row, index) => (
-        <WhatToTrainItem
-          key={row.skillTypeId}
-          row={row}
-          rank={index + 1}
-          evaluator={evaluator}
-          plan={plan}
-          plannedLevels={plannedLevels}
-          scheduleFor={scheduleFor}
-          skills={catalog?.engineSkills}
-          trainedSkills={trainedSkills}
-          onAdd={(picked, level) =>
-            addEntries([{ skillTypeID: picked.skillTypeId, targetLevel: level }])
-          }
-        />
-      ))}
-      {modules.slice(0, FREE_ROWS_SHOWN).map((row) => (
-        <ModuleUpgradeItem
-          key={row.fromTypeId}
-          row={row}
-          typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-          skills={catalog?.engineSkills}
-          trainedSkills={trainedSkills}
-          plan={plan}
-          plannedLevels={plannedLevels}
-          onAdd={addEntries}
-        />
-      ))}
-    </ul>
+    <>
+      <ul className="m-0 list-none p-0 text-xs">
+        {skills.slice(0, FREE_ROWS_SHOWN).map((row, index) => (
+          <WhatToTrainItem
+            key={row.skillTypeId}
+            row={row}
+            rank={index + 1}
+            evaluator={evaluator}
+            plan={plan}
+            plannedLevels={plannedLevels}
+            scheduleFor={scheduleFor}
+            skills={catalog?.engineSkills}
+            trainedSkills={trainedSkills}
+            onAdd={(picked, level) =>
+              addEntries([{ skillTypeID: picked.skillTypeId, targetLevel: level }])
+            }
+          />
+        ))}
+        {modules.slice(0, FREE_ROWS_SHOWN).map((row) => (
+          <ModuleUpgradeItem
+            key={row.fromTypeId}
+            row={row}
+            typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
+            skills={catalog?.engineSkills}
+            trainedSkills={trainedSkills}
+            plan={plan}
+            plannedLevels={plannedLevels}
+            onAdd={addEntries}
+          />
+        ))}
+      </ul>
+      {onShowWhatToTrain && (
+        <button
+          type="button"
+          className={textActionClassName('mt-2 text-xs')}
+          onClick={onShowWhatToTrain}
+        >
+          {t('fittings.improve.seeAllInWhatToTrain')}
+        </button>
+      )}
+    </>
   );
   const toast = added && (
     <Toast

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
@@ -12,6 +12,7 @@ import { damageSections, shipSections, tankSections } from './stats/columnSectio
 import { makeFigure } from './stats/statFigures';
 import { YourCharactersSection } from './stats/StatSection';
 import { useSectionBuilder } from './stats/useSectionBuilder';
+import { useStatsSectionsPreference, withSectionExpanded } from './statsSectionsPreference';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
@@ -101,6 +102,9 @@ interface FittingStatsSectionsProps {
   previewIsk?: number | null;
   /** One sentence per fitting rule the fit breaks; empty or absent for a legal fit. */
   ruleBreaks?: readonly string[];
+  /** Open the Pilot panel with What to train expanded and in view; `onWhatToTrainShown` is called once it has. */
+  whatToTrainRequested?: boolean;
+  onWhatToTrainShown?: () => void;
 }
 
 /**
@@ -133,6 +137,8 @@ export function FittingStatsSections({
   yourCharacters,
   showDrones = true,
   ruleBreaks = [],
+  whatToTrainRequested,
+  onWhatToTrainShown,
   fitting = null,
   moduleResults = null,
   preview = null,
@@ -156,6 +162,22 @@ export function FittingStatsSections({
     setPanel(which);
   };
   const closePanel = () => setPanel(null);
+  if (whatToTrainRequested && panel !== 'pilot') openPanel('pilot');
+  // Not tied to a change in the request: a phone mounts this column only once its Stats tab shows.
+  useEffect(() => {
+    if (!whatToTrainRequested) return;
+    void useStatsSectionsPreference
+      .getState()
+      .setValue(
+        withSectionExpanded(useStatsSectionsPreference.getState().value, 'whatToTrain', true)
+      );
+    requestAnimationFrame(() =>
+      document
+        .querySelector('[data-section="whatToTrain"]')
+        ?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+    );
+    onWhatToTrainShown?.();
+  }, [whatToTrainRequested, onWhatToTrainShown]);
   const pilotTriggerRef = useRef<HTMLButtonElement>(null);
   const situationTriggerRef = useRef<HTMLButtonElement>(null);
   const overheatAll = useOverheatAll((state) => state.overheatAll);
