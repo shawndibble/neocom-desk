@@ -14265,7 +14265,72 @@
     "period": "{{start}} – {{end}}",
     "periodOngoing": "{{start}} – now",
     "npcAgent": "NPC agent",
-    "npcAgentHint": "An agent run by CCP, not a player. There's no killboard or employment history to show."
+    "npcAgentHint": "An agent run by CCP, not a player. There's no killboard or employment history to show.",
+    "npc": {
+      "kind": {
+        "faction": "Faction",
+        "corporation": "Corporation",
+        "agent": "Agent"
+      },
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "standing": {
+        "title": "Your standing",
+        "baseAndSkills": "Base {{base}}, {{effective}} with your skills",
+        "highest": "Agents use your highest: {{name}}.",
+        "blocked": "{{name}} is at {{standing}}: at −2.0 or lower it blocks level 2+ agents.",
+        "unavailable": "Your standing couldn't be read."
+      },
+      "access": {
+        "title": "Agent access",
+        "titleAgent": "Can you use this agent?",
+        "levelShort": "L{{level}}",
+        "levelOpen": "Level {{level}} needs {{needs}}, open",
+        "levelClosed": "Level {{level}} needs {{needs}}, closed",
+        "levelOneOpen": "Level 1 needs no standing, open",
+        "next": "Level {{level}} needs {{needs}}: {{short}} more.",
+        "all": "Every agent level is open.",
+        "blocked": "Only level 1 agents stay open while a standing is at −2.0 or lower.",
+        "agentFree": "Yes. Level 1 agents need no standing.",
+        "agentYes": "Yes. Level {{level}} needs {{needs}}; you have {{have}}.",
+        "agentNo": "Not yet. Level {{level}} needs {{needs}}; you have {{have}}.",
+        "agentBlocked": "No. {{name}} is at {{standing}}, which blocks level 2+ agents."
+      },
+      "stations": {
+        "title": "At their stations",
+        "brokerFee": "Broker fee at {{place}}",
+        "reprocessing": "Reprocessing tax",
+        "reprocessingAt": "Reprocessing tax at {{place}}",
+        "saves": "saves {{amount}}",
+        "costs": "costs {{amount}} more",
+        "note": "Broker fee uses your base standings and Broker Relations {{level}}."
+      },
+      "where": {
+        "title": "Where",
+        "headquarters": "Headquarters",
+        "capital": "Capital",
+        "stations": "Stations",
+        "stationsValue_one": "{{stations}} in {{count}} system",
+        "stationsValue_other": "{{stations}} in {{count}} systems",
+        "militia": "Militia",
+        "nearest": "Nearest",
+        "station": "Station",
+        "agent": "Agent",
+        "agentValue": "Level {{level}} {{division}}",
+        "agentValueNoDivision": "Level {{level}}"
+      },
+      "known": {
+        "agents": "Agents you know",
+        "corporations": "Corporations you know",
+        "agentLevel": "L{{level}} {{division}}",
+        "agentLevelNoDivision": "L{{level}}"
+      },
+      "loyalty": {
+        "title": "Loyalty points",
+        "none": "None yet",
+        "openStore": "Open LP store"
+      }
+    }
   },
   "filters": {
     "title": "Filters",
