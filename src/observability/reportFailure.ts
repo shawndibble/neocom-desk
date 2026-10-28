@@ -1,4 +1,5 @@
 import { captureException } from '@sentry/react';
+import { DYNAMIC_IMPORT_FAILURE } from '@/app/routeChunks';
 import { isOnline } from '@/stores/network';
 import { redactSecrets } from './scrub';
 
@@ -180,9 +181,6 @@ export function isStrayAbortEvent(event: {
   );
 }
 
-/** The browser's wording, per engine, for a dynamic import that would not load. */
-export const CHUNK_LOAD_MESSAGE = /dynamically imported module|importing a module script failed/i;
-
 /**
  * `beforeSend`'s half of the chunk-failure downgrade `main.tsx` does for React's
  * error hooks. The reports seen in production arrive by a path that never
@@ -200,7 +198,7 @@ export function markChunkLoadFailure<
   },
 >(event: E): E {
   const failed = event.exception?.values?.some(
-    (v) => v.type === 'TypeError' && CHUNK_LOAD_MESSAGE.test(v.value ?? '')
+    (v) => v.type === 'TypeError' && DYNAMIC_IMPORT_FAILURE.test(v.value ?? '')
   );
   if (!failed) return event;
   return { ...event, level: 'warning', tags: { ...event.tags, chunk_load: 'failed' } };
