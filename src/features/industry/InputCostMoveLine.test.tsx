@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { InputCostMoveLine } from './InputCostMoveLine';
 
 describe('InputCostMoveLine', () => {
-  it('names the input, its share and the product move; warns when cost rose and product did not', () => {
+  it('names the input, its share and the product move; warns when cost rose and product did not rise; no warn without product history', () => {
     render(
       <InputCostMoveLine
         move={{ costPct: 9, topInput: { typeID: 34, sharePct: 38.2 }, productPct: 0 }}
@@ -31,5 +31,12 @@ describe('InputCostMoveLine', () => {
       />
     );
     expect(screen.getByText(/Build cost −9%/).textContent).not.toContain('product');
+    rerender(
+      <InputCostMoveLine
+        move={{ costPct: 9, topInput: { typeID: 34, sharePct: 50 }, productPct: null }}
+        inputName="Tritanium"
+      />
+    );
+    expect(screen.getByText(/Build cost \+9%/).className).toContain('text-text-dim');
   });
 });

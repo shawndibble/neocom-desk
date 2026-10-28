@@ -20,8 +20,8 @@ describe('inputCostMove', () => {
   it('reports the cost move, the biggest input and the product move', () => {
     const move = inputCostMove({
       inputs: [
-        { typeID: 34, quantity: 100 },
-        { typeID: 35, quantity: 100 },
+        { typeID: 34, quantity: 100, lineCost: 100 },
+        { typeID: 35, quantity: 100, lineCost: 100 },
       ],
       series: new Map([
         [34, line(10, 12)],
@@ -42,14 +42,14 @@ describe('inputCostMove', () => {
     expect(INPUT_COST_MOVE_MIN_PCT).toBe(5);
     expect(
       inputCostMove({
-        inputs: [{ typeID: 34, quantity: 1 }],
+        inputs: [{ typeID: 34, quantity: 1, lineCost: 100 }],
         series: new Map([[34, line(100, 104)]]),
         materialSide: 'sell',
         product: null,
       })
     ).toBeNull();
     const fell = inputCostMove({
-      inputs: [{ typeID: 34, quantity: 1 }],
+      inputs: [{ typeID: 34, quantity: 1, lineCost: 100 }],
       series: new Map([[34, line(100, 90)]]),
       materialSide: 'sell',
       product: null,
@@ -60,7 +60,7 @@ describe('inputCostMove', () => {
   it('reads the chosen side only', () => {
     expect(
       inputCostMove({
-        inputs: [{ typeID: 34, quantity: 1 }],
+        inputs: [{ typeID: 34, quantity: 1, lineCost: 100 }],
         series: new Map([[34, line(100, 120, 'sell')]]),
         materialSide: 'buy',
         product: null,
@@ -71,8 +71,8 @@ describe('inputCostMove', () => {
   it('skips an input with no history, hides when none has any', () => {
     const move = inputCostMove({
       inputs: [
-        { typeID: 34, quantity: 1 },
-        { typeID: 35, quantity: 1 },
+        { typeID: 34, quantity: 1, lineCost: 100 },
+        { typeID: 35, quantity: 1, lineCost: 10 },
       ],
       series: new Map([[34, line(100, 120)]]),
       materialSide: 'sell',
@@ -83,8 +83,22 @@ describe('inputCostMove', () => {
     expect(move?.productPct).toBeNull();
     expect(
       inputCostMove({
-        inputs: [{ typeID: 35, quantity: 1 }],
+        inputs: [{ typeID: 35, quantity: 1, lineCost: 100 }],
         series: new Map(),
+        materialSide: 'sell',
+        product: null,
+      })
+    ).toBeNull();
+  });
+
+  it('hides when the priced inputs are a sliver of the plan cost', () => {
+    expect(
+      inputCostMove({
+        inputs: [
+          { typeID: 34, quantity: 1, lineCost: 10 },
+          { typeID: 35, quantity: 1, lineCost: 90 },
+        ],
+        series: new Map([[34, line(100, 120)]]),
         materialSide: 'sell',
         product: null,
       })
@@ -94,7 +108,7 @@ describe('inputCostMove', () => {
   it('needs a base day 7 days back', () => {
     expect(
       inputCostMove({
-        inputs: [{ typeID: 34, quantity: 1 }],
+        inputs: [{ typeID: 34, quantity: 1, lineCost: 100 }],
         series: new Map([[34, line(100, 120).slice(3)]]),
         materialSide: 'sell',
         product: null,
@@ -105,7 +119,7 @@ describe('inputCostMove', () => {
   it('ignores zero-quantity inputs', () => {
     expect(
       inputCostMove({
-        inputs: [{ typeID: 34, quantity: 0 }],
+        inputs: [{ typeID: 34, quantity: 0, lineCost: 100 }],
         series: new Map([[34, line(100, 120)]]),
         materialSide: 'sell',
         product: null,

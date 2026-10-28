@@ -24,7 +24,7 @@ export function useInputCostMove(
     () =>
       materials
         .filter((m) => !m.subBuild && !m.acquisitionTier)
-        .map((m) => ({ typeID: m.typeID, quantity: m.remainingQuantity })),
+        .map((m) => ({ typeID: m.typeID, quantity: m.remainingQuantity, lineCost: m.lineCost })),
     [materials]
   );
   const key = [
@@ -32,6 +32,7 @@ export function useInputCostMove(
   ]
     .sort((a, b) => a - b)
     .join(',');
+  const loadKey = `${regionId}:${key}`;
   const [loaded, setLoaded] = useState<{
     key: string;
     series: ReadonlyMap<number, readonly OpenPricePoint[]>;
@@ -46,20 +47,20 @@ export function useInputCostMove(
         return [Number(id), hub ? openPricePoints(hub.series) : []] as const;
       })
     ).then((entries) => {
-      if (!cancelled) setLoaded({ key: `${regionId}:${key}`, series: new Map(entries) });
+      if (!cancelled) setLoaded({ key: loadKey, series: new Map(entries) });
     });
     return () => {
       cancelled = true;
     };
-  }, [regionId, key]);
+  }, [regionId, key, loadKey]);
 
   return useMemo(() => {
-    if (!loaded || loaded.key !== `${regionId}:${key}`) return null;
+    if (!loaded || loaded.key !== loadKey) return null;
     return inputCostMove({
       inputs,
       series: loaded.series,
       materialSide: basis,
       product: productTypeID === null ? null : { typeID: productTypeID, side: PRODUCT_SIDE },
     });
-  }, [loaded, regionId, key, inputs, basis, productTypeID]);
+  }, [loaded, loadKey, inputs, basis, productTypeID]);
 }

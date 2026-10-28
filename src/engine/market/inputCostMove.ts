@@ -10,6 +10,8 @@ import { shiftDay } from './priceTrend';
 export const INPUT_COST_MOVE_DAYS = 7;
 /** The line shows only when build cost moved at least this many percent, up or down. */
 export const INPUT_COST_MOVE_MIN_PCT = 5;
+/** Inputs with a usable series must carry at least this share of the plan's input cost, or the line would speak for a sliver. */
+export const INPUT_COST_MOVE_MIN_COVERAGE = 0.8;
 
 type Side = 'buy' | 'sell';
 
@@ -17,6 +19,8 @@ export interface InputCostMoveInput {
   typeID: number;
   /** Units still to buy (owned units cost nothing). */
   quantity: number;
+  /** What the plan costs this line, to judge how much of the cost the series cover. */
+  lineCost: number;
 }
 
 export interface InputCostMove {
@@ -55,18 +59,24 @@ export function inputCostMove(args: {
 }): InputCostMove | null {
   let now = 0;
   let then = 0;
+  let coveredLineCost = 0;
+  let totalLineCost = 0;
   let top: { typeID: number; delta: number; cost: number } | null = null;
   for (const input of args.inputs) {
     if (input.quantity <= 0) continue;
+    totalLineCost += input.lineCost;
     const w = sideWindow(args.series.get(input.typeID), args.materialSide);
     if (!w) continue;
     const cost = input.quantity * w.latest;
     const delta = cost - input.quantity * w.base;
+    coveredLineCost += input.lineCost;
     now += cost;
     then += input.quantity * w.base;
     if (!top || Math.abs(delta) > Math.abs(top.delta)) top = { typeID: input.typeID, delta, cost };
   }
-  if (!top || then <= 0) return null;
+  if (!top || then <= 0 || coveredLineCost < totalLineCost * INPUT_COST_MOVE_MIN_COVERAGE) {
+    return null;
+  }
   const costPct = (now / then - 1) * 100;
   if (Math.abs(costPct) < INPUT_COST_MOVE_MIN_PCT) return null;
   const pw = args.product
