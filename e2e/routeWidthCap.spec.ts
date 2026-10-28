@@ -11,24 +11,16 @@ import { signInAndGoto } from './support/authSeed';
 import { CORPORATION_ID } from './support/fixtureData';
 
 const DESKTOP = { width: 1440, height: 900 };
-const MAX_WIDTH = 1152; // max-w-6xl
+const MAX_WIDTH = 1152; // 72rem, the page content width
 
-test('LP Store root content is capped at max-w-6xl on desktop', async ({ page }) => {
+test('the LP Store modal is capped at the page content width (72rem) on desktop', async ({
+  page,
+}) => {
   await signInAndGoto(page, `./wallet/lp-store/${CORPORATION_ID}`);
   await page.setViewportSize(DESKTOP);
 
-  // Level 2, not 1: the route's `PageHeader` h1 races the corp-name fetch —
-  // it reads "LP Store" only until the name resolves, then flips to the
-  // corp's own name (here "Test Corp", seeded fast enough to usually beat
-  // this assertion's first poll) — while the offers `Panel`'s own h2 always
-  // reads "LP Store", corp name or not. Asserting on the h1 made this test
-  // flaky: pass only on the rare poll that landed before the fetch resolved.
-  await expect(page.getByRole('heading', { level: 2, name: 'LP Store' })).toBeVisible();
-  // `main`'s direct child is `Layout`'s own focus-management wrapper
-  // (`focus:outline-none`, no width classes of its own) — the route's capped
-  // root div is its child.
-  const root = page.locator('main > div > div').first();
-
-  const box = (await root.boundingBox())!;
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const box = (await dialog.boundingBox())!;
   expect(box.width).toBeLessThanOrEqual(MAX_WIDTH);
 });
