@@ -11078,7 +11078,6 @@
       "accessNeeds": "Needs {{standing}}",
       "accessBlocked": "Blocked"
     },
-    "standingsFeesNote": "Broker fees use your standing with each Trade Hub's owning corporation and faction. Other NPC stations use their own owner, and agents never count.",
     "standingsUnavailableHint": "Your standings aren't saved on this device yet. They load once ESI answers.",
     "standingsEmptyTitle": "No standings yet",
     "standingsEmptyHint": "EVE lists a standing once you have earned or lost one with a faction, corporation or agent.",
