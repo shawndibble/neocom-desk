@@ -391,8 +391,11 @@ describe('SkillPlans CRUD', () => {
     const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(stored).toHaveLength(1);
     expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`);
+    // The import lands "Gunnery V" as one row; once the Character's trained skills
+    // arrive the editor splits it into one row per level (I-V). Wait for that, or
+    // the split can land after Undo and write the rows back over it.
     await waitFor(async () => {
-      expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(1);
+      expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(5);
     });
     // Spent: a reload must not import again or make a second plan.
     expect((window.history.state as { usr: unknown }).usr).toBeNull();
