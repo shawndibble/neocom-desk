@@ -14274,6 +14274,7 @@
       },
       "jumps_one": "{{count}} jump",
       "jumps_other": "{{count}} jumps",
+      "here": "here",
       "standing": {
         "title": "Your standing",
         "baseAndSkills": "Base {{base}}, {{effective}} with your skills",

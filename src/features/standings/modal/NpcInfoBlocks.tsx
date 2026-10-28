@@ -52,7 +52,7 @@ const Note = ({ children }: { children: ReactNode }) => (
   <p className="text-[0.6875rem] text-text-dim">{children}</p>
 );
 
-/** "6 jumps", a link to Route Safety with the route set. */
+/** "6 jumps", a link to Route Safety with the route set; "here" (no link) when the pilot is already there. */
 function Jumps({
   systemId,
   stationId,
@@ -63,6 +63,7 @@ function Jumps({
   count: number;
 }) {
   const { t } = useTranslation();
+  if (count === 0) return <span className="text-text-dim">{t('publicInfo.npc.here')}</span>;
   return (
     <JumpsLink systemId={systemId} stationId={stationId}>
       {t('publicInfo.npc.jumps', { count })}
