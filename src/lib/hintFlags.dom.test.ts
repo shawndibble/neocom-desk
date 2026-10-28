@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import {
   claimSessionHint,
   dismissSessionHint,
+  releaseSessionHint,
   resetSessionHints,
   useSessionHintShown,
 } from './hintFlags';
@@ -17,8 +18,22 @@ describe('useSessionHintShown', () => {
     act(() => void claimSessionHint('goTo'));
     expect(result.current).toBe(true);
 
-    act(() => dismissSessionHint());
+    act(() => dismissSessionHint('rowHint:x'));
+    expect(result.current).toBe(true);
+    act(() => dismissSessionHint('goTo'));
     expect(result.current).toBe(false);
     expect(claimSessionHint('rowHint')).toBe(false);
+  });
+});
+
+describe('releaseSessionHint', () => {
+  it('frees an unanswered hint for another owner, never a dismissed one', () => {
+    claimSessionHint('rowHint:a');
+    releaseSessionHint('rowHint:a');
+    expect(claimSessionHint('rowHint:b')).toBe(true);
+
+    dismissSessionHint('rowHint:b');
+    releaseSessionHint('rowHint:b');
+    expect(claimSessionHint('goTo')).toBe(false);
   });
 });

@@ -53,9 +53,17 @@ export function claimSessionHint(owner: string): boolean {
   return true;
 }
 
-/** The session's hint has been answered; it stays spent, so no other hint takes its place. */
-export function dismissSessionHint(): void {
+/** `owner` answered its hint; the session's hint stays spent, so no other hint takes its place. */
+export function dismissSessionHint(owner: string): void {
+  if (sessionHint !== owner) return;
   sessionHintDismissed = true;
+  notify();
+}
+
+/** `owner` went away without showing its hint to anyone: the session's hint is free again. */
+export function releaseSessionHint(owner: string): void {
+  if (sessionHint !== owner || sessionHintDismissed) return;
+  sessionHint = null;
   notify();
 }
 
