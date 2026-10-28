@@ -2,12 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { Close } from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useTranslation } from 'react-i18next';
-import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { useHydratedStore } from '@/lib/useHydratedStore';
-import { ASSETS_ENDPOINTS, useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
-import { useMarketHub } from '@/features/market/hub';
-import { useOwnedAtStation, type OwnedScope } from '@/features/market/useOwnedAtStation';
-import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { IconButton, Modal, Panel, Toast } from '@/components/ui';
 import {
   applyImproveCandidate,
@@ -40,7 +34,6 @@ import {
   useImproveReach,
   useImproveSort,
   useImproveBudget,
-  useImproveCountOwned,
   useImproveRefitCap,
   migrateSpendCap,
 } from './useImprove';
@@ -128,20 +121,6 @@ export function useImproveDrawer({
   useEffect(() => {
     void migrateSpendCap();
   }, []);
-  // Planning counts what the pilot owns at Appraisal's one shared place pick.
-  const countOwned = useImproveCountOwned((state) => state.value);
-  const setCountOwned = useImproveCountOwned((state) => state.setValue);
-  const ownedPref = useAppraisalOwnedPref((state) => state.value);
-  const setOwnedPref = useAppraisalOwnedPref((state) => state.setValue);
-  useHydratedStore(useImproveCountOwned, useAppraisalOwnedPref);
-  const marketHubId = useMarketHub((state) => state.value);
-  const lacksAssets = useCharacterLacksEndpoints(characterId, ASSETS_ENDPOINTS);
-  const canCountOwned = !lacksAssets && characterId !== null;
-  const counting = mode === 'buy' && countOwned && canCountOwned;
-  const ownedPlace: OwnedScope = ownedPref.everywhere
-    ? 'all'
-    : (ownedPref.stationId ?? (getTradeHub(marketHubId) ?? DEFAULT_TRADE_HUB).stationId);
-  const stock = useOwnedAtStation(counting && isOpen, ownedPlace);
   // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
   const [defense, setDefense] = useState<DefenseChoice>('keep');
   const [includeRigs, setIncludeRigs] = useState(false);
@@ -203,8 +182,7 @@ export function useImproveDrawer({
     catalogue,
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
-    // The first search waits for the stock, so it does not run twice.
-    isOpen && !(counting && stock.loading),
+    isOpen,
     {
       reach,
       mode,
@@ -214,26 +192,8 @@ export function useImproveDrawer({
       includeOfficer,
       oreFamily,
       hold,
-      owned: counting ? stock.owned : null,
     },
     chargeSteps
-  );
-
-  const placeLabel = (id: number) =>
-    TRADE_HUBS.find((hub) => hub.stationId === id)?.systemName ??
-    stock.placeNames.get(id) ??
-    t(
-      stock.places.find((place) => place.id === id)?.kind === 'station'
-        ? 'market.appraisal.minusOwnedUnknownStation'
-        : 'market.appraisal.minusOwnedUnknownStructure',
-      { id }
-    );
-  // Trade Hubs are always offered; any other place that holds stock joins them, and so does a saved pick not read yet.
-  const otherPlaceIds = [
-    ...stock.places.map((place) => place.id),
-    ...(ownedPlace === 'all' ? [] : [ownedPlace]),
-  ].filter(
-    (id, i, ids) => ids.indexOf(id) === i && !TRADE_HUBS.some((hub) => hub.stationId === id)
   );
 
   function loadBestCharge() {
@@ -349,26 +309,6 @@ export function useImproveDrawer({
         onOreFamilyChange: (next) => void setOreFamily(next),
         hold,
         onHoldChange: (next) => void setHold(next),
-        ...(canCountOwned
-          ? {
-              owned: {
-                on: countOwned,
-                onChange: (on: boolean) => void setCountOwned(on),
-                place: ownedPlace,
-                onPlaceChange: (place: OwnedScope) =>
-                  void setOwnedPref(
-                    place === 'all'
-                      ? { ...ownedPref, everywhere: true }
-                      : { ...ownedPref, everywhere: false, stationId: place }
-                  ),
-                otherPlaces: otherPlaceIds.map((id) => ({ id, label: placeLabel(id) })),
-                placeLabel:
-                  ownedPlace === 'all'
-                    ? t('market.appraisal.minusOwnedEverywhere')
-                    : placeLabel(ownedPlace),
-              },
-            }
-          : {}),
       }}
     />
   );

@@ -36,7 +36,6 @@ import { ImproveSkillsSlotContext } from './improveSkillsSlot';
 import { hullRoleOf, roleUnlocks } from '@/engine/fittings/improveRole';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
-import { OwnedCostLine, OwnedStockControl, type ImproveOwnedSettings } from './ImproveOwnedStock';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
@@ -156,8 +155,6 @@ export interface ImproveSettings {
   /** Carry more: the hold scored. */
   hold: ImproveHold;
   onHoldChange: (hold: ImproveHold) => void;
-  /** Planning: count what the pilot owns; absent when no Character has the assets scope. */
-  owned?: ImproveOwnedSettings;
 }
 
 interface Props {
@@ -366,14 +363,6 @@ export function ImprovePanel({
   }
 
   function isk(option: ImproveOption) {
-    const stock = state.status === 'done' ? state.owned?.stock : undefined;
-    if (counting && stock && option.iskDelta !== null) {
-      // Units the fit already uses are covered by the stock first.
-      const toId = option.candidate.toTypeId;
-      const own = Math.max(0, (stock.owned.get(toId) ?? 0) - (stock.fitCounts.get(toId) ?? 0));
-      if (own > 0)
-        return <OwnedCostLine need={option.candidate.at.length} own={own} isk={option.iskDelta} />;
-    }
     if (option.iskDelta === null)
       return <span className="text-text-dim">{t('fittings.improve.noPrice')}</span>;
     return option.iskDelta < 0 ? (
@@ -778,7 +767,6 @@ export function ImprovePanel({
           mode: settings.mode,
           spendCap: settings.spendCap,
           fitTotal: state.fitTotal,
-          ...(state.owned ? { stock: state.owned.stock, priceOf: state.owned.priceOf } : {}),
           target,
         })
       : null;
@@ -826,13 +814,10 @@ export function ImprovePanel({
     () => (previewBefore && previewAfter ? diffFittingStats(previewBefore, previewAfter) : null),
     [previewBefore, previewAfter]
   );
-  // The Price figure follows the same rows. Only buy mode without owned stock moves the fit's price by exactly the rows' iskDelta.
+  // The Price figure follows the same rows. Only buy mode moves the fit's price by exactly the rows' iskDelta.
   const previewRows = hoverAfter && hoverSet ? hoverSet : chosen;
   const previewIsk =
-    settings.mode === 'buy' &&
-    !settings.owned?.on &&
-    previewDelta &&
-    previewRows.some((row) => row.iskDelta !== null)
+    settings.mode === 'buy' && previewDelta && previewRows.some((row) => row.iskDelta !== null)
       ? previewRows.reduce((sum, row) => sum + (row.iskDelta ?? 0), 0)
       : null;
   useEffect(() => {
@@ -884,8 +869,6 @@ export function ImprovePanel({
     (id === goal || roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id));
   const relevantGoals = IMPROVE_GOALS.filter(isRelevant);
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
-  // Planning counts owned stock while the switch is on and the Character may read assets.
-  const counting = settings.mode === 'buy' && Boolean(settings.owned?.on);
   const settingsSummary = [
     t(`fittings.improve.reach.${settings.reach}`),
     t(`fittings.improve.mode.${settings.mode}`),
@@ -894,9 +877,6 @@ export function ImprovePanel({
       : t(`fittings.improve.summaryCap.${settings.mode}`, {
           cap: formatIskCompact(settings.spendCap),
         }),
-    ...(counting && settings.owned
-      ? [t('fittings.improve.owned.summary', { place: settings.owned.placeLabel })]
-      : []),
   ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
     if (goal === id) return;
@@ -1050,20 +1030,8 @@ export function ImprovePanel({
               onChange={settings.onModeChange}
               fill
             />
-            {settings.mode === 'buy' && settings.owned && (
-              <OwnedStockControl
-                owned={settings.owned}
-                noneHere={state.status === 'done' && state.owned?.anyOwned === false}
-              />
-            )}
             <label className="block space-y-1 text-sm">
-              <span>
-                {t(
-                  counting
-                    ? 'fittings.improve.cap.buyOwned'
-                    : `fittings.improve.cap.${settings.mode}`
-                )}
-              </span>
+              <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
               <IskInput
                 value={settings.spendCap === null ? '' : String(settings.spendCap)}
                 onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
@@ -1373,7 +1341,6 @@ export function ImprovePanel({
                       <SelectionCost
                         summary={summary}
                         buy={settings.mode === 'buy'}
-                        counting={counting}
                         spendCap={settings.spendCap}
                       />
                     </>
@@ -1417,17 +1384,14 @@ export function ImprovePanel({
 /**
  * The ticked set's price: the fit's total cost after (buy mode) with what the
  * ticks add to it, or just that change when there is no total to compare.
- * Owned stock, when counted, is already taken off both figures.
  */
 function SelectionCost({
   summary,
   buy,
-  counting,
   spendCap,
 }: {
   summary: SelectionSummary;
   buy: boolean;
-  counting: boolean;
   spendCap: number | null;
 }) {
   const { t } = useTranslation();
@@ -1451,7 +1415,6 @@ function SelectionCost({
             ? 'fittings.improve.selection.totalCost'
             : 'fittings.improve.selection.costChange'
         )}
-        {counting && ` · ${t('fittings.improve.selection.ownedCounted')}`}
       </p>
       <p className="text-base font-semibold">
         {total !== null ? (

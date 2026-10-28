@@ -62,27 +62,3 @@ describe('summariseSelection', () => {
     ]);
   });
 });
-
-describe('summariseSelection with owned stock', () => {
-  const swap = (fromTypeId: number, toTypeId: number): ImproveOption =>
-    ({
-      candidate: { fromTypeId, toTypeId, at: [{ slot: 'low', slotIndex: 0 }] },
-      iskDelta: 0,
-    }) as unknown as ImproveOption;
-  const priceOf = (typeId: number) => ({ 1: 10, 2: 100, 3: 100 })[typeId] ?? null;
-
-  it('spends one owned unit once across two rows that need it', () => {
-    const stock = { owned: new Map([[2, 1]]), fitCounts: new Map([[1, 2]]) };
-    const s = summariseSelection({
-      ...base,
-      mode: 'buy',
-      fitTotal: 20,
-      stock,
-      priceOf,
-      options: [swap(1, 2), swap(1, 2)],
-    });
-    // Row 1 uses the owned unit (-10); row 2 buys a full one (100 - 10).
-    expect(s.isk).toBe(80);
-    expect(s.total).toBe(100);
-  });
-});
