@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
-import { interactiveClassName } from '@/components/ui/controlStyles';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
@@ -74,8 +74,8 @@ function PriceCell({
     <section
       aria-label={title}
       className={cx(
-        'relative flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2 hover:bg-panel active:bg-panel has-[button:focus-visible]:outline-2 has-[button:focus-visible]:-outline-offset-2 has-[button:focus-visible]:outline-accent',
-        interactiveClassName
+        'relative flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel px-2.5 py-2 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:-outline-offset-2 has-[button:focus-visible]:outline-accent',
+        rowInteractiveClassName
       )}
     >
       <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
