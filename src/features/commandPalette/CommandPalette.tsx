@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
-import { Modal, SearchInput, Spinner } from '@/components/ui';
+import { EmptyState, Modal, SearchInput, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   activeOptionClassName,
@@ -440,37 +440,30 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
           )
         )}
         {trimmed === '' && (
-          <p className="px-2 py-1.5 text-sm text-text-dim">{t('commandPalette.emptyHint')}</p>
+          <EmptyState title={t('commandPalette.emptyTitle')} hint={t('commandPalette.emptyHint')} />
         )}
         {recentViews.length > 0 && (
-          <section aria-labelledby={`${baseId}-recent`} className="space-y-1.5 px-2">
-            <h3 id={`${baseId}-recent`} className={cx(eyebrowClassName, 'pb-1')}>
-              {t('nav.recent')}
-            </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {recentViews.map((view) => (
-                <Link
-                  key={view.path}
-                  to={view.path}
-                  onClick={onClose}
-                  className={cx(
-                    'flex min-h-9 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 text-xs text-text hover:border-line-bright',
-                    interactiveClassName,
-                    focusRingClassName
-                  )}
-                >
-                  <Icon.Recent aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-                  {view.breadcrumb}
-                </Link>
-              ))}
-            </div>
+          <section
+            aria-label={t('nav.recent')}
+            className="flex flex-wrap gap-1.5 border-t border-line px-2 pt-2"
+          >
+            {recentViews.map((view) => (
+              <Link
+                key={view.path}
+                to={view.path}
+                onClick={onClose}
+                className={cx(
+                  'flex min-h-9 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 text-xs text-text hover:border-line-bright',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
+              >
+                <Icon.Recent aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                {view.breadcrumb}
+              </Link>
+            ))}
           </section>
         )}
-        {/* The rail's Go to button opens this too, so say it is not the page's
-            own search: a page's search box filters that page; this goes elsewhere. */}
-        <p className="border-t border-line px-2 pt-2 text-xs text-text-dim">
-          {t('commandPalette.scopeNote')}
-        </p>
         <span role="status" aria-live="polite" className="sr-only">
           {statusText}
         </span>
