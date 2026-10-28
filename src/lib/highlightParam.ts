@@ -15,9 +15,10 @@ export const HIGHLIGHT_PARAM = 'highlight';
  */
 export const OPEN_PARAM = 'open';
 
-/** `path?open=<id>`, the link a widget row builds to open a record's modal on its page. */
+/** `path?open=<id>` (`&` after an existing query), the link a widget row builds to open a record's modal on its page. */
 export function openHref(path: string, id: number | string): string {
-  return `${path}?${OPEN_PARAM}=${encodeURIComponent(String(id))}`;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}${OPEN_PARAM}=${encodeURIComponent(String(id))}`;
 }
 
 /** `path?highlight=<id>`, the link a widget row builds to scroll to and flash a record on its page. */

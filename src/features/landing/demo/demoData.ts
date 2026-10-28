@@ -28,7 +28,13 @@ import { buildView } from '@/features/overview/widgets/data/models';
 import { settingsContext } from '@/features/overview/widgets/data/viewSettings';
 import { wobble } from '@/features/overview/samplePilot';
 import { ordersStateChart, ordersTable } from '@/features/overview/widgets/data/ordersModels';
-import type { Feeds, FeedState, KindView, Translate } from '@/features/overview/widgets/data/types';
+import type {
+  Feeds,
+  FeedState,
+  KindView,
+  TableModel,
+  Translate,
+} from '@/features/overview/widgets/data/types';
 import type { Widget } from '@/features/overview/widgets/layout';
 import { formatIskCompact } from '@/lib/isk';
 import { NEXT_EVENT } from './demoCast';
@@ -305,6 +311,11 @@ function openOrderRows(now: number): OpenOrderRow[] {
   );
 }
 
+/** The landing demo links nowhere: drop the row links the real builder adds. */
+function demoTable(table: TableModel): TableModel {
+  return { ...table, rows: table.rows.map((row) => ({ ...row, to: undefined })) };
+}
+
 function ordersView(t: Translate, now: number): KindView {
   const rows = openOrderRows(now);
   const undercut = rows.filter((row) => row.problem.startsWith('undercut')).length;
@@ -320,7 +331,7 @@ function ordersView(t: Translate, now: number): KindView {
       },
       tone: ordersSeverity(rows, false) ?? 'clear',
     },
-    table: ordersTable(t, rows, now, { used: rows.length, total: 305 }),
+    table: demoTable(ordersTable(t, rows, now, { used: rows.length, total: 305 })),
     summary: '',
     chart: ordersStateChart(t, rows) ?? undefined,
   };
