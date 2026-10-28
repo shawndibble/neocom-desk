@@ -85,6 +85,9 @@ const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
   outside: { label: 'wallet.marginGap.outside', hint: 'wallet.marginGapHint.outside' },
 };
 
+/** The gap label is `text-xs`, so each letter takes about this much of a digit's `ch`. */
+const GAP_LABEL_CH_PER_CHAR = 0.85;
+
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
 /** Margin over what the sold units cost, as a percent; null when the sale has no margin. */
@@ -300,7 +303,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     const gapChars = transactions.flatMap((txn) => {
       const gap = gaps.get(txn.transaction_id);
       return !txn.is_buy && gap && !margins.has(txn.transaction_id)
-        ? [Math.ceil(t(MARGIN_GAP_COPY[gap].label).length * 0.85)]
+        ? [Math.ceil(t(MARGIN_GAP_COPY[gap].label).length * GAP_LABEL_CH_PER_CHAR)]
         : [];
     });
     return {
