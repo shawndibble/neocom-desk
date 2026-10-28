@@ -52,11 +52,11 @@ for (const width of [1024, 1100, 1280, 1440]) {
     await expect(page.getByRole('table', { name: 'Appraisal' })).toBeVisible({ timeout: 15_000 });
 
     const sell = page
-      .getByRole('button', { name: /^Copy 6\d\.\dB ISK \(6\d,\d{3},\d{3},\d{3}\)$/ })
+      .getByRole('button', { name: /^Sell: copy 6\d\.\dB ISK \(6\d,\d{3},\d{3},\d{3}\)$/ })
       .first();
     await expect(sell).toBeVisible();
-    // The shorthand alone is printed; the full digits live in the hover and the copy.
-    await expect(sell).toHaveText(/^6\d\.\dB$/);
+    // The shorthand alone is printed; the full digits live in the accessible name and the copy.
+    await expect(page.getByRole('region', { name: 'Sell' }).first()).toContainText(/6\d\.\dB/);
 
     const geometry = await page.evaluate(() => {
       const groups = [...document.querySelectorAll('section[aria-label]')].filter((s) =>
