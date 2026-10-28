@@ -26,6 +26,7 @@ import {
   MenuRadioItem,
   MenuSeparator,
   Modal,
+  OpenInNewTabMenuItem,
   RowActionsMenu,
   TextInput,
   useOpenAfterMenu,
@@ -223,6 +224,7 @@ export function WidgetMenu({
           <MenuItem onSelect={() => navigate(to)}>
             {t('overview.menu.openPage', { title })}
           </MenuItem>
+          <OpenInNewTabMenuItem href={to} />
           <MenuSeparator />
         </>
       )}
