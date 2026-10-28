@@ -386,17 +386,21 @@ export function Market() {
   } = itemActions.quickbar;
 
   // Remove keeps the row and its slot so the Undo toast can put it back.
-  const [quickbarUndo, setQuickbarUndo] = useState<{ item: QuickbarItem; index: number } | null>(
-    null
-  );
+  const [quickbarUndo, setQuickbarUndo] = useState<{
+    item: QuickbarItem;
+    index: number;
+    characterId: number;
+  } | null>(null);
   function handleRemoveFromQuickbar(typeId: number) {
     const index = quickbarItems.findIndex((i) => i.typeId === typeId);
     if (index === -1) return;
-    setQuickbarUndo({ item: quickbarItems[index], index });
+    if (activeCharacterId !== null) {
+      setQuickbarUndo({ item: quickbarItems[index], index, characterId: activeCharacterId });
+    }
     void writeQuickbar(removeQuickbarItem(quickbarItems, typeId));
   }
   function handleUndoQuickbarRemove() {
-    if (!quickbarUndo) return;
+    if (!quickbarUndo || quickbarUndo.characterId !== activeCharacterId) return;
     void writeQuickbar(restoreQuickbarItem(quickbarItems, quickbarUndo.item, quickbarUndo.index));
     setQuickbarUndo(null);
   }
@@ -1473,7 +1477,7 @@ export function Market() {
           />
         )}
 
-        {quickbarUndo && (
+        {quickbarUndo && quickbarUndo.characterId === activeCharacterId && (
           <Toast
             message={t('market.quickbar.removed', { name: quickbarUndo.item.name })}
             undo={{ label: t('market.quickbar.undo'), onUndo: handleUndoQuickbarRemove }}
