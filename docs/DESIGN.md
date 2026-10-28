@@ -1191,6 +1191,9 @@ Browser Back is unchanged; the crumb is a labelled way up, not a second Back.
 | Solar system                | Route Safety, with that system as the destination                                              |
 | Station, structure, region  | Place Info (`PlaceLink`, `?info=place-<id>`)                                                   |
 
+An NPC faction (`FactionLink`, `?info=faction-<id>`) opens Show Info too, as its
+own view without tabs.
+
 The table is the destination for a name that stands alone. **Unless the row
 has its own primary action** (Restraint, below): then the name is not a link,
 and the entity link lives in the opened modal or detail, or the page the row
@@ -1336,9 +1339,6 @@ is clutter, and clutter hides the actions that matter.
 - **Check first.** Before adding any cue or control, check whether the row
   click, a visible link or name, a header action, a bulk action or the detail
   view already gives that action. If it does, add nothing.
-  Recorded exception: Wallet loyalty points rows carry an ⓘ for the
-  corporation's Show Info though the LP Store header has it too
-  (`docs/context/decisions/20261021-210214-wallet-lp-rows-carry-an-in-row-show.md`).
 - **A row gets a ⋮ only for two or more real actions** that can't be reached
   elsewhere in one tap. Show info, Copy, View in Market, a duplicate of a
   visible control and a duplicate of the row click do not count, except a

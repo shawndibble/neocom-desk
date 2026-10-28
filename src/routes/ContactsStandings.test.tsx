@@ -1,18 +1,75 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
+import type { NpcStandingsReference } from '@/features/character/npcStandingsRows';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { useContactsStandings } from './ContactsStandings';
 
 const loadMock = vi.hoisted(() => vi.fn());
+const openNpcInfoMock = vi.hoisted(() => vi.fn());
+const referenceMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/character/standings', () => ({ loadCharacterStandingsResult: loadMock }));
 vi.mock('@/features/character/names', () => ({
-  resolveNames: vi.fn(async () => new Map([[500001, 'Caldari Navy']])),
+  resolveNames: vi.fn(
+    async () =>
+      new Map([
+        [500001, 'Caldari Navy'],
+        [1000035, 'Caldari Navy Corp'],
+        [3009001, 'Hanna Kurosawa'],
+      ])
+  ),
 }));
+vi.mock('@/features/character/npcStandingsReference', () => ({
+  loadNpcStandingsReference: referenceMock,
+}));
+vi.mock('@/features/standings/openNpcInfo', () => ({ openNpcInfo: openNpcInfoMock }));
 vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => false }));
 
 const ENTRY = { from_id: 500001, from_type: 'faction', standing: 3.5 };
+const CORP = { from_id: 1000035, from_type: 'npc_corp', standing: 5 };
+const AGENT = { from_id: 3009001, from_type: 'agent', standing: 1 };
+const MANY = {
+  entries: [ENTRY, CORP, AGENT],
+  fetchedAt: new Date(),
+  fromCache: false,
+  available: true,
+};
+
+const REFERENCE: NpcStandingsReference = {
+  skills: { connections: 0, criminalConnections: 0, diplomacy: 0 },
+  corporations: {
+    factions: new Map([
+      [1000035, 500001],
+      [1000127, 500001],
+    ]),
+    corporationName: (id) =>
+      ({ 1000035: 'Caldari Navy Corp', 1000127: 'Ishukone Corporation' })[id],
+    factionName: (id) => (id === 500001 ? 'Caldari State' : undefined),
+  },
+  agents: {
+    agentById: (id) =>
+      id === 3009001
+        ? {
+            id,
+            name: 'Hanna Kurosawa',
+            level: 3,
+            divisionId: 24,
+            corporationId: 1000127,
+            stationId: 1,
+            isLocator: false,
+          }
+        : undefined,
+    divisionName: () => 'Security',
+  },
+};
+
+/** Shows the query string, so a test can read what the filters wrote to the URL. */
+function SearchProbe() {
+  return <output data-testid="search">{useLocation().search}</output>;
+}
 
 /** The page's header, as `Contacts` lays it out around the hook's parts. */
 function StandingsHarness({ characterId }: { characterId: number }) {
@@ -27,16 +84,19 @@ function StandingsHarness({ characterId }: { characterId: number }) {
   );
 }
 
-function renderTab() {
+function renderTab(initialEntry = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <StandingsHarness characterId={91} />
+      <SearchProbe />
     </MemoryRouter>
   );
 }
 
 beforeEach(() => {
   loadMock.mockReset();
+  openNpcInfoMock.mockReset();
+  referenceMock.mockReset().mockResolvedValue(REFERENCE);
 });
 
 describe('ContactsStandings header', () => {
@@ -50,6 +110,9 @@ describe('ContactsStandings header', () => {
     renderTab();
 
     expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Broker fees use your standing with each Trade Hub/)
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
     expect(screen.getByText(/just now|ago/i)).toBeInTheDocument();
     expect(loadMock).toHaveBeenCalledWith(91, { force: false });
@@ -74,14 +137,14 @@ describe('ContactsStandings header', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await waitFor(() => expect(loadMock).toHaveBeenLastCalledWith(91, { force: true }));
-    expect(await screen.findByText('-2.00')).toBeInTheDocument();
+    expect(await screen.findAllByText('-2.00')).not.toHaveLength(0);
   });
 
   it('has no chip when there is no data', async () => {
     loadMock.mockResolvedValue({ entries: [], fetchedAt: null, fromCache: false, available: true });
     renderTab();
 
-    expect(await screen.findByText('No NPC standings yet')).toBeInTheDocument();
+    expect(await screen.findByText('No standings yet')).toBeInTheDocument();
     expect(screen.queryByText(/just now|ago/i)).toBeNull();
   });
 
@@ -95,7 +158,7 @@ describe('ContactsStandings header', () => {
     renderTab();
 
     expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
-    expect(screen.queryByText('No NPC standings yet')).toBeNull();
+    expect(screen.queryByText('No standings yet')).toBeNull();
 
     loadMock.mockResolvedValueOnce({
       entries: [ENTRY],
@@ -138,5 +201,180 @@ describe('ContactsStandings header', () => {
     expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
     finish({ entries: [ENTRY], fetchedAt: new Date(), fromCache: true, available: true });
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+  });
+});
+
+describe('ContactsStandings table', () => {
+  beforeEach(() => loadMock.mockResolvedValue(MANY));
+
+  it('lists what each row belongs to, what its chain opens, and who is open now', async () => {
+    renderTab();
+    await screen.findByText('Hanna Kurosawa');
+
+    const table = screen.getByRole('table', { name: 'Standings' });
+    for (const header of ['Name', 'Type', 'Belongs to', 'Base', 'With skills', 'Access', 'Fees']) {
+      expect(
+        within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })
+      ).toBeVisible();
+    }
+    const agent = within(table).getByText('Hanna Kurosawa').closest('tr') as HTMLElement;
+    expect(within(agent).getByText('Agent')).toBeInTheDocument();
+    expect(within(agent).getByText(/Ishukone Corporation/)).toBeInTheDocument();
+    expect(within(agent).getByText(/L3 Security/)).toBeInTheDocument();
+    // the faction's 3.5 is the best standing in the chain: level 3 is open
+    expect(within(agent).getByText('Open')).toBeInTheDocument();
+
+    const corp = within(table).getByText('Caldari Navy Corp').closest('tr') as HTMLElement;
+    expect(within(corp).getByText('Corporation')).toBeInTheDocument();
+    expect(within(corp).getByText('Caldari State')).toBeInTheDocument();
+    expect(within(corp).getByText('Agents up to level 4')).toBeInTheDocument();
+    expect(within(corp).getByText('Broker fee')).toBeInTheDocument();
+  });
+
+  it('says what a closed agent needs', async () => {
+    loadMock.mockResolvedValue({ ...MANY, entries: [{ ...AGENT, standing: 0 }] });
+    renderTab();
+    await screen.findByText('Hanna Kurosawa');
+    expect(screen.getByText('Needs 3.00')).toBeInTheDocument();
+  });
+
+  it("leaves With skills and Access empty when the pilot's skills are unknown", async () => {
+    referenceMock.mockResolvedValue({ ...REFERENCE, skills: null });
+    renderTab();
+    const corp = (await screen.findByText('Caldari Navy Corp')).closest('tr') as HTMLElement;
+    expect(within(corp).getByText('5.00')).toBeInTheDocument();
+    // With skills and Access: a base-standing answer would understate what the skills lift.
+    expect(within(corp).getAllByText('—')).toHaveLength(2);
+  });
+
+  it('leaves an agent the agents data does not know with no belongs to and no access', async () => {
+    loadMock.mockResolvedValue({
+      ...MANY,
+      entries: [{ from_id: 3009777, from_type: 'agent', standing: 6 }],
+    });
+    renderTab();
+    const row = (await screen.findByText('#3009777')).closest('tr') as HTMLElement;
+    expect(within(row).queryByText('Open')).toBeNull();
+    expect(within(row).queryByText(/Agents up to level/)).toBeNull();
+    expect(within(row).getAllByText('—')).toHaveLength(3);
+  });
+
+  it("opens the row's info when its name is clicked", async () => {
+    renderTab();
+    fireEvent.click(await screen.findByText('Caldari Navy Corp'));
+    expect(openNpcInfoMock).toHaveBeenLastCalledWith('corporation', 1000035);
+    fireEvent.click(screen.getByText('Hanna Kurosawa'));
+    expect(openNpcInfoMock).toHaveBeenLastCalledWith('agent', 3009001);
+    fireEvent.click(screen.getByText('Caldari Navy'));
+    expect(openNpcInfoMock).toHaveBeenLastCalledWith('faction', 500001);
+  });
+
+  it("opens the row's info from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderTab();
+    const name = await screen.findByText('Hanna Kurosawa');
+    ((name.closest('tr') ?? name) as HTMLElement).focus();
+    await user.keyboard('{Enter}');
+    expect(openNpcInfoMock).toHaveBeenCalledWith('agent', 3009001);
+  });
+
+  describe('filters', () => {
+    it('narrows by type from the URL', async () => {
+      renderTab('/?standings.type=agent');
+      await screen.findByText('Hanna Kurosawa');
+      expect(screen.queryByText('Caldari Navy Corp')).toBeNull();
+      expect(screen.queryByText('Caldari Navy')).toBeNull();
+    });
+
+    it('narrows by type from the Type menu, with a count per type, and writes it to the URL', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await screen.findByText('Hanna Kurosawa');
+      await user.click(screen.getByRole('button', { name: /^Type: / }));
+      expect(await screen.findByRole('menuitemcheckbox', { name: 'Agent (1)' })).toBeChecked();
+      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Faction (1)' }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Corporation (1)' }));
+
+      await waitFor(() => expect(screen.queryByText('Caldari Navy Corp')).toBeNull());
+      expect(screen.getByText('Hanna Kurosawa')).toBeInTheDocument();
+      expect(screen.getByTestId('search')).toHaveTextContent('standings.type=agent');
+    });
+
+    it('keeps agents of at least the chosen level from the URL', async () => {
+      // the corporation's 5.0 opens level 4; the faction's 3.5 and the agent's chain (best 3.5) only level 3
+      renderTab('/?standings.access=4');
+      await screen.findByText('Caldari Navy Corp');
+      expect(screen.queryByText('Hanna Kurosawa')).toBeNull();
+      expect(screen.queryByText('Caldari Navy')).toBeNull();
+    });
+
+    it('keeps the fee owners with the Used for fees chip, and writes it to the URL', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await screen.findByText('Hanna Kurosawa');
+      await user.click(screen.getByRole('button', { name: 'Used for fees' }));
+      await waitFor(() => expect(screen.queryByText('Hanna Kurosawa')).toBeNull());
+      expect(screen.getByText('Caldari Navy Corp')).toBeInTheDocument();
+      expect(screen.getByTestId('search')).toHaveTextContent('standings.fees=1');
+    });
+
+    it('searches what a row belongs to', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await screen.findByText('Hanna Kurosawa');
+      await user.type(screen.getByRole('searchbox', { name: 'Name' }), 'security');
+      await waitFor(() => expect(screen.queryByText('Caldari Navy Corp')).toBeNull());
+      expect(screen.getByText('Hanna Kurosawa')).toBeInTheDocument();
+    });
+
+    it('says when the filters match nothing', async () => {
+      renderTab('/?standings.type=');
+      expect(await screen.findByText('No contacts match the selected filters')).toBeInTheDocument();
+    });
+  });
+
+  it('hides a column from the Columns menu', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await screen.findByText('Hanna Kurosawa');
+    expect(screen.getByRole('columnheader', { name: /^Belongs to/ })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Belongs to' }));
+    // An open menu hides the page from the accessibility tree.
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('columnheader', { name: /^Belongs to/ })).toBeNull()
+    );
+    expect(screen.getByRole('columnheader', { name: /^Base/ })).toBeVisible();
+  });
+
+  describe('on a phone', () => {
+    const realMatchMedia = window.matchMedia;
+    beforeEach(() => {
+      window.matchMedia = (media: string) =>
+        ({
+          media,
+          matches: media === NARROW_QUERY,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as unknown as MediaQueryList;
+    });
+    afterEach(() => {
+      window.matchMedia = realMatchMedia;
+    });
+
+    it('puts the filters behind a funnel that counts the active ones', async () => {
+      renderTab('/?standings.fees=1&standings.access=3');
+      await screen.findByText('Caldari Navy Corp');
+      expect(screen.queryByRole('button', { name: /^Type: / })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+    });
   });
 });

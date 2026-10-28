@@ -2,7 +2,8 @@
 // public/data/market/stations.json (issue #1675): which NPC corporation owns
 // each station, and which faction that corporation belongs to. ESI's
 // `GET /corporations/{id}` omits `faction_id` for NPC corps, so the faction
-// can only come from the SDE's `crpNPCCorporations.factionID`.
+// can only come from the SDE's `crpNPCCorporations.factionID`. The reprocessing
+// take rides along in the same file.
 // Takes the array-of-arrays `parseCsv` returns (header row first, every cell a
 // string), so this is testable with small hand-made fixtures.
 
@@ -38,4 +39,22 @@ export function stationOwnerFields(corporationIdCell, factionByCorp) {
   const ownerFactionId = factionByCorp.get(ownerCorporationId);
   if (ownerFactionId !== undefined) fields.ownerFactionId = ownerFactionId;
   return fields;
+}
+
+// staStations.reprocessingStationsTake is 0.05 at 5,091 of 5,210 stations and
+// 0.025 at the other 119 (build 3654997). The default is not written out, which
+// keeps stations.json small; the app reads an absent key as this value.
+export const DEFAULT_REPROCESSING_TAKE = 0.05;
+
+/**
+ * The reprocessing-take key for one `staStations` row's
+ * `reprocessingStationsTake` cell (a fraction): only where the station's take
+ * differs from {@link DEFAULT_REPROCESSING_TAKE}. A blank or malformed cell
+ * leaves the key off rather than writing NaN, like `stationOwnerFields`.
+ */
+export function stationReprocessingFields(takeCell) {
+  if (takeCell === undefined || takeCell === '') return {};
+  const take = Number(takeCell);
+  if (!Number.isFinite(take) || take === DEFAULT_REPROCESSING_TAKE) return {};
+  return { reprocessingStationsTake: take };
 }

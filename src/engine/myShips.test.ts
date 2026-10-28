@@ -26,9 +26,72 @@ describe('findShips', () => {
     expect(rows.map((r) => r.itemId)).toEqual([1]);
   });
 
-  it('skips unassembled (non-singleton) hulls', () => {
+  it('returns a packaged stack as one row with its quantity', () => {
     const rows = findShips(
       [asset({ item_id: 1, type_id: 100, is_singleton: false, quantity: 3 })],
+      isShip
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ itemId: 1, packaged: true, quantity: 3 });
+  });
+
+  it('leaves an assembled ship unpackaged with quantity 1', () => {
+    const [row] = findShips([asset({ item_id: 1, type_id: 100, quantity: 1 })], isShip);
+    expect(row).toMatchObject({ packaged: false, quantity: 1, holderFlags: [] });
+  });
+
+  it('keeps trail, inCargo and holder flags for a packaged stack in a ship maintenance bay', () => {
+    const rows = findShips(
+      [
+        asset({ item_id: 10, type_id: 101 }),
+        asset({
+          item_id: 11,
+          type_id: 100,
+          location_id: 10,
+          location_type: 'item',
+          location_flag: 'ShipHangar',
+          is_singleton: false,
+          quantity: 5,
+        }),
+      ],
+      isShip
+    );
+    expect(rows.find((r) => r.itemId === 11)).toMatchObject({
+      packaged: true,
+      quantity: 5,
+      inCargo: true,
+      trail: [10],
+      holderFlags: ['ShipHangar'],
+    });
+  });
+
+  it('gives one holder flag per trail entry in a deeper chain', () => {
+    const row = findShips(
+      [
+        asset({ item_id: 20, type_id: 101 }),
+        asset({
+          item_id: 21,
+          type_id: 3,
+          location_id: 20,
+          location_type: 'item',
+          location_flag: 'ShipHangar',
+        }),
+        asset({
+          item_id: 22,
+          type_id: 100,
+          location_id: 21,
+          location_type: 'item',
+          location_flag: 'Unlocked',
+        }),
+      ],
+      isShip
+    ).find((r) => r.itemId === 22);
+    expect(row).toMatchObject({ trail: [20, 21], holderFlags: ['ShipHangar', 'Unlocked'] });
+  });
+
+  it('still ignores a non-ship stack', () => {
+    const rows = findShips(
+      [asset({ item_id: 1, type_id: 5, is_singleton: false, quantity: 900 })],
       isShip
     );
     expect(rows).toEqual([]);

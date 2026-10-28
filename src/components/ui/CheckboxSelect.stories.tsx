@@ -65,3 +65,6 @@ export const Open: Story = {
     await userEvent.click(within(canvasElement).getByRole('button'));
   },
 };
+
+/** @summary `size="md"`: the 36px height of a `SearchInput` beside it, for a filter row built at the default size. */
+export const Medium: Story = { args: { size: 'md' } };

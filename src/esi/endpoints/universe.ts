@@ -216,6 +216,36 @@ export function getUniverseSystem(
   });
 }
 
+// --- GET /universe/factions (public) ---
+
+/** An NPC faction. Fields verified against live ESI (2026-10-28); `Unknown` and the like omit the optional ones. */
+export interface UniverseFaction {
+  faction_id: number;
+  name: string;
+  description: string;
+  /** The faction's main corporation (its headquarters), absent for a faction without one. */
+  corporation_id?: number;
+  /** The Faction Warfare militia corporation; only the four empires have one. */
+  militia_corporation_id?: number;
+  /** Relative size, 0 for factions with no stations. */
+  size_factor: number;
+  /** The faction's capital system. */
+  solar_system_id?: number;
+  station_count: number;
+  station_system_count: number;
+  is_unique: boolean;
+}
+
+/** Every NPC faction in one call. */
+export function getUniverseFactions(
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseFaction[]>> {
+  return esiFetch<UniverseFaction[]>('/universe/factions', {
+    ...options,
+    endpointId: 'getUniverseFactions',
+  });
+}
+
 // --- GET /incursions (public) ---
 
 /** Every active Incursion: its constellation, staging system, state and influence. */

@@ -796,16 +796,13 @@ describe('PublicInfoModal', () => {
         creator_id: 1,
         member_count: 0,
         tax_rates: { isk: 0 },
-        faction_id: 500016,
       });
-      mockNames([{ id: 500016, name: 'Servant Sisters of EVE' }]);
 
       renderModal();
       act(() => usePublicInfoModalStore.getState().open('corporation', 1000125));
 
       const dialog = await screen.findByRole('dialog');
-      expect(await within(dialog).findByText('NPC corporation')).toBeInTheDocument();
-      expect(await within(dialog).findByText('Servant Sisters of EVE')).toBeInTheDocument();
+      expect(await within(dialog).findByText('[SOE]')).toBeInTheDocument();
       expect(
         within(dialog).queryByRole('link', { name: /^zKillboard\s*\(opens/ })
       ).not.toBeInTheDocument();
@@ -837,7 +834,7 @@ describe('PublicInfoModal', () => {
       act(() => usePublicInfoModalStore.getState().open('character', 3008416));
 
       const dialog = await screen.findByRole('dialog');
-      expect(await within(dialog).findByText('NPC agent')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Agent')).toBeInTheDocument();
       expect(within(dialog).queryByText('No kills or losses on zKillboard')).toBeNull();
       await waitFor(() =>
         expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument()
