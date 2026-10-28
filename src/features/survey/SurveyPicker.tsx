@@ -1,5 +1,5 @@
 /**
- * Switches between the Surveys this pilot created or opened in the last 7 days
+ * Switches between the latest 8 Surveys this pilot created or opened in the last 7 days
  * (`surveyHistory`). The list is only ids and the pilot's own names; each label
  * (the name, or main ore and percent mined, then when) is read from the survey's
  * Share Link (the one in view right away, the rest the first time the dropdown
@@ -110,7 +110,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       open={open}
       onOpenChange={setOpen}
     >
-      <SelectTrigger size="sm" aria-label={t('survey.historyLabel')} className="w-56 max-w-full">
+      <SelectTrigger size="md" aria-label={t('survey.historyLabel')} className="w-56 max-w-full">
         <SelectValue placeholder={t('survey.historyPlaceholder')}>
           {/* The item's remove button lives in its children, which Radix would copy up here. */}
           {current !== undefined
