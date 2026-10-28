@@ -1467,19 +1467,55 @@ describe('AppraisalPanel — the row as an item', () => {
   describe('Sell and Buy totals', () => {
     afterEach(() => configureClipboard(null));
 
-    it('read as shorthand only, and copy the full figure on click', async () => {
+    it('read as shorthand only, and the whole card copies the full figure', async () => {
       const written: string[] = [];
       configureClipboard(async (text) => {
         written.push(text);
       });
       renderPanel({ controller: controller({ result: outcome() }) });
 
-      const sell = screen.getByRole('button', { name: 'Copy 1.4M ISK (1,386,400)' });
-      expect(sell).toHaveTextContent(/^1\.4M$/);
+      const card = screen.getByRole('region', { name: 'Sell' });
+      expect(card).toHaveTextContent('1.4M');
+      expect(card).toHaveClass('relative');
+      const sell = within(card).getByRole('button', { name: 'Sell: copy 1.4M ISK (1,386,400)' });
+      expect(sell).toHaveClass('after:absolute', 'after:inset-0');
+      expect(within(card).getAllByRole('button')).toHaveLength(1);
       await userEvent.click(sell);
 
       expect(written).toEqual(['1,386,400']);
       expect(await screen.findAllByText('Copied 1,386,400 ISK')).not.toHaveLength(0);
+    });
+
+    it('the Split card copies the midpoint, by keyboard, and its net hint does not copy', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({
+        controller: controller({
+          result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
+        }),
+      });
+
+      const split = screen.getByRole('region', { name: 'Split' });
+      const sell = screen.getByRole('region', { name: 'Sell' });
+      const buy = screen.getByRole('region', { name: 'Buy' });
+      const digits = (card: HTMLElement) =>
+        Number(
+          /\(([\d,]+)\)/
+            .exec(within(card).getByRole('button').getAttribute('aria-label') ?? '')![1]
+            .replaceAll(',', '')
+        );
+      const midpoint = (digits(buy) + digits(sell)) / 2;
+
+      await userEvent.click(within(sell).getByText('List it, after fees'));
+      expect(written).toEqual([]);
+
+      within(split).getByRole('button').focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+      expect(written).toHaveLength(2);
+      expect(Number(written[0].replaceAll(',', ''))).toBe(midpoint);
     });
   });
 });
