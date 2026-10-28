@@ -1393,7 +1393,7 @@
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
-        "cheaper": "Keeps damage, tank and speed each within 5%, the capacitor stable and the fit within CPU, powergrid and calibration."
+        "cheaper": "Keeps damage, tank and speed each within 10%, the capacitor stable and the fit within CPU, powergrid and calibration."
       },
       "checking": "Checking {{checked}} of {{total}} swaps…",
       "progressLabel": "Improve search progress",
@@ -1405,6 +1405,7 @@
       "swap_one": "{{from}} → {{to}}",
       "swap_other": "{{count}}× {{from}} → {{to}}",
       "givesUp": "Gives up:",
+      "unflyable": "You can't fly the current module yet; this one you can.",
       "noPrice": "No price",
       "gain": "+{{percent}}%",
       "moreOptions_one": "{{count}} more option",
@@ -1443,7 +1444,7 @@
       "broke": {
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
-        "keepsStats": "Loses more than 5% of damage, tank or speed",
+        "keepsStats": "Loses more than 10% of damage, tank or speed",
         "spend": "Costs more than your budget or spend cap",
         "spendBudget": "Over your {{cap}} budget by {{over}}",
         "spendCap": "{{over}} over your {{cap}} cap"

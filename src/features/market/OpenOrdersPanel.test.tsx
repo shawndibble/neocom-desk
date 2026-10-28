@@ -652,6 +652,25 @@ describe('OpenOrdersPanel', () => {
     });
   });
 
+  it('opens the detail modal from ?open=<orderId> as a row click would, leaving a clean URL', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanelWithLocation('/market/orders?open=101');
+
+    expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
+    expect(screen.getByTestId('location-search')).toHaveTextContent(/^$/);
+  });
+
+  it('does nothing for an ?open= id that matches no order', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, NO_COST_BASIS_ORDER])]));
+
+    renderPanel('/market/orders?open=999999');
+
+    expect(await screen.findByRole('table', NEEDS_YOU_TABLE)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('opens the detail modal by clicking the row', async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));

@@ -649,12 +649,15 @@ export function ImprovePanel({
           <span className="min-w-0 flex-1">
             <span className="flex items-start justify-between gap-2">
               <span className="font-medium">{swapLabel(option)}</span>
-              {goal !== 'cheaper' && (
+              {goal !== 'cheaper' && !option.candidate.fixesUnflyable && (
                 <span className="text-success shrink-0 text-xs font-medium">
                   {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
                 </span>
               )}
             </span>
+            {option.candidate.fixesUnflyable && (
+              <span className="text-warning block text-xs">{t('fittings.improve.unflyable')}</span>
+            )}
             {lead && <span className="block text-xs">{lead.node}</span>}
             <span className="text-text-dim block text-xs">
               {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
