@@ -5,7 +5,6 @@ import en from './locales/en.json';
 // matching "Create Build Plan" and Stock Targets' "New Build Group". Prose stays as is.
 const INDUSTRY_LABEL_KEYS = [
   'addPlan',
-  'deletePlan',
   'compareTitle',
   'backToList',
   'createGroup',
