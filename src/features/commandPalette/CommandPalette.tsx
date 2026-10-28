@@ -317,13 +317,22 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     switch (event.key) {
+      case 'Tab':
       case 'ArrowDown':
       case 'ArrowUp':
       case 'Home':
       case 'End': {
         if (options.length === 0) return;
         event.preventDefault();
-        const next = moveHighlight(event.key as ComboboxNavKey, highlightedIndex, options.length);
+        // Options are not focusable, so Tab would only leave the input and
+        // strand Enter: it steps the highlight like the arrows instead.
+        const key: ComboboxNavKey =
+          event.key === 'Tab'
+            ? event.shiftKey
+              ? 'ArrowUp'
+              : 'ArrowDown'
+            : (event.key as ComboboxNavKey);
+        const next = moveHighlight(key, highlightedIndex, options.length);
         setHighlightedKey(next === null ? null : options[next].key);
         break;
       }
