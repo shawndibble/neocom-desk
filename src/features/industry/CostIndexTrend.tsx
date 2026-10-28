@@ -58,7 +58,7 @@ export function CostIndexTrend({
   return (
     <Popover>
       <PopoverTrigger
-        className={`-mx-1 inline-flex items-center gap-1 rounded-xs px-1 hover:bg-line active:bg-panel-2 ${focusRingClassName}`}
+        className={`-mx-1 inline-flex items-center gap-1 rounded-xs px-1 hover:bg-line-bright/40 active:bg-panel-2 ${focusRingClassName}`}
         aria-label={t('industry.costIndexTrend.open', { system: systemName, value })}
       >
         {value}

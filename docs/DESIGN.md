@@ -1450,8 +1450,9 @@ Every interactive element takes its states from one shared recipe in
   fill and no other. Raw CSS `:hover` goes inside `@media (hover: hover)` so
   it never sticks after a tap.
   - **Exception, trigger on a Panel body:** a small inline trigger on a
-    `Panel` body (`bg-panel/85`, about `#101519`) takes `hover:bg-line`
-    (`#2a3442`, 26–41 levels per channel brighter) and `active:bg-panel-2`.
+    `Panel` body (`bg-panel/85`, about `#101519`) takes
+    `hover:bg-line-bright/40` (about `#2d3845`, 29–44 levels per channel
+    brighter; bare `hover:bg-line` is a retired fill) and `active:bg-panel-2`.
     `panel-2` is only 6–14 levels from that surface, so it reads as no
     change. `bg` is 5–7 levels away, just as faint. The cost index trigger
     in `CostIndexTrend` is the example. Full-width rows and `bg-bg` areas
