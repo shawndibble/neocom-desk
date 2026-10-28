@@ -100,6 +100,8 @@ interface MaterialsPhoneRowProps {
   total: ReactNode;
   ownedHint: ReactNode;
   action: ReactNode;
+  /** The item menu's visible button, beside the total. */
+  menu?: ReactNode;
   haveField: ReactNode;
   priceField: (autoFocus: boolean) => ReactNode;
   /** The price field of a built row with an unpriced ingredient — the warning, not a price. */
@@ -135,6 +137,7 @@ export function MaterialsPhoneRow({
   total,
   ownedHint,
   action,
+  menu,
   haveField,
   priceField,
   unpricedField,
@@ -179,6 +182,7 @@ export function MaterialsPhoneRow({
           ) : (
             total
           )}
+          {menu}
         </span>
       </div>
 

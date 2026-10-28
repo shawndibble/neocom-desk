@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import '@/i18n';
 import { materialCostLines } from '@/engine/industry/sourcing';
 import type {
@@ -28,6 +28,11 @@ import { PHONE_QUERY } from '@/lib/useIsPhone';
 import type { MaterialTableRow } from './subBuildPlan';
 import type { OwnedStockDetection } from './ownedStockDetection';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
+import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
+import { ItemActionsContext, type ItemActions } from '@/features/market/itemActions';
+import { EMPTY_BLUEPRINT_CATALOG, type BlueprintCatalog } from './blueprintCatalog';
+import { buildItemMenuProps } from './buildItemMenuProps';
+import { useTableExport } from '@/components/ui/useTableExport';
 
 /** `MaterialsTable` rows carry the jobs producing them; a plain cost line has none. */
 function asRows(materials: readonly MaterialCostLine[]): MaterialTableRow[] {
@@ -1853,5 +1858,113 @@ describe('MaterialsTable Depth Prices (issue #3993)', () => {
   it('drops the line from a row the pilot priced', () => {
     render(<Harness initial={{ 34: { overridePrice: 3 } }} depthFor={() => walk} />);
     expect(within(row('Tritanium')).queryByText(/avg for/)).toBeNull();
+  });
+});
+
+describe('MaterialsTable item menu (issue #5381)', () => {
+  // 9840 is built by blueprint 9841; 34 has no blueprint.
+  const CATALOG: BlueprintCatalog = {
+    ...EMPTY_BLUEPRINT_CATALOG,
+    byProductTypeID: new Map([[9840, { blueprintTypeID: 9841 } as never]]),
+    byBlueprintTypeID: new Map([[9841, { blueprintTypeID: 9841 } as never]]),
+    typesById: { '34': { name: 'Tritanium' } as never },
+  };
+  const showInfo = vi.fn();
+  const actions: ItemActions = {
+    canAddToQuickbar: false,
+    addToQuickbar: vi.fn(),
+    showInfo,
+    blueprints: CATALOG,
+    blueprintFor: () => null,
+    requestBlueprints: vi.fn(),
+  };
+
+  function Probe() {
+    return <output data-testid="url">{useLocation().pathname + useLocation().search}</output>;
+  }
+
+  function Menu() {
+    const navigate = useNavigate();
+    const { itemMenuFor, itemActionsFor } = buildItemMenuProps(CATALOG, (typeId) =>
+      navigate(bpcSourcingHref(typeId))
+    );
+    const exported = useTableExport({
+      surface: 'build-materials',
+      rows: MENU_LINES,
+      columns: [{ header: 'Name', value: (row) => nameFor(row.typeID) }],
+      source: 'rows',
+    });
+    return (
+      <MaterialsTable
+        materials={MENU_LINES}
+        nameFor={nameFor}
+        volumeFor={volumeFor}
+        sourcing={undefined}
+        pricesReady
+        onSourcingChange={vi.fn()}
+        exportProps={exported.tableProps}
+        itemMenuFor={itemMenuFor}
+        itemActionsFor={itemActionsFor}
+      />
+    );
+  }
+
+  function renderMenu() {
+    return render(
+      <ItemActionsContext.Provider value={actions}>
+        <MemoryRouter>
+          <Menu />
+          <Probe />
+        </MemoryRouter>
+      </ItemActionsContext.Provider>
+    );
+  }
+
+  async function openRowMenu(name: string) {
+    const row = screen.getByText(name).closest('tr');
+    fireEvent.contextMenu(row!);
+    return screen.findAllByRole('menuitem');
+  }
+
+  it('lists Show info and View in Market ahead of the export items', async () => {
+    renderMenu();
+    const labels = (await openRowMenu('Tritanium')).map((item) => item.textContent);
+    const showInfoAt = labels.indexOf('Show info');
+    const marketAt = labels.indexOf('View in Market');
+    const exportAt = labels.findIndex((label) => /export/i.test(label ?? ''));
+    expect(showInfoAt).toBeGreaterThanOrEqual(0);
+    expect(marketAt).toBeGreaterThanOrEqual(0);
+    expect(exportAt).toBeGreaterThan(Math.max(showInfoAt, marketAt));
+  });
+
+  it('opens Show info for the row’s material', async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await openRowMenu('Tritanium');
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+    expect(showInfo).toHaveBeenCalledWith(34, 'Tritanium');
+  });
+
+  it('offers no BPC sourcing item for a material nothing builds', async () => {
+    renderMenu();
+    await openRowMenu('Tritanium');
+    expect(screen.queryByRole('menuitem', { name: /BPC Sourcing/ })).not.toBeInTheDocument();
+  });
+
+  it('lands on BPC Sourcing searched for the blueprint', async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await openRowMenu('Mechanical Parts');
+    await user.click(screen.getByRole('menuitem', { name: 'Find BPC in BPC Sourcing' }));
+    expect(screen.getByTestId('url')).toHaveTextContent(bpcSourcingHref(9841));
+  });
+
+  it('gives each row the same menu from its More actions button', async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    const row = screen.getByText('Mechanical Parts').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: /More actions/ }));
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Find BPC in BPC Sourcing' })).toBeInTheDocument();
   });
 });

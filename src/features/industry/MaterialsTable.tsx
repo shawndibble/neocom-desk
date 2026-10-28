@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type FocusEvent,
+  type ReactElement,
   type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +32,7 @@ import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
+import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { buildMaterialsColumns } from './MaterialsColumns';
 import { NotApplicable } from './NotApplicable';
 import { whenFocusLeaves } from './focusLeaves';
@@ -142,6 +144,10 @@ interface MaterialsTableProps {
   characterNameFor?: (characterId: number) => string;
   /** `useTableExport(...).tableProps` — makes the table exportable from its row menus. */
   exportProps?: UseTableExport<MaterialTableRow>['tableProps'];
+  /** The page's item menu (`buildItemMenuProps`): Show info, View in Market and the rest, ahead of the export items. Omitted, rows have no item menu. */
+  itemMenuFor?: ItemMenuFor;
+  /** The same menu as a visible button, for the phone card (which has no right-click). */
+  itemActionsFor?: (typeId: number) => ReactElement;
 }
 
 /**
@@ -222,6 +228,8 @@ export function MaterialsTable({
   skillGates,
   characterNameFor,
   exportProps,
+  itemMenuFor,
+  itemActionsFor,
   depthFor,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
@@ -982,6 +990,7 @@ export function MaterialsTable({
                         total={renderTotal(material)}
                         ownedHint={renderOwnedHint(material)}
                         action={renderAction(material, false)}
+                        menu={itemActionsFor?.(material.typeID)}
                         haveField={
                           editingHave === material.typeID
                             ? renderHave(
@@ -1004,6 +1013,10 @@ export function MaterialsTable({
                 <div className="overflow-x-auto">
                   <DataTable
                     {...exportProps}
+                    rowContextMenu={
+                      itemMenuFor ? (material, tr) => itemMenuFor(material.typeID, tr) : undefined
+                    }
+                    rowMoreActions={itemMenuFor !== undefined}
                     columns={tableColumns}
                     rows={rows}
                     // Fixed layout over the same column widths in every

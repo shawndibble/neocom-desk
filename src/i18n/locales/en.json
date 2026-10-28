@@ -2908,6 +2908,7 @@
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
+      "findBpcInSourcing": "Find BPC in BPC Sourcing",
       "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
