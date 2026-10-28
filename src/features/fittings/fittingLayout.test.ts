@@ -27,6 +27,19 @@ describe('editorGridClass', () => {
   });
 });
 
+describe('editorGridClass with Improve open', () => {
+  it('pins the stats track and stops re-centring, so the stats never shift', () => {
+    for (const view of ['ring', 'list'] as const) {
+      const open = editorGridClass('slideOut', view, false, true);
+      expect(open).not.toContain('28rem');
+      expect(open).not.toContain('justify-center');
+      expect(open).toContain('justify-start');
+      expect(editorGridClass('docked', view, false, true)).not.toContain('26rem');
+    }
+    expect(editorGridClass('slideOut', 'list', false)).toContain('minmax(22rem,28rem)');
+  });
+});
+
 describe('editorColumnClass', () => {
   it('sticks the ring column when docked or the browser is closed', () => {
     expect(editorColumnClass('ring', 'docked', true)).toContain('lg:sticky');

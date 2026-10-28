@@ -186,7 +186,8 @@ export function shipSections({
   placeholder,
   typeName,
   price,
-}: ColumnContext & { price: Appraisal | null }): ReactNode[] {
+  previewIsk = null,
+}: ColumnContext & { price: Appraisal | null; previewIsk?: number | null }): ReactNode[] {
   const priceInfo = priceView(price, typeName);
   const { nothingPriced, unpriced } = priceInfo;
   return [
@@ -275,7 +276,18 @@ export function shipSections({
       ),
     section(
       'price',
-      price ? nothingPriced ? '—' : <IskLabel value={price.totals.sell} /> : undefined,
+      price ? (
+        nothingPriced ? (
+          '—'
+        ) : previewIsk !== null && previewIsk !== 0 ? (
+          <span className={previewIsk < 0 ? 'text-success' : 'text-warning'}>
+            <IskLabel value={price.totals.sell} /> →{' '}
+            <IskLabel value={price.totals.sell + previewIsk} />
+          </span>
+        ) : (
+          <IskLabel value={price.totals.sell} />
+        )
+      ) : undefined,
       priceInfo.named ? (
         <PriceBody view={{ ...priceInfo, named: priceInfo.named }} />
       ) : (

@@ -5,9 +5,11 @@
  * the fit nothing, so they sit above the swaps. Only for the active
  * Character's real skills, and only when something helps.
  */
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Toast } from '@/components/ui';
+import { Caret, textActionClassName, Toast } from '@/components/ui';
+import { ImproveSkillsSlotContext } from './improveSkillsSlot';
 import type { ImproveGoal } from '@/engine/fittings/improve';
 import { FREE_ROWS_SHOWN, TRAIN_SORT } from '@/engine/fittings/improveFree';
 import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
@@ -58,6 +60,7 @@ function Train({
   const upgrades = useModuleUpgrades(evaluator, catalogue, scheduleEntriesFor);
   const targetPlan = target.plans?.find((plan) => plan.id === target.targetPlanId);
   const plannedLevels = usePlannedLevels(targetPlan, catalog, trainedSkills, trainedSkillsKnown);
+  const slot = useContext(ImproveSkillsSlotContext);
   const [added, setAdded] = useState<{
     planId: string;
     planName: string;
@@ -92,54 +95,89 @@ function Train({
   const scheduleFor = (skillTypeId: number, level: number): readonly ScheduledStep[] | null =>
     scheduleEntriesFor?.([{ skillTypeID: skillTypeId, targetLevel: level }]) ?? null;
 
+  const rows = (
+    <ul className="m-0 list-none p-0 text-xs">
+      {skills.map((row, index) => (
+        <WhatToTrainItem
+          key={row.skillTypeId}
+          row={row}
+          rank={index + 1}
+          evaluator={evaluator}
+          plan={plan}
+          plannedLevels={plannedLevels}
+          scheduleFor={scheduleFor}
+          skills={catalog?.engineSkills}
+          trainedSkills={trainedSkills}
+          onAdd={(picked, level) =>
+            addEntries([{ skillTypeID: picked.skillTypeId, targetLevel: level }])
+          }
+        />
+      ))}
+      {modules.map((row) => (
+        <ModuleUpgradeItem
+          key={row.fromTypeId}
+          row={row}
+          typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
+          skills={catalog?.engineSkills}
+          trainedSkills={trainedSkills}
+          plan={plan}
+          plannedLevels={plannedLevels}
+          onAdd={addEntries}
+        />
+      ))}
+    </ul>
+  );
+  const toast = added && (
+    <Toast
+      message={t('skills.fitCheck.addedToast', {
+        count: added.entries.length,
+        plan: added.planName,
+      })}
+      undo={{
+        label: t('skills.fitCheck.addedToastUndo'),
+        onUndo: () => {
+          void target.removeEntries(added.planId, added.entries);
+          setAdded(null);
+        },
+      }}
+      onClose={() => setAdded(null)}
+    />
+  );
+  // Inside Improve's header: a Skills control with a count, its rows only while it is open.
+  if (slot) {
+    const count = skills.length + modules.length;
+    return (
+      <>
+        {slot.trigger &&
+          createPortal(
+            <button
+              type="button"
+              className={textActionClassName('gap-1')}
+              aria-expanded={slot.open}
+              aria-controls={slot.panelId}
+              aria-label={`${t('fittings.improve.skills')}, ${t('fittings.improve.skillsCount', { count })}`}
+              onClick={slot.onToggle}
+            >
+              {t('fittings.improve.skills')}
+              <span
+                aria-hidden="true"
+                className="bg-accent/20 text-accent rounded-full px-1.5 text-xs normal-case tracking-normal"
+              >
+                {count}
+              </span>
+              <Caret expanded={slot.open} />
+            </button>,
+            slot.trigger
+          )}
+        {slot.open && slot.panel && createPortal(rows, slot.panel)}
+        {toast}
+      </>
+    );
+  }
   return (
     <MakeItFitSection heading={t('fittings.improve.section.train')}>
-      <ul className="m-0 list-none p-0 text-xs">
-        {skills.map((row, index) => (
-          <WhatToTrainItem
-            key={row.skillTypeId}
-            row={row}
-            rank={index + 1}
-            evaluator={evaluator}
-            plan={plan}
-            plannedLevels={plannedLevels}
-            scheduleFor={scheduleFor}
-            skills={catalog?.engineSkills}
-            trainedSkills={trainedSkills}
-            onAdd={(picked, level) =>
-              addEntries([{ skillTypeID: picked.skillTypeId, targetLevel: level }])
-            }
-          />
-        ))}
-        {modules.map((row) => (
-          <ModuleUpgradeItem
-            key={row.fromTypeId}
-            row={row}
-            typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
-            skills={catalog?.engineSkills}
-            trainedSkills={trainedSkills}
-            plan={plan}
-            plannedLevels={plannedLevels}
-            onAdd={addEntries}
-          />
-        ))}
-      </ul>
-      {added && (
-        <Toast
-          message={t('skills.fitCheck.addedToast', {
-            count: added.entries.length,
-            plan: added.planName,
-          })}
-          undo={{
-            label: t('skills.fitCheck.addedToastUndo'),
-            onUndo: () => {
-              void target.removeEntries(added.planId, added.entries);
-              setAdded(null);
-            },
-          }}
-          onClose={() => setAdded(null)}
-        />
-      )}
+      {rows}
+      {toast}
     </MakeItFitSection>
   );
 }

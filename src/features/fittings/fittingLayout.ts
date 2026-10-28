@@ -52,18 +52,27 @@ export function leftColumn(
  * track stops at 52rem (its 48rem ring and the panel around it);
  * width past the caps becomes even gutters.
  */
-export function editorGridClass(addMode: AddMode, view: FittingView, addOpen: boolean): string {
+export function editorGridClass(
+  addMode: AddMode,
+  view: FittingView,
+  addOpen: boolean,
+  improveOpen = false
+): string {
+  // With Improve's column open the stats hold one width and the editor absorbs the
+  // loss, so the stats never resize or re-centre as the column opens or shuts.
+  const stats = improveOpen ? '22rem' : 'minmax(22rem,28rem)';
+  const dockedStats = improveOpen ? '22rem' : 'minmax(22rem,26rem)';
   const tracks =
     addMode === 'docked'
       ? view === 'ring'
-        ? 'grid-cols-[20rem_minmax(0,52rem)_minmax(22rem,26rem)]'
-        : 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
+        ? `grid-cols-[20rem_minmax(0,52rem)_${dockedStats}]`
+        : `grid-cols-[20rem_minmax(0,1fr)_${dockedStats}]`
       : addOpen
         ? 'grid-cols-1'
         : view === 'ring'
-          ? 'grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem] xl:grid-cols-[minmax(0,52rem)_minmax(22rem,28rem)]'
-          : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]';
-  return `grid items-start justify-center gap-3 ${tracks}`;
+          ? `grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem] xl:grid-cols-[minmax(0,52rem)_${stats}]`
+          : `grid-cols-1 xl:grid-cols-[minmax(0,1fr)_${stats}]`;
+  return `grid items-start ${improveOpen ? 'justify-start' : 'justify-center'} gap-3 ${tracks}`;
 }
 
 /**

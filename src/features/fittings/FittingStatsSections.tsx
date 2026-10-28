@@ -97,6 +97,8 @@ interface FittingStatsSectionsProps {
   moduleResults?: FittingModuleResult[] | null;
   /** A change to preview in place (`current → after`), from Improve's ticked or hovered rows; absent or null: none. */
   preview?: FittingStatsDelta | null;
+  /** What the previewed change adds to the price (`current → after`); absent or null: the plain price. */
+  previewIsk?: number | null;
   /** One sentence per fitting rule the fit breaks; empty or absent for a legal fit. */
   ruleBreaks?: readonly string[];
 }
@@ -134,6 +136,7 @@ export function FittingStatsSections({
   fitting = null,
   moduleResults = null,
   preview = null,
+  previewIsk = null,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
@@ -222,7 +225,7 @@ export function FittingStatsSections({
     moduleResults,
   });
   const tank = tankSections({ ...column, damageProfiles, profileName });
-  const ship = shipSections({ ...column, price });
+  const ship = shipSections({ ...column, price, previewIsk });
 
   return (
     <StatPreviewProvider delta={preview}>
