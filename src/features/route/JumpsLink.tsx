@@ -18,12 +18,15 @@ const stop = (event: { stopPropagation: () => void }) => event.stopPropagation()
 
 export function JumpsLink({
   systemId,
+  stationId,
   fromId,
   preference,
   label,
   children,
 }: {
   systemId: number;
+  /** The route ends at this station, not just its system. */
+  stationId?: number | null;
   /** Accessible name, when the bare count isn't one ("5 jumps — open route safety"). */
   label?: string;
   /** Where the count starts, when that isn't the Character's current system. */
@@ -36,7 +39,7 @@ export function JumpsLink({
   return (
     <Tooltip content={t('travel.waypoints.viewRoute')}>
       <Link
-        to={routeToHref(systemId, fromId, preference)}
+        to={routeToHref(systemId, fromId, preference, stationId)}
         className={entityLinkClassName()}
         aria-label={label}
         onClick={stop}
