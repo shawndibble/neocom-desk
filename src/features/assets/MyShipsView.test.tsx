@@ -18,13 +18,24 @@ vi.mock('./assets', () => ({
   })),
 }));
 vi.mock('@/sde/loadSde', () => ({
-  loadTypes: async () => ({}),
-  loadGroupCategories: async () => ({}),
+  loadTypes: async () => ({
+    '100': { name: 'Catalyst', groupID: 1 },
+    '101': { name: 'Bestower', groupID: 1 },
+  }),
+  loadGroupCategories: async () => ({ '1': 6 }),
 }));
 vi.mock('@/features/character/location', () => ({ loadCharacterSolarSystemId: async () => null }));
 vi.mock('@/features/places', () => ({
   placeKey: () => '',
   usePlaceDetails: () => new Map(),
+}));
+vi.mock('@/features/market/itemActions', () => ({ useItemActions: () => ({ showInfo: vi.fn() }) }));
+vi.mock('@/features/market/ItemContextMenu', () => ({
+  ShowInfoMenuItem: () => null,
+  OpenInEveItemMenuItems: () => null,
+}));
+vi.mock('@/features/fittings/useOpenInFittings', () => ({
+  useOpenInFittings: () => ({ open: vi.fn(), pending: false }),
 }));
 vi.mock('@/features/market/groupNames', () => ({ loadGroupNames: async () => new Map() }));
 
@@ -39,7 +50,7 @@ function renderShips(
         onSkippedChange={onSkippedChange}
         activeCharacterId={characterIds[0] ?? null}
         hrefFor={() => '/assets'}
-        route={'shortest' as never}
+        route={{ rules: { preference: 'shortest' } } as never}
       />
     </MemoryRouter>
   );
@@ -49,6 +60,79 @@ beforeEach(() => {
   read.entries = [];
   read.skipped = [];
   read.cachedAt = null;
+});
+
+const shipAsset = (over: Record<string, unknown>) =>
+  ({
+    type_id: 100,
+    quantity: 1,
+    location_id: 60000001,
+    location_type: 'station',
+    location_flag: 'Hangar',
+    is_singleton: true,
+    ...over,
+  }) as never;
+
+describe('MyShipsView packaged ships', () => {
+  it('marks a packaged stack with a Packaged pill and its quantity, without Show fitting', async () => {
+    read.entries = [
+      {
+        characterId: 1,
+        name: 'Alice',
+        assets: [
+          shipAsset({ item_id: 1, is_singleton: false, quantity: 10 }),
+          shipAsset({ item_id: 2, type_id: 101 }),
+        ],
+      },
+    ];
+    renderShips([1]);
+    expect(await screen.findByText('Packaged')).toBeInTheDocument();
+    expect(screen.getAllByText('Packaged')).toHaveLength(1);
+    expect(screen.getByText('×10')).toBeInTheDocument();
+    expect(screen.getByText('Bestower')).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: /more actions|actions/i })[0]);
+    expect(screen.getByRole('menuitem', { name: 'Open location assets' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Show fitting' })).not.toBeInTheDocument();
+  });
+
+  it('finds packaged rows by searching "packaged"', async () => {
+    read.entries = [
+      {
+        characterId: 1,
+        name: 'Alice',
+        assets: [
+          shipAsset({ item_id: 1, is_singleton: false, quantity: 1 }),
+          shipAsset({ item_id: 2, type_id: 101 }),
+        ],
+      },
+    ];
+    renderShips([1]);
+    await screen.findByText('Bestower');
+    await userEvent.type(screen.getByRole('searchbox'), 'packaged');
+    expect(screen.queryByText('Bestower')).not.toBeInTheDocument();
+    expect(screen.getByText('Catalyst')).toBeInTheDocument();
+    expect(screen.queryByText('×1')).not.toBeInTheDocument();
+  });
+
+  it('says what holds a ship that sits in a bay', async () => {
+    read.entries = [
+      {
+        characterId: 1,
+        name: 'Alice',
+        assets: [
+          shipAsset({ item_id: 2, type_id: 101 }),
+          shipAsset({
+            item_id: 3,
+            location_id: 2,
+            location_type: 'item',
+            location_flag: 'ShipHangar',
+          }),
+        ],
+      },
+    ];
+    renderShips([1]);
+    expect(await screen.findByText('inside Bestower (Ship Maintenance Bay)')).toBeInTheDocument();
+  });
 });
 
 describe('MyShipsView with unreadable assets', () => {
