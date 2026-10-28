@@ -3643,6 +3643,8 @@
       "teNote": "Sub-jobs are timed at TE 0"
     },
     "heroVs90dSpike": "Sell price is {{value}} above its 90-day median",
+    "inputCostMove": "Build cost {{cost}} in 7d ({{input}} is {{share}}% of cost)",
+    "inputCostMoveProduct": "product {{value}}",
     "heroNoPrices": "No price data yet",
     "bpcCoverageWarning": "{{name}}: your BPC covers {{covered}} of {{needed}} runs",
     "bpcCoverageSetRuns": "Set runs to {{count}}",
