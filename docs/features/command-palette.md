@@ -66,7 +66,7 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 | 5     | LP Stores    | 2         | NPC corp name; hint "N LP" for corps the active Character holds LP with | navigate `/market/lp-store/<corpId>`                     | SDE `loadLpCorporations` + cached loyalty balances                  |
 | 6     | Contacts     | 1         | contact name; sublabel type + "+standing Character" per holder          | open Public Info modal                                   | cached contacts across Characters whose token has contacts scope    |
 
-- Pages: empty query lists pages only (kind `page`), uncapped, as a quick navigator; with a query, tabs and sub-views are included, capped to 6 (`providers.ts:34-53`). Corp pages are listed only while the Corp entry is visible (hidden, never locked); other scope-gated pages are marked locked, never hidden. Contacts is `tablessNav` so its views are not listed separately (no `/contacts/across` entry).
+- Pages: empty query lists pages only (kind `page`), uncapped, as a quick navigator; with a query, tabs and sub-views are included, capped to 6 (`providers.ts:34-53`). Corp pages are listed only while the Corp entry is visible (hidden, never locked); other scope-gated pages are marked locked, never hidden. Contacts lists Standings but not its character-filter views (`controlTabs`: no `/contacts/across` entry).
 - Commands (`PALETTE_COMMANDS`, `providers.ts:70-95`): Open settings (`/settings`), Keyboard shortcuts (`/help/shortcuts`), Add character (`beginAddCharacterLogin()`), Open notification feed (`/alerts`).
 - Assets href (`assetsHref`): `chars=all` added when any holder is not the active Character, so an alt-only item never opens an empty search. A type with no cached name is dropped. Scope check uses `requiredScopesForEndpoints(['getCharacterAssets'])` against `db.tokens.scopes`; a Character without it contributes nothing; with no grant anywhere the group never shows. No request is ever made.
 - Contacts: cache-only; names read from the name cache (`readCachedNames`), unresolved names are dropped, factions dropped (no Public Info). Open goes through `openPublicInfoModal` (URL-backed `?info=`).
@@ -98,7 +98,7 @@ Ctrl+K from a text field (:120), no stacking over dialogs (:137), empty query li
 ## Observed gaps
 
 - No recent items. Settings sections and Help tabs are listed as tabs (`SETTINGS_TABS`, Help tabs; Settings sections hidden-from-tab-bar only at `md+`, still palette-listed), but individual settings (e.g. Week starts on) are not searchable.
-- No palette entry for the Contacts All-characters view (tablessNav) or for Alerts filters/mute.
+- No palette entry for the Contacts All-characters view (controlTabs) or for Alerts filters/mute.
 - Characters, commands and contacts groups need >= 1 char; group results capped at 6 with no "show more".
 - Assets/contacts groups are only as fresh as the caches; a never-opened alt contributes nothing, with no hint that it is missing.
 - Only four commands; none for refresh, theme, log out or export.

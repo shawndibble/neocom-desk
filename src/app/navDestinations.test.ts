@@ -222,8 +222,9 @@ describe('listNavDestinations', () => {
     expect(byPath('/wallet/transactions')).toBeUndefined();
   });
 
-  it("lists no tabs for a page whose tabs are an in-page control (Contacts' character filter)", () => {
+  it("leaves out tabs that are an in-page control (Contacts' character filter) but lists Standings", () => {
     expect(byPath('/contacts')).toBeDefined();
+    expect(byPath('/contacts/standings')).toBeDefined();
     expect(byPath('/contacts/character')).toBeUndefined();
     expect(byPath('/contacts/across')).toBeUndefined();
   });
