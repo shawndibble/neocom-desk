@@ -15,10 +15,11 @@ import { useCharacters } from '@/features/character/useCharacters';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
-import { GrantBanner } from '@/app/GrantNote';
-import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { beginGrant } from '@/app/grantAction';
+import { useCharacterIdsWithScopes, useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import {
   Button,
+  NeedsConnection,
   Select,
   SelectContent,
   SelectItem,
@@ -26,10 +27,16 @@ import {
   SelectValue,
   Tooltip,
 } from '@/components/ui';
-import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
+import {
+  permissionsForEndpoints,
+  requiredScopesForEndpoints,
+  type EsiEndpointId,
+} from '@/esi/registry';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
+import { useWaypointsDismissed } from './waypointsDismissed';
 import { setWaypointsInGame } from './sendWaypoints';
 import { waypointFailureText } from './waypointFailureText';
 import type { RouteSafetyLeg } from './useRouteSafety';
@@ -58,6 +65,13 @@ export function SetWaypoints({
   const characterName = characters.find((c) => c.characterId === characterId)?.name;
   const lacksScope = useCharacterLacksEndpoints(characterId, ENDPOINTS);
   const online = useOnline();
+  const dismissed = useWaypointsDismissed((state) => state.value);
+  const setDismissed = useWaypointsDismissed((state) => state.setValue);
+  useHydratedStore(useWaypointsDismissed);
+  const holders = useCharacterIdsWithScopes(requiredScopesForEndpoints(ENDPOINTS));
+  // Unknown holders hide it too: a dismissed pilot must not see the button flash on a cold load.
+  const hidden =
+    dismissed && characters.length > 0 && (holders === undefined || holders.size === 0);
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -126,49 +140,69 @@ export function SetWaypoints({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {children}
         {/* Full width under the facts on a phone, so it reads as the panel's action rather than one more fact. */}
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {characters.length > 1 && characterId !== null && (
-            <Select
-              value={String(characterId)}
-              onValueChange={(value) => {
-                setChosenId(Number(value));
-                setOutcome(null);
-              }}
-            >
-              <SelectTrigger
-                size="sm"
-                aria-label={t('travel.waypoints.character')}
-                className="w-40"
+        {!hidden && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            {characters.length > 1 && characterId !== null && (
+              <Select
+                value={String(characterId)}
+                onValueChange={(value) => {
+                  setChosenId(Number(value));
+                  setOutcome(null);
+                }}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {characters.map((character) => (
-                  <SelectItem key={character.characterId} value={String(character.characterId)}>
-                    {character.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
-          {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
-          <Tooltip content={blockedReason}>{sendButton}</Tooltip>
-        </div>
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('travel.waypoints.character')}
+                  className="w-40"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {characters.map((character) => (
+                    <SelectItem key={character.characterId} value={String(character.characterId)}>
+                      {character.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
+            {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
+            <Tooltip content={blockedReason}>{sendButton}</Tooltip>
+          </div>
+        )}
       </div>
-      {blockedReason !== null && !lacksScope && (
+      {blockedReason !== null && !lacksScope && !hidden && (
         <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
-      {lacksScope && characterId !== null && (
-        <GrantBanner
-          variant="ghost"
-          characterId={characterId}
-          characterName={characterName}
-          endpoints={ENDPOINTS}
-          title={t('travel.waypoints.grantTitle')}
-          hint={t('travel.waypoints.grantHint')}
-          actionLabel={t('travel.waypoints.grantAction')}
-        />
+      {lacksScope && characterId !== null && !hidden && (
+        <div className="space-y-2 py-2">
+          <p className="text-xs font-semibold tracking-widest text-warning uppercase">
+            {t('travel.waypoints.grantTitle', { character: characterName ?? '' })}
+          </p>
+          <p className="text-xs text-text-dim">{t('travel.waypoints.grantHint')}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <NeedsConnection>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void beginGrant(characterId, ENDPOINTS)}
+              >
+                {t('travel.waypoints.grantAction')}
+              </Button>
+            </NeedsConnection>
+            <GrantMissingLink
+              groups={permissionsForEndpoints(ENDPOINTS)}
+              asCharacter={characterId}
+              label={t('travel.waypoints.manageAction')}
+            />
+            <Tooltip content={t('travel.waypoints.dismissHint')}>
+              <Button variant="ghost" size="sm" onClick={() => void setDismissed(true)}>
+                {t('travel.waypoints.dismissAction')}
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
       )}
       {outcome && (
         <p
