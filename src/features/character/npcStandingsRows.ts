@@ -27,9 +27,11 @@ import {
   type ChainKind,
   type SocialSkillLevels,
 } from '@/engine/standings';
+import { nearestStationWhere } from '@/features/loyalty/nearestNpcStation';
 import { buildChain, type ChainTarget } from '@/features/standings/buildChain';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { NpcAgent } from '@/sde/agents';
+import type { NpcStationEntry } from '@/sde/marketTypes';
 
 export type NpcStandingKind = 'faction' | 'corp' | 'agent';
 
@@ -42,6 +44,13 @@ export interface NpcBelongsTo {
   level?: AgentLevel;
   /** Agents only; absent for a division no baked agent works in. */
   division?: string;
+}
+
+/** The station a row is about, and how far: a corporation's or faction's nearest, an agent's own. */
+export interface NpcNearestPlace {
+  stationId: number;
+  systemId: number;
+  jumps: number;
 }
 
 export interface NpcStandingRow {
@@ -57,6 +66,8 @@ export interface NpcStandingRow {
   accessLevel: AgentLevel | null;
   /** Agent rows only: whether this agent is open now; null for the rest, for an agent with no known level and when skills are unknown. */
   agentAccess: AgentAccess | null;
+  /** Null when the distances, the stations or the agent's station are unknown, or it owns none. */
+  nearest: NpcNearestPlace | null;
   usedForFees: boolean;
 }
 
@@ -77,12 +88,18 @@ export interface NpcStandingsReference {
     agentById(agentId: number): NpcAgent | undefined;
     divisionName(divisionId: number): string | undefined;
   } | null;
+  /** The NPC station snapshot, for the nearest station of each row. */
+  stations: readonly NpcStationEntry[] | null;
+  /** Jumps from the pilot's Current System to every reachable system; null when unknown. */
+  jumps: ReadonlyMap<number, number> | null;
 }
 
 export const NO_NPC_STANDINGS_REFERENCE: NpcStandingsReference = {
   skills: null,
   corporations: null,
   agents: null,
+  stations: null,
+  jumps: null,
 };
 
 const KIND: Record<CharacterStandingEntry['from_type'], NpcStandingKind> = {
@@ -111,7 +128,8 @@ export function buildNpcStandingRows(
   feeOwners: ReadonlySet<number>,
   reference: NpcStandingsReference
 ): NpcStandingRow[] {
-  const { skills, corporations, agents } = reference;
+  const { skills, corporations, agents, stations, jumps } = reference;
+  const stationById = new Map((stations ?? []).map((station) => [station.id, station]));
   return entries
     .map((entry): NpcStandingRow => {
       const kind = KIND[entry.from_type];
@@ -150,10 +168,36 @@ export function buildNpcStandingRows(
         belongsTo: belongsTo(kind, entry.from_id, agent, reference),
         accessLevel: chain && skills ? highestAccessLevel(chain) : null,
         agentAccess: chain && skills && agentLevel ? agentAccess(chain, agentLevel) : null,
+        nearest: nearestPlace(kind, entry.from_id, agent, stations, stationById, jumps),
         usedForFees: kind !== 'agent' && feeOwners.has(entry.from_id),
       };
     })
     .sort((a, b) => b.base - a.base);
+}
+
+/** An agent sits in one station; a corporation or faction owns many, of which the nearest counts. */
+function nearestPlace(
+  kind: NpcStandingKind,
+  id: number,
+  agent: NpcAgent | undefined,
+  stations: readonly NpcStationEntry[] | null,
+  stationById: ReadonlyMap<number, NpcStationEntry>,
+  jumps: ReadonlyMap<number, number> | null
+): NpcNearestPlace | null {
+  if (!stations || !jumps) return null;
+  if (kind === 'agent') {
+    const station = agent && stationById.get(agent.stationId);
+    const count = station && jumps.get(station.systemId);
+    return station && count !== undefined
+      ? { stationId: station.id, systemId: station.systemId, jumps: count }
+      : null;
+  }
+  const nearest = nearestStationWhere(stations, jumps, (station) =>
+    kind === 'corp' ? station.ownerCorporationId === id : station.ownerFactionId === id
+  );
+  return nearest
+    ? { stationId: nearest.stationId, systemId: nearest.systemId, jumps: nearest.jumps }
+    : null;
 }
 
 function belongsTo(

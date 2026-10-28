@@ -324,7 +324,29 @@ describe('PublicContractDetailModal — price check', () => {
 
     const check = await screen.findByRole('region', { name: /^Is it fair/ });
     expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument(); // 10 x 100m, the item only
-    expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+    expect(within(check).getByText(/1 of 2 items priced \(1 item unpriced\)/)).toBeInTheDocument();
+    expect(within(check).getByText(/Against 1 of 2 items/)).toBeInTheDocument();
+  });
+
+  it('shows the estimate from other contracts apart from the hub value (#5427)', async () => {
+    showItems([
+      item({
+        record_id: 1,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 16,
+        runs: 1,
+      }),
+      item({ record_id: 2, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 50_000_000, otherValue: { value: 4_300_000_000, lines: 1 } });
+
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('Other contracts')).toBeInTheDocument();
+    expect(within(check).getByText(/about 4,300,000,000 ISK/)).toBeInTheDocument();
+    // The difference stays against the hub value: 50M against 1B.
+    expect(within(check).getByText('−95.0%')).toBeInTheDocument();
   });
 
   it('has no price check for a contract with no ISK ask and nothing requested', async () => {

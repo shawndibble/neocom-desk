@@ -64,6 +64,26 @@ const REFERENCE: NpcStandingsReference = {
         : undefined,
     divisionName: () => 'Security',
   },
+  stations: [
+    {
+      id: 60000001,
+      name: 'Navy HQ',
+      systemId: 30000142,
+      ownerCorporationId: 1000035,
+      ownerFactionId: 500001,
+    },
+    {
+      id: 1,
+      name: 'Agent station',
+      systemId: 30000144,
+      ownerCorporationId: 1000127,
+      ownerFactionId: 500001,
+    },
+  ],
+  jumps: new Map([
+    [30000142, 3],
+    [30000144, 0],
+  ]),
 };
 
 /** Shows the query string, so a test can read what the filters wrote to the URL. */
@@ -212,11 +232,13 @@ describe('ContactsStandings table', () => {
     await screen.findByText('Hanna Kurosawa');
 
     const table = screen.getByRole('table', { name: 'Standings' });
-    for (const header of ['Name', 'Type', 'Belongs to', 'Base', 'With skills', 'Access', 'Fees']) {
+    for (const header of ['Name', 'Type', 'Belongs to', 'Standing', 'Access', 'Jumps', 'Fees']) {
       expect(
         within(table).getByRole('columnheader', { name: new RegExp(`^${header}`) })
       ).toBeVisible();
     }
+    // Base is ESI's number, which only broker fees read: off until asked for.
+    expect(within(table).queryByRole('columnheader', { name: /^Base/ })).toBeNull();
     const agent = within(table).getByText('Hanna Kurosawa').closest('tr') as HTMLElement;
     expect(within(agent).getByText('Agent')).toBeInTheDocument();
     expect(within(agent).getByText(/Ishukone Corporation/)).toBeInTheDocument();
@@ -238,13 +260,46 @@ describe('ContactsStandings table', () => {
     expect(screen.getByText('Needs 3.00')).toBeInTheDocument();
   });
 
-  it("leaves With skills and Access empty when the pilot's skills are unknown", async () => {
+  it("shows Base in place of Standing, and no Access, when the pilot's skills are unknown", async () => {
     referenceMock.mockResolvedValue({ ...REFERENCE, skills: null });
     renderTab();
     const corp = (await screen.findByText('Caldari Navy Corp')).closest('tr') as HTMLElement;
+    const table = screen.getByRole('table', { name: 'Standings' });
+    expect(within(table).queryByRole('columnheader', { name: /^Standing/ })).toBeNull();
+    expect(within(table).getByRole('columnheader', { name: /^Base/ })).toBeVisible();
     expect(within(corp).getByText('5.00')).toBeInTheDocument();
-    // With skills and Access: a base-standing answer would understate what the skills lift.
-    expect(within(corp).getAllByText('—')).toHaveLength(2);
+    // Access: a base-standing answer would understate what the skills lift.
+    expect(within(corp).getAllByText('—')).toHaveLength(1);
+  });
+
+  it('links the jumps to the nearest station, an agent to its own, and plainly says 0 jumps when already there', async () => {
+    renderTab();
+    const table = await screen.findByRole('table', { name: 'Standings' });
+    const corp = within(table).getByText('Caldari Navy Corp').closest('tr') as HTMLElement;
+    const link = within(corp).getByRole('link', { name: '3 jumps' });
+    expect(link.getAttribute('href')).toContain('/travel/route');
+    expect(link.getAttribute('href')).toContain('30000142');
+    const agent = within(table).getByText('Hanna Kurosawa').closest('tr') as HTMLElement;
+    expect(within(agent).getByText('0 jumps')).toBeInTheDocument();
+    expect(within(agent).queryByRole('link', { name: /jump/ })).toBeNull();
+  });
+
+  it('leaves the jumps empty when the distances are unknown', async () => {
+    referenceMock.mockResolvedValue({ ...REFERENCE, jumps: null });
+    renderTab();
+    const table = await screen.findByRole('table', { name: 'Standings' });
+    expect(within(table).queryByRole('link', { name: /jump/ })).toBeNull();
+    expect(within(table).queryByText(/jumps?$/)).toBeNull();
+  });
+
+  it('offers Base from the Columns menu', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await screen.findByText('Hanna Kurosawa');
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Base' }));
+    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('columnheader', { name: /^Base/ })).toBeVisible();
   });
 
   it('leaves an agent the agents data does not know with no belongs to and no access', async () => {
@@ -347,7 +402,7 @@ describe('ContactsStandings table', () => {
     await waitFor(() =>
       expect(screen.queryByRole('columnheader', { name: /^Belongs to/ })).toBeNull()
     );
-    expect(screen.getByRole('columnheader', { name: /^Base/ })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /^Standing/ })).toBeVisible();
   });
 
   describe('on a phone', () => {

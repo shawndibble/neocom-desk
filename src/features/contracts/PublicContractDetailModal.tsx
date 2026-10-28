@@ -78,6 +78,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { ContractAbyssalValue } from './ContractAbyssalValue';
 import { loadAbyssalContractValue, type AbyssalContractValue } from './abyssalValueMath';
+import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { ContractPriceCheck, type PriceCheckRowModel } from './ContractPriceCheck';
 import { CopyContractIdButton } from './CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
@@ -134,6 +135,10 @@ export interface PublicContractDetailModalProps {
   flag?: ContractFlag | null;
   /** The pilot's flag multiple, named in the overpriced sentence so the setting is findable. */
   flagMultiple?: number;
+  /** Which side of the hub book the price check opens on; default sell orders. */
+  defaultPriceSide?: PriceSide;
+  /** Below market's estimate for the lines the hub cannot price (#5427); absent outside that board. */
+  otherValue?: { value: number; lines: number } | null;
   onClose: () => void;
 }
 
@@ -159,6 +164,8 @@ export function PublicContractDetailModal({
   bpcCheck,
   flag = null,
   flagMultiple,
+  defaultPriceSide = 'sell',
+  otherValue,
   onClose,
 }: PublicContractDetailModalProps) {
   const { t } = useTranslation();
@@ -260,8 +267,9 @@ export function PublicContractDetailModal({
     asking: askingIsk ?? 0,
     basis: LIVE,
     hub,
-    defaultSide: 'sell',
+    defaultSide: defaultPriceSide,
     sellOverrides,
+    otherValue,
     searchedTypeIds: anySearched ? searchedTypeIds : null,
   });
 

@@ -26,6 +26,8 @@ export interface PriceCheckRowModel {
   note?: string;
   /** A part of the row above it: indented, no rule of its own weight. */
   sub?: boolean;
+  /** An estimate, not a hub figure: dimmed so it does not read as part of the verdict. */
+  dim?: boolean;
 }
 
 export interface PriceCheckFlip {
@@ -77,7 +79,9 @@ export function ContractPriceCheck({
             >
               <dt className="text-text-dim">{row.label}</dt>
               <dd className="text-right">
-                <span className="tabular-nums font-semibold">{row.value}</span>
+                <span className={cx('tabular-nums font-semibold', row.dim && 'text-text-dim')}>
+                  {row.value}
+                </span>
                 {row.note && <span className="block text-text-dim">{row.note}</span>}
               </dd>
             </div>

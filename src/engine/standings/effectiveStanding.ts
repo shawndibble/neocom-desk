@@ -48,11 +48,12 @@ export function effectiveStanding(
 }
 
 /**
- * UNVERIFIED: `GET /characters/{id}/standings` is assumed to return BASE
- * standings (no CCP source says; one forum post says "raw"). The check is to
- * compare ESI against the in-game Standings tab on a pilot with Connections
- * trained. If ESI turns out to return effective ones, set this to false and
- * every `base` in the app becomes the inverse of that number.
+ * `GET /characters/{id}/standings` returns BASE standings. No CCP source says
+ * so; it was confirmed by a pilot whose in-game Standings window matched the
+ * with-skills figures worked out from ESI's number read as base
+ * (docs/research/npc-standings-rules.md section 7). The constant stays so the
+ * reading is one named place: set it to false and every `base` in the app
+ * becomes the inverse of ESI's number.
  */
 export const ESI_STANDINGS_ARE_BASE = true;
 

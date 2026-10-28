@@ -41,17 +41,24 @@ export const contactsAcrossColumnsStore = createColumnVisibilitySetting({
 export const NPC_STANDINGS_COLUMN_IDS = [
   'kind',
   'belongsTo',
-  'standing',
   'effective',
+  'standing',
   'access',
+  'jumps',
   'fees',
 ] as const;
 export type NpcStandingsColumnId = (typeof NPC_STANDINGS_COLUMN_IDS)[number];
 
-/** Unticked on a phone until picked: it repeats Base in a card with little room. */
-export const NPC_STANDINGS_PHONE_OFF_COLUMNS: readonly NpcStandingsColumnId[] = ['effective'];
+/**
+ * Standing (with skills) is the number the game shows and uses; Base is ESI's
+ * figure, which only broker fees read, so it starts off (it is shown anyway
+ * when the skills could not be read and Standing has nothing to say).
+ */
+export const NPC_STANDINGS_DEFAULT_COLUMNS: readonly NpcStandingsColumnId[] =
+  NPC_STANDINGS_COLUMN_IDS.filter((id) => id !== 'standing');
 
 export const npcStandingsColumnsStore = createColumnVisibilitySetting({
   key: 'npcStandingsVisibleColumns',
   ids: NPC_STANDINGS_COLUMN_IDS,
+  defaultVisible: NPC_STANDINGS_DEFAULT_COLUMNS,
 });

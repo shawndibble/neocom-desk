@@ -57,6 +57,13 @@ export interface ContractPriceCheckArgs {
   sellOverrides?: ReadonlyMap<number, number>;
   /** The item(s) the shopper searched for: splits the value into theirs and the rest. */
   searchedTypeIds?: ReadonlySet<number> | null;
+  /**
+   * What the lines the hub cannot price would fetch at other contracts' asks
+   * (Below market, #5427). Shown apart from the hub value and never in the
+   * difference. Only the board holds the snapshot this takes, so it is absent
+   * elsewhere.
+   */
+  otherValue?: { value: number; lines: number } | null;
 }
 
 /** The UTC day as "Aug 25": Open Prices are per UTC day, so it is never shifted to the viewer's zone. */
@@ -80,6 +87,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     defaultSide,
     sellOverrides,
     searchedTypeIds = null,
+    otherValue = null,
   } = args;
   const { t } = useTranslation();
   const unavailableLabel = usePricesUnavailableLabel();
@@ -167,10 +175,28 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       });
     }
   } else {
+    const pricedCount = included.length - check.unpricedLines;
     rows.push(
       { label: t('contractDetail.priceCheckAsking'), value: formatContractIsk(check.asking) },
-      { label: sideWord, value: formatContractIsk(check.value), note: unpricedNote }
+      {
+        label: sideWord,
+        value: formatContractIsk(check.value),
+        note:
+          check.unpricedLines > 0
+            ? `${t('contractDetail.priceCheckPriced', { priced: pricedCount, total: included.length })} ${unpricedNote}`
+            : undefined,
+      }
     );
+    if (otherValue && otherValue.value > 0) {
+      rows.push({
+        label: t('contractDetail.priceCheckOtherContracts'),
+        value: t('contractDetail.priceCheckOtherContractsValue', {
+          value: formatContractIsk(otherValue.value),
+        }),
+        note: t('contractDetail.priceCheckOtherContractsNote', { count: otherValue.lines }),
+        dim: true,
+      });
+    }
     const split = splitBySearch(included, searchedTypeIds, unitPricesOn(prices, side));
     const restLines = split ? split.rest.pricedLines + split.rest.unpricedLines : 0;
     if (split && restLines > 0) {
@@ -200,11 +226,21 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       rows.push({
         label: t('contractDetail.priceCheckDifference'),
         value: formatSignedPercent(check.diff),
-        note: pick(check.diff, {
-          below: t('contractDetail.priceCheckAskingBelow', { side: sideLower }),
-          above: t('contractDetail.priceCheckAskingAbove', { side: sideLower }),
-          level: t('contractDetail.priceCheckAskingLevel', { side: sideLower }),
-        }),
+        note: [
+          pick(check.diff, {
+            below: t('contractDetail.priceCheckAskingBelow', { side: sideLower }),
+            above: t('contractDetail.priceCheckAskingAbove', { side: sideLower }),
+            level: t('contractDetail.priceCheckAskingLevel', { side: sideLower }),
+          }),
+          ...(check.unpricedLines > 0
+            ? [
+                t('contractDetail.priceCheckAgainstPriced', {
+                  priced: pricedCount,
+                  total: included.length,
+                }),
+              ]
+            : []),
+        ].join(' '),
       });
     }
   }

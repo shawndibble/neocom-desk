@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StandingIcon, type DataTableColumn } from '@/components/ui';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import { fixed2 } from '@/lib/fixedFormat';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlSort } from '@/lib/useUrlState';
 import {
   NPC_STANDINGS_COLUMN_IDS,
-  NPC_STANDINGS_PHONE_OFF_COLUMNS,
+  NPC_STANDINGS_DEFAULT_COLUMNS,
   npcStandingsColumnsStore,
   type NpcStandingsColumnId,
 } from '@/features/character/contactsColumns';
@@ -14,21 +15,23 @@ import { EmptyCell } from '@/features/character/ContactCells';
 import type { NpcStandingRow } from '@/features/character/npcStandingsRows';
 import { AccessPips } from '@/features/standings/table/AccessPips';
 
-const STANDINGS_SORT = { columnId: 'standing', direction: 'desc' } as const;
+/** The number the game shows, or Base when the pilot's skills could not be read. */
+const standingsSort = (skillsKnown: boolean) =>
+  ({ columnId: skillsKnown ? 'effective' : 'standing', direction: 'desc' }) as const;
 const ALL_COLUMN_IDS = ['name', ...NPC_STANDINGS_COLUMN_IDS];
 
 /**
  * The Standings tab's table: its columns, the optional-column picker's state
  * and the URL sort. The name opens the row's info modal through the table's
  * row click (DESIGN.md §6c: one accent cue per row, on the primary cell).
+ *
+ * `skillsKnown`: Standing (with skills) leads and Base is optional. With the
+ * skills unknown Standing has nothing to say, so Base stands in for it, shown
+ * whatever the column picker says.
  */
-export function useNpcStandingsColumns() {
+export function useNpcStandingsColumns(skillsKnown: boolean) {
   const { t } = useTranslation();
-  const visibility = useColumnVisibility(
-    npcStandingsColumnsStore,
-    NPC_STANDINGS_COLUMN_IDS,
-    NPC_STANDINGS_PHONE_OFF_COLUMNS
-  );
+  const visibility = useColumnVisibility(npcStandingsColumnsStore, NPC_STANDINGS_DEFAULT_COLUMNS);
 
   const optionalColumns = useMemo<Record<NpcStandingsColumnId, DataTableColumn<NpcStandingRow>>>(
     () => ({
@@ -66,7 +69,7 @@ export function useNpcStandingsColumns() {
         header: t('contacts.standings.columnBase'),
         headerTooltip: t('contacts.standings.columnBaseTooltip'),
         align: 'center',
-        cardCorner: true,
+        cardCorner: !skillsKnown,
         render: (row) => (
           <span className="inline-flex items-center gap-1.5">
             <StandingIcon value={row.base} />
@@ -80,13 +83,37 @@ export function useNpcStandingsColumns() {
         header: t('contacts.standings.columnEffective'),
         headerTooltip: t('contacts.standings.columnEffectiveTooltip'),
         align: 'center',
+        cardCorner: true,
         render: (row) =>
           row.effective === null ? (
             <EmptyCell />
           ) : (
-            <span className="tabular-nums">{fixed2(row.effective)}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <StandingIcon value={row.effective} />
+              <span className="tabular-nums">{fixed2(row.effective)}</span>
+            </span>
           ),
         sortValue: (row) => row.effective ?? undefined,
+      },
+      jumps: {
+        id: 'jumps',
+        header: t('contacts.standings.columnJumps'),
+        headerTooltip: t('contacts.standings.columnJumpsTooltip'),
+        align: 'right',
+        className: 'whitespace-nowrap tabular-nums',
+        render: (row) => {
+          const { nearest } = row;
+          if (nearest === null) return <EmptyCell />;
+          const text = t('contacts.standings.jumpsValue', { count: nearest.jumps });
+          // Already there: no route to open.
+          if (nearest.jumps === 0) return <span className="text-text-dim">{text}</span>;
+          return (
+            <JumpsLink systemId={nearest.systemId} stationId={nearest.stationId}>
+              {text}
+            </JumpsLink>
+          );
+        },
+        sortValue: (row) => row.nearest?.jumps,
       },
       access: {
         id: 'access',
@@ -130,7 +157,26 @@ export function useNpcStandingsColumns() {
         sortValue: (row) => (row.usedForFees ? 1 : 0),
       },
     }),
-    [t]
+    [t, skillsKnown]
+  );
+
+  // Standing leads; Base shows when asked, or in its place when the skills are unknown.
+  const { isVisible } = visibility;
+  const shownIds = useMemo(
+    () =>
+      NPC_STANDINGS_COLUMN_IDS.filter((id) =>
+        id === 'standing'
+          ? !skillsKnown || isVisible(id)
+          : id === 'effective'
+            ? skillsKnown && isVisible(id)
+            : isVisible(id)
+      ),
+    [skillsKnown, isVisible]
+  );
+  // Standing is not offered when it would be empty.
+  const availableIds = useMemo(
+    () => NPC_STANDINGS_COLUMN_IDS.filter((id) => skillsKnown || id !== 'effective'),
+    [skillsKnown]
   );
 
   const columns = useMemo<DataTableColumn<NpcStandingRow>[]>(
@@ -142,13 +188,13 @@ export function useNpcStandingsColumns() {
         render: (row) => <span className="text-accent">{row.name}</span>,
         sortValue: (row) => row.name,
       },
-      ...NPC_STANDINGS_COLUMN_IDS.filter(visibility.isVisible).map((id) => optionalColumns[id]),
+      ...shownIds.map((id) => optionalColumns[id]),
     ],
-    [t, optionalColumns, visibility.isVisible]
+    [t, optionalColumns, shownIds]
   );
   // The full catalog, not the visible ids: a sort in a shared link survives a
   // hidden column (the Contacts table's own `characterSortProps`).
-  const sortProps = useUrlSort('standings.sort', STANDINGS_SORT, ALL_COLUMN_IDS);
+  const sortProps = useUrlSort('standings.sort', standingsSort(skillsKnown), ALL_COLUMN_IDS);
 
-  return { columns, optionalColumns, visibility, sortProps };
+  return { columns, optionalColumns, availableIds, visibility, sortProps };
 }

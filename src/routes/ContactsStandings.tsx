@@ -23,10 +23,7 @@ import { GrantBanner } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { loadCharacterStandingsResult } from '@/features/character/standings';
 import { resolveNames } from '@/features/character/names';
-import {
-  NPC_STANDINGS_COLUMN_IDS,
-  type NpcStandingsColumnId,
-} from '@/features/character/contactsColumns';
+import { type NpcStandingsColumnId } from '@/features/character/contactsColumns';
 import { NpcStandingsFilterBar } from '@/features/character/NpcStandingsFilterBar';
 import { loadNpcStandingsReference } from '@/features/character/npcStandingsReference';
 import {
@@ -94,7 +91,11 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
   // Rows derive from a deferred copy so a keystroke paints the box first
   // (`useUrlFilter`'s rule); the bar keeps the immediate one.
   const rowsFilter = useDeferredValue(filter);
-  const { columns, optionalColumns, visibility, sortProps } = useNpcStandingsColumns();
+  // Skills unreadable leaves every Standing empty: Base then stands in for it.
+  const skillsKnown =
+    !state || state.rows.length === 0 || state.rows.some((row) => row.effective !== null);
+  const { columns, optionalColumns, availableIds, visibility, sortProps } =
+    useNpcStandingsColumns(skillsKnown);
 
   const fetchState = useCallback(
     async (force: boolean) => {
@@ -222,7 +223,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
           counts={counts}
           columnPicker={
             <ColumnPickerMenu<NpcStandingsColumnId, NpcStandingRow>
-              available={NPC_STANDINGS_COLUMN_IDS}
+              available={availableIds}
               visible={visibility.visible}
               columnsById={optionalColumns}
               onToggle={visibility.toggle}

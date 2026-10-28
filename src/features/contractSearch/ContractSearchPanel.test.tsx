@@ -1,3 +1,4 @@
+import { useBelowMarketSide } from '@/features/contractSearch/belowMarketData';
 import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -2390,7 +2391,12 @@ describe("ContractSearchPanel — a row's primary action beats its name links (�
 });
 
 describe('ContractSearchPanel — Below market (#3989)', () => {
-  const buy = (buyMax: number) => ({ sellMin: null, buyMax, sellVolume: 0, buyVolume: 0 });
+  const book = (price: number) => ({
+    sellMin: price,
+    buyMax: price,
+    sellVolume: 0,
+    buyVolume: 0,
+  });
   const WANTS_ITEMS = row({
     contractId: 9,
     typeId: 35,
@@ -2398,17 +2404,27 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     quantity: 10,
     requestsItems: true,
   });
+  /** No hub market: valued only from three other single-type contracts' asks. */
+  const NO_MARKET = 99_999;
+  const BLUEPRINTY = [
+    row({ contractId: 20, typeId: 34, price: 1_000, quantity: 1 }),
+    row({ contractId: 20, typeId: NO_MARKET, price: 1_000, quantity: 10 }),
+  ];
+  const COMPARABLES = [30, 31, 32].map((contractId) =>
+    row({ contractId, typeId: NO_MARKET, price: 100_000, quantity: 10, regionId: 10000043 })
+  );
 
   afterEach(() => {
     getHubPricesWithStatus.mockImplementation(async () => NO_HUB_PRICES);
   });
 
   beforeEach(() => {
-    // Tritanium 8,000 and Pyerite 300,000 at best buy; 7.5% tax at Accounting 0.
+    useBelowMarketSide.setState({ value: 'sell', hydrated: false });
+    // Tritanium 8,000 and Pyerite 300,000 on both sides of the book, no fees.
     getHubPricesWithStatus.mockResolvedValue({
       prices: new Map([
-        [34, buy(8_000)],
-        [35, buy(300_000)],
+        [34, book(8_000)],
+        [35, book(300_000)],
       ]),
       unreachable: false,
     });
@@ -2423,16 +2439,104 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     await waitFor(() => {});
     const [, body] = within(table).getAllByRole('rowgroup');
     const rows = within(body).getAllByRole('row');
-    // Pyerite: 10 × 300k × 0.925 − 2M buyout = 775k. Tritanium in Domain:
-    // 100 × 8k × 0.925 − 500k = 240k. The Forge's 1M ask and the contract
-    // that wants items are left out.
+    // Pyerite: 10 × 300k − 2M buyout = 1M. Tritanium in Domain: 100 × 8k −
+    // 500k = 300k. The Forge's 1M ask and the contract that wants items are left out.
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Pyerite');
-    expect(rows[0]).toHaveTextContent('775,000');
-    expect(rows[0]).toHaveTextContent('market');
+    expect(rows[0]).toHaveTextContent('1,000,000');
+    expect(rows[0]).not.toHaveTextContent('priced');
     expect(rows[1]).toHaveTextContent('Tritanium');
-    expect(rows[1]).toHaveTextContent('240,000');
-    expect(screen.getByText(/valued at Jita best buy minus sales tax/)).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent('300,000');
+    expect(screen.getByText(/lowest sell order, no fees taken off/)).toBeInTheDocument();
+  });
+
+  it('prices the buy side when Buy orders is picked', async () => {
+    getHubPricesWithStatus.mockResolvedValue({
+      prices: new Map([
+        [34, { sellMin: 8_000, buyMax: 4_000, sellVolume: 0, buyVolume: 0 }],
+        [35, book(300_000)],
+      ]),
+      unreachable: false,
+    });
+    const user = userEvent.setup();
+    renderWithRouter(['/?items.belowMarket=1']);
+    await screen.findByRole('table', { name: 'Below-market contracts' });
+    await user.click(screen.getByRole('button', { name: 'Buy orders' }));
+    // Tritanium in Domain falls to 100 × 4k − 500k < 0 and drops out.
+    await waitFor(() => {
+      const table = screen.getByRole('table', { name: 'Below-market contracts' });
+      expect(within(table).queryByText(/Tritanium/)).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/best buy order, no fees taken off/)).toBeInTheDocument();
+  });
+
+  describe('contracts valued from other contracts (#5427)', () => {
+    beforeEach(() => {
+      loadPublicContractOffers.mockResolvedValue(
+        cachedSnapshot([...BLUEPRINTY, ...COMPARABLES, TRIT_FORGE])
+      );
+    });
+
+    it('hides a contract profitable only through other contracts, and lists it when asked', async () => {
+      // Contract 20: market 8,000 against an ask of 2,000 is already positive, so
+      // raise the ask to make only Other (10 × 10k = 100k) carry it.
+      loadPublicContractOffers.mockResolvedValue(
+        cachedSnapshot([
+          row({ contractId: 20, typeId: 34, price: 50_000, quantity: 1 }),
+          row({ contractId: 20, typeId: NO_MARKET, price: 50_000, quantity: 10 }),
+          ...COMPARABLES,
+        ])
+      );
+      const user = userEvent.setup();
+      renderWithRouter(['/?items.belowMarket=1']);
+      await screen.findByText(/Contract snapshot from/);
+      await waitFor(() =>
+        expect(screen.queryByRole('status', { name: /Pricing/ })).not.toBeInTheDocument()
+      );
+      expect(screen.queryByRole('table', { name: 'Below-market contracts' })).toBeNull();
+      await user.click(
+        screen.getByRole('button', { name: 'Include contracts valued from other contracts' })
+      );
+      const table = await screen.findByRole('table', { name: 'Below-market contracts' });
+      const [, body] = within(table).getAllByRole('rowgroup');
+      const [only] = within(body).getAllByRole('row');
+      // Value is market only, Other is the 100k estimate, Profit adds it.
+      expect(only).toHaveTextContent('8,000');
+      expect(only).toHaveTextContent('100,000');
+      expect(only).toHaveTextContent('1 of 2 priced');
+      expect(only).toHaveTextContent('58,000 ISK');
+    });
+
+    it('shows Other with a one-word header and a dash where a contract has none', async () => {
+      loadPublicContractOffers.mockResolvedValue(cachedSnapshot([...BLUEPRINTY, ...COMPARABLES]));
+      renderWithRouter(['/?items.belowMarket=1&items.bmOther=1']);
+      const table = await screen.findByRole('table', { name: 'Below-market contracts' });
+      expect(within(table).getByRole('columnheader', { name: /^Other/ })).toBeInTheDocument();
+      const [, body] = within(table).getAllByRole('rowgroup');
+      expect(within(body).getAllByRole('row')[0]).toHaveTextContent('100,000');
+    });
+  });
+
+  it('opens a slide-over whose hub figure matches the row to the ISK, on the same side', async () => {
+    getHubPricesWithStatus.mockResolvedValue({
+      prices: new Map([
+        [34, { sellMin: 8_123, buyMax: 4_000, sellVolume: 0, buyVolume: 0 }],
+        [35, book(300_000)],
+      ]),
+      unreachable: false,
+    });
+    const user = userEvent.setup();
+    renderWithRouter(['/?items.belowMarket=1']);
+    const table = await screen.findByRole('table', { name: 'Below-market contracts' });
+    await waitFor(() => expect(within(table).getAllByRole('row').length).toBeGreaterThan(1));
+    const tritRow = within(table)
+      .getAllByRole('row')
+      .find((r) => r.textContent?.includes('Tritanium'));
+    expect(tritRow).toHaveTextContent('812,300 ISK');
+    await user.click(tritRow as HTMLElement);
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findByText('812,300 ISK')).toBeInTheDocument();
+    expect(within(check).getByRole('button', { name: 'Sell orders' })).toBeInTheDocument();
   });
 
   it('toggles from the offer table through the chip', async () => {

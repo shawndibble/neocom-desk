@@ -1,7 +1,7 @@
 /**
  * What the Standings table reads beside the Character's standings: the pilot's
- * social skills, the NPC corporation data (a corporation's faction, names) and
- * the agents data. Each is optional: one that cannot be read leaves its part
+ * social skills, the NPC corporation data (a corporation's faction, names), the
+ * agents data and the stations with the jumps to them. Each is optional: one that cannot be read leaves its part
  * of the table empty rather than guessed (`NpcStandingsReference`).
  *
  * The corporation to faction map is `loadCorporationFactions`, built from
@@ -9,7 +9,9 @@
  */
 import { loadCorporationFactions } from '@/features/standings/corporationFactions';
 import { loadStandingSkills } from '@/features/standings/standingSkills';
+import { loadJumpsFromCurrent } from '@/features/standings/stationJumps';
 import { loadAgents } from '@/sde/agents';
+import { loadNpcStations } from '@/sde/loadMarketSde';
 import { loadNpcCorporationsFile } from '@/sde/loadSde';
 import { buildNpcCorporationIndex } from '@/sde/npcCorporations';
 import type { NpcCorporationsFile } from '@/sde/types';
@@ -32,12 +34,14 @@ export async function loadNpcStandingsReference(
   characterId: number,
   withAgents: boolean
 ): Promise<NpcStandingsReference> {
-  const [skills, corporations, agents] = await Promise.all([
+  const [skills, corporations, agents, stations, jumps] = await Promise.all([
     loadStandingSkills(characterId).catch(() => null),
     Promise.all([loadNpcCorporationsFile(), loadCorporationFactions()])
       .then(([file, factions]) => npcCorporationLookup(file, factions))
       .catch(() => null),
     withAgents ? loadAgents().catch(() => null) : null,
+    loadNpcStations().catch(() => null),
+    loadJumpsFromCurrent(characterId),
   ]);
-  return { skills: skills?.social ?? null, corporations, agents };
+  return { skills: skills?.social ?? null, corporations, agents, stations, jumps };
 }
