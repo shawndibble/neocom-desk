@@ -21,7 +21,6 @@ import {
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
-import { r2ConfigFromEnv } from './publicDataActiveWars.js';
 import {
   publishContractOffersToR2,
   publishCourierContractsToR2,
@@ -31,9 +30,9 @@ import {
   type R2PublishOutcome,
   type R2PublishState,
 } from './r2Publisher.js';
-import { createR2Get, createR2Put, type R2Get, type R2Put } from './r2Client.js';
+import { createR2Get, createR2Put, r2ConfigFromEnv, type R2Get, type R2Put } from './r2Client.js';
 
-export const CONTRACT_OFFERS_STATE_PREFIX = 'contract-offers-state/';
+const CONTRACT_OFFERS_STATE_PREFIX = 'contract-offers-state/';
 export const ARCHIVE_FINGERPRINT_R2_KEY = `${CONTRACT_OFFERS_STATE_PREFIX}archive-fingerprint.json`;
 export const TYPE_HASHES_R2_KEY = `${CONTRACT_OFFERS_STATE_PREFIX}type-hashes.json`;
 export const OFFERS_STATE_R2_KEY = `${CONTRACT_OFFERS_STATE_PREFIX}offers.json`;
@@ -82,27 +81,24 @@ async function publishOffers(
   rows: readonly PublicContractOfferRow[],
   lastSyncedAt: number
 ): Promise<R2PublishOutcome> {
+  const now = deps.now ?? Date.now;
   const previous = await readState<R2PublishState>(deps.get, OFFERS_STATE_R2_KEY);
   const result = await publishContractOffersToR2({
     rows,
     lastSyncedAt,
     previous,
-    now: (deps.now ?? Date.now)(),
+    now: now(),
     put: deps.put,
     onProgress: (state) => writeState(deps.put, OFFERS_STATE_R2_KEY, state),
   });
   await writeState(deps.put, OFFERS_STATE_R2_KEY, result.state);
   const { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError } = result;
-  console.info('Contract offers R2 publish', {
-    uploaded,
-    skipped,
-    failed,
-    remaining,
-    indexWritten,
-    bundlesWritten,
-    firstError,
-  });
-  return r2PublishOutcome(result);
+  const outcome = r2PublishOutcome(result);
+  (outcome.kind === 'complete' && bundlesWritten ? console.info : console.warn)(
+    'Contract offers R2 publish',
+    { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError }
+  );
+  return outcome;
 }
 
 async function publishCouriers(
@@ -110,18 +106,24 @@ async function publishCouriers(
   rows: readonly PublicCourierContractRow[],
   lastSyncedAt: number
 ): Promise<R2PublishOutcome> {
+  const now = deps.now ?? Date.now;
   const previous = await readState<CourierR2PublishState>(deps.get, COURIERS_STATE_R2_KEY);
   const result = await publishCourierContractsToR2({
     rows,
     lastSyncedAt,
     previous,
-    now: (deps.now ?? Date.now)(),
+    now: now(),
     put: deps.put,
   });
   await writeState(deps.put, COURIERS_STATE_R2_KEY, result.state);
   const { uploaded, indexWritten, firstError } = result;
-  console.info('Courier contracts R2 publish', { uploaded, indexWritten, firstError });
-  return r2PublishOutcome(result);
+  const outcome = r2PublishOutcome(result);
+  (outcome.kind === 'complete' ? console.info : console.warn)('Courier contracts R2 publish', {
+    uploaded,
+    indexWritten,
+    firstError,
+  });
+  return outcome;
 }
 
 /**

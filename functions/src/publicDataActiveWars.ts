@@ -5,7 +5,10 @@
  * lives in a second R2 object next to it.
  */
 import { runActiveWarsSweep, type ActiveWarsDoc } from './activeWarsSweep.js';
-import { createR2Get, createR2Put, type R2Config, type R2Get, type R2Put } from './r2Client.js';
+import { createR2Get, createR2Put, r2ConfigFromEnv, type R2Get, type R2Put } from './r2Client.js';
+
+// Kept here: the other public-data jobs import it from this module.
+export { r2ConfigFromEnv };
 
 /** What the app reads: `{ updatedAt, wars }`, what `src/features/wars/activeWars.ts` reads. */
 export const ACTIVE_WARS_R2_KEY = 'active-wars/wars.json';
@@ -17,19 +20,6 @@ const LIST_HEADERS = {
   'Cache-Control': 'public, max-age=3600',
 };
 const STATE_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
-
-export function r2ConfigFromEnv(env: Record<string, string | undefined>): R2Config {
-  const missing = ['R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'].filter(
-    (name) => !env[name]
-  );
-  if (missing.length > 0) throw new Error(`Missing R2 settings: ${missing.join(', ')}`);
-  return {
-    endpoint: env.R2_ENDPOINT as string,
-    bucket: env.R2_BUCKET as string,
-    accessKeyId: env.R2_ACCESS_KEY_ID as string,
-    secretAccessKey: env.R2_SECRET_ACCESS_KEY as string,
-  };
-}
 
 export interface PublicActiveWarsDeps {
   get: R2Get;

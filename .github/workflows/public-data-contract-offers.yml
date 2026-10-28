@@ -15,8 +15,8 @@ on:
 permissions:
   contents: read
 
-# Never two writers at once: each keeps its own state, so an overlap could skip a type the
-# other just overwrote.
+# Never two runs at once: both read and write the same state objects, so an overlap could skip
+# a type the other just overwrote.
 concurrency:
   group: public-data-contract-offers
   cancel-in-progress: false

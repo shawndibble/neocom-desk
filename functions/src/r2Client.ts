@@ -48,3 +48,17 @@ export function createR2Get(config: R2Config): R2Get {
     return response.json();
   };
 }
+
+/** The R2 connection of a runner job, from its environment; throws naming every missing setting. */
+export function r2ConfigFromEnv(env: Record<string, string | undefined>): R2Config {
+  const missing = ['R2_ENDPOINT', 'R2_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'].filter(
+    (name) => !env[name]
+  );
+  if (missing.length > 0) throw new Error(`Missing R2 settings: ${missing.join(', ')}`);
+  return {
+    endpoint: env.R2_ENDPOINT as string,
+    bucket: env.R2_BUCKET as string,
+    accessKeyId: env.R2_ACCESS_KEY_ID as string,
+    secretAccessKey: env.R2_SECRET_ACCESS_KEY as string,
+  };
+}
