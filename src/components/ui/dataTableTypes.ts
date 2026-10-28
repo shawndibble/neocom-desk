@@ -36,14 +36,14 @@ export interface DataTableColumn<T> {
    * switches to `table-layout: fixed`: columns without one share what is left
    * and their text truncates (`truncate` on the cell), so scrolling cannot
    * resize columns as rows mount and unmount (`minWidth` sets their floor). Ignored while the table is not
-   * windowed and in the stacked card layout.
+   * windowed (unless `hugColumns`) and in the stacked card layout.
    */
   width?: string;
   /**
    * Least a width-less column of a fixed-layout (windowed) table squeezes to,
-   * a CSS length; default `16ch`. A `min-w-*` class on the cell does nothing
+   * a CSS length of content width (cell padding comes on top); default `16ch`. A `min-w-*` class on the cell does nothing
    * there, so the table's own `min-width` is where the floor lives. Ignored
-   * like `width` is: while not windowed, and in the stacked card layout.
+   * like `width` is: while not windowed (unless `hugColumns`), and in the stacked card layout.
    */
   minWidth?: string;
   /**
@@ -411,6 +411,15 @@ export interface DataTableProps<T> {
    * down rather than under it.
    */
   virtualize?: boolean | 'auto';
+  /**
+   * Gives an unwindowed table (`table-layout: auto`) what a windowed one gets
+   * from `width`: each sized column's header takes its width and the table's
+   * `min-width` is their sum plus a floor for every width-less column
+   * (`minWidth`, default 16ch), so the wrapper scrolls sideways rather than
+   * squeezing a text column to a few letters, and slack goes to the
+   * width-less columns, never to the sized ones. Off by default.
+   */
+  hugColumns?: boolean;
   /**
    * Hands the caller the rows in on-screen order — the table sorts
    * internally, so an export that wants to match what the reader sees reads
