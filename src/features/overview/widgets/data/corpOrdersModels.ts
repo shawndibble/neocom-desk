@@ -51,7 +51,7 @@ export const corpOrders: Builder = (feeds, { t, now }) => {
       tone: undercut > 0 ? 'warning' : 'clear',
     },
     rows: [],
-    table: ordersTable(t, rows, now, null, issuedBy),
+    table: ordersTable(t, rows, now, null, issuedBy, TO),
     summary: t(`${C}.summary`, { count: rows.length, undercut }),
   };
 };

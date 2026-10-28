@@ -35,4 +35,8 @@ describe('openHref', () => {
   it('builds path?open=<id>', () => {
     expect(openHref('/market/orders', 7)).toBe('/market/orders?open=7');
   });
+
+  it('joins with & after an existing query', () => {
+    expect(openHref('/market/orders?scope=corp', 7)).toBe('/market/orders?scope=corp&open=7');
+  });
 });
