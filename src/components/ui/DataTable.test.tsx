@@ -1474,6 +1474,16 @@ describe('DataTable virtualize', () => {
         />
       );
 
+    it("sums a width-less column's own minWidth into the table min-width", () => {
+      renderSized({
+        virtualize: true,
+        cols: [{ ...sized[0], minWidth: '7rem' }, sized[1]],
+      });
+      const style = screen.getByRole('table').getAttribute('style') ?? '';
+      expect(style).toContain('7rem');
+      expect(style).not.toContain('16ch');
+    });
+
     it('fixes the layout and sizes the header cells when windowed', () => {
       renderSized({ virtualize: true });
       expect(screen.getByRole('table')).toHaveClass('table-fixed');

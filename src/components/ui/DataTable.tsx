@@ -83,8 +83,9 @@ function fixedLayoutMinWidth<T>(
   const sized = shown.flatMap((column) =>
     column.width ? [columnCellWidth(column.width, density)] : []
   );
-  const grow = shown.length - sized.length;
-  return `calc(${[...sized, `${grow * GROW_COLUMN_MIN}ch`, `${trailingRem}rem`].join(' + ')})`;
+  const grows = shown.filter((column) => !column.width);
+  const floors = grows.map((column) => column.minWidth ?? `${GROW_COLUMN_MIN}ch`);
+  return `calc(${[...sized, ...floors, `${trailingRem}rem`].join(' + ')})`;
 }
 
 /**
