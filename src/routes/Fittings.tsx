@@ -405,6 +405,8 @@ function FittingsPage() {
     edit((f) => swapModuleType(f, moduleSlot.slot, moduleSlot.slotIndex, typeId));
   }
   const targetProfiles = useTargetProfiles();
+  // Improve's "See all in What to train": the stats column takes the request and clears it.
+  const [whatToTrainRequested, setWhatToTrainRequested] = useState(false);
   const improve = useImproveDrawer({
     workspace,
     fitting,
@@ -416,6 +418,7 @@ function FittingsPage() {
     context,
     moduleResults,
     openMakeItFit: makeItFit.open,
+    showWhatToTrain: () => setWhatToTrainRequested(true),
   });
   // Improve and the Add browser share the left of the page: the last one opened wins.
   const { docked: improveDocked, close: closeImprove } = improve;
@@ -514,6 +517,8 @@ function FittingsPage() {
       preview={improve.preview}
       previewIsk={improve.previewIsk}
       ruleBreaks={ruleBreaks.lines}
+      whatToTrainRequested={whatToTrainRequested}
+      onWhatToTrainShown={() => setWhatToTrainRequested(false)}
     />
   );
 
@@ -589,6 +594,7 @@ function FittingsPage() {
               onViewChange={(next) => void setView(next)}
               editor={editor}
               statsSections={statsSections}
+              statsRequested={whatToTrainRequested}
               statsFirst={statsFirst}
               alpha={{ blockers: alpha.blockers, skillName: alpha.skillName }}
               improveColumn={improve.column}

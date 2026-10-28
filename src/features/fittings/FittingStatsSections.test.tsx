@@ -1468,6 +1468,32 @@ describe('FittingStatsSections — column and side panels', () => {
     ]);
   });
 
+  it('opens the Pilot panel on What to train when asked, then reports it shown', async () => {
+    const onShown = vi.fn();
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+        pilot={{ characterName: 'Test Pilot', missingSkills: 0 }}
+        whatToTrain={<span>Train list</span>}
+        whatToTrainRequested
+        onWhatToTrainShown={onShown}
+      />
+    );
+    const pilot = within(await screen.findByRole('dialog', { name: 'Pilot' }));
+    expect(pilot.getByRole('button', { name: 'What to train' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(pilot.getByText('Train list')).toBeInTheDocument();
+    expect(onShown).toHaveBeenCalled();
+  });
+
   it('keeps the pilot and the situation off the column, behind their triggers', async () => {
     const user = userEvent.setup();
     render(

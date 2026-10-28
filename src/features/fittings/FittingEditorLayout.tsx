@@ -19,6 +19,8 @@ interface FittingEditorLayoutProps {
   onViewChange: (view: FittingView) => void;
   editor: ReactNode;
   statsSections: ReactNode;
+  /** Something asked for the stats column (Improve's "See all in What to train"): a phone shows its Stats tab. */
+  statsRequested?: boolean;
   /** Improve holds the left column on a narrower desktop: one column, the stats above the editor (`leftColumn`). */
   statsFirst?: boolean;
   /** Improve, open on desktop: a column left of the editor and stats, where the docked browser sits. */
@@ -43,6 +45,7 @@ export function FittingEditorLayout({
   onViewChange,
   editor,
   statsSections,
+  statsRequested = false,
   statsFirst = false,
   improveColumn,
   alpha,
@@ -50,6 +53,12 @@ export function FittingEditorLayout({
   const { t } = useTranslation();
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
+  // One-shot on the request rising, so the pilot can still leave the Stats tab afterwards.
+  const [statsSeen, setStatsSeen] = useState(statsRequested);
+  if (statsSeen !== statsRequested) {
+    setStatsSeen(statsRequested);
+    if (statsRequested) setPhoneTab('stats');
+  }
   // The tab bar renders on the phone sheet only.
   const viewTabsId = useTabsId();
 

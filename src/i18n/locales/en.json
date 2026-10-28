@@ -1477,6 +1477,7 @@
       "moreCount": "{{count}} goals",
       "skills": "Skills",
       "skillsCount": "{{count}} to train",
+      "seeAllInWhatToTrain": "See all in What to train",
       "implantsHelp_one": "{{count}} implant would help",
       "implantsHelp_other": "{{count}} implants would help",
       "findImplants": "Find implants",
