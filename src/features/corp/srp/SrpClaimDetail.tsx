@@ -12,10 +12,13 @@ import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { CharacterLink } from '@/features/entities';
+import type { SrpClaimValues } from '../srpTypes';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
 import { DoctrineCheckView } from './DoctrineCheckView';
+import { OfficerKillmailModal } from './OfficerKillmailModal';
+import { AppraisalComparison, type Read } from './SrpKillmailView';
 import { ClaimStatePill, CopyAmount, DecideTip, TypeAmountField } from './OfficerClaimCells';
 import { SrpAuditTrail } from './SrpAuditTrail';
 import { claimBasisLine } from './srpClaimText';
@@ -53,22 +56,49 @@ function useClaimAudit(claim: SrpClaim, load: (killmailId: number) => Promise<Sr
   return loaded?.key === key ? loaded.entries : null;
 }
 
+/** The claim's Jita appraisals (the lost ship and the nearest Doctrine Fit, no cargo), read once per claim. */
+function useClaimValues(
+  claim: SrpClaim,
+  load: (killmailId: number) => Promise<SrpClaimValues>
+): Read<SrpClaimValues> {
+  const [loaded, setLoaded] = useState<{ id: number; value: Read<SrpClaimValues> } | null>(null);
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  });
+  useEffect(() => {
+    let cancelled = false;
+    loadRef
+      .current(claim.killmailId)
+      .then((value) => !cancelled && setLoaded({ id: claim.killmailId, value }))
+      .catch(() => !cancelled && setLoaded({ id: claim.killmailId, value: 'failed' }));
+    return () => {
+      cancelled = true;
+    };
+  }, [claim.killmailId]);
+  return loaded?.id === claim.killmailId ? loaded.value : 'loading';
+}
+
 export function SrpClaimDetail({
   claim,
   ctx,
   loadAudit,
+  loadValues,
   onClose,
   onChangeAmount,
 }: {
   claim: SrpClaim;
   ctx: ClaimColumnsContext;
   loadAudit: (killmailId: number) => Promise<SrpAuditEntry[]>;
+  loadValues: (killmailId: number) => Promise<SrpClaimValues>;
   onClose: () => void;
   onChangeAmount: (claim: SrpClaim) => void;
 }) {
   const { t } = useTranslation();
   const phone = useIsPhone();
   const audit = useClaimAudit(claim, loadAudit);
+  const values = useClaimValues(claim, loadValues);
+  const [killmailOpen, setKillmailOpen] = useState(false);
   const at = (ms: number) => formatTimestamp(new Date(ms), ctx.zone);
   const hull = ctx.names.hull(claim.hullTypeId);
   const own = ownClaimReason(claim, ctx);
@@ -104,9 +134,23 @@ export function SrpClaimDetail({
               </Row>
             )}
             <Row label={t('srp.officer.detail.killmail')}>
-              <ExternalLink href={`https://zkillboard.com/kill/${claim.killmailId}/`}>
-                {t('srp.officer.detail.killmailLink', { id: claim.killmailId })}
-              </ExternalLink>
+              <span className="flex flex-wrap items-center gap-x-3">
+                <ExternalLink href={`https://zkillboard.com/kill/${claim.killmailId}/`}>
+                  {t('srp.officer.detail.killmailLink', { id: claim.killmailId })}
+                </ExternalLink>
+                {claim.killmailHash && (
+                  <button
+                    type="button"
+                    className={textActionClassName()}
+                    onClick={() => setKillmailOpen(true)}
+                  >
+                    {t('srpKillmail.openKillmail')}
+                  </button>
+                )}
+              </span>
+            </Row>
+            <Row label={t('srpKillmail.appraisal.title')}>
+              <AppraisalComparison values={values} />
             </Row>
             <Row label={t('srp.officer.detail.lost')}>{at(claim.killedAt)}</Row>
             <Row label={t('srp.officer.detail.filed')}>{at(claim.filedAt)}</Row>
@@ -215,6 +259,21 @@ export function SrpClaimDetail({
           </div>
         )}
       </div>
+      {killmailOpen && claim.killmailHash ? (
+        <OfficerKillmailModal
+          subject={{
+            killmailId: claim.killmailId,
+            killmailHash: claim.killmailHash,
+            hullTypeId: claim.hullTypeId,
+            hullName: hull,
+            systemName: ctx.names.system(claim.solarSystemId),
+            killedAt: claim.killedAt,
+          }}
+          check={claim.doctrineCheck}
+          values={values}
+          onClose={() => setKillmailOpen(false)}
+        />
+      ) : null}
     </SlideOver>
   );
 }

@@ -79,6 +79,7 @@ const WIRE_NAMES = [
   'corpTaxBook:getSrpStatusCallable',
   'corpTaxBook:fileSrpClaimCallable',
   'corpTaxBook:previewSrpDoctrineCheckCallable',
+  'corpTaxBook:getSrpClaimValuesCallable',
   'corpTaxBook:saveSrpDoctrineCallable',
   'corpTaxBook:deleteSrpDoctrineCallable',
   'corpTaxBook:turnOnSrpCallable',

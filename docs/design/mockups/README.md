@@ -27,6 +27,5 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [queue-remap-advice](queue-remap-advice/README.md) | Issue #4701 | Optimize queue at the foot of the Attributes card (full width, under the remap budget): one press makes a plan from the queue with the optimizer's Remap Markers and opens it, Undo toast; empty queue aria-disabled, already optimal makes no plan |
 | [compare-trade-hubs](compare-trade-hubs/README.md) | Issue #4696 (build: #4697) | Desktop as proposed (items × hubs, best sell over best buy, LOWEST/HIGHEST words, jumps in headers); table at every width (phone scrolls sideways, item pinned, "Hubs" label); own hub highlighted |
 | [srp](srp/README.md) | Epic #4608 (mockups #4847; build #4848-#4856) | Member filing with lost-ships list, officer queue (approve, reject with reason, override, Mark paid), Director settings with Hull Rules, `corpSrp` widget; phone uses dense cards |
-| [srp-killmail](srp-killmail/README.md) | Issue #5379 | Combined: payout on top, facts left, doctrine-checked fit right (green check / yellow exclamation with tooltips); `medium` modal; officer keeps the slide-over, gains Open killmail |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

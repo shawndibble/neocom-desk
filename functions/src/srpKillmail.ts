@@ -7,6 +7,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import { int } from './corpTaxBook.js';
 import type { SrpHullRule, SrpPricingInput } from './srpPricing.js';
+import type { DoctrineFitSnapshot } from './srpDoctrine.js';
 import type { HullRule, SrpSettings } from './srpTypes.js';
 
 export const MAX_NOTE_LENGTH = 500;
@@ -126,6 +127,40 @@ export function appraisalItems(victim: {
 }): Map<number, number> {
   const items = new Map<number, number>([[victim.shipTypeId, 1]]);
   addItems(items, victim.items);
+  return items;
+}
+
+// ESI inventory flags: racks are 8 flags each from LoSlot0 11, MedSlot0 19, HiSlot0 27, RigSlot0 92,
+// SubSystem0 125; DroneBay 87. Cargo (5) and hangars are not "ship and fit".
+const FIT_RACK_BASES = [11, 19, 27, 92, 125] as const;
+const isFitFlag = (flag: number): boolean =>
+  flag === 87 || FIT_RACK_BASES.some((base) => flag >= base && flag < base + 8);
+
+function addFitItems(into: Map<number, number>, items: readonly KillmailItem[]): void {
+  for (const item of items) {
+    const typeId = item.item_type_id;
+    if (typeof typeId === 'number' && typeof item.flag === 'number' && isFitFlag(item.flag)) {
+      const quantity = (item.quantity_dropped ?? 0) + (item.quantity_destroyed ?? 0);
+      if (quantity > 0) into.set(typeId, (into.get(typeId) ?? 0) + quantity);
+      if (item.items) addItems(into, item.items); // a module's loaded charge
+    }
+  }
+}
+
+/** The lost ship and its fit, apart: hull alone, then fitted modules, rigs and drones (no cargo). */
+export function shipFitItems(victim: { shipTypeId: number; items: readonly KillmailItem[] }): {
+  hull: Map<number, number>;
+  fit: Map<number, number>;
+} {
+  const fit = new Map<number, number>();
+  addFitItems(fit, victim.items);
+  return { hull: new Map([[victim.shipTypeId, 1]]), fit };
+}
+
+/** A Doctrine Fit as an appraisal list: its hull, modules and rigs. */
+export function doctrineItems(snapshot: DoctrineFitSnapshot): Map<number, number> {
+  const items = new Map<number, number>([[snapshot.hullTypeId, 1]]);
+  for (const id of [...snapshot.modules, ...snapshot.rigs]) items.set(id, (items.get(id) ?? 0) + 1);
   return items;
 }
 

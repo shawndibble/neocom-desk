@@ -31,7 +31,12 @@ import {
 } from './srpKillmail.js';
 import { checkDoctrine, hullRuleOf } from './srpDoctrineCheck.js';
 import { readDoctrines } from './srpDoctrineRead.js';
-import { priceSrpClaim, type SrpBasis, type SrpSuggestion } from './srpPricing.js';
+import {
+  priceSrpClaim,
+  type SrpBasis,
+  type SrpPricingResult,
+  type SrpSuggestion,
+} from './srpPricing.js';
 import {
   CORPS_COLLECTION,
   SRP_AUDIT,
@@ -384,7 +389,7 @@ async function softZkill(source: SrpKillmailSource, killmailId: number): Promise
   }
 }
 
-async function softJita(
+export async function softJita(
   source: SrpKillmailSource,
   items: ReadonlyMap<number, number>
 ): Promise<number | null> {
@@ -451,6 +456,37 @@ export async function doctrineCheckOf(
 }
 
 /**
+ * What the corp's pricing chain makes of a loss: the hull's class, the values it used and the
+ * result. The Jita Appraisal is read only when the chain needs it. Shared by filing and the
+ * pre-filing preview so the preview never quotes an amount the filing would not give.
+ */
+export async function priceLoss(
+  source: SrpKillmailSource,
+  settings: Pick<SrpSettings, 'killmailPct' | 'appraisalPct' | 'hullRules'>,
+  victim: EsiKillmail['victim'],
+  killmailValue: number | null
+): Promise<{ classId: number; values: ClaimValues; result: SrpPricingResult }> {
+  const hullTypeId = victim.shipTypeId;
+  const classId = await source.shipGroupId(hullTypeId);
+  const priced = pricingInput(settings, hullTypeId, classId, {
+    killmailValue: null,
+    appraisalValue: null,
+  });
+  const values: ClaimValues = { killmailValue, appraisalValue: null };
+  if (priceSrpClaim(priced).kind === 'refused') {
+    return { classId, values, result: { kind: 'refused', reason: 'not-covered' } };
+  }
+  const price = () => priceSrpClaim({ ...priced, ...values });
+  let result = price();
+  const settled = result.kind === 'amount' || (result.kind === 'officer' && result.suggested);
+  if (!settled && (priced.appraisalPercent ?? 0) >= 1) {
+    values.appraisalValue = await softJita(source, appraisalItems(victim));
+    result = price();
+  }
+  return { classId, values, result };
+}
+
+/**
  * A pilot files an SRP Claim against their own killmail. The server fetches the killmail and
  * decides hull, system, time and amount; the client sends only the link and the notes.
  */
@@ -489,23 +525,12 @@ export async function fileSrpClaim(
   }
 
   const hullTypeId = km.victim.shipTypeId;
-  const classId = await deps.killmails.shipGroupId(hullTypeId);
-  const priced = pricingInput(settings, hullTypeId, classId, {
-    killmailValue: null,
-    appraisalValue: null,
-  });
-  if (priceSrpClaim(priced).kind === 'refused') {
-    fail('failed-precondition', 'This corporation does not cover that hull', 'not-covered');
-  }
-
-  const values: ClaimValues = { killmailValue: zkill.totalValue, appraisalValue: null };
-  const price = () => priceSrpClaim({ ...priced, ...values });
-  let result = price();
-  const settled = result.kind === 'amount' || (result.kind === 'officer' && result.suggested);
-  if (!settled && (priced.appraisalPercent ?? 0) >= 1) {
-    values.appraisalValue = await softJita(deps.killmails, appraisalItems(km.victim));
-    result = price();
-  }
+  const { classId, values, result } = await priceLoss(
+    deps.killmails,
+    settings,
+    km.victim,
+    zkill.totalValue
+  );
   if (result.kind === 'refused') {
     fail('failed-precondition', 'This corporation does not cover that hull', 'not-covered');
   }

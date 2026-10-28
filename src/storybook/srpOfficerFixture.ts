@@ -283,6 +283,12 @@ export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOffice
   return {
     claims: () => claims.map((c) => ({ ...c })),
     activity: () => [...audit].sort((a, b) => b.at - a.at),
+    claimValues: () => ({
+      hullValue: 71_000_000,
+      fitValue: 116_000_000,
+      doctrineValue: 104_000_000,
+      doctrineName: 'Hurricane - artillery',
+    }),
     claimAudit: (id) => {
       const filed = find(id);
       const own = audit.filter((e) => e.detail.killmailId === id);

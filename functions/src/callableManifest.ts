@@ -77,6 +77,7 @@ export const CALLABLE_ACTIONS = {
     'getSrpStatusCallable',
     'fileSrpClaimCallable',
     'previewSrpDoctrineCheckCallable',
+    'getSrpClaimValuesCallable',
     'saveSrpDoctrineCallable',
     'deleteSrpDoctrineCallable',
     'turnOnSrpCallable',

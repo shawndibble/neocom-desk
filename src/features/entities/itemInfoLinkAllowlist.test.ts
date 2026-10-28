@@ -19,8 +19,6 @@ const REVIEWED = new Set<string>([
   'src/features/contracts/PublicContractDetailModal.tsx',
   'src/features/corp/CorpRoster.tsx',
   'src/features/corp/CorpTransactionsPanel.tsx',
-  // Lost ships table: no onRowClick, its File button is a cell control, so the hull stands alone.
-  'src/features/corp/srp/LostShipsList.tsx',
   'src/features/fittings/AbyssalRunPlanner.tsx',
   'src/features/fittings/FittingFightersPanel.tsx',
   'src/features/fittings/FittingModuleList.tsx',

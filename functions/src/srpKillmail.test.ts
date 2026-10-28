@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
   appraisalItems,
+  doctrineItems,
+  shipFitItems,
   parseFileClaimInput,
   parseKillmailRef,
   pricingInput,
@@ -155,5 +157,59 @@ describe('srpPricing mirror', () => {
     const body = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
     const mirror = body('./srpPricing.ts').split('\n').slice(1).join('\n');
     expect(mirror).toBe(body('../../src/engine/srpPricing.ts'));
+  });
+});
+
+describe('shipFitItems', () => {
+  it('splits the hull from fitted and drone items, leaving cargo out', () => {
+    const { hull, fit } = shipFitItems({
+      shipTypeId: 10,
+      items: [
+        { item_type_id: 1, flag: 27, quantity_destroyed: 1 },
+        { item_type_id: 2, flag: 11, quantity_dropped: 2 },
+        { item_type_id: 3, flag: 92, quantity_destroyed: 1 },
+        { item_type_id: 4, flag: 87, quantity_destroyed: 5 },
+        { item_type_id: 5, flag: 5, quantity_destroyed: 99 },
+        { item_type_id: 6, flag: 90, quantity_destroyed: 1 },
+      ],
+    });
+    expect([...hull]).toEqual([[10, 1]]);
+    expect([...fit].sort()).toEqual([
+      [1, 1],
+      [2, 2],
+      [3, 1],
+      [4, 5],
+    ]);
+  });
+  it('counts a loaded charge nested in a module, never an item with no flag', () => {
+    const { fit } = shipFitItems({
+      shipTypeId: 10,
+      items: [
+        {
+          item_type_id: 1,
+          flag: 19,
+          quantity_destroyed: 1,
+          items: [{ item_type_id: 7, quantity_destroyed: 3 }],
+        },
+        { item_type_id: 8, quantity_destroyed: 1 },
+      ],
+    });
+    expect([...fit].sort()).toEqual([
+      [1, 1],
+      [7, 3],
+    ]);
+  });
+});
+
+describe('doctrineItems', () => {
+  it('is the hull plus every module and rig', () => {
+    expect([
+      ...doctrineItems({ hullTypeId: 10, name: 'x', modules: [1, 1, 2], rigs: [3] }),
+    ]).toEqual([
+      [10, 1],
+      [1, 2],
+      [2, 1],
+      [3, 1],
+    ]);
   });
 });

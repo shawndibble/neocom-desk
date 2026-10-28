@@ -20,12 +20,14 @@ import {
   changeSrpClaimAmount,
   markSrpClaimPaid,
   markSrpClaimsPaid,
+  getSrpClaimValues,
   readSrpActivity,
   readSrpClaimAudit,
   readSrpClaims,
   readSrpHistory,
   rejectSrpClaim,
 } from '../srpOfficerClient';
+import type { SrpClaimValues } from '../srpTypes';
 import { runInBatches } from './srpQueue';
 
 /** Closed claims, loaded the first time the History tab opens. */
@@ -65,6 +67,8 @@ export interface SrpQueueData {
   markPaidMany: (items: SrpMarkPaidItem[]) => Promise<SrpBatchOutcome>;
   /** One claim's audit trail, for its detail. */
   claimAudit: (killmailId: number) => Promise<SrpAuditEntry[]>;
+  /** One claim's ship value against its nearest Doctrine Fit's, for the officer appraisal. */
+  claimValues: (killmailId: number) => Promise<SrpClaimValues>;
 }
 
 const DENIED = /permission-denied|unauthenticated|failed-precondition/;
@@ -245,6 +249,16 @@ export function useSrpQueue(): SrpQueueData {
     [characterId, corporationId]
   );
 
+  const claimValues = useCallback(
+    async (id: number): Promise<SrpClaimValues> => {
+      if (characterId === null || corporationId === null) {
+        return { hullValue: null, fitValue: null, doctrineValue: null };
+      }
+      return getSrpClaimValues(characterId, corporationId, id);
+    },
+    [characterId, corporationId]
+  );
+
   return {
     state,
     reload,
@@ -260,5 +274,6 @@ export function useSrpQueue(): SrpQueueData {
     markPaidMany: (items) =>
       act((c, corp) => runInBatches(items, (chunk) => markSrpClaimsPaid(c, corp, chunk)), many),
     claimAudit,
+    claimValues,
   };
 }

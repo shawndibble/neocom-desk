@@ -11,11 +11,13 @@ import type {
   SrpClaimOutcome,
   SrpMarkPaidItem,
 } from './srpClaimTypes';
+import type { SrpClaimValues } from './srpTypes';
 
 export interface SrpOfficerBackendOverride {
   claims: () => SrpClaim[];
   activity: () => SrpAuditEntry[];
   claimAudit: (killmailId: number) => SrpAuditEntry[];
+  claimValues: (killmailId: number) => SrpClaimValues;
   approve: (item: SrpApproveItem) => SrpClaimOutcome;
   approveMany: (items: SrpApproveItem[]) => SrpBatchOutcome;
   reject: (killmailId: number, reason: string) => SrpClaimOutcome;

@@ -10,6 +10,7 @@ import { MemberClaimsList } from './MemberClaimsList';
 import { OffDoctrineFileDialog } from './OffDoctrineFileDialog';
 import { MemberFileForm, type FileFormErrors } from './MemberFileForm';
 import { LostShipsList } from './LostShipsList';
+import { MemberKillmailModal } from './MemberKillmailModal';
 import { useDoctrinePreview } from './useDoctrinePreview';
 import {
   esiKillmailLink,
@@ -88,6 +89,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     check: DoctrineCheckRecord;
   } | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [killmailRow, setKillmailRow] = useState<LostRow | null>(null);
   const [refiling, setRefiling] = useState<{ claim: MemberClaim; error?: string } | null>(null);
   const [refileBusy, setRefileBusy] = useState(false);
   const fleetRef = useRef<HTMLInputElement>(null);
@@ -142,20 +144,24 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     }
   }
 
-  function fileFromList(row: LostRow) {
-    if (hullIsDoctrineChecked(hullRules, row.hullTypeId)) void fileChecked(row);
+  function fileFromList(row: LostRow, known?: DoctrineCheckRecord) {
+    if (hullIsDoctrineChecked(hullRules, row.hullTypeId)) void fileChecked(row, known);
     else fileUnchecked(row);
   }
 
   /** A hull the corp checks: read the check first. Off doctrine asks in a dialog; anything else files as an unchecked hull would. */
-  async function fileChecked(row: LostRow) {
+  async function fileChecked(row: LostRow, known?: DoctrineCheckRecord) {
     setFiling(row.killmailId);
     setListError(null);
-    let check: DoctrineCheckRecord | undefined;
-    try {
-      check = (await data.previewDoctrine(esiKillmailLink(row.killmailId, row.killmailHash))).check;
-    } catch {
-      // Filing reports its own errors; an unreadable check is no reason to stop it.
+    // The killmail modal already read the check; reading it again would spend another fetch slot.
+    let check: DoctrineCheckRecord | undefined = known;
+    if (check === undefined) {
+      try {
+        check = (await data.previewDoctrine(esiKillmailLink(row.killmailId, row.killmailHash)))
+          .check;
+      } catch {
+        // Filing reports its own errors; an unreadable check is no reason to stop it.
+      }
     }
     setFiling(null);
     if (check?.status === 'off-doctrine') setOffDoctrine({ row, check });
@@ -216,6 +222,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     <LostShipsList
       rows={lostRows}
       onFile={fileFromList}
+      onOpen={setKillmailRow}
       busyKillmailId={typeof filing === 'number' ? filing : null}
     />
   ) : null;
@@ -314,6 +321,20 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
             setRefiling({ claim: detail });
             setDetailId(null);
           }}
+        />
+      ) : null}
+      {killmailRow ? (
+        <MemberKillmailModal
+          subject={killmailRow}
+          canFile={killmailRow.kind === 'open'}
+          busy={filing !== null}
+          previewDoctrine={(killmail) => data.previewDoctrine(killmail)}
+          onFile={(check) => {
+            const row = killmailRow;
+            setKillmailRow(null);
+            fileFromList(row, check);
+          }}
+          onClose={() => setKillmailRow(null)}
         />
       ) : null}
       {offDoctrine ? (

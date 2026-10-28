@@ -82,6 +82,7 @@ export interface Killmail {
   killmail_time?: string;
   solar_system_id?: number;
   victim: KillmailVictim & { character_id?: number; corporation_id?: number };
+  attackers?: { final_blow?: boolean; ship_type_id?: number }[];
 }
 
 export function getKillmail(

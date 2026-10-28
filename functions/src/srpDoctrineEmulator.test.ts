@@ -356,8 +356,11 @@ suite('SRP doctrine-fit (emulator)', () => {
       await setRules(rule([id]));
       loss(1001, [slotted(HIGH, 27)]);
       const before = (await corp().collection('srpAudit').get()).size;
-      expect(await preview(1001)).toEqual({
+      expect(await preview(1001)).toMatchObject({
         killmailId: 1001,
+        killedAt: T0 - 2 * DAY,
+        solarSystemId: 30000142,
+        values: { killmailValue: 20_000_000, hullValue: null, fitValue: null },
         hullTypeId: HULL,
         check: {
           status: 'off-doctrine',

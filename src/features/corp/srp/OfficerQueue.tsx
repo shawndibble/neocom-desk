@@ -389,6 +389,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           claim={open}
           ctx={ctx}
           loadAudit={data.claimAudit}
+          loadValues={data.claimValues}
           onClose={() => setOpenId(null)}
           onChangeAmount={setChanging}
         />
