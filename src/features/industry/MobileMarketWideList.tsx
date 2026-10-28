@@ -67,6 +67,9 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = [
   'orderDepth',
 ];
 
+/** The text field: A-Z on first tap, like the desktop table's text column; the rest are numbers, biggest first. */
+const TEXT_SORT_FIELDS: ReadonlySet<SortFieldId> = new Set(['product']);
+
 /** The fields with a figure to show; a sort by any other leads with ISK/hour. */
 type FigureId = 'iskPerHour' | 'iskPerDay' | 'margin' | 'vs90d' | 'duration' | 'buildCost';
 const FIGURE_ORDER: readonly FigureId[] = [
@@ -166,7 +169,11 @@ export function MobileMarketWideList({
             ? t('industry.marketOpportunitiesTopOf', { shown: rows.length, total })
             : t('industry.marketOpportunitiesCount', { count: total })
         }
-        fields={SORT_FIELD_ORDER.map((id) => ({ id, label: fieldLabel[id] }))}
+        fields={SORT_FIELD_ORDER.map((id) => ({
+          id,
+          label: fieldLabel[id],
+          firstDirection: TEXT_SORT_FIELDS.has(id) ? 'asc' : 'desc',
+        }))}
         sort={sort}
         onSortChange={onSortChange}
         className="px-3"

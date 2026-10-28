@@ -51,7 +51,7 @@ export type {
   DataTableGroupBy,
   DataTableSort,
 } from './DataTable';
-export { sortRows, nextDataTableSort } from './dataTableSort';
+export { sortRows, nextDataTableSort, firstSortDirection } from './dataTableSort';
 export { CharacterAvatar } from './CharacterAvatar';
 export { TypeIcon } from './TypeIcon';
 export { characterAvatarBoxClassName } from './characterAvatarBox';

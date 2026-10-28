@@ -88,6 +88,13 @@ export interface DataTableColumn<T> {
    */
   sortValue?: (row: T) => string | number | undefined;
   /**
+   * Direction a first click on this column sorts. Default: inferred from the
+   * sort value — numbers and dates `desc` (biggest, newest first), text `asc`.
+   * Set `'asc'` for a number whose best row is the lowest: jumps and
+   * distance, rank and position, a price in a cheapest-first list.
+   */
+  sortFirst?: 'asc' | 'desc';
+  /**
    * Names the row in the stacked (below-`sm`) layout: this cell becomes the
    * card's title — hoisted to the top, unlabelled, semibold — while the rest
    * stay label/value pairs. Defaults to the first column, which is usually

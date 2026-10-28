@@ -230,6 +230,7 @@ export function RequestsTab({
       header: t('communities.board.columns.status'),
       className: 'whitespace-nowrap',
       render: ({ status }) => <span className={STATUS_TONE[status]}>{statusLabels[status]}</span>,
+      sortFirst: 'asc',
       sortValue: ({ status }) => STATUS_ORDER[status],
     },
     {

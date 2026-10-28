@@ -162,7 +162,8 @@ describe('VariationsTable', () => {
     });
     await user.click(screen.getByRole('button', { name: /Buy/ }));
     const rowEls = screen.getAllByRole('row').slice(1);
-    expect(within(rowEls[0]).getByText('Rifter')).toBeInTheDocument();
+    // Buy is a price, not a cheapest-first ask: high to low on the first click.
+    expect(within(rowEls[0]).getByText("Vherokior's Slasher")).toBeInTheDocument();
   });
 
   describe('row context menu (issue #147)', () => {
