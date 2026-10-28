@@ -14458,6 +14458,7 @@
     "jumpsUnknownLabel": "Jumps unknown",
     "routePathLabel": "Route, system by system",
     "pickUpLabel": "Pick up",
+    "planRoute": "Plan route",
     "dropOffLabel": "Drop off",
     "playerStructureShort": "Player structure",
     "reverseLaneCount_one": "{{count}} haul runs the reverse lane",

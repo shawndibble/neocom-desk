@@ -177,3 +177,14 @@ describe('CourierContractDetailModal focus return', () => {
     await waitFor(() => expect(fallback).toHaveBeenCalled());
   });
 });
+
+describe('CourierContractDetailModal plan route', () => {
+  it('links to Route Safety with pickup and drop-off as stops', () => {
+    routeExposure.mockResolvedValue(KNOWN);
+    renderModal();
+    expect(screen.getByRole('link', { name: 'Plan route' })).toHaveAttribute(
+      'href',
+      '/travel/route?pref=prefer-highsec&stops=30000142%3A60003760%2C30002187%3A60003760'
+    );
+  });
+});
