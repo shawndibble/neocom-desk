@@ -76,6 +76,11 @@ describe('ordersListed', () => {
 describe('ordersTable', () => {
   const table = ordersTable(t, [healthy, expiring, outbid, undercut, floor], NOW, null);
 
+  it('opens each order on the Market orders page, with its modal', () => {
+    expect(table.rows.map((r) => [r.key, r.to])).toContainEqual(['2', '/market/orders?open=2']);
+    expect(table.rows.every((r) => r.detail === undefined)).toBe(true);
+  });
+
   it('is real columns, with the item first and the key figure kept longest', () => {
     expect(table.columns.map((c) => c.key)).toEqual([
       'item',
