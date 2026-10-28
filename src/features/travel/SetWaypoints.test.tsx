@@ -244,6 +244,7 @@ describe('SetWaypoints', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull());
     expect(screen.queryByRole('button', { name: 'Grant permission' })).toBeNull();
+    expect(screen.getByText('Grant missing Permissions')).toBeInTheDocument();
   });
 
   it('shows the button for a Character that holds the scope even when dismissed', async () => {
