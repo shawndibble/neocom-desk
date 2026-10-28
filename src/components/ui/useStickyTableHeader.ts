@@ -66,9 +66,9 @@ function horizontalScroller(table: HTMLElement): HTMLElement | null {
   return null;
 }
 
-/** Alpha of a computed colour: `rgba(r, g, b, a)` or `oklab(l a b / a)`; 1 when absent. */
+/** Alpha of a computed colour: `rgba(r, g, b, a)` or `oklab(l a b / a)`; 1 when absent (plain `rgb(r, g, b)` too). */
 function alphaOf(color: string): number {
-  const match = /(?:\/\s*|,\s*)([\d.]+%?)\)$/.exec(color);
+  const match = /(?:\/\s*|^rgba\(.*,\s*)([\d.]+%?)\)$/.exec(color);
   if (!match) return 1;
   return match[1].endsWith('%') ? parseFloat(match[1]) / 100 : parseFloat(match[1]);
 }

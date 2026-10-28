@@ -146,4 +146,23 @@ describe('DataTable sticky header on a phone', () => {
     expect(background).toContain('linear-gradient');
     expect(background).toContain('var(--color-bg)');
   });
+
+  it('keeps an opaque fill whose blue channel is 0 as it is', () => {
+    phone(true);
+    render(
+      <div style={{ backgroundColor: 'rgb(255, 128, 0)' }}>
+        <DataTable
+          label="Items"
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.id}
+          responsive="table"
+        />
+      </div>
+    );
+    expect(screen.getByTestId('dt-sticky-header').style.background).toContain('rgb(255, 128, 0)');
+    expect(screen.getByTestId('dt-sticky-header').style.background).not.toContain(
+      'linear-gradient'
+    );
+  });
 });
