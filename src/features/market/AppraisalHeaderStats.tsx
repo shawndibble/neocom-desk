@@ -8,13 +8,20 @@ import { fixed2 } from '@/lib/fixedFormat';
 import type { ReactNode } from 'react';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
+import { cx } from '@/lib/cx';
+import { interactiveClassName } from '@/components/ui/controlStyles';
+import { writeToClipboard } from '@/lib/clipboard';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { IskAmount, StatChip, StatChips } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
-import { FullIskTotal } from './FullIskTotal';
 import { RefiningSetupChips } from '@/features/refining/RefiningSetupChips';
+
+/** How long the "copied" bubble stays on the card. */
+const COPIED_FEEDBACK_MS = 2000;
 
 interface AppraisalHeaderStatsProps {
   totals: AppraisalTotals;
@@ -30,36 +37,74 @@ interface AppraisalHeaderStatsProps {
   pricesUnavailable?: boolean;
 }
 
-/** One of the three headline numbers: label, figure, what it is, and the figure it nets to. */
+/**
+ * One of the three headline numbers: label, figure, what it is, and the figure
+ * it nets to. The whole card is one copy control: the title is the button and
+ * its `::after` stretches over the card, so a press anywhere copies the full
+ * digits and the bubble says so on the card.
+ */
 function PriceCell({
   title,
   hint,
+  value,
   emphasis = false,
-  children,
   below,
 }: {
   title: string;
   hint: string;
+  value: number;
   emphasis?: boolean;
-  children: ReactNode;
   below?: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const { copied, flash } = useCopyFeedback(COPIED_FEEDBACK_MS);
+  const full = formatIsk(value, 0);
+  const short = formatIskCompact(value);
+
+  async function copy() {
+    try {
+      await writeToClipboard(full);
+    } catch {
+      return;
+    }
+    flash();
+  }
+
   return (
     <section
       aria-label={title}
-      className="flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2"
+      className={cx(
+        'relative flex min-w-0 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2 hover:bg-panel active:bg-panel has-[button:focus-visible]:outline-2 has-[button:focus-visible]:-outline-offset-2 has-[button:focus-visible]:outline-accent',
+        interactiveClassName
+      )}
     >
       <h3 className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-        {title}
+        <button
+          type="button"
+          onClick={() => void copy()}
+          aria-label={t('market.appraisal.copyCardTotal', { title, short, full })}
+          className="cursor-copy rounded-xs uppercase tracking-widest after:absolute after:inset-0 focus-visible:outline-none"
+        >
+          {title}
+        </button>
       </h3>
       <span
         className={`text-xl font-semibold tabular-nums ${emphasis ? 'text-accent' : 'text-text'}`}
       >
-        {children}
+        {short}
       </span>
       <span className="mb-1 text-[0.6875rem] text-text-dim">{hint}</span>
       {below && (
         <div className="mt-auto border-t border-line pt-1 text-xs text-text-dim">{below}</div>
+      )}
+      {/* Mounted only while showing, so three cards aren't three empty live regions. */}
+      {copied && (
+        <span
+          role="status"
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap text-text normal-case shadow-md"
+        >
+          {t('market.appraisal.copiedAmount', { amount: t('common.iskExact', { amount: full }) })}
+        </span>
       )}
     </section>
   );
@@ -116,10 +161,12 @@ export function AppraisalHeaderStats({
         <PriceCell
           title={t('market.appraisal.summaryBuy')}
           hint={t('market.appraisal.summaryBuyHint')}
+          value={totals.buy}
           below={
             net && (
               <>
                 <HintText
+                  className="relative"
                   content={t('market.appraisal.instantNetHelp', {
                     tax: fixed2(net.salesTaxPct),
                   })}
@@ -132,12 +179,11 @@ export function AppraisalHeaderStats({
               </>
             )
           }
-        >
-          <FullIskTotal value={totals.buy} compact />
-        </PriceCell>
+        />
         <PriceCell
           title={t('market.appraisal.summarySplit')}
           hint={t('market.appraisal.summarySplitHint')}
+          value={(totals.buy + totals.sell) / 2}
           emphasis
           below={
             <>
@@ -147,16 +193,16 @@ export function AppraisalHeaderStats({
               </b>
             </>
           }
-        >
-          <FullIskTotal value={(totals.buy + totals.sell) / 2} compact />
-        </PriceCell>
+        />
         <PriceCell
           title={t('market.appraisal.summarySell')}
           hint={t('market.appraisal.summarySellHint')}
+          value={totals.sell}
           below={
             net && (
               <>
                 <HintText
+                  className="relative"
                   content={t('market.appraisal.listNetHelp', {
                     tax: fixed2(net.salesTaxPct),
                     broker: fixed2(net.brokerFeePct),
@@ -170,9 +216,7 @@ export function AppraisalHeaderStats({
               </>
             )
           }
-        >
-          <FullIskTotal value={totals.sell} compact />
-        </PriceCell>
+        />
       </div>
       {facts}
     </div>

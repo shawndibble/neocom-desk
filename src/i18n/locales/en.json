@@ -12144,6 +12144,7 @@
       "compareHubsTitle": "Compare hubs",
       "appraiseAtHub": "Appraise at {{hub}}",
       "copyTotal": "Copy {{amount}}",
+      "copyCardTotal": "{{title}}: copy {{short}} ISK ({{full}})",
       "copyTotalCompact": "Copy {{short}} ISK ({{full}})",
       "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
