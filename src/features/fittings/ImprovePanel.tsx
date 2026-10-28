@@ -32,6 +32,7 @@ import {
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { commandOf } from '@/engine/fittings/improveCommand';
+import { ImproveSkillsSlotContext } from './improveSkillsSlot';
 import { hullRoleOf, roleUnlocks } from '@/engine/fittings/improveRole';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
@@ -81,7 +82,7 @@ import {
 } from '@/engine/fittings/skillGains';
 import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { groupByModule, IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
-import { summariseSelection } from '@/engine/fittings/improveSelection';
+import { summariseSelection, type SelectionSummary } from '@/engine/fittings/improveSelection';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MakeItFitSection } from './MakeItFitSection';
@@ -184,7 +185,7 @@ interface Props {
    * Tells the stats column what the ticked rows, plus the row under the
    * pointer or keyboard focus, would change; null when nothing is previewed.
    */
-  onPreview?: (delta: FittingStatsDelta | null) => void;
+  onPreview?: (delta: FittingStatsDelta | null, iskDelta?: number | null) => void;
   /** The drawer's footer, where the selection and Apply bar goes; absent: it sticks to the list's bottom. */
   footerTarget?: HTMLElement | null;
 }
@@ -240,7 +241,20 @@ export function ImprovePanel({
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
   const settingsId = useId();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Search settings and Skills share one expansion area: opening one shuts the other.
+  const [openPanel, setOpenPanel] = useState<'settings' | 'skills' | null>(null);
+  const settingsOpen = openPanel === 'settings';
+  const togglePanel = (panel: 'settings' | 'skills') =>
+    setOpenPanel((current) => (current === panel ? null : panel));
+  const skillsId = useId();
+  // A new Goal may have nothing to train: don't leave an empty Skills panel open.
+  const [panelGoal, setPanelGoal] = useState(goal);
+  if (panelGoal !== goal) {
+    setPanelGoal(goal);
+    if (openPanel === 'skills') setOpenPanel(null);
+  }
+  const [skillsTrigger, setSkillsTrigger] = useState<HTMLElement | null>(null);
+  const [skillsPanel, setSkillsPanel] = useState<HTMLElement | null>(null);
   const goalsId = useId();
   const [goalsOpen, setGoalsOpen] = useState(false);
   const { sort, onSortChange: setSort } = settings;
@@ -812,9 +826,18 @@ export function ImprovePanel({
     () => (previewBefore && previewAfter ? diffFittingStats(previewBefore, previewAfter) : null),
     [previewBefore, previewAfter]
   );
+  // The Price figure follows the same rows. Only buy mode without owned stock moves the fit's price by exactly the rows' iskDelta.
+  const previewRows = hoverAfter && hoverSet ? hoverSet : chosen;
+  const previewIsk =
+    settings.mode === 'buy' &&
+    !settings.owned?.on &&
+    previewDelta &&
+    previewRows.some((row) => row.iskDelta !== null)
+      ? previewRows.reduce((sum, row) => sum + (row.iskDelta ?? 0), 0)
+      : null;
   useEffect(() => {
-    onPreview?.(previewDelta);
-  }, [onPreview, previewDelta]);
+    onPreview?.(previewDelta, previewIsk);
+  }, [onPreview, previewDelta, previewIsk]);
   // Closing Improve (or a new search) takes the panel away: nothing stays previewed.
   useEffect(() => () => onPreview?.(null), [onPreview]);
   // A pending check holds Apply back; a failed one (each row was valid alone) warns but does not block.
@@ -897,43 +920,42 @@ export function ImprovePanel({
               onToggle={() => pickGoal(id)}
             />
           ))}
+          {otherGoals.length > 0 && (
+            <FilterChip
+              label={t('fittings.improve.more')}
+              selected={goalsOpen}
+              expanded={goalsOpen}
+              controls={goalsId}
+              onToggle={() => setGoalsOpen((open) => !open)}
+              count={otherGoals.length}
+              countLabel={t('fittings.improve.moreCount', { count: otherGoals.length })}
+            />
+          )}
         </div>
         {otherGoals.length > 0 && (
-          <div>
-            <button
-              type="button"
-              className={textActionClassName('gap-1')}
-              aria-expanded={goalsOpen}
-              aria-controls={goalsId}
-              onClick={() => setGoalsOpen((open) => !open)}
-            >
-              {t('fittings.improve.moreGoals', { count: otherGoals.length })}
-              <Caret expanded={goalsOpen} />
-            </button>
-            <Collapse open={goalsOpen} id={goalsId} className="pt-1">
-              <ul>
-                {otherGoals.map((id) => {
-                  const reason = unavailableReason(id);
-                  return (
-                    <li
-                      key={id}
-                      className="flex flex-col items-start gap-1 py-1 sm:flex-row sm:items-center sm:gap-3"
-                    >
-                      <span className="sm:w-52 sm:shrink-0">
-                        <FilterChip
-                          label={t(`fittings.improve.goal.${id}`)}
-                          selected={goal === id}
-                          disabled={reason !== undefined}
-                          onToggle={() => pickGoal(id)}
-                        />
-                      </span>
-                      {reason && <span className="text-warning text-xs">{reason}</span>}
-                    </li>
-                  );
-                })}
-              </ul>
-            </Collapse>
-          </div>
+          <Collapse open={goalsOpen} id={goalsId} className="pt-1">
+            <ul>
+              {otherGoals.map((id) => {
+                const reason = unavailableReason(id);
+                return (
+                  <li
+                    key={id}
+                    className="flex flex-col items-start gap-1 py-1 sm:flex-row sm:items-center sm:gap-3"
+                  >
+                    <span className="sm:w-52 sm:shrink-0">
+                      <FilterChip
+                        label={t(`fittings.improve.goal.${id}`)}
+                        selected={goal === id}
+                        disabled={reason !== undefined}
+                        onToggle={() => pickGoal(id)}
+                      />
+                    </span>
+                    {reason && <span className="text-warning text-xs">{reason}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </Collapse>
         )}
         {goal === 'mining' && (
           <div className="space-y-1 text-sm">
@@ -980,19 +1002,22 @@ export function ImprovePanel({
       </div>
 
       <div>
-        <button
-          type="button"
-          className={textActionClassName('flex-wrap gap-x-1 text-left')}
-          aria-expanded={settingsOpen}
-          aria-controls={settingsId}
-          onClick={() => setSettingsOpen((open) => !open)}
-        >
-          <span>{t('fittings.improve.settingsLabel')}</span>
-          <Caret expanded={settingsOpen} />
-          <span className="text-text-dim basis-full text-xs normal-case tracking-normal">
-            {settingsSummary}
-          </span>
-        </button>
+        <div className="flex items-start justify-between gap-3">
+          <button
+            type="button"
+            className={textActionClassName('min-w-0 flex-wrap gap-x-1 text-left')}
+            aria-expanded={settingsOpen}
+            aria-controls={settingsId}
+            onClick={() => togglePanel('settings')}
+          >
+            <span>{t('fittings.improve.settingsLabel')}</span>
+            <Caret expanded={settingsOpen} />
+            <span className="text-text-dim basis-full text-xs normal-case tracking-normal">
+              {settingsSummary}
+            </span>
+          </button>
+          <div ref={setSkillsTrigger} className="shrink-0" />
+        </div>
         <Collapse open={settingsOpen} id={settingsId} className="pt-2">
           <div className="space-y-3">
             <p className="text-text-dim text-xs">
@@ -1097,6 +1122,9 @@ export function ImprovePanel({
             </div>
           </div>
         </Collapse>
+        <Collapse open={openPanel === 'skills'} id={skillsId} className="pt-2">
+          <div ref={setSkillsPanel} />
+        </Collapse>
       </div>
 
       {unloaded && (
@@ -1177,7 +1205,17 @@ export function ImprovePanel({
         <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
       )}
 
-      {freeSections}
+      <ImproveSkillsSlotContext.Provider
+        value={{
+          trigger: skillsTrigger,
+          panel: skillsPanel,
+          open: openPanel === 'skills',
+          onToggle: () => togglePanel('skills'),
+          panelId: skillsId,
+        }}
+      >
+        {freeSections}
+      </ImproveSkillsSlotContext.Provider>
 
       {state.status === 'done' && state.sides && (
         <p className="text-sm" data-testid="improve-sides">
@@ -1298,60 +1336,46 @@ export function ImprovePanel({
             )}
             <ImproveFooter target={footerTarget}>
               {chosen.length > 0 && checkable && (
-                <div className="space-y-1 text-sm" data-testid="improve-selection">
+                <div
+                  className="flex items-end justify-between gap-3 text-sm"
+                  data-testid="improve-selection"
+                >
                   {summary ? (
                     <>
-                      <p>
-                        {t('fittings.improve.selection.changes', { count: summary.count })}
-                        {' · '}
-                        {settings.mode === 'buy' && summary.total !== null ? (
-                          <>
-                            {t(
-                              counting
-                                ? 'fittings.improve.selection.stillToBuy'
-                                : 'fittings.improve.selection.total'
-                            )}{' '}
-                            <IskAmount value={summary.total} />
-                            {counting &&
-                              settings.spendCap !== null &&
-                              ` ${t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(settings.spendCap) })}`}
-                          </>
-                        ) : (
-                          <>
-                            {summary.isk < 0
-                              ? t('fittings.makeItFit.saves')
-                              : t('fittings.makeItFit.costs')}{' '}
-                            <IskAmount value={Math.abs(summary.isk)} />
-                          </>
-                        )}
-                        {summary.unpriced > 0 &&
-                          ` + ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
-                      </p>
-                      <p>
-                        {t('fittings.improve.selection.dps', {
-                          before: m3sFormat(summary.dps.before),
-                          after: m3sFormat(summary.dps.after),
-                        })}
-                        {' · '}
-                        {t('fittings.improve.selection.ehp', {
-                          before: m3Format(summary.ehp.before),
-                          after: m3Format(summary.ehp.after),
-                        })}
-                      </p>
-                      {summary.problems.map((problem) => (
-                        <p
-                          key={problem.kind === 'over' ? problem.resource : problem.kind}
-                          role="alert"
-                          className="text-danger text-xs"
-                        >
-                          {t(`fittings.improve.selection.problem.${problem.kind}`, {
-                            resource:
-                              problem.kind === 'over'
-                                ? t(`fittings.improve.selection.resource.${problem.resource}`)
-                                : undefined,
+                      <div className="min-w-0 space-y-1">
+                        <p>{t('fittings.improve.selection.changes', { count: summary.count })}</p>
+                        <p>
+                          {t('fittings.improve.selection.dps', {
+                            before: m3sFormat(summary.dps.before),
+                            after: m3sFormat(summary.dps.after),
+                          })}
+                          {' · '}
+                          {t('fittings.improve.selection.ehp', {
+                            before: m3Format(summary.ehp.before),
+                            after: m3Format(summary.ehp.after),
                           })}
                         </p>
-                      ))}
+                        {summary.problems.map((problem) => (
+                          <p
+                            key={problem.kind === 'over' ? problem.resource : problem.kind}
+                            role="alert"
+                            className="text-danger text-xs"
+                          >
+                            {t(`fittings.improve.selection.problem.${problem.kind}`, {
+                              resource:
+                                problem.kind === 'over'
+                                  ? t(`fittings.improve.selection.resource.${problem.resource}`)
+                                  : undefined,
+                            })}
+                          </p>
+                        ))}
+                      </div>
+                      <SelectionCost
+                        summary={summary}
+                        buy={settings.mode === 'buy'}
+                        counting={counting}
+                        spendCap={settings.spendCap}
+                      />
                     </>
                   ) : (
                     <p className="text-text-dim text-xs" role="status">
@@ -1386,6 +1410,69 @@ export function ImprovePanel({
             </ImproveFooter>
           </div>
         ))}
+    </div>
+  );
+}
+
+/**
+ * The ticked set's price: the fit's total cost after (buy mode) with what the
+ * ticks add to it, or just that change when there is no total to compare.
+ * Owned stock, when counted, is already taken off both figures.
+ */
+function SelectionCost({
+  summary,
+  buy,
+  counting,
+  spendCap,
+}: {
+  summary: SelectionSummary;
+  buy: boolean;
+  counting: boolean;
+  spendCap: number | null;
+}) {
+  const { t } = useTranslation();
+  const tone =
+    summary.isk < 0 ? 'text-success' : summary.isk > 0 ? 'text-warning' : 'text-text-dim';
+  const delta =
+    summary.isk === 0 ? (
+      t('fittings.improve.selection.noChange')
+    ) : (
+      <>
+        {summary.isk < 0 ? '−' : '+'}
+        <IskAmount value={Math.abs(summary.isk)} />
+      </>
+    );
+  const total = buy ? summary.total : null;
+  return (
+    <div className="shrink-0 text-right" data-testid="improve-cost">
+      <p className="text-text-dim text-xs">
+        {t(
+          total !== null
+            ? 'fittings.improve.selection.totalCost'
+            : 'fittings.improve.selection.costChange'
+        )}
+        {counting && ` · ${t('fittings.improve.selection.ownedCounted')}`}
+      </p>
+      <p className="text-base font-semibold">
+        {total !== null ? (
+          <>
+            <IskAmount value={total} />{' '}
+            <span className={cx('text-sm font-normal', tone)}>({delta})</span>
+          </>
+        ) : (
+          <span className={tone}>{delta}</span>
+        )}
+      </p>
+      {(summary.unpriced > 0 || (total !== null && spendCap !== null)) && (
+        <p className="text-text-dim text-xs">
+          {total !== null &&
+            spendCap !== null &&
+            t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(spendCap) })}
+          {total !== null && spendCap !== null && summary.unpriced > 0 && ' · '}
+          {summary.unpriced > 0 &&
+            `+ ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
+        </p>
+      )}
     </div>
   );
 }

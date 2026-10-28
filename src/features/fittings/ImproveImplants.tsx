@@ -1,44 +1,31 @@
 /**
- * Improve's "Implants" section: the Implant Finder's best implants for the
- * active Improve Goal's stat, each at the grade that moves it most. They
- * cost the fit nothing, so they sit above the swaps. A row click puts the
- * implant in the Fitting's set, planned from the clone as Make it fit does.
+ * Improve's "Implants" line: how many of the Implant Finder's implants would
+ * raise the active Improve Goal's stat, the best of them, and a link into the
+ * Finder to pick. They cost the fit nothing, so they stay out of its total.
  * Shown only when something helps; Best overall and Cheaper have no one stat
- * to chase, so no section.
+ * to chase, so no line.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IskAmount } from '@/components/ui';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { textActionClassName } from '@/components/ui';
 import type { ImproveGoal } from '@/engine/fittings/improve';
-import { FREE_ROWS_SHOWN, IMPLANT_GOAL } from '@/engine/fittings/improveFree';
+import { IMPLANT_GOAL } from '@/engine/fittings/improveFree';
 import { cloneSeedSet } from '@/engine/fittings/implantBasis';
-import {
-  displayValue,
-  goalById,
-  goalGain,
-  placeAllInSet,
-  type ImplantGoalId,
-} from '@/engine/fittings/implantFinder';
-import type { FittingImplantSet } from '@/engine/fittings/types';
+import { goalById, goalGain, type ImplantGoalId } from '@/engine/fittings/implantFinder';
 import { useMarketHub } from '@/features/market/hub';
-import { cx } from '@/lib/cx';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { fmt } from './implantFinderFormat';
 import type { MakeItFitImplantsInput } from './MakeItFitImplants';
-import { MakeItFitSection } from './MakeItFitSection';
+import { ImplantSetPicker } from './ImplantSetPicker';
 import { useTargetProfiles } from './targetProfiles';
 import { implantNames, useImplantFinder } from './useImplantFinder';
 
-const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 const MIN_GAIN = 1e-4;
 
 interface Props {
   goal: ImproveGoal;
   open: boolean;
   implants: MakeItFitImplantsInput;
-  /** After an implant is put in the set, with its name. */
-  onApplied: (names: string) => void;
 }
 
 export function ImproveImplants({ goal, ...rest }: Props) {
@@ -47,12 +34,7 @@ export function ImproveImplants({ goal, ...rest }: Props) {
   return <Implants goalId={goalId} {...rest} />;
 }
 
-function Implants({
-  goalId,
-  open,
-  implants,
-  onApplied,
-}: Omit<Props, 'goal'> & { goalId: ImplantGoalId }) {
+function Implants({ goalId, open, implants }: Omit<Props, 'goal'> & { goalId: ImplantGoalId }) {
   const { t } = useTranslation();
   const { fitting, profile, basis, onChange } = implants;
   const hubId = useMarketHub((state) => state.value);
@@ -79,6 +61,7 @@ function Implants({
   const names = useMemo(() => implantNames(finder.catalog?.families ?? []), [finder.catalog]);
   const goalDef = goalById(goalId);
   const { baseline, context } = finder;
+  const [picking, setPicking] = useState(false);
 
   const rows = useMemo(() => {
     if (!baseline || finder.updating || !finder.results) return [];
@@ -94,58 +77,34 @@ function Implants({
         );
         return best && best.gain > MIN_GAIN ? [best] : [];
       })
-      .sort((a, b) => b.gain - a.gain)
-      .slice(0, FREE_ROWS_SHOWN);
+      .sort((a, b) => b.gain - a.gain);
   }, [baseline, finder.updating, finder.results, goalDef, context]);
 
   if (finder.status === 'error' || rows.length === 0 || !baseline) return null;
 
-  const set = fitting.implantSet ?? seed ?? EMPTY_SET;
-  const unit = t(`fittings.implantFinder.unit.${goalId}`);
-  const n = (value: number) => fmt(value, goalDef.display.decimals);
+  const top = rows[0];
+  const topName = names.get(top.grade.grade.typeId)?.full ?? `#${top.grade.grade.typeId}`;
 
   return (
-    <MakeItFitSection heading={t('fittings.improve.section.implants')}>
-      <ul className="space-y-1">
-        {rows.map(({ grade, gain }) => {
-          const typeId = grade.grade.typeId;
-          const name = names.get(typeId)?.full ?? `#${typeId}`;
-          const before = displayValue(goalDef, baseline, context);
-          const after = displayValue(goalDef, grade.stats, context);
-          return (
-            <li key={typeId} className="border-line rounded-xs border">
-              <button
-                type="button"
-                className={cx(
-                  'w-full rounded-xs p-2 text-left text-sm',
-                  rowInteractiveClassName,
-                  focusRingInsetClassName
-                )}
-                onClick={() => {
-                  if (!finder.catalog) return;
-                  onChange(placeAllInSet(set, finder.catalog.slotOf, [typeId]));
-                  onApplied(name);
-                }}
-              >
-                <p className="font-medium">{name}</p>
-                <p className="text-text-dim text-xs">
-                  {t('fittings.implantFinder.delta', {
-                    before: n(before),
-                    after: n(after),
-                    unit,
-                    pct: `+${fmt(gain * 100, 1)}%`,
-                  })}
-                </p>
-                {grade.best && grade.best.cost !== null && (
-                  <p className="text-xs">
-                    {t('fittings.makeItFit.costs')} <IskAmount value={grade.best.cost} />
-                  </p>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </MakeItFitSection>
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+      <p>
+        <span className="font-medium">{t('fittings.improve.section.implants')}</span>
+        <span className="text-text-dim">
+          {' · '}
+          {t('fittings.improve.implantsHelp', { count: rows.length })}
+          {` (${topName} +${fmt(top.gain * 100, 1)}%)`}
+        </span>
+      </p>
+      <button type="button" className={textActionClassName()} onClick={() => setPicking(true)}>
+        {t('fittings.improve.findImplants')}
+      </button>
+      <ImplantSetPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        implantSet={fitting.implantSet}
+        onChange={(next) => next && onChange(next)}
+        finder={{ fitting, profile, basis }}
+      />
+    </div>
   );
 }

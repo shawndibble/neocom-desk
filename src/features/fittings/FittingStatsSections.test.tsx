@@ -1680,6 +1680,38 @@ describe('FittingStatsSections previewed change', () => {
     expect(screen.getByRole('heading', { name: 'Capacitor' })).toBeInTheDocument();
   });
 
+  it('shows the price as current → after while a priced change is previewed', () => {
+    const price = {
+      rows: [],
+      totals: { buy: 1_000_000, sell: 1_000_000, spread: 0, unpricedRows: 0 },
+    } as unknown as Appraisal;
+    const { rerender } = render(
+      <FittingStatsSections
+        stats={current}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+        previewIsk={-400_000}
+      />
+    );
+    expect(document.body).toHaveTextContent(/1M.*→.*600K/);
+    rerender(
+      <FittingStatsSections
+        stats={current}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    expect(document.body).not.toHaveTextContent('→');
+  });
+
   it('reads as it always does with no preview', () => {
     renderSections(current);
     expect(document.querySelectorAll('[data-verdict]')).toHaveLength(0);

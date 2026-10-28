@@ -52,18 +52,26 @@ export function leftColumn(
  * track stops at 52rem (its 48rem ring and the panel around it);
  * width past the caps becomes even gutters.
  */
-export function editorGridClass(addMode: AddMode, view: FittingView, addOpen: boolean): string {
+export function editorGridClass(
+  addMode: AddMode,
+  view: FittingView,
+  addOpen: boolean,
+  improveOpen = false
+): string {
+  // The stats hold one width (22rem) so Improve's column opening or shutting never
+  // resizes them; the editor track absorbs the change. Whole class names, so Tailwind sees them.
   const tracks =
     addMode === 'docked'
       ? view === 'ring'
-        ? 'grid-cols-[20rem_minmax(0,52rem)_minmax(22rem,26rem)]'
-        : 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
+        ? 'grid-cols-[20rem_minmax(0,52rem)_22rem]'
+        : 'grid-cols-[20rem_minmax(0,1fr)_22rem]'
       : addOpen
         ? 'grid-cols-1'
         : view === 'ring'
-          ? 'grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem] xl:grid-cols-[minmax(0,52rem)_minmax(22rem,28rem)]'
-          : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]';
-  return `grid items-start justify-center gap-3 ${tracks}`;
+          ? 'grid-cols-1 lg:grid-cols-[minmax(0,52rem)_22rem]'
+          : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem]';
+  // Improve's column sits left of the grid, so nothing is re-centred while it is open.
+  return `grid items-start ${improveOpen ? 'justify-start' : 'justify-center'} gap-3 ${tracks}`;
 }
 
 /**

@@ -82,7 +82,14 @@ export function FittingEditorLayout({
           </div>
         ) : (
           <ImproveBeside column={improveColumn}>
-            <div className={editorGridClass(addMode, view, addOpen || statsFirst)}>
+            <div
+              className={editorGridClass(
+                addMode,
+                view,
+                addOpen || statsFirst,
+                Boolean(improveColumn)
+              )}
+            >
               {addMode === 'docked' && (
                 <Panel
                   title={addTitle}

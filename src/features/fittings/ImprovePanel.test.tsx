@@ -10,6 +10,9 @@ import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
+import { createPortal } from 'react-dom';
+import { useContext } from 'react';
+import { ImproveSkillsSlotContext } from './improveSkillsSlot';
 import type { ImproveOwnedSettings } from './ImproveOwnedStock';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
@@ -58,7 +61,8 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
   };
 }
 
-const openMoreGoals = () => userEvent.click(screen.getByRole('button', { name: /^More goals/ }));
+const openMoreGoals = () =>
+  userEvent.click(screen.getByRole('button', { name: /^More \d+ goals/ }));
 const openSettings = () =>
   userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
 
@@ -852,6 +856,78 @@ describe('ImprovePanel', () => {
       await userEvent.click(boxes[0]);
       await userEvent.click(boxes[1]);
       expect(screen.getByText(/Replaces your pick:/)).toBeInTheDocument();
+    });
+  });
+
+  describe('selection cost', () => {
+    const fitting = {
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+      ],
+    } as unknown as Fitting;
+    const priced = (isk: number) => {
+      const a = option(11, { ehp: 1100 }, { iskDelta: isk });
+      const state = { ...done({ noDownside: [a] }), fitTotal: 5_000_000 } as ImproveState;
+      return { ...search(state), recalc: vi.fn().mockResolvedValue(before) };
+    };
+
+    it('reads Total cost with the rise over the current fit', async () => {
+      renderPanel(priced(2_000_000), vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      const cost = await screen.findByTestId('improve-cost');
+      expect(cost).toHaveTextContent('Total cost');
+      expect(cost).toHaveTextContent(/7M.*\(\+2M/);
+      expect(cost).not.toHaveTextContent('still to buy');
+    });
+
+    it('shows a saving with a minus', async () => {
+      renderPanel(priced(-1_000_000), vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      expect(await screen.findByTestId('improve-cost')).toHaveTextContent(/\(−1M/);
+    });
+
+    it('says no change rather than showing nothing', async () => {
+      renderPanel(priced(0), vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      expect(await screen.findByTestId('improve-cost')).toHaveTextContent('(no change)');
+    });
+  });
+
+  describe('Search settings and Skills', () => {
+    function SkillsStub() {
+      const slot = useContext(ImproveSkillsSlotContext);
+      if (!slot?.trigger) return null;
+      return (
+        <>
+          {createPortal(
+            <button
+              type="button"
+              aria-expanded={slot.open}
+              aria-controls={slot.panelId}
+              onClick={slot.onToggle}
+            >
+              Skills 2
+            </button>,
+            slot.trigger
+          )}
+          {slot.open && slot.panel && createPortal(<p>skill rows</p>, slot.panel)}
+        </>
+      );
+    }
+
+    it('opens neither by default, and one at a time', async () => {
+      renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { freeSections: <SkillsStub /> });
+      const settingsButton = screen.getByRole('button', { name: /^Search settings/ });
+      const skills = await screen.findByRole('button', { name: 'Skills 2' });
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
+      expect(skills).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(settingsButton);
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.click(skills);
+      expect(skills).toHaveAttribute('aria-expanded', 'true');
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
+      expect(await screen.findByText('skill rows')).toBeInTheDocument();
     });
   });
 

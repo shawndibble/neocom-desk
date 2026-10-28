@@ -512,6 +512,7 @@ function FittingsPage() {
       overlay={overlay}
       onOpenMakeItFit={makeItFit.open}
       preview={improve.preview}
+      previewIsk={improve.previewIsk}
       ruleBreaks={ruleBreaks.lines}
     />
   );

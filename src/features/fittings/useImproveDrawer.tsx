@@ -8,7 +8,7 @@ import { ASSETS_ENDPOINTS, useAppraisalOwnedPref } from '@/features/market/appra
 import { useMarketHub } from '@/features/market/hub';
 import { useOwnedAtStation, type OwnedScope } from '@/features/market/useOwnedAtStation';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
-import { IconButton, Modal, Panel, Toast, useTimedToast } from '@/components/ui';
+import { IconButton, Modal, Panel, Toast } from '@/components/ui';
 import {
   applyImproveCandidate,
   type DefenseChoice,
@@ -94,6 +94,8 @@ export function useImproveDrawer({
   docked: boolean;
   /** The stat changes to preview in the stats column; null when Improve is shut or nothing is ticked or hovered. */
   preview: FittingStatsDelta | null;
+  /** What the previewed rows add to the fit's price (buy mode); null when none or not comparable. */
+  previewIsk: number | null;
 } {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -146,6 +148,11 @@ export function useImproveDrawer({
   const [includeOfficer, setIncludeOfficer] = useState(false);
   // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
   const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
+  const [previewIsk, setPreviewIsk] = useState<number | null>(null);
+  const onPreview = useCallback((delta: FittingStatsDelta | null, isk: number | null = null) => {
+    setPreview(delta);
+    setPreviewIsk(isk);
+  }, []);
   // The Fitting before the last Apply and the one it made, for the toast's Undo; null once it is gone.
   const [undo, setUndo] = useState<{ before: Fitting; applied: Fitting; message: string } | null>(
     null
@@ -155,8 +162,6 @@ export function useImproveDrawer({
   // A later edit (a Ring change while the toast is up) ends the Undo: restoring would discard it.
   const undoable = undo !== null && fitting !== null && sameModules(fitting, undo.applied);
   // What the last implant put in the set was, for its confirmation toast.
-  const [implantApplied, setImplantApplied] = useState<string | null>(null);
-  useTimedToast(implantApplied, () => setImplantApplied(null));
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
   // A column beside the editor from desktop up; below it (phone and tablet, where the
@@ -288,7 +293,7 @@ export function useImproveDrawer({
       onApply={apply}
       fitting={fitting}
       target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
-      onPreview={setPreview}
+      onPreview={onPreview}
       footerTarget={footerTarget}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
@@ -320,9 +325,6 @@ export function useImproveDrawer({
                   basis: workspace.implantBasis,
                   onChange: workspace.setImplantSet,
                 }}
-                onApplied={(name) =>
-                  setImplantApplied(t('fittings.makeItFit.implantsApplied', { names: name }))
-                }
               />
             )}
           </>
@@ -430,7 +432,6 @@ export function useImproveDrawer({
         </Modal>
       ) : // Desktop: `column`, a column in the page itself.
       null}
-      {implantApplied !== null && <Toast message={implantApplied} />}
       {undo && undoable && (
         <Toast
           message={undo.message}
@@ -455,6 +456,7 @@ export function useImproveDrawer({
     column: column || null,
     docked: isOpen && asColumn,
     preview: isOpen ? preview : null,
+    previewIsk: isOpen ? previewIsk : null,
   };
 }
 
