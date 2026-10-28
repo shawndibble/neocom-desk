@@ -1,5 +1,7 @@
 # Scope decisions — Improve: a buy list that subtracts owned items (issue #5033)
 
+**Superseded by `20261027-201156-improve-no-longer-counts-owned-stock`: Improve no longer counts owned stock.**
+
 _Recorded 2026-10-25 · issue #5033. Design only: no code yet. Extends `20261024-171917-improve-a-goal-driven-swap-search-on-the`._
 
 - **In Planning mode an owned unit costs 0 ISK in the search.** The search may then prefer a swap to a module the pilot holds. Showing owned stock only at the end would hide that the best swap is one they already own. Refitting mode is unchanged: it already prices "sell the old part, buy the new part".
