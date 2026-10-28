@@ -180,7 +180,8 @@ export function isStrayAbortEvent(event: {
   );
 }
 
-const CHUNK_LOAD_MESSAGE = /dynamically imported module|importing a module script failed/i;
+/** The browser's wording, per engine, for a dynamic import that would not load. */
+export const CHUNK_LOAD_MESSAGE = /dynamically imported module|importing a module script failed/i;
 
 /**
  * `beforeSend`'s half of the chunk-failure downgrade `main.tsx` does for React's

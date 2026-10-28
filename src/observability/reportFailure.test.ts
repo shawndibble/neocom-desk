@@ -190,6 +190,15 @@ describe('isStrayAbortEvent', () => {
       })
     ).toBe(true);
   });
+  it("matches Safari's 'Error: AbortError' wording", () => {
+    expect(
+      isStrayAbortEvent({
+        exception: {
+          values: [{ value: 'Error: AbortError: AbortError', mechanism: { type: rejection } }],
+        },
+      })
+    ).toBe(true);
+  });
   it('keeps other errors and aborts the app reported itself', () => {
     expect(
       isStrayAbortEvent({

@@ -22,6 +22,7 @@
  */
 import type { ComponentType } from 'react';
 import type { AppRoutePath } from './routeScopes';
+import { CHUNK_LOAD_MESSAGE } from '@/observability/reportFailure';
 import { staleBuildRecoveryOutcome } from './staleBuildState';
 
 type RouteModule = { default: ComponentType };
@@ -81,11 +82,10 @@ export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
 // A chunk `main.tsx` declined to recover (offline, purged this minute) rejects
 // with the browser's own TypeError, not `RouteChunkUnavailableError`; each
 // engine words it differently.
-const DYNAMIC_IMPORT_FAILURE = /dynamically imported module|importing a module script failed/i;
 
 export function isRouteChunkFailure(error: unknown): boolean {
   if (error instanceof RouteChunkUnavailableError) return true;
-  return error instanceof TypeError && DYNAMIC_IMPORT_FAILURE.test(error.message);
+  return error instanceof TypeError && CHUNK_LOAD_MESSAGE.test(error.message);
 }
 
 /** A loader that also hands back its component synchronously once loaded. */
