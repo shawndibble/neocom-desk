@@ -141,27 +141,27 @@ export async function previewSrpDoctrineCheck(
   call: BookCall,
   ref: KillmailRef
 ): Promise<DoctrinePreview> {
+  // The settings read needs no member, so it runs beside the affiliation lookup; a non-member
+  // still fails first, before anything about SRP being on or off is said.
+  const settingsRead = srpSettingsRef(deps.db, call.corporationId).get();
+  settingsRead.catch(() => undefined); // its failure surfaces at the await below
   const member = await authorizeMember(deps, caller, call);
-  const settings = (await srpSettingsRef(deps.db, call.corporationId).get()).data() as
-    SrpSettings | undefined;
+  const settings = (await settingsRead).data() as SrpSettings | undefined;
   if (!settings || settings.enabled !== true) {
     fail('failed-precondition', 'SRP is not on for this corporation', 'srp-off');
   }
   const { zkill, km } = await fetchOwnLoss(deps, member, ref);
-  const check = await doctrineCheckOf(deps.db, settings, call.corporationId, km.victim);
   const hullTypeId = km.victim.shipTypeId;
-  const { classId, result } = await priceLoss(
-    deps.killmails,
-    settings,
-    km.victim,
-    zkill.totalValue
-  );
-  const rule = matchedHullRule(settings.hullRules, hullTypeId, classId);
   const { hull, fit } = shipFitItems(km.victim);
-  const [hullValue, fitValue] = await Promise.all([
+  // None of these reads depends on another: the fit check (Firestore), the pricing chain (ESI
+  // hull group, then Jita when it needs it) and the two Jita values the pilot is shown.
+  const [check, { classId, result }, hullValue, fitValue] = await Promise.all([
+    doctrineCheckOf(deps.db, settings, call.corporationId, km.victim),
+    priceLoss(deps.killmails, settings, km.victim, zkill.totalValue),
     softJita(deps.killmails, hull),
     softJita(deps.killmails, fit),
   ]);
+  const rule = matchedHullRule(settings.hullRules, hullTypeId, classId);
   return {
     killmailId: km.killmailId,
     hullTypeId,
