@@ -240,6 +240,24 @@ describe('JournalTable filtered summary status', () => {
       expect(headers[1]).toHaveTextContent('+700');
     });
 
+    it('puts the sort in the summary row as an icon, with no sort bar in the table', () => {
+      phone.value = true;
+      render(<Harness rows={days} />);
+      const picker = screen.getByRole('combobox', { name: /^Sort by, now Sort: Date/ });
+      expect(screen.getByText(/^\d+ entries$/).closest('div')?.parentElement).toContainElement(
+        picker
+      );
+      expect(document.querySelectorAll('select')).toHaveLength(1);
+    });
+
+    it('has no sort picker off a phone, or with nothing to sort', () => {
+      render(<Harness rows={days} />);
+      expect(screen.queryByRole('combobox', { name: /Sort by/ })).not.toBeInTheDocument();
+      phone.value = true;
+      render(<Harness rows={[]} />);
+      expect(screen.queryByRole('combobox', { name: /Sort by/ })).not.toBeInTheDocument();
+    });
+
     it('opens only the newest three days', () => {
       phone.value = true;
       const many = [1, 2, 3, 4, 5].map((n) => ({
@@ -289,7 +307,7 @@ describe('JournalTable filtered summary status', () => {
       phone.value = true;
       render(<Harness rows={days} sort={{ columnId: 'amount', direction: 'desc' }} />);
       expect(document.querySelectorAll('.dt-group-header')).toHaveLength(0);
-      const picker = screen.getByRole('combobox', { name: 'Sort by' });
+      const picker = screen.getByRole('combobox', { name: /^Sort by/ });
       const options = within(picker)
         .getAllByRole('option')
         .map((option) => option.textContent);
@@ -300,7 +318,7 @@ describe('JournalTable filtered summary status', () => {
     it('keeps the unchanged table at desktop width', () => {
       render(<Harness rows={days} />);
       expect(document.querySelectorAll('.dt-group-header')).toHaveLength(0);
-      expect(screen.queryByRole('combobox', { name: 'Sort by' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: /^Sort by/ })).not.toBeInTheDocument();
     });
   });
 });

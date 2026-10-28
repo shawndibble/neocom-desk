@@ -602,6 +602,10 @@ exactly the markup above.
   table is unsortable on a phone. A real `<select>` rather than `Select`
   because the phone should get the OS picker, laid invisibly over its own
   label because the closed control's text differs from its options'.
+  `DataTableSortPicker` takes `iconOnly` for a row with no width to spare: the
+  same select over a 36px `IconButton`-look square, the sort in force in its
+  accessible name ("Sort by, now Date ↓"). The Wallet Journal puts it at the
+  right end of its summary row on a phone, with no `mobileSort` bar.
 - **`groupBy`** folds rows sharing a non-null key behind one full-width
   toggle row (collapsed by default, `defaultExpanded` to seed), with expanded
   members indented on the `panel` fill. Groups keep the table's sort: each
