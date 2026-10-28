@@ -16,6 +16,8 @@ import {
   isValidElement,
   useContext,
   useEffect,
+  useId,
+  useState,
   type ComponentProps,
   type MouseEvent,
   type PointerEvent,
@@ -24,6 +26,16 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTouchContext } from '@/lib/useMediaQuery';
+import {
+  claimSessionHint,
+  dismissSessionHint,
+  hintSeenCount,
+  recordHintSeen,
+  releaseSessionHint,
+  useHintCounts,
+  useSessionHintShown,
+} from '@/lib/hintFlags';
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -52,6 +64,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './DropdownMenu';
+import { Button } from './Button';
 import { IconButton } from './IconButton';
 import type { IconButtonSize, IconButtonVariant } from './iconButtonClassName';
 import * as Icon from './icons';
@@ -62,6 +75,7 @@ import {
   RowOpenHrefContext,
   type RowActions,
 } from './rowActionsContext';
+import { Popover, PopoverAnchor, PopoverContent } from './Popover';
 import { Tooltip } from './Tooltip';
 import { TooltipHoldContext } from './tooltipHold';
 
@@ -305,6 +319,32 @@ export function RowActionsMenu({
   );
 }
 
+const ROW_MENU_TIP = 'rowMenuTip';
+const ROW_HINT = 'rowHint';
+/** How many ⋮ opens carry the "right-click any row" footer. */
+const ROW_MENU_TIP_OPENS = 3;
+
+/**
+ * The one-time hint on the first ⋮ a pilot sees (§6c "Hints"): shows once ever,
+ * on one ⋮ only, and never in a session that already showed another hint.
+ */
+function useRowMoreHint(active: boolean): [shown: boolean, dismiss: () => void] {
+  const owner = `${ROW_HINT}:${useId()}`;
+  const hydrated = useHintCounts((state) => state.hydrated);
+  const shown = useSessionHintShown(owner);
+  useEffect(() => {
+    if (!active || !hydrated) return;
+    if (hintSeenCount(useHintCounts.getState().value, ROW_HINT) > 0) return;
+    if (claimSessionHint(owner)) return () => releaseSessionHint(owner);
+  }, [active, hydrated, owner]);
+  // Counted when answered, not when claimed: a hint that never reached the screen is not spent.
+  const dismiss = () => {
+    recordHintSeen(ROW_HINT);
+    dismissSessionHint(owner);
+  };
+  return [shown, dismiss];
+}
+
 /**
  * The visible trigger for the enclosing row's actions. A real dropdown rather
  * than a synthetic right-click, so it announces `aria-haspopup`/`expanded`,
@@ -337,19 +377,57 @@ export function RowMoreActions({
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
   const extras = useContext(RowMenuExtrasContext);
+  const [tip, setTip] = useState(false);
+  const [hintShown, dismissHint] = useRowMoreHint(actions !== null);
+  const context = useTouchContext();
   if (!actions) return null;
+  const onOpenChange = (open: boolean) => {
+    if (open) {
+      if (hintShown) dismissHint();
+      // Counted per open, but the footer stays for the open that earned it.
+      const { value, hydrated } = useHintCounts.getState();
+      const earned = hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
+      setTip(earned);
+      if (earned) recordHintSeen(ROW_MENU_TIP);
+    }
+    actions.onOpenChange?.(open);
+  };
   return (
-    <DropdownMenu onOpenChange={actions.onOpenChange} modal={actions.modal}>
-      <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-          label={label ?? t('common.moreActionsLabel', { name: actions.name })}
-          variant={variant}
-          size={size}
-          className={className}
-          data-focus-target={focusTarget ? true : undefined}
-        />
-      </DropdownMenuTrigger>
+    <DropdownMenu onOpenChange={onOpenChange} modal={actions.modal}>
+      <Popover open={hintShown} onOpenChange={(open) => !open && dismissHint()}>
+        <PopoverAnchor asChild>
+          <DropdownMenuTrigger asChild>
+            <IconButton
+              icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+              label={label ?? t('common.moreActionsLabel', { name: actions.name })}
+              variant={variant}
+              size={size}
+              className={className}
+              data-focus-target={focusTarget ? true : undefined}
+            />
+          </DropdownMenuTrigger>
+        </PopoverAnchor>
+        <PopoverContent
+          align="end"
+          className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
+          // A hint never takes focus from where the pilot is working.
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          // Portalled, so React still bubbles these to the row's own handlers.
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+          // Focus moving elsewhere is not an answer; a press outside or Escape is.
+          onFocusOutside={(event) => event.preventDefault()}
+        >
+          <p>{t('common.rowHint', { context })}</p>
+          <Button size="sm" onClick={dismissHint}>
+            {t('common.hintGotIt')}
+          </Button>
+        </PopoverContent>
+      </Popover>
       {/* Stops a right-click on an item bubbling (through the React tree,
           portal or not) to the row's own context-menu trigger. */}
       <DropdownMenuContent
@@ -361,6 +439,11 @@ export function RowMoreActions({
           {actions.openHref && <OpenInNewTabMenuItem href={actions.openHref} />}
           {actions.items}
           {extras}
+          {tip && (
+            <p className="mt-1 border-t border-line px-2 pt-1.5 pb-1 text-xs text-text-dim">
+              {t('common.rowMenuTip', { context })}
+            </p>
+          )}
         </MenuKindContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>

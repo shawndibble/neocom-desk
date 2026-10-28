@@ -71,12 +71,12 @@ export interface NavPage {
   /** Tab ids listed nowhere as destinations: a redirect alias, not a view of this page. */
   readonly aliasTabs?: readonly string[];
   /**
-   * The page's `PAGE_TABS` are URL state behind an in-page control, not views
-   * of their own: the nav lists the page alone (Contacts' This character / All
-   * characters is a `CharacterFilterControl`, #2427, but `/contacts/across`
-   * links still resolve).
+   * Tab ids that are URL state behind an in-page control, not views of their
+   * own: the nav leaves them out (Contacts' This character / All characters is
+   * a `CharacterFilterControl`, #2427, but `/contacts/across` links still
+   * resolve). The page's other tabs (Standings) are listed as usual.
    */
-  readonly tablessNav?: true;
+  readonly controlTabs?: readonly string[];
   /** Tab ids shown only while the Corp entry is (`visibleSettingsGroups`' Corporation section). */
   readonly corpTabs?: readonly string[];
   /** For a Corp page: the capability it is listed for. Hidden, never locked, without it. */
@@ -302,7 +302,7 @@ export const NAV_PAGES = [
     group: 'social',
     gating: 'scope',
     mobileTab: true,
-    tablessNav: true,
+    controlTabs: ['character', 'across'],
   },
   // Communities: Firebase-backed, no ESI scope of its own.
   {
@@ -355,14 +355,14 @@ export interface NavTab {
 
 /**
  * The `PAGE_TABS` tabs the nav lists under a page: the tab bar's tabs, less
- * redirect aliases, and none at all for a `tablessNav` page. The one rule the
+ * redirect aliases, and any `controlTabs`. The one rule the
  * destination list and the rail's path ownership (`navRail.ts`) both read.
  */
 export function navTabs(page: NavPage): readonly NavTab[] {
-  const tabs = page.tablessNav ? undefined : PAGE_TABS[page.path];
+  const tabs = PAGE_TABS[page.path];
   if (!tabs) return [];
   return tabBarTabs(tabs)
-    .filter((tab) => !page.aliasTabs?.includes(tab.id))
+    .filter((tab) => !page.aliasTabs?.includes(tab.id) && !page.controlTabs?.includes(tab.id))
     .map((tab) => ({ id: tab.id, labelKey: tab.labelKey, path: tabPath(tabs, tab.id) }));
 }
 
