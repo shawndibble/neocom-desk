@@ -1080,8 +1080,10 @@ describe('ActiveJobsPanel: table columns', () => {
     // Absolute end time as a machine-readable <time>, one per row.
     expect(container.querySelectorAll('tbody time')).toHaveLength(2);
 
-    // Default sort is soonest-ending; sorting by runs ascending flips the pair.
+    // Default sort is soonest-ending; Runs is numeric so a first click is high to low
+    // (the same Alpha first), and a second click, ascending, flips the pair.
     expect(within(rows[0]).getByText('Widget Alpha')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Runs' }));
     await user.click(screen.getByRole('button', { name: 'Runs' }));
     const resorted = within(container.querySelector('tbody')!).getAllByRole('row');
     expect(within(resorted[0]).getByText('Widget Beta')).toBeInTheDocument();

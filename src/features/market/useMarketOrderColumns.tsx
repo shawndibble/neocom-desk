@@ -239,6 +239,7 @@ export function useMarketOrderColumns({
         width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (o) => {
           const cell = orderJumps(o.system_id);
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;

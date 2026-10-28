@@ -106,6 +106,7 @@ export function BelowMarketResults({
         width: '12ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
+        sortFirst: 'asc',
         sortValue: (row) => row.asking,
         stackAffix: { before: t('contractSearch.belowMarket.askingAffix') },
         render: (row) => <IskAmount value={row.asking} decimals={0} />,
@@ -153,6 +154,7 @@ export function BelowMarketResults({
         width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (row) => {
           const cell = offerJumps(row.lead);
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;

@@ -46,13 +46,38 @@ export function sortRowsBy<T>(
 }
 
 /**
- * Same toggle rule the header click uses: clicking the active column flips
- * direction, clicking a different one starts it at `asc`. Exported for the
- * same reason as `sortRows` — a caller keeping its own `DataTableSort` state
- * outside `DataTable` (no header row to click) still needs the identical rule.
+ * Direction a first click on `column` sorts: numbers (and dates, which are
+ * numbers here) high to low, text A-Z. The type is the column's first
+ * non-missing value, so it doesn't depend on row order or flip as rows
+ * change; `sortFirst` overrides it for a column whose best row is the lowest
+ * (jumps, rank, a cheapest-first price). No value anywhere: ascending.
  */
-export function nextDataTableSort(previous: DataTableSort | null, columnId: string): DataTableSort {
+export function firstSortDirection<T>(
+  column: Pick<DataTableColumn<T>, 'sortValue' | 'sortFirst'>,
+  rows: readonly T[]
+): 'asc' | 'desc' {
+  if (column.sortFirst) return column.sortFirst;
+  if (!column.sortValue) return 'asc';
+  for (const row of rows) {
+    const value = column.sortValue(row);
+    if (value !== undefined) return typeof value === 'number' ? 'desc' : 'asc';
+  }
+  return 'asc';
+}
+
+/**
+ * Same toggle rule the header click uses: clicking the active column flips
+ * direction, clicking a different one starts it at `firstDirection`
+ * (`firstSortDirection`; `asc` when the caller has no column to ask). Exported
+ * for the same reason as `sortRows` — a caller keeping its own `DataTableSort`
+ * state outside `DataTable` (no header row to click) still needs the identical rule.
+ */
+export function nextDataTableSort(
+  previous: DataTableSort | null,
+  columnId: string,
+  firstDirection: 'asc' | 'desc' = 'asc'
+): DataTableSort {
   return previous?.columnId === columnId
     ? { columnId, direction: previous.direction === 'asc' ? 'desc' : 'asc' }
-    : { columnId, direction: 'asc' };
+    : { columnId, direction: firstDirection };
 }

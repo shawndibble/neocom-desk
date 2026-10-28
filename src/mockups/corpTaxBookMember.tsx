@@ -458,6 +458,7 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
           {phone && (
             <DataTableSortPicker
               columns={openColumns}
+              rows={OPEN_ROWS}
               sort={sort}
               onSortChange={(next) => next && setSort(next)}
               size="sm"
