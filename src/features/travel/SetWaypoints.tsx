@@ -14,7 +14,9 @@ import { useCharacters } from '@/features/character/useCharacters';
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
+import { grantMissingPath } from '@/app/grantMissingPath';
 import { beginGrant } from '@/app/grantAction';
 import { useCharacterIdsWithScopes, useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import {
@@ -57,6 +59,7 @@ export function SetWaypoints({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const characters = useCharacters();
   const activeId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const [chosenId, setChosenId] = useState<number | null>(null);
@@ -191,11 +194,16 @@ export function SetWaypoints({
                 {t('travel.waypoints.grantAction')}
               </Button>
             </NeedsConnection>
-            <GrantMissingLink
-              groups={permissionsForEndpoints(ENDPOINTS)}
-              asCharacter={characterId}
-              label={t('travel.waypoints.manageAction')}
-            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                void useActiveCharacter.getState().setActiveCharacter(characterId);
+                navigate(grantMissingPath(permissionsForEndpoints(ENDPOINTS)));
+              }}
+            >
+              {t('travel.waypoints.manageAction')}
+            </Button>
             <Tooltip content={t('travel.waypoints.dismissHint')}>
               <Button variant="ghost" size="sm" onClick={() => void setDismissed(true)}>
                 {t('travel.waypoints.dismissAction')}

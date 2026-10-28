@@ -15,7 +15,6 @@ import { grantMissingPath } from './grantMissingPath';
 export function GrantMissingLink({
   groups,
   asCharacter,
-  label,
 }: {
   groups: readonly ScopeGroup[];
   /**
@@ -23,8 +22,6 @@ export function GrantMissingLink({
    * shows the active Character, so the link switches to it first.
    */
   asCharacter?: number;
-  /** Replaces the default "Grant missing Permissions" text. */
-  label?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -37,7 +34,7 @@ export function GrantMissingLink({
           : () => void useActiveCharacter.getState().setActiveCharacter(asCharacter)
       }
     >
-      {label ?? t('permissions.grantMissing')}
+      {t('permissions.grantMissing')}
     </Link>
   );
 }
