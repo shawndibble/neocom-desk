@@ -56,6 +56,14 @@ describe('corpOrders', () => {
     expect(corpOrders(feed([], { readable: false }), ctx).to).toBe('/market/orders?scope=corp');
   });
 
+  it("opens each row on the Corp view with that order's modal", () => {
+    const view = corpOrders(feed([order(1), order(2)]), ctx);
+    expect(view.table?.rows.map((r) => r.to).sort()).toEqual([
+      '/market/orders?scope=corp&open=1',
+      '/market/orders?scope=corp&open=2',
+    ]);
+  });
+
   it('counts open orders, sums escrow and flags the undercut one', () => {
     const view = corpOrders(
       feed([
