@@ -1410,6 +1410,12 @@
       "flyableWith": "Also swaps {{swaps}} to keep the fit within CPU, powergrid and calibration.",
       "flyableImplants": "Or fly {{fix}} with implants instead:",
       "appliedWithImplants": "Made the module flyable and set the implants.",
+      "cover": {
+        "searching": "Looking for swaps that cover this set…",
+        "title": "Add one of these so the set fits:",
+        "none": "No module or rig swap covers this set.",
+        "thisSet": "this set"
+      },
       "flyableShort": "{{amount}} more {{resource}}",
       "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
       "flyableNoCover": "Needs {{short}}, and no module or rig swap frees it.",

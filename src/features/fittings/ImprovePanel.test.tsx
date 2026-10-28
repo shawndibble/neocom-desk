@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
@@ -52,6 +52,7 @@ function search(state: ImproveState, own: FittingStats | null = before): Improve
     showBestSoFar: vi.fn(),
     restart: vi.fn(),
     recalc: null,
+    completion: null,
   };
 }
 
@@ -261,6 +262,43 @@ describe('ImprovePanel', () => {
     );
     expect(screen.getByText('implant row')).toBeInTheDocument();
     expect(render).toHaveBeenCalledWith(overran, expect.stringContaining(''));
+  });
+
+  it('offers swaps that cover two ticked rows which together overrun the CPU', async () => {
+    const fitting = {
+      shipTypeId: 1,
+      name: 'T',
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+        { slot: 'low', slotIndex: 2, typeId: 5 },
+      ],
+    } as unknown as Fitting;
+    const recalc = async (f: Fitting) => ({
+      ...before,
+      cpuUsed: f.modules.some((m) => m.typeId === 6) ? 0 : before.cpuTotal + 40,
+    });
+    const state = {
+      ...search(done({ noDownside: [option(11, {}), option(21, {})] })),
+      recalc,
+      completion: async () => ({
+        swaps: [{ slot: 'low' as const, slotIndex: 2, fromTypeId: 5, toTypeId: 6 }],
+        priceOf: () => null,
+      }),
+    };
+    renderPanel(state, vi.fn(), vi.fn(), settings(), { fitting });
+    const [a, b] = screen.getAllByRole('checkbox');
+    await userEvent.click(a);
+    await userEvent.click(b);
+    expect(await screen.findByText(/over-run the CPU/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled();
+    expect(
+      await screen.findByText('Add one of these so the set fits:', {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+    await userEvent.click(within(screen.getByTestId('improve-cover')).getByRole('button'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Apply 3 changes' })).toBeEnabled()
+    );
   });
 
   it('greys a fix nothing can pay for, saying what it needs', () => {

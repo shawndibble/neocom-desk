@@ -39,6 +39,7 @@ import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
+  overSpendCap,
   bestScore,
   damageOf,
   DEFENSE_CHOICES,
@@ -81,8 +82,13 @@ import {
 } from '@/engine/fittings/skillGains';
 import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { groupByModule, IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
+import { findCompletions, mergeCandidates } from '@/engine/fittings/improveComplete';
 import { summariseSelection, type SelectionSummary } from '@/engine/fittings/improveSelection';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MakeItFitSection } from './MakeItFitSection';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
@@ -93,6 +99,9 @@ const CHANGES_SHOWN = 4;
 
 /** How many overrun fixes get an implant search: each runs the Implant Finder whole. */
 const FLYABLE_IMPLANT_FIXES = 3;
+
+/** How long a set must sit over budget before its covering swaps are searched: ticking several rows in a row searches once. */
+const COMPLETION_DELAY_MS = 400;
 
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
@@ -831,6 +840,68 @@ export function ImprovePanel({
           target,
         })
       : null;
+  // The ticked rows were each checked alone; together they can overrun, and the pilot is then offered what covers it.
+  const overruns = summary?.problems.some((problem) => problem.kind === 'over') ?? false;
+  const completion = search.completion;
+  const [covers, setCovers] = useState<{ key: string; options: ImproveOption[] } | null>(null);
+  useEffect(() => {
+    if (!fitting || !recalc || !completion || !checked || !overruns || chosen.length === 0) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const taken = new Set(chosen.flatMap((pick) => slotsOf(pick.candidate)));
+        const pool = await completion();
+        const options = await findCompletions({
+          fitting: chosen.reduce(
+            (acc, pick) => applyImproveCandidate(acc, pick.candidate),
+            fitting
+          ),
+          before: checked,
+          swaps: pool.swaps.filter((swap) => !taken.has(`${swap.slot}${swap.slotIndex}`)),
+          stats: recalc,
+          priceOf: pool.priceOf,
+          mode: settings.mode,
+          isCancelled: () => stale,
+        });
+        if (!stale) setCovers({ key: chosenKey, options });
+      })().catch(() => !stale && setCovers({ key: chosenKey, options: [] }));
+    }, COMPLETION_DELAY_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+    // `settings.mode` is part of the price a cover shows.
+  }, [fitting, recalc, completion, checked, overruns, chosen, chosenKey, settings.mode]);
+  const offered =
+    covers?.key === chosenKey && summary
+      ? covers.options.filter(
+          (option) =>
+            !overSpendCap(
+              settings.mode,
+              settings.spendCap,
+              state.status === 'done' ? state.fitTotal : null,
+              summary.isk + (option.iskDelta ?? 0)
+            )
+        )
+      : null;
+  // The set as one change with its overrun, for the implant alternative; stable so the finder is not re-run each render.
+  const setAsFix = useMemo<RejectedOption | null>(() => {
+    const candidate = mergeCandidates(chosen.map((pick) => pick.candidate));
+    if (!fitting || !checked || !candidate || !summary || !overruns) return null;
+    return {
+      candidate,
+      fitting: chosen.reduce((acc, pick) => applyImproveCandidate(acc, pick.candidate), fitting),
+      after: checked,
+      score: 0,
+      iskDelta: summary.isk,
+      destroysRigs: false,
+      lost: [],
+      guardrail: 'budget',
+    };
+    // `summary` follows `checked` and `chosen`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitting, checked, chosenKey, overruns]);
+
   // The ticked set with the hovered row on top (it displaces a ticked row sharing a slot, as ticking it would).
   const hoverSet = useMemo(() => {
     if (!hovered || ticked.has(optionKey(hovered))) return null;
@@ -1441,6 +1512,49 @@ export function ImprovePanel({
                         : t('fittings.improve.selection.checking')}
                     </p>
                   )}
+                </div>
+              )}
+              {overruns && (
+                <div className="space-y-1 text-sm" data-testid="improve-cover">
+                  {offered === null ? (
+                    <p className="text-text-dim text-xs" role="status">
+                      {t('fittings.improve.cover.searching')}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs font-medium">
+                        {offered.length > 0
+                          ? t('fittings.improve.cover.title')
+                          : t('fittings.improve.cover.none')}
+                      </p>
+                      {offered.map((option) => (
+                        <button
+                          key={optionKey(option)}
+                          type="button"
+                          className={cx(
+                            'border-line w-full rounded-xs border p-2 text-left text-xs',
+                            rowInteractiveClassName,
+                            focusRingInsetClassName
+                          )}
+                          onClick={() => toggle(option)}
+                        >
+                          <span className="block font-medium">
+                            {[moveLabel(option.candidate), ...flyableSwaps(option.candidate)].join(
+                              '; '
+                            )}
+                          </span>
+                          <span className="block">{isk(option)}</span>
+                          {option.destroysRigs && (
+                            <span className="text-warning block">
+                              {t('fittings.improve.destroysRig')}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {setAsFix &&
+                    renderFlyableImplants?.(setAsFix, t('fittings.improve.cover.thisSet'))}
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-between gap-2">

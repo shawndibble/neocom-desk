@@ -252,6 +252,17 @@ export interface ImproveSearch {
   restart: () => void;
   /** One whole-fit recalculation under the search's own conditions, for the ticked set; null before a search has run. */
   recalc: ((fitting: Fitting) => Promise<FittingStats>) | null;
+  /**
+   * The swaps and prices that could cover a ticked set running the fit out of CPU,
+   * powergrid or calibration, fetched on the first ask (most sets never need them); null before a search has run.
+   */
+  completion: (() => Promise<CompletionPool>) | null;
+}
+
+/** What `findCompletions` needs beyond the ticked set. */
+export interface CompletionPool {
+  swaps: FitSwap[];
+  priceOf: (typeId: number) => number | null;
 }
 
 /** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
@@ -441,6 +452,7 @@ export function useImprove(
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
+  const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
   const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
@@ -468,6 +480,7 @@ export function useImprove(
     // The last fit's baseline must not decide this fit's goal chips.
     setBefore(null);
     setRecalc(null);
+    setCompletion(null);
     const started = performance.now();
     const slowTimer = setTimeout(() => {
       if (!cancelled)
@@ -630,6 +643,20 @@ export function useImprove(
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
         setRecalc(() => stats);
+        let pool: Promise<CompletionPool> | null = null;
+        setCompletion(
+          () => () =>
+            (pool ??= (async () => {
+              const swaps = compensationSwaps(variants, catalogue, true);
+              const prices = await getHubPrices(hub, [
+                ...new Set(swaps.flatMap((swap) => [swap.fromTypeId, swap.toTypeId])),
+              ]).catch(() => null);
+              return {
+                swaps,
+                priceOf: (typeId: number) => prices?.get(typeId)?.sellMin ?? null,
+              };
+            })())
+        );
         setState({
           status: 'done',
           result: { ...listed, checked },
@@ -656,6 +683,7 @@ export function useImprove(
       controller.abort();
       // Its signal is aborted: a recalculation through it would fail.
       setRecalc(null);
+      setCompletion(null);
       clearTimeout(slowTimer);
     };
   }, [
@@ -693,5 +721,6 @@ export function useImprove(
     showBestSoFar,
     restart,
     recalc: enabled ? recalc : null,
+    completion: enabled ? completion : null,
   };
 }

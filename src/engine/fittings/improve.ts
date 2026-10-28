@@ -635,7 +635,7 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
 }
 
 /** Hub sell price of every part, per the mode (`ImproveOption.iskDelta`). */
-function iskDeltaOf(
+export function iskDeltaOf(
   candidate: ImproveCandidate,
   priceOf: (typeId: number) => number | null,
   mode: ImproveMode
@@ -774,7 +774,13 @@ const changeCount = (candidate: ImproveCandidate): number =>
 
 /** `fix` with each swap chained behind it as a paired change, so one Apply makes them all. */
 function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCandidate {
-  const chain = swaps.reduceRight<ImproveCandidate | undefined>(
+  const chain = chainOf(swaps);
+  return chain ? { ...fix, pairedWith: chain } : fix;
+}
+
+/** The swaps as one candidate with the rest chained behind it; undefined for none. */
+export function chainOf(swaps: readonly FitSwap[]): ImproveCandidate | undefined {
+  return swaps.reduceRight<ImproveCandidate | undefined>(
     (next, swap) => ({
       fromTypeId: swap.fromTypeId,
       toTypeId: swap.toTypeId,
@@ -783,7 +789,6 @@ function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCand
     }),
     undefined
   );
-  return chain ? { ...fix, pairedWith: chain } : fix;
 }
 
 /** Fewest changes first, then the cheaper; an unpriced bundle after every priced one. */
