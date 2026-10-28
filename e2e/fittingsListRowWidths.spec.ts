@@ -55,8 +55,11 @@ test.describe('Fitter List rows', () => {
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
-    await page.getByRole('tab', { name: 'List', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
+    await page.getByRole('button', { name: 'List', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'List', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     await expect(page.getByText(NAMES[0], { exact: true }).first()).toBeVisible();
 
     for (const width of [390, 744, 768, 1024, 1280, 1366, 1440, 1920]) {
