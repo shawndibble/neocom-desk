@@ -48,6 +48,7 @@ export function ExtractionsTab() {
       canEdit && row.oreSource === 'survey' && row.tax > 0 ? (
         <RowActionsMenu
           name={names.refinery(row.structureId)}
+          openHref={extractionPath(row.id)}
           onCloseAutoFocus={onCloseAutoFocus}
           items={
             <>

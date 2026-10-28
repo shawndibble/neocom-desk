@@ -7,7 +7,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Button,
   Checkbox,
@@ -36,7 +36,7 @@ import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
 import { PiSettingsForm } from '@/features/settings/PiSettingsForm';
 import { PercentInput } from './piControls';
 import { parseDecimal } from './goalPlannerFormat';
-import { PI_MAP_HREF } from './piPlanLink';
+import { PI_MAP_HREF, piProductHref } from './piPlanLink';
 
 /** How long typing pauses before a units box re-plans. */
 const COMMIT_DEBOUNCE_MS = 300;
@@ -146,6 +146,7 @@ export function GoalsSection({
   size: ControlSize;
 }) {
   const { t } = useTranslation();
+  const { search } = useLocation();
   const hintId = useId();
   const byId = new Map(products.map((product) => [product.typeId, product]));
   const shown = goals.filter((goal) => byId.has(goal.typeId));
@@ -177,6 +178,7 @@ export function GoalsSection({
                 typeId={goal.typeId}
                 itemName={product.name}
                 linksKeepBrowserMenu
+                openHref={piProductHref(goal.typeId, search)}
                 extraItems={
                   <MenuItem
                     className="text-danger"

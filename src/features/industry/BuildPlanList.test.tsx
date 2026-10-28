@@ -423,6 +423,21 @@ describe('BuildPlanList: build groups (#626)', () => {
     expect(onToggleCompareSelected).not.toHaveBeenCalledWith('a');
   });
 
+  it('leads a group and a plan row menu with Open in new tab to its own page', async () => {
+    renderGrouped();
+    fireEvent.contextMenu(screen.getByRole('button', { name: "Loru's Max Hacker — Buzzard" }));
+    expect(await screen.findByRole('menuitem', { name: 'Open in new tab' })).toHaveAttribute(
+      'href',
+      '/industry/groups/g1'
+    );
+    await userEvent.keyboard('{Escape}');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rokh' }));
+    expect(await screen.findByRole('menuitem', { name: 'Open in new tab' })).toHaveAttribute(
+      'href',
+      '/industry/plans/c'
+    );
+  });
+
   it('renames a group from its context menu, with no separate visible rename button', async () => {
     // A second always-visible icon here shifted the Est./Verdict/Runs
     // columns over for every group header — rename lives in the context
@@ -776,6 +791,7 @@ describe('BuildPlanList: "More actions" button for a group header (#1498)', () =
       screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
     );
     expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual([
+      'Open in new tab',
       'Rename',
       'Delete group',
     ]);
