@@ -395,7 +395,7 @@ interface SliceShapeProps {
   fill?: string;
 }
 
-/** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. Translucent fill with a solid edge, like the ore-left and ISK-left areas. */
+/** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. The fill is as translucent as the ore-left and ISK-left areas. */
 function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
   if (x === undefined || y === undefined || width === undefined || height === undefined) {
     return <g />;
@@ -408,7 +408,6 @@ function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
       height={Math.max(0, height - 2)}
       fill={fill}
       fillOpacity={0.45}
-      stroke={fill}
     />
   );
 }
