@@ -65,16 +65,11 @@ describe('FittingHeader on desktop', () => {
     expect(onCompare).toHaveBeenCalledOnce();
   });
 
-  it('opens Improve from the ⋮ menu once the menu has closed and refocused its button', async () => {
-    const trigger = () => screen.getByRole('button', { name: 'Fitting actions' });
-    const onImprove = vi.fn();
-    renderHeader({ onImprove });
-    const user = userEvent.setup();
-    await user.click(trigger());
-    await user.click(await screen.findByRole('menuitem', { name: 'Improve Fit' }));
-    expect(onImprove).toHaveBeenCalledOnce();
-    // The button holds focus as Improve's column renders, so the column can give it back on close.
-    await waitFor(() => expect(document.activeElement).toBe(trigger()));
+  it('keeps Improve out of the ⋮ menu, its button beside Open being the one entry', async () => {
+    renderHeader({ onImprove: vi.fn() });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Fitting actions' }));
+    await screen.findByRole('menuitem', { name: 'Compare' });
+    expect(screen.queryByRole('menuitem', { name: 'Improve Fit' })).toBeNull();
   });
 
   it('puts an Improve button between Open and Export, the same height as they are', async () => {
@@ -114,6 +109,18 @@ describe('FittingHeader on desktop', () => {
 });
 
 describe('FittingHeader below desktop', () => {
+  it('opens Improve from the ⋮ menu once the menu has closed and refocused its button', async () => {
+    const trigger = () => screen.getByRole('button', { name: 'Fitting actions' });
+    const onImprove = vi.fn();
+    renderHeader({ compact: true, onImprove });
+    const user = userEvent.setup();
+    await user.click(trigger());
+    await user.click(await screen.findByRole('menuitem', { name: 'Improve Fit' }));
+    expect(onImprove).toHaveBeenCalledOnce();
+    // The button holds focus as Improve's column renders, so the column can give it back on close.
+    await waitFor(() => expect(document.activeElement).toBe(trigger()));
+  });
+
   it('leaves the Alpha/Omega verdict out of the ⋮ menu when the tab row carries it', async () => {
     renderHeader({
       compact: true,
