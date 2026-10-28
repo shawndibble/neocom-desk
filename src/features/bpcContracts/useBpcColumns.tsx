@@ -102,7 +102,7 @@ export function useBpcColumns({
         className: 'truncate',
         sortValue: (row) => (row.source === 'lp' ? row.corpName : (row.locationName ?? '')),
         render: (row) => {
-          // An LP offer has no station here: the store's corporation is its place.
+          // An LP offer's place is its corporation; its nearest station, once found, sits beneath.
           const name =
             row.source === 'lp'
               ? row.corpName
@@ -118,6 +118,9 @@ export function useBpcColumns({
                 {name}
               </span>
               {system && <SecurityStatus security={system.security} />}
+              {row.source === 'lp' && row.stationName && (
+                <span className="block truncate text-xs text-text-dim">{row.stationName}</span>
+              )}
             </>
           );
           // The owner's #1240 rule for market BPOs: the whole region, the hub's own station marked.
