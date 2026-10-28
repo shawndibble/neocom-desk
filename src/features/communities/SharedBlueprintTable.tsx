@@ -176,6 +176,7 @@ export function SharedBlueprintTable({
       align: 'right',
       width: COL_SMALL_NUMBER,
       className: 'tabular-nums',
+      sortFirst: 'asc',
       sortValue: (row) => jumpsCellSortValue(rowJumps(row)),
       render: (row) =>
         renderJumpsCell(rowJumps(row), t, 'communities.library.jumpsUnavailable', systemIdOf(row)),

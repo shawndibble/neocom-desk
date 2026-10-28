@@ -610,11 +610,15 @@ describe('OpenOrdersPanel', () => {
         within(screen.getByRole('table', NEEDS_YOU_TABLE)).getAllByRole('row')[1].textContent;
       await screen.findByRole('table', NEEDS_YOU_TABLE);
       expect(firstItem()).toContain('Tritanium');
-      await user.click(
-        within(screen.getByRole('table', NEEDS_YOU_TABLE)).getByRole('button', {
-          name: /^Your price/,
-        })
-      );
+      // A price column starts high to low (the same Tritanium first), so a second
+      // click, low to high, is the one that moves a row.
+      for (let click = 0; click < 2; click += 1) {
+        await user.click(
+          within(screen.getByRole('table', NEEDS_YOU_TABLE)).getByRole('button', {
+            name: /^Your price/,
+          })
+        );
+      }
       expect(firstItem()).toContain('Mexallon');
 
       await openColumns(user);

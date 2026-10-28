@@ -7,6 +7,7 @@ interface DataTableSortBarProps<T> {
   sortableColumns: readonly DataTableColumn<T>[];
   sort: DataTableSort | undefined;
   onSortChange: (sort: DataTableSort) => void;
+  rows: readonly T[];
   summary?: ReactNode;
   actions?: ReactNode;
   /** `undefined`: CSS hides it above `sm`. Set: the caller decided the layout. */
@@ -18,6 +19,7 @@ export function DataTableSortBar<T>({
   sortableColumns,
   sort,
   onSortChange,
+  rows,
   summary,
   actions,
   stacked,
@@ -36,6 +38,7 @@ export function DataTableSortBar<T>({
         columns={sortableColumns}
         sort={sort}
         onSortChange={onSortChange}
+        rows={rows}
         className="ml-auto"
       />
       {actions}

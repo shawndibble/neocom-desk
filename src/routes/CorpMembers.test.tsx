@@ -345,10 +345,18 @@ describe('the roster table', () => {
       ])
     );
     const table = await rosterTable();
-    for (const name of ['Member', 'Last seen', 'Ship', 'Location', 'Joined']) {
+    // Text starts A to Z; dates start newest first.
+    const first = {
+      Member: 'ascending',
+      'Last seen': 'descending',
+      Ship: 'ascending',
+      Location: 'ascending',
+      Joined: 'descending',
+    };
+    for (const [name, direction] of Object.entries(first)) {
       const header = within(table).getByRole('columnheader', { name });
       await user.click(within(header).getByRole('button'));
-      expect(header).toHaveAttribute('aria-sort', 'ascending');
+      expect(header).toHaveAttribute('aria-sort', direction);
     }
     const member = within(table).getByRole('columnheader', { name: 'Member' });
     expect(within(member).getByRole('button')).toBeInTheDocument();

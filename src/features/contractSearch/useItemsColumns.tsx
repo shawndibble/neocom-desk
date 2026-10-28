@@ -122,6 +122,7 @@ export function useItemsColumns({
         // The headline figure of the dense phone card, on the title line.
         cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
+        sortFirst: 'asc',
         sortValue: (row) => sortValueForPriceColumn(row, plexPrice),
         render: (row) => (
           <>
@@ -204,6 +205,7 @@ export function useItemsColumns({
         width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (row) => {
           const cell = offerJumps(row);
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;

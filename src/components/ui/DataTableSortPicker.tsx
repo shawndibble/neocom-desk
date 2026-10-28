@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { controlHeightClassName, fieldBaseClassName, type ControlSize } from './controlStyles';
 import * as Icon from './icons';
+import { firstSortDirection } from './dataTableSort';
 import type { DataTableColumn, DataTableSort } from './DataTable';
 
 const SORT_ARROW = { asc: '↑', desc: '↓' } as const;
@@ -25,6 +26,8 @@ interface DataTableSortPickerProps<T> {
   /** The sort in force, or `undefined` before any. */
   sort: DataTableSort | undefined;
   onSortChange: (sort: DataTableSort) => void;
+  /** The rows sorted; they type each column, so its first option is the direction a header click starts at. */
+  rows: readonly T[];
   /**
    * `md` (the default) is the 36px touch target of the bar above a table;
    * `sm` matches the `size="sm"` buttons of a filter row it sits in.
@@ -47,6 +50,7 @@ export function DataTableSortPicker<T>({
   columns,
   sort,
   onSortChange,
+  rows,
   size = 'md',
   className,
 }: DataTableSortPickerProps<T>) {
@@ -86,7 +90,10 @@ export function DataTableSortPicker<T>({
           {t('common.dataTable.sortNone')}
         </option>
         {sortable.flatMap((column) =>
-          (['asc', 'desc'] as const).map((direction) => (
+          (firstSortDirection(column, rows) === 'desc'
+            ? (['desc', 'asc'] as const)
+            : (['asc', 'desc'] as const)
+          ).map((direction) => (
             <option
               key={`${column.id}:${direction}`}
               value={sortOptionValue({ columnId: column.id, direction })}

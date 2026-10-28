@@ -14,7 +14,7 @@ import { rootFontScale } from '@/lib/fontScale';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { groupSortedRows } from './dataTableGroup';
-import { nextDataTableSort, sortRowsBy } from './dataTableSort';
+import { firstSortDirection, nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { DataTableRow } from './DataTableRow';
 import { DataTableHeader } from './DataTableHeader';
 import { DataTableGroupHeader } from './DataTableGroupHeader';
@@ -311,7 +311,7 @@ export function DataTable<T>({
   useScrollToRowKey(tableRef, highlightRowKey, scrollToRowTrigger);
 
   function toggleSort(column: DataTableColumn<T>) {
-    setSort(nextDataTableSort(sort, column.id));
+    setSort(nextDataTableSort(sort, column.id, firstSortDirection(column, rows)));
   }
 
   // Cells after the caller's columns: the disclosure chevron and the More
@@ -436,6 +436,7 @@ export function DataTable<T>({
         sortableColumns={sortableColumns}
         sort={sort && activeSortId ? sort : undefined}
         onSortChange={setSort}
+        rows={rows}
         summary={stackSummary}
         actions={stackActions}
         stacked={stacked}
