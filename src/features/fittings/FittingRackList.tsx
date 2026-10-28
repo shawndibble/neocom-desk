@@ -171,7 +171,7 @@ interface FittingRackListProps extends EditContext {
   unusableModuleKeys?: ReadonlySet<string>;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
-  /** Stands in for the panel's "List" title: the editor's Ring | List switch. */
+  /** The editor's Ring | List switch, in the panel header's leading slot (it carries the panel's heading). */
   titleSwitch?: ReactNode;
 }
 
@@ -202,7 +202,11 @@ export function FittingRackList({
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
 
   return (
-    <Panel title={titleSwitch ?? t('fittings.list.title')} actions={actions}>
+    <Panel
+      title={titleSwitch ? undefined : t('fittings.list.title')}
+      leading={titleSwitch}
+      actions={actions}
+    >
       <div className="space-y-3">
         <div className="space-y-1.5">
           <ResourceBar

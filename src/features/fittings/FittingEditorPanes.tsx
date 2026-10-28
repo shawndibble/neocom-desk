@@ -18,7 +18,7 @@ type RackListProps = ComponentProps<typeof FittingRackList>;
 
 interface FittingEditorPanesProps {
   view: FittingView;
-  /** Present on desktop and tablet: the Ring | List switch then replaces the panel's title. Absent on the phone, whose tab bar switches. */
+  /** Present on desktop and tablet: the Ring | List switch then sits in the panel's header. Absent on the phone, whose tab bar switches. */
   onViewChange?: (view: FittingView) => void;
   fitting: RackListProps['fitting'];
   stats: RackListProps['stats'];
@@ -70,17 +70,23 @@ export function FittingEditorPanes({
   onOpenMakeItFit,
 }: FittingEditorPanesProps) {
   const { t } = useTranslation();
+  // The switch replaces the panel's visible title, so the heading stays for screen readers.
   const titleSwitch = onViewChange && (
-    <SegmentedControl
-      label={t('fittings.view.label')}
-      size="sm"
-      value={view}
-      onChange={onViewChange}
-      options={[
-        { value: 'ring', label: t('fittings.view.ring') },
-        { value: 'list', label: t('fittings.view.list') },
-      ]}
-    />
+    <span className="flex min-w-0 items-center pl-2">
+      <h2 className="sr-only">
+        {t(view === 'ring' ? 'fittings.ring.title' : 'fittings.list.title')}
+      </h2>
+      <SegmentedControl
+        label={t('fittings.view.label')}
+        size="sm"
+        value={view}
+        onChange={onViewChange}
+        options={[
+          { value: 'ring', label: t('fittings.view.ring') },
+          { value: 'list', label: t('fittings.view.list') },
+        ]}
+      />
+    </span>
   );
   const body =
     view === 'ring' ? (
