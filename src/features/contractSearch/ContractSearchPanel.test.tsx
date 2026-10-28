@@ -1,3 +1,4 @@
+import { useBelowMarketSide } from '@/features/contractSearch/belowMarketData';
 import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -2418,6 +2419,7 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
   });
 
   beforeEach(() => {
+    useBelowMarketSide.setState({ value: 'sell', hydrated: false });
     // Tritanium 8,000 and Pyerite 300,000 on both sides of the book, no fees.
     getHubPricesWithStatus.mockResolvedValue({
       prices: new Map([
