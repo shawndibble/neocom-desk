@@ -2,7 +2,7 @@
 
 _Recorded 2026-10-11._
 
-- **The Undo toast is persistent, not 8 seconds.** Remove, add, resize,
+- **The Undo toast is persistent, not 8 seconds.** _Superseded by `20261027-195313-undo-toasts-expire-after-8-seconds.md`: it now expires after 8 s._ Remove, add, resize,
   duplicate, reset and a role replacing the layout each raise one `Toast` with
   Undo, and it stays until dismissed (close button, Escape, the next toast or a
   route change). The design record said 8 s, but the repo's `Toast` makes any

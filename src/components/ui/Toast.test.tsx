@@ -116,19 +116,60 @@ describe('Toast', () => {
   describe('persistence and dismissal', () => {
     afterEach(() => vi.useRealTimers());
 
-    it('keeps an undo toast past the plain timer and closes it from the close button', () => {
+    it('closes an undo toast after 8s, and sooner from the close button', () => {
       vi.useFakeTimers();
       const onClose = vi.fn();
       render(
         <Toast message="Added" undo={{ label: 'Undo', onUndo: () => {} }} onClose={onClose} />
       );
       act(() => {
+        vi.advanceTimersByTime(7_999);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole('button', { name: /close/i }));
+      expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it('holds the undo clock while hovered and resumes with the time left', () => {
+      vi.useFakeTimers();
+      const onClose = vi.fn();
+      render(
+        <Toast message="Added" undo={{ label: 'Undo', onUndo: () => {} }} onClose={onClose} />
+      );
+      act(() => {
+        vi.advanceTimersByTime(5_000);
+      });
+      fireEvent.focus(screen.getByRole('button', { name: /undo/i }));
+      act(() => {
         vi.advanceTimersByTime(30_000);
       });
-      expect(screen.getByRole('button', { name: /undo/i })).toBeInTheDocument();
       expect(onClose).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByRole('button', { name: /close/i }));
+      fireEvent.blur(screen.getByRole('button', { name: /undo/i }));
+      act(() => {
+        vi.advanceTimersByTime(2_999);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps an action-only toast past the plain timer', () => {
+      vi.useFakeTimers();
+      const onClose = vi.fn();
+      render(
+        <Toast message="Saved" action={{ label: 'Open', onAction: () => {} }} onClose={onClose} />
+      );
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+      });
+      expect(screen.getByRole('button', { name: /open/i })).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('expires a plain toast that was given onClose, and shows no close button', () => {

@@ -39,8 +39,9 @@ interface PlainToastProps extends ToastBaseProps {
 }
 
 /**
- * A toast offering Undo or another action stays until dismissed (WCAG 2.2.1),
- * so it must be able to close itself: `onClose` is required here. `undo` and
+ * A toast offering Undo expires after 8s; one offering only another action
+ * stays until dismissed (WCAG 2.2.1). Either must be able to close itself:
+ * `onClose` is required here. `undo` and
  * `action` may still be `undefined` (a toast that only sometimes carries an
  * undo) — then it behaves as a plain toast and expires.
  */
@@ -57,9 +58,10 @@ export type ToastProps = PlainToastProps | ActionToastProps;
 
 /**
  * Fixed-position confirmation, floating above the tab bar. An "Undo" link
- * when `undo` is given. A toast that offers an Undo or action stays until
- * dismissed — close button, Escape, the next toast, or a route change; a plain
- * one expires, and hover or focus-within pauses what is left of its clock.
+ * when `undo` is given. A plain or Undo toast expires, and hover or
+ * focus-within pauses what is left of its clock; an action-only toast stays
+ * until dismissed. Close button, Escape, the next toast and a route change
+ * close an Undo or action toast sooner.
  *
  * Portalled to `document.body` rather than rendered in place: `position:
  * fixed` is relative to the nearest ancestor with a `transform`/`filter`/
@@ -108,7 +110,8 @@ export function Toast({
   const [held, setHeld] = useState(false);
   const remainingRef = useRef(durationMs);
   const clockFor = useRef(occurrence);
-  const expires = Boolean(onClose) && !persistent;
+  // An Undo toast expires like a plain one; an action-only toast stays until dismissed.
+  const expires = Boolean(onClose) && (Boolean(undo) || !persistent);
   useEffect(() => {
     if (!expires || held) return;
     if (clockFor.current !== occurrence) {
