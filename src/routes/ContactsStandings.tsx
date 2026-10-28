@@ -235,7 +235,6 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
             />
           }
         />
-        <p className="text-xs text-text-dim">{t('contacts.standingsFeesNote')}</p>
         <Panel padded={false}>
           {rows.length === 0 ? (
             <EmptyState
