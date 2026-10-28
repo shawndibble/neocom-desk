@@ -2,8 +2,9 @@
 
 GitHub starts `schedule:` runs hours late (#5113: lawless gaps of 150-250 min
 against a 15 min target). This Worker has a Cloudflare Cron Trigger that calls
-`workflow_dispatch` on `public-data-lawless-systems.yml` every 15 min, which
-starts right away. The workflow's own `schedule:` stays as a fallback; its
+`workflow_dispatch` on `public-data-lawless-systems.yml` every 15 min and on
+`public-data-contract-offers.yml` every 30 min (two crons, well inside the Cloudflare
+free plan's limit), which start right away. The workflow's own `schedule:` stays as a fallback; its
 `concurrency` group (`cancel-in-progress: false`) keeps overlapping runs from
 colliding (one running and one pending run per group; extra pending runs are dropped), and the job rewrites one R2 object, so last writer wins.
 
@@ -29,6 +30,8 @@ colliding (one running and one pending run per group; extra pending runs are dro
   invocations every 15 min, no errors.
 - Runs started by it show `workflow_dispatch` as the event:
   `gh run list --workflow public-data-lawless-systems.yml --event workflow_dispatch`
+- Contract offers: `gh run list --workflow public-data-contract-offers.yml --event workflow_dispatch`;
+  a run with an unchanged archive ends in seconds ("archive unchanged" in its log).
 - Freshness: `curl -sI https://data.neocomdesk.com/lawless-systems/systems.json | grep -i last-modified`
   stays under an hour old.
 

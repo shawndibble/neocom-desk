@@ -17,10 +17,12 @@ no app server. Two kinds of data:
   Function, `mintFirebaseToken`). Firebase exists _only_ for this sync path —
   it is not a general backend and never sees EVE tokens beyond one
   short-lived access token per sign-in (ADR 0001). The public contract
-  snapshots (ADR 0013) are not in Firestore: a scheduled function
-  (`syncPublicContractOffers`) that holds no EVE token and calls no ESI
-  endpoint publishes them to Cloudflare R2 as static objects, R2 being their
-  only store (ADR 0019, issue #4270). One is every for-sale contract line of
+  snapshots (ADR 0013) are not in Firestore: a GitHub Actions job
+  (`.github/workflows/public-data-contract-offers.yml`, `functions/src/publicDataContractOffers.ts`,
+  every 30 min, fired on time by the Cloudflare Worker `workers/public-data-dispatch`) that holds no EVE
+  token and calls no ESI endpoint publishes them to Cloudflare R2 as static objects, R2 being their
+  only store (ADR 0019, issue #4270). Its state (archive fingerprint, type hashes, writer state) is
+  R2 objects under `contract-offers-state/`. One is every for-sale contract line of
   every item type, as an `index.json` (per type the offer count, cheapest ask
   and the objects holding its rows, plus every region) and per-type objects;
   the Items board and BPC Sourcing read only the types they need. The other,
