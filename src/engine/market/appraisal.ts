@@ -131,6 +131,15 @@ export function iskPerM3(row: Pick<AppraisalRow, 'sellTotal' | 'volume'>): numbe
 }
 
 /**
+ * The split: the midpoint of the buy-each and sell-each price. Null unless both
+ * sides are priced — half a price is not a midpoint.
+ */
+export function splitEach(row: Pick<AppraisalRow, 'buyEach' | 'sellEach'>): number | null {
+  if (row.buyEach === null || row.sellEach === null) return null;
+  return (row.buyEach + row.sellEach) / 2;
+}
+
+/**
  * Sales tax in ISK on selling the row's sell total, at the Accounting level's
  * rate. Null where nothing sells: no price is not a free 0.
  */
