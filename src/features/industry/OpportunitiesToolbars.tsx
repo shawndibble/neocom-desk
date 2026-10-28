@@ -68,21 +68,23 @@ function StockFilterControl({
 }) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  // The segmented control on desktop gets one-word labels so the three fit on
-  // the title's line at 1280; the phone select has the room for the full ones.
+  // Full wording in the desktop segmented control and the phone's open list;
+  // the phone's closed select shows the short word so the title row fits one line.
   const stockOptions = [
-    { value: 'any' as const, label: t('industry.opportunitiesStockAny') },
+    {
+      value: 'any' as const,
+      label: t('industry.opportunitiesStockAny'),
+      short: t('industry.opportunitiesStockAny'),
+    },
     {
       value: 'mostly' as const,
-      label: isDesktop
-        ? t('industry.opportunitiesStockMostlyShort', { pct: MOSTLY_COVERED_PCT })
-        : t('industry.opportunitiesStockMostly', { pct: MOSTLY_COVERED_PCT }),
+      label: t('industry.opportunitiesStockMostly', { pct: MOSTLY_COVERED_PCT }),
+      short: t('industry.opportunitiesStockMostlyShort', { pct: MOSTLY_COVERED_PCT }),
     },
     {
       value: 'full' as const,
-      label: isDesktop
-        ? t('industry.opportunitiesStockFullShort')
-        : t('industry.opportunitiesStockFull'),
+      label: t('industry.opportunitiesStockFull'),
+      short: t('industry.opportunitiesStockFullShort'),
     },
   ];
   return isDesktop ? (
@@ -98,9 +100,14 @@ function StockFilterControl({
       <SelectTrigger
         size="sm"
         aria-label={t('industry.opportunitiesUseMyStock')}
-        className="min-w-0 flex-1"
+        className="min-w-0"
       >
-        <SelectValue />
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="text-text-dim" aria-hidden="true">
+            {t('industry.opportunitiesStockPrefix')}
+          </span>
+          <SelectValue>{stockOptions.find((o) => o.value === value)?.short}</SelectValue>
+        </span>
       </SelectTrigger>
       <SelectContent>
         {stockOptions.map((o) => (
@@ -154,11 +161,7 @@ export function OpportunitiesFilterBar({
       {stockFilterControl}
     </span>
   ) : (
-    // A second header row on a phone, so the stock select gets the full width
-    // instead of colliding with the view picker and Refresh. None at all on
-    // All owned, which has no stock filter.
-    stockFilterControl && (
-      <span className="flex items-center gap-2 max-md:basis-full">{stockFilterControl}</span>
-    )
+    // One row with the view picker and the actions on a phone; none on All owned.
+    stockFilterControl || null
   );
 }
