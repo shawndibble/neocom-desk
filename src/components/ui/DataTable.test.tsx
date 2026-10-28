@@ -18,6 +18,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from './ContextMenu';
+import { MenuItem, RowActionsMenu } from './RowActions';
 import { Tooltip } from './Tooltip';
 import { IskAmount } from './IskAmount';
 
@@ -519,6 +520,30 @@ describe('DataTable', () => {
       const cells = screen.getAllByRole('cell');
       expect(cells[0]).toHaveTextContent('Tritanium');
       expect(cells[2]).toHaveTextContent('Pyerite');
+    });
+  });
+
+  describe('rowHref', () => {
+    it('gives only the rows with an href an Open in new tab item in the right-click menu', async () => {
+      const user = userEvent.setup();
+      renderTable({
+        rowHref: (row) => (row.item === 'Tritanium' ? '/items/34' : undefined),
+        rowContextMenu: (row, tr) => (
+          <RowActionsMenu key={row.id} name={row.item} items={<MenuItem>Copy {row.item}</MenuItem>}>
+            {tr}
+          </RowActionsMenu>
+        ),
+      });
+      const [, first, second] = screen.getAllByRole('row');
+      await user.pointer({ keys: '[MouseRight]', target: first });
+      expect(await screen.findByRole('menuitem', { name: 'Open in new tab' })).toHaveAttribute(
+        'href',
+        '/items/34'
+      );
+      await user.keyboard('{Escape}');
+      await user.pointer({ keys: '[MouseRight]', target: second });
+      await screen.findByRole('menuitem', { name: /^Copy / });
+      expect(screen.queryByRole('menuitem', { name: 'Open in new tab' })).toBeNull();
     });
   });
 

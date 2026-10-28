@@ -13,6 +13,7 @@ import { isRowOwnEvent } from './rowEvents';
 import * as Icon from './icons';
 import { Caret } from './Disclosure';
 import { RowMoreActions } from './RowActions';
+import { RowOpenHrefContext } from './rowActionsContext';
 import { RowTappableContext } from './tooltipHold';
 import type { DataTableColumn } from './DataTable';
 
@@ -55,6 +56,8 @@ export interface DataTableRowProps<T> {
   onActivate: (row: T, key: string | number) => void;
   rowClassName: ((row: T) => string | undefined) | undefined;
   rowContextMenu: ((row: T, tr: ReactElement) => ReactElement) | undefined;
+  /** `rowHref(row)`: the page a click goes to, handed to the row menu's "Open in new tab". */
+  href: string | undefined;
   rowMoreActions: boolean;
   cellPadding: string;
   compact: boolean;
@@ -110,6 +113,7 @@ function DataTableRowImpl<T>({
   onActivate,
   rowClassName,
   rowContextMenu,
+  href,
   rowMoreActions,
   cellPadding,
   compact,
@@ -298,7 +302,13 @@ function DataTableRowImpl<T>({
       )}
     </tr>
   );
-  const mainRow = rowContextMenu ? rowContextMenu(row, tr) : tr;
+  const mainRow = rowContextMenu ? (
+    <RowOpenHrefContext.Provider value={href}>
+      {rowContextMenu(row, tr)}
+    </RowOpenHrefContext.Provider>
+  ) : (
+    tr
+  );
   if (!expandable) return mainRow;
   return (
     <>

@@ -298,6 +298,14 @@ export interface DataTableProps<T> {
    */
   onRowClick?: (row: T) => void;
   /**
+   * Where a click on the row goes, when that is another page (a route change):
+   * the row's menus lead with "Open in new tab" linking there. Return
+   * `undefined` for a row whose click opens a modal, sidebar or expansion, and
+   * leave the prop off a table whose rows all do. Needs a `RowActionsMenu`
+   * row menu (`rowContextMenu`); it never adds a menu by itself.
+   */
+  rowHref?: (row: T) => string | undefined;
+  /**
    * Per-row opt-out of `onRowClick`: a row it returns false for is inert (no
    * pointer cursor, no tab stop, no Enter/Space) so it never looks clickable
    * while doing nothing. Omit when every row opens something.
