@@ -33,6 +33,18 @@ export function setLoginReturnTo(path: string): void {
   }
 }
 
+/**
+ * A router path fit to land a login on: the gate's recorded `state.from`.
+ * Refuses anything not a single-slash in-app path (a protocol-relative
+ * `//host` is never handed to the router), and `/login` / `/callback`, which
+ * would loop or replay a spent code.
+ */
+export function usableLoginReturnTo(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return null;
+  if (/^\/(login|callback)(?:[/?#]|$)/.test(value)) return null;
+  return value;
+}
+
 /** Reads and clears the stash; `null` when absent, unreadable, or expired. */
 export function takeLoginReturnTo(): string | null {
   try {
