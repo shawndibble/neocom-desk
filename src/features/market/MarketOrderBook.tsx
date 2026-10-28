@@ -123,41 +123,45 @@ export function HubComparisonLine({
   return (
     <section
       aria-label={t('market.hubCompare.label', { place: placeName })}
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border border-line bg-panel px-3 py-2 text-xs max-sm:flex-col max-sm:items-start"
+      className="flex items-center justify-between gap-x-3 border border-line bg-panel px-3 py-2 text-xs"
     >
-      <p className="m-0 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+      <dl className="m-0 grid min-w-0 grid-cols-[auto_auto] items-baseline gap-x-2 gap-y-1">
         {summary.bestSell !== null && (
-          <span className="whitespace-nowrap">
-            <span className="font-semibold">
+          <>
+            <dt className="whitespace-nowrap text-right font-semibold tabular-nums">
               {t('market.hubCompare.sells', {
                 place: placeName,
                 price: formatMarketIsk(summary.bestSell),
               })}
-            </span>
-            {sell && sell.delta !== 0 && (
-              // Cheaper at the hub is the good news for a buyer.
-              <span className={cx('ml-1', sell.delta < 0 ? 'text-isk-pos' : 'text-isk-neg')}>
-                {signedPercent(sell.ratio)}
-              </span>
-            )}
-          </span>
+            </dt>
+            <dd className="m-0 whitespace-nowrap tabular-nums">
+              {sell && sell.delta !== 0 && (
+                // Cheaper at the hub is the good news for a buyer.
+                <span className={sell.delta < 0 ? 'text-isk-pos' : 'text-isk-neg'}>
+                  {signedPercent(sell.ratio)}
+                </span>
+              )}
+            </dd>
+          </>
         )}
         {summary.bestBuy !== null && (
-          <span className="whitespace-nowrap">
-            <span className="font-semibold">
+          <>
+            <dt className="whitespace-nowrap text-right font-semibold tabular-nums">
               {t('market.hubCompare.buys', { price: formatMarketIsk(summary.bestBuy) })}
-            </span>
-            {buy && buy.delta !== 0 && (
-              // A higher buy at the hub is the good news for a seller.
-              <span className={cx('ml-1', buy.delta > 0 ? 'text-isk-pos' : 'text-isk-neg')}>
-                {signedPercent(buy.ratio)}
-              </span>
-            )}
-          </span>
+            </dt>
+            <dd className="m-0 whitespace-nowrap tabular-nums">
+              {buy && buy.delta !== 0 && (
+                // A higher buy at the hub is the good news for a seller.
+                <span className={buy.delta > 0 ? 'text-isk-pos' : 'text-isk-neg'}>
+                  {signedPercent(buy.ratio)}
+                </span>
+              )}
+            </dd>
+          </>
         )}
-      </p>
+      </dl>
       {jumps !== null && (
-        <span className="text-text-dim">
+        <span className="whitespace-nowrap text-text-dim">
           {stationId === null ? (
             t('market.hubCompare.jumps', { count: jumps })
           ) : (
@@ -167,7 +171,7 @@ export function HubComparisonLine({
           )}
         </span>
       )}
-      <Button size="sm" onClick={onView}>
+      <Button size="sm" className="shrink-0" onClick={onView}>
         {t('market.hubCompare.view', { place: placeName })}
       </Button>
     </section>
