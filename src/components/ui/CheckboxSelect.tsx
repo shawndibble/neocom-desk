@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from './DropdownMenu';
-import { selectTriggerClassName } from './controlStyles';
+import { selectTriggerClassName, type ControlSize } from './controlStyles';
 import { useFilterSurface } from './filterSurface';
 import { SelectChevron } from './SelectChevron';
 
@@ -23,6 +23,8 @@ export interface CheckboxSelectProps<V> {
   options: readonly CheckboxSelectOption<V>[];
   selected: ReadonlySet<V>;
   onToggle: (value: V) => void;
+  /** `sm` (default) matches the filter rows; `md` lines up with a `SearchInput` beside it. */
+  size?: ControlSize;
   className?: string;
 }
 
@@ -43,6 +45,7 @@ export function CheckboxSelect<V extends string | number>({
   options,
   selected,
   onToggle,
+  size = 'sm',
   className,
 }: CheckboxSelectProps<V>) {
   const { t } = useTranslation();
@@ -63,7 +66,7 @@ export function CheckboxSelect<V extends string | number>({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t('common.checkboxSelect.labelled', { label, value: summary })}
-        className={cx(selectTriggerClassName('sm'), className)}
+        className={cx(selectTriggerClassName(size), className)}
       >
         <span>
           {inline ? t('common.checkboxSelect.labelled', { label, value: summary }) : summary}
