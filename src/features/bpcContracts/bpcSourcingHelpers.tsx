@@ -37,7 +37,11 @@ export function waypointItemFor(
   return (
     <>
       {waypoint}
-      <OpenInEveMenuItem kind="contract" id={row.contract.contractId} specific />
+      <OpenInEveMenuItem
+        kind="contract"
+        id={row.contract.contractId}
+        specific={waypoint !== null}
+      />
     </>
   );
 }
