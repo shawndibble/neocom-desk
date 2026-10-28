@@ -21,7 +21,8 @@ import type { LpBasis } from '@/features/loyalty/lpBasis';
 import type { PriceBasis } from '@/features/loyalty/priceBasis';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { useColumnVisibility } from '@/lib/columnVisibility';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { TradeHubSelect } from '@/features/loyalty/TradeHubSelect';
+import type { TradeHub } from '@/market/hubs';
 
 export interface LoyaltyOfferFilterValue {
   hubId: TradeHub['id'];
@@ -81,21 +82,10 @@ export function LoyaltyOfferFilterBar({
           {/* Radix, to match the revenue-basis select beside it: side by side,
     two selects that open into different-looking lists read as a seam. */}
           <FilterField label={t('loyaltyStore.hubLabel')}>
-            <Select
+            <TradeHubSelect
               value={draft.hubId}
-              onValueChange={(value) => setDraft({ ...draft, hubId: value as TradeHub['id'] })}
-            >
-              <SelectTrigger aria-label={t('loyaltyStore.hubLabel')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRADE_HUBS.map((h) => (
-                  <SelectItem key={h.id} value={h.id}>
-                    {h.systemName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onValueChange={(hubId) => setDraft({ ...draft, hubId })}
+            />
           </FilterField>
           {/*
   Radix rather than `NativeSelect`, the one thing a real `<select>`

@@ -1,21 +1,39 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Tabs } from '@/components/ui';
+import { Field, Fields, Tabs } from '@/components/ui';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
-import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
+import { TradeHubSelect } from '@/features/loyalty/TradeHubSelect';
+import { useMarketHub } from '@/features/market/hub';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 
-/** The header's gear for the one setting this page's numbers lean on, LP Value. */
+/**
+ * The header's gear for the two settings this page's numbers lean on: LP
+ * Value and the Trade hub. The hub is the app-wide one (`useMarketHub`) the
+ * filter row's select writes too, so the two never disagree.
+ */
 export function LpStoreActions() {
   const { t } = useTranslation();
+  const hubId = useMarketHub((s) => s.value);
+  const setHubId = useMarketHub((s) => s.setValue);
+  useHydratedStore(useMarketHub);
   return (
-    <>
-      <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
+    <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
+      <div className="space-y-4">
+        <Fields variant="form">
+          <Field label={t('loyaltyStore.hubLabel')} htmlFor="lp-store-gear-hub">
+            <TradeHubSelect
+              id="lp-store-gear-hub"
+              value={hubId}
+              onValueChange={(id) => void setHubId(id)}
+            />
+          </Field>
+        </Fields>
         <LpValueSettingsForm />
-      </PageSettingsButton>
-    </>
+      </div>
+    </PageSettingsButton>
   );
 }
 
@@ -39,34 +57,5 @@ export function WalletTabBar({ tabsId }: { tabsId: string }) {
         .filter((tab) => tab.id !== 'transactions')
         .map((tab) => ({ id: tab.id, label: t(tab.labelKey) }))}
     />
-  );
-}
-
-const CRUMB_CLASS =
-  'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:min-h-0';
-
-/**
- * The links above an open store: back to the search it was opened from (a
- * result row carries the query in the location state), and "Change store" to
- * the landing search, the way to switch stores.
- */
-export function StoreCrumbs() {
-  const { t } = useTranslation();
-  const state = useLocation().state as Partial<LpSearchCrumbState> | null;
-  // An empty query is the landing itself, which "Change store" already links to.
-  const q = state?.from === 'lp-search' && state.q ? state.q : null;
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 self-start">
-      {q !== null && (
-        <Link to={`/wallet/lp-store?q=${encodeURIComponent(q)}`} className={CRUMB_CLASS}>
-          <span aria-hidden="true">‹</span>
-          {t('loyaltyStore.search.crumb')}
-        </Link>
-      )}
-      <Link to="/wallet/lp-store" className={CRUMB_CLASS}>
-        <span aria-hidden="true">‹</span>
-        {t('loyaltyStore.search.changeStore')}
-      </Link>
-    </div>
   );
 }
