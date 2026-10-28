@@ -448,6 +448,13 @@ describe('price watch', () => {
     expect(far!.cells[3]).toBe('overview.widgets.priceWatch.target.above{"isk":"100"}');
   });
 
+  it('opens Show info for the watched item', () => {
+    const [row] = priceWatchTable(t, [alert('Near', 'below', 100, 105)]).rows;
+    expect(row!.info).toEqual({ typeId: 4 });
+    expect(row!.to).toBeUndefined();
+    expect(row!.detail).toBeUndefined();
+  });
+
   it('shows a dash for a target the poller has not priced, and tones a hit target', () => {
     const rows = priceWatchTable(t, [
       alert('Hit', 'above', 100, 130, true),

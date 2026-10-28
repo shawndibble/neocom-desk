@@ -6,8 +6,8 @@
  * label), tabular numerals, numeric columns right-aligned, a severity icon
  * before the first cell of a toned row, the first column truncated, and the
  * whole row a link when it has a `to` (the trailing caret is the §6c cue), or
- * a button that opens `RowDetailModal` when it has a `detail` (the first cell's
- * accent name is the cue, §6c "Widget rows"). No row buttons and no other
+ * a button that opens `RowDetailModal` when it has a `detail`, or the item's Show
+ * info when it has an `info` (the first cell's accent name is the cue either way, §6c "Widget rows"). No row buttons and no other
  * chrome: the widget's title link and the row's own link or modal are the only
  * ways out. Columns are chosen by `visibleColumns` from the width budget the
  * caller passes, never from the viewport, then by `fitColumns` for a
@@ -34,6 +34,7 @@ import { nextDataTableSort } from '@/components/ui/dataTableSort';
 import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
+import { openItemInfo } from '@/stores/itemInfoModal';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
 import type { WidgetSize } from './kinds';
@@ -136,7 +137,7 @@ function Row({
   rowHeader: boolean;
   /** The visible column that truncates in the first one's place, when a table has one. */
   growKey: string | undefined;
-  /** Opens the row's detail modal; set only for a row with a `detail`. */
+  /** Opens the row's detail modal or Show info; set only for a row with a `detail` or `info`. */
   onOpen?: () => void;
 }) {
   const { t } = useTranslation();
@@ -486,7 +487,13 @@ export function TableBody({
               compact={columnsFor === 'S'}
               rowHeader={!hasHeader}
               growKey={growKey}
-              onOpen={row.detail === undefined ? undefined : () => setOpened(row)}
+              onOpen={
+                row.detail !== undefined
+                  ? () => setOpened(row)
+                  : row.info !== undefined
+                    ? () => openItemInfo(row.info!.typeId, cellText(row.cells[0]!))
+                    : undefined
+              }
             />
           ))}
         </tbody>

@@ -331,10 +331,14 @@ const survey: Builder = (feeds, { t, now }) => {
         { key: 'ore', label: t(`${W}.survey.col.ore`), priority: 0 },
         { key: 'left', label: t(`${W}.survey.col.left`), align: 'end', priority: 0 },
       ],
-      rows: left.map((o) => ({
-        key: o.ore,
-        cells: [o.ore, volume(o.volume)],
-      })),
+      rows: left.map((o) => {
+        const typeId = data.oreTypeIds?.get(o.ore);
+        return {
+          key: o.ore,
+          cells: [o.ore, volume(o.volume)],
+          info: typeId === undefined ? undefined : { typeId },
+        };
+      }),
     },
     summary: note,
     chart:
