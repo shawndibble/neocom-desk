@@ -35,14 +35,15 @@ export interface DataTableColumn<T> {
    * kinds. A windowed table (`virtualize`) that sets a width on any column
    * switches to `table-layout: fixed`: columns without one share what is left
    * and their text truncates (`truncate` on the cell), so scrolling cannot
-   * resize columns as rows mount and unmount. Ignored while the table is not
+   * resize columns as rows mount and unmount (`minWidth` sets their floor). Ignored while the table is not
    * windowed and in the stacked card layout.
    */
   width?: string;
   /**
    * Least a width-less column of a fixed-layout (windowed) table squeezes to,
    * a CSS length; default `16ch`. A `min-w-*` class on the cell does nothing
-   * there, so the table's own `min-width` is where the floor lives.
+   * there, so the table's own `min-width` is where the floor lives. Ignored
+   * like `width` is: while not windowed, and in the stacked card layout.
    */
   minWidth?: string;
   /**

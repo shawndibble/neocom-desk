@@ -80,6 +80,8 @@ interface HaulingTableInput {
   cards: boolean;
   /** Figures go compact (`3.41K`). */
   compact: boolean;
+  /** The table windows its rows (`virtualize="auto"` past the threshold), so lays out fixed. */
+  windowed: boolean;
   lineOf: ReadonlyMap<number, TripLine>;
   suggestedProfitOf: ReadonlyMap<number, number>;
   overrides: ReadonlyMap<number, TripOverride>;
@@ -97,6 +99,7 @@ export function useHaulingTable({
   anyEnd,
   cards,
   compact,
+  windowed,
   lineOf,
   suggestedProfitOf,
   overrides,
@@ -145,9 +148,11 @@ export function useHaulingTable({
       headerClassName: 'whitespace-nowrap',
       primary: true,
       // The one width-less column: it takes the spare width and wraps a long
-      // name. A `w-full` here would, in a windowed table's fixed layout, mean
-      // 100% of the table and starve it; the floor is `minWidth`, below which
-      // the table scrolls in its wrapper.
+      // name, so the longest name never sets the table's minimum. Auto layout
+      // does that with `w-full max-w-0 min-w-28`; in a windowed table's fixed
+      // layout `w-full` would mean 100% of the table and starve it, so there
+      // the floor is `minWidth`. Either way the table scrolls in its wrapper below it.
+      className: cards || windowed ? undefined : 'w-full max-w-0 min-w-28',
       minWidth: '7rem',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
