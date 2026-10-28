@@ -112,15 +112,20 @@ export function useBpcColumns({
           // station name is cut short — it opens with its system's name, so
           // "Jita IV - Moon 4 -…" still says where.
           const system = row.systemId == null ? undefined : solarSystems?.get(row.systemId);
+          const security = system && <SecurityStatus security={system.security} />;
           const place = (
             <>
               <span className="max-sm:inline-block max-sm:max-w-36 max-sm:truncate max-sm:align-bottom">
                 {name}
               </span>
-              {system && <SecurityStatus security={system.security} />}
-              {row.source === 'lp' && row.stationName && (
-                <span className="block truncate text-xs text-text-dim">{row.stationName}</span>
-              )}
+              {row.source === 'lp'
+                ? row.stationName && (
+                    <span className="block truncate text-xs text-text-dim">
+                      {row.stationName}
+                      {security}
+                    </span>
+                  )
+                : security}
             </>
           );
           // The owner's #1240 rule for market BPOs: the whole region, the hub's own station marked.

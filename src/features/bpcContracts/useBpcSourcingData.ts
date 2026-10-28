@@ -225,9 +225,12 @@ export function useBpcSourcingData() {
   const bpcRowJumps = useCallback(
     (row: BpcSearchRow): JumpsCellValue => {
       if (row.systemId === null) {
-        return row.source === 'lp' && lpStationsLoading
-          ? { kind: 'loading' }
-          : { kind: 'value', count: null };
+        // An unplaced LP row waits on the station list and the distances like any placed row.
+        if (row.source !== 'lp') return { kind: 'value', count: null };
+        if (lpStationsLoading) return { kind: 'loading' };
+        return jumpFilter.jumpsStatus === 'ready'
+          ? { kind: 'value', count: null }
+          : { kind: jumpFilter.jumpsStatus };
       }
       if (jumpFilter.jumpsStatus !== 'ready') return { kind: jumpFilter.jumpsStatus };
       return { kind: 'value', count: jumpFilter.jumps?.get(row.systemId) ?? null };
