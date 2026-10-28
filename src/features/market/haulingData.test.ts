@@ -272,8 +272,9 @@ describe('runHaulingScan, selling into buy orders', () => {
 
 describe('runHaulingScan, shortlist order', () => {
   const TODAY = '2026-10-15';
-  /** More high-ratio, thin items than the price pass keeps, and one bulk steady seller at a lower ratio. */
-  const THIN = Array.from({ length: MAX_BOOK_CANDIDATES + 45 }, (_, i) => 2000 + i);
+  /** Many high-ratio items that never sell (history drops them), and one bulk steady seller at a lower ratio. */
+  const THIN_COUNT = 85;
+  const THIN = Array.from({ length: THIN_COUNT }, (_, i) => 2000 + i);
   const BULK = 5000;
 
   function history(average: number, volume: number) {
@@ -747,6 +748,32 @@ describe('runHaulingScan, history pass feeding', () => {
     expect(loadPriceHistory).toHaveBeenCalledTimes(120);
     expect(bookedIds()).toHaveLength(12);
     expect(scan.capped).toBeUndefined();
+  });
+
+  it('instant mode: capped only when more than 40 pass the price pass', async () => {
+    const run = async (count: number, scope: number) => {
+      const { typeIds, types } = setup(count, () => true);
+      return runHaulingScan({
+        from: FROM,
+        to: TO,
+        typeIds,
+        scope,
+        types,
+        today: TODAY,
+        mode: 'instant',
+      });
+    };
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(ids.map((id) => [id, atOrigin ? aggregate(100, 90) : aggregate(200, 150)]));
+    });
+    expect((await run(MAX_BOOK_CANDIDATES, 5)).capped).toBeUndefined();
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(ids.map((id) => [id, atOrigin ? aggregate(100, 90) : aggregate(200, 150)]));
+    });
+    expect((await run(MAX_BOOK_CANDIDATES + 1, 6)).capped).toBe(true);
+    expect(loadPriceHistory).not.toHaveBeenCalled();
   });
 
   it('never reads more history than the safety cap, and says capped', async () => {

@@ -11751,7 +11751,7 @@
       "hiddenLineInstantMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
       "emptyHiddenHintInstant": "We looked at {{scanned}} items. Hidden by your filters: {{low}} have a margin under your minimum.",
       "emptyHiddenHintInstantMaxPrice": "We looked at {{scanned}} items. Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
-      "cappedLine": "The best {{books}} items got order books. We checked demand in order of price gap, up to {{reads}} items, so more routes may exist. Narrow the category to see them.",
+      "cappedLine": "We checked demand in order of price gap, up to {{reads}} items, and at most the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
       "cappedLineInstant": "Only the best {{books}} price gaps got order books, so more routes may exist. Narrow the category to see them.",
       "scannedLine": "{{count}} items looked at. Prices and history come from public market data.",
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",

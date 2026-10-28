@@ -778,10 +778,14 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   low: hidden.lowMargin,
                 })}
           {state.scan.capped
-            ? ` ${t(instant ? 'market.hauling.cappedLineInstant' : 'market.hauling.cappedLine', {
-                reads: MAX_HISTORY_READS,
-                books: MAX_BOOK_CANDIDATES,
-              })}`
+            ? ` ${
+                instant
+                  ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
+                  : t('market.hauling.cappedLine', {
+                      reads: MAX_HISTORY_READS,
+                      books: MAX_BOOK_CANDIDATES,
+                    })
+              }`
             : ''}
         </p>
       </Panel>

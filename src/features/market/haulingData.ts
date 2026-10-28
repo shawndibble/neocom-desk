@@ -375,6 +375,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       onProgress?.({ stage: 'history', done: historyDone, total: historyPass.length });
     });
   }
+  // Stopped early once enough passed: close the bar on what was actually read.
+  if (mode === 'list') onProgress?.({ stage: 'history', done: historyDone, total: historyDone });
   withHistory.sort(byRank);
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 
