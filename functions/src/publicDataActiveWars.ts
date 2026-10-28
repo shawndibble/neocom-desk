@@ -11,7 +11,7 @@ import { createR2Get, createR2Put, type R2Config, type R2Get, type R2Put } from 
 export const ACTIVE_WARS_R2_KEY = 'active-wars/wars.json';
 /** The sweep's cursor and the open list it holds; the runner starts from it. */
 export const ACTIVE_WARS_STATE_R2_KEY = 'active-wars/state.json';
-/** The list moves every 12 h: an hour is the longest a copy is worth keeping. */
+/** The list moves every 6 h: an hour is the longest a copy is worth keeping. */
 const LIST_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=3600',
