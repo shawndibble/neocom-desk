@@ -146,7 +146,7 @@ export function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) 
  * and a contract id are separate id spaces that regularly collide.
  *
  * Note this test has a known false-negative edge — settle-up's later steps are
- * skippable, and "Just mark paid" records no `payment` at all, so a payment
+ * skippable, and "Mark paid only" records no `payment` at all, so a payment
  * settled that way stays eligible forever. That is why `suggestLink` only ever
  * offers a payment with a plausible target, rather than an ignore-list.
  */

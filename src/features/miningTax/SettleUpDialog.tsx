@@ -571,9 +571,6 @@ export function SettleUpDialog({
           <Button disabled={saving || included.length === 0} onClick={() => void commit(false)}>
             {t('miningTax.settleUpJustMarkPaid')}
           </Button>
-          <Button className="ml-auto" onClick={onClose}>
-            {t('filters.cancel')}
-          </Button>
         </div>
       </div>
     </Modal>
