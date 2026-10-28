@@ -162,9 +162,9 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
   const selectedOfferId = filterParams.offer;
-  // A phone arriving on a linked offer opens its breakdown straight away.
   // The offer the link arrived on: the table scrolls to it once, not on every later pick.
   const [arrivedOfferId] = useState(selectedOfferId);
+  // A phone arriving on a linked offer opens its breakdown straight away.
   const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
@@ -173,15 +173,16 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const filteredRows = useMemo(() => {
     const q = rowsSearch.trim().toLowerCase();
     return rows.filter((row) => {
-      // The offer a link arrived on (or the pilot picked) stays listed whatever
-      // the filters say, so its detail never vanishes behind "affordable only".
-      if (row.offer.offer_id === selectedOfferId) return true;
+      // The offer a link arrived on stays listed whatever the filters say, so its
+      // detail never vanishes behind "affordable only".
+      if (row.offer.offer_id === arrivedOfferId && row.offer.offer_id === selectedOfferId)
+        return true;
       if (affordableOnly && row.profit.affordableLp === false) return false;
       if (blueprintsOnly && !row.isBlueprint) return false;
       if (q && !row.itemName.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId]);
+  }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId, arrivedOfferId]);
 
   const affordableCount = useMemo(
     () => rows.filter((row) => row.profit.affordableLp !== false).length,
