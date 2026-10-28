@@ -17,30 +17,20 @@ const UNSTORIED = [
   'Caret',
   'CharacterAvatar',
   'ColumnPickerMenu',
-  'DisabledMenuItem',
   'Disclosure',
   'EveSsoButton',
   'IconButton',
   'IskAmount',
   'IskFigureGroup',
   'LogoMark',
-  'MenuItem',
-  'MenuRadioGroup',
-  'MenuRadioItem',
-  'MenuSeparator',
-  'MenuSub',
-  'MenuSubContent',
-  'MenuSubTrigger',
   'RegionSelect',
-  'RowActionsMenu',
   'RowCaret',
-  'RowMoreActions',
   'StandingIcon',
   'TypeIcon',
 ];
 
 /** Pinned size. Removing a name means lowering this; adding a name fails. */
-const PINNED_COUNT = 24;
+const PINNED_COUNT = 14;
 
 /** Component name -> source module, from the value (non-type) re-exports in index.ts. */
 function exportedComponents(): Map<string, string> {

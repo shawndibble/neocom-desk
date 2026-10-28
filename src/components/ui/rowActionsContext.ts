@@ -13,6 +13,8 @@ export interface RowActions {
   onOpenChange?: (open: boolean) => void;
   /** Runs as either menu closes; `useOpenAfterMenu` hands its handler here so an item can open a dialog after focus is back on ⋮. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** `false` keeps the page scrollable and the scrollbar in place while either menu is open (the landing page's demo). */
+  modal?: boolean;
 }
 
 /**

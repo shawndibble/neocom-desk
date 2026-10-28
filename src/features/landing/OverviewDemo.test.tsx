@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { OverviewDemo } from './OverviewDemo';
 
@@ -29,7 +30,11 @@ afterEach(() => {
 describe('OverviewDemo alert auto-play', () => {
   it('starts with 4 alerts and a fifth arrives after 3s in view, once', () => {
     const state = mockObserver();
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     expect(badge()).toHaveAccessibleName('Alerts, 4 waiting');
     act(() => state.cb([{ isIntersecting: true }]));
     act(() => void vi.advanceTimersByTime(2900));
@@ -40,7 +45,11 @@ describe('OverviewDemo alert auto-play', () => {
 
   it('does not count while off-screen', () => {
     const state = mockObserver();
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     act(() => state.cb([{ isIntersecting: true }]));
     act(() => void vi.advanceTimersByTime(2000));
     act(() => state.cb([{ isIntersecting: false }]));
@@ -56,7 +65,11 @@ describe('OverviewDemo alert auto-play', () => {
       addEventListener: () => {},
       removeEventListener: () => {},
     }));
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     expect(badge()).toHaveAccessibleName('Alerts, 5 waiting');
     act(() => void vi.advanceTimersByTime(10_000));
     expect(badge()).toHaveAccessibleName('Alerts, 5 waiting');
@@ -64,7 +77,11 @@ describe('OverviewDemo alert auto-play', () => {
 
   it('is static without IntersectionObserver', () => {
     vi.stubGlobal('IntersectionObserver', undefined);
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     expect(badge()).toHaveAccessibleName('Alerts, 5 waiting');
   });
 });

@@ -74,6 +74,39 @@ export function ContextMenuRadioItem({
   );
 }
 
+/** A toggle, ticked while on — as `DropdownMenuCheckboxItem` marks its own. */
+export function ContextMenuCheckboxItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.CheckboxItem>) {
+  return (
+    <ContextMenuPrimitive.CheckboxItem className={cx(menuItemClassName, className)} {...props}>
+      <span aria-hidden="true" className="inline-block w-3 text-center">
+        <ContextMenuPrimitive.ItemIndicator>✓</ContextMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </ContextMenuPrimitive.CheckboxItem>
+  );
+}
+
+/** A small-caps caption heading the items below it — as `DropdownMenuLabel`. */
+export function ContextMenuLabel({
+  className,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.Label>) {
+  return (
+    <ContextMenuPrimitive.Label
+      role="presentation"
+      className={cx(
+        'px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
 export function ContextMenuSeparator({
   className,
   ...props

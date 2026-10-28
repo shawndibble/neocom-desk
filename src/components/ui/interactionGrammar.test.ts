@@ -184,6 +184,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/market/OpenOrdersList.tsx',
       'src/features/market/UsedInSection.tsx',
       'src/features/skills/planner/entryList/EntryRow.tsx',
+      // Overview widget header: the settings menu (Show, View, Range, Rename, Remove …), the same list as the card's right-click menu.
+      'src/features/overview/widgets/Widget.tsx',
     ];
     // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');

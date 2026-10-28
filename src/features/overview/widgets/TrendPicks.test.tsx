@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { DropdownMenu, DropdownMenuContent } from '@/components/ui';
+import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { TrendHubsMenuGroup, TrendItemsDialog } from './TrendPicks';
 import type { Widget } from './layout';
 
@@ -220,7 +221,9 @@ describe('TrendHubsMenuGroup', () => {
     render(
       <DropdownMenu open>
         <DropdownMenuContent>
-          <TrendHubsMenuGroup widget={w} />
+          <MenuKindContext.Provider value="dropdown">
+            <TrendHubsMenuGroup widget={w} />
+          </MenuKindContext.Provider>
         </DropdownMenuContent>
       </DropdownMenu>
     );

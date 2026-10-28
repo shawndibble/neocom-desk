@@ -68,7 +68,7 @@ export function Chart({
   className?: string;
 }) {
   return (
-    <div className={cx('grid gap-1.5', className)}>
+    <div data-card-click-ignore className={cx('grid gap-1.5', className)}>
       <Drawing model={model} size={size} />
       {model.note && <p className="text-[0.6875rem] text-text-dim">{model.note}</p>}
       <p className="sr-only">{model.summary}</p>

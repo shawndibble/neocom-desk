@@ -92,7 +92,11 @@ export default function DemoBoard() {
               previewView={views.get(widget.id)}
               inertTitle
               onRemove={none}
-              menu={<WidgetMenu widget={widget} inert />}
+              menu={(card) => (
+                <WidgetMenu widget={widget} inert>
+                  {card}
+                </WidgetMenu>
+              )}
             />
           </div>
         ))}
