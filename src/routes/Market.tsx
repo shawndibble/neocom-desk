@@ -60,6 +60,7 @@ import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import type { QuickbarItem } from '@/db';
 import { QuickbarList } from '@/features/market/QuickbarList';
+import { useQuickbarVsPaid } from '@/features/market/useQuickbarVsPaid';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { VariationsTable } from '@/features/market/VariationsTable';
 import {
@@ -522,6 +523,9 @@ export function Market() {
   const selectedInCompare = useCompareSet((state) =>
     state.items.some((item) => item.typeId === selectedTypeId)
   );
+  // Issue #5333: each pinned item's hub price against what the wallet says was paid.
+  const quickbarTypeIds = useMemo(() => quickbarItems.map((i) => i.typeId), [quickbarItems]);
+  const quickbarVsPaid = useQuickbarVsPaid(activeCharacterId, quickbarTypeIds, effectiveHub);
   const selectedPinned = quickbarItems.some((item) => item.typeId === selectedTypeId);
 
   // The finder Panel's own root, so Back can look up the tree button the
@@ -1080,6 +1084,7 @@ export function Market() {
 
                 <QuickbarList
                   items={quickbarItems}
+                  vsPaid={quickbarVsPaid}
                   selectedTypeId={selectedTypeId}
                   onSelect={handleSelectItem}
                   onRemove={handleRemoveFromQuickbar}

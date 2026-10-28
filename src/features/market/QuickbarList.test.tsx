@@ -92,3 +92,29 @@ describe('QuickbarList selection', () => {
     expect(other.closest('li')).not.toHaveClass('border-l-accent');
   });
 });
+
+describe('QuickbarList price against paid', () => {
+  it('shows a signed chip only for items with a covered basis', () => {
+    const two = [...items, { typeId: 35, name: 'Pyerite', characterId: 1, position: 1 }];
+    renderList({
+      items: two,
+      vsPaid: new Map([[34, { percent: 50, paid: 4, price: 6, units: 100 }]]),
+    });
+    expect(screen.getByLabelText('Tritanium is +50% against what you paid')).toHaveTextContent(
+      '+50%'
+    );
+    expect(screen.queryByLabelText(/Pyerite is/)).not.toBeInTheDocument();
+  });
+
+  it('shows a negative figure with its minus sign', () => {
+    renderList({ vsPaid: new Map([[34, { percent: -12, paid: 5, price: 4.4, units: 10 }]]) });
+    expect(screen.getByLabelText('Tritanium is -12% against what you paid')).toHaveTextContent(
+      '-12%'
+    );
+  });
+
+  it('shows no chip without a basis', () => {
+    renderList();
+    expect(screen.queryByLabelText(/against what you paid/)).not.toBeInTheDocument();
+  });
+});

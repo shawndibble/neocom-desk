@@ -12229,7 +12229,11 @@
         "cancelled": "Reordering cancelled. {{name}} stayed at its original position.",
         "instructions": "Press space to pick up an item. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel."
       },
-      "addItem": "Add {{name}} to Quickbar"
+      "addItem": "Add {{name}} to Quickbar",
+      "vsPaid": {
+        "label": "{{name}} is {{percent}} against what you paid",
+        "tooltip": "vs paid: {{price}} now against {{paid}} average paid per unit, before fees. Covers the {{units}} units you still hold."
+      }
     },
     "priceAlert": {
       "button": "Set price alert for {{name}}",
