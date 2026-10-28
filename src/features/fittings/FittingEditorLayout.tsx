@@ -46,7 +46,7 @@ export function FittingEditorLayout({
   const { t } = useTranslation();
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
-  // One tab bar renders at a time (phone sheet or docked/wide), so one id base serves both.
+  // The tab bar renders on the phone sheet only.
   const viewTabsId = useTabsId();
 
   return (
@@ -91,25 +91,13 @@ export function FittingEditorLayout({
                   {addPanel}
                 </Panel>
               )}
-              {/* Ring | List as the app's own tabs over the column they switch. */}
+              {/* The Ring | List switch is in the editor panel's header. */}
               <div
                 data-testid="fitting-editor-column"
                 {...{ [RING_ROOM_ATTR]: '' }}
                 className={`${editorColumnClass(view, addMode, addOpen || statsFirst)}${statsFirst ? ' order-last' : ''}`}
               >
-                <Tabs
-                  tabsId={viewTabsId}
-                  tabs={[
-                    { id: 'ring', label: t('fittings.view.ring') },
-                    { id: 'list', label: t('fittings.view.list') },
-                  ]}
-                  value={view}
-                  onChange={(id) => onViewChange(id as FittingView)}
-                  label={t('fittings.view.label')}
-                />
-                <TabPanel tabsId={viewTabsId} tabId={view} className="space-y-3">
-                  {editor}
-                </TabPanel>
+                {editor}
               </div>
               {statsSections}
             </div>

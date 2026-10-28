@@ -83,6 +83,8 @@ interface FittingRingProps {
   hardpointKindOf?: HardpointKindOf;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
+  /** Stands in for the panel's "Ring" title: the editor's Ring | List switch. */
+  titleSwitch?: ReactNode;
   /** No panel of its own, for a host that already frames it (the Start screen's preview). */
   bare?: boolean;
 }
@@ -94,7 +96,7 @@ function RingFrame({
   children,
 }: {
   bare: boolean;
-  title: string;
+  title: ReactNode;
   actions: ReactNode;
   children: ReactNode;
 }) {
@@ -143,6 +145,7 @@ export function FittingRing({
   hardpointsUsed,
   hardpointKindOf,
   actions,
+  titleSwitch,
   bare = false,
 }: FittingRingProps) {
   const { t } = useTranslation();
@@ -306,7 +309,7 @@ export function FittingRing({
   const cargoDrop = !compact && cargoTarget.accepts;
 
   return (
-    <RingFrame bare={bare} title={t('fittings.ring.title')} actions={actions}>
+    <RingFrame bare={bare} title={titleSwitch ?? t('fittings.ring.title')} actions={actions}>
       {/* The block keeps the ring's own width, so cargo and the legend sit under it on a wide panel. */}
       <div className="mx-auto w-full max-w-[48rem] space-y-3">
         <div
