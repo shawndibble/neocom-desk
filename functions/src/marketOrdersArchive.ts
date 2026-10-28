@@ -10,6 +10,7 @@
 import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';
 import unbzip2Stream from 'unbzip2-stream';
+import type { HaulingBookFold } from './haulingBooks.js';
 import type { OpenPriceFold, StationPriceFold } from './marketOpenPrices.js';
 
 const REQUIRED_COLUMNS = ['is_buy_order', 'price', 'type_id', 'region_id'] as const;
@@ -133,4 +134,65 @@ export async function foldSnapshotUrl(
     fold,
     stations
   );
+}
+
+const BOOK_COLUMNS = ['is_buy_order', 'price', 'type_id', 'location_id', 'volume_remain'] as const;
+
+/** Folds a decompressed snapshot CSV into `books` by column name; returns the data rows read. */
+export async function foldOrderBooksCsv(csv: Readable, books: HaulingBookFold): Promise<number> {
+  const rows = snapshotCsvParser();
+  pipeline(csv, rows, () => {});
+  return foldBookRows(rows, books);
+}
+
+async function foldBookRows(
+  rows: ReturnType<typeof snapshotCsvParser>,
+  books: HaulingBookFold
+): Promise<number> {
+  let at: number[] | null = null;
+  let count = 0;
+  for await (const row of rows as AsyncIterable<string[]>) {
+    if (!at) {
+      const found = BOOK_COLUMNS.map((name) => row.indexOf(name));
+      if (found.some((i) => i < 0)) {
+        rows.destroy();
+        throw new Error(`market-order snapshot is missing a column of ${BOOK_COLUMNS.join(', ')}`);
+      }
+      at = found;
+      continue;
+    }
+    count++;
+    books.add(
+      Number(row[at[3]]),
+      Number(row[at[2]]),
+      parseIsBuy(row[at[0]]),
+      Number(row[at[1]]),
+      Number(row[at[4]])
+    );
+  }
+  return count;
+}
+
+/** Downloads one snapshot into `books`. Returns the data rows read and when EVE Ref published it (ms; null if not stated). */
+export async function foldOrderBooksUrl(
+  url: string,
+  books: HaulingBookFold,
+  userAgent: string
+): Promise<{ rows: number; publishedAt: number | null }> {
+  const response = await fetch(url, { headers: { 'User-Agent': userAgent } });
+  if (!response.ok || !response.body) {
+    throw new Error(`EVE Ref market-orders fetch failed: HTTP ${response.status}`);
+  }
+  const modified = Date.parse(response.headers.get('last-modified') ?? '');
+  const rows = snapshotCsvParser();
+  pipeline(
+    Readable.fromWeb(response.body as import('node:stream/web').ReadableStream<Uint8Array>),
+    unbzip2Stream(),
+    rows,
+    () => {}
+  );
+  return {
+    rows: await foldBookRows(rows, books),
+    publishedAt: Number.isFinite(modified) ? modified : null,
+  };
 }

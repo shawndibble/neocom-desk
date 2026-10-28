@@ -7,6 +7,7 @@ const getHubPrices = vi.fn();
 const loadPriceHistory = vi.fn();
 const getOrderBook = vi.fn();
 const loadHaulingDemand = vi.fn();
+const loadHaulingBooks = vi.fn();
 
 vi.mock('@/market/prices', () => ({ getHubPrices: (...a: unknown[]) => getHubPrices(...a) }));
 vi.mock('@/features/market/priceHistory', () => ({
@@ -15,6 +16,10 @@ vi.mock('@/features/market/priceHistory', () => ({
 // Default: no daily demand object, so pass 2 takes the ESI history path.
 vi.mock('@/features/market/haulingDemand', () => ({
   loadHaulingDemand: (...a: unknown[]) => loadHaulingDemand(...a),
+}));
+// Default: no books snapshot, so pass 3 reads ESI books for a short list.
+vi.mock('@/features/market/haulingBooks', () => ({
+  loadHaulingBooks: (...a: unknown[]) => loadHaulingBooks(...a),
 }));
 vi.mock('@/features/market/orderBook', () => ({
   getOrderBook: (...a: unknown[]) => getOrderBook(...a),
@@ -65,6 +70,7 @@ beforeEach(() => {
   clearMarketTypeIndex();
   loadMarketTypes.mockResolvedValue([]);
   loadHaulingDemand.mockResolvedValue(null);
+  loadHaulingBooks.mockResolvedValue(null);
   getHubPrices.mockImplementation(async (hub: { id: string }) =>
     hub.id === FROM.id ? new Map([[34, aggregate(100, 90)]]) : new Map([[34, aggregate(200, 115)]])
   );
@@ -943,5 +949,139 @@ describe('runHaulingScan, demand from the daily R2 object', () => {
     });
     expect(loadHaulingDemand).not.toHaveBeenCalled();
     expect(scan.demandSource).toBeUndefined();
+  });
+});
+
+describe('runHaulingScan, order books from the R2 snapshot', () => {
+  const TODAY = '2026-10-14';
+  const COUNT = MAX_BOOK_CANDIDATES * 3;
+  const idAt = (rank: number) => 1000 + rank;
+  const typeIds = Array.from({ length: COUNT }, (_, i) => idAt(i));
+
+  const level = (price: number, units = 50_000) => ({ price, units, orders: 1 });
+  /** Every type: sells at 100 at Jita, sells at 300 and buys at 280 at Amarr. */
+  function snapshot(stationId: number, asOf: number) {
+    const atFrom = stationId === FROM.stationId;
+    return {
+      asOf,
+      lastSyncedAt: asOf,
+      types: new Map(
+        typeIds.map((id) => [
+          id,
+          atFrom
+            ? { sell: [level(100)], buy: [level(90)] }
+            : { sell: [level(300)], buy: [level(280)] },
+        ])
+      ),
+    };
+  }
+
+  beforeEach(() => {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => [id, atOrigin ? aggregate(100, 90, 100) : aggregate(300, 280, 100)])
+      );
+    });
+    loadPriceHistory.mockImplementation(async () => ({
+      points: Array.from({ length: 30 }, (_, day) =>
+        historyPoint({
+          date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+            .toISOString()
+            .slice(0, 10),
+          average: 300,
+          volume: 50,
+          orderCount: 10,
+        })
+      ),
+    }));
+  });
+
+  it('books every item that passes, with no ESI book request and no cap', async () => {
+    const asOf = Date.now() - 20 * 60_000;
+    loadHaulingBooks.mockImplementation(async (stationId: number) => snapshot(stationId, asOf));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 'snap-1',
+      types: typesFor(typeIds),
+      today: TODAY,
+    });
+    expect(getOrderBook).not.toHaveBeenCalled();
+    expect(scan.rows).toHaveLength(COUNT);
+    expect(scan.rows[0].buyLadder).toEqual([level(100)]);
+    expect(scan.rows[0].destLadder).toEqual([level(300)]);
+    expect(scan.booksSource).toBe('snapshot');
+    expect(scan.booksAsOf).toBe(asOf);
+    expect(scan.capped).toBeUndefined();
+  });
+
+  it('instant mode books every price-pass survivor from the snapshot', async () => {
+    loadHaulingBooks.mockImplementation(async (stationId: number) =>
+      snapshot(stationId, Date.now())
+    );
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 'snap-2',
+      types: typesFor(typeIds),
+      today: TODAY,
+      mode: 'instant',
+    });
+    expect(getOrderBook).not.toHaveBeenCalled();
+    expect(scan.rows).toHaveLength(COUNT);
+    expect(scan.rows[0].destBuyLadder).toEqual([level(280)]);
+    expect(scan.capped).toBeUndefined();
+  });
+
+  it('drops an item the snapshot has no orders for, not the scan', async () => {
+    loadHaulingBooks.mockImplementation(async (stationId: number) => {
+      const books = snapshot(stationId, Date.now());
+      books.types.delete(idAt(0));
+      return books;
+    });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 'snap-3',
+      types: typesFor(typeIds),
+      today: TODAY,
+      mode: 'instant',
+    });
+    expect(scan.rows).toHaveLength(COUNT - 1);
+  });
+
+  it('falls back to ESI books for the best 40 when one station has no snapshot', async () => {
+    loadHaulingBooks.mockImplementation(async (stationId: number) =>
+      stationId === FROM.stationId ? snapshot(stationId, Date.now()) : null
+    );
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const hub = regionId === FROM.regionId ? FROM : TO;
+      return {
+        orders: [
+          {
+            price: hub === FROM ? 100 : 300,
+            volume_remain: 50_000,
+            is_buy_order: false,
+            location_id: hub.stationId,
+          },
+        ],
+      };
+    });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 'snap-4',
+      types: typesFor(typeIds),
+      today: TODAY,
+    });
+    expect(scan.booksSource).toBe('esi');
+    expect(scan.booksAsOf).toBeUndefined();
+    expect(scan.rows).toHaveLength(MAX_BOOK_CANDIDATES);
+    expect(scan.capped).toBe(true);
   });
 });

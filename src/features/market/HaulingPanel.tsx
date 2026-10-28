@@ -1,4 +1,5 @@
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
+import { formatAge } from '@/lib/age';
 import { formatCount } from '@/lib/formatCount';
 /**
  * The Market page's Hauling tab (back from Travel, #4702): what is worth buying
@@ -780,19 +781,26 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           {state.scan.demandSource
             ? ` ${t(`market.hauling.demand${state.scan.demandSource === 'esi' ? 'Fallback' : 'Daily'}Line`)}`
             : ''}
+          {state.scan.booksSource === 'snapshot' && state.scan.booksAsOf
+            ? ` ${t('market.hauling.booksSnapshotLine', {
+                age: formatAge(state.scan.fetchedAt - state.scan.booksAsOf, t),
+              })}`
+            : ''}
           {state.scan.capped
             ? ` ${
-                instant
-                  ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
-                  : state.scan.demandSource === 'daily'
-                    ? t('market.hauling.cappedLineDaily', {
-                        passed: state.scan.demandPassed,
-                        books: MAX_BOOK_CANDIDATES,
-                      })
-                    : t('market.hauling.cappedLine', {
-                        reads: MAX_HISTORY_READS,
-                        books: MAX_BOOK_CANDIDATES,
-                      })
+                state.scan.booksSource === 'snapshot'
+                  ? t('market.hauling.cappedLineHistory', { reads: MAX_HISTORY_READS })
+                  : instant
+                    ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
+                    : state.scan.demandSource === 'daily'
+                      ? t('market.hauling.cappedLineDaily', {
+                          passed: state.scan.demandPassed,
+                          books: MAX_BOOK_CANDIDATES,
+                        })
+                      : t('market.hauling.cappedLine', {
+                          reads: MAX_HISTORY_READS,
+                          books: MAX_BOOK_CANDIDATES,
+                        })
               }`
             : ''}
         </p>

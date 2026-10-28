@@ -11756,6 +11756,8 @@
       "cappedLineDaily": "{{passed}} items passed the demand check, and only the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
       "demandDailyLine": "Demand comes from the daily market summary.",
       "demandFallbackLine": "The daily demand summary was not available, so demand was read from ESI history instead.",
+      "booksSnapshotLine": "Order books are from the market snapshot taken {{age}}.",
+      "cappedLineHistory": "We checked demand in order of price gap, up to {{reads}} items, so more routes may exist. Narrow the category to see them.",
       "cappedLineInstant": "Only the best {{books}} price gaps got order books, so more routes may exist. Narrow the category to see them.",
       "scannedLine": "{{count}} items looked at. Prices and history come from public market data.",
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
