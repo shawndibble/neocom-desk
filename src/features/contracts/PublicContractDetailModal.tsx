@@ -383,6 +383,7 @@ export function PublicContractDetailModal({
         ) : twoSided ? (
           <>
             <ItemGroup
+              // Keyed on contractId so each group's expanded state resets when another contract opens.
               key={`${contractId}-hand`}
               heading={t('contractDetail.youHandOverHeading')}
               lines={requested}

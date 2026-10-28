@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -615,6 +615,52 @@ describe('PublicContractDetailModal — item cap (#5423)', () => {
     expect(screen.getByRole('button', { name: 'Show 4 more items' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show 5 more items' })).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(20);
+  });
+
+  it('keeps focus on the toggle after it expands', async () => {
+    showItems(manyItems(13));
+    renderModal();
+    await itemRows();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Show 3 more items' }));
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toHaveFocus();
+  });
+
+  it('shows every searched line, and no others, when more than 10 match', async () => {
+    showItems(manyItems(20));
+    renderModal(null, {
+      searchedTypeIds: new Set(Array.from({ length: 12 }, (_, i) => 1001 + i * 1)),
+    });
+    const rows = await itemRows();
+    expect(rows).toHaveLength(12);
+    expect(screen.getByRole('button', { name: 'Show 8 more items' })).toBeInTheDocument();
+  });
+
+  it('collapses again when a different contract opens', async () => {
+    showItems(manyItems(13));
+    const props = {
+      title: 'Large Skill Injector',
+      characterId: 1,
+      locationId: 60003760,
+      regionName: 'The Forge',
+      dateExpired: Date.UTC(2026, 8, 13, 14, 59),
+      statChips: [{ label: 'Price', value: '0.00' }],
+      onClose: vi.fn(),
+    };
+    const { rerender } = render(
+      <MemoryRouter>
+        <PublicContractDetailModal {...props} contractId={1} />
+      </MemoryRouter>
+    );
+    await itemRows();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Show 3 more items' }));
+    expect(await itemRows()).toHaveLength(13);
+    rerender(
+      <MemoryRouter>
+        <PublicContractDetailModal {...props} contractId={2} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(10));
   });
 
   it('still counts a hidden line in the price check', async () => {
