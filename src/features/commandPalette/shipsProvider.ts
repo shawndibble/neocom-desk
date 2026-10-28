@@ -23,8 +23,7 @@ export function createShipsProvider({
   // Once in memory, later keystrokes answer synchronously: no "Searching…" flash.
   let loaded: ShipTreeData | null = null;
 
-  const match = (query: string): PaletteResult[] => {
-    const tree = loaded!;
+  const match = (tree: ShipTreeData, query: string): PaletteResult[] => {
     return searchHulls(tree.ships, query)
       .slice(0, GROUP_LIMIT)
       .map((ship) => ({
@@ -47,14 +46,14 @@ export function createShipsProvider({
     order: 7,
     minQueryLength: 2,
     search: (query) => {
-      if (loaded) return match(query);
+      if (loaded) return match(loaded, query);
       pending ??= loadShipTree().catch((error: unknown) => {
         pending = null; // a failed snapshot load retries on the next keystroke
         throw error;
       });
       return pending.then((tree) => {
         loaded = tree;
-        return match(query);
+        return match(tree, query);
       });
     },
   };

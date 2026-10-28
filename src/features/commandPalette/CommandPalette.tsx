@@ -2,7 +2,7 @@ import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
 import { Modal, SearchInput, Spinner } from '@/components/ui';
@@ -57,6 +57,9 @@ function signedStanding(standing: number): string {
 function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const shipWindowOpen =
+    location.pathname === '/ships/tree' && new URLSearchParams(location.search).has('ship');
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const corpVisible = useCorpNavVisible();
   const srpVisible = useSrpNavVisible();
@@ -107,10 +110,14 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
     () =>
       createShipsProvider({
         loadShipTree,
+        // Over an open Ship Info window, replace: one Close or Back still leaves the tree.
         onOpen: (typeID) =>
-          void navigate(`/ships/tree?ship=${typeID}`, { state: ENTITY_INFO_PUSHED_STATE }),
+          void navigate(
+            `/ships/tree?ship=${typeID}`,
+            shipWindowOpen ? { replace: true } : { state: ENTITY_INFO_PUSHED_STATE }
+          ),
       }),
-    [navigate]
+    [navigate, shipWindowOpen]
   );
 
   return useMemo(
