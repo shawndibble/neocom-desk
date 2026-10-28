@@ -37,8 +37,9 @@ export function createPagesProvider({
     labelKey: 'commandPalette.groups.pages',
     order: 0,
     search: (query) => {
-      // Nothing typed: the rail's Go to and the More sheet already list the
-      // pages. They stay searchable, hidden-from-rail ones included.
+      // Nothing typed: the rail and the More sheet are the page navigation, so
+      // the empty state shows a hint and Recent. Pages stay searchable,
+      // hidden-from-rail ones included.
       if (!query) return [];
       return rankedSearch(destinations, query, {
         primary: (destination) => destination.label,
