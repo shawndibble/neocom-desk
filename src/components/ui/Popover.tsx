@@ -15,6 +15,8 @@ import { menuContentClassName } from './menuStyles';
  */
 export const Popover = PopoverPrimitive.Root;
 export const PopoverTrigger = PopoverPrimitive.Trigger;
+/** Positions the popover on an element other than its trigger, for a hint that opens itself. */
+export const PopoverAnchor = PopoverPrimitive.Anchor;
 
 export function PopoverContent({
   className,
