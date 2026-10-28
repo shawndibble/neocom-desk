@@ -78,7 +78,11 @@ export function FittingEditorLayout({
                 }}
                 label={t('fittings.phoneTabs.label')}
               />
-              {alpha && <AlphaCloneChip {...alpha} />}
+              {alpha && (
+                <span className="shrink-0">
+                  <AlphaCloneChip {...alpha} />
+                </span>
+              )}
             </div>
             <TabPanel
               tabsId={viewTabsId}
