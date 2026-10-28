@@ -186,16 +186,6 @@ export function BpcSourcingPanel({
         : 'ok',
     activeCharacterId
   );
-  const lastSyncedAt = contractsResult?.data?.lastSyncedAt ?? null;
-  useEffect(() => {
-    onHeaderChange?.({
-      dataAge: lastSyncedAt ? new Date(lastSyncedAt) : null,
-      busy: loading,
-      refresh: refreshAll,
-    });
-    return () => onHeaderChange?.(null);
-  }, [onHeaderChange, lastSyncedAt, loading, refreshAll]);
-
   const {
     suggestions,
     filteredRows,
@@ -204,6 +194,7 @@ export function BpcSourcingPanel({
     displayRows,
     summary,
     awaiting: awaitingOffers,
+    refreshing: refreshingOffers,
   } = useBpcRows({
     uiFilter,
     selectedTypeId,
@@ -212,6 +203,16 @@ export function BpcSourcingPanel({
     allowedSystems: jumpFilter.allowed,
     sourceData,
   });
+
+  const lastSyncedAt = contractsResult?.data?.lastSyncedAt ?? null;
+  useEffect(() => {
+    onHeaderChange?.({
+      dataAge: lastSyncedAt ? new Date(lastSyncedAt) : null,
+      busy: loading || refreshingOffers,
+      refresh: refreshAll,
+    });
+    return () => onHeaderChange?.(null);
+  }, [onHeaderChange, lastSyncedAt, loading, refreshingOffers, refreshAll]);
 
   const selectedName =
     selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
