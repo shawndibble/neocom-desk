@@ -1,17 +1,15 @@
 import { idSetKey } from '@/lib/idSetKey';
 /**
  * What a lost ship cost (issue #2852): hull, fitted modules and cargo priced at
- * the Settings market hub, minus the insurance payout found in the wallet
+ * Jita, minus the insurance payout found in the wallet
  * journal when the victim is the active Character. Sits in Pilot Lookup's
  * loss-row expansion.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/losses/netLoss';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { loadWalletJournal } from '@/features/character/wallet';
-import { useMarketHub } from '@/features/market/hub';
 import { formatIsk } from '@/lib/isk';
 import type { KillmailDetail } from '@/lib/zkillboard';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -27,16 +25,16 @@ interface LossSummaryProps {
 type Insurance =
   { state: 'loading' } | { state: 'failed' } | { state: 'done'; value: LossInsurance | null };
 
+// A loss is talked about in Jita terms, whatever hub the viewer picked in Settings.
+const hub = getTradeHub('jita') ?? DEFAULT_TRADE_HUB;
+
 export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const mutaplasmids = useMutaplasmidLookup();
   const [prices, setPrices] = useState<ReadonlyMap<number, number | null> | null>(null);
   const [pricesFailed, setPricesFailed] = useState(false);
   const [payout, setPayout] = useState<Insurance>({ state: 'loading' });
-  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const typeKey = useMemo(() => {
     const ids = new Set([detail.victim.ship_type_id]);
@@ -45,7 +43,6 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   }, [detail]);
 
   useEffect(() => {
-    if (!hubHydrated) return;
     let cancelled = false;
     getHubPrices(hub, typeKey.split(',').map(Number))
       .then((aggregates) => {
@@ -60,7 +57,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
     return () => {
       cancelled = true;
     };
-  }, [hub, hubHydrated, typeKey]);
+  }, [typeKey]);
 
   const isOwnLoss =
     activeCharacterId !== null && detail.victimParty?.characterId === activeCharacterId;
@@ -117,7 +114,7 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   return (
     <section aria-label={t('travel.pilot.recent.lossSummary.title')} className="space-y-1 text-xs">
       <h4 className="font-semibold tracking-widest text-text-dim uppercase">
-        {t('travel.pilot.recent.lossSummary.heading', { hub: hub.name })}
+        {t('travel.pilot.recent.lossSummary.heading', { hub: hub.systemName })}
       </h4>
       <dl className="max-w-sm space-y-0.5">
         {row(t('travel.pilot.recent.lossSummary.hull'), formatIsk(loss.hull))}

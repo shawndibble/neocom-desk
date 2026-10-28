@@ -25,6 +25,7 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold. Stated in
   Costs & revenue as "Buying <product> instead", not in the **Verdict Hero**.
+- **Agent access**: Which mission agent levels a pilot's NPC standings open, shown on an NPC faction's or corporation's info modal as five pips (levels 1 to 5, the standing each needs underneath) and what the next level takes. Level 1 is always open; levels 2 to 5 need 1.0, 3.0, 5.0 and 7.0 of the best effective standing in the **Standing chain**, and none of them is open while any link is at -2.0 or lower. On an agent's modal it answers "Can you use this agent?" for that agent's own level. Storyline, research and COSMOS agents follow other rules and are not covered.
 - **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. When one exists it wins over the **Requested rate**. Player-facing: "your rate" or "their rate".
 - **Alert**: One fired Notification Event as it appears in the Notification
   Feed and in the bell panel, grouped by _type_ (the EVE notification type, or
@@ -721,6 +722,7 @@ here — they go one per file in `docs/context/decisions/`.
   shows.
 - **Stale-Serve**: Showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence; silent for a game constant, whose long window asserts the value cannot change. One that fails to revalidate must say so on the next read.
 - **Standing (corp)**: Retired. The old Corp Ops Board's top panel of figures (clocks due inside a day, Runway, 30-day net); the **Corp Board**'s Due soon, Corp wallet and Cash flow **Widgets** carry them now.
+- **Standing chain**: The NPC standings that govern one NPC entity, faction first: a faction alone; a corporation and the faction it belongs to; an agent, its corporation and their faction. There are no NPC alliances. The game uses the highest effective standing in the chain (the bold one in the info modal), except that a link at -2.0 or lower blocks level 2+ agents. Each link shows the effective standing (base lifted by Connections, Criminal Connections or Diplomacy) with the base on hover.
 - **Starred Character**: A Character the user has marked to float to the top of its group on the Characters page. Device-local, never synced. Called "starred", not "pinned", because **Pin** already means a planetary structure (and a **Station Pin**).
 - **Statement**: One miner's bill from a **Corp Tax Book** for one billing period: what they mined, where and when, its value, the tax due, and what they have paid. What gets mailed to the miner.
 - **Stock List**: A market the pilot stocks: the station or structure they sell at, and the **Stock Targets** it should have listed. Account-wide: it counts every Character's own sell orders there (listed) and their hangars at the same location (ready to list). Shared by link as a copy, never with the sender's counts. Called a "market" in the UI.

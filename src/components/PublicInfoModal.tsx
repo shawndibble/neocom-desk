@@ -19,9 +19,17 @@
  * wherever it's opened. Its corporation and alliance come from the live
  * affiliation `loadPilotProfile` resolves, and the Corporation and Alliance
  * tabs follow those ids, not the cached public record's, so the two agree.
- * The dialog is `wide` for every request: each tab is a full profile now.
+ * The dialog is `wide`: each tab is a full profile now. The NPC views below are the
+ * exception: `medium` (a full-height sheet on a phone).
  *
- * A link inside the modal that changes page (Open in Fittings) closes it.
+ * A link inside the modal that changes page (Open in Fittings) closes it: `info`
+ * leaves the URL, which `EntityInfoRoute` turns into a cleared request. Back from
+ * that page returns to this one with `info` still in the URL, so the modal reopens.
+ *
+ * NPC entities get the standings view instead (`features/standings/modal`): an
+ * NPC corporation's Corporation tab, an NPC agent's card with the standings
+ * cards below it, and a `faction` request, which has no tabs and is its own
+ * modal. Pilots and player corporations are unchanged.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
@@ -31,7 +39,7 @@ import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { tabDomId } from '@/components/ui/tabPanel';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRetryFocus } from '@/lib/useRetryFocus';
-import { usePageLeave } from '@/lib/usePageLeave';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import {
@@ -45,7 +53,7 @@ import {
   useTabsId,
   type TabItem,
 } from '@/components/ui';
-import { isNpcCharacterId } from '@/esi/entityIds';
+import { isNpcCharacterId, isNpcCorporationId } from '@/esi/entityIds';
 import { useEntityName } from '@/features/character/useEntityName';
 import {
   loadPublicAllianceInfo,
@@ -65,6 +73,14 @@ const LazyCorporationTab = lazy(() =>
 const LazyAllianceTab = lazy(() =>
   guarded(() => import('@/features/character/PublicInfoAllianceTab'))
 );
+// Lazy: the NPC views read the standings, agent and station data only an NPC id needs.
+const LazyNpcCorporationView = lazy(() =>
+  guarded(() => import('@/features/standings/modal/NpcCorporationView'))
+);
+const LazyNpcInfoView = lazy(() => guarded(() => import('@/features/standings/modal/NpcInfoView')));
+const LazyFactionModal = lazy(() =>
+  guarded(() => import('@/features/standings/modal/FactionModal'))
+);
 // Lazy: its killmail fits pull in Fittings, and this modal is mounted app-wide.
 const LazyPilotProfileView = lazy(() =>
   guarded(() => import('@/features/travel/PilotProfileView'))
@@ -81,9 +97,9 @@ const IDLE: TabState<never> = { status: 'idle' };
 export function PublicInfoModal() {
   const { t } = useTranslation();
   const tabsId = useTabsId();
+  const isPhone = useIsPhone();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
-  const clear = usePublicInfoModalStore((state) => state.clear);
 
   const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
   const focusAfterCommit = useFocusAfterCommit();
@@ -113,12 +129,6 @@ export function PublicInfoModal() {
     setAttempt((n) => n + 1);
   };
 
-  // Runs after render, so a caller must not navigate and open in one handler — the
-  // open would be closed straight away. None does: every opener stays on its page.
-  // A redirect is not a page change (`usePageLeave`): `EntityInfoRoute` keeps
-  // `info` through it, so the modal stays.
-  usePageLeave(clear);
-
   /** The request whose tab was last chosen, so a retry re-runs the lookups without jumping tabs. */
   const tabChosenFor = useRef<typeof request>(null);
   useEffect(() => {
@@ -135,6 +145,8 @@ export function PublicInfoModal() {
       setCharacter(request.kind === 'character' ? { status: 'loading' } : IDLE);
       setCorporation(request.kind === 'corporation' ? { status: 'loading' } : IDLE);
       setAlliance(request.kind === 'alliance' ? { status: 'loading' } : IDLE);
+      // A faction is one view with nothing to look up here: it loads its own facts.
+      if (request.kind === 'faction') return;
 
       let corporationId: number | undefined;
       let allianceId: number | undefined;
@@ -186,6 +198,13 @@ export function PublicInfoModal() {
   }, [request, attempt]);
 
   if (!request) return null;
+  if (request.kind === 'faction') {
+    return (
+      <Suspense fallback={null}>
+        <LazyFactionModal id={request.id} onClose={close} />
+      </Suspense>
+    );
+  }
 
   const tabs: TabItem[] = [];
   if (character.status !== 'idle')
@@ -196,6 +215,9 @@ export function PublicInfoModal() {
   // Only a character has a corporation history to show — and not one EVE has no record
   // of, nor an NPC agent, whose "history" is the one corporation CCP placed it in.
   const npcCharacter = request.kind === 'character' && isNpcCharacterId(request.id);
+  // An NPC's view is the standings cards, which want a narrower dialog than a pilot's killboard.
+  const npcView =
+    npcCharacter || (request.kind === 'corporation' && isNpcCorporationId(request.id));
   if (
     request.kind === 'character' &&
     !npcCharacter &&
@@ -226,7 +248,7 @@ export function PublicInfoModal() {
       open
       onClose={close}
       title={title}
-      placement="wide"
+      placement={npcView ? (isPhone ? 'sheet-full' : 'medium') : 'wide'}
       closeOnBack={false}
       titleActions={
         activeEntityId === undefined || activeEntityId === null ? undefined : (
@@ -349,11 +371,16 @@ function CharacterTab({
     );
   if (npc) {
     return (
-      <NpcCharacterCard
-        profile={state.data}
-        factionId={corporation.status === 'ready' ? corporation.data.faction_id : undefined}
-        onOpenCorporation={onOpenCorporation}
-      />
+      <div className="space-y-4">
+        <NpcCharacterCard
+          profile={state.data}
+          factionId={corporation.status === 'ready' ? corporation.data.faction_id : undefined}
+          onOpenCorporation={onOpenCorporation}
+        />
+        <Suspense fallback={null}>
+          <LazyNpcInfoView kind="agent" id={state.data.characterId} />
+        </Suspense>
+      </div>
     );
   }
   return (
@@ -392,6 +419,13 @@ function CorporationTab({
       <TabStatus status={state.status === 'idle' ? 'loading' : state.status} onRetry={onRetry} />
     );
   const { data } = state;
+  if (isNpcCorporationId(data.corporation_id)) {
+    return (
+      <Suspense fallback={<TabStatus status="loading" />}>
+        <LazyNpcCorporationView key={data.corporation_id} data={data} />
+      </Suspense>
+    );
+  }
   const allianceId = liveAllianceId === undefined ? (data.alliance_id ?? null) : liveAllianceId;
   return (
     <Suspense fallback={<TabStatus status="loading" />}>

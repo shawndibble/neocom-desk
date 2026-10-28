@@ -21,6 +21,7 @@ import {
   LiveStatus,
   MenuItem,
   SearchInput,
+  DataTableSortPicker,
   Select,
   SelectContent,
   SelectItem,
@@ -480,6 +481,18 @@ export function JournalTable({
           totals={totals}
           entryCount={filteredJournal.length}
           showInternal={panel.coverage !== undefined}
+          // Phone: the sort is an icon at the row's end, so the table has no sort bar.
+          sortControl={
+            isPhone && filteredJournal.length > 0 ? (
+              <DataTableSortPicker
+                iconOnly
+                columns={cards ? cardColumns : shownColumns}
+                rows={filteredJournal}
+                sort={cardsSort}
+                onSortChange={onSortChange}
+              />
+            ) : undefined
+          }
         />
       </div>
       <LiveStatus>
@@ -531,7 +544,6 @@ export function JournalTable({
             responsive={cards ? 'stack' : 'table'}
             stacked={cards}
             stackLayout="dense"
-            mobileSort={isPhone}
             groupBy={groupBy}
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.

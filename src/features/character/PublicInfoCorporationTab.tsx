@@ -11,9 +11,8 @@
  * station and faction names — load here, each on its own, so one slow or
  * failed lookup never blanks the rest of the tab.
  *
- * An NPC corporation (CCP's id block, `isNpcCorporationId`) shows its faction
- * and skips the killboard and the alliance history: neither means anything
- * for a corporation no player runs.
+ * An NPC corporation (CCP's id block) never reaches this tab: `PublicInfoModal`
+ * gives it the standings view (`features/standings/modal`) instead.
  */
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatCount } from '@/lib/formatCount';
@@ -22,7 +21,6 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { EveMarkupText } from '@/components/EveMarkupText';
-import { isNpcCorporationId } from '@/esi/entityIds';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { allianceLogoUrl, corporationLogoUrl } from '@/lib/eveImages';
 import { corporationZkillUrl, fetchCorporationStats } from '@/lib/zkillboard';
@@ -67,8 +65,8 @@ export default function PublicInfoCorporationTab({
 }: PublicInfoCorporationTabProps) {
   const { t } = useTranslation();
   const corporationId = data.corporation_id;
-  const npc = isNpcCorporationId(corporationId);
   const [now] = useState(() => new Date());
+  // A player corporation enlisted in Faction Warfare carries the faction it fights for.
   const factionName = useEntityName(data.faction_id);
 
   const key = String(corporationId);
@@ -82,8 +80,8 @@ export default function PublicInfoCorporationTab({
     () => loadStationName(homeStationId ?? 0).catch(() => null),
     [homeStationId]
   );
-  const stats = useKeyedLoad(key, loadStats, npc).data ?? null;
-  const history = useKeyedLoad(key, loadHistory, npc).data ?? null;
+  const stats = useKeyedLoad(key, loadStats).data ?? null;
+  const history = useKeyedLoad(key, loadHistory).data ?? null;
   const stationName =
     useKeyedLoad(homeStationId === undefined ? null : String(homeStationId), loadStation).data ??
     null;
@@ -100,7 +98,7 @@ export default function PublicInfoCorporationTab({
   const ready = stats?.kind === 'stats' ? stats.stats : null;
   const figures = killFigures(t, ready);
   // One line: who it is (members, age, tax), then how it fights. Tax only when
-  // ESI states it; the zKillboard figures only for a corp players run.
+  // ESI states it.
   const facts: StatTileItem[] = [
     { label: t('publicInfo.memberCount'), value: formatCount(data.member_count) },
     {
@@ -113,7 +111,9 @@ export default function PublicInfoCorporationTab({
     ...(taxPercent === null
       ? []
       : [{ label: t('publicInfo.taxRate'), value: `${formatDecimal(taxPercent)}%` }]),
-    ...(npc ? [] : [figures.kills, figures.losses, figures.iskDestroyed]),
+    figures.kills,
+    figures.losses,
+    figures.iskDestroyed,
   ];
 
   return (
@@ -155,7 +155,7 @@ export default function PublicInfoCorporationTab({
           )}
           <p className="flex flex-wrap gap-x-3 gap-y-1">
             <span className={`${statusWordClassName} text-text-dim`}>
-              {npc ? t('publicInfo.npcCorporation') : t('publicInfo.playerCorporation')}
+              {t('publicInfo.playerCorporation')}
             </span>
             {data.war_eligible && (
               <span className={`${statusWordClassName} text-warning`}>
@@ -165,11 +165,9 @@ export default function PublicInfoCorporationTab({
           </p>
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
-          {!npc && (
-            <ExternalLink href={corporationZkillUrl(corporationId)}>
-              {t('publicInfo.zkillboard')}
-            </ExternalLink>
-          )}
+          <ExternalLink href={corporationZkillUrl(corporationId)}>
+            {t('publicInfo.zkillboard')}
+          </ExternalLink>
           {website && <ExternalLink href={website}>{t('publicInfo.website')}</ExternalLink>}
         </div>
       </div>
@@ -177,7 +175,7 @@ export default function PublicInfoCorporationTab({
       {ready && <ZkillRatioMeters stats={ready} />}
 
       <StatTiles items={facts} className={FACT_COLUMNS[facts.length]} />
-      {!npc && <ZkillStatsNote stats={stats} subject="corporation" />}
+      <ZkillStatsNote stats={stats} subject="corporation" />
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="min-w-0 space-y-5 self-start">

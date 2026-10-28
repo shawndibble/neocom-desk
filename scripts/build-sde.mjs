@@ -22,6 +22,7 @@ import { USER_AGENT as ESI_USER_AGENT } from './lib/constants.mjs';
 import { bakeCharacterTitles } from './lib/characterTitles.mjs';
 import { bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
+import { bakeAgents, bakeNpcCorporations } from './lib/npcAgents.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
 import { bakeTypeInfoShards } from './lib/typeInfo.mjs';
@@ -48,6 +49,9 @@ async function main() {
       'dynamicItemAttributes.jsonl',
       'dogmaAttributes.jsonl',
       'characterTitles.jsonl',
+      'npcCharacters.jsonl',
+      'npcCorporations.jsonl',
+      'npcCorporationDivisions.jsonl',
     ],
     ESI_USER_AGENT
   );
@@ -194,6 +198,17 @@ async function main() {
   if (Object.keys(characterTitles).length < 30) {
     throw new Error('characterTitles.json looks wrong: expected 30+ titles with English names');
   }
+
+  // --- agents.json and npcCorporations.json: the Contacts standings view's NPC
+  // agents, corporations and factions; see lib/npcAgents.mjs ---
+  const agents = bakeAgents(
+    parseJsonl(ccpStaticData['npcCharacters.jsonl']),
+    parseJsonl(ccpStaticData['npcCorporationDivisions.jsonl'])
+  );
+  const npcCorporationData = bakeNpcCorporations(
+    parseJsonl(ccpStaticData['npcCorporations.jsonl']),
+    parseJsonl(ccpStaticData['factions.jsonl'])
+  );
   await writeOutputs({
     lpCorporations,
     npcStations,
@@ -221,6 +236,8 @@ async function main() {
     wormholeMass,
     shipMass,
     characterTitles,
+    agents,
+    npcCorporationData,
     marketGroups,
     marketTypes,
     solarSystems,
@@ -268,6 +285,8 @@ async function main() {
     piUnclassifiedPins,
     piDisagreeingPins,
     alphaGradesDisagree,
+    agents,
+    npcCorporationData,
     masteries,
     certifiedPlans,
     skillPlanRecords,

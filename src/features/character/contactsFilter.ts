@@ -67,8 +67,8 @@ export function contactKind(contact: ContactIdentity): ContactKind {
 
 /**
  * Which Show Info tab a contact opens on — the row click and the row menu's
- * entry alike. No public faction-info endpoint is wired into the modal, so a
- * faction contact opens nothing.
+ * entry alike. The modal now has a faction view (Standings opens it), but a
+ * faction contact here opens nothing: the Contacts page has no use for it yet.
  */
 export function contactPublicInfoKind(contact: ContactIdentity): PublicInfoKind | null {
   return contact.contact_type === 'faction' ? null : contact.contact_type;

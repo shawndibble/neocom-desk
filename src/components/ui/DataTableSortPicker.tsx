@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { controlHeightClassName, fieldBaseClassName, type ControlSize } from './controlStyles';
 import * as Icon from './icons';
+import { iconButtonClassName } from './iconButtonClassName';
 import { firstSortDirection } from './dataTableSort';
 import type { DataTableColumn, DataTableSort } from './DataTable';
 
@@ -33,6 +34,12 @@ interface DataTableSortPickerProps<T> {
    * `sm` matches the `size="sm"` buttons of a filter row it sits in.
    */
   size?: ControlSize;
+  /**
+   * Renders a 36px square icon button instead of the labelled control, for a
+   * row with no width to spare. The native select still sits over it, so a
+   * phone keeps the OS picker; the sort in force moves to the accessible name.
+   */
+  iconOnly?: boolean;
   className?: string;
 }
 
@@ -52,32 +59,56 @@ export function DataTableSortPicker<T>({
   onSortChange,
   rows,
   size = 'md',
+  iconOnly = false,
   className,
 }: DataTableSortPickerProps<T>) {
   const { t } = useTranslation();
   const sortable = columns.filter((column) => column.sortValue !== undefined);
   const sortColumn = sort ? sortable.find((column) => column.id === sort.columnId) : undefined;
+  const currentLabel =
+    sortColumn && sort
+      ? t('common.dataTable.sortLabel', {
+          column: sortColumn.header,
+          arrow: SORT_ARROW[sort.direction],
+        })
+      : t('common.dataTable.sortNone');
   return (
     <label
       className={cx(
-        fieldBaseClassName,
-        controlHeightClassName[size],
-        size === 'sm' ? 'px-2' : 'px-3',
-        'relative inline-flex shrink-0 items-center gap-1.5 text-xs focus-within:outline-2 focus-within:outline-accent',
+        iconOnly
+          ? iconButtonClassName({
+              className: 'relative focus-within:outline-2 focus-within:outline-accent',
+            })
+          : cx(
+              fieldBaseClassName,
+              controlHeightClassName[size],
+              size === 'sm' ? 'px-2' : 'px-3',
+              'relative inline-flex shrink-0 items-center gap-1.5 text-xs focus-within:outline-2 focus-within:outline-accent'
+            ),
         className
       )}
     >
-      <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-dim" />
-      <span aria-hidden="true">
-        {sortColumn && sort
-          ? t('common.dataTable.sortLabel', {
-              column: sortColumn.header,
-              arrow: SORT_ARROW[sort.direction],
-            })
-          : t('common.dataTable.sortNone')}
-      </span>
+      {iconOnly ? (
+        <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.md} />
+      ) : (
+        <>
+          <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-dim" />
+          <span aria-hidden="true">{currentLabel}</span>
+        </>
+      )}
       <select
-        aria-label={t('common.dataTable.sortBy')}
+        aria-label={
+          iconOnly
+            ? sortColumn && sort
+              ? t('common.dataTable.sortByCurrent', {
+                  current: t('common.dataTable.sortOption', {
+                    column: sortColumn.header,
+                    arrow: SORT_ARROW[sort.direction],
+                  }),
+                })
+              : t('common.dataTable.sortBy')
+            : t('common.dataTable.sortBy')
+        }
         className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
         value={sortColumn && sort ? sortOptionValue(sort) : ''}
         onChange={(event) => {
