@@ -53,7 +53,12 @@ export function FittingEditorLayout({
   const { t } = useTranslation();
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
-  if (statsRequested && phoneTab !== 'stats') setPhoneTab('stats');
+  // One-shot on the request rising, so the pilot can still leave the Stats tab afterwards.
+  const [statsSeen, setStatsSeen] = useState(statsRequested);
+  if (statsSeen !== statsRequested) {
+    setStatsSeen(statsRequested);
+    if (statsRequested) setPhoneTab('stats');
+  }
   // The tab bar renders on the phone sheet only.
   const viewTabsId = useTabsId();
 

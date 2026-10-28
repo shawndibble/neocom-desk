@@ -164,18 +164,19 @@ export function FittingStatsSections({
   const closePanel = () => setPanel(null);
   if (whatToTrainRequested && panel !== 'pilot') openPanel('pilot');
   // Not tied to a change in the request: a phone mounts this column only once its Stats tab shows.
+  const scrollToTrain = useRef(false);
   useEffect(() => {
     if (!whatToTrainRequested) return;
-    void useStatsSectionsPreference
-      .getState()
-      .setValue(
-        withSectionExpanded(useStatsSectionsPreference.getState().value, 'whatToTrain', true)
+    scrollToTrain.current = true;
+    const store = useStatsSectionsPreference.getState();
+    // Hydrated first: writing over the unread default would wipe the saved layout.
+    void store
+      .hydrate()
+      .then(() =>
+        store.setValue(
+          withSectionExpanded(useStatsSectionsPreference.getState().value, 'whatToTrain', true)
+        )
       );
-    requestAnimationFrame(() =>
-      document
-        .querySelector('[data-section="whatToTrain"]')
-        ?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
-    );
     onWhatToTrainShown?.();
   }, [whatToTrainRequested, onWhatToTrainShown]);
   const pilotTriggerRef = useRef<HTMLButtonElement>(null);
@@ -358,7 +359,22 @@ export function FittingStatsSections({
                 )}
               {stats &&
                 whatToTrain &&
-                section('whatToTrain', undefined, whatToTrain, undefined, 'h3')}
+                section(
+                  'whatToTrain',
+                  undefined,
+                  // Mounts once the section is open: the one moment there is something to scroll to.
+                  <div
+                    ref={(el) => {
+                      if (!el || !scrollToTrain.current) return;
+                      scrollToTrain.current = false;
+                      el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+                    }}
+                  >
+                    {whatToTrain}
+                  </div>,
+                  undefined,
+                  'h3'
+                )}
               {stats && fitting && yourCharacters && (
                 <YourCharactersSection
                   fitting={fitting}

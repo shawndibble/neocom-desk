@@ -36,7 +36,7 @@ export function StatSection({
   const { t } = useTranslation();
   const previewed = useSectionPreviewed(id);
   return (
-    <section data-section={id} className="border-b border-line last:border-b-0">
+    <section className="border-b border-line last:border-b-0">
       {/* Every section's row looks alike, open or shut: its small-caps title, the headline figure beside. Hover fills it `panel-2`, so it rests unfilled. */}
       <div className={cx('flex items-center gap-2 pr-3', rowInteractiveClassName)}>
         <Heading className="min-w-0 flex-1">
