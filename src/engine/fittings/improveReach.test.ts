@@ -243,6 +243,21 @@ describe('a fitted module the pilot cannot fly', () => {
     expect(list.map((c) => [c.toTypeId, c.fixesUnflyable])).toEqual([[8, true]]);
   });
 
+  it('keeps a fix when more than the cap of other candidates come first', () => {
+    const many = fit([
+      ['medium', 0, 6],
+      ['low', 0, 11],
+    ]);
+    const list = improveCandidates(many.modules, index, rackOf, {
+      ...base,
+      goal: 'reach',
+      reach: 'rework',
+      limit: 1,
+      pool: { ...base.pool!, flyable: () => true, pilotCanFly: (_slot, id) => id !== 11 },
+    });
+    expect(list.map((c) => [c.fromTypeId, c.fixesUnflyable])).toEqual([[11, true]]);
+  });
+
   it('leaves a flyable module’s candidates untagged', () => {
     const list = offered(() => true);
     expect(list.map((c) => [c.toTypeId, c.fixesUnflyable])).toEqual([[7, undefined]]);

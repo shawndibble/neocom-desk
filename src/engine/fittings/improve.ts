@@ -364,7 +364,7 @@ function scoreOf(
   }
 }
 
-/** Cheaper may give up this much damage, tank or speed: a bit worse for a lot less ISK is the point. */
+/** Cheaper may give up this much damage, tank or speed: a bit worse for a lot less ISK is the point. Deliberately looser than Make it fit's `STAT_TOLERANCE`. */
 const CHEAPER_TOLERANCE = 0.1;
 
 /** The first Guardrail `after` breaks, or null. */
@@ -395,6 +395,8 @@ export interface ModulePool {
   published: (typeId: number) => boolean;
   /** Whether the hull takes the module in that rack and the pilot can fly it; absent: assumed. Asked before the per-module cap so unfittable types do not use it. */
   flyable?: (slot: FittingSlotKind, typeId: number) => boolean;
+  /** Whether the pilot's skills alone allow the module, for a fitted one (its hull fit is not in question); absent: `flyable`. */
+  pilotCanFly?: (slot: FittingSlotKind, typeId: number) => boolean;
 }
 
 export interface CandidateOptions {
@@ -512,7 +514,8 @@ export function improveCandidates(
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
-    const unflyable = o.pool?.flyable ? !o.pool.flyable(slot, fromTypeId) : false;
+    const canFly = o.pool?.pilotCanFly ?? o.pool?.flyable;
+    const unflyable = canFly ? !canFly(slot, fromTypeId) : false;
     const from = groupOf(fromTypeId);
     const job = jobOf(from);
     const guardsJob = job !== null && !scored.includes(job);
@@ -542,14 +545,6 @@ export function improveCandidates(
     for (const member of getVariations(index, fromTypeId).members) {
       offer(0, member.typeId, groupOf(member.typeId));
     }
-    // Variants first, then the same group, then the goal's groups: each only when the last found none.
-    if (o.pool && unflyable) {
-      if (taken[0] === 0 && from !== undefined && o.reach === 'upgrade')
-        for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
-      if (taken[0] + taken[1] === 0 && o.reach !== 'rework')
-        for (const group of reworkGroups(o.goal, sides))
-          for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
-    }
     // The other side's tank modules are freed: they take the chosen side's modules whatever the Reach.
     const otherSide = from === undefined ? null : sideOf(from);
     if (o.pool && freesTank && otherSide !== null && otherSide !== o.defense) {
@@ -563,6 +558,14 @@ export function improveCandidates(
     if (o.pool && o.reach === 'rework') {
       for (const group of reworkGroups(o.goal, sides))
         for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
+    }
+    // Whatever the Reach found, an unflyable module is replaced: the same group when no variant was found, then the goal's groups.
+    if (o.pool && unflyable) {
+      if (taken[0] + taken[1] + taken[2] === 0 && from !== undefined)
+        for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
+      if (taken[0] + taken[1] + taken[2] === 0)
+        for (const group of reworkGroups(o.goal, sides))
+          for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
     }
   }
 
@@ -588,7 +591,13 @@ export function improveCandidates(
       }
     }
   }
-  return tiers.flat().slice(0, o.limit ?? MAX_CANDIDATES);
+  // Replacing an unflyable module is never cut by the cap.
+  const all = tiers.flat();
+  const fixes = all.filter((candidate) => candidate.fixesUnflyable);
+  return [...fixes, ...all.filter((candidate) => !candidate.fixesUnflyable)].slice(
+    0,
+    o.limit ?? MAX_CANDIDATES
+  );
 }
 
 /** Best score first; a tie goes to the cheaper swap; an unpriced swap sorts after every priced one. */
