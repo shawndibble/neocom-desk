@@ -577,7 +577,7 @@ export function Market() {
   // `?share=<id>`, its hub and percent riding `?hub=` and `?percent=`.
   const sharedSeed = useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
   // The appraised list rides `?list=`, so Back and a reload restore it.
-  useAppraisalListUrl(appraisal);
+  useAppraisalListUrl(appraisal, tab === 'appraisal');
   // Feeds the net-of-fees chips' broker fee — resolved once per character,
   // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);

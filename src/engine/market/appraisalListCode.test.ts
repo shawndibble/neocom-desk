@@ -47,6 +47,11 @@ describe('appraisal list code', () => {
     expect(result).toEqual({ ok: false, reason: 'too-large' });
   });
 
+  it('rejects text whose raw size passes the decode cap, even if it compresses small', async () => {
+    const result = await encodeAppraisalList(`${'Tritanium 1\n'.repeat(6000)}`);
+    expect(result).toEqual({ ok: false, reason: 'too-large' });
+  });
+
   it('keeps a 1,000-line list under the cap', async () => {
     const list = Array.from({ length: 1000 }, (_, i) => `Tritanium ${i + 1}`).join('\n');
     const result = await encodeAppraisalList(list);
