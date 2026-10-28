@@ -524,6 +524,18 @@ describe('AppraisalPanel', () => {
       }
     });
 
+    it('carries a short Sell / Buy label for the phone layout, hidden from assistive tech', async () => {
+      renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
+      const list = await compareCards();
+      const card = hubCard(list, TRADE_HUBS[1].systemName);
+      const short = within(card).getByText('Sell');
+      expect(short).toHaveClass('sm:hidden');
+      expect(short).toHaveAttribute('aria-hidden', 'true');
+      expect(within(card).getByText('Sell total')).toHaveClass('max-sm:hidden');
+      expect(within(card).getByText('Buy')).toHaveClass('sm:hidden');
+      expect(within(card).getByText('Buy total')).toHaveClass('max-sm:hidden');
+    });
+
     it('is expanded on mount when opened via defaultCompareExpanded (issue #726)', () => {
       renderPanel({
         controller: controller({ result: outcome(), compare: COMPARE_ROWS }),

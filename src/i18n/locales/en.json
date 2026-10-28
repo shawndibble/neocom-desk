@@ -12105,6 +12105,8 @@
       "totalVolumePartial_other": "{{count}} items have no known volume, so this total leaves them out.",
       "sellTotal": "Sell total",
       "buyTotal": "Buy total",
+      "sellShort": "Sell",
+      "buyShort": "Buy",
       "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing.",
       "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row.",
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",

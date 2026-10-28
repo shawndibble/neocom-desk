@@ -82,18 +82,27 @@ function CopyableTotal({
  */
 function HubFigure({
   label,
+  shortLabel,
   value,
   copied,
   onCopied,
 }: {
   label: string;
+  /** What the label reads as below `sm`, where two figures share a row. */
+  shortLabel: string;
   value: number | null;
   copied: boolean;
   onCopied: () => void;
 }) {
   return (
-    <div>
-      <dt className={eyebrowClassName}>{label}</dt>
+    <div className="min-w-0">
+      {/* One DOM at every width (DESIGN.md §4b): the short form is aria-hidden so the full label is what is announced. */}
+      <dt className={eyebrowClassName}>
+        <span aria-hidden="true" className="sm:hidden">
+          {shortLabel}
+        </span>
+        <span className="max-sm:hidden">{label}</span>
+      </dt>
       <dd className="text-base text-text tabular-nums">
         {value === null ? '—' : <CopyableTotal value={value} copied={copied} onCopied={onCopied} />}
       </dd>
@@ -125,7 +134,7 @@ export function HubCompareCards({
         them any more. They sit straight on the page ground, like the result
         `Panel` above them.
 
-        One column on a phone, three from `sm`, all five from `lg` — which is
+        Two columns on a phone, three from `sm`, all five from `lg` — which is
         also where the paste box becomes a 21rem sidebar, so the results track
         narrows at the same breakpoint the card count grows. Five tracks in
         that ~640px track is ~120px of content each: enough for a compact ISK
@@ -171,15 +180,17 @@ export function HubCompareCards({
                   {row.hub.systemName}
                 </button>
               </p>
-              <dl className="mt-2 flex flex-col gap-2">
+              <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-1">
                 <HubFigure
                   label={t('market.appraisal.sellTotal')}
+                  shortLabel={t('market.appraisal.sellShort')}
                   value={row.sell}
                   copied={copied === `${row.hub.id}:sell`}
                   onCopied={() => announceCopied(`${row.hub.id}:sell`)}
                 />
                 <HubFigure
                   label={t('market.appraisal.buyTotal')}
+                  shortLabel={t('market.appraisal.buyShort')}
                   value={row.buy}
                   copied={copied === `${row.hub.id}:buy`}
                   onCopied={() => announceCopied(`${row.hub.id}:buy`)}
