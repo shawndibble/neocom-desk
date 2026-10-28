@@ -233,6 +233,20 @@ describe('SetWaypoints', () => {
     );
   });
 
+  it('Dismiss hides the note even while another Character holds the scope', async () => {
+    await seed([
+      { id: ONE, name: 'Pilot One', scopes: [] },
+      { id: TWO, name: 'Pilot Two', scopes: [WAYPOINT_SCOPE] },
+    ]);
+    show([leg([JITA, PERIMETER])]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Grant permission' })).toBeNull();
+    expect(screen.getByText('Grant missing Permissions')).toBeInTheDocument();
+  });
+
   it('shows the button for a Character that holds the scope even when dismissed', async () => {
     await useWaypointsDismissed.getState().setValue(true);
     await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);

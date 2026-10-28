@@ -171,14 +171,18 @@ export function SetWaypoints({
             )}
             {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
             {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
-            <Tooltip content={lacksScope ? null : blockedReason}>{sendButton}</Tooltip>
+            <Tooltip content={lacksScope && !dismissed ? null : blockedReason}>
+              {sendButton}
+            </Tooltip>
           </div>
         )}
       </div>
-      {blockedReason !== null && !lacksScope && !hidden && (
+      {/* A dismissed note leaves the reason as the disabled button's only explanation. */}
+      {blockedReason !== null && (!lacksScope || dismissed) && !hidden && (
         <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
-      {lacksScope && characterId !== null && !hidden && (
+      {/* The raw flag, not `hidden`: Dismiss clears the note even while another Character holds the scope. */}
+      {lacksScope && characterId !== null && !dismissed && (
         <div className="space-y-2 py-2">
           <p className="text-xs font-semibold tracking-widest text-warning uppercase">
             {t('travel.waypoints.grantTitle', { character: characterName ?? '' })}
