@@ -71,6 +71,11 @@ describe('corpMembers', () => {
       'overview.widgets.corpMembers.secondary{"joined":1,"left":1}'
     );
     expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Bea', '#9']);
+    // A joined row flashes on the roster; a left member is gone from it, so that row stays plain.
+    expect(view.table?.rows.map((r) => r.to)).toEqual([
+      '/corp/members/roster?highlight=2',
+      undefined,
+    ]);
     expect(view.table?.footer).toBeUndefined();
     expect(view.to).toBe('/corp/members');
   });
@@ -137,6 +142,10 @@ describe('corpInactive', () => {
       ['Ann', 'common.age.days{"count":40}'],
     ]);
     expect(view.table?.pageable).toBe(true);
+    expect(view.table?.rows.map((r) => r.to)).toEqual([
+      '/corp/members?dark=1&highlight=3',
+      '/corp/members?dark=1&highlight=1',
+    ]);
     expect(view.to).toBe('/corp/members?dark=1');
   });
 
@@ -189,6 +198,7 @@ describe('corpMining', () => {
     expect(view.number.secondary?.text).toBe(
       'overview.widgets.corpMining.topMiner{"name":"Ann","share":"overview.widgets.corpMining.percent{\\"value\\":80}"}'
     );
+    expect(view.table?.rows.map((r) => r.to)).toEqual(['/corp/moons/miners', '/corp/moons/miners']);
     expect(view.table?.rows[0]?.cells[0]).toBe('Ann');
     expect(view.table?.rows[0]?.cells[3]).toBe('Zeolites');
     expect(view.table?.rows[1]?.cells[0]).toBe('#2');

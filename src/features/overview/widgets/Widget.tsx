@@ -174,12 +174,16 @@ function TableViewBody({
   size,
   title,
   paging,
+  inert,
 }: {
   view: KindView;
   size: WidgetModel['size'];
   title: string;
   paging: TableBodyProps['paging'];
+  /** The landing demo has no page to go to: its rows draw no links. */
+  inert: boolean;
 }) {
+  const table = tableOf(view);
   return (
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
@@ -187,7 +191,9 @@ function TableViewBody({
         model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
       />
       <TableBody
-        table={tableOf(view)}
+        table={
+          inert ? { ...table, rows: table.rows.map((row) => ({ ...row, to: undefined })) } : table
+        }
         columnsFor={size}
         rowLimit={TABLE_ROWS[size]}
         paging={paging}
@@ -440,6 +446,7 @@ function WidgetFrame({
           view={view}
           size={widget.size}
           title={title}
+          inert={inertTitle}
           paging={{
             rowsPerPage: widget.rowsPerPage ?? DEFAULT_ROWS_PER_PAGE,
             onRowsPerPage: (rows) => setRowsPerPage(widget.id, rows),
