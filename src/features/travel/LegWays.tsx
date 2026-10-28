@@ -327,9 +327,9 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
-  const { leg, holes, nameOf } = props;
+  const { leg, holes, bridges, nameOf } = props;
   // One way is no comparison; the Ansiblex setup box still offers something to do.
-  const showWays = leg.ways.length > 1 || props.bridges === 'none';
+  const showWays = leg.ways.length > 1 || bridges === 'none';
   // A pin waiting on the hole list: said once the list is off or unreachable, not while it loads.
   const noteKey =
     leg.pinNote === 'no-list' ? (holes === 'loading' ? null : `no-list-${holes}`) : leg.pinNote;
