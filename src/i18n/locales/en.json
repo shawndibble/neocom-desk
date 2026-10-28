@@ -7818,6 +7818,8 @@
         "noGateRoute": "no gate route",
         "load": "Load {{volume}} m³ at {{place}}",
         "drop": "Drop {{volume}} m³ at {{place}}",
+        "travel": "Travel to {{place}}",
+        "haul": "Haul to {{place}}",
         "take": "Take {{ships}} at {{place}}",
         "fly": "Fly {{ships}} to {{place}}",
         "waypoint": "Set waypoint",
