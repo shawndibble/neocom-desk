@@ -19,7 +19,15 @@ const KBD =
  * Two columns from `md` up, so the list fills the card without throwing a
  * description and its key a card's width apart; one column on a phone.
  */
-const LIST = 'grid grid-cols-1 gap-x-8 text-sm md:grid-cols-2';
+const LIST =
+  'grid grid-cols-1 gap-x-8 text-sm md:grid-cols-2 [&>*:last-child]:border-b-0 md:[&>*:nth-last-child(2)]:border-b-0';
+
+/**
+ * The card's own edge closes the list, so the last row drops its divider.
+ * In the two-column `LIST` the last row of each column is the last and the
+ * second-to-last child, whichever column holds an odd count.
+ */
+const SINGLE_LIST = 'text-sm [&>*:last-child]:border-b-0';
 
 /** A description and its key, one row of a shortcut list. */
 function Row({
@@ -85,7 +93,7 @@ export function ShortcutsPanel() {
         {/* The app-wide paste router (`app/GlobalPasteRouter.tsx`); rows come from its registry. */}
         <p className="mb-2 text-sm text-text-dim">{t('shortcuts.pasteHint')}</p>
         {/* One column: its rows name a destination, not a key, and wrap in a half-width column. */}
-        <dl className="text-sm">
+        <dl className={SINGLE_LIST}>
           <Row label={t('shortcuts.paste')}>
             <kbd className={KBD}>{pasteDisplayKey(apple)}</kbd>
           </Row>
