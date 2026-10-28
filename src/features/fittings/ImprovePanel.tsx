@@ -872,6 +872,21 @@ export function ImprovePanel({
     };
     // `settings.mode` is part of the price a cover shows.
   }, [fitting, recalc, completion, checked, overruns, chosen, chosenKey, settings.mode]);
+  // Ticked rows that no list shows are covers added from the footer: they get a tick of their own there.
+  const listedKeys = useMemo(
+    () =>
+      state.status === 'done'
+        ? new Set(
+            [
+              ...state.result.makeFlyable,
+              ...state.result.noDownside,
+              ...state.result.tradeOffs,
+            ].map(optionKey)
+          )
+        : new Set<string>(),
+    [state]
+  );
+  const tickedCovers = chosen.filter((pick) => !listedKeys.has(optionKey(pick)));
   const offered =
     covers?.key === chosenKey && summary
       ? covers.options.filter(
@@ -1514,9 +1529,24 @@ export function ImprovePanel({
                   )}
                 </div>
               )}
-              {overruns && (
+              {(overruns || tickedCovers.length > 0) && (
                 <div className="space-y-1 text-sm" data-testid="improve-cover">
-                  {offered === null ? (
+                  {tickedCovers.map((pick) => (
+                    <label
+                      key={optionKey(pick)}
+                      className={cx('flex items-start gap-2 text-xs', tappableRowClassName)}
+                    >
+                      <Checkbox checked onChange={() => toggle(pick)} />
+                      <span>
+                        {t('fittings.improve.cover.added', {
+                          swaps: [moveLabel(pick.candidate), ...flyableSwaps(pick.candidate)].join(
+                            '; '
+                          ),
+                        })}
+                      </span>
+                    </label>
+                  ))}
+                  {!overruns ? null : offered === null ? (
                     <p className="text-text-dim text-xs" role="status">
                       {t('fittings.improve.cover.searching')}
                     </p>
@@ -1525,7 +1555,9 @@ export function ImprovePanel({
                       <p className="text-xs font-medium">
                         {offered.length > 0
                           ? t('fittings.improve.cover.title')
-                          : t('fittings.improve.cover.none')}
+                          : covers && covers.options.length > 0
+                            ? t('fittings.improve.cover.overBudget')
+                            : t('fittings.improve.cover.none')}
                       </p>
                       {offered.map((option) => (
                         <button
@@ -1553,7 +1585,8 @@ export function ImprovePanel({
                       ))}
                     </>
                   )}
-                  {setAsFix &&
+                  {overruns &&
+                    setAsFix &&
                     renderFlyableImplants?.(setAsFix, t('fittings.improve.cover.thisSet'))}
                 </div>
               )}

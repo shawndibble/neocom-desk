@@ -655,7 +655,11 @@ export function useImprove(
                 swaps,
                 priceOf: (typeId: number) => prices?.get(typeId)?.sellMin ?? null,
               };
-            })())
+            })().catch((error: unknown) => {
+              // A failed lookup is asked again next time, not remembered.
+              pool = null;
+              throw error;
+            }))
         );
         setState({
           status: 'done',

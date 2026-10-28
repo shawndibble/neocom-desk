@@ -1414,6 +1414,8 @@
         "searching": "Looking for swaps that cover this set…",
         "title": "Add one of these so the set fits:",
         "none": "No module or rig swap covers this set.",
+        "overBudget": "Swaps would cover this set, but not within your budget.",
+        "added": "Added to cover the set: {{swaps}}",
         "thisSet": "this set"
       },
       "flyableShort": "{{amount}} more {{resource}}",

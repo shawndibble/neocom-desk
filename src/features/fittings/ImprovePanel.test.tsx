@@ -299,6 +299,11 @@ describe('ImprovePanel', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Apply 3 changes' })).toBeEnabled()
     );
+    // The added cover has its own tick, so it can be taken back out.
+    await userEvent.click(screen.getByRole('checkbox', { name: /Added to cover the set/ }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled()
+    );
   });
 
   it('greys a fix nothing can pay for, saying what it needs', () => {
