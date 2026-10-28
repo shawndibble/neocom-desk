@@ -12,6 +12,7 @@ import { createMarketItemCatalogue, type MarketItemCatalogue } from './marketIte
 import { useCommandPalette } from './store';
 import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { SHIP_TREE } from '@/features/fittings/shipTree/__fixtures__/shipTreeFixture';
 import { loadPaletteContacts } from './contactsProvider';
 
 // The session catalogue is module-level; each test gets a fresh one behind it.
@@ -77,11 +78,19 @@ vi.mock('@/features/corp/useCorpAccess', () => ({
 }));
 const loadLpCorporations = vi.hoisted(() => vi.fn());
 vi.mock('@/sde/loadMarketSde', () => ({ loadLpCorporations }));
+const loadShipTree = vi.hoisted(() => vi.fn());
+vi.mock('@/sde/loadSde', () => ({ loadShipTree }));
 const beginAddCharacterLogin = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/app/loginFlow', () => ({ beginAddCharacterLogin }));
 
 function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
+  const { pathname, search } = useLocation();
+  return (
+    <>
+      <p data-testid="where">{pathname}</p>
+      <p data-testid="search">{search}</p>
+    </>
+  );
 }
 
 function renderShell() {
@@ -106,6 +115,7 @@ beforeEach(async () => {
   ] as never);
   await useActiveCharacter.getState().setActiveCharacter(1);
   await db.esiCache.clear();
+  loadShipTree.mockResolvedValue(SHIP_TREE);
   loadLpCorporations.mockResolvedValue([
     { id: 1000130, name: 'Sisters of EVE' },
     { id: 1000125, name: 'CONCORD' },
@@ -410,6 +420,20 @@ describe('CommandPalette', () => {
       });
       expect(screen.queryByRole('group', { name: 'Contacts' })).not.toBeInTheDocument();
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Ships', () => {
+    it('finds a hull by name and Enter opens the Ship Tree on it', async () => {
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.type(await screen.findByRole('combobox'), 'tengu');
+      const ships = await screen.findByRole('group', { name: 'Ships' });
+      expect(await within(ships).findByRole('option', { name: /Tengu/ })).toBeVisible();
+      await user.keyboard('{Enter}');
+      expect(screen.getByTestId('where')).toHaveTextContent('/ships/tree');
+      expect(screen.getByTestId('search')).toHaveTextContent('?ship=29984');
     });
   });
 

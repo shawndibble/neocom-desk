@@ -37,6 +37,9 @@ import {
   type ShownMarketItem,
 } from './marketItems';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { loadShipTree } from '@/sde/loadSde';
+import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
+import { createShipsProvider } from './shipsProvider';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
@@ -98,6 +101,18 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
     [activeCharacterId, navigate, t]
   );
 
+  // Same reason as LP Stores: it holds the loaded Ship Tree. The pushed-entry
+  // marker makes Back from the window return to the page the pilot was on.
+  const ships = useMemo(
+    () =>
+      createShipsProvider({
+        loadShipTree,
+        onOpen: (typeID) =>
+          void navigate(`/ships/tree?ship=${typeID}`, { state: ENTITY_INFO_PUSHED_STATE }),
+      }),
+    [navigate]
+  );
+
   return useMemo(
     () => [
       createPagesProvider({ destinations, navigate: (path) => void navigate(path) }),
@@ -144,6 +159,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
           t('commandPalette.assetQuantity', { quantity: formatCount(quantity) }),
       }),
       lpStores,
+      ships,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
     [
@@ -157,6 +173,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       assets,
       assetsScope,
       lpStores,
+      ships,
       onShowItem,
     ]
   );

@@ -104,6 +104,7 @@ function InfoSurface({
   children: ReactNode;
 }) {
   // One dismissal contract on both surfaces: Escape, the ✕ and Back close it.
+  // Back works through the `?ship=` URL entry (ShipTreeTab), not an overlay entry.
   // Below `sm` it is a bottom sheet (grabber, swipe down, scrim). From `sm` up
   // — touch tablets included — it stays the non-modal `SlideOver`, because the
   // tree behind it must stay live to pick the next ship; `SlideOver` carries a
@@ -111,13 +112,19 @@ function InfoSurface({
   // no sheet to get the same ways out.
   if (phone) {
     return open ? (
-      <Modal open onClose={onClose} title={title} placement="sheet">
+      <Modal open onClose={onClose} title={title} placement="sheet" closeOnBack={false}>
         {children}
       </Modal>
     ) : null;
   }
   return (
-    <SlideOver open={open} onClose={onClose} title={title} className="max-w-[40rem]!">
+    <SlideOver
+      open={open}
+      onClose={onClose}
+      title={title}
+      closeOnBack={false}
+      className="max-w-[40rem]!"
+    >
       {children}
     </SlideOver>
   );

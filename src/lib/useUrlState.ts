@@ -57,6 +57,8 @@ export type UrlParamSchema = Record<
 /** `push` adds a history entry instead of replacing the current one; `clearHash` drops the `#fragment`. */
 export interface UrlWriteOptions {
   push?: boolean;
+  /** History state for the written entry; default keeps the current entry's. */
+  state?: unknown;
   clearHash?: boolean;
 }
 
@@ -186,7 +188,7 @@ function writeParams(
   navigate: NavigateFunction,
   codecs: Record<string, AnyCodec>,
   values: Record<string, unknown>,
-  { push = false, clearHash = false }: UrlWriteOptions
+  { push = false, clearHash = false, state }: UrlWriteOptions
 ): void {
   const params = new URLSearchParams(location.search);
   for (const [key, value] of Object.entries(values)) {
@@ -202,7 +204,7 @@ function writeParams(
       search: search === '' ? '' : `?${search}`,
       hash: clearHash ? '' : location.hash,
     },
-    { replace: !push, state: location.state }
+    { replace: !push, state: state ?? location.state }
   );
 }
 
