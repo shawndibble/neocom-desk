@@ -1,5 +1,5 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,6 +36,8 @@ import { clonesCsvColumns } from '@/features/character/clonesCsv';
 import { CloneVerdictCard } from '@/features/character/CloneVerdictCard';
 import { WORN_CLONE_ID } from '@/features/character/cloneTraining';
 import { CLONES_SORTS, type ClonesSort } from '@/features/character/clonesSort';
+import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { loadClonesSnapshot } from '@/features/character/clonesSnapshot';
 import { CloneCard, TOUCH_LINK } from '@/features/character/CloneCard';
 
@@ -79,6 +81,10 @@ export function Clones() {
   const loadedAt = data?.loadedAt ?? 0;
 
   const clones = useMemo(() => clonesResult?.data.jump_clones ?? NO_CLONES, [clonesResult]);
+  // An Overview row's `?highlight=<jump_clone_id>`: the worn clone has no id, so its row stays plain.
+  const highlightedCloneId = useHighlightParam();
+  const cloneListRef = useRef<HTMLUListElement>(null);
+  useScrollToRowKey(cloneListRef, highlightedCloneId, clones);
   const lastCloneJumpDate = clonesResult?.data.last_clone_jump_date ?? null;
   const homeLocation = clonesResult?.data.home_location;
   const lastStationChangeDate = clonesResult?.data.last_station_change_date ?? null;
@@ -293,7 +299,11 @@ export function Clones() {
                 <p className="px-3 pt-3 text-xs text-text-dim">{t('clones.namesNote')}</p>
               )}
             {(clones.length > 0 || hasWorn) && (
-              <ul aria-label={t('clones.title')} className="grid gap-3 p-3 md:grid-cols-2">
+              <ul
+                ref={cloneListRef}
+                aria-label={t('clones.title')}
+                className="grid gap-3 p-3 md:grid-cols-2"
+              >
                 {hasWorn && (
                   <CloneCard
                     current
@@ -320,6 +330,8 @@ export function Clones() {
                   return (
                     <CloneCard
                       key={clone.jump_clone_id}
+                      rowKey={String(clone.jump_clone_id)}
+                      highlighted={clone.jump_clone_id === highlightedCloneId}
                       title={name ?? place}
                       place={name === undefined ? null : place}
                       rename={

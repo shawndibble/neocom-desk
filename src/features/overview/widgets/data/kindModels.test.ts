@@ -659,6 +659,27 @@ describe('clones table', () => {
     expect(table?.rows[2]?.cells[1]).toEqual(expect.stringContaining('laterBy'));
   });
 
+  it('sends each jump clone row to its card, and leaves the worn clone plain', () => {
+    const view = buildView(
+      'clones',
+      {
+        clones: ok({
+          ...base,
+          verdict: 'stay' as const,
+          bestId: 'worn',
+          savedSeconds: null,
+          rows: [
+            { id: 'worn', label: null, totalSeconds: 9, deltaSeconds: 0 },
+            { id: 7, label: 'Far', totalSeconds: 12, deltaSeconds: SDAY },
+          ],
+        }),
+      },
+      ctx()
+    );
+    expect(view.table?.rows.map((r) => r.to)).toEqual([undefined, '/clones?highlight=7']);
+    expect(view.rows.map((r) => r.to)).toEqual([undefined, '/clones?highlight=7']);
+  });
+
   it('names the nearest rival when the answer is to stay', () => {
     const view = buildView(
       'clones',

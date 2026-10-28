@@ -20,3 +20,8 @@ export function openHref(path: string, id: number | string): string {
   const sep = path.includes('?') ? '&' : '?';
   return `${path}${sep}${OPEN_PARAM}=${encodeURIComponent(String(id))}`;
 }
+
+/** `path?highlight=<id>`, the link a widget row builds to scroll to and flash a record on its page. */
+export function highlightHref(path: string, id: number | string): string {
+  return `${path}?${HIGHLIGHT_PARAM}=${encodeURIComponent(String(id))}`;
+}

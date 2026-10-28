@@ -5,6 +5,7 @@
  * time, the widget's range applied here over data shared by every widget of
  * the kind.
  */
+import { highlightHref } from '@/lib/highlightParam';
 import { fixed1 } from '@/lib/fixedFormat';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
@@ -574,6 +575,7 @@ const clones: Builder = (feeds, { t }) => {
     return {
       key: String(row.id),
       title: labelOf(row),
+      to: row.id === 'worn' ? undefined : highlightHref('/clones', row.id),
       detail: row.id === data.bestId ? t(`${D}.clones.best`) : undefined,
       value:
         delta === null
