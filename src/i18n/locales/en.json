@@ -7197,6 +7197,10 @@
     "oreTagsRemoveError": "Couldn't remove the {{name}} tag. Try again.",
     "removeOreTagLabel": "Remove the {{name}} tag",
     "allPayees": "All payees",
+    "noPayees": "No payees",
+    "noPayeesSelected": "No payees selected.",
+    "selectAllPayees": "Select all",
+    "selectNoPayees": "Select none",
     "payeesSelected_one": "{{count}} payee",
     "payeesSelected_other": "{{count}} payees",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
@@ -13751,6 +13755,7 @@
       "assets": "Assets",
       "contacts": "Contacts",
       "lpStores": "LP Stores",
+      "ships": "Ships",
       "marketItems": "Market items"
     },
     "commands": {

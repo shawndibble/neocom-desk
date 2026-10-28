@@ -672,3 +672,32 @@ describe('ShipTreeTab — no character', () => {
     expect(within(dialog).queryByRole('button', { name: /Add/ })).not.toBeInTheDocument();
   });
 });
+
+describe('ShipTreeTab — ?ship= window', () => {
+  const location = () => screen.getByTestId('location').textContent;
+
+  it('arrives with the hull window open on the hull faction', async () => {
+    renderTab(`/ships/tree?ship=${WORM}`);
+    await screen.findByRole('dialog', { name: 'Worm' });
+    await waitFor(() => expect(location()).toContain('faction=500010'));
+    expect(await screen.findByRole('region', { name: 'Guristas Pirates ship tree' })).toBeVisible();
+  });
+
+  it('ignores an unknown id and strips it', async () => {
+    renderTab('/ships/tree?ship=999999');
+    await screen.findByRole('region', { name: 'Caldari State ship tree' });
+    await waitFor(() => expect(location()).toBe('/ships/tree'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('writes the param on a click and clears it on close', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(await screen.findByRole('button', { name: /^Crow/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Crow' });
+    expect(location()).toContain(`ship=${CROW}`);
+    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+    await waitFor(() => expect(location()).not.toContain('ship='));
+    expect(screen.queryByRole('dialog', { name: 'Crow' })).not.toBeInTheDocument();
+  });
+});
