@@ -178,7 +178,7 @@ export function SetWaypoints({
       {blockedReason !== null && !lacksScope && !hidden && (
         <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
-      {lacksScope && characterId !== null && !hidden && (
+      {lacksScope && characterId !== null && !dismissed && (
         <div className="space-y-2 py-2">
           <p className="text-xs font-semibold tracking-widest text-warning uppercase">
             {t('travel.waypoints.grantTitle', { character: characterName ?? '' })}
