@@ -16,7 +16,9 @@ import {
   type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
-import { COL_DATETIME, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
+import { COL_DATETIME, COL_DATETIME_STACKED } from '@/components/ui/dataTableWidths';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { fitColumnWidth } from './transactionColumnWidths';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
@@ -82,6 +84,9 @@ const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
   noTax: { label: 'wallet.marginGap.noTax', hint: 'wallet.marginGapHint.noTax' },
   outside: { label: 'wallet.marginGap.outside', hint: 'wallet.marginGapHint.outside' },
 };
+
+/** The gap label is `text-xs`, so each letter takes about this much of a digit's `ch`. */
+const GAP_LABEL_CH_PER_CHAR = 0.85;
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
@@ -150,6 +155,7 @@ interface TransactionsPanelProps {
 export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const isPhone = useIsPhone();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
   const highlightTypeId = useHighlightParam();
@@ -285,12 +291,46 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [placeDetails, placeOwnerOf, t]
   );
 
+  // Number columns fit the loaded rows, not a worst case; see `fitColumnWidth`.
+  const numberWidths = useMemo(() => {
+    const chars = (pick: (txn: WalletTransaction) => number | null) =>
+      transactions.map((txn) => {
+        const value = pick(txn);
+        return value === null ? 1 : formatMarketIsk(value).length;
+      });
+    const marginOf = (txn: WalletTransaction) =>
+      txn.is_buy ? null : (margins.get(txn.transaction_id)?.margin ?? null);
+    const gapChars = transactions.flatMap((txn) => {
+      const gap = gaps.get(txn.transaction_id);
+      return !txn.is_buy && gap && !margins.has(txn.transaction_id)
+        ? [Math.ceil(t(MARGIN_GAP_COPY[gap].label).length * GAP_LABEL_CH_PER_CHAR)]
+        : [];
+    });
+    return {
+      quantity: fitColumnWidth(
+        transactions.map((txn) => formatCount(txn.quantity).length),
+        t('wallet.quantity')
+      ),
+      unitPrice: fitColumnWidth(
+        chars((txn) => txn.unit_price),
+        t('wallet.unitPrice')
+      ),
+      total: fitColumnWidth(chars(transactionTotal), t('wallet.total')),
+      margin: fitColumnWidth([...chars(marginOf), ...gapChars], t('wallet.margin')),
+      unitCost: fitColumnWidth(
+        chars((txn) => (txn.is_buy ? null : (margins.get(txn.transaction_id)?.unitCost ?? null))),
+        t('wallet.unitCost')
+      ),
+    };
+  }, [transactions, margins, gaps, t]);
+
   const columns = useMemo<DataTableColumn<WalletTransaction>[]>(
     () => [
       {
         id: 'date',
         header: t('wallet.date'),
-        width: COL_DATETIME,
+        // Stacked date over time below `sm` (see render), one line from there up.
+        width: isPhone ? COL_DATETIME_STACKED : COL_DATETIME,
         className: 'whitespace-nowrap text-text-dim max-sm:px-1',
         headerClassName: 'max-sm:px-1',
         // Date over time on a phone, freeing width for the other columns; one line from `sm` up.
@@ -324,11 +364,14 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'item',
         header: t('wallet.item'),
         stickyStart: true,
-        className: 'truncate',
+        // Wraps to two lines on a phone rather than truncating to "Repu…".
+        className: 'sm:truncate',
         render: (txn) => (
-          <ItemInfoLink typeId={txn.type_id}>
-            {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
-          </ItemInfoLink>
+          <span className="max-sm:line-clamp-2 max-sm:break-words">
+            <ItemInfoLink typeId={txn.type_id}>
+              {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
+            </ItemInfoLink>
+          </span>
         ),
         sortValue: (txn) => nameFor(txn.type_id),
       },
@@ -343,7 +386,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'quantity',
         header: t('wallet.quantity'),
-        width: COL_QUANTITY,
+        width: numberWidths.quantity,
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatCount(txn.quantity),
@@ -352,7 +395,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'unitPrice',
         header: t('wallet.unitPrice'),
-        width: '16ch',
+        width: numberWidths.unitPrice,
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatMarketIsk(txn.unit_price),
@@ -361,7 +404,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'total',
         header: t('wallet.total'),
-        width: COL_ISK,
+        width: numberWidths.total,
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
@@ -372,7 +415,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'margin',
         header: t('wallet.margin'),
         headerTooltip: t('wallet.marginTooltip'),
-        width: COL_ISK,
+        width: numberWidths.margin,
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (txn) => {
@@ -426,7 +469,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'unitCost',
         header: t('wallet.unitCost'),
         headerTooltip: t('wallet.unitCostTooltip'),
-        width: '16ch',
+        width: numberWidths.unitCost,
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => {
@@ -444,7 +487,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         sortValue: (txn) => placeNameFor(txn),
       },
     ],
-    [t, typeNames, timeZone, nameFor, margins, gaps, allScope, placeNameFor]
+    [t, typeNames, timeZone, nameFor, margins, gaps, allScope, placeNameFor, isPhone, numberWidths]
   );
 
   const columnsById = useMemo(
