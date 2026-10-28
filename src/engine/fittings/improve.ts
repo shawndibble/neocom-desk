@@ -25,7 +25,15 @@ import {
 } from './improveGroups';
 import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
-import { overageOf, PAIR_LIMIT, RESOURCES, usedOf, type Resource } from './makeItFit';
+import {
+  findFitSwaps,
+  overageOf,
+  PAIR_LIMIT,
+  RESOURCES,
+  usedOf,
+  type FitSwap,
+  type Resource,
+} from './makeItFit';
 import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
@@ -191,6 +199,19 @@ export interface RejectedOption extends ImproveOption {
 }
 
 export interface ImproveResult {
+  /**
+   * Replacements for fitted modules the pilot cannot fly, each one applicable:
+   * a fix that overran CPU, powergrid or calibration carries the swaps that
+   * bring the fit back under (`pairedWith`), fewest changes first.
+   */
+  makeFlyable: ImproveOption[];
+  /**
+   * The fixes that overran CPU, powergrid or calibration on their own, covered or
+   * not: what an implant could also pay for, shown beside the swaps that do.
+   */
+  flyableOverrun: RejectedOption[];
+  /** Fixes no swap could make applicable, or that cost more than the budget: shown greyed with why. */
+  flyableBlocked: RejectedOption[];
   /** Gains on the goal and worsens no stat. */
   noDownside: ImproveOption[];
   /** Gains on the goal and names what it gives up. */
@@ -614,7 +635,7 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
 }
 
 /** Hub sell price of every part, per the mode (`ImproveOption.iskDelta`). */
-function iskDeltaOf(
+export function iskDeltaOf(
   candidate: ImproveCandidate,
   priceOf: (typeId: number) => number | null,
   mode: ImproveMode
@@ -706,6 +727,8 @@ export interface FindImprovementsParams {
   spendCap?: number | null;
   /** What the fit costs now, for Planning's total budget. */
   fitTotal?: number | null;
+  /** Module and rig swaps that pay for an unflyable-module fix that overruns the fit. */
+  compensators?: FlyableCompensators;
   /** After each candidate: how many are done, of how many. */
   onProgress?: (checked: number, total: number) => void;
   /** Cancel: nothing comes back. */
@@ -716,6 +739,67 @@ export interface FindImprovementsParams {
 
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
 const PAIR_SEEDS = 5;
+
+/**
+ * Whether a change costing `iskDelta` (plus `extra`, an implant set bought with
+ * it) passes the pilot's budget: Planning's total fit price, or Refitting's
+ * extra spend. No cap, or an unpriced change, never blocks.
+ */
+export function overSpendCap(
+  mode: ImproveMode,
+  spendCap: number | null,
+  fitTotal: number | null,
+  iskDelta: number | null,
+  extra = 0
+): boolean {
+  if (spendCap === null || (iskDelta === null && extra === 0)) return false;
+  // An unpriced change adds nothing it can be charged, but the implants bought with it still count.
+  const spent = (iskDelta ?? 0) + extra;
+  return (mode === 'buy' ? (fitTotal ?? 0) + spent : spent) > spendCap;
+}
+
+/** Fixes over budget that get a compensation search, and the bundles kept for each. */
+const FLYABLE_SEEDS = 8;
+const FLYABLE_PER_FIX = 3;
+
+/**
+ * The module and rig swaps that could pay for `fix` when it overruns the fit:
+ * called with the fit as the fix leaves it. Absent: no compensation is tried.
+ */
+export type FlyableCompensators = (fix: ImproveCandidate) => readonly FitSwap[];
+
+/** How many module changes a candidate makes, the paired ones included. */
+const changeCount = (candidate: ImproveCandidate): number =>
+  1 + (candidate.pairedWith ? changeCount(candidate.pairedWith) : 0);
+
+/** `fix` with each swap chained behind it as a paired change, so one Apply makes them all. */
+function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCandidate {
+  const chain = chainOf(swaps);
+  return chain ? { ...fix, pairedWith: chain } : fix;
+}
+
+/** The swaps as one candidate with the rest chained behind it; undefined for none. */
+export function chainOf(swaps: readonly FitSwap[]): ImproveCandidate | undefined {
+  return swaps.reduceRight<ImproveCandidate | undefined>(
+    (next, swap) => ({
+      fromTypeId: swap.fromTypeId,
+      toTypeId: swap.toTypeId,
+      at: [{ slot: swap.slot, slotIndex: swap.slotIndex }],
+      ...(next ? { pairedWith: next } : {}),
+    }),
+    undefined
+  );
+}
+
+/** Fewest changes first, then the cheaper; an unpriced bundle after every priced one. */
+function rankFlyable<T extends ImproveOption>(options: readonly T[]): T[] {
+  return [...options].sort((a, b) => {
+    const changes = changeCount(a.candidate) - changeCount(b.candidate);
+    if (changes !== 0) return changes;
+    if ((a.iskDelta === null) !== (b.iskDelta === null)) return a.iskDelta === null ? 1 : -1;
+    return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
+  });
+}
 
 const isNoDownside = (option: ImproveOption) => option.lost.length === 0;
 
@@ -732,12 +816,16 @@ export async function findImprovements({
   mode = 'buy',
   spendCap = null,
   fitTotal = null,
+  compensators,
   onProgress,
   isCancelled,
   shouldStop,
 }: FindImprovementsParams): Promise<ImproveResult | null> {
   const kept: ImproveOption[] = [];
   const rejected: RejectedOption[] = [];
+  const flyable: ImproveOption[] = [];
+  const flyableBlocked: RejectedOption[] = [];
+  const overrun: RejectedOption[] = [];
   // Every swap's own result, gain or not: a pair's downgrade is one that frees CPU or powergrid.
   const swaps: { candidate: ImproveCandidate; after: FittingStats }[] = [];
   let checked = 0;
@@ -745,13 +833,13 @@ export async function findImprovements({
   let stopped = false;
 
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
-  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats) {
+  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats): boolean {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
-    if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return;
+    if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     const fix = candidate.fixesUnflyable === true;
-    if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return;
+    if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return false;
     const option: ImproveOption = {
       candidate,
       fitting: swapped,
@@ -761,15 +849,14 @@ export async function findImprovements({
       destroysRigs,
       lost: lostStats(before, after),
     };
-    const overSpend =
-      spendCap !== null &&
-      iskDelta !== null &&
-      (mode === 'buy' ? (fitTotal ?? 0) + iskDelta : iskDelta) > spendCap;
+    const overSpend = overSpendCap(mode, spendCap, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target);
     const guardrail = (fix && broken !== 'budget' ? null : broken) ?? (overSpend ? 'spend' : null);
-    if (guardrail) rejected.push({ ...option, guardrail });
-    else kept.push(option);
+    // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
+    if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
+    else (fix ? flyable : kept).push(option);
+    return true;
   }
 
   for (const candidate of candidates) {
@@ -832,8 +919,51 @@ export async function findImprovements({
     }
   }
 
+  // A fix over budget: the module and rig swaps that bring the fit back under, so Apply is never locked.
+  if (compensators) {
+    const seeds = flyableBlocked
+      .filter((option) => option.guardrail === 'budget')
+      .slice(0, FLYABLE_SEEDS);
+    overrun.push(...seeds);
+    for (const seed of seeds) {
+      if (isCancelled?.()) return null;
+      if (shouldStop?.()) {
+        stopped = true;
+        break;
+      }
+      const swaps = compensators(seed.candidate);
+      if (swaps.length === 0) continue;
+      let found: Awaited<ReturnType<typeof findFitSwaps>>;
+      try {
+        found = await findFitSwaps({
+          fitting: seed.fitting,
+          before: seed.after,
+          candidates: swaps,
+          stats,
+          priceOf,
+          isCancelled,
+        });
+      } catch {
+        // A failed search leaves the fix greyed with its reason; it must not end the whole search.
+        continue;
+      }
+      if (isCancelled?.()) return null;
+      if (found.options.length === 0) continue;
+      // The fix leaves its greyed row only once a bundle took its place (a rule break can drop them all).
+      const taken = found.options
+        .slice(0, FLYABLE_PER_FIX)
+        .map((option) =>
+          take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
+        );
+      if (taken.some(Boolean)) flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
+    }
+  }
+
   const ranked = rankImproveOptions(kept);
   return {
+    makeFlyable: rankFlyable(flyable),
+    flyableOverrun: overrun,
+    flyableBlocked: rankFlyable(flyableBlocked),
     noDownside: ranked.filter(isNoDownside),
     tradeOffs: ranked.filter((option) => !isNoDownside(option)),
     rejected: [...rejected].sort((a, b) => b.score - a.score).slice(0, REJECTED_LIMIT),

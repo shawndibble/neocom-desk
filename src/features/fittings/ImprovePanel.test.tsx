@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
-import type { ImproveGoal, ImproveOption, ImproveResult } from '@/engine/fittings/improve';
+import type {
+  ImproveGoal,
+  ImproveOption,
+  ImproveResult,
+  RejectedOption,
+} from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
@@ -47,6 +52,7 @@ function search(state: ImproveState, own: FittingStats | null = before): Improve
     showBestSoFar: vi.fn(),
     restart: vi.fn(),
     recalc: null,
+    completion: null,
   };
 }
 
@@ -56,7 +62,17 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
     before: own,
     fitTotal: null,
     elapsedMs: 1200,
-    result: { noDownside: [], tradeOffs: [], rejected: [], checked: 3, stopped: false, ...result },
+    result: {
+      makeFlyable: [],
+      flyableOverrun: [],
+      flyableBlocked: [],
+      noDownside: [],
+      tradeOffs: [],
+      rejected: [],
+      checked: 3,
+      stopped: false,
+      ...result,
+    },
   };
 }
 
@@ -101,6 +117,7 @@ const renderPanel = (
     fitting?: Fitting;
     onPreview?: (delta: FittingStatsDelta | null) => void;
     target?: TargetProfile;
+    renderFlyableImplants?: (fix: RejectedOption, label: string) => ReactNode;
   } = {}
 ) =>
   render(
@@ -110,6 +127,7 @@ const renderPanel = (
       search={s}
       catalogue={null}
       onApply={onApply}
+      renderFlyableImplants={extra.renderFlyableImplants}
       settings={config}
       onFixFirst={extra.onFixFirst ?? vi.fn()}
       freeSections={extra.freeSections}
@@ -207,6 +225,98 @@ describe('ImprovePanel', () => {
     await userEvent.click(boxes[1]);
     await userEvent.click(screen.getByRole('button', { name: 'Apply 2 changes' }));
     expect(onApply).toHaveBeenCalledWith([gain, trade]);
+  });
+
+  it('lists replacements for unflyable modules under Make Flyable, with the swaps that pay for them', async () => {
+    const fix = option(
+      12,
+      { ehp: 900 },
+      {
+        candidate: {
+          fromTypeId: 1,
+          toTypeId: 12,
+          at: [{ slot: 'low', slotIndex: 0 }],
+          fixesUnflyable: true,
+          pairedWith: { fromTypeId: 2, toTypeId: 22, at: [{ slot: 'low', slotIndex: 1 }] },
+        },
+      }
+    );
+    renderPanel(search(done({ makeFlyable: [fix], noDownside: [option(11, { ehp: 1100 })] })));
+    expect(screen.getByText('Make Flyable')).toBeInTheDocument();
+    expect(screen.getByText(/Also swaps .* to keep the fit within CPU/)).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+  });
+
+  it('offers the implant alternative beside a fix that overran', () => {
+    const overran = {
+      ...option(12, { cpuUsed: before.cpuTotal + 40 }),
+      guardrail: 'budget',
+    } as RejectedOption;
+    const render = vi.fn(() => <p>implant row</p>);
+    renderPanel(
+      search(done({ flyableBlocked: [overran], flyableOverrun: [overran] })),
+      vi.fn(),
+      vi.fn(),
+      settings(),
+      { renderFlyableImplants: render }
+    );
+    expect(screen.getByText('implant row')).toBeInTheDocument();
+    expect(render).toHaveBeenCalledWith(overran, expect.stringContaining(''));
+  });
+
+  it('offers swaps that cover two ticked rows which together overrun the CPU', async () => {
+    const fitting = {
+      shipTypeId: 1,
+      name: 'T',
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+        { slot: 'low', slotIndex: 2, typeId: 5 },
+      ],
+    } as unknown as Fitting;
+    const recalc = async (f: Fitting) => ({
+      ...before,
+      cpuUsed: f.modules.some((m) => m.typeId === 6) ? 0 : before.cpuTotal + 40,
+    });
+    const state = {
+      ...search(done({ noDownside: [option(11, {}), option(21, {})] })),
+      recalc,
+      completion: async () => ({
+        swaps: [{ slot: 'low' as const, slotIndex: 2, fromTypeId: 5, toTypeId: 6 }],
+        priceOf: () => null,
+      }),
+    };
+    renderPanel(state, vi.fn(), vi.fn(), settings(), { fitting });
+    const [a, b] = screen.getAllByRole('checkbox');
+    await userEvent.click(a);
+    await userEvent.click(b);
+    expect(await screen.findByText(/over-run the CPU/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled();
+    expect(
+      await screen.findByText('Add one of these so the set fits:', {}, { timeout: 3000 })
+    ).toBeInTheDocument();
+    await userEvent.click(within(screen.getByTestId('improve-cover')).getByRole('button'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Apply 3 changes' })).toBeEnabled()
+    );
+    // The added cover has its own tick, so it can be taken back out.
+    await userEvent.click(screen.getByRole('checkbox', { name: /Added to cover the set/ }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Apply 2 changes' })).toBeDisabled()
+    );
+  });
+
+  it('greys a fix nothing can pay for, saying what it needs', () => {
+    const stuck = {
+      ...option(12, { cpuUsed: before.cpuTotal + 40 }),
+      guardrail: 'budget',
+    } as RejectedOption;
+    renderPanel(search(done({ flyableBlocked: [stuck], flyableOverrun: [stuck] })));
+    expect(screen.getByText('Make Flyable')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Needs 40 more CPU, and no module or rig swap frees it/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
   it('shows one row per module with its best option, the rest behind "more options"', async () => {
@@ -502,7 +612,16 @@ describe('ImprovePanel', () => {
   it('shows both Defense sides, a side with nothing to offer as no gain', () => {
     const state = done({ noDownside: [option(30, {})] });
     if (state.status !== 'done') throw new Error('state');
-    const empty = { noDownside: [], tradeOffs: [], rejected: [], checked: 2, stopped: false };
+    const empty = {
+      makeFlyable: [],
+      flyableOverrun: [],
+      flyableBlocked: [],
+      noDownside: [],
+      tradeOffs: [],
+      rejected: [],
+      checked: 2,
+      stopped: false,
+    };
     renderPanel(
       search({
         ...state,
@@ -520,7 +639,16 @@ describe('ImprovePanel', () => {
   it('adds an Either figure for neutral rows such as Damage Control, and omits it with none', () => {
     const state = done({ noDownside: [option(30, {})] });
     if (state.status !== 'done') throw new Error('state');
-    const empty = { noDownside: [], tradeOffs: [], rejected: [], checked: 2, stopped: false };
+    const empty = {
+      makeFlyable: [],
+      flyableOverrun: [],
+      flyableBlocked: [],
+      noDownside: [],
+      tradeOffs: [],
+      rejected: [],
+      checked: 2,
+      stopped: false,
+    };
     const withNeutral = { ...empty, noDownside: state.result.noDownside };
     const sides = { shield: state.result, armor: empty };
     const view = renderPanel(
