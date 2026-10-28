@@ -14,7 +14,7 @@
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useCallback, useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState, type ReactElement } from 'react';
 import { useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -112,8 +112,10 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // Read once, on arrival: a push is an entry this app stacked over where the
   // pilot was (Back returns there); anything else (a pasted link, a reload,
   // Forward) has nowhere in the app to go back to, so Close replaces the URL.
-  const arrivedByPush = useRef(useNavigationType() === 'PUSH').current;
-  const arrivedState = useRef(useLocation().state as Partial<LpSearchCrumbState> | null).current;
+  const navigationType = useNavigationType();
+  const location = useLocation();
+  const [arrivedByPush] = useState(() => navigationType === 'PUSH');
+  const [arrivedState] = useState(() => location.state as Partial<LpSearchCrumbState> | null);
 
   const hubId = useMarketHub((s) => s.value);
   const setHubId = useMarketHub((s) => s.setValue);
@@ -366,7 +368,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             rows={filteredRows}
             rowKey={offerRowKey}
             density="compact"
-            virtualize="auto"
+            // Not windowed: the virtualizer follows the window scroll, and the modal body scrolls instead.
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}
             mobileSort
