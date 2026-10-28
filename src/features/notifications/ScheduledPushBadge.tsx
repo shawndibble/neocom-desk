@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
-import { isSyncConfigured } from '@/app/syncStatus';
-import { useAlertsGrants, useAlertsMail, useAlertsNearby } from './alertsGrant';
+import { useAlertsMail, useAlertsNearby, useEveGrantMissing } from './alertsGrant';
 
 /**
  * The "arrives with the app closed" mark on a Scheduled Push event's row, or on
@@ -97,9 +96,12 @@ export function MailPushBadge() {
  * and nothing else, so the page does not gain a column of normal marks.
  */
 export function EveNotificationBadge({ onlyWhenMissing = false }: { onlyWhenMissing?: boolean }) {
-  const grants = useAlertsGrants();
-  if (!isSyncConfigured()) return null;
-  const hasActive = Object.values(grants).some((grant) => grant.status === 'active');
-  if (hasActive) return onlyWhenMissing ? null : <ScheduledPushBadge kind="server" />;
+  const missing = useEveGrantMissing();
+  if (missing === null) return null;
+  if (!missing) return onlyWhenMissing ? null : <ScheduledPushBadge kind="server" />;
+  return <EveGrantMissingBadge />;
+}
+
+export function EveGrantMissingBadge() {
   return <MissingGrantBadge labelKey="settings.notifications.missingGrantBadge.base" />;
 }

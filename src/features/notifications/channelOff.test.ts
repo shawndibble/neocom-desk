@@ -21,6 +21,22 @@ describe('channelOffReasons', () => {
     ).toBe(reason);
   });
 
+  it('turns both channels off while the master switch is off, whatever else is true', () => {
+    expect(
+      channelOffReasons({
+        permission: 'granted',
+        installRequired: false,
+        prefsValue: { ...prefs, masterEnabled: false },
+      })
+    ).toEqual({ browser: 'masterOff', feed: 'masterOff' });
+  });
+
+  it('says install first, even when the permission reads default', () => {
+    expect(
+      channelOffReasons({ permission: 'default', installRequired: true, prefsValue: prefs }).browser
+    ).toBe('installRequired');
+  });
+
   it('says install first on a platform that needs the app installed', () => {
     expect(
       channelOffReasons({ permission: 'unsupported', installRequired: true, prefsValue: prefs })

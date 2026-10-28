@@ -17,9 +17,14 @@ export function ChannelOffTip({
 }) {
   const { t } = useTranslation();
   if (reason === null) return <>{children}</>;
+  const text = t(`settings.notifications.channelOff.${reason}`);
   return (
-    <Tooltip content={t(`settings.notifications.channelOff.${reason}`)} openOnTap>
-      <span className="inline-flex">{children}</span>
+    <Tooltip content={text} openOnTap>
+      {/* Focusable, with the reason as its text: a natively disabled box cannot take focus, so keyboard and screen-reader users would never reach the reason. */}
+      <span tabIndex={0} className="inline-flex">
+        {children}
+        <span className="sr-only">{text}</span>
+      </span>
     </Tooltip>
   );
 }

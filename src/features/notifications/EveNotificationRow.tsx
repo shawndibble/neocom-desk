@@ -11,7 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AggregateRow } from './AggregateRow';
 import { ChannelOffTip } from './ChannelOffTip';
-import { EveNotificationBadge } from './ScheduledPushBadge';
+import { EveGrantMissingBadge, EveNotificationBadge } from './ScheduledPushBadge';
+import { useEveGrantMissing } from './alertsGrant';
 import { EVENT_ROW_GRID, DEVICE_CELL, ALERTS_CELL } from './ChannelColumns';
 import { eveTypeLabel } from './eveTypeLabel';
 import { PermissionNote } from './PermissionNote';
@@ -54,6 +55,7 @@ export function EveNotificationRow({
   const { t } = useTranslation();
   const eventId = 'eveNotification' as const;
   const availability = useEventAvailability(eventId, context);
+  const grantMissing = useEveGrantMissing();
   const { prefsValue } = context;
   const currentValue = () => useNotificationPreferences.getState().value;
   const missing = missingPermissionSummary([eventId], context);
@@ -146,6 +148,7 @@ export function EveNotificationRow({
                           label={typeLabel}
                           labelAccessory={
                             // Only the missing-grant mark, and only where Device is ticked: a hundred rows of marks would drown the page.
+                            grantMissing === true &&
                             applicableIds.some((id) =>
                               isEveTypeEnabledFor(
                                 characterEveTypePrefs(prefsValue, id),
@@ -153,7 +156,7 @@ export function EveNotificationRow({
                                 'browser'
                               )
                             ) ? (
-                              <EveNotificationBadge onlyWhenMissing />
+                              <EveGrantMissingBadge />
                             ) : undefined
                           }
                           characters={context.characters}
