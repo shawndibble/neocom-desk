@@ -226,7 +226,9 @@ describe('Widget states', () => {
       store.set('mail', { data: mailData(2, 2), error: false, loading: false })
     );
     expect(screen.queryByText('Subject 1')).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Mail' }).querySelectorAll('td')).toHaveLength(4);
+    expect(
+      screen.getByRole('region', { name: 'Mail' }).querySelectorAll('td:not([aria-hidden])')
+    ).toHaveLength(4);
   });
 
   it('shows the subject as a third column at Medium', () => {
