@@ -8074,7 +8074,15 @@
       "emptyTitle": "No ships found",
       "emptyHint": "No ships in the assets of the chosen characters.",
       "showAllCharacters": "Show all characters",
-      "inCargo": "In cargo",
+      "packaged": "Packaged",
+      "quantity": "×{{count}}",
+      "inside": "inside {{holder}}",
+      "insideFlag": "{{holder}} ({{flag}})",
+      "flags": {
+        "ShipHangar": "Ship Maintenance Bay",
+        "FleetHangar": "Fleet Hangar",
+        "Cargo": "Cargo hold"
+      },
       "here": "Here",
       "unknownType": "Type #{{id}}",
       "searchLabel": "Search ships",
