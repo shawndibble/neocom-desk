@@ -1,4 +1,6 @@
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
+import { formatAge } from '@/lib/age';
+import { HaulingHowItWorks } from './HaulingHowItWorks';
 import { formatCount } from '@/lib/formatCount';
 /**
  * The Market page's Hauling tab (back from Travel, #4702): what is worth buying
@@ -354,6 +356,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   // A new route, category or mode starts a fresh plan — the fill and the items added from it included.
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [howOpen, setHowOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
   // Crossing the rail's width closes the sheets, so a resize never opens one on its own.
@@ -721,6 +724,21 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             />
           </label>
           {t('market.hauling.inTrip', { selected: selectedCount, total: tableRows.length })}
+          <IconButton
+            variant="plain"
+            size="sm"
+            className="ml-auto"
+            icon={<Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+            label={t('market.hauling.how.open')}
+            aria-haspopup="dialog"
+            onClick={() => setHowOpen(true)}
+          />
+          <HaulingHowItWorks
+            open={howOpen}
+            onClose={() => setHowOpen(false)}
+            instant={instant}
+            scan={state.scan}
+          />
         </div>
 
         {/* The multibuy text, on request, or opened by a refused copy to copy by hand. */}
@@ -780,19 +798,26 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           {state.scan.demandSource
             ? ` ${t(`market.hauling.demand${state.scan.demandSource === 'esi' ? 'Fallback' : 'Daily'}Line`)}`
             : ''}
+          {state.scan.booksSource === 'snapshot' && state.scan.booksAsOf
+            ? ` ${t('market.hauling.booksSnapshotLine', {
+                age: formatAge(state.scan.fetchedAt - state.scan.booksAsOf, t),
+              })}`
+            : ''}
           {state.scan.capped
             ? ` ${
-                instant
-                  ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
-                  : state.scan.demandSource === 'daily'
-                    ? t('market.hauling.cappedLineDaily', {
-                        passed: state.scan.demandPassed,
-                        books: MAX_BOOK_CANDIDATES,
-                      })
-                    : t('market.hauling.cappedLine', {
-                        reads: MAX_HISTORY_READS,
-                        books: MAX_BOOK_CANDIDATES,
-                      })
+                state.scan.booksSource === 'snapshot'
+                  ? t('market.hauling.cappedLineHistory', { reads: MAX_HISTORY_READS })
+                  : instant
+                    ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
+                    : state.scan.demandSource === 'daily'
+                      ? t('market.hauling.cappedLineDaily', {
+                          passed: state.scan.demandPassed,
+                          books: MAX_BOOK_CANDIDATES,
+                        })
+                      : t('market.hauling.cappedLine', {
+                          reads: MAX_HISTORY_READS,
+                          books: MAX_BOOK_CANDIDATES,
+                        })
               }`
             : ''}
         </p>

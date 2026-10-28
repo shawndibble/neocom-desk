@@ -1,0 +1,27 @@
+name: Public data - hauling books
+
+# Publishes each Trade Hub station's best buy and sell price levels per item to R2
+# (hauling-books/<stationId>.json) every 30 min, from EVE Ref's latest market-order snapshot.
+# The hauling scan builds its order-book pass from them, with no ESI request per item.
+# GitHub starts scheduled runs hours late, so a Cloudflare Worker also fires
+# workflow_dispatch on time (workers/public-data-dispatch); this `schedule:` is the
+# fallback. A run on a snapshot already published exits after one small R2 read.
+# Pattern and secrets: public-data-job.yml.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-data-hauling-books
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/public-data-job.yml
+    with:
+      script: scripts/public-data/hauling-books.mjs
+    secrets: inherit

@@ -134,3 +134,36 @@ describe('parseIsBuy', () => {
     for (const v of ['', '1', '0', 'yes', undefined]) expect(() => parseIsBuy(v)).toThrow();
   });
 });
+
+describe('foldOrderBooksCsv', () => {
+  it('folds station levels by column name and ignores other stations', async () => {
+    const { HaulingBookFold } = await import('./haulingBooks.js');
+    const elsewhere = row(false, 1, 34, 10000002).replace(
+      '2026-09-18T15:01:18Z,60003760,',
+      '2026-09-18T15:01:18Z,60003761,'
+    );
+    const books = new HaulingBookFold([60003760]);
+    const { foldOrderBooksCsv } = await import('./marketOrdersArchive.js');
+    const rows = await foldOrderBooksCsv(Readable.from([`${CSV}${elsewhere}\n`]), books);
+    expect(rows).toBe(6);
+    // row(): volume_remain 5; the two 6.0/6.1 sells and two buys at the station, region-1 sell too.
+    const [sell, buy] = books.toObject(60003760, { lastSyncedAt: 0, asOf: 0 }).types[34];
+    expect(sell).toEqual([
+      [6.0, 5, 1],
+      [6.1, 5, 1],
+      [7, 5, 1],
+    ]);
+    expect(buy).toEqual([
+      [5.6, 5, 1],
+      [5.5, 5, 1],
+    ]);
+  });
+
+  it('throws when a column is missing', async () => {
+    const { HaulingBookFold } = await import('./haulingBooks.js');
+    const { foldOrderBooksCsv } = await import('./marketOrdersArchive.js');
+    await expect(
+      foldOrderBooksCsv(Readable.from(['price,type_id\n1,2\n']), new HaulingBookFold([1]))
+    ).rejects.toThrow(/missing a column/);
+  });
+});
