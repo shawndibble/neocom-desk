@@ -164,6 +164,18 @@ export function BpcSourcingPanel({
   const [askRow, setAskRow] = useState<Extract<BpcSearchRow, { source: 'community' }> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  // The route a row click opens, if it is a page: an LP offer's store (this offer picked;
+  // `affordableOnly=0` so an offer the pilot can't yet afford stays in view) or the item's
+  // Market entry. A contract row opens a modal; an owned row creates a plan (async, no URL).
+  const rowRouteHref = (row: BpcSearchRow): string | undefined => {
+    if (row.source === 'lp') {
+      return `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`;
+    }
+    if (row.source === 'market') {
+      return `/market/browser?${new URLSearchParams(marketLinkParams(row.typeId, location.search)).toString()}`;
+    }
+    return undefined;
+  };
 
   // Retry can unmount into the spinner: focus waits on the always-mounted card wrapper.
   const [cardRef, , holdRetryFocus] = useRetryFocus(
@@ -174,16 +186,6 @@ export function BpcSourcingPanel({
         : 'ok',
     activeCharacterId
   );
-  const lastSyncedAt = contractsResult?.data?.lastSyncedAt ?? null;
-  useEffect(() => {
-    onHeaderChange?.({
-      dataAge: lastSyncedAt ? new Date(lastSyncedAt) : null,
-      busy: loading,
-      refresh: refreshAll,
-    });
-    return () => onHeaderChange?.(null);
-  }, [onHeaderChange, lastSyncedAt, loading, refreshAll]);
-
   const {
     suggestions,
     filteredRows,
@@ -192,6 +194,7 @@ export function BpcSourcingPanel({
     displayRows,
     summary,
     awaiting: awaitingOffers,
+    refreshing: refreshingOffers,
   } = useBpcRows({
     uiFilter,
     selectedTypeId,
@@ -200,6 +203,16 @@ export function BpcSourcingPanel({
     allowedSystems: jumpFilter.allowed,
     sourceData,
   });
+
+  const lastSyncedAt = contractsResult?.data?.lastSyncedAt ?? null;
+  useEffect(() => {
+    onHeaderChange?.({
+      dataAge: lastSyncedAt ? new Date(lastSyncedAt) : null,
+      busy: loading || refreshingOffers,
+      refresh: refreshAll,
+    });
+    return () => onHeaderChange?.(null);
+  }, [onHeaderChange, lastSyncedAt, loading, refreshingOffers, refreshAll]);
 
   const selectedName =
     selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
@@ -972,17 +985,9 @@ export function BpcSourcingPanel({
                   rowClickable={(row) => row.source !== 'community'}
                   onRowClick={(row) => {
                     if (row.source === 'community') return;
-                    if (row.source === 'lp') {
-                      // The store, with this offer picked; `affordableOnly=0` so an
-                      // offer the pilot can't yet afford is not filtered out of view.
-                      navigate(
-                        `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`
-                      );
-                      return;
-                    }
-                    if (row.source === 'market') {
-                      const params = marketLinkParams(row.typeId, location.search);
-                      navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+                    const href = rowRouteHref(row);
+                    if (href) {
+                      navigate(href);
                       return;
                     }
                     if (row.source === 'owned') {
@@ -1005,6 +1010,7 @@ export function BpcSourcingPanel({
                     setOpenRow(asContract(row));
                   }}
                   rowMoreActions
+                  rowHref={rowRouteHref}
                   rowContextMenu={(row, tr) => (
                     // The Offer's own ME/TE/runs, not the defaults, so a pilot
                     // shopping a specific copy sees what *that* copy builds. A

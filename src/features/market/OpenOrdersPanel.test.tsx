@@ -610,11 +610,15 @@ describe('OpenOrdersPanel', () => {
         within(screen.getByRole('table', NEEDS_YOU_TABLE)).getAllByRole('row')[1].textContent;
       await screen.findByRole('table', NEEDS_YOU_TABLE);
       expect(firstItem()).toContain('Tritanium');
-      await user.click(
-        within(screen.getByRole('table', NEEDS_YOU_TABLE)).getByRole('button', {
-          name: /^Your price/,
-        })
-      );
+      // A price column starts high to low (the same Tritanium first), so a second
+      // click, low to high, is the one that moves a row.
+      for (let click = 0; click < 2; click += 1) {
+        await user.click(
+          within(screen.getByRole('table', NEEDS_YOU_TABLE)).getByRole('button', {
+            name: /^Your price/,
+          })
+        );
+      }
       expect(firstItem()).toContain('Mexallon');
 
       await openColumns(user);
@@ -650,6 +654,25 @@ describe('OpenOrdersPanel', () => {
       const expiring = screen.getByRole('row', { name: /Mexallon/ });
       expect(expiring.querySelector('td[data-label="Never sell below"]')).toHaveTextContent('—');
     });
+  });
+
+  it('opens the detail modal from ?open=<orderId> as a row click would, leaving a clean URL', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanelWithLocation('/market/orders?open=101');
+
+    expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
+    expect(screen.getByTestId('location-search')).toHaveTextContent(/^$/);
+  });
+
+  it('does nothing for an ?open= id that matches no order', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([EXPIRING_ORDER, NO_COST_BASIS_ORDER])]));
+
+    renderPanel('/market/orders?open=999999');
+
+    expect(await screen.findByRole('table', NEEDS_YOU_TABLE)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('opens the detail modal by clicking the row', async () => {

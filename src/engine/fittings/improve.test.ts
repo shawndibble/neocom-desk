@@ -4,7 +4,9 @@ import {
   findImprovements,
   goalAvailability,
   improveCandidates,
+  overSpendCap,
   rankImproveOptions,
+  type FlyableCompensators,
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveOption,
@@ -76,7 +78,12 @@ async function search(
   table: Record<number, Row>,
   candidates: ImproveCandidate[],
   prices: Record<number, number> = {},
-  base = fit([1])
+  base = fit([1]),
+  extra: {
+    compensators?: FlyableCompensators;
+    spendCap?: number | null;
+    mode?: 'buy' | 'refit';
+  } = {}
 ) {
   const stat = calc(table);
   const before = await stat(base);
@@ -87,6 +94,7 @@ async function search(
     candidates,
     stats: stat,
     priceOf: (typeId) => prices[typeId] ?? null,
+    ...extra,
   });
   if (result === null) throw new Error('cancelled');
   return result;
@@ -225,6 +233,94 @@ describe('findImprovements goals', () => {
   });
 });
 
+describe('findImprovements replacing an unflyable module', () => {
+  const fix = (fromTypeId: number, toTypeId: number): ImproveCandidate => ({
+    ...candidate(fromTypeId, toTypeId),
+    fixesUnflyable: true,
+  });
+
+  it('lists a swap that scores worse on the goal under makeFlyable, apart from the real gains', async () => {
+    const table = { 1: { dps: 50 }, 2: { dps: 10 }, 3: { dps: 70 }, 4: { dps: 60 } };
+    const result = await search('damage', table, [candidate(1, 3), candidate(1, 4), fix(1, 2)]);
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+    expect(toIds(result.noDownside)).toEqual([3, 4]);
+    expect(result.tradeOffs).toEqual([]);
+  });
+
+  it('ignores the capacitor and Cheaper stat guardrails, but not the fit’s CPU', async () => {
+    const table = { 1: {}, 2: { capUnstable: true, dps: -50 }, 3: { cpu: 999 } };
+    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3)], { 1: 100, 2: 500 });
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+    expect(result.rejected).toEqual([]);
+    expect(result.flyableBlocked.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
+      [3, 'budget'],
+    ]);
+  });
+});
+
+describe('findImprovements Make Flyable bundles', () => {
+  // Module 2 flies but takes 70 CPU next to module 5's 60: 130 of 100.
+  const table = { 1: { cpu: 10 }, 2: { cpu: 70 }, 5: { cpu: 60 }, 6: { cpu: 20 }, 7: { cpu: 55 } };
+  const base = fit([1, 5]);
+  const prices = { 1: 50, 2: 50, 5: 100, 6: 300, 7: 100 };
+  const fix: ImproveCandidate = { ...candidate(1, 2), fixesUnflyable: true };
+  const swapFor = (toTypeId: number) => ({
+    slot: 'low' as const,
+    slotIndex: 1,
+    fromTypeId: 5,
+    toTypeId,
+  });
+
+  it('adds the swap that frees the CPU, so the option can be applied', async () => {
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6)],
+    });
+    expect(result.flyableBlocked).toEqual([]);
+    const [option] = result.makeFlyable;
+    expect(option.candidate.toTypeId).toBe(2);
+    expect(option.candidate.pairedWith?.toTypeId).toBe(6);
+    expect(option.after.cpuUsed).toBeLessThanOrEqual(option.after.cpuTotal);
+    expect(option.fitting.modules.map((m) => m.typeId)).toEqual([2, 6]);
+    expect(option.iskDelta).toBe(200);
+  });
+
+  it('reports the fix that overran even when swaps cover it, so implants can be offered beside them', async () => {
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6)],
+    });
+    expect(result.makeFlyable).toHaveLength(1);
+    expect(result.flyableOverrun.map((r) => r.candidate.toTypeId)).toEqual([2]);
+  });
+
+  it('prefers the fewest swaps: a single before a pair', async () => {
+    const wide = fit([1, 5, 5]);
+    const result = await search('damage', table, [fix], prices, wide, {
+      compensators: () => [swapFor(6), { slot: 'low', slotIndex: 2, fromTypeId: 5, toTypeId: 7 }],
+    });
+    expect(result.makeFlyable[0].candidate.pairedWith?.pairedWith).toBeUndefined();
+  });
+
+  it('keeps the fix as a greyed row with its reason when nothing frees enough', async () => {
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(7)],
+    });
+    expect(result.makeFlyable).toEqual([]);
+    expect(result.flyableBlocked.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
+      [2, 'budget'],
+    ]);
+  });
+
+  it('greys a bundle that costs more than the spend cap', async () => {
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6)],
+      spendCap: 150,
+      mode: 'refit',
+    });
+    expect(result.makeFlyable).toEqual([]);
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['spend']);
+  });
+});
+
 describe('findImprovements guardrails', () => {
   it('rejects a swap that puts the fit over CPU', async () => {
     const table = { 1: { cpu: 50 }, 2: { cpu: 150, dps: 50 } };
@@ -240,13 +336,13 @@ describe('findImprovements guardrails', () => {
     expect(result.rejected[0].guardrail).toBe('capStable');
   });
 
-  it('Cheaper keeps damage, tank and speed each within 5%', async () => {
+  it('Cheaper keeps damage, tank and speed each within 10%', async () => {
     const table = {
       1: {},
-      // Damage 100 → 90: 10% down.
-      2: { dps: -10 },
-      // Damage 100 → 97: within 5%, a trade-off.
-      3: { dps: -3 },
+      // Damage 100 → 85: 15% down.
+      2: { dps: -15 },
+      // Damage 100 → 92: within 10%, a trade-off.
+      3: { dps: -8 },
     };
     const result = await search('cheaper', table, [candidate(1, 2), candidate(1, 3)], {
       1: 1000,
@@ -500,5 +596,25 @@ describe('damageOf', () => {
     expect(damageOf(stats([{ dps: 80 }]), cruiser)).toBe(
       80 + baseFittingStats().offense.sustainedDps
     );
+  });
+});
+
+describe('overSpendCap', () => {
+  it('counts an implant set against the same budget as the swaps', () => {
+    // Planning: the fit costs 900 and the fix 50; 100 of implants makes 1050.
+    expect(overSpendCap('buy', 1000, 900, 50, 0)).toBe(false);
+    expect(overSpendCap('buy', 1000, 900, 50, 100)).toBe(true);
+    // Refitting: only the extra spend counts.
+    expect(overSpendCap('refit', 200, 900, 50, 100)).toBe(false);
+    expect(overSpendCap('refit', 120, 900, 50, 100)).toBe(true);
+  });
+
+  it('never blocks without a cap or a price', () => {
+    expect(overSpendCap('buy', null, 900, 50, 1e9)).toBe(false);
+    expect(overSpendCap('buy', 10, 900, null, 0)).toBe(false);
+  });
+
+  it('still charges the implants of an unpriced change', () => {
+    expect(overSpendCap('refit', 100, 900, null, 150)).toBe(true);
   });
 });

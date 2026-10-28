@@ -581,3 +581,40 @@ export interface MutaplasmidData {
   /** Every abyssal (mutated) type id, ascending. */
   abyssalTypeIds: number[];
 }
+
+/**
+ * One row of `agents.json`'s `agents`: `[id, name, level, divisionId,
+ * corporationId, stationId, isLocator]`, `isLocator` as 0 or 1. Rows rather than
+ * objects: there are ~8,800 of them. Read through `agents.ts`'s `loadAgents`.
+ */
+export type AgentRow = [number, string, number, number, number, number, 0 | 1];
+
+/**
+ * `agents.json`: the basic (level 1-5 mission) agents a pilot can talk to, and
+ * the name of each division they work in, keyed by divisionID. The storyline,
+ * faction warfare, epic arc, research, career and CONCORD agents are not in it
+ * (`scripts/lib/npcAgents.mjs`).
+ */
+export interface AgentsFile {
+  divisions: Record<string, string>;
+  agents: AgentRow[];
+}
+
+/** One NPC corporation in `npcCorporations.json`; ESI gives none of its faction or headquarters. */
+export interface NpcCorporationEntry {
+  id: number;
+  name: string;
+  ticker: string;
+  /** Absent for a factionless corporation (e.g. Sisters of EVE). */
+  factionId?: number;
+  /** The headquarters station; not every one is in `market/stations.json`. */
+  hqStationId?: number;
+  /** Member tax as a fraction (0.11 is 11%); absent where it is zero. */
+  taxRate?: number;
+}
+
+/** `npcCorporations.json`: every NPC corporation and the faction names. */
+export interface NpcCorporationsFile {
+  factions: { id: number; name: string }[];
+  corporations: NpcCorporationEntry[];
+}

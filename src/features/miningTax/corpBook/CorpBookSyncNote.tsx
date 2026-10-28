@@ -25,12 +25,15 @@ export function CorpBookSyncNote({
   book,
   owedNow,
   now: nowOverride,
+  showCredit = true,
 }: {
   book: CorpBookViewBook;
   /** What the book's rows owe right now. */
   owedNow: number;
   /** Test seam; the note reads the shared minute ticker otherwise. */
   now?: number;
+  /** The Tax page leaves the Statement credit line out; the pay dialog keeps it. */
+  showCredit?: boolean;
 }) {
   const ticked = useTicker(60_000);
   const now = nowOverride ?? ticked;
@@ -39,7 +42,8 @@ export function CorpBookSyncNote({
   const synced = summary.lastSyncedAt;
   const ago = synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : null;
   const closedThrough = summary.closedThrough;
-  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || book.left || summary.credit > 0;
+  const credit = showCredit && summary.credit > 0;
+  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || book.left || credit;
   if (!hasWords) return null;
 
   const safe =
@@ -74,7 +78,7 @@ export function CorpBookSyncNote({
           })}
         </span>
       )}
-      {summary.credit > 0 && (
+      {credit && (
         <span className="text-text-dim">
           {t('miningTax.corpBook.sync.credit', {
             amount: formatIsk(summary.credit, 0),

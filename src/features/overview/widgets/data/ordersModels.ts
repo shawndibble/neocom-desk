@@ -7,6 +7,7 @@ import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems
 import { notCheckedCount, type OpenOrderRow } from '@/features/market/openOrdersModel';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCountdown } from '@/lib/duration';
+import { openHref } from '@/lib/highlightParam';
 import type { StackChartModel, StackPart } from '../charts/types';
 import { UNKNOWN } from './builderKit';
 import type { TableCell, TableModel, TableRowModel, Translate } from './types';
@@ -64,6 +65,9 @@ function expiresIn(t: Translate, row: OpenOrderRow, now: number): string {
   return formatCountdown((row.expiry.expiresAt - now) / 1000);
 }
 
+/** The Market orders page, the Character's own orders. */
+export const ORDERS_PAGE = '/market/orders';
+
 /**
  * Every open order as a record: the item and how many are left, which side,
  * the price, how far it sits from the best rival price at its station, when
@@ -76,7 +80,9 @@ export function ordersTable(
   now: number,
   slots: { used: number; total: number } | null,
   /** Corp view: who placed each order (by order id), as an extra column before the station. */
-  issuedBy: ReadonlyMap<number, string> | null = null
+  issuedBy: ReadonlyMap<number, string> | null = null,
+  /** The Market orders page (and scope) a row opens on, with that order's modal. */
+  page = ORDERS_PAGE
 ): TableModel {
   const sorted = [...rows].sort(
     (a, b) =>
@@ -105,6 +111,7 @@ export function ordersTable(
       row.stationName === null ? undefined : shortStation(t, row.stationName),
     ],
     tone: PROBLEM_TONE[row.problem],
+    to: openHref(page, row.orderId),
   }));
   if (issuedBy) {
     // Before the station: the last cell and sort key of each row.

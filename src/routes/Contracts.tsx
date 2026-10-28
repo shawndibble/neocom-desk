@@ -3,6 +3,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useOpenParam } from '@/lib/useOpenParam';
 import {
   Button,
   DataAgeBadge,
@@ -113,8 +114,11 @@ export function Contracts() {
       'history.status': next.status,
       'history.type': next.type,
     });
-  // The contract a `contractAccepted` alert pointed at, if any.
-  const highlightedContractId = useHighlightParam();
+  // The contract a `contractAccepted` alert pointed at, if any. It opens the modal too, as `?open=` does.
+  const highlightParamId = useHighlightParam();
+  // `?open=` opens the contract's modal as a row click would, and flashes the row too.
+  const openParamId = useOpenParam();
+  const highlightedContractId = highlightParamId ?? openParamId;
 
   /**
    * Item search's and Courier's own freshness and reload, reported up by the panel so the
@@ -209,9 +213,13 @@ export function Contracts() {
   // A switch of Character, source or corporation drops the open contract, so the modal
   // never pairs one party's reads with another's contract id.
   const selectionScope = `${source}:${activeCharacterId}:${view.corporationId}`;
-  const selectedContract = picked?.scope === selectionScope ? picked.contract : null;
+  // A param read off the History tab is spent: a later switch to History must not open it.
+  const [paramOpenDismissed, setParamOpenDismissed] = useState(tab !== 'history');
   const openContract = useCallback(
-    (contract: Contract | null) => setPicked(contract && { scope: selectionScope, contract }),
+    (contract: Contract | null) => {
+      setParamOpenDismissed(true);
+      setPicked(contract && { scope: selectionScope, contract });
+    },
     [selectionScope]
   );
   const selectTab = useCallback(
@@ -258,6 +266,14 @@ export function Contracts() {
       [...(contractsResult?.data ?? [])].sort((a, b) => b.date_issued.localeCompare(a.date_issued)),
     [contractsResult]
   );
+
+  // `?open=` and `?highlight=` wait for the contract to load and show it until the reader picks
+  // or closes one; a contract that never appears opens nothing.
+  const paramContract =
+    highlightedContractId !== null && !paramOpenDismissed
+      ? (contracts.find((c) => c.contract_id === highlightedContractId) ?? null)
+      : null;
+  const selectedContract = picked?.scope === selectionScope ? picked.contract : paramContract;
 
   const statusOptions = useMemo(() => contractStatusOptions(contracts), [contracts]);
   const typeOptions = useMemo(() => contractTypeOptions(contracts), [contracts]);

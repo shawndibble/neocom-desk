@@ -226,7 +226,9 @@ describe('Widget states', () => {
       store.set('mail', { data: mailData(2, 2), error: false, loading: false })
     );
     expect(screen.queryByText('Subject 1')).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Mail' }).querySelectorAll('td')).toHaveLength(4);
+    expect(
+      screen.getByRole('region', { name: 'Mail' }).querySelectorAll('td:not([aria-hidden])')
+    ).toHaveLength(4);
   });
 
   it('shows the subject as a third column at Medium', () => {
@@ -648,12 +650,17 @@ describe('Widget header', () => {
     expect(screen.queryByRole('button', { name: /settings for/i })).not.toBeInTheDocument();
 
     renderWidget(model({ id: 'w2', kind: 'priceWatch', title: 'Second' }), ready, {
-      menu: <button type="button">Menu here</button>,
+      menu: (card) => (
+        <div>
+          {card}
+          <span>Menu here</span>
+        </div>
+      ),
       headerStart: <span>Handle here</span>,
       editControls: <div>Controls here</div>,
     });
     const region = screen.getByRole('region', { name: 'Second' });
-    expect(within(region).getByText('Menu here')).toBeInTheDocument();
+    expect(screen.getByText('Menu here')).toBeInTheDocument();
     expect(within(region).getByText('Handle here')).toBeInTheDocument();
     expect(within(region).getByText('Controls here')).toBeInTheDocument();
   });

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { captureException } from '@sentry/react';
 import {
   isClosedDatabaseEvent,
+  isStrayAbortEvent,
+  markChunkLoadFailure,
   addFailureTag,
   annotateFailure,
   reportFailure,
@@ -174,5 +176,65 @@ describe('isClosedDatabaseEvent', () => {
     ).toBe(true);
     expect(isClosedDatabaseEvent({ exception: { values: [{ type: 'TypeError' }] } })).toBe(false);
     expect(isClosedDatabaseEvent({})).toBe(false);
+  });
+});
+
+describe('isStrayAbortEvent', () => {
+  const rejection = 'auto.browser.global_handlers.onunhandledrejection';
+  it('matches a bare AbortError from an unhandled rejection', () => {
+    expect(
+      isStrayAbortEvent({
+        exception: {
+          values: [{ value: 'AbortError: AbortError', mechanism: { type: rejection } }],
+        },
+      })
+    ).toBe(true);
+  });
+  it("matches Safari's 'Error: AbortError' wording", () => {
+    expect(
+      isStrayAbortEvent({
+        exception: {
+          values: [{ value: 'Error: AbortError: AbortError', mechanism: { type: rejection } }],
+        },
+      })
+    ).toBe(true);
+  });
+  it('keeps other errors and aborts the app reported itself', () => {
+    expect(
+      isStrayAbortEvent({
+        exception: { values: [{ value: 'TypeError: x', mechanism: { type: rejection } }] },
+      })
+    ).toBe(false);
+    expect(
+      isStrayAbortEvent({
+        exception: {
+          values: [{ value: 'AbortError: AbortError', mechanism: { type: 'generic' } }],
+        },
+      })
+    ).toBe(false);
+    expect(isStrayAbortEvent({})).toBe(false);
+  });
+});
+
+describe('markChunkLoadFailure', () => {
+  const chunk = (value: string) => ({
+    level: 'error',
+    tags: { release: 'x' },
+    exception: { values: [{ type: 'TypeError', value }] },
+  });
+  it('makes a failed chunk fetch a tagged warning, in either engine wording', () => {
+    for (const value of [
+      'Failed to fetch dynamically imported module: https://x/assets/Market-1.js',
+      'Importing a module script failed.',
+    ]) {
+      expect(markChunkLoadFailure(chunk(value))).toMatchObject({
+        level: 'warning',
+        tags: { release: 'x', chunk_load: 'failed' },
+      });
+    }
+  });
+  it('leaves every other error alone', () => {
+    const other = chunk('x is undefined');
+    expect(markChunkLoadFailure(other)).toBe(other);
   });
 });

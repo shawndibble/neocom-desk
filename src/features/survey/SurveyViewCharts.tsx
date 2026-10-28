@@ -91,6 +91,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
     () => [
       {
         id: 'at',
+        stickyStart: true,
         header: t('survey.chartScan'),
         render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
       },
@@ -208,6 +209,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
     () => [
       {
         id: 'at',
+        stickyStart: true,
         header: t('survey.chartScan'),
         render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
       },

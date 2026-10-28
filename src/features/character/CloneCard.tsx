@@ -120,6 +120,8 @@ export function CloneCard({
   training,
   rename,
   current = false,
+  rowKey,
+  highlighted = false,
 }: {
   title: string;
   /** Under a named clone's title; null when the title already is the place. */
@@ -137,6 +139,10 @@ export function CloneCard({
   rename?: CloneRename;
   /** The clone the Character is wearing now: set apart from the jump clones. */
   current?: boolean;
+  /** The `data-row-key` an Overview row's `?highlight=` finds this card by. */
+  rowKey?: string;
+  /** Pulse the card: the clone an Overview row sent the reader to. */
+  highlighted?: boolean;
 }) {
   const { t } = useTranslation();
   const hintId = useId();
@@ -155,9 +161,10 @@ export function CloneCard({
 
   return (
     <li
+      data-row-key={rowKey}
       className={`space-y-1.5 rounded-xs border p-3 text-sm ${
         current ? 'border-accent/60 bg-accent/5 md:col-span-2' : 'border-line bg-panel-2'
-      }`}
+      } ${highlighted ? 'row-pulse' : ''}`}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
         {editing && rename ? (

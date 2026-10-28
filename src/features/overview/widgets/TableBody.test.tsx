@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { TableModel } from './data/types';
+import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 import { TableBody } from './TableBody';
 
 const table: TableModel = {
@@ -126,6 +127,19 @@ describe('TableBody grow column', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('cell', { name: 'Bob' })).toHaveClass('w-full');
+  });
+});
+
+describe('TableBody row info', () => {
+  it('opens Show info for the row item on a click', async () => {
+    const open = vi.spyOn(useItemInfoModalStore.getState(), 'open').mockImplementation(() => {});
+    renderTable({
+      columns: [{ key: 'ore', label: 'Ore', priority: 0 }],
+      rows: [{ key: 'a', cells: ['Veldspar'], info: { typeId: 1230 } }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Veldspar' }));
+    expect(open).toHaveBeenCalledWith(1230, 'Veldspar', undefined);
+    open.mockRestore();
   });
 });
 

@@ -36,14 +36,14 @@ export interface DataTableColumn<T> {
    * switches to `table-layout: fixed`: columns without one share what is left
    * and their text truncates (`truncate` on the cell), so scrolling cannot
    * resize columns as rows mount and unmount (`minWidth` sets their floor). Ignored while the table is not
-   * windowed and in the stacked card layout.
+   * windowed (unless `hugColumns`) and in the stacked card layout.
    */
   width?: string;
   /**
    * Least a width-less column of a fixed-layout (windowed) table squeezes to,
-   * a CSS length; default `16ch`. A `min-w-*` class on the cell does nothing
+   * a CSS length of content width (cell padding comes on top); default `16ch`. A `min-w-*` class on the cell does nothing
    * there, so the table's own `min-width` is where the floor lives. Ignored
-   * like `width` is: while not windowed, and in the stacked card layout.
+   * like `width` is: while not windowed (unless `hugColumns`), and in the stacked card layout.
    */
   minWidth?: string;
   /**
@@ -87,6 +87,13 @@ export interface DataTableColumn<T> {
    * being treated as zero.
    */
   sortValue?: (row: T) => string | number | undefined;
+  /**
+   * Direction a first click on this column sorts. Default: inferred from the
+   * sort value — numbers and dates `desc` (biggest, newest first), text `asc`.
+   * Set `'asc'` for a number whose best row is the lowest: jumps and
+   * distance, rank and position, a price in a cheapest-first list.
+   */
+  sortFirst?: 'asc' | 'desc';
   /**
    * Names the row in the stacked (below-`sm`) layout: this cell becomes the
    * card's title — hoisted to the top, unlabelled, semibold — while the rest
@@ -298,6 +305,14 @@ export interface DataTableProps<T> {
    */
   onRowClick?: (row: T) => void;
   /**
+   * Where a click on the row goes, when that is another page (a route change):
+   * the row's menus lead with "Open in new tab" linking there. Return
+   * `undefined` for a row whose click opens a modal, sidebar or expansion, and
+   * leave the prop off a table whose rows all do. Needs a `RowActionsMenu`
+   * row menu (`rowContextMenu`); it never adds a menu by itself.
+   */
+  rowHref?: (row: T) => string | undefined;
+  /**
    * Per-row opt-out of `onRowClick`: a row it returns false for is inert (no
    * pointer cursor, no tab stop, no Enter/Space) so it never looks clickable
    * while doing nothing. Omit when every row opens something.
@@ -396,6 +411,15 @@ export interface DataTableProps<T> {
    * down rather than under it.
    */
   virtualize?: boolean | 'auto';
+  /**
+   * Gives an unwindowed table (`table-layout: auto`) what a windowed one gets
+   * from `width`: each sized column's header takes its width and the table's
+   * `min-width` is their sum plus a floor for every width-less column
+   * (`minWidth`, default 16ch), so the wrapper scrolls sideways rather than
+   * squeezing a text column to a few letters, and slack goes to the
+   * width-less columns, never to the sized ones. Off by default.
+   */
+  hugColumns?: boolean;
   /**
    * Hands the caller the rows in on-screen order — the table sorts
    * internally, so an export that wants to match what the reader sees reads

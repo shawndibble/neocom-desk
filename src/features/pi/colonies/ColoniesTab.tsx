@@ -47,6 +47,8 @@ import {
 import { ColonyListHeader, ColonyRowView } from './ColonyRowView';
 import { PlanetImage } from '../PlanetImage';
 import { TodayPanel } from './TodayPanel';
+import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const PLAN_HREF = '/planetary-industry/plan';
@@ -257,6 +259,11 @@ export function ColoniesTab({
     [setOpen]
   );
   const expand = useCallback((key: string) => setOpen(key, true), [setOpen]);
+
+  // An Overview row's `?highlight=<planetId>`: scrolled to and pulsed once, own colonies only.
+  const highlightedPlanetId = useHighlightParam();
+  const ownListRef = useRef<HTMLDivElement>(null);
+  useScrollToRowKey(ownListRef, highlightedPlanetId, data);
 
   // Scrolled to and focused once per link, not on every refresh of the data.
   const focusedLink = useRef<string | null>(null);
@@ -623,7 +630,7 @@ export function ColoniesTab({
                 className="py-6"
               />
             ) : (
-              <>
+              <div ref={ownListRef}>
                 {showAltColonies && <CharacterGroupHeader name={activeCharacterName} />}
                 {ownRows.map((row, index) => {
                   const planet = planets.find((p) => p.planet_id === row.planetId)!;
@@ -645,10 +652,11 @@ export function ColoniesTab({
                       primary={index === 0}
                       own
                       haulLabel={haulLabel}
+                      highlighted={row.planetId === highlightedPlanetId}
                     />
                   );
                 })}
-              </>
+              </div>
             )}
 
             {ownRows.length === 0 && includeAlts && <ColonyListHeader haulHours={haulHours} />}

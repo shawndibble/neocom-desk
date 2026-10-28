@@ -9,6 +9,7 @@ import { assignLocation } from '@/app/navigation';
 import { AUTHORIZED_APPS_URL, DISCORD_URL, REPO_URL } from '@/lib/links';
 import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { LANDING_SHELL_ATTR, LANDING_SHELL_ID } from '@/app/landingShell';
+import { takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
@@ -61,7 +62,7 @@ const WRITE_SCOPE_PHRASES: Record<string, string> = {
 // Permissions, disclosed in the trust card but not asked for at sign-in.
 const BASE_GRANT_PHRASES: Record<string, string> = READ_ONLY_PHRASES;
 
-function renderLogin(url = '/login') {
+function renderLogin(url: string | { pathname: string; state?: unknown } = '/login') {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
@@ -83,6 +84,27 @@ beforeEach(async () => {
 });
 
 describe('Login', () => {
+  it('stashes the page the auth gate sent the visitor from', async () => {
+    renderLogin({ pathname: '/login', state: { from: '/market/browser?info=123#x' } });
+    await screen.findByRole('heading', { name: /answers, not api dumps/i });
+    expect(takeLoginReturnTo()).toBe('/market/browser?info=123#x');
+  });
+
+  it.each([['//evil.com'], ['/login'], ['/callback?code=abc'], [42]])(
+    'ignores an unusable from %j',
+    async (from) => {
+      renderLogin({ pathname: '/login', state: { from } });
+      await screen.findByRole('heading', { name: /answers, not api dumps/i });
+      expect(takeLoginReturnTo()).toBeNull();
+    }
+  );
+
+  it('stashes nothing on a plain visit', async () => {
+    renderLogin();
+    await screen.findByRole('heading', { name: /answers, not api dumps/i });
+    expect(takeLoginReturnTo()).toBeNull();
+  });
+
   it('shows only logo, name and the sign-in button in the Play Store app', async () => {
     vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
     renderLogin();

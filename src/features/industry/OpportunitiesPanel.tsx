@@ -694,7 +694,6 @@ export function OpportunitiesPanel({
       title={title}
       leading={viewPicker}
       meta={meta}
-      wrapMeta
       actions={
         <span className="flex items-center gap-2">
           {pricingActions}

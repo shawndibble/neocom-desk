@@ -1,7 +1,7 @@
 /** Pure rules of the SRP member page: row kinds, re-file, ordering, refusal messages. */
 import { DAY_MS } from '@/lib/age';
 import { callableErrorReason } from '@/lib/callableError';
-import type { HullRule, SrpClaimBasis, SrpClaimState } from '../srpTypes';
+import type { DoctrinePreview, HullRule, SrpClaimBasis, SrpClaimState } from '../srpTypes';
 
 /** A claim as the pilot reads it: the fields of `corps/{id}/srpClaims/{killmailId}` the page shows. */
 export interface MemberClaim {
@@ -35,6 +35,7 @@ export interface LostLoss {
   killedAt: number;
 }
 
+/** `old` is judged here but never listed (`useMemberSrp` drops it). */
 export type LostRowKind = 'open' | 'claimed' | 'old' | 'notCovered';
 
 export interface LostRowContext {
@@ -123,4 +124,23 @@ export function memberErrorKey(error: unknown): string {
 export function memberErrorTarget(error: unknown): MemberErrorTarget {
   const reason = callableErrorReason(error);
   return (reason !== null ? REASONS[reason]?.target : undefined) ?? 'form';
+}
+
+/**
+ * Whether a doctrine preview carries the pricing fields #5379 added. The Cloud Function is deployed
+ * separately from the client, so an older answer (no `quote`/`values`) can arrive; the modal reads
+ * such an answer as failed instead of rendering from `undefined`.
+ */
+export function isUsablePreview(preview: unknown): preview is DoctrinePreview {
+  if (typeof preview !== 'object' || preview === null) return false;
+  const { check, quote, values } = preview as Partial<DoctrinePreview>;
+  return (
+    typeof check === 'object' &&
+    check !== null &&
+    typeof quote === 'object' &&
+    quote !== null &&
+    typeof quote.kind === 'string' &&
+    typeof values === 'object' &&
+    values !== null
+  );
 }

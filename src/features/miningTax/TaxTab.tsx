@@ -39,6 +39,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
   HeaderMoreMenu,
@@ -67,7 +68,6 @@ import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useRememberedUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { type UrlParamCodec } from '@/lib/urlState';
@@ -223,11 +223,24 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
   };
 }
 
-/** `payeeFilter` as a URL query param: a comma-separated set of Payee ids, absent means "all". */
-function payeeFilterParam(): UrlParamCodec<ReadonlySet<string> | 'all'> {
+/**
+ * The Payee filter: some Payees, `'all'`, or `'none'` (Select none: the Open
+ * list shows nothing). Unlike the shared `MultiSelectFilter`, nothing ticked
+ * is its own state here, not "all".
+ */
+type PayeeFilter = ReadonlySet<string> | 'all' | 'none';
+
+/**
+ * `payeeFilter` as a URL query param: a comma-separated set of Payee ids,
+ * absent means "all", `none` means no Payee (a Payee id is a UUID, never
+ * the word "none").
+ */
+function payeeFilterParam(): UrlParamCodec<PayeeFilter> {
   return {
-    parse: (raw) => (raw === null || raw === '' ? 'all' : new Set(raw.split(','))),
-    serialize: (value) => (value === 'all' ? null : [...value].sort().join(',')),
+    parse: (raw) =>
+      raw === null || raw === '' ? 'all' : raw === 'none' ? 'none' : new Set(raw.split(',')),
+    serialize: (value) =>
+      value === 'all' ? null : value === 'none' ? 'none' : [...value].sort().join(','),
   };
 }
 
@@ -290,7 +303,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [setTaxUrlParams]
   );
   const setPayeeFilter = useCallback(
-    (next: ReadonlySet<string> | 'all') => setTaxUrlParams({ 'tax.payee': next }),
+    (next: PayeeFilter) => setTaxUrlParams({ 'tax.payee': next }),
     [setTaxUrlParams]
   );
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
@@ -537,10 +550,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // "unknown value falls back to the default" rule the codecs otherwise apply
   // themselves. Emptying out entirely (every id unknown) reads as no filter.
   const resolvedPayeeFilter = useMemo(() => {
-    if (payeeFilter === 'all') return 'all' as const;
+    if (payeeFilter === 'all') return payeeFilter;
+    // No Payees left means no dropdown to leave "none" with.
+    if (payeeFilter === 'none') return ledgerPayees.length === 0 ? ('all' as const) : payeeFilter;
     const known = new Set(ledgerPayees.map((p) => p.id));
     const kept = new Set([...payeeFilter].filter((id) => known.has(id)));
-    return kept.size === 0 ? ('all' as const) : kept;
+    return kept.size === 0 || kept.size === known.size ? ('all' as const) : kept;
   }, [payeeFilter, ledgerPayees]);
 
   // Filtering "by Payee" only makes sense for rows that already have one —
@@ -550,10 +565,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     () =>
       resolvedPayeeFilter === 'all'
         ? characterFiltered
-        : characterFiltered.filter(
-            (dr) =>
-              dr.assignment?.payeeId !== undefined && resolvedPayeeFilter.has(dr.assignment.payeeId)
-          ),
+        : resolvedPayeeFilter === 'none'
+          ? []
+          : characterFiltered.filter(
+              (dr) =>
+                dr.assignment?.payeeId !== undefined &&
+                resolvedPayeeFilter.has(dr.assignment.payeeId)
+            ),
     [characterFiltered, resolvedPayeeFilter]
   );
 
@@ -647,18 +665,24 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   });
   const busy = continuing || acting;
 
+  // Not the shared `toggleFilterMember`: unticking the last Payee lands in
+  // "none" here, not back on "all" (Select none, #5413).
   function togglePayee(payeeId: string) {
-    setPayeeFilter(
-      toggleFilterMember(
-        resolvedPayeeFilter,
-        payeeId,
-        ledgerPayees.map((p) => p.id)
-      )
-    );
+    const universe = ledgerPayees.map((p) => p.id);
+    const next =
+      resolvedPayeeFilter === 'all'
+        ? new Set(universe)
+        : resolvedPayeeFilter === 'none'
+          ? new Set<string>()
+          : new Set(resolvedPayeeFilter);
+    if (next.has(payeeId)) next.delete(payeeId);
+    else next.add(payeeId);
+    setPayeeFilter(next.size === universe.length ? 'all' : next.size === 0 ? 'none' : next);
   }
 
   const isSolePayeeFilter = (payeeId: string) =>
     resolvedPayeeFilter !== 'all' &&
+    resolvedPayeeFilter !== 'none' &&
     resolvedPayeeFilter.size === 1 &&
     resolvedPayeeFilter.has(payeeId);
 
@@ -1187,6 +1211,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     key={book.loaded.corporationId}
                     book={book}
                     owedNow={corpOwedNow(book.loaded.corporationId)}
+                    showCredit={false}
                   />
                 ))}
 
@@ -1223,15 +1248,41 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                           <Button size="sm">
                             {resolvedPayeeFilter === 'all'
                               ? t('miningTax.allPayees')
-                              : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
+                              : resolvedPayeeFilter === 'none'
+                                ? t('miningTax.noPayees')
+                                : t('miningTax.payeesSelected', {
+                                    count: resolvedPayeeFilter.size,
+                                  })}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
+                          <div className="flex">
+                            <DropdownMenuItem
+                              className="flex-1 justify-center"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setPayeeFilter('all');
+                              }}
+                            >
+                              {t('miningTax.selectAllPayees')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="flex-1 justify-center"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setPayeeFilter('none');
+                              }}
+                            >
+                              {t('miningTax.selectNoPayees')}
+                            </DropdownMenuItem>
+                          </div>
+                          <DropdownMenuSeparator />
                           {ledgerPayees.map((p) => (
                             <DropdownMenuCheckboxItem
                               key={p.id}
                               checked={
-                                resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)
+                                resolvedPayeeFilter === 'all' ||
+                                (resolvedPayeeFilter !== 'none' && resolvedPayeeFilter.has(p.id))
                               }
                               onSelect={(e) => e.preventDefault()}
                               onCheckedChange={() => togglePayee(p.id)}
@@ -1255,6 +1306,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     {isPhone && openRows.length > 1 && (
                       <DataTableSortPicker
                         columns={openColumns}
+                        rows={openRows}
                         sort={taxSort.sort}
                         onSortChange={taxSort.onSortChange}
                         size="sm"
@@ -1348,8 +1400,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   </section>
                 )}
 
-                {visibleRows.length === 0 && (
-                  <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
+                {resolvedPayeeFilter === 'none' ? (
+                  <EmptyState title={t('miningTax.noPayeesSelected')} />
+                ) : (
+                  visibleRows.length === 0 && (
+                    <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
+                  )
                 )}
 
                 {/* Pinned above the phone tab bar (and to the bottom of the

@@ -4,6 +4,7 @@
  */
 import { HOUR_MS } from '@/lib/age';
 import type { DeadlineSeverity } from '@/engine/character/severity';
+import { highlightHref } from '@/lib/highlightParam';
 import { formatCountdown } from '@/lib/duration';
 import { planetarySeverity } from '../../data/boardSeverity';
 import { planetarySummary } from '../../data/boardSummary';
@@ -126,6 +127,7 @@ export const planetary: Builder = (feeds, { t, now }) => {
         colony.programs === undefined ? UNKNOWN : count(colony.programs),
       ],
       tone: colony.severity,
+      to: highlightHref(`${to}/colonies`, colony.key),
     })),
   };
 

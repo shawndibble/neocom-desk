@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setLoginReturnTo, takeLoginReturnTo } from './loginReturnTo';
+import { setLoginReturnTo, takeLoginReturnTo, usableLoginReturnTo } from './loginReturnTo';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -37,5 +37,31 @@ describe('loginReturnTo', () => {
     setLoginReturnTo('/settings');
     vi.advanceTimersByTime(14 * 60_000);
     expect(takeLoginReturnTo()).toBe('/settings');
+  });
+});
+
+describe('usableLoginReturnTo', () => {
+  it('keeps path, query and hash', () => {
+    expect(usableLoginReturnTo('/market/browser?info=123#x')).toBe('/market/browser?info=123#x');
+  });
+
+  it.each([
+    undefined,
+    null,
+    42,
+    '',
+    'market',
+    'https://evil.com',
+    '//evil.com',
+    '/login',
+    '/login?x=1',
+    '/callback?code=abc',
+    '/callback',
+  ])('refuses %j', (value) => {
+    expect(usableLoginReturnTo(value)).toBeNull();
+  });
+
+  it('keeps a path that only starts like a gate route', () => {
+    expect(usableLoginReturnTo('/loginfo')).toBe('/loginfo');
   });
 });

@@ -21,6 +21,7 @@
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Link } from 'react-router-dom';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, SlideOver, Tooltip } from '@/components/ui';
@@ -57,6 +58,7 @@ import { routeExposure, type RouteExposure } from '@/features/route/routeExposur
 import { useJumpBasis } from '@/features/route/jumpBasis';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { courierPlanRouteHref } from '@/features/contractSearch/courierPlanRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
 import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
@@ -250,6 +252,7 @@ export function CourierContractDetailModal({
       : []),
   ];
   const exposure = useRouteExposure(row, preference);
+  const planRouteHref = courierPlanRouteHref(row.origin, row.destination, preference);
   const lawless = useLawlessSystems();
   // A same-system haul has a one-system path, which is no trip to review.
   const path = exposure?.kind === 'known' && exposure.path.length > 1 ? exposure.path : null;
@@ -415,6 +418,14 @@ export function CourierContractDetailModal({
             <span className={eyebrowClassName}>{t('contractSearch.dropOffLabel')}</span>
             <span className="text-sm">{endpointPlace(row.destination)}</span>
             {place(row.destination)}
+            {planRouteHref !== null && (
+              <Link
+                to={planRouteHref}
+                className={`-my-1.5 flex min-h-9 items-center self-start py-1 text-xs md:my-0 md:min-h-0 ${inlineLinkClassName}`}
+              >
+                {t('contractSearch.planRoute')}
+              </Link>
+            )}
           </div>
 
           {/*
@@ -624,9 +635,15 @@ export function CourierContractDetailModal({
               <span className="flex items-center gap-1">
                 {String(row.contractId)}
                 <CopyContractIdButton contractId={row.contractId} />
-                <OpenInEveButton kind="contract" id={row.contractId} />
               </span>
             }
+          />
+          {/* Its own cell, so the button keeps its natural width; nothing renders when unavailable. */}
+          <OpenInEveButton
+            kind="contract"
+            id={row.contractId}
+            name={t('contractDetail.openInEveName', { id: row.contractId })}
+            className="self-end"
           />
         </div>
       </div>

@@ -27,6 +27,10 @@ export const LAZY_SDE_FILES: readonly string[] = [
   'reprocessing.json',
   'marketWideTrees.json',
   'invention.json',
+  // NPC agents (~140 KB gzip), read only by the Contacts standings view and the
+  // NPC agent card. `npcCorporations.json` (~6 KB gzip, every corporation's
+  // faction and headquarters) is the small shared lookup that stays precached.
+  'agents.json',
 ];
 
 /**

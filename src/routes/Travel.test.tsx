@@ -1154,6 +1154,13 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
       server.use(http.get(EVE_SCOUT_SIGNATURES_URL, () => HttpResponse.json(HOLES)));
     });
 
+    it('shows no ways panel when gates are the only way', async () => {
+      visit(`?from=${JITA}&to=${UEDAMA}`);
+
+      await screen.findByRole('table', { name: 'Systems on the route' });
+      expect(screen.queryByRole('region', { name: 'Ways to fly leg 1' })).toBeNull();
+    });
+
     it('lists each way with its facts, the one in use first', async () => {
       visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
 

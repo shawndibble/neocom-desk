@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
   iskPerM3,
+  splitEach,
   sellSalesTax,
   sellAfterTax,
   appraisalUndercut,
@@ -259,6 +260,7 @@ describe('buildAppraisal', () => {
       // whatever the last player reseller asked, here worse than LP.
       sell: 95_000_000,
       lpOption: {
+        offerId: 3001,
         corporationId: 1000125,
         corpName: 'Sisters of EVE',
         lpCost: 400_000,
@@ -270,6 +272,7 @@ describe('buildAppraisal', () => {
     it('carries the LP option through onto the row', () => {
       const { rows } = buildAppraisal([astero], 100);
       expect(rows[0].lpCorporationId).toBe(1000125);
+      expect(rows[0].lpOfferId).toBe(3001);
       expect(rows[0].lpCorpName).toBe('Sisters of EVE');
       expect(rows[0].lpCost).toBe(400_000);
       expect(rows[0].lpIskCost).toBe(850_000);
@@ -733,6 +736,18 @@ describe('iskPerM3', () => {
 
   it('is null when nobody sells it, rather than a free cargo', () => {
     expect(iskPerM3({ ...base, sellTotal: null })).toBeNull();
+  });
+});
+
+describe('splitEach', () => {
+  it('is the midpoint of the buy and sell each price', () => {
+    expect(splitEach({ buyEach: 5, sellEach: 7 })).toBe(6);
+  });
+
+  it('is null when either side has no price, never half a price or zero', () => {
+    expect(splitEach({ buyEach: null, sellEach: 7 })).toBeNull();
+    expect(splitEach({ buyEach: 5, sellEach: null })).toBeNull();
+    expect(splitEach({ buyEach: null, sellEach: null })).toBeNull();
   });
 });
 

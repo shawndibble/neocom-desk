@@ -51,7 +51,7 @@ export type {
   DataTableGroupBy,
   DataTableSort,
 } from './DataTable';
-export { sortRows, nextDataTableSort } from './dataTableSort';
+export { sortRows, nextDataTableSort, firstSortDirection } from './dataTableSort';
 export { CharacterAvatar } from './CharacterAvatar';
 export { TypeIcon } from './TypeIcon';
 export { characterAvatarBoxClassName } from './characterAvatarBox';
@@ -79,6 +79,8 @@ export {
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuCheckboxItem,
+  ContextMenuLabel,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
@@ -86,7 +88,7 @@ export {
   ContextMenuSubTrigger,
   ContextMenuSubContent,
 } from './ContextMenu';
-export { Popover, PopoverContent, PopoverTrigger } from './Popover';
+export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from './Popover';
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -104,16 +106,19 @@ export {
 export {
   MenuItem,
   DisabledMenuItem,
+  MenuCheckboxItem,
+  MenuLabel,
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
   MenuSub,
   MenuSubTrigger,
   MenuSubContent,
+  OpenInNewTabMenuItem,
   RowActionsMenu,
   RowMoreActions,
 } from './RowActions';
-export { RowActionsContext, RowMenuExtrasContext } from './rowActionsContext';
+export { RowActionsContext, RowMenuExtrasContext, RowOpenHrefContext } from './rowActionsContext';
 export type { RowActions } from './rowActionsContext';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
 export { CheckboxSelect } from './CheckboxSelect';

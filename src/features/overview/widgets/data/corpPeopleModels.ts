@@ -20,6 +20,14 @@ const MEMBERS_PATH = '/corp/members';
 /** The roster's own dark-only filter (`CorpMembers` reads `?dark=1`), so the link lands on the same set. */
 const INACTIVE_PATH = `${MEMBERS_PATH}?dark=1`;
 const MOONS_PATH = '/corp/moons';
+/** A member's row flashes on the roster (`CorpRoster` reads `?highlight=<characterId>`). */
+const rosterPath = (query: string, characterId: number) =>
+  `${MEMBERS_PATH}${query}highlight=${characterId}`;
+/**
+ * The ledger names characters, the Miners tab names Miners (a main with its alts, or `solo:<id>`),
+ * so a row cannot name its own Miner: it opens the tab.
+ */
+const MINERS_PATH = `${MOONS_PATH}/miners`;
 
 /** ESI keeps about this many days of an observer ledger. */
 const LEDGER_DAYS = 30;
@@ -100,6 +108,7 @@ export const corpMembers: Builder = (feeds, { t, now }) => {
       : [
           ...diff.joined.map((id) => ({
             key: `joined:${id}`,
+            to: rosterPath('/roster?', id),
             cells: [nameOf(names, id), { text: t(`${M}.joined`), tone: 'good' as const }],
           })),
           ...diff.left.map((id) => ({
@@ -165,6 +174,7 @@ export const corpInactive: Builder = (feeds, { t }) => {
     ],
     rows: inactive.map(({ member, standing }) => ({
       key: String(member.characterId),
+      to: rosterPath('?dark=1&', member.characterId),
       cells: [
         nameOf(names, member.characterId),
         standing.neverSeen ? t('corp.members.never') : ageText(t, loadedAt, standing.lastSeenMs),
@@ -285,6 +295,7 @@ export const corpMining: Builder = (feeds, { t, now, range }) => {
       const bar = fractionBar(miner.units, total);
       return {
         key: String(miner.id),
+        to: MINERS_PATH,
         cells: [
           minerName(miner.id),
           formatNumber(miner.units),

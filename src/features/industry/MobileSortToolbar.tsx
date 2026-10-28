@@ -23,7 +23,8 @@ interface MobileSortToolbarProps<Id extends string> {
   count: number;
   /** Replaces the "N blueprints" count, for a list whose cards aren't blueprints. */
   summary?: string;
-  fields: readonly { id: Id; label: string }[];
+  /** `firstDirection`: where a tap on an inactive field starts it (`firstSortDirection`'s rule); default `asc`. */
+  fields: readonly { id: Id; label: string; firstDirection?: 'asc' | 'desc' }[];
   sort: DataTableSort;
   onSortChange: (next: DataTableSort) => void;
   className?: string;
@@ -67,7 +68,7 @@ export function MobileSortToolbar<Id extends string>({
           {fields.map((field) => (
             <DropdownMenuItem
               key={field.id}
-              onSelect={() => onSortChange(nextDataTableSort(sort, field.id))}
+              onSelect={() => onSortChange(nextDataTableSort(sort, field.id, field.firstDirection))}
               aria-label={
                 field.id === sort.columnId
                   ? t(sort.direction === 'asc' ? 'industry.sortedAsc' : 'industry.sortedDesc', {

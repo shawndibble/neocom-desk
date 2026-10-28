@@ -9,6 +9,12 @@ const STATIONS: NpcStationEntry[] = [
     typeId: 52678,
   },
   { id: 60008494, name: 'Amarr VIII (Oris) - Emperor Family Academy', systemId: 30002187 },
+  {
+    id: 60015001,
+    name: 'Example Station',
+    systemId: 30000001,
+    reprocessingStationsTake: 0.025,
+  },
 ];
 
 const loadNpcStations = vi.fn(async (): Promise<NpcStationEntry[]> => STATIONS);
@@ -16,7 +22,7 @@ vi.mock('./loadMarketSde', () => ({
   loadNpcStations: () => loadNpcStations(),
 }));
 
-import { clearNpcStationIndex, lookupNpcStation } from './npcStations';
+import { clearNpcStationIndex, lookupNpcStation, stationReprocessingTake } from './npcStations';
 
 beforeEach(() => {
   clearNpcStationIndex();
@@ -63,5 +69,20 @@ describe('lookupNpcStation', () => {
     expect((await lookupNpcStation(60003760))?.name).toBe(
       'Jita IV - Moon 4 - Caldari Navy Assembly Plant'
     );
+  });
+});
+
+describe('stationReprocessingTake', () => {
+  it('reads an entry without the field as the usual 5%', async () => {
+    const station = await lookupNpcStation(60003760);
+
+    expect(station).toBeTruthy();
+    expect(stationReprocessingTake(station!)).toBe(0.05);
+  });
+
+  it("reads a station's own take where the snapshot carries one", async () => {
+    const station = await lookupNpcStation(60015001);
+
+    expect(stationReprocessingTake(station!)).toBe(0.025);
   });
 });

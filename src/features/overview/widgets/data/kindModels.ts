@@ -5,6 +5,7 @@
  * time, the widget's range applied here over data shared by every widget of
  * the kind.
  */
+import { highlightHref } from '@/lib/highlightParam';
 import { fixed1 } from '@/lib/fixedFormat';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
@@ -20,6 +21,7 @@ import type { LayerId } from '@/engine/netWorth/series';
 import { summarizeRouteKills, type KillLevel } from '@/engine/route/routeKillTrend';
 import type { ChartColor, StackPart } from '../charts/types';
 import {
+  ageText,
   blank,
   count,
   NEUTRAL_NUMBER,
@@ -39,13 +41,14 @@ import {
   flowBars,
   flowSecondary,
   flowTable,
+  LP_STORE_PATH,
   lpTable,
   netWorthSeries,
   netWorthTable,
 } from './moneyModels';
 import { journalCoverageDays, withinRange } from './chartSeries';
 import { dayTitle, rollingTitles } from './chartTips';
-import type { ListRow, NumberModel, TableCell } from './types';
+import type { ListRow, NumberModel, RowDetailModel, TableCell } from './types';
 import { formatNumber } from '@/lib/numberLocale';
 
 const D = 'overview.widgets.data';
@@ -227,7 +230,7 @@ const LP_CHART_ROWS = 6;
 const lp: Builder = (feeds, { t }) => {
   const feed = feeds.lp;
   const data = feed?.data ?? null;
-  const to = '/wallet';
+  const to = LP_STORE_PATH;
   if (!data) return blank(to, statusOf(feed));
   const total = data.entries.reduce((sum, entry) => sum + entry.points, 0);
   const nameOf = (entry: (typeof data.entries)[number]) =>
@@ -328,10 +331,14 @@ const survey: Builder = (feeds, { t, now }) => {
         { key: 'ore', label: t(`${W}.survey.col.ore`), priority: 0 },
         { key: 'left', label: t(`${W}.survey.col.left`), align: 'end', priority: 0 },
       ],
-      rows: left.map((o) => ({
-        key: o.ore,
-        cells: [o.ore, volume(o.volume)],
-      })),
+      rows: left.map((o) => {
+        const typeId = data.oreTypeIds?.get(o.ore);
+        return {
+          key: o.ore,
+          cells: [o.ore, volume(o.volume)],
+          info: typeId === undefined ? undefined : { typeId },
+        };
+      }),
     },
     summary: note,
     chart:
@@ -573,6 +580,7 @@ const clones: Builder = (feeds, { t }) => {
     return {
       key: String(row.id),
       title: labelOf(row),
+      to: row.id === 'worn' ? undefined : highlightHref('/clones', row.id),
       detail: row.id === data.bestId ? t(`${D}.clones.best`) : undefined,
       value:
         delta === null
@@ -869,7 +877,30 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
             ? { text: t(`${W}.kills.side.loss`), tone: 'bad' }
             : { text: t(`${W}.kills.side.kill`), tone: 'good' },
         ];
-        return { key: String(entry.killmailId), cells };
+        const detail: RowDetailModel = {
+          title: shipName(entry.shipTypeId),
+          status:
+            entry.side === 'loss'
+              ? { badge: t(`${W}.kills.side.loss`), tone: 'danger' }
+              : { badge: t(`${W}.kills.side.kill`), tone: 'success' },
+          facts: [
+            { label: t(`${W}.kills.col.system`), value: systemName(entry.systemId) },
+            {
+              label: t(`${W}.kills.col.value`),
+              value: entry.value === null ? UNKNOWN : formatIskCompact(entry.value),
+            },
+            {
+              label: t('overview.widgets.kills.detail.when'),
+              value: ageText(t, now, entry.timeMs),
+            },
+            { label: t('overview.widgets.kills.detail.killmail'), value: `#${entry.killmailId}` },
+          ],
+          place:
+            entry.systemId !== null && data.systemNames.has(entry.systemId)
+              ? { systemId: entry.systemId, name: systemName(entry.systemId) }
+              : undefined,
+        };
+        return { key: String(entry.killmailId), cells, detail };
       }),
     },
     summary,

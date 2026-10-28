@@ -4,6 +4,7 @@ import { useReportSkipped } from './useReportSkipped';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   EmptyState,
@@ -15,6 +16,7 @@ import {
   TypeIcon,
   CachedNotice,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { DataGate } from '@/components/DataGate';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
@@ -118,6 +120,24 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   };
 }
 
+/** Flags worth naming; a container's own flag (Unlocked) adds nothing, so it reads as the holder name alone. */
+const NAMED_HOLD_FLAGS = new Set(['ShipHangar', 'FleetHangar', 'Cargo']);
+
+/** What holds a ship inside another asset, outermost first: "inside Orca (Ship Maintenance Bay) › Cargo Container". Empty for a free-standing ship. */
+function holderTrail(row: ShipRow, holderNames: ReadonlyMap<number, string>, t: TFunction): string {
+  const parts = row.trail.flatMap((itemId, i) => {
+    const holder = holderNames.get(itemId);
+    if (!holder) return [];
+    const flag = row.holderFlags[i];
+    return [
+      flag && NAMED_HOLD_FLAGS.has(flag)
+        ? t('assets.myShips.insideFlag', { holder, flag: t(`assets.myShips.flags.${flag}`) })
+        : holder,
+    ];
+  });
+  return parts.length === 0 ? '' : t('assets.myShips.inside', { holder: parts.join(' › ') });
+}
+
 /** The kind a ship's location resolves under: a station, a system, else a structure (`other`, or the parent of an item ESI never returned as an asset). */
 function placeRefOf(row: ShipRow) {
   return {
@@ -171,9 +191,9 @@ interface MyShipsViewProps {
 /** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. The Character column only exists when more than one Character's ships are listed. */
 const ROW_GRID_BASE = 'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:gap-y-0.5';
 const ROW_GRID_WITH_CHARACTER =
-  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_4.5rem_2rem]';
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
 const ROW_GRID_SINGLE_CHARACTER =
-  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_4.5rem_2rem]';
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
 
 type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
 
@@ -241,10 +261,7 @@ function ShipRowView({
     (row.locationType === 'station'
       ? t('assets.stationLabel', { id: row.locationId })
       : t('assets.structureLabel', { id: row.locationId }));
-  const trail = row.trail
-    .map((itemId) => data.holderNames.get(itemId))
-    .filter(Boolean)
-    .join(' › ');
+  const trail = holderTrail(row, data.holderNames, t);
   const openInFittings = useOpenInFittings();
   const openFitting = () =>
     openInFittings.open(() =>
@@ -260,7 +277,9 @@ function ShipRowView({
         <>
           <ShowInfoMenuItem typeId={row.typeId} itemName={shipName} />
           <OpenInEveItemMenuItems typeId={row.typeId} />
-          <MenuItem onSelect={openFitting}>{t('assets.myShips.menu.showFitting')}</MenuItem>
+          {!row.packaged && (
+            <MenuItem onSelect={openFitting}>{t('assets.myShips.menu.showFitting')}</MenuItem>
+          )}
           {systemId !== null && (
             <MenuItem onSelect={() => void navigate(routeToHref(systemId, null, preference))}>
               {t('assets.myShips.menu.planRoute')}
@@ -290,35 +309,53 @@ function ShipRowView({
             >
               {shipName}
             </button>
-            {shipClass && (
-              <span className="text-xs text-text-dim max-sm:ml-2 sm:block">{shipClass}</span>
+            {row.quantity > 1 && (
+              <span className="ml-1.5 text-xs text-text-dim tabular-nums">
+                {t('assets.myShips.quantity', { count: row.quantity })}
+              </span>
+            )}
+            {(shipClass || row.packaged) && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-text-dim max-sm:ml-2 sm:flex">
+                {shipClass}
+                {row.packaged && (
+                  <Pill tone="warning" className="shrink-0">
+                    {t('assets.myShips.packaged')}
+                  </Pill>
+                )}
+              </span>
             )}
           </span>
           {openInFittings.pending && (
             <Spinner size="sm" label={t('assets.myShips.openingFitting')} className="shrink-0" />
           )}
-          {row.inCargo && (
-            <span className="shrink-0 rounded-xs border border-line px-1 text-[0.6875rem] text-text-dim">
-              {t('assets.myShips.inCargo')}
-            </span>
-          )}
         </span>
         {showCharacter && (
           <span
             role="cell"
-            className="min-w-0 text-xs break-words text-text-dim max-sm:order-3 max-sm:flex-1 max-sm:truncate"
+            className="min-w-0 text-xs break-words text-text-dim max-sm:order-5 max-sm:basis-full max-sm:truncate"
           >
             {data.characterNames.get(row.characterId)}
           </span>
         )}
-        <span role="cell" className="min-w-0 text-xs break-words max-sm:order-2 max-sm:basis-full">
+        <span
+          role="cell"
+          className="min-w-0 text-xs break-words max-sm:order-3 max-sm:flex-1 max-sm:truncate"
+        >
           {name}
-          {trail && <span className="text-text-dim"> · {trail}</span>}
+          {trail && (
+            <>
+              <span className="text-text-dim"> · </span>
+              <span className="text-text-dim">{trail}</span>
+            </>
+          )}
         </span>
-        <span role="cell" className="text-xs max-sm:order-4">
+        <span role="cell" className="text-xs max-sm:order-2">
           <SecurityValue security={security} />
         </span>
-        <span role="cell" className="text-xs whitespace-nowrap max-sm:order-5">
+        <span
+          role="cell"
+          className="flex items-center gap-2 text-xs whitespace-nowrap max-sm:order-4"
+        >
           {jumps?.kind === 'known' && jumps.jumps === 0 ? (
             <span>{t('assets.myShips.here')}</span>
           ) : (
@@ -397,12 +434,13 @@ export function MyShipsView({
       shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
       character: data.characterNames.get(row.characterId) ?? '',
       trail: row.trail.map((id) => data.holderNames.get(id) ?? '').join(' '),
+      packaged: row.packaged ? t('assets.myShips.packaged') : '',
     }));
-  }, [state, rows, shipClasses]);
+  }, [state, rows, shipClasses, t]);
   const sorted = useMemo(() => {
     const describe = (
       base: (typeof staticKeys)[number]
-    ): SortKeys & { shipClass: string; trail: string } => {
+    ): SortKeys & { shipClass: string; trail: string; packaged: string } => {
       const place = places.get(placeKey(base.row));
       const jumps = place?.jumps;
       return {
@@ -411,6 +449,7 @@ export function MyShipsView({
         character: base.character,
         location: place?.name ?? '',
         trail: base.trail,
+        packaged: base.packaged,
         security: typeof place?.systemId === 'number' ? (place.security ?? null) : null,
         jumps: jumps?.kind === 'known' ? jumps.jumps : null,
       };
@@ -421,7 +460,9 @@ export function MyShipsView({
       .filter(
         ({ d }) =>
           needle === '' ||
-          [d.ship, d.shipClass, d.location, d.trail].some((v) => v.toLowerCase().includes(needle))
+          [d.ship, d.shipClass, d.location, d.trail, d.packaged].some((v) =>
+            v.toLowerCase().includes(needle)
+          )
       );
     const sign = sort.direction === 'asc' ? 1 : -1;
     items.sort((x, y) => {

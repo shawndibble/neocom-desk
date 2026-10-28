@@ -6,7 +6,12 @@ import {
   useNavigationType,
 } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
-import { isClosedDatabaseEvent, tagAnnotatedEvent } from './observability/reportFailure';
+import {
+  isClosedDatabaseEvent,
+  isStrayAbortEvent,
+  markChunkLoadFailure,
+  tagAnnotatedEvent,
+} from './observability/reportFailure';
 import { scrubBreadcrumb, scrubEvent } from './observability/scrub';
 import { visitorTags } from './observability/visitor';
 import { onCacheMiss } from './esi/cacheMissSignal';
@@ -74,9 +79,9 @@ if (dsn) {
 
     // Last line of defence for the SSO handshake — see observability/scrub.ts.
     beforeSend: (event, hint) =>
-      isClosedDatabaseEvent(event)
+      isClosedDatabaseEvent(event) || isStrayAbortEvent(event)
         ? null
-        : scrubEvent(tagAnnotatedEvent(event, hint.originalException)),
+        : scrubEvent(markChunkLoadFailure(tagAnnotatedEvent(event, hint.originalException))),
     beforeSendTransaction: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
   });

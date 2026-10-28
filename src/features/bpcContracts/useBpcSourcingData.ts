@@ -12,6 +12,9 @@ import {
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { useLpBlueprintOffers } from '@/features/bpcContracts/useLpBlueprintOffers';
 import { useCommunityBlueprintOffers } from '@/features/bpcContracts/useCommunityBlueprintOffers';
+import { placeLpRows } from '@/features/bpcContracts/lpStationRows';
+import { loadNpcStations } from '@/sde/loadMarketSde';
+import type { NpcStationEntry } from '@/sde/marketTypes';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { useBpcSources } from '@/features/bpcContracts/bpcSourcesPref';
 import { useMarketBpoOrders } from '@/features/bpcContracts/useMarketBpoOrders';
@@ -118,14 +121,6 @@ export function useBpcSourcingData() {
   const jumpFilter = useJumpRangeFilter(currentSystem, jumps);
   // Names each row's system on the phone card (the Location cell).
   const solarSystems = useSolarSystemIndex();
-  const bpcRowJumps = useCallback(
-    (row: BpcSearchRow): JumpsCellValue => {
-      if (row.systemId === null) return { kind: 'value', count: null };
-      if (jumpFilter.jumpsStatus !== 'ready') return { kind: jumpFilter.jumpsStatus };
-      return { kind: 'value', count: jumpFilter.jumps?.get(row.systemId) ?? null };
-    },
-    [jumpFilter]
-  );
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing
@@ -202,6 +197,46 @@ export function useBpcSourcingData() {
     hub: marketHub,
     lpValue,
   });
+  // An LP row's system is its corporation's nearest station: the station list loads
+  // lazily (outside the install precache) and never blocks the table.
+  const lpRowsFound = lpOffers.rows.length > 0;
+  const [npcStations, setNpcStations] = useState<readonly NpcStationEntry[] | null>(null);
+  const [npcStationsFailed, setNpcStationsFailed] = useState(false);
+  useEffect(() => {
+    if (!lpRowsFound) return;
+    let cancelled = false;
+    loadNpcStations().then(
+      (list) => {
+        if (!cancelled) setNpcStations(list);
+      },
+      () => {
+        if (!cancelled) setNpcStationsFailed(true);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [lpRowsFound]);
+  const lpRows = useMemo(
+    () => placeLpRows(lpOffers.rows, npcStations, jumpFilter.jumps),
+    [lpOffers.rows, npcStations, jumpFilter.jumps]
+  );
+  const lpStationsLoading = lpRowsFound && npcStations === null && !npcStationsFailed;
+  const bpcRowJumps = useCallback(
+    (row: BpcSearchRow): JumpsCellValue => {
+      if (row.systemId === null) {
+        // An unplaced LP row waits on the station list and the distances like any placed row.
+        if (row.source !== 'lp') return { kind: 'value', count: null };
+        if (lpStationsLoading) return { kind: 'loading' };
+        return jumpFilter.jumpsStatus === 'ready'
+          ? { kind: 'value', count: null }
+          : { kind: jumpFilter.jumpsStatus };
+      }
+      if (jumpFilter.jumpsStatus !== 'ready') return { kind: jumpFilter.jumpsStatus };
+      return { kind: 'value', count: jumpFilter.jumps?.get(row.systemId) ?? null };
+    },
+    [jumpFilter, lpStationsLoading]
+  );
   const communityOffers = useCommunityBlueprintOffers({
     characterId: activeCharacterId,
     enabled: sources.has('community'),
@@ -220,7 +255,7 @@ export function useBpcSourcingData() {
       marketRegionId,
       marketHubStationId,
       marketTypeIds: marketLookup.typeIds,
-      lpRows: lpOffers.rows,
+      lpRows,
       communityRows: communityOffers.rows,
     }),
     [
@@ -235,7 +270,7 @@ export function useBpcSourcingData() {
       marketRegionId,
       marketHubStationId,
       marketLookup.typeIds,
-      lpOffers.rows,
+      lpRows,
       communityOffers.rows,
     ]
   );

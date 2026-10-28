@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import type { RouteStep } from '@/engine/route/routeSafetyTrip';
@@ -10,7 +11,16 @@ import type { RouteSafetyLeg } from './useRouteSafety';
 const postAutopilotWaypointMock = vi.hoisted(() => vi.fn());
 vi.mock('@/esi/endpoints', () => ({ postAutopilotWaypoint: postAutopilotWaypointMock }));
 
+const grantMock = vi.hoisted(() => vi.fn());
+vi.mock('@/app/grantAction', () => ({ beginGrant: grantMock }));
+
 import { SetWaypoints } from './SetWaypoints';
+import { useWaypointsDismissed } from './waypointsDismissed';
+
+function Where() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="where">{pathname + search}</output>;
+}
 
 const ONE = 91;
 const TWO = 92;
@@ -74,10 +84,13 @@ async function seed(characters: { id: number; name: string; scopes: string[] }[]
 }
 
 function show(legs: RouteSafetyLeg[]) {
-  render(
-    <SetWaypoints legs={legs} nameOf={(id) => NAMES.get(id) ?? String(id)}>
-      <span>facts</span>
-    </SetWaypoints>
+  return render(
+    <MemoryRouter>
+      <SetWaypoints legs={legs} nameOf={(id) => NAMES.get(id) ?? String(id)}>
+        <span>facts</span>
+      </SetWaypoints>
+      <Where />
+    </MemoryRouter>
   );
 }
 
@@ -94,6 +107,7 @@ beforeEach(async () => {
   postAutopilotWaypointMock.mockResolvedValue({ data: null });
   await db.characters.clear();
   await db.tokens.clear();
+  await useWaypointsDismissed.getState().setValue(false);
   useActiveCharacter.setState({ activeCharacterId: ONE, hydrated: true });
 });
 
@@ -152,19 +166,110 @@ describe('SetWaypoints', () => {
     ).toBeInTheDocument();
   });
 
-  it('disables the button for a Character without the scope, with a way to grant it', async () => {
+  it('offers Grant, Manage and Dismiss to a Character without the scope', async () => {
     await seed([{ id: ONE, name: 'Pilot One', scopes: ['esi-location.read_location.v1'] }]);
     show([leg([JITA, PERIMETER])]);
 
     expect(
-      await screen.findByText(/Setting waypoints needs a permission this character hasn't granted/)
+      await screen.findByText("Pilot One hasn't granted Autopilot waypoints")
     ).toBeInTheDocument();
+    expect(screen.queryByText(/log in again/i)).not.toBeInTheDocument();
     // `aria-disabled`, not `disabled`: the reason stays reachable in a tooltip.
     expect(screen.getByRole('button', { name: 'Set waypoints in game' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
-    expect(screen.getByRole('button', { name: 'Log in again' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant permission' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage permissions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
+  it('grants only Autopilot waypoints, for that Character', async () => {
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [] }]);
+    show([leg([JITA, PERIMETER])]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Grant permission' }));
+    expect(grantMock).toHaveBeenCalledWith(ONE, ['postAutopilotWaypoint']);
+  });
+
+  it('links Manage to Permissions, switching to a Character that is not active', async () => {
+    await seed([
+      { id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] },
+      { id: TWO, name: 'Pilot Two', scopes: [] },
+    ]);
+    show([leg([JITA, PERIMETER])]);
+
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Character to set waypoints for' })
+    );
+    await userEvent.click(await screen.findByRole('option', { name: 'Pilot Two' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Manage permissions' }));
+
+    expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions?grant=autopilot');
+    expect(useActiveCharacter.getState().activeCharacterId).toBe(TWO);
+  });
+
+  it('Dismiss hides the note, the button and the select, and survives a remount', async () => {
+    await seed([
+      { id: ONE, name: 'Pilot One', scopes: [] },
+      { id: TWO, name: 'Pilot Two', scopes: [] },
+    ]);
+    const first = show([leg([JITA, PERIMETER])]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull()
+    );
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Grant permission' })).toBeNull();
+    expect(screen.getByText('facts')).toBeInTheDocument();
+
+    first.unmount();
+    show([leg([JITA, PERIMETER])]);
+    expect(await screen.findByText('facts')).toBeInTheDocument();
+    // The flag hydrates from Dexie after the first paint.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull()
+    );
+  });
+
+  it('Dismiss hides the whole control even while another Character holds the scope', async () => {
+    await seed([
+      { id: ONE, name: 'Pilot One', scopes: [] },
+      { id: TWO, name: 'Pilot Two', scopes: [WAYPOINT_SCOPE] },
+    ]);
+    show([leg([JITA, PERIMETER])]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Grant permission' })).toBeNull();
+    expect(screen.queryByText('Grant missing Permissions')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('shows the button for a Character that holds the scope even when dismissed', async () => {
+    await useWaypointsDismissed.getState().setValue(true);
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    show([leg([JITA, PERIMETER])]);
+
+    expect(
+      await screen.findByRole('button', { name: 'Set waypoints in game' })
+    ).toBeInTheDocument();
+  });
+
+  it('brings the dismissal back when the scope is revoked', async () => {
+    await useWaypointsDismissed.getState().setValue(true);
+    await seed([{ id: ONE, name: 'Pilot One', scopes: [WAYPOINT_SCOPE] }]);
+    show([leg([JITA, PERIMETER])]);
+    await screen.findByRole('button', { name: 'Set waypoints in game' });
+
+    await db.tokens.update(ONE, { scopes: [] });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull()
+    );
+    expect(useWaypointsDismissed.getState().value).toBe(true);
   });
 
   it('sets waypoints for the Character picked, not only the active one', async () => {

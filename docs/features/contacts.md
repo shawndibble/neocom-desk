@@ -1,6 +1,6 @@
 # Contacts
 
-`/contacts` (This character) and `/contacts/across` (All characters). Nav: Social group, scope-gated, phone tab, `tablessNav` (the nav and command palette list the page only; the This character / All characters scope is one in-page control, not tabs; the tab bar is just Contacts and Standings). Read-only view of the in-game contact list with standings, affiliation, labels, blocked/watched flags, plus a cross-Character comparison. No add/edit/delete contact, no standings editing.
+`/contacts` (This character) and `/contacts/across` (All characters). Nav: Social group, scope-gated, phone tab, `controlTabs` (the nav and command palette list Contacts and Standings; the This character / All characters scope is one in-page control, not tabs). Read-only view of the in-game contact list with standings, affiliation, labels, blocked/watched flags, plus a cross-Character comparison. No add/edit/delete contact, no standings editing.
 
 User goal: "who do I have standing with, who is blocked/watched, and do my alts agree?"
 
@@ -27,7 +27,7 @@ Code: `src/routes/Contacts.tsx`, `src/features/character/contactsColumns.ts`, `s
 
 ## Purpose and user goal
 
-"What standing do I have with this pilot or corp, and do my alts agree?" A read-only mirror of the in-game contact list plus the cross-Character comparison; a row shows every distinct standing because which alt is right is the reader's call (`20260912-211914`). The Standings tab adds NPC standings that set broker fees (`20261007-224449`).
+"What standing do I have with this pilot or corp, and do my alts agree?" A read-only mirror of the in-game contact list plus the cross-Character comparison; a row shows every distinct standing because which alt is right is the reader's call (`20260912-211914`). The Standings tab adds the faction, corporation and agent standings that set broker fees and open agents (`20261007-224449`).
 
 - **Top jobs (ranked):** 1. "Look up a name: what standing, blocked or watched?" 2. "Where do my Characters' lists disagree?" (Only disagreements). 3. "Which NPC standings lower my broker fees?" (Standings tab).
 - **Device and cadence:** desktop primary (owner, 2026-10-11): the list is "actually worked through" above `sm` (`20260912-210929`). Phone parity: rows stack. Cadence: occasional.
@@ -55,7 +55,11 @@ Code: `src/routes/Contacts.tsx`, `src/features/character/contactsColumns.ts`, `s
 
 ## NPC standings (Standings tab)
 
-`/contacts/standings` lists the Character's NPC faction, corp and agent standings (`ContactsStandings.tsx`, rows from `features/character/npcStandingsRows.ts`): name, kind, standing with the tier icon, and a "Used for fees" marker on the Trade Hub owner corps and factions the broker-fee path applies (#2859). Other NPC stations use their own owner and agents never count; refine/reprocessing applies no standing. A missing standings scope shows a `GrantBanner` in the tab, not an empty table. Skill-adjusted effective standing is not shown. Standings to a contact are the contact's own number, not these.
+`/contacts/standings` lists the Character's faction, corporation and agent standings (`ContactsStandings.tsx`, rows from `features/character/npcStandingsRows.ts`, columns from `useNpcStandingsColumns.tsx`). Columns: Name (accent; the row opens that faction's, corporation's or agent's info through `openNpcInfo`), then optional Type, Belongs to (a corporation's faction; an agent's corporation with its level and division), Standing (the number the game shows and uses: ESI's base lifted by Connections, Criminal Connections or Diplomacy, with the tier icon; the card's corner on a phone), Base (what ESI reports, which only broker fees read: off until ticked, and shown in Standing's place when the skills could not be read), Access (five pips and "L4": the highest agent level the best standing in the chain opens; an agent row says Open, Needs 3.00 or Blocked instead) Jumps (from the current system to a corporation's or faction's nearest station, or the station an agent sits in: a link to Route Safety, "0 jumps" (not a link) when already there; one distance sweep, `loadJumpsFromCurrent`) and Fees (a Trade Hub owner whose standing the broker-fee path applies, #2859; other stations use their own owner and agents never count). Columns are picked with the Columns button and kept on the device (`npcStandingsColumnsStore`). One filter row: search (name, what it belongs to, an agent's division, id), Type with counts, Access (any / level 2-5 agents or higher) and Used for fees; a phone gets the shared `FilterBar` funnel instead. Filters are in the URL as `standings.q`, `standings.type`, `standings.access`, `standings.fees` beside `standings.sort` (ADR 0015). Rules and sources: `docs/research/npc-standings-*.md`; the engine is `engine/standings`. On desktop the filters sit inline in one row with search and the Columns button (the page's design, an exception to `FilterBar`'s funnel-only rule); a phone gets the funnel. An agent the agents data leaves out (storyline, faction warfare, research...) shows no Belongs to or Access, never a guess; a corporation's faction comes from `npcCorporations.json`. A missing standings scope shows a `GrantBanner` in the tab, not an empty table. Standings to a contact are the contact's own number, not these.
+
+### NPC info modal
+
+A Standings name opens the shared info modal (`?info=faction-<id>`, `corporation-<id>` or `character-<agent id>`: `src/features/standings/modal/`; the URL holds the open state, so a Route Safety "N jumps" link inside it and Back return to the page with the modal open). A faction is its own tabless view; an NPC corporation's Corporation tab and an NPC agent's card carry the same cards, each loaded on its own and left out when its data is missing: **Your standing** (the **Standing chain**, effective numbers, base on hover), **Agent access** / "Can you use this agent?", **At their stations** (broker fee on base standings and the real Broker Relations level at the Trade Hub the faction or corporation owns; reprocessing tax with `~` from the station's own take and the station owner's effective standing), **Where** (headquarters, capital, station count, nearest station, an agent's station), **Agents you know** / **Corporations you know**, and **Loyalty points** with a link to the LP store. Without a signed-in Character only the facts show. Player corporations and pilots keep the tabbed modal. Faction contacts on the Contacts page still open nothing.
 
 ## States
 
@@ -126,7 +130,7 @@ Listing/flags (:167), type naming (:180), phone cards (:193), affiliation/own co
 6. **What is "also via" in Affiliation?** `effectiveStanding` on the contact's corp/alliance among your own contacts (precedence character > corp > alliance > faction): a pilot you did not rate individually but whose corp you did (`contactAffiliation.ts`, `contactStandings.ts:28,85`).
 7. **Why do the filter counts persist during refresh?** A refresh momentarily yields no data; `lastGoodCounts` keeps chips mounted (no layout jump) and is cleared on Character switch so counts never leak (`Contacts.tsx:809-816`, tests `:528`, `:555`).
 8. **What happens with one Character and `/contacts/across`?** Falls back to This character; no switch (`:1001`, `:1082`).
-9. **Why is the page not tabbed in nav?** `tablessNav`: the two views are state behind `CharacterFilterControl`; palette and rail list the page once (`navDestinations.ts:73-80`).
+9. **Why are only Contacts and Standings listed in nav?** `controlTabs`: the This character / All characters views are state behind `CharacterFilterControl`, so the palette lists the page once for them; Standings is a real view and is listed (`navDestinations.ts`, `controlTabs`).
 10. **What does a truncated list mean for export?** `truncated` from the paged loader flags an incomplete fetch; both views export with `-partial` and show an "incomplete" notice (`Contacts.tsx` export setup, test `:644`, `:686`).
 11. **Who uses contacts besides this page?** Mail standing tags and forward quick-picks, Contracts counterparty tags, command palette Contacts group (cache-only), see `mail.md`, `command-palette.md`.
 
@@ -138,7 +142,6 @@ Listing/flags (:167), type naming (:180), phone cards (:193), affiliation/own co
 - Contact names unresolved fall back to `#id` (no retry UI).
 - Decision `20261002-145207` says the row menu keeps its Show Info entry, but code/tests ship no row menu.
 - Faction contacts are not clickable (no public faction endpoint).
-- Standings page for NPC faction/agent/corp standings does not exist; `getCharacterStandings` only feeds broker-fee maths.
 - The command palette `Contacts` group and `/contacts/across` are separate: no palette entry for the across view.
 - FAQ/Help panels do not mention Contacts.
 
@@ -146,6 +149,5 @@ Listing/flags (:167), type naming (:180), phone cards (:193), affiliation/own co
 
 - Filter by label, blocked/watched; show contact label chips.
 - Make standing chips on Across meaningful (e.g. "any holder rates bad") or hide them there.
-- Standings view (faction/NPC corp/agent) with broker-fee impact.
 - Per-Character freshness on the Across view (show how old each cached list is) and a per-row "fetch this Character".
 - Contact write-back (add/edit standing) would need `esi-characters.write_contacts.v1`, currently not requested.

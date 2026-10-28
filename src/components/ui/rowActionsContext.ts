@@ -13,6 +13,10 @@ export interface RowActions {
   onOpenChange?: (open: boolean) => void;
   /** Runs as either menu closes; `useOpenAfterMenu` hands its handler here so an item can open a dialog after focus is back on ⋮. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** `false` keeps the page scrollable and the scrollbar in place while either menu is open (the landing page's demo). */
+  modal?: boolean;
+  /** Where a click on the row goes, when that is another page: both menus lead with an "Open in new tab" link to it. */
+  openHref?: string;
 }
 
 /**
@@ -28,3 +32,9 @@ export const RowActionsContext = createContext<RowActions | null>(null);
  * by `RowActions.tsx`, so the row menu needn't know what the table adds.
  */
 export const RowMenuExtrasContext = createContext<ReactNode>(null);
+
+/**
+ * The page a click on the current `DataTable` row navigates to (its `rowHref`).
+ * A `RowActionsMenu` under it picks the href up as its `openHref`.
+ */
+export const RowOpenHrefContext = createContext<string | undefined>(undefined);

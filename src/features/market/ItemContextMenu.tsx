@@ -65,6 +65,8 @@ export interface ItemContextMenuProps {
   extraItems?: ReactNode;
   /** A right-click or hold on a link in the row stays the browser's (`RowActionsMenu`'s `linksKeepBrowserMenu`). */
   linksKeepBrowserMenu?: boolean;
+  /** A click on the row (or its name) goes to this page: both menus lead with "Open in new tab" (`RowActionsMenu`'s `openHref`). */
+  openHref?: string;
   children: ReactElement;
 }
 
@@ -107,10 +109,17 @@ export function ShowInfoMenuItem({
  * Market details only: ESI's information window opens characters,
  * corporations and alliances, and silently ignores an inventory type.
  */
-export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
+export function OpenInEveItemMenuItems({
+  typeId,
+  specific,
+}: {
+  typeId: number;
+  /** The menu also offers another Open in EVE item (a place's window). */
+  specific?: boolean;
+}) {
   return (
     <MarketOnly typeId={typeId}>
-      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
+      <OpenInEveMenuItem kind="marketDetails" id={typeId} specific={specific} />
     </MarketOnly>
   );
 }
@@ -294,7 +303,7 @@ function useItemMenuItems(
  * 2.1.1, issue #1497).
  */
 export function ItemContextMenu(props: ItemContextMenuProps) {
-  const { typeId, itemName, linksKeepBrowserMenu, children } = props;
+  const { typeId, itemName, linksKeepBrowserMenu, openHref, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
   const [stockOpen, setStockOpen] = useState(false);
   const items = useItemMenuItems(
@@ -310,6 +319,7 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
         name={itemName}
         items={items}
         linksKeepBrowserMenu={linksKeepBrowserMenu}
+        openHref={openHref}
         onOpenChange={(open) => {
           if (open) requestBlueprints();
         }}

@@ -14,9 +14,11 @@ import { rootFontScale } from '@/lib/fontScale';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { groupSortedRows } from './dataTableGroup';
-import { nextDataTableSort, sortRowsBy } from './dataTableSort';
+import { firstSortDirection, nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { DataTableRow } from './DataTableRow';
 import { DataTableHeader } from './DataTableHeader';
+import { DataTableStickyHeader } from './DataTableStickyHeader';
+import { useStickyTableHeader } from './useStickyTableHeader';
 import { DataTableGroupHeader } from './DataTableGroupHeader';
 import { DataTableSortBar } from './DataTableSortBar';
 import { stickyStartClass } from './dataTableSticky';
@@ -84,7 +86,10 @@ function fixedLayoutMinWidth<T>(
     column.width ? [columnCellWidth(column.width, density)] : []
   );
   const grows = shown.filter((column) => !column.width);
-  const floors = grows.map((column) => column.minWidth ?? `${GROW_COLUMN_MIN}ch`);
+  // The floor is content width; the cell's padding comes on top, as for a sized column.
+  const floors = grows.map((column) =>
+    columnCellWidth(column.minWidth ?? `${GROW_COLUMN_MIN}ch`, density)
+  );
   return `calc(${[...sized, ...floors, `${trailingRem}rem`].join(' + ')})`;
 }
 
@@ -117,6 +122,7 @@ export function DataTable<T>({
   rowContextMenu,
   rowMoreActions = false,
   onRowClick,
+  rowHref,
   rowClickable,
   expandableRow,
   responsive = 'stack',
@@ -129,6 +135,7 @@ export function DataTable<T>({
   groupBy,
   fullWidthRow,
   virtualize = false,
+  hugColumns = false,
   exportRef,
   exportable,
 }: DataTableProps<T>) {
@@ -162,6 +169,9 @@ export function DataTable<T>({
   const isStacked = responsive === 'stack' && cardsWanted;
   const tableRef = useRef<HTMLTableElement>(null);
   const dense = responsive === 'stack' && stackLayout === 'dense';
+  // A table that stays a table on a phone keeps its header in view; a
+  // stacked one has no header row (each card labels its own cells).
+  const stickyHeader = useStickyTableHeader(tableRef, responsive === 'table' && isPhone);
 
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
   const cellPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-1.5';
@@ -283,6 +293,9 @@ export function DataTable<T>({
   // windowed table) and only for a table that opted in with a width; a
   // stacked card has no columns to fix.
   const fixedLayout = windowed && !isStacked && columns.some((column) => column.width);
+  // `hugColumns`: the same widths and sideways-scroll floor in an auto layout.
+  const sizedLayout =
+    fixedLayout || (hugColumns && !isStacked && columns.some((column) => column.width));
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
   const estimatedRowHeight =
@@ -310,7 +323,7 @@ export function DataTable<T>({
   useScrollToRowKey(tableRef, highlightRowKey, scrollToRowTrigger);
 
   function toggleSort(column: DataTableColumn<T>) {
-    setSort(nextDataTableSort(sort, column.id));
+    setSort(nextDataTableSort(sort, column.id, firstSortDirection(column, rows)));
   }
 
   // Cells after the caller's columns: the disclosure chevron and the More
@@ -388,6 +401,7 @@ export function DataTable<T>({
         onActivate={activateRow}
         rowClassName={rowClassName}
         rowContextMenu={rowContextMenu}
+        href={rowHref?.(row)}
         rowMoreActions={rowMoreActions}
         cellPadding={cellPadding}
         compact={density === 'compact'}
@@ -434,6 +448,7 @@ export function DataTable<T>({
         sortableColumns={sortableColumns}
         sort={sort && activeSortId ? sort : undefined}
         onSortChange={setSort}
+        rows={rows}
         summary={stackSummary}
         actions={stackActions}
         stacked={stacked}
@@ -449,7 +464,7 @@ export function DataTable<T>({
       // An open row's detail is a row too.
       aria-rowcount={windowed ? sortedRows.length + 1 + (expandedIndex >= 0 ? 1 : 0) : undefined}
       style={
-        fixedLayout
+        sizedLayout
           ? { minWidth: fixedLayoutMinWidth(columns, density, isPhone, trailingRem) }
           : undefined
       }
@@ -469,7 +484,7 @@ export function DataTable<T>({
         sort={sort}
         density={density}
         isStacked={isStacked}
-        fixedLayout={fixedLayout}
+        fixedLayout={sizedLayout}
         expandable={expandable}
         rowMoreActions={rowMoreActions}
         onToggleSort={toggleSort}
@@ -521,6 +536,21 @@ export function DataTable<T>({
     </table>
   );
 
+  const stickyCopy = stickyHeader && (
+    <DataTableStickyHeader
+      state={stickyHeader}
+      columns={columns}
+      headerTextClass={headerTextClass}
+      sort={sort}
+      density={density}
+      isStacked={isStacked}
+      fixedLayout={sizedLayout}
+      expandable={expandable}
+      rowMoreActions={rowMoreActions}
+      onToggleSort={toggleSort}
+    />
+  );
+
   // Exportable: row menus grow the submenu through context; a table with no
   // row menus gets a right-click menu of its own holding just the export
   // formats (the trigger is `asChild`, so still no wrapper element).
@@ -539,10 +569,11 @@ export function DataTable<T>({
 
   // No wrapper element either way, so `className` and every caller's layout
   // (a flex/grid parent sizing the table) see the same `<table>` child.
-  return sortBar ? (
+  return sortBar || stickyCopy ? (
     <>
       {sortBar}
       {body}
+      {stickyCopy}
     </>
   ) : (
     body

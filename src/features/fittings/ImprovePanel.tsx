@@ -39,6 +39,7 @@ import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
+  overSpendCap,
   bestScore,
   damageOf,
   DEFENSE_CHOICES,
@@ -61,7 +62,7 @@ import {
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { crystalParts } from '@/engine/fittings/improveMining';
-import type { Resource } from '@/engine/fittings/makeItFit';
+import { overageOf, RESOURCES, type Resource } from '@/engine/fittings/makeItFit';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
@@ -81,8 +82,13 @@ import {
 } from '@/engine/fittings/skillGains';
 import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { groupByModule, IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
+import { findCompletions, mergeCandidates } from '@/engine/fittings/improveComplete';
 import { summariseSelection, type SelectionSummary } from '@/engine/fittings/improveSelection';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MakeItFitSection } from './MakeItFitSection';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
@@ -90,6 +96,12 @@ import type { ImproveSearch } from './useImprove';
 
 /** How many stat changes a row spells out before counting the rest. */
 const CHANGES_SHOWN = 4;
+
+/** How many overrun fixes get an implant search: each runs the Implant Finder whole. */
+const FLYABLE_IMPLANT_FIXES = 3;
+
+/** How long a set must sit over budget before its covering swaps are searched: ticking several rows in a row searches once. */
+const COMPLETION_DELAY_MS = 400;
 
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
@@ -163,6 +175,8 @@ interface Props {
   search: ImproveSearch;
   catalogue: FittingCatalogue | null;
   onApply: (options: ImproveOption[]) => void;
+  /** The implant alternative under a Make Flyable fix that overran CPU or powergrid; absent: none. */
+  renderFlyableImplants?: (fix: RejectedOption, label: string) => ReactNode;
   settings: ImproveSettings;
   /** Opens Make it fit on that budget, from "Fix this first". */
   onFixFirst: (resource: Resource) => void;
@@ -223,6 +237,7 @@ export function ImprovePanel({
   search,
   catalogue,
   onApply,
+  renderFlyableImplants,
   settings,
   onFixFirst,
   unloaded,
@@ -302,13 +317,21 @@ export function ImprovePanel({
           from: name(candidate.fromTypeId),
           to: name(candidate.toTypeId),
         });
+  /** The swaps chained behind a Make Flyable fix, each named: what frees the CPU or powergrid it takes. */
+  const flyableSwaps = (candidate: ImproveOption['candidate']): string[] =>
+    candidate.pairedWith
+      ? [moveLabel(candidate.pairedWith), ...flyableSwaps(candidate.pairedWith)]
+      : [];
+
   const swapLabel = (option: ImproveOption) =>
-    option.candidate.pairedWith
-      ? t('fittings.improve.pair', {
-          add: moveLabel({ ...option.candidate, pairedWith: undefined }),
-          downgrade: moveLabel(option.candidate.pairedWith),
-        })
-      : moveLabel(option.candidate);
+    option.candidate.fixesUnflyable
+      ? moveLabel({ ...option.candidate, pairedWith: undefined })
+      : option.candidate.pairedWith
+        ? t('fittings.improve.pair', {
+            add: moveLabel({ ...option.candidate, pairedWith: undefined }),
+            downgrade: moveLabel(option.candidate.pairedWith),
+          })
+        : moveLabel(option.candidate);
 
   /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
   function changeLine(
@@ -649,12 +672,22 @@ export function ImprovePanel({
           <span className="min-w-0 flex-1">
             <span className="flex items-start justify-between gap-2">
               <span className="font-medium">{swapLabel(option)}</span>
-              {goal !== 'cheaper' && (
+              {goal !== 'cheaper' && !option.candidate.fixesUnflyable && (
                 <span className="text-success shrink-0 text-xs font-medium">
                   {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
                 </span>
               )}
             </span>
+            {option.candidate.fixesUnflyable && (
+              <span className="text-warning block text-xs">{t('fittings.improve.unflyable')}</span>
+            )}
+            {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
+              <span className="block text-xs">
+                {t('fittings.improve.flyableWith', {
+                  swaps: flyableSwaps(option.candidate).join('; '),
+                })}
+              </span>
+            )}
             {lead && <span className="block text-xs">{lead.node}</span>}
             <span className="text-text-dim block text-xs">
               {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
@@ -722,6 +755,43 @@ export function ImprovePanel({
     );
   }
 
+  /** A fix that cannot be applied as it stands: greyed, with what it needs and why nothing covers it. */
+  function blockedRow(
+    option: RejectedOption,
+    own: FittingStats,
+    fitTotal: number | null,
+    searched: boolean
+  ) {
+    const short = RESOURCES.filter((resource) => overageOf(option.after, resource) > 0).map(
+      (resource) =>
+        t('fittings.improve.flyableShort', {
+          amount: m3sFormat(overageOf(option.after, resource)),
+          resource: t(`fittings.improve.resource.${resource}`),
+        })
+    );
+    return (
+      <li
+        key={optionKey(option)}
+        className="border-line text-text-dim rounded-xs border p-2 text-sm"
+        data-testid="improve-flyable-blocked"
+      >
+        <span className="flex items-start gap-2">
+          <TypeIcon typeId={option.candidate.toTypeId} size={32} width={24} height={24} />
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">{swapLabel(option)}</span>
+            <span className="block text-xs">{t('fittings.improve.unflyable')}</span>
+            <span className="text-warning block text-xs">
+              {option.guardrail === 'budget' && searched
+                ? t('fittings.improve.flyableNoCover', { short: short.join(', ') })
+                : brokeText(t, option, settings, fitTotal)}
+            </span>
+            <span className="block text-xs">{changeLine(option, own)}</span>
+          </span>
+        </span>
+      </li>
+    );
+  }
+
   // Mine more's rows compare on the best crystals; "Now" is the fit as it is.
   const bestFound =
     state.status === 'done' ? bestFoundLine(state.result, state.fitAsIs ?? state.before) : null;
@@ -770,6 +840,83 @@ export function ImprovePanel({
           target,
         })
       : null;
+  // The ticked rows were each checked alone; together they can overrun, and the pilot is then offered what covers it.
+  const overruns = summary?.problems.some((problem) => problem.kind === 'over') ?? false;
+  const completion = search.completion;
+  const [covers, setCovers] = useState<{ key: string; options: ImproveOption[] } | null>(null);
+  useEffect(() => {
+    if (!fitting || !recalc || !completion || !checked || !overruns || chosen.length === 0) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const taken = new Set(chosen.flatMap((pick) => slotsOf(pick.candidate)));
+        const pool = await completion();
+        const options = await findCompletions({
+          fitting: chosen.reduce(
+            (acc, pick) => applyImproveCandidate(acc, pick.candidate),
+            fitting
+          ),
+          before: checked,
+          swaps: pool.swaps.filter((swap) => !taken.has(`${swap.slot}${swap.slotIndex}`)),
+          stats: recalc,
+          priceOf: pool.priceOf,
+          mode: settings.mode,
+          isCancelled: () => stale,
+        });
+        if (!stale) setCovers({ key: chosenKey, options });
+      })().catch(() => !stale && setCovers({ key: chosenKey, options: [] }));
+    }, COMPLETION_DELAY_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+    // `settings.mode` is part of the price a cover shows.
+  }, [fitting, recalc, completion, checked, overruns, chosen, chosenKey, settings.mode]);
+  // Ticked rows that no list shows are covers added from the footer: they get a tick of their own there.
+  const listedKeys = useMemo(
+    () =>
+      state.status === 'done'
+        ? new Set(
+            [
+              ...state.result.makeFlyable,
+              ...state.result.noDownside,
+              ...state.result.tradeOffs,
+            ].map(optionKey)
+          )
+        : new Set<string>(),
+    [state]
+  );
+  const tickedCovers = chosen.filter((pick) => !listedKeys.has(optionKey(pick)));
+  const offered =
+    covers?.key === chosenKey && summary
+      ? covers.options.filter(
+          (option) =>
+            !overSpendCap(
+              settings.mode,
+              settings.spendCap,
+              state.status === 'done' ? state.fitTotal : null,
+              summary.isk + (option.iskDelta ?? 0)
+            )
+        )
+      : null;
+  // The set as one change with its overrun, for the implant alternative; stable so the finder is not re-run each render.
+  const setAsFix = useMemo<RejectedOption | null>(() => {
+    const candidate = mergeCandidates(chosen.map((pick) => pick.candidate));
+    if (!fitting || !checked || !candidate || !summary || !overruns) return null;
+    return {
+      candidate,
+      fitting: chosen.reduce((acc, pick) => applyImproveCandidate(acc, pick.candidate), fitting),
+      after: checked,
+      score: 0,
+      iskDelta: summary.isk,
+      destroysRigs: false,
+      lost: [],
+      guardrail: 'budget',
+    };
+    // `summary` follows `checked` and `chosen`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitting, checked, chosenKey, overruns]);
+
   // The ticked set with the hovered row on top (it displaces a ticked row sharing a slot, as ticking it would).
   const hoverSet = useMemo(() => {
     if (!hovered || ticked.has(optionKey(hovered))) return null;
@@ -1211,7 +1358,10 @@ export function ImprovePanel({
       )}
 
       {state.status === 'done' &&
-        (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
+        (state.result.makeFlyable.length === 0 &&
+        state.result.flyableBlocked.length === 0 &&
+        state.result.noDownside.length === 0 &&
+        state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
             <p className="text-sm">
               {t(
@@ -1292,6 +1442,32 @@ export function ImprovePanel({
               onChange={setSort}
               fill
             />
+            {(state.result.makeFlyable.length > 0 || state.result.flyableBlocked.length > 0) && (
+              <MakeItFitSection heading={t('fittings.improve.section.makeFlyable')}>
+                {state.result.makeFlyable.length > 0 &&
+                  rows(state.result.makeFlyable, state.before, 'mf')}
+                {renderFlyableImplants &&
+                  state.result.flyableOverrun
+                    .slice(0, FLYABLE_IMPLANT_FIXES)
+                    .map((fix) => (
+                      <Fragment key={optionKey(fix)}>
+                        {renderFlyableImplants(fix, swapLabel(fix))}
+                      </Fragment>
+                    ))}
+                {state.result.flyableBlocked.length > 0 && (
+                  <ul className="space-y-1">
+                    {state.result.flyableBlocked.map((option) =>
+                      blockedRow(
+                        option,
+                        state.before,
+                        state.fitTotal,
+                        state.result.flyableOverrun.includes(option)
+                      )
+                    )}
+                  </ul>
+                )}
+              </MakeItFitSection>
+            )}
             {state.result.noDownside.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.noDownside')}>
                 {rows(state.result.noDownside, state.before, 'nd')}
@@ -1351,6 +1527,67 @@ export function ImprovePanel({
                         : t('fittings.improve.selection.checking')}
                     </p>
                   )}
+                </div>
+              )}
+              {(overruns || tickedCovers.length > 0) && (
+                <div className="space-y-1 text-sm" data-testid="improve-cover">
+                  {tickedCovers.map((pick) => (
+                    <label
+                      key={optionKey(pick)}
+                      className={cx('flex items-start gap-2 text-xs', tappableRowClassName)}
+                    >
+                      <Checkbox checked onChange={() => toggle(pick)} />
+                      <span>
+                        {t('fittings.improve.cover.added', {
+                          swaps: [moveLabel(pick.candidate), ...flyableSwaps(pick.candidate)].join(
+                            '; '
+                          ),
+                        })}
+                      </span>
+                    </label>
+                  ))}
+                  {!overruns ? null : offered === null ? (
+                    <p className="text-text-dim text-xs" role="status">
+                      {t('fittings.improve.cover.searching')}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs font-medium">
+                        {offered.length > 0
+                          ? t('fittings.improve.cover.title')
+                          : covers && covers.options.length > 0
+                            ? t('fittings.improve.cover.overBudget')
+                            : t('fittings.improve.cover.none')}
+                      </p>
+                      {offered.map((option) => (
+                        <button
+                          key={optionKey(option)}
+                          type="button"
+                          className={cx(
+                            'border-line w-full rounded-xs border p-2 text-left text-xs',
+                            rowInteractiveClassName,
+                            focusRingInsetClassName
+                          )}
+                          onClick={() => toggle(option)}
+                        >
+                          <span className="block font-medium">
+                            {[moveLabel(option.candidate), ...flyableSwaps(option.candidate)].join(
+                              '; '
+                            )}
+                          </span>
+                          <span className="block">{isk(option)}</span>
+                          {option.destroysRigs && (
+                            <span className="text-warning block">
+                              {t('fittings.improve.destroysRig')}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {overruns &&
+                    setAsFix &&
+                    renderFlyableImplants?.(setAsFix, t('fittings.improve.cover.thisSet'))}
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-between gap-2">

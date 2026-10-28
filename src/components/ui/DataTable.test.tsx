@@ -18,6 +18,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from './ContextMenu';
+import { MenuItem, RowActionsMenu } from './RowActions';
 import { Tooltip } from './Tooltip';
 import { IskAmount } from './IskAmount';
 
@@ -397,19 +398,53 @@ describe('DataTable', () => {
       expect(screen.getByRole('columnheader', { name: 'Name' })).not.toHaveAttribute('aria-sort');
     });
 
-    it('sorts ascending on first click and descending on second, and exposes it to assistive tech', async () => {
+    it('sorts a numeric column high to low on first click and low to high on second, and exposes it to assistive tech', async () => {
       const user = userEvent.setup();
       renderSortable();
       const header = screen.getByRole('columnheader', { name: 'Value' });
       expect(header).toHaveAttribute('aria-sort', 'none');
 
       await user.click(screen.getByRole('button', { name: 'Value' }));
-      expect(header).toHaveAttribute('aria-sort', 'ascending');
-      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
-
-      await user.click(screen.getByRole('button', { name: 'Value' }));
       expect(header).toHaveAttribute('aria-sort', 'descending');
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(header).toHaveAttribute('aria-sort', 'ascending');
+      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
+    });
+
+    it('sorts a text column A to Z on first click', async () => {
+      const user = userEvent.setup();
+      renderSortable({
+        columns: [
+          { id: 'name', header: 'Name', sortValue: (row) => row.name, render: (r) => r.name },
+        ],
+      });
+      await user.click(screen.getByRole('button', { name: 'Name' }));
+      expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+      expect(itemNames()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+    });
+
+    it("starts a numeric column low to high on first click when it declares sortFirst: 'asc'", async () => {
+      const user = userEvent.setup();
+      const onSortChange = vi.fn();
+      renderSortable({
+        onSortChange,
+        columns: sortColumns.map((column) =>
+          column.id === 'value' ? { ...column, sortFirst: 'asc' as const } : column
+        ),
+      });
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'asc' });
+      expect(screen.getByRole('columnheader', { name: 'Value' })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+      // A row with no value is still last.
+      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
     });
 
     it('keeps the original relative order of rows that tie on sort value', async () => {
@@ -459,6 +494,7 @@ describe('DataTable', () => {
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
 
       await user.click(screen.getByRole('button', { name: 'Value' }));
+      // The active column toggles, whatever its first-click direction.
       expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'asc' });
       // Nothing moved: the parent owns the sort and has not changed it.
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
@@ -510,8 +546,8 @@ describe('DataTable', () => {
       const onSortChange = vi.fn();
       renderSortable({ onSortChange });
       await user.click(screen.getByRole('button', { name: 'Value' }));
-      expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'asc' });
-      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
+      expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'desc' });
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
     });
 
     it('leaves every existing (non-opted-in) table unsorted and in original row order', () => {
@@ -519,6 +555,30 @@ describe('DataTable', () => {
       const cells = screen.getAllByRole('cell');
       expect(cells[0]).toHaveTextContent('Tritanium');
       expect(cells[2]).toHaveTextContent('Pyerite');
+    });
+  });
+
+  describe('rowHref', () => {
+    it('gives only the rows with an href an Open in new tab item in the right-click menu', async () => {
+      const user = userEvent.setup();
+      renderTable({
+        rowHref: (row) => (row.item === 'Tritanium' ? '/items/34' : undefined),
+        rowContextMenu: (row, tr) => (
+          <RowActionsMenu key={row.id} name={row.item} items={<MenuItem>Copy {row.item}</MenuItem>}>
+            {tr}
+          </RowActionsMenu>
+        ),
+      });
+      const [, first, second] = screen.getAllByRole('row');
+      await user.pointer({ keys: '[MouseRight]', target: first });
+      expect(await screen.findByRole('menuitem', { name: 'Open in new tab' })).toHaveAttribute(
+        'href',
+        '/items/34'
+      );
+      await user.keyboard('{Escape}');
+      await user.pointer({ keys: '[MouseRight]', target: second });
+      await screen.findByRole('menuitem', { name: /^Copy / });
+      expect(screen.queryByRole('menuitem', { name: 'Open in new tab' })).toBeNull();
     });
   });
 
@@ -970,7 +1030,7 @@ describe('DataTable opt-in phone features', () => {
       await user.click(screen.getByRole('button', { name: /Value/ }));
       expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveAttribute(
         'aria-sort',
-        'ascending'
+        'descending'
       );
     });
 
@@ -1024,12 +1084,33 @@ describe('DataTable opt-in phone features', () => {
       expect(table?.tagName).toBe('TABLE');
       expect(table).toHaveClass('mt-2');
       const select = screen.getByRole('combobox', { name: 'Sort by' });
-      // Only the sortable column, both directions (plus the unsorted placeholder).
+      // Only the sortable column, both directions (plus the unsorted placeholder),
+      // the numeric column's first-click direction (high to low) first.
       expect(
         Array.from((select as HTMLSelectElement).options)
           .filter((option) => !option.disabled)
           .map((option) => option.textContent)
-      ).toEqual(['Value ↑', 'Value ↓']);
+      ).toEqual(['Value ↓', 'Value ↑']);
+    });
+
+    it("selecting the numeric column's first (descending) option orders high to low", async () => {
+      const user = userEvent.setup();
+      render(
+        <DataTable
+          columns={sortColumns}
+          rows={sortRows}
+          rowKey={(row) => row.id}
+          label="Values"
+          mobileSort
+        />
+      );
+      const select = screen.getByRole('combobox', { name: 'Sort by' });
+      const firstOption = Array.from((select as HTMLSelectElement).options).find(
+        (option) => !option.disabled
+      );
+      await user.selectOptions(select, firstOption!.value);
+      expect(firstOption!.value).toBe('value:desc');
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
     });
 
     it('drives the same sort state the header buttons use', async () => {
@@ -1053,7 +1134,7 @@ describe('DataTable opt-in phone features', () => {
         'descending'
       );
 
-      // …and the other way round: a header click moves the picker.
+      // …and the other way round: a header click on the active column flips the picker.
       await user.click(screen.getByRole('button', { name: /Value/ }));
       expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveValue('value:asc');
       expect(screen.getByText('Sort: Value ↑')).toBeInTheDocument();
@@ -1463,7 +1544,11 @@ describe('DataTable virtualize', () => {
       { id: 'item', header: 'Item', render: (row) => row.item },
       { id: 'amount', header: 'Amount', width: '12ch', render: (row) => row.amount },
     ];
-    const renderSized = (props: { virtualize?: boolean; cols?: DataTableColumn<Row>[] }) =>
+    const renderSized = (props: {
+      virtualize?: boolean;
+      hugColumns?: boolean;
+      cols?: DataTableColumn<Row>[];
+    }) =>
       render(
         <DataTable
           label="Offers"
@@ -1471,6 +1556,7 @@ describe('DataTable virtualize', () => {
           rows={many}
           rowKey={(row) => row.id}
           virtualize={props.virtualize}
+          hugColumns={props.hugColumns}
         />
       );
 
@@ -1480,7 +1566,7 @@ describe('DataTable virtualize', () => {
         cols: [{ ...sized[0], minWidth: '7rem' }, sized[1]],
       });
       const style = screen.getByRole('table').getAttribute('style') ?? '';
-      expect(style).toContain('7rem');
+      expect(style).toContain('8.5rem');
       expect(style).not.toContain('16ch');
     });
 
@@ -1530,6 +1616,16 @@ describe('DataTable virtualize', () => {
       } finally {
         window.matchMedia = real;
       }
+    });
+
+    it('hugColumns sizes headers and the table floor but keeps the auto layout', () => {
+      renderSized({ hugColumns: true });
+      const table = screen.getByRole('table');
+      expect(table).not.toHaveClass('table-fixed');
+      expect(table.getAttribute('style')).toContain('min-width');
+      expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('style')).toContain(
+        '12ch'
+      );
     });
 
     it('keeps the auto layout when not windowed', () => {

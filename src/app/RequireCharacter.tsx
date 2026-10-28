@@ -19,9 +19,12 @@ export function RequireCharacter() {
   if (characterCount === undefined) return <BootScreen gate="require-character" />;
   if (characterCount > 0) return <Outlet />;
 
-  // `state.from` is recorded, not yet consumed: throwing the destination away
-  // now would design a post-login return-to flow out.
+  // `state.from` is the destination `/login` stashes for the post-login return.
   return (
-    <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+    <Navigate
+      to="/login"
+      replace
+      state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+    />
   );
 }

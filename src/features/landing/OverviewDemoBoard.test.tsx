@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { OverviewDemo } from './OverviewDemo';
 
@@ -16,7 +17,11 @@ const board = async () => {
 describe('OverviewDemo board', () => {
   it('opens a card menu with the real widget settings, and a choice only closes it', async () => {
     const user = userEvent.setup();
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     const demo = await board();
 
     await user.click(demo.getByRole('button', { name: 'Settings for Wallet' }));
@@ -35,7 +40,11 @@ describe('OverviewDemo board', () => {
 
   it('opens the Data updated popover and its Refresh does nothing but exist', async () => {
     const user = userEvent.setup();
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     const demo = await board();
 
     await user.click(demo.getByRole('button', { name: /data updated/i }));
@@ -46,7 +55,11 @@ describe('OverviewDemo board', () => {
   });
 
   it('draws titles with their caret but links nowhere', async () => {
-    render(<OverviewDemo />);
+    render(
+      <MemoryRouter>
+        <OverviewDemo />
+      </MemoryRouter>
+    );
     const demo = await board();
     expect(demo.queryAllByRole('link')).toHaveLength(0);
   });

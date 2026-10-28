@@ -31,3 +31,22 @@ describe('Sells/day column (issue #5127)', () => {
     expect(column.sortValue?.(row(null))).toBeUndefined();
   });
 });
+
+describe('Item column in a windowed table (issue #5388)', () => {
+  const { result } = renderHook(() =>
+    useLoyaltyOfferColumns({
+      lpBasis: 'lp',
+      concord: null,
+      concordPending: false,
+      isColumnVisible: () => true,
+    })
+  );
+
+  it('is the one width-less column, with its own floor, so a fixed layout cannot squeeze it', () => {
+    const [item, ...rest] = result.current.columns;
+    expect(item.width).toBeUndefined();
+    expect(item.minWidth).toBe('14rem');
+    expect(item.className).toBeUndefined();
+    expect(rest.every((column) => column.width)).toBe(true);
+  });
+});

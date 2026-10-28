@@ -58,8 +58,7 @@ describe('MemberSrp', () => {
     setup();
     const lost = await screen.findByRole('table', { name: 'My lost ships' });
     await within(lost).findByRole('button', { name: 'File claim for Hurricane' });
-    const hull = within(lost).getAllByRole('link', { name: 'Hurricane' })[0]!;
-    expect(hull.getAttribute('href')).toContain('info=type-');
+    expect(within(lost).getByRole('button', { name: 'Hurricane' })).toBeTruthy();
     expect(
       within(lost)
         .getAllByRole('link')
@@ -67,12 +66,106 @@ describe('MemberSrp', () => {
     ).toBe(true);
     expect(within(lost).getByText('Claimed')).toBeTruthy();
     expect(within(lost).getByText('Not covered')).toBeTruthy();
-    expect(within(lost).getByText('Too old')).toBeTruthy();
+    // A loss past the corp's window (the 45-day Gila) is not listed at all.
+    expect(within(lost).queryByText('Too old')).toBeNull();
+    expect(within(lost).queryByRole('button', { name: 'Gila' })).toBeNull();
     const claims = screen.getByRole('table', { name: 'My SRP claims' });
     expect(within(claims).getByText('Pending')).toBeTruthy();
     expect(within(claims).getAllByText('Officer sets amount').length).toBeGreaterThan(0);
     expect(within(claims).getByText(/no FC listed/)).toBeTruthy();
     expect(within(claims).getByText('Re-filed once, final.')).toBeTruthy();
+  });
+
+  describe('killmail modal', () => {
+    const open = async (ship = 'Hurricane') => {
+      await userEvent.click(await screen.findByRole('button', { name: ship }));
+      return screen.findByRole('dialog');
+    };
+
+    it('opens on the ship name with payout, facts and the fit', async () => {
+      setup();
+      const modal = await open();
+      expect(await within(modal).findByText('Covered')).toBeTruthy();
+      expect(within(modal).getByText('Killmail value')).toBeTruthy();
+      expect(await within(modal).findByText('2 · final blow Hull 17715')).toBeTruthy();
+      expect(file).not.toHaveBeenCalled();
+    });
+
+    it('marks doctrine and off-doctrine modules with accessible names, and warns once', async () => {
+      setup({ doctrine: true });
+      const modal = await open();
+      expect(await within(modal).findAllByRole('img', { name: 'Off doctrine' })).toHaveLength(1);
+      expect(within(modal).getAllByRole('img', { name: 'Doctrine' }).length).toBeGreaterThan(0);
+      expect(within(modal).getByText(/Fit checked against Hurricane - artillery/)).toBeTruthy();
+      expect(
+        within(modal).getByText(
+          '2 modules off doctrine. You can still file; an officer will see this.'
+        )
+      ).toBeTruthy();
+    });
+
+    it('shows no marks and no off-doctrine line when the hull is not checked', async () => {
+      setup();
+      const modal = await open('Ferox');
+      await within(modal).findByText('Covered');
+      expect(within(modal).queryByRole('img', { name: 'Off doctrine' })).toBeNull();
+      expect(within(modal).queryByRole('img', { name: 'Doctrine' })).toBeNull();
+      expect(within(modal).queryByText(/off doctrine\./)).toBeNull();
+    });
+
+    it.each([
+      ['more than', 200_000_000, true],
+      ['exactly', 187_000_000, false],
+      ['less than', 130_900_000, false],
+    ])('repays %s the ship and fit are worth: amount hidden is %s', async (_n, isk, hidden) => {
+      setup();
+      const real = backend.previewDoctrine;
+      vi.spyOn(backend, 'previewDoctrine').mockImplementation(async (...args) => {
+        const p = await real(...args);
+        return { ...p, quote: { kind: 'amount', isk, basis: { step: 'hull-fixed' } } };
+      });
+      const modal = await open();
+      if (hidden) {
+        expect(await within(modal).findByText('An officer will review your claim')).toBeTruthy();
+        expect(within(modal).queryByText('Covered')).toBeNull();
+      } else {
+        expect(await within(modal).findByText('Covered')).toBeTruthy();
+        expect(within(modal).queryByText('An officer will review your claim')).toBeNull();
+      }
+    });
+
+    it('File claim in the modal files the loss like the row button', async () => {
+      setup();
+      const modal = await open();
+      await within(modal).findByText('Covered');
+      await userEvent.click(within(modal).getByRole('button', { name: 'File claim' }));
+      await waitFor(() =>
+        expect(file).toHaveBeenCalledWith(7, 98765432, { killmail: esiKillmailLink(8001, HASH) })
+      );
+    });
+  });
+
+  it('shows the empty state when every loss is past the corp window', async () => {
+    setup();
+    vi.spyOn(backend, 'lostLosses').mockResolvedValue([
+      {
+        killmailId: 9100,
+        killmailHash: HASH,
+        hullTypeId: 24702,
+        classId: 26,
+        solarSystemId: 30000142,
+        killedAt: Date.now() - 90 * 86_400_000,
+      },
+    ]);
+    // The spy lands after the first read: reload through Retry-free remount.
+    cleanup();
+    render(
+      <MemoryRouter>
+        <MemberSrp characterId={7} corporationId={98765432} />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('No recent losses')).toBeTruthy();
+    expect(screen.queryByRole('table', { name: 'My lost ships' })).toBeNull();
   });
 
   it('files a lost ship in one tap with its ESI link, and refreshes My claims', async () => {

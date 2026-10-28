@@ -72,7 +72,7 @@ export function GroupHeader({
   );
 
   return (
-    <RowActionsMenu name={group.name} items={items}>
+    <RowActionsMenu name={group.name} items={items} openHref={`/industry/groups/${group.id}`}>
       <li
         ref={setNodeRef}
         aria-current={active ? 'true' : undefined}

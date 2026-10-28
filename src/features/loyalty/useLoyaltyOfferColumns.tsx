@@ -96,6 +96,10 @@ export function useLoyaltyOfferColumns({
       id: 'item',
       header: t('loyaltyStore.colItem'),
       primary: true,
+      // The one width-less column. A windowed table lays out fixed, where it
+      // takes what the sized columns leave and its floor is `minWidth` (the
+      // two-line name + cost cell), so the table scrolls in its wrapper below it.
+      minWidth: '14rem',
       sortValue: (row) => row.itemName,
       render: (row) => (
         <span className="flex flex-col">

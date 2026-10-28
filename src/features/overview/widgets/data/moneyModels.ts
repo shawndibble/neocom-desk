@@ -14,6 +14,7 @@ import { humanizeRefType } from '@/features/character/format';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { formatAge } from '@/lib/age';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { highlightHref } from '@/lib/highlightParam';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
 import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
@@ -55,6 +56,8 @@ export function balanceChange(
 }
 
 const JOURNAL_ROWS = 6;
+/** The Wallet Journal, where `?highlight=` scrolls to an entry and flashes it. */
+const JOURNAL_PATH = '/wallet/journal';
 
 /** The newest journal entries that moved ISK: what it was, how much, how long ago, and the balance after. */
 export function journalTable(
@@ -83,6 +86,7 @@ export function journalTable(
           ? { text: formatIskCompact(entry.balance), iskAmount: entry.balance }
           : UNKNOWN,
       ],
+      to: highlightHref(JOURNAL_PATH, entry.id),
     })),
   };
 }
@@ -497,12 +501,16 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
           vs90dCell(alert.vs90d),
         ],
         tone: alert.crossed ? 'warning' : 'clear',
+        info: { typeId: alert.typeId },
       };
     }),
   };
 }
 
 // --- Loyalty points ------------------------------------------------------------------
+
+/** The LP Store (a Wallet tab); a corporation's own store is `/<corporationId>` below it. */
+export const LP_STORE_PATH = '/wallet/lp-store';
 
 /** Each corporation's points and its share of all of them (a sliver reads `<1%`, never `0%`). */
 export function lpTable(
@@ -524,6 +532,7 @@ export function lpTable(
     ],
     rows: entries.map((entry) => ({
       key: String(entry.corporationId),
+      to: `${LP_STORE_PATH}/${entry.corporationId}`,
       cells: [
         entry.name ?? t(`${W}.data.lp.corporation`, { id: entry.corporationId }),
         formatCompactNumber(entry.points),

@@ -111,6 +111,8 @@ export interface AppraisalRow {
   refineUnitsLeftOver?: number;
   /** Undefined when nothing the character holds LP with sells this item. */
   lpCorporationId?: number;
+  /** The store `offer_id` the LP option priced — the Appraisal's link opens the store on it. */
+  lpOfferId?: number;
   lpCorpName?: string;
   lpCost?: number;
   lpIskCost?: number;
@@ -128,6 +130,15 @@ export interface AppraisalRow {
 export function iskPerM3(row: Pick<AppraisalRow, 'sellTotal' | 'volume'>): number | null {
   if (row.sellTotal === null || row.volume === null || !(row.volume > 0)) return null;
   return row.sellTotal / row.volume;
+}
+
+/**
+ * The split: the midpoint of the buy-each and sell-each price. Null unless both
+ * sides are priced — half a price is not a midpoint.
+ */
+export function splitEach(row: Pick<AppraisalRow, 'buyEach' | 'sellEach'>): number | null {
+  if (row.buyEach === null || row.sellEach === null) return null;
+  return (row.buyEach + row.sellEach) / 2;
 }
 
 /**
@@ -297,6 +308,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       refinePricedAll,
       refineUnitsLeftOver,
       lpCorporationId: item.lpOption?.corporationId,
+      lpOfferId: item.lpOption?.offerId,
       lpCorpName: item.lpOption?.corpName,
       lpCost: item.lpOption?.lpCost,
       lpIskCost: item.lpOption?.iskCost,

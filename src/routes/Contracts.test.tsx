@@ -283,6 +283,69 @@ describe('Contracts', () => {
     expect(screen.getAllByRole('button', { name: /^More actions/ }).length).toBeGreaterThan(0);
   });
 
+  it('opens the contract detail modal from ?open=<contractId>', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    window.history.pushState({}, '', '/contracts/history?open=1');
+    render(<App />);
+    const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
+    expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).not.toContain('open='));
+  });
+
+  it('opens the detail sidebar and highlights the row from ?highlight=<contractId>', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    window.history.pushState({}, '', '/contracts/history?highlight=1');
+    render(<App />);
+    const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
+    expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).not.toContain('highlight='));
+  });
+
+  it('opens nothing for a ?highlight= contract that never loads', async () => {
+    window.history.pushState({}, '', '/contracts/history?highlight=987654');
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens nothing for ?highlight= on a non-History tab, even after switching to History', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/contracts/search/items?highlight=1');
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'History' }));
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('does not reopen a ?highlight= contract once closed', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/contracts/history?highlight=1');
+    render(<App />);
+    await screen.findByRole('dialog', { name: /Item Exchange/ });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('ignores an ?open= contract that never loads', async () => {
+    window.history.pushState({}, '', '/contracts/history?open=987654');
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('opens the contract detail modal on click', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
@@ -852,7 +915,7 @@ describe('Contracts row right-click (issue #676)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openContractMenu('Rifter fit');
-    await user.click(await screen.findByRole('menuitem', { name: 'Open contract in EVE' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
     await waitFor(() => expect(openContractMock).toHaveBeenCalledWith(CHAR_ID, 1));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

@@ -73,6 +73,7 @@
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",
     "goTo": "Go to",
+    "goToNew": "New",
     "pageViews": "{{page}} views",
     "editRail": "Hide pages you don't use",
     "editHint": "Hide pages and views you never use. They stay in Go to, and a page's own tabs never change.",
@@ -757,7 +758,7 @@
       "sourceSaved": "Saved",
       "sourceInGame": "In-game",
       "emptyTitle": "No fittings yet",
-      "emptyHint": "Start one from a hull, or import an EFT block, a link or a fittings file.",
+      "emptyHint": "Start one from a hull, or import an EFT block, a link or a fittings file. You can also press Ctrl+V anywhere in the app to paste an EFT block.",
       "noMatches": "No saved or In-game fitting matches that search.",
       "matches_one": "{{count}} matching fitting",
       "matches_other": "{{count}} matching fittings",
@@ -1393,7 +1394,7 @@
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
-        "cheaper": "Keeps damage, tank and speed each within 5%, the capacitor stable and the fit within CPU, powergrid and calibration."
+        "cheaper": "Keeps damage, tank and speed each within 10%, the capacitor stable and the fit within CPU, powergrid and calibration."
       },
       "checking": "Checking {{checked}} of {{total}} swaps…",
       "progressLabel": "Improve search progress",
@@ -1405,6 +1406,21 @@
       "swap_one": "{{from}} → {{to}}",
       "swap_other": "{{count}}× {{from}} → {{to}}",
       "givesUp": "Gives up:",
+      "unflyable": "You can't fly the current module yet; this one you can.",
+      "flyableWith": "Also swaps {{swaps}} to keep the fit within CPU, powergrid and calibration.",
+      "flyableImplants": "Or fly {{fix}} with implants instead:",
+      "appliedWithImplants": "Made the module flyable and set the implants.",
+      "cover": {
+        "searching": "Looking for swaps that cover this set…",
+        "title": "Add one of these so the set fits:",
+        "none": "No module or rig swap covers this set.",
+        "overBudget": "Swaps would cover this set, but not within your budget.",
+        "added": "Added to cover the set: {{swaps}}",
+        "thisSet": "this set"
+      },
+      "flyableShort": "{{amount}} more {{resource}}",
+      "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
+      "flyableNoCover": "Needs {{short}}, and no module or rig swap frees it.",
       "noPrice": "No price",
       "gain": "+{{percent}}%",
       "moreOptions_one": "{{count}} more option",
@@ -1416,6 +1432,7 @@
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
         "fixFirst": "Fix this first",
+        "makeFlyable": "Make Flyable",
         "implants": "Implants",
         "noDownside": "No downside",
         "tradeOffs": "Trade-offs"
@@ -1443,7 +1460,7 @@
       "broke": {
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
-        "keepsStats": "Loses more than 5% of damage, tank or speed",
+        "keepsStats": "Loses more than 10% of damage, tank or speed",
         "spend": "Costs more than your budget or spend cap",
         "spendBudget": "Over your {{cap}} budget by {{over}}",
         "spendCap": "{{over}} over your {{cap}} cap"
@@ -2428,7 +2445,8 @@
       "nextNeeds_one": "{{grade}} needs {{count}} skill level · {{time}}",
       "nextNeeds_other": "{{grade}} needs {{count}} skill levels · {{time}}",
       "eliteDone": "Elite: nothing left to train",
-      "add": "Add {{grade}} to plan",
+      "add": "Add to plan",
+      "addLabel": "Add to plan: {{grade}} for {{name}}",
       "inPlan": "In plan",
       "complete": "Complete",
       "omegaOnly": "Omega only",
@@ -2489,7 +2507,7 @@
     "cancel": "Cancel",
     "rename": "Rename",
     "emptyTitle": "No skill plans yet",
-    "emptyHint": "Create a plan to start training toward a goal. Import your in-game queue, start from a Certified Plan, or pick a ship in the Ship Tree.",
+    "emptyHint": "Create a plan to start training toward a goal. Import your in-game queue, start from a Certified Plan, or pick a ship in the Ship Tree. You can also press Ctrl+V anywhere in the app to paste a skill plan.",
     "backToList": "Back to plans",
     "yourEntries": "Your entries",
     "yourEntriesEmpty": "No entries yet. Add a skill to get started.",
@@ -2907,6 +2925,7 @@
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
+      "findBpcInSourcing": "Find BPC in BPC Sourcing",
       "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
@@ -2917,7 +2936,7 @@
     "deleteMenu": "Delete",
     "rename": "Rename",
     "emptyTitle": "No build plans yet",
-    "emptyHint": "Create a plan to price out a manufacturing job.",
+    "emptyHint": "Create a plan to price out a manufacturing job. Or press Ctrl+V anywhere in the app to paste a blueprint list as a Build Group.",
     "selectHint": "Select a build plan, or create one.",
     "backToList": "Back to Build Plans",
     "profitColumn": "Profit",
@@ -3749,6 +3768,7 @@
     "opportunitiesStockCovers": "Stock covers",
     "opportunitiesStillToBuy": "Still to buy",
     "opportunitiesUseMyStock": "Use my stock",
+    "opportunitiesStockPrefix": "Stock",
     "opportunitiesStockAny": "Any",
     "opportunitiesStockMostly": "{{pct}}%+ covered",
     "opportunitiesStockFull": "Fully covered",
@@ -5353,6 +5373,15 @@
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
+        },
+        "detail": {
+          "unanchors": "Unanchors in",
+          "services": "Services",
+          "serviceState": {
+            "online": "Online",
+            "offline": "Offline",
+            "cleanup": "Going offline"
+          }
         }
       },
       "moonChunks": {
@@ -5442,6 +5471,10 @@
         "side": {
           "kill": "Kill",
           "loss": "Loss"
+        },
+        "detail": {
+          "when": "When",
+          "killmail": "Killmail"
         }
       },
       "comingUp": {
@@ -5820,6 +5853,11 @@
         "changes_other": "{{count}} role changes in {{days}} days",
         "changesUnknown": "Role changes unavailable",
         "historyUnknown": "Role history could not be read, so last changes are not shown.",
+        "fact": {
+          "granted": "Granted",
+          "removed": "Removed",
+          "changedBy": "Changed by"
+        },
         "summary_one": "{{count}} Director. Members with a sensitive role: {{holders}}.",
         "summary_other": "{{count}} Directors. Members with a sensitive role: {{holders}}."
       },
@@ -6272,6 +6310,7 @@
       }
     },
     "menu": {
+      "openPage": "Open {{title}} page",
       "view": "View",
       "views": {
         "number": "Number",
@@ -6489,7 +6528,13 @@
     "aboutLabel": "About {{label}}",
     "scrollTabsBefore": "Scroll tabs left",
     "scrollTabsAfter": "Scroll tabs right",
+    "openInNewTab": "Open in new tab",
     "moreActionsLabel": "More actions for {{name}}",
+    "rowMenuTip": "Tip: right-click any row",
+    "rowMenuTip_touch": "Tip: touch and hold any row",
+    "rowHint": "Tip: right-click any row to open its actions",
+    "rowHint_touch": "Tip: touch and hold any row to open its actions",
+    "hintGotIt": "Got it",
     "moreActions": "More actions",
     "tableExport": {
       "menuLabel": "{{name}} actions",
@@ -6504,6 +6549,7 @@
     },
     "dataTable": {
       "sortBy": "Sort by",
+      "sortByCurrent": "Sort by, now {{current}}",
       "sortLabel": "Sort: {{column}} {{arrow}}",
       "sortOption": "{{column}} {{arrow}}",
       "sortNone": "Sort",
@@ -6612,9 +6658,9 @@
     "margin": "Margin",
     "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A sale without a margin says why in its own cell.",
     "marginGap": {
-      "noBuy": "No wallet buy covers it",
+      "noBuy": "No wallet buy",
       "noTax": "No sales tax line found",
-      "outside": "Stock came from outside this history"
+      "outside": "Unknown origin"
     },
     "marginGapHint": {
       "noBuy": "No earlier wallet buy covers all of these units, so there is no cost to take off.",
@@ -6632,8 +6678,6 @@
     "tradingMargin": "Margin",
     "tradingMatched_one": "{{matched}} of {{count}} sale matched",
     "tradingMatched_other": "{{matched}} of {{count}} sales matched",
-    "tradingUncosted_one": "{{count}} sale uncosted · {{isk}} ISK",
-    "tradingUncosted_other": "{{count}} sales uncosted · {{isk}} ISK",
     "brokerFees": "Broker fees",
     "brokerFeesTooltip": "Broker fees paid over the same dates, from your journal. They aren't taken off the margin — a fee can't be tied to a sale.",
     "archiveSince": "Since {{date}} — your wallet archive starts there.",
@@ -7175,6 +7219,10 @@
     "oreTagsRemoveError": "Couldn't remove the {{name}} tag. Try again.",
     "removeOreTagLabel": "Remove the {{name}} tag",
     "allPayees": "All payees",
+    "noPayees": "No payees",
+    "noPayeesSelected": "No payees selected.",
+    "selectAllPayees": "Select all",
+    "selectNoPayees": "Select none",
     "payeesSelected_one": "{{count}} payee",
     "payeesSelected_other": "{{count}} payees",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
@@ -7814,9 +7862,13 @@
         "legTitle": "{{from}} → {{to}}",
         "startUnknown": "Start",
         "noGateRoute": "no gate route",
-        "load": "Load {{volume}} m³ at {{place}}",
-        "drop": "Drop {{volume}} m³ at {{place}}",
-        "take": "Take {{ships}} at {{place}}",
+        "stopLoad": "Load {{volume}} m³",
+        "stopDrop": "Drop {{volume}} m³",
+        "stopTake": "Take {{ships}}",
+        "stopItemsShow": "Show items for {{action}} at the end of leg {{n}}",
+        "stopItemsHide": "Hide items for {{action}} at the end of leg {{n}}",
+        "travel": "Travel to {{place}}",
+        "haul": "Haul to {{place}}",
         "fly": "Fly {{ships}} to {{place}}",
         "waypoint": "Set waypoint",
         "waypointAria": "Set waypoint, leg {{n}}",
@@ -7833,8 +7885,6 @@
         "condition_unknown": "Not rated",
         "carryLoaded": "Carrying {{volume}} m³",
         "carryEmpty": "Flying empty",
-        "carryLoadsOnArrival": "Loads {{volume}} m³ at {{place}} on arrival.",
-        "carryDrops": "Drops {{volume}} m³ at {{place}}.",
         "cargoLine": "{{place}}: {{volume}} m³",
         "itemLine": "{{quantity}} × {{name}}",
         "itemsFewer": "Show fewer",
@@ -8046,7 +8096,15 @@
       "emptyTitle": "No ships found",
       "emptyHint": "No ships in the assets of the chosen characters.",
       "showAllCharacters": "Show all characters",
-      "inCargo": "In cargo",
+      "packaged": "Packaged",
+      "quantity": "×{{count}}",
+      "inside": "inside {{holder}}",
+      "insideFlag": "{{holder}} ({{flag}})",
+      "flags": {
+        "ShipHangar": "Ship Maintenance Bay",
+        "FleetHangar": "Fleet Hangar",
+        "Cargo": "Cargo hold"
+      },
       "here": "Here",
       "unknownType": "Type #{{id}}",
       "searchLabel": "Search ships",
@@ -9999,11 +10057,15 @@
   },
   "contractDetail": {
     "regionLabel": "Region",
+    "showMoreItems_one": "Show {{count}} more item",
+    "showMoreItems_other": "Show {{count}} more items",
+    "showFewerItems": "Show fewer",
     "systemLabel": "System",
     "locationLabel": "Location",
     "unknownLocation": "Unknown location (#{{id}})",
     "expiresLabel": "Expires",
     "contractIdLabel": "Contract",
+    "openInEveName": "contract {{id}}",
     "copyContractId": "Copy contract ID",
     "contractIdCopied": "Contract ID copied",
     "openLink": "Open {{host}}",
@@ -10021,6 +10083,12 @@
     "priceCheckShowSide": "Show {{side}}",
     "priceCheckAsking": "Asking price",
     "priceCheckDifference": "Difference",
+    "priceCheckPriced": "{{priced}} of {{total}} items priced",
+    "priceCheckOtherContracts": "Other contracts",
+    "priceCheckOtherContractsValue": "about {{value}}",
+    "priceCheckOtherContractsNote_one": "{{count}} item with no hub market, at what other contracts ask. Asking prices, not sales. Not in the difference.",
+    "priceCheckOtherContractsNote_other": "{{count}} items with no hub market, at what other contracts ask. Asking prices, not sales. Not in the difference.",
+    "priceCheckAgainstPriced": "Against {{priced}} of {{total}} items.",
     "priceCheckAskingBelow": "Asking is below {{side}}",
     "priceCheckAskingAbove": "Asking is above {{side}}",
     "priceCheckAskingLevel": "Asking is level with {{side}}",
@@ -10992,18 +11060,45 @@
     "tabStandings": "Standings",
     "standingsKind": {
       "faction": "Faction",
-      "corp": "NPC corp",
-      "agent": "NPC agent"
+      "corp": "Corporation",
+      "agent": "Agent"
     },
-    "standingsUsedForFees": "Broker fees",
-    "standingsUsedForFeesYes": "Used for fees",
-    "standingsFeesNote": "Broker fees use your standing with each Trade Hub's owning corporation and faction. Other NPC stations use their own owner, and agents never count.",
-    "standingsUnavailableHint": "Your NPC standings aren't saved on this device yet. They load once ESI answers.",
-    "standingsEmptyTitle": "No NPC standings yet",
+    "standings": {
+      "typeFilter": "Type",
+      "typeOption": "{{kind}} ({{count}})",
+      "accessFilter": "Access",
+      "accessAny": "Access: any",
+      "accessAtLeast": "Level {{level}} agents or higher",
+      "feesFilter": "Fees",
+      "usedForFees": "Used for fees",
+      "count_one": "{{count}} standing",
+      "count_other": "{{count}} standings",
+      "columnBelongsTo": "Belongs to",
+      "columnBase": "Base",
+      "columnBaseTooltip": "The standing ESI reports. Broker fees are worked out from this one: skills do not lower them.",
+      "columnEffective": "Standing",
+      "columnEffectiveTooltip": "Your standing with your Connections, Criminal Connections or Diplomacy counted: the number the game shows and uses for agents.",
+      "columnJumps": "Jumps",
+      "columnJumpsTooltip": "Jumps from your current system to the nearest station of a corporation or faction, or to the station an agent sits in.",
+      "jumpsValue_one": "{{count}} jump",
+      "jumpsValue_other": "{{count}} jumps",
+      "columnAccess": "Access",
+      "columnAccessTooltip": "The highest agent level the best standing in this chain opens (level 1 needs none). For an agent: whether you can use them now.",
+      "columnFees": "Fees",
+      "columnFeesTooltip": "Owns a Trade Hub: this standing lowers your broker fee there. Other stations use their own owner, and agents never count.",
+      "fees": "Broker fee",
+      "level": "L{{level}}",
+      "accessUpTo": "Agents up to level {{level}}",
+      "accessOpen": "Open",
+      "accessNeeds": "Needs {{standing}}",
+      "accessBlocked": "Blocked"
+    },
+    "standingsUnavailableHint": "Your standings aren't saved on this device yet. They load once ESI answers.",
+    "standingsEmptyTitle": "No standings yet",
     "standingsEmptyHint": "EVE lists a standing once you have earned or lost one with a faction, corporation or agent.",
-    "standingsNoResultsHint": "Clear the search to see every standing.",
+    "standingsNoResultsHint": "Clear the search or the filters to see every standing.",
     "standingsReauthTitle": "Log in again to see your standings",
-    "standingsReauthHint": "Log in again to grant Character details and fetch this character's NPC standings.",
+    "standingsReauthHint": "Log in again to grant Character details and fetch this character's standings.",
     "acrossLabel": "Contacts across every character",
     "acrossCharacters": "On",
     "acrossCharactersHeaderTooltip": "How many of your characters hold this contact, out of every character logged in on this device. Read from each character's cached contacts.",
@@ -11030,8 +11125,6 @@
     "emptyHint": "Couldn't load loyalty point balances yet. Try again shortly.",
     "noneLine": "Loyalty Points: none ·",
     "corporation": "Corporation",
-    "corporationInfo": "Show info for {{corporation}}",
-    "corporationInfoShort": "Show info",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
     "reauthTitle": "Log in again to see your loyalty points",
@@ -11043,7 +11136,6 @@
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
     "title": "LP Store",
-    "corporationInfo": "Corporation info",
     "searchPlaceholder": "Search offers…",
     "hubLabel": "Market hub",
     "priceBasisLabel": "Revenue basis",
@@ -11113,9 +11205,15 @@
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
       "resultsStatus": "{{stores}}, {{items}}",
-      "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down.",
-      "crumb": "LP Store search",
-      "changeStore": "Change store"
+      "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down."
+    },
+    "nearestStation": {
+      "found": "Nearest station: {{station}} · ",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "loading": "Nearest station: …",
+      "noOrigin": "Set your location to see the nearest station",
+      "noStation": "No station of this corporation is reachable from your system"
     },
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",
@@ -11935,7 +12033,7 @@
         "title": "Trip",
         "jumps_one": "{{count}} jump ({{preference}})",
         "jumps_other": "{{count}} jumps ({{preference}})",
-        "laneJumps": "{{lane}} · {{jumps}}",
+        "laneLead": "{{lane}} · ",
         "cargoValue": "Cargo value",
         "cargoValueAfter": "→ {{value}} with the fill",
         "m3": "{{m3}} m³",
@@ -11990,6 +12088,7 @@
         "multibuy": "Multibuy"
       },
       "openInJanice": "Open in Janice",
+      "pickHaulingShip": "Pick hauling ship",
       "janiceFetching": "Fetching your Janice URL…",
       "janiceFailed": {
         "failed": "Janice didn't answer, so no tab was opened. Try again in a moment.",
@@ -12052,6 +12151,8 @@
       "columnItem": "Item",
       "columnBuyEach": "Buy each",
       "columnSellEach": "Sell each",
+      "columnSplitEach": "Split each",
+      "columnSplitEachHelp": "Midpoint of the buy and sell price.",
       "columnBuyTotal": "Buy total",
       "columnSellTotal": "Sell total",
       "columnRefineTotal": "Refine total",
@@ -12074,6 +12175,8 @@
       "totalVolumePartial_other": "{{count}} items have no known volume, so this total leaves them out.",
       "sellTotal": "Sell total",
       "buyTotal": "Buy total",
+      "sellShort": "Sell",
+      "buyShort": "Buy",
       "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing.",
       "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row.",
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
@@ -12098,7 +12201,7 @@
       "spread": "Spread",
       "items": "Items",
       "emptyTitle": "Nothing appraised yet",
-      "emptyHint": "Paste a stack of items to price them at your chosen trade hub. One item per line, with an optional quantity. A pasted ship fit prices its hull, modules and loaded charges together.",
+      "emptyHint": "Paste a stack of items to price them at your chosen trade hub. One item per line, with an optional quantity. A pasted ship fit prices its hull, modules and loaded charges together. You can also press Ctrl+V anywhere in the app.",
       "noMatchesTitle": "No items recognised",
       "noMatchesHint": "None of these lines name an item that trades on the market. Check the spelling against the item's name in game.",
       "unmatched_one": "{{count}} line not matched",
@@ -12113,7 +12216,7 @@
       "compareHubsTitle": "Compare hubs",
       "appraiseAtHub": "Appraise at {{hub}}",
       "copyTotal": "Copy {{amount}}",
-      "copyTotalCompact": "Copy {{short}} ISK ({{full}})",
+      "copyCardTotal": "{{title}}: copy {{short}} ISK ({{full}})",
       "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
       "copiedToClipboard": "Copied to clipboard",
@@ -12684,8 +12787,8 @@
       "sells": "{{place}} sells for {{price}}",
       "buys": "buys for {{price}}",
       "jumps_zero": "in your system",
-      "jumps_one": "{{count}} jump away",
-      "jumps_other": "{{count}} jumps away",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
       "view": "View {{place}}"
     },
     "sideToggle": {
@@ -13693,7 +13796,8 @@
     }
   },
   "commandPalette": {
-    "scopeNote": "Jumps to pages, items, assets and contacts. It doesn't filter the page you're on.",
+    "emptyTitle": "Search a page, item, asset, pilot or command",
+    "emptyHint": "Or paste a fit, item list, Local list or D-Scan",
     "title": "Command palette",
     "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
     "inputLabel": "Search pages, commands, characters, assets and items",
@@ -13717,6 +13821,7 @@
       "assets": "Assets",
       "contacts": "Contacts",
       "lpStores": "LP Stores",
+      "ships": "Ships",
       "marketItems": "Market items"
     },
     "commands": {
@@ -13749,7 +13854,7 @@
     "cycleModuleState": "Step a focused Ring module through its states (Fittings)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Pasting several lines into Go to does the same. Back returns you where you were.",
     "paste": "Paste",
     "pasteOffline": "Couldn't read that paste offline — item data isn't downloaded yet.",
     "pasteDestinations": {
@@ -14187,7 +14292,6 @@
     "ageValue": "{{years}}y {{months}}m",
     "taxRate": "Tax",
     "allianceSince": "since {{date}}",
-    "npcCorporation": "NPC corporation",
     "playerCorporation": "Player corporation",
     "warEligible": "War eligible",
     "website": "Website",
@@ -14209,8 +14313,74 @@
     "noAlliance": "No alliance",
     "period": "{{start}} – {{end}}",
     "periodOngoing": "{{start}} – now",
-    "npcAgent": "NPC agent",
-    "npcAgentHint": "An agent run by CCP, not a player. There's no killboard or employment history to show."
+    "npcAgent": "Agent",
+    "npcAgentHint": "An agent run by CCP, not a player. There's no killboard or employment history to show.",
+    "npc": {
+      "kind": {
+        "faction": "Faction",
+        "corporation": "Corporation",
+        "agent": "Agent"
+      },
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "here": "here",
+      "standing": {
+        "title": "Your standing",
+        "baseAndSkills": "Base {{base}}, {{effective}} with your skills",
+        "highest": "Agents use your highest: {{name}}.",
+        "blocked": "{{name}} is at {{standing}}: at -2.0 or lower it blocks level 2+ agents.",
+        "unavailable": "Your standing couldn't be read."
+      },
+      "access": {
+        "title": "Agent access",
+        "titleAgent": "Can you use this agent?",
+        "levelShort": "L{{level}}",
+        "levelOpen": "Level {{level}} needs {{needs}}, open",
+        "levelClosed": "Level {{level}} needs {{needs}}, closed",
+        "levelOneOpen": "Level 1 needs no standing, open",
+        "next": "Level {{level}} needs {{needs}}: {{short}} more.",
+        "all": "Every agent level is open.",
+        "blocked": "Only level 1 agents stay open while a standing is at -2.0 or lower.",
+        "agentFree": "Yes. Level 1 agents need no standing.",
+        "agentYes": "Yes. Level {{level}} needs {{needs}}; you have {{have}}.",
+        "agentNo": "Not yet. Level {{level}} needs {{needs}}; you have {{have}}.",
+        "agentBlocked": "No. {{name}} is at {{standing}}, which blocks level 2+ agents."
+      },
+      "stations": {
+        "title": "At their stations",
+        "brokerFee": "Broker fee at {{place}}",
+        "reprocessing": "Reprocessing tax",
+        "reprocessingAt": "Reprocessing tax at {{place}}",
+        "saves": "saves {{amount}}",
+        "costs": "costs {{amount}} more",
+        "note": "Broker fee uses your base standings and Broker Relations {{level}}."
+      },
+      "where": {
+        "title": "Where",
+        "headquarters": "Headquarters",
+        "capital": "Capital",
+        "stations": "Stations",
+        "stationsValue_one": "{{stations}} in {{count}} system",
+        "stationsValue_other": "{{stations}} in {{count}} systems",
+        "militia": "Militia",
+        "nearest": "Nearest",
+        "station": "Station",
+        "agent": "Agent",
+        "agentValue": "Level {{level}} {{division}}",
+        "agentValueNoDivision": "Level {{level}}"
+      },
+      "known": {
+        "agents": "Agents you know",
+        "corporations": "Corporations you know",
+        "agentLevel": "L{{level}} {{division}}",
+        "agentLevelNoDivision": "L{{level}}"
+      },
+      "loyalty": {
+        "title": "Loyalty points",
+        "none": "None yet",
+        "openStore": "Open LP store"
+      }
+    }
   },
   "filters": {
     "title": "Filters",
@@ -14320,6 +14490,7 @@
     "jumpsUnknownLabel": "Jumps unknown",
     "routePathLabel": "Route, system by system",
     "pickUpLabel": "Pick up",
+    "planRoute": "Plan route",
     "dropOffLabel": "Drop off",
     "playerStructureShort": "Player structure",
     "reverseLaneCount_one": "{{count}} haul runs the reverse lane",
@@ -14418,9 +14589,21 @@
     "routeExposureChokepoints": "Route runs through {{systems}}, where haulers are most often killed.",
     "belowMarket": {
       "chip": "Below market",
-      "chipTooltip": "One row per contract, valued at the trade hub's best buy, sorted by profit",
-      "note": "Contract snapshot from {{age}} · valued at {{hub}} best buy minus sales tax · contracts that ask for items, and auctions with no buyout, are left out",
-      "pricesUnreachable": "some hub prices could not be read, so those items are valued from other contracts, or at 0",
+      "chipTooltip": "One row per contract, valued at the trade hub's price, sorted by profit",
+      "note": "Contract snapshot from {{age}} · valued at the {{hub}} {{side}}, no fees taken off · contracts that ask for items, and auctions with no buyout, are left out",
+      "sideSellNote": "lowest sell order",
+      "sideBuyNote": "best buy order",
+      "pricesUnreachable": "some hub prices could not be read, so those items are unpriced",
+      "sideLabel": "Value at",
+      "sideSell": "Sell orders",
+      "sideBuy": "Buy orders",
+      "includeOther": "Include Other",
+      "includeOtherTooltip": "Also list contracts that are only profitable through Other, and add it to Profit.",
+      "profitIncludesOther": "Includes Other",
+      "coverage": "{{priced}} of {{total}} priced",
+      "otherColumn": "Other",
+      "otherAffix": "Other ",
+      "otherTooltip": "Lines with no hub market, valued at what other contracts ask for the same item. Asking prices, not sales, so treat as a guide. Not included in Profit.",
       "pricing": "Pricing contract contents at the trade hub…",
       "failedTitle": "Couldn't value these contracts",
       "failedHint": "The item data needed to value them could not be read. Try Refresh.",
@@ -14437,10 +14620,7 @@
       "valueAffix": "Value ",
       "askingColumn": "Asking",
       "askingAffix": "Asking ",
-      "profitColumn": "Profit",
-      "sourceMarket": "market",
-      "sourceOffers_one": "from {{count}} contract",
-      "sourceOffers_other": "from {{count}} contracts"
+      "profitColumn": "Profit"
     }
   },
   "jumpRange": {
@@ -14485,7 +14665,7 @@
     "unknownHint": "Neocom Desk has no record of this location."
   },
   "openInEve": {
-    "information": "Open in EVE",
+    "label": "Open in EVE",
     "marketDetails": "Open market in EVE",
     "contract": "Open contract in EVE",
     "sending": "Opening in EVE…",
@@ -14587,7 +14767,7 @@
     "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",
-      "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded. Or paste a Local list or a D-Scan to size up a whole system at once.",
+      "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded. Or paste a Local list or a D-Scan to size up a whole system at once. You can also press Ctrl+V anywhere in the app.",
       "searchLabel": "Pilot",
       "searchPlaceholder": "Pilot name, Local, or D-Scan",
       "suggestionsLabel": "Matching pilots",
@@ -15362,9 +15542,12 @@
       "sending": "Setting waypoints…",
       "character": "Character to set waypoints for",
       "needCharacter": "Log in a character to set waypoints in its EVE client.",
-      "grantTitle": "Setting waypoints needs a permission this character hasn't granted",
-      "grantHint": "Characters that logged in before this button existed must log in again to let Neocom Desk set autopilot waypoints in the EVE client.",
-      "grantAction": "Log in again",
+      "grantTitle": "{{character}} hasn't granted Autopilot waypoints",
+      "grantHint": "Neocom Desk needs this permission to set waypoints in your EVE client.",
+      "grantAction": "Grant permission",
+      "manageAction": "Manage permissions",
+      "dismissAction": "Dismiss",
+      "dismissHint": "Hide this. You can grant it later in Settings → Permissions.",
       "done": "Waypoints set. Your client plans the path between them with its own settings.",
       "cutOff": {
         "jump": "Waypoints set to {{entrance}}. Jump from there to {{exit}}, then set the rest from {{exit}}. Your client plans the path to {{entrance}} with its own settings.",
@@ -17283,6 +17466,47 @@
       }
     }
   },
+  "srpKillmail": {
+    "close": "Close",
+    "file": "File claim",
+    "covered": "Covered",
+    "officerWillReview": "An officer will review your claim",
+    "previewFailed": "Couldn't check this loss. You can still file it.",
+    "openFailed": "Couldn't open this killmail. Close this and try again.",
+    "offDoctrine_one": "{{count}} module off doctrine. You can still file; an officer will see this.",
+    "offDoctrine_other": "{{count}} modules off doctrine. You can still file; an officer will see this.",
+    "offDoctrineMissing": "Your fit is missing doctrine modules. You can still file; an officer will see this.",
+    "checkedAgainst": "Fit checked against {{name}}",
+    "system": "System",
+    "lost": "Lost",
+    "killmailValue": "Killmail value",
+    "hullFit": "Hull / fit",
+    "attackers": "Attackers",
+    "attackersFinalBlow": "{{count}} · final blow {{ship}}",
+    "fitFailed": "Couldn't load this fit",
+    "noFit": "Nothing was fitted",
+    "slot": {
+      "high": "High",
+      "medium": "Mid",
+      "low": "Low",
+      "rig": "Rig",
+      "subsystem": "Subsystem",
+      "drone": "Drones"
+    },
+    "mark": {
+      "doctrine": "Doctrine",
+      "off": "Off doctrine"
+    },
+    "openKillmail": "Open killmail",
+    "appraisal": {
+      "title": "Appraisal",
+      "lost": "Ship and fit (Jita)",
+      "doctrine": "Doctrine fit (Jita)",
+      "difference": "Difference",
+      "doctrineUnavailable": "Doctrine value unavailable",
+      "failed": "Couldn't price this loss"
+    }
+  },
   "srpMember": {
     "title": "SRP",
     "notSetUp": {
@@ -17323,7 +17547,6 @@
       "file": "File",
       "fileShip": "File claim for {{hull}}",
       "claimed": "Claimed",
-      "old": "Too old",
       "notCovered": "Not covered",
       "ago": "{{count}}d ago",
       "empty": {

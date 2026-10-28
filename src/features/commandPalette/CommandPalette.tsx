@@ -1,17 +1,34 @@
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
-import { Modal, SearchInput, Spinner } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import { EmptyState, Modal, SearchInput, Spinner } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import {
+  activeOptionClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
+import { routePaste } from '@/app/pasteRouting';
+import { listNavDestinations, NAV_LOCK_PATHS, type NavDestination } from '@/app/navDestinations';
+import { recentNavFor, viewPathFor } from '@/app/navRail';
+import { useRecentNav } from '@/app/navPreferences';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useHiddenTabPaths } from '@/app/useHiddenTabPaths';
@@ -37,6 +54,9 @@ import {
   type ShownMarketItem,
 } from './marketItems';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { loadShipTree } from '@/sde/loadSde';
+import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
+import { createShipsProvider } from './shipsProvider';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
@@ -51,9 +71,15 @@ function signedStanding(standing: number): string {
 }
 
 /** The live reads behind the shipped groups, turned into providers. */
-function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
+function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
+  providers: PaletteProvider[];
+  destinations: NavDestination[];
+} {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const shipWindowOpen =
+    location.pathname === '/ships/tree' && new URLSearchParams(location.search).has('ship');
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const corpVisible = useCorpNavVisible();
   const srpVisible = useSrpNavVisible();
@@ -98,7 +124,23 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
     [activeCharacterId, navigate, t]
   );
 
-  return useMemo(
+  // Same reason as LP Stores: it holds the loaded Ship Tree. The pushed-entry
+  // marker makes Back from the window return to the page the pilot was on.
+  const ships = useMemo(
+    () =>
+      createShipsProvider({
+        loadShipTree,
+        // Over an open Ship Info window, replace: one Close or Back still leaves the tree.
+        onOpen: (typeID) =>
+          void navigate(
+            `/ships/tree?ship=${typeID}`,
+            shipWindowOpen ? { replace: true } : { state: ENTITY_INFO_PUSHED_STATE }
+          ),
+      }),
+    [navigate, shipWindowOpen]
+  );
+
+  const providers = useMemo(
     () => [
       createPagesProvider({ destinations, navigate: (path) => void navigate(path) }),
       createCommandsProvider({
@@ -144,6 +186,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
           t('commandPalette.assetQuantity', { quantity: formatCount(quantity) }),
       }),
       lpStores,
+      ships,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
     [
@@ -157,9 +200,11 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       assets,
       assetsScope,
       lpStores,
+      ships,
       onShowItem,
     ]
   );
+  return { providers, destinations };
 }
 
 interface CommandPaletteProps {
@@ -188,7 +233,15 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const providers = useShippedProviders(onShowItem);
+  const { providers, destinations } = useShippedProviders(onShowItem);
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  // Only the latest paste may navigate, whichever classifies first.
+  const latestPaste = useRef(0);
+  // The rail's layouts only: below `md` the More sheet already showed Recent
+  // before the palette opened.
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const recent = useRecentNav((state) => state.value);
   const [query, setQuery] = useState('');
   const groups = usePaletteSearch(providers, query);
 
@@ -215,6 +268,14 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     inputRef.current?.focus();
   }, []);
 
+  // A closed palette (Escape, a pick) must not be navigated by a paste still classifying.
+  useEffect(
+    () => () => {
+      latestPaste.current = -1;
+    },
+    []
+  );
+
   // The item catalogue starts loading as the palette opens, not at the third
   // keystroke — and off the render path, so typing never waits on it. Each
   // opening retries a failed load once; a failure is the Market Items
@@ -235,15 +296,43 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     result.run();
   }
 
+  /**
+   * A multi-line paste the app recognises (a fit, a skill plan, an item list…)
+   * goes where `GlobalPasteRouter` would send it, no confirm step. The text
+   * still lands in the input meanwhile, so one that matches nothing — or an
+   * item list read offline, which says nothing here — just stays as typed.
+   * A single line is a search.
+   */
+  function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
+    const text = event.clipboardData.getData('text/plain');
+    const id = ++latestPaste.current;
+    if (!text.trim().includes('\n')) return;
+    void routePaste(text, { pathname, search }).then(({ route }) => {
+      if (id !== latestPaste.current || route === null) return;
+      // Closed first, as `activate` does, so focus hands back before the route's own.
+      onClose();
+      void navigate(...route);
+    });
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     switch (event.key) {
+      case 'Tab':
       case 'ArrowDown':
       case 'ArrowUp':
       case 'Home':
       case 'End': {
         if (options.length === 0) return;
         event.preventDefault();
-        const next = moveHighlight(event.key as ComboboxNavKey, highlightedIndex, options.length);
+        // Options are not focusable, so Tab would only leave the input and
+        // strand Enter: it steps the highlight like the arrows instead.
+        const key: ComboboxNavKey =
+          event.key === 'Tab'
+            ? event.shiftKey
+              ? 'ArrowUp'
+              : 'ArrowDown'
+            : (event.key as ComboboxNavKey);
+        const next = moveHighlight(key, highlightedIndex, options.length);
         setHighlightedKey(next === null ? null : options[next].key);
         break;
       }
@@ -263,6 +352,13 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
 
   let optionIndex = 0;
   const trimmed = query.trim();
+  const recentViews =
+    trimmed === '' && isDesktop
+      ? recentNavFor(recent, viewPathFor(pathname)).flatMap((path) => {
+          const destination = destinations.find((candidate) => candidate.path === path);
+          return destination ? [destination] : [];
+        })
+      : [];
   // The error row is not an option, so the live count alone would hide it.
   const failedGroups = groups.filter((group) => group.status === 'error');
   const groupCapped = groups.some(
@@ -290,6 +386,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={t('commandPalette.placeholder')}
           aria-label={t('commandPalette.inputLabel')}
           role="combobox"
@@ -391,11 +488,31 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
             <p className="px-2 py-1.5 text-sm text-text-dim">{t('commandPalette.noResults')}</p>
           )
         )}
-        {/* The rail's Go to button opens this too, so say it is not the page's
-            own search: a page's search box filters that page; this goes elsewhere. */}
-        <p className="border-t border-line px-2 pt-2 text-xs text-text-dim">
-          {t('commandPalette.scopeNote')}
-        </p>
+        {trimmed === '' && (
+          <EmptyState title={t('commandPalette.emptyTitle')} hint={t('commandPalette.emptyHint')} />
+        )}
+        {recentViews.length > 0 && (
+          <section
+            aria-label={t('nav.recent')}
+            className="flex flex-wrap gap-1.5 border-t border-line px-2 pt-2"
+          >
+            {recentViews.map((view) => (
+              <Link
+                key={view.path}
+                to={view.path}
+                onClick={onClose}
+                className={cx(
+                  'flex min-h-9 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 text-xs text-text hover:border-line-bright',
+                  interactiveClassName,
+                  focusRingClassName
+                )}
+              >
+                <Icon.Recent aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                {view.breadcrumb}
+              </Link>
+            ))}
+          </section>
+        )}
         <span role="status" aria-live="polite" className="sr-only">
           {statusText}
         </span>

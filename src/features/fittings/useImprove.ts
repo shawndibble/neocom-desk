@@ -48,10 +48,10 @@ import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCha
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
-import type { Resource } from '@/engine/fittings/makeItFit';
+import type { FitSwap, Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
-import { buildVariationIndex } from '@/engine/market/variations';
+import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
@@ -252,17 +252,42 @@ export interface ImproveSearch {
   restart: () => void;
   /** One whole-fit recalculation under the search's own conditions, for the ticked set; null before a search has run. */
   recalc: ((fitting: Fitting) => Promise<FittingStats>) | null;
+  /**
+   * The swaps and prices that could cover a ticked set running the fit out of CPU,
+   * powergrid or calibration, fetched on the first ask (most sets never need them); null before a search has run.
+   */
+  completion: (() => Promise<CompletionPool>) | null;
+}
+
+/** What `findCompletions` needs beyond the ticked set. */
+export interface CompletionPool {
+  swaps: FitSwap[];
+  priceOf: (typeId: number) => number | null;
 }
 
 /** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
 function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluator): ModulePool {
   const listed = new Set(catalogue.marketTypes.map((entry) => entry.typeId));
   const flyable = new Map<string, boolean>();
+  const skilled = new Map<string, boolean>();
   return {
     groupOf: (typeId) => catalogue.types[String(typeId)]?.groupID,
     typeIdsInGroup: (groupId) => catalogue.typeIdsByGroup.get(groupId) ?? [],
     published: (typeId) => listed.has(typeId),
-    // A module the pilot lacks skills for goes under Train instead.
+    // A fitted module the pilot lacks skills for is replaced; its hull fit is not asked again.
+    pilotCanFly: (slot, typeId) => {
+      const key = `${slot}:${typeId}`;
+      let ok = skilled.get(key);
+      if (ok === undefined) {
+        const check = variants.engine
+          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
+          .get(typeId);
+        ok = check ? check.canFly : true;
+        skilled.set(key, ok);
+      }
+      return ok;
+    },
+    // A candidate the pilot lacks skills for goes under Train instead.
     flyable: (slot, typeId) => {
       const key = `${slot}:${typeId}`;
       let ok = flyable.get(key);
@@ -357,6 +382,43 @@ async function crystalPlan(
     : { crystalFor: forKey(best), bestKey: best, crystalsOf: crystalsFor };
 }
 
+/** Officer and Deadspace meta groups: never offered as a stand-in, as in the search proper. */
+const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
+
+/**
+ * The module and rig swaps that can pay for an unflyable-module fix that runs
+ * the fit out of CPU, powergrid or calibration: every other fitted module's
+ * and rig's siblings the hull takes and the pilot can fly, whatever the Reach
+ * or the rigs tick. Empty when the fit has no module to replace.
+ */
+function compensationSwaps(
+  variants: VariantEvaluator,
+  catalogue: FittingCatalogue,
+  hasFix: boolean
+): FitSwap[] {
+  if (!hasFix) return [];
+  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
+  const pool = modulePool(catalogue, variants);
+  return variants.fitting.modules.flatMap((module) => {
+    if (module.slot === 'subsystem') return [];
+    return getVariations(index, module.typeId)
+      .members.filter(
+        (member) =>
+          member.typeId !== module.typeId &&
+          catalogue.rackOf[String(member.typeId)] === module.slot &&
+          pool.published(member.typeId) &&
+          !EXCLUDED_META_GROUPS.has(index.types[member.typeId]?.metaGroupId ?? 0) &&
+          (pool.flyable?.(module.slot, member.typeId) ?? true)
+      )
+      .map((member) => ({
+        slot: module.slot,
+        slotIndex: module.slotIndex,
+        fromTypeId: module.typeId,
+        toTypeId: member.typeId,
+      }));
+  });
+}
+
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
 function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   const ids = new Set<number>();
@@ -390,6 +452,7 @@ export function useImprove(
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
+  const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
   const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
@@ -417,6 +480,7 @@ export function useImprove(
     // The last fit's baseline must not decide this fit's goal chips.
     setBefore(null);
     setRecalc(null);
+    setCompletion(null);
     const started = performance.now();
     const slowTimer = setTimeout(() => {
       if (!cancelled)
@@ -466,7 +530,18 @@ export function useImprove(
           current.status === 'searching' ? { ...current, checked: 0, total } : current
         );
         const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-        const typeIds = candidateTypeIds(sets.flatMap((set) => set.candidates));
+        const candidates = sets.flatMap((set) => set.candidates);
+        const compensation = compensationSwaps(
+          variants,
+          catalogue,
+          candidates.some((candidate) => candidate.fixesUnflyable)
+        );
+        const typeIds = [
+          ...new Set([
+            ...candidateTypeIds(candidates),
+            ...compensation.flatMap((swap) => [swap.fromTypeId, swap.toTypeId]),
+          ]),
+        ];
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
           // The Price section's own total, for Planning's budget.
@@ -525,6 +600,11 @@ export function useImprove(
             mode,
             spendCap,
             fitTotal,
+            compensators: (fix) =>
+              compensation.filter(
+                (swap) =>
+                  !fix.at.some((at) => at.slot === swap.slot && at.slotIndex === swap.slotIndex)
+              ),
             onProgress: (checked) => {
               if (!cancelled)
                 setState((current) =>
@@ -563,6 +643,24 @@ export function useImprove(
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
         setRecalc(() => stats);
+        let pool: Promise<CompletionPool> | null = null;
+        setCompletion(
+          () => () =>
+            (pool ??= (async () => {
+              const swaps = compensationSwaps(variants, catalogue, true);
+              const prices = await getHubPrices(hub, [
+                ...new Set(swaps.flatMap((swap) => [swap.fromTypeId, swap.toTypeId])),
+              ]).catch(() => null);
+              return {
+                swaps,
+                priceOf: (typeId: number) => prices?.get(typeId)?.sellMin ?? null,
+              };
+            })().catch((error: unknown) => {
+              // A failed lookup is asked again next time, not remembered.
+              pool = null;
+              throw error;
+            }))
+        );
         setState({
           status: 'done',
           result: { ...listed, checked },
@@ -589,6 +687,7 @@ export function useImprove(
       controller.abort();
       // Its signal is aborted: a recalculation through it would fail.
       setRecalc(null);
+      setCompletion(null);
       clearTimeout(slowTimer);
     };
   }, [
@@ -626,5 +725,6 @@ export function useImprove(
     showBestSoFar,
     restart,
     recalc: enabled ? recalc : null,
+    completion: enabled ? completion : null,
   };
 }

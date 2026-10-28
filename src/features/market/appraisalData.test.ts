@@ -525,6 +525,7 @@ describe('appraisePaste', () => {
       });
       mockedToLpOfferInputs.mockReturnValue([
         {
+          offerId: 3001,
           corporationId: 1000125,
           corpName: 'Test Corp',
           quantityPerRedemption: 1,

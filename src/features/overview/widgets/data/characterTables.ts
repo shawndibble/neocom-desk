@@ -15,17 +15,21 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
+import { mailOpenHref, openHref } from '@/lib/highlightParam';
 import type { BoardMail } from '../../data/boardData';
 import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
 import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
+import { highlightHref } from '@/lib/highlightParam';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
 // Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const W = 'overview.widgets';
+/** The Contracts History table, where `?open=` finds a contract of the Character's own. */
+const CONTRACTS_PATH = '/contracts/history';
 
 /** `finish_date` as an instant, null when ESI gave none (a paused queue). */
 function instant(date: string | undefined): number | null {
@@ -71,6 +75,7 @@ export function trainingTable(
           : UNKNOWN,
       ],
       tone: 'clear',
+      info: { typeId: entry.skill_id },
     });
     if (finish !== null) previousFinish = finish;
   }
@@ -185,6 +190,7 @@ export function comingUpTable(
         t(`overview.board.response.${event.response}`),
       ],
       tone: toneOf(event.atMs, now),
+      to: openHref('/calendar', event.eventId),
     })),
   };
 }
@@ -227,6 +233,7 @@ export function contractsTable(
         : item.state === 'in_progress' && left <= DAY_MS
           ? 'warning'
           : 'clear',
+      to: openHref(CONTRACTS_PATH, item.contractId),
     };
   });
   return {
@@ -249,11 +256,16 @@ export function contractsTable(
 
 // --- Mail ---------------------------------------------------------------------------
 
-/** The newest mail: who, how long ago, what. Unread rows carry the watch tone. */
+/**
+ * The newest mail: who, how long ago, what. Unread rows carry the watch tone.
+ * A row opens that mail in the reader (`?open=`), for the mailbox's owner
+ * (`owner`): the mail id alone repeats across mailboxes.
+ */
 export function mailTable(
   t: Translate,
   mails: readonly BoardMail[],
-  ageText: (atMs: number | null) => string
+  ageText: (atMs: number | null) => string,
+  ownerId: number | null
 ): TableModel {
   return {
     columns: [
@@ -269,6 +281,7 @@ export function mailTable(
         mail.subject || t('overview.board.mailNoSubject'),
       ],
       tone: mail.unread === false ? 'clear' : 'watch',
+      to: mailOpenHref(mail.mailId, ownerId),
     })),
   };
 }
@@ -320,6 +333,8 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
           row.location === null ? UNKNOWN : placeHead(row.location),
         ],
         tone: 'clear',
+        // The worn clone has no card id to flash.
+        to: row.id === 'worn' ? undefined : highlightHref('/clones', row.id),
       };
     }),
   };

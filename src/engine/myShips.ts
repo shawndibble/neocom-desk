@@ -1,6 +1,6 @@
 /**
- * "My ships": every assembled ship an account owns, found in a flat asset
- * list, nested ones included, then ordered nearest first.
+ * "My ships": every ship an account owns, assembled or packaged (one row per
+ * packaged stack), found in a flat asset list, nested ones included.
  *
  * Which type is a ship is the caller's call (SDE category lookup — pure
  * engines don't fetch). Ships inside a Ship Maintenance Bay or fleet hangar
@@ -28,6 +28,12 @@ export interface ShipRow {
   inCargo: boolean;
   /** Item ids of the owned assets holding this ship, outermost first. */
   trail: number[];
+  /** `location_flag` of what each trail entry directly holds (the next holder, or this ship last): the bay or hold it sits in. One per trail entry. */
+  holderFlags: string[];
+  /** A stack of unassembled hulls (ESI `is_singleton === false`). */
+  packaged: boolean;
+  /** 1 for an assembled ship; the stack size for a packaged one. */
+  quantity: number;
 }
 
 export function findShips(
@@ -37,8 +43,9 @@ export function findShips(
   const byItemId = new Map(assets.map((a) => [a.item_id, a]));
   const rows: ShipRow[] = [];
   for (const ship of assets) {
-    if (!isShipType(ship.type_id) || ship.is_singleton === false) continue;
+    if (!isShipType(ship.type_id)) continue;
     const trail: number[] = [];
+    const holderFlags: string[] = [ship.location_flag];
     const seen = new Set([ship.item_id]);
     let locationId = ship.location_id;
     let locationType = ship.location_type;
@@ -47,6 +54,7 @@ export function findShips(
       if (!parent || seen.has(parent.item_id)) break;
       seen.add(parent.item_id);
       trail.unshift(parent.item_id);
+      holderFlags.unshift(parent.location_flag);
       locationId = parent.location_id;
       locationType = parent.location_type;
     }
@@ -58,6 +66,9 @@ export function findShips(
       locationType,
       inCargo: trail.length > 0,
       trail,
+      holderFlags: holderFlags.slice(1),
+      packaged: ship.is_singleton === false,
+      quantity: ship.is_singleton === false ? ship.quantity : 1,
     });
   }
   return rows;

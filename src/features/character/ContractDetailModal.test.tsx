@@ -692,7 +692,7 @@ describe('ContractDetailModal', () => {
 
       const check = await screen.findByRole('region', { name: /^Is it fair/ });
       expect(await within(check).findByText('3,720 ISK')).toBeInTheDocument(); // the Tritanium only
-      expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+      expect(within(check).getByText(/\(1 item unpriced\)/)).toBeInTheDocument();
       expect(within(check).queryByText(/900,000,000/)).not.toBeInTheDocument();
     });
 
@@ -710,7 +710,7 @@ describe('ContractDetailModal', () => {
       open(OUTSTANDING_FOR_4000);
 
       const check = await screen.findByRole('region', { name: /^Is it fair/ });
-      expect(await within(check).findByText('(1 item unpriced)')).toBeInTheDocument();
+      expect(await within(check).findByText(/\(1 item unpriced\)/)).toBeInTheDocument();
       expect(within(check).getByText('3,720 ISK')).toBeInTheDocument();
     });
 
@@ -832,7 +832,7 @@ describe('ContractDetailModal', () => {
       expect(within(dialog).getByText('12345')).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
       expect(
-        await within(dialog).findByRole('button', { name: /Open contract in EVE/ })
+        await within(dialog).findByRole('button', { name: 'Open in EVE: contract 12345' })
       ).toBeInTheDocument();
     });
 

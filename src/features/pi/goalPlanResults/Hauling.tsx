@@ -1,6 +1,7 @@
 /** What it costs to move: hauling effort against the Baseline, and every leg. */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { DataTable, Panel, StatChip, StatChips, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -15,6 +16,7 @@ import { formatVolume } from '@/features/industry/format';
 import { TierChip } from '../DirectiveRow';
 import type { PlanHauling } from '../goalPlannerModel';
 import { commodityName, formatUnits } from '../goalPlannerFormat';
+import { piProductHref } from '../piPlanLink';
 import { ColonyLink } from './ColonyLink';
 import { endName, type PlanNames } from './format';
 
@@ -59,6 +61,7 @@ export function Hauling({
   names: PlanNames;
 }) {
   const { t } = useTranslation();
+  const { search } = useLocation();
   const { pi } = names;
   const rows: LegRow[] = useMemo(
     () =>
@@ -126,6 +129,7 @@ export function Hauling({
         header: t('piPlan.legJumps'),
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (row) => row.jumps ?? undefined,
         render: (row) => {
           if (row.jumps === undefined) {
@@ -253,6 +257,8 @@ export function Hauling({
           density="compact"
           stackColumns={2}
           rowMoreActions
+          // The product name opens its PI page.
+          rowHref={(row) => piProductHref(row.typeId, search)}
           rowContextMenu={(row, tr) => (
             <ItemContextMenu typeId={row.typeId} itemName={row.name} linksKeepBrowserMenu>
               {tr}

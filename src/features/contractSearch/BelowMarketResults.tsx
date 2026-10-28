@@ -1,7 +1,9 @@
 /**
  * Contracts › Item search with "Below market" on (#3989): one row per public
- * contract worth more than it asks — Value · Asking · Profit · Jumps, best
- * Profit first. The valuation is `engine/contracts/belowMarket.ts`; the
+ * contract worth more than it asks — Value · Other · Asking · Profit · Jumps,
+ * best Profit first. Value is the hub market only; Other is what lines with
+ * no market would fetch at other contracts' asks, and is never in Profit
+ * unless the Include Other filter says so (#5427). The valuation is `engine/contracts/belowMarket.ts`; the
  * prices come from `belowMarketData.ts`. The panel owns the filters and hands
  * over only the contracts that pass them.
  */
@@ -13,6 +15,7 @@ import {
   EmptyState,
   IskAmount,
   Spinner,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import { COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
@@ -20,6 +23,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { BelowMarketContract } from '@/engine/contracts/belowMarket';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import type { BelowMarketState } from '@/features/contractSearch/belowMarketData';
 import { belowMarketItemLabel } from '@/features/contractSearch/belowMarketSummary';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
@@ -37,6 +41,8 @@ interface BelowMarketResultsProps {
   contracts: readonly BelowMarketContract[];
   /** ms since epoch of the contract snapshot behind the valuation. */
   lastSyncedAt: number | null;
+  /** Which side of the hub book values the Value column. */
+  side: PriceSide;
   typeNames: ReadonlyMap<number, string>;
   offerLocations: ReadonlyMap<number, OfferLocation>;
   offerJumps: (row: PublicContractOfferRow) => JumpsCellValue;
@@ -49,6 +55,7 @@ export function BelowMarketResults({
   state,
   contracts,
   lastSyncedAt,
+  side,
   typeNames,
   offerLocations,
   offerJumps,
@@ -87,18 +94,37 @@ export function BelowMarketResults({
         width: '14ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        sortValue: (row) => row.value,
+        sortValue: (row) => row.market,
         stackAffix: { before: t('contractSearch.belowMarket.valueAffix') },
         render: (row) => (
           <>
-            <IskAmount value={row.value} decimals={0} />
-            <span className="ml-1 text-[0.625rem] text-text-dim sm:ml-0 sm:block">
-              {row.source.kind === 'market'
-                ? t('contractSearch.belowMarket.sourceMarket')
-                : t('contractSearch.belowMarket.sourceOffers', { count: row.source.offerCount })}
-            </span>
+            <IskAmount value={row.market} decimals={0} />
+            {row.pricedLines < row.lines && (
+              <span className="ml-1 text-[0.625rem] text-text-dim sm:ml-0 sm:block">
+                {t('contractSearch.belowMarket.coverage', {
+                  priced: row.pricedLines,
+                  total: row.lines,
+                })}
+              </span>
+            )}
           </>
         ),
+      },
+      {
+        id: 'other',
+        header: t('contractSearch.belowMarket.otherColumn'),
+        headerTooltip: t('contractSearch.belowMarket.otherTooltip'),
+        width: '12ch',
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        sortValue: (row) => row.other,
+        stackAffix: { before: t('contractSearch.belowMarket.otherAffix') },
+        render: (row) =>
+          row.other > 0 ? (
+            <IskAmount value={row.other} decimals={0} />
+          ) : (
+            <span className="text-text-dim">—</span>
+          ),
       },
       {
         id: 'asking',
@@ -106,6 +132,7 @@ export function BelowMarketResults({
         width: '12ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
+        sortFirst: 'asc',
         sortValue: (row) => row.asking,
         stackAffix: { before: t('contractSearch.belowMarket.askingAffix') },
         render: (row) => <IskAmount value={row.asking} decimals={0} />,
@@ -121,6 +148,17 @@ export function BelowMarketResults({
         render: (row) => (
           <>
             +<IskAmount value={row.profit} decimals={0} />
+            {row.includesOther && (
+              <Tooltip content={t('contractSearch.belowMarket.profitIncludesOther')}>
+                <span
+                  tabIndex={0}
+                  aria-label={t('contractSearch.belowMarket.profitIncludesOther')}
+                  className="ml-1 text-text-dim"
+                >
+                  *
+                </span>
+              </Tooltip>
+            )}
           </>
         ),
       },
@@ -153,6 +191,7 @@ export function BelowMarketResults({
         width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (row) => {
           const cell = offerJumps(row.lead);
           return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
@@ -185,6 +224,11 @@ export function BelowMarketResults({
       : t('contractSearch.belowMarket.note', {
           age: formatAge(Math.max(0, now - lastSyncedAt), t),
           hub: hubName ?? '…',
+          side: t(
+            (state.status === 'ready' ? state.side : side) === 'buy'
+              ? 'contractSearch.belowMarket.sideBuyNote'
+              : 'contractSearch.belowMarket.sideSellNote'
+          ),
         });
 
   return (

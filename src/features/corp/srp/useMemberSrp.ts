@@ -137,13 +137,20 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     const now = losses.value.at;
     return {
       state: 'ready',
-      value: losses.value.losses.map((loss) => ({
-        ...loss,
-        kind: lostRowKind(loss, { claims: claimList ?? [], hullRules, windowDays, now }),
-        ageDays: Math.max(0, Math.floor((now - loss.killedAt) / DAY_MS)),
-        hullName: names.hull(loss.hullTypeId),
-        systemName: names.system(loss.solarSystemId),
-      })),
+      // A loss past the corp's window is not listed: nothing can be filed for it.
+      value: losses.value.losses.flatMap((loss) => {
+        const kind = lostRowKind(loss, { claims: claimList ?? [], hullRules, windowDays, now });
+        if (kind === 'old') return [];
+        return [
+          {
+            ...loss,
+            kind,
+            ageDays: Math.max(0, Math.floor((now - loss.killedAt) / DAY_MS)),
+            hullName: names.hull(loss.hullTypeId),
+            systemName: names.system(loss.solarSystemId),
+          },
+        ];
+      }),
     };
   }, [granted, losses, status, claimList, names]);
 

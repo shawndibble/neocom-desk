@@ -124,6 +124,7 @@ export function SurveyCharts({
     () => [
       {
         id: 'at',
+        stickyStart: true,
         header: t('survey.chartScan'),
         render: (r) => t('survey.eveTime', { time: formatEveClock(r.at) }),
       },

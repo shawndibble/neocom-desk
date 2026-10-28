@@ -326,6 +326,7 @@ describe('miningYield', () => {
     expect(view.chart.values).toHaveLength(7);
     expect(view.chart.values.at(-1)).toBe(700);
     expect(view.rows[0]!.title).toBe('Veldspar');
+    expect(view.table?.rows[0]?.info).toEqual({ typeId: 1 });
   });
 
   it('filters to the header Character unless scoped to all', () => {
@@ -390,6 +391,8 @@ describe('lp', () => {
     );
     expect(view.number.value).toBe('1.2K');
     expect(view.rows).toEqual([]);
+    expect(view.to).toBe('/wallet/lp-store');
+    expect(view.table?.rows.map((r) => r.to)).toEqual(['/wallet/lp-store/1', '/wallet/lp-store/2']);
     expect(view.table?.rows.map((r) => r.cells)).toEqual([
       ['Sisters of EVE', '800', { text: '67%', bar: 800 / 1200 }],
       [expect.stringContaining('lp.corporation'), '400', { text: '33%', bar: 400 / 1200 }],
@@ -657,6 +660,27 @@ describe('clones table', () => {
     expect(table?.rows[2]?.cells[1]).toEqual(expect.stringContaining('laterBy'));
   });
 
+  it('sends each jump clone row to its card, and leaves the worn clone plain', () => {
+    const view = buildView(
+      'clones',
+      {
+        clones: ok({
+          ...base,
+          verdict: 'stay' as const,
+          bestId: 'worn',
+          savedSeconds: null,
+          rows: [
+            { id: 'worn', label: null, totalSeconds: 9, deltaSeconds: 0 },
+            { id: 7, label: 'Far', totalSeconds: 12, deltaSeconds: SDAY },
+          ],
+        }),
+      },
+      ctx()
+    );
+    expect(view.table?.rows.map((r) => r.to)).toEqual([undefined, '/clones?highlight=7']);
+    expect(view.rows.map((r) => r.to)).toEqual([undefined, '/clones?highlight=7']);
+  });
+
   it('names the nearest rival when the answer is to stay', () => {
     const view = buildView(
       'clones',
@@ -725,6 +749,17 @@ describe('survey', () => {
     summary: summary(),
     fetchedAt: new Date(NOW),
     ...over,
+  });
+
+  it('opens Show info on each ore row, by the ore name resolved to its type id', () => {
+    const view = buildView(
+      'survey',
+      { survey: ok(data({ oreTypeIds: new Map([['Veldspar', 1230]]) })) },
+      ctx()
+    );
+    expect(view.table?.rows.map((r) => r.info)).toEqual([{ typeId: 1230 }]);
+    const unresolved = buildView('survey', { survey: ok(data()) }, ctx());
+    expect(unresolved.table?.rows[0]?.info).toBeUndefined();
   });
 
   it('reads from its own feed and links to the Mining Survey tab', () => {
@@ -1169,6 +1204,28 @@ describe('kills', () => {
     ]);
   });
 
+  it('opens a killmail modal with the ship, side, system, value and time', () => {
+    const rows = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 })).table!.rows;
+    expect(rows[0]!.detail).toMatchObject({
+      title: 'Vexor',
+      status: { badge: 'overview.widgets.kills.side.kill', tone: 'success' },
+      place: { systemId: 30000142, name: 'Jita' },
+    });
+    expect(rows[0]!.detail!.facts).toContainEqual({
+      label: 'overview.widgets.kills.col.value',
+      value: '5M',
+    });
+    expect(rows[0]!.detail!.facts).toContainEqual({
+      label: 'overview.widgets.kills.detail.killmail',
+      value: '#1',
+    });
+    expect(rows[1]!.detail!.status).toMatchObject({ tone: 'danger' });
+    expect(rows[1]!.detail!.facts).toContainEqual({
+      label: 'overview.widgets.kills.col.value',
+      value: '—',
+    });
+  });
+
   it('charts kills and losses per day over the range, with a text summary', () => {
     const view = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 }));
     if (view.chart?.kind !== 'bars') throw new Error('bars');
@@ -1423,6 +1480,7 @@ describe('profit on Trading', () => {
   it('lists margin per item in the table', () => {
     const view = build({ scopeAll: true });
     expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Tritanium']);
+    expect(view.table?.rows.map((r) => r.to)).toEqual(['/market/history?highlight=34']);
   });
 
   it('asks for the wallet grant when the header Character has no wallet read', () => {

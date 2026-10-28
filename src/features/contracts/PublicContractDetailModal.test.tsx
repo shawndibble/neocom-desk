@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -324,7 +324,29 @@ describe('PublicContractDetailModal — price check', () => {
 
     const check = await screen.findByRole('region', { name: /^Is it fair/ });
     expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument(); // 10 x 100m, the item only
-    expect(within(check).getByText('(1 item unpriced)')).toBeInTheDocument();
+    expect(within(check).getByText(/1 of 2 items priced \(1 item unpriced\)/)).toBeInTheDocument();
+    expect(within(check).getByText(/Against 1 of 2 items/)).toBeInTheDocument();
+  });
+
+  it('shows the estimate from other contracts apart from the hub value (#5427)', async () => {
+    showItems([
+      item({
+        record_id: 1,
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 16,
+        runs: 1,
+      }),
+      item({ record_id: 2, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 50_000_000, otherValue: { value: 4_300_000_000, lines: 1 } });
+
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument();
+    expect(within(check).getByText('Other contracts')).toBeInTheDocument();
+    expect(within(check).getByText(/about 4,300,000,000 ISK/)).toBeInTheDocument();
+    // The difference stays against the hub value: 50M against 1B.
+    expect(within(check).getByText('−95.0%')).toBeInTheDocument();
   });
 
   it('has no price check for a contract with no ISK ask and nothing requested', async () => {
@@ -537,5 +559,141 @@ describe('PublicContractDetailModal — flag sentences (#4773)', () => {
     await screen.findByText('5,000,000,000 ISK');
     expect(screen.queryByText(/Asks \d/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Your search is/)).not.toBeInTheDocument();
+  });
+});
+
+describe('PublicContractDetailModal — item cap (#5423)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureClipboard(null);
+    loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+
+  /** `count` distinct types (ids 1001..), each its own line. */
+  function manyItems(count: number, isIncluded = true): PublicContractItem[] {
+    return Array.from({ length: count }, (_, i) =>
+      item({ record_id: i + 1, type_id: 1001 + i, is_included: isIncluded })
+    );
+  }
+
+  it('shows 10 of 25 lines with a button for the other 15', async () => {
+    showItems(manyItems(25));
+    renderModal();
+    expect(await itemRows()).toHaveLength(10);
+    expect(screen.getByRole('button', { name: 'Show 15 more items' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('pins a searched line from deep in the list to the top and still shows 10', async () => {
+    showItems(manyItems(25));
+    renderModal(null, { searchedTypeIds: new Set([1020]) });
+    const rows = await itemRows();
+    expect(rows).toHaveLength(10);
+    expect(rows[0]).toHaveTextContent('Your search');
+    expect(rows[0]).toHaveTextContent('#1020');
+    expect(rows[1]).toHaveTextContent('#1001');
+  });
+
+  it('shows everything for 12 lines, with no button', async () => {
+    showItems(manyItems(12));
+    renderModal();
+    expect(await itemRows()).toHaveLength(12);
+    expect(screen.queryByRole('button', { name: /more item/ })).toBeNull();
+  });
+
+  it('caps 13 lines, hiding 3', async () => {
+    showItems(manyItems(13));
+    renderModal();
+    expect(await itemRows()).toHaveLength(10);
+    expect(screen.getByRole('button', { name: 'Show 3 more items' })).toBeInTheDocument();
+  });
+
+  it('expands in place, keeps focus on the button, and collapses again', async () => {
+    showItems(manyItems(13));
+    renderModal();
+    await itemRows();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Show 3 more items' }));
+    expect(await itemRows()).toHaveLength(13);
+    const fewer = screen.getByRole('button', { name: 'Show fewer' });
+    expect(fewer).toHaveAttribute('aria-expanded', 'true');
+    await user.click(fewer);
+    expect(await itemRows()).toHaveLength(10);
+  });
+
+  it('caps each side of a two-sided contract on its own', async () => {
+    showItems([
+      ...manyItems(14, false),
+      ...manyItems(15, true).map((i) => ({
+        ...i,
+        record_id: i.record_id + 100,
+        type_id: i.type_id + 500,
+      })),
+    ]);
+    renderModal();
+    await screen.findByText('What you hand over');
+    expect(screen.getByRole('button', { name: 'Show 4 more items' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show 5 more items' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(20);
+  });
+
+  it('keeps focus on the toggle after it expands', async () => {
+    showItems(manyItems(13));
+    renderModal();
+    await itemRows();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Show 3 more items' }));
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toHaveFocus();
+  });
+
+  it('shows every searched line, and no others, when more than 10 match', async () => {
+    showItems(manyItems(20));
+    renderModal(null, {
+      searchedTypeIds: new Set(Array.from({ length: 12 }, (_, i) => 1001 + i * 1)),
+    });
+    const rows = await itemRows();
+    expect(rows).toHaveLength(12);
+    expect(screen.getByRole('button', { name: 'Show 8 more items' })).toBeInTheDocument();
+  });
+
+  it('collapses again when a different contract opens', async () => {
+    showItems(manyItems(13));
+    const props = {
+      title: 'Large Skill Injector',
+      characterId: 1,
+      locationId: 60003760,
+      regionName: 'The Forge',
+      dateExpired: Date.UTC(2026, 8, 13, 14, 59),
+      statChips: [{ label: 'Price', value: '0.00' }],
+      onClose: vi.fn(),
+    };
+    const { rerender } = render(
+      <MemoryRouter>
+        <PublicContractDetailModal {...props} contractId={1} />
+      </MemoryRouter>
+    );
+    await itemRows();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Show 3 more items' }));
+    expect(await itemRows()).toHaveLength(13);
+    rerender(
+      <MemoryRouter>
+        <PublicContractDetailModal {...props} contractId={2} />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(10));
+  });
+
+  it('still counts a hidden line in the price check', async () => {
+    // Line 13 (hidden behind the button) is the only priced line.
+    showItems([
+      ...manyItems(12).map((i) => ({ ...i, quantity: 1 })),
+      item({ record_id: 99, type_id: 40519, quantity: 10 }),
+    ]);
+    renderModal(null, { askingIsk: 1_000_000_000 });
+    expect(await itemRows()).toHaveLength(10);
+    const check = await screen.findByRole('region', { name: /^Is it fair/ });
+    expect(await within(check).findAllByText('1,000,000,000 ISK')).toHaveLength(2); // ask and value
   });
 });

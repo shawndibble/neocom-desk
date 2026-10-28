@@ -1,16 +1,21 @@
-import { fixed2 } from '@/lib/fixedFormat';
-import { useCallback, useEffect, useRef, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
   IconButton,
   Panel,
-  SearchInput,
   Spinner,
-  StandingIcon,
-  type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -18,22 +23,49 @@ import { GrantBanner } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { loadCharacterStandingsResult } from '@/features/character/standings';
 import { resolveNames } from '@/features/character/names';
+import { type NpcStandingsColumnId } from '@/features/character/contactsColumns';
+import { NpcStandingsFilterBar } from '@/features/character/NpcStandingsFilterBar';
+import { loadNpcStandingsReference } from '@/features/character/npcStandingsReference';
 import {
+  NPC_STANDING_KINDS,
   buildNpcStandingRows,
+  countNpcStandingRows,
   feeOwnerIds,
   filterNpcStandingRows,
+  type NpcStandingKind,
   type NpcStandingRow,
+  type NpcStandingsFilter,
 } from '@/features/character/npcStandingsRows';
+import { useNpcStandingsColumns } from '@/features/character/useNpcStandingsColumns';
+import { openNpcInfo, type NpcInfoKind } from '@/features/standings/openNpcInfo';
 import { DataGate } from '@/components/DataGate';
-import { useUrlSort } from '@/lib/useUrlState';
+import {
+  boolParam,
+  defineUrlFilter,
+  enumSetParam,
+  optionalIntParam,
+  textParam,
+} from '@/lib/urlState';
+import { filterFromParamValues, paramsPatchFromFilter, useUrlParams } from '@/lib/useUrlState';
 
-const STANDINGS_SORT = { columnId: 'standing', direction: 'desc' } as const;
-const COLUMN_IDS = ['name', 'kind', 'standing', 'fees'] as const;
 const FEE_OWNERS = feeOwnerIds();
+const INFO_KIND: Record<NpcStandingKind, NpcInfoKind> = {
+  faction: 'faction',
+  corp: 'corporation',
+  agent: 'agent',
+};
+
+/** The filter row, in the URL (ADR 0015) under `standings.` keys that Contacts' other tabs never read. */
+const FILTER_URL = defineUrlFilter<NpcStandingsFilter>({
+  text: { key: 'standings.q', codec: textParam() },
+  kinds: { key: 'standings.type', codec: enumSetParam(NPC_STANDING_KINDS) },
+  minAccess: { key: 'standings.access', codec: optionalIntParam({ min: 2, max: 5 }) },
+  feesOnly: { key: 'standings.fees', codec: boolParam() },
+});
 
 /**
- * The Contacts page's Standings tab (issue #2859): the Character's NPC faction,
- * corp and agent standings. A hook rather than a component so the page can
+ * The Contacts page's Standings tab (issue #2859): the Character's faction,
+ * corporation and agent standings. A hook rather than a component so the page can
  * keep one header and tab bar mounted across all three tabs (focus stays on
  * the tab that was just chosen); `enabled` holds the fetch until the tab opens.
  */
@@ -51,8 +83,19 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     available: boolean;
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [text, setText] = useState('');
-  const sortProps = useUrlSort('standings.sort', STANDINGS_SORT, COLUMN_IDS);
+  const [filterParams, setFilterParams] = useUrlParams(FILTER_URL.schema);
+  const filter = useMemo(
+    () => filterFromParamValues<NpcStandingsFilter>(filterParams, FILTER_URL.fieldToParam),
+    [filterParams]
+  );
+  // Rows derive from a deferred copy so a keystroke paints the box first
+  // (`useUrlFilter`'s rule); the bar keeps the immediate one.
+  const rowsFilter = useDeferredValue(filter);
+  // Skills unreadable leaves every Standing empty: Base then stands in for it.
+  const skillsKnown =
+    !state || state.rows.length === 0 || state.rows.some((row) => row.effective !== null);
+  const { columns, optionalColumns, availableIds, visibility, sortProps } =
+    useNpcStandingsColumns(skillsKnown);
 
   const fetchState = useCallback(
     async (force: boolean) => {
@@ -61,12 +104,16 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
           characterId,
           { force }
         );
+        const reference = await loadNpcStandingsReference(
+          characterId,
+          entries.some((entry) => entry.from_type === 'agent')
+        );
         const names = await resolveNames(entries.map((entry) => entry.from_id)).catch(
           () => new Map<number, string>()
         );
         return {
           characterId,
-          rows: buildNpcStandingRows(entries, names, FEE_OWNERS),
+          rows: buildNpcStandingRows(entries, names, FEE_OWNERS, reference),
           failed: false,
           fetchedAt,
           fromCache,
@@ -135,45 +182,11 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     (refreshing && (state.failed || !state.available));
   const status = lacksScope ? 'ok' : spinning ? 'busy' : unreadable ? 'failed' : 'ok';
 
-  const rows = useMemo(() => filterNpcStandingRows(state?.rows ?? [], text), [state?.rows, text]);
-  const columns = useMemo<DataTableColumn<NpcStandingRow>[]>(
-    () => [
-      {
-        id: 'name',
-        header: t('contacts.name'),
-        primary: true,
-        render: (row) => row.name,
-        sortValue: (row) => row.name,
-      },
-      {
-        id: 'kind',
-        header: t('contacts.type'),
-        render: (row) => t(`contacts.standingsKind.${row.kind}`),
-        sortValue: (row) => row.kind,
-      },
-      {
-        id: 'standing',
-        header: t('contacts.standing'),
-        align: 'center',
-        cardCorner: true,
-        render: (row) => (
-          <span className="inline-flex items-center gap-1.5">
-            <StandingIcon value={row.standing} />
-            <span className="tabular-nums">{fixed2(row.standing)}</span>
-          </span>
-        ),
-        sortValue: (row) => row.standing,
-      },
-      {
-        id: 'fees',
-        header: t('contacts.standingsUsedForFees'),
-        render: (row) =>
-          row.usedForFees ? t('contacts.standingsUsedForFeesYes') : <span data-dense-omit />,
-        sortValue: (row) => (row.usedForFees ? 1 : 0),
-      },
-    ],
-    [t]
+  const rows = useMemo(
+    () => filterNpcStandingRows(state?.rows ?? [], rowsFilter),
+    [state?.rows, rowsFilter]
   );
+  const counts = useMemo(() => countNpcStandingRows(state?.rows ?? []), [state?.rows]);
 
   let content: ReactNode;
   if (lacksScope) {
@@ -204,14 +217,24 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
     content = (
       <div className="space-y-3">
         {state.fromCache && <CachedNotice fetchedAt={state.fetchedAt} />}
-        <SearchInput
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder={t('contacts.searchPlaceholder')}
-          aria-label={t('contacts.searchPlaceholder')}
-          className="max-w-sm"
+        <NpcStandingsFilterBar
+          filter={filter}
+          onChange={(next) => setFilterParams(paramsPatchFromFilter(next, FILTER_URL.fieldToParam))}
+          counts={counts}
+          columnPicker={
+            <ColumnPickerMenu<NpcStandingsColumnId, NpcStandingRow>
+              available={availableIds}
+              visible={visibility.visible}
+              columnsById={optionalColumns}
+              onToggle={visibility.toggle}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              onReset={visibility.reset}
+              resetLabel={t('common.resetColumns')}
+              showLabel
+            />
+          }
         />
-        <p className="text-xs text-text-dim">{t('contacts.standingsFeesNote')}</p>
         <Panel padded={false}>
           {rows.length === 0 ? (
             <EmptyState
@@ -228,6 +251,8 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
               {...sortProps}
               mobileSort
               stackLayout="dense"
+              stackSummary={t('contacts.standings.count', { count: rows.length })}
+              onRowClick={(row) => openNpcInfo(INFO_KIND[row.kind], row.id)}
             />
           )}
         </Panel>

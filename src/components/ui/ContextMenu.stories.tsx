@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from './ContextMenu';
@@ -54,6 +56,23 @@ export const Open: Story = {
           <ContextMenuItem>Duplicate</ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem>Delete</ContextMenuItem>
+        </ContextMenuContent>
+      </>
+    ),
+  },
+};
+
+/** @summary A captioned group and a toggle: the Overview widget card's menu (Show on phone is the toggle). */
+export const LabelAndCheckbox: Story = {
+  args: {
+    children: (
+      <>
+        {area}
+        <ContextMenuContent>
+          <ContextMenuLabel>Range</ContextMenuLabel>
+          <ContextMenuItem>30 days</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuCheckboxItem checked>Show on phone</ContextMenuCheckboxItem>
         </ContextMenuContent>
       </>
     ),

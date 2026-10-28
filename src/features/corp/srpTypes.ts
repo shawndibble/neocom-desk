@@ -54,11 +54,42 @@ export interface SaveDoctrineInput {
   snapshot: DoctrineFitSnapshot;
 }
 
-/** `previewSrpDoctrineCheckCallable`'s answer: the check a filing now would store. */
+/** Jita values of a loss, no cargo. Each null when unpriced. */
+export interface LossValues {
+  killmailValue: number | null;
+  hullValue: number | null;
+  fitValue: number | null;
+}
+
+/** What filing the loss would pay, from the pricing the filing uses. */
+export type PayoutQuote =
+  | { kind: 'amount'; isk: number; basis: SrpClaimBasis }
+  | {
+      kind: 'officer';
+      reason: 'officer-decides' | 'no-amount';
+      suggested?: { isk: number; basis: SrpClaimBasis };
+    }
+  | { kind: 'not-covered' };
+
+/** `previewSrpDoctrineCheckCallable`'s answer: the check a filing now would store, and its price. */
 export interface DoctrinePreview {
   killmailId: number;
   hullTypeId: number;
   check: DoctrineCheckRecord;
+  killedAt: number;
+  solarSystemId: number;
+  quote: PayoutQuote;
+  hullRule: { scope: HullRuleScope; id: number; kind: HullRuleKind } | null;
+  values: LossValues;
+}
+
+/** `getSrpClaimValuesCallable` result: the lost ship against the nearest Doctrine Fit, no cargo. */
+export interface SrpClaimValues {
+  hullValue: number | null;
+  fitValue: number | null;
+  /** Jita value of the nearest Doctrine Fit's hull, modules and rigs; null when none or unpriced. */
+  doctrineValue: number | null;
+  doctrineName?: string;
 }
 
 /** `corps/{corporationId}/srp/settings`. */

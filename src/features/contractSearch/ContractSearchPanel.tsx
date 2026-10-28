@@ -20,6 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
+import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -41,6 +42,11 @@ import {
   ProgressBar,
   RegionSelect,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   StatChips,
@@ -76,7 +82,8 @@ import {
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
 import { isItemsSearchActive } from '@/features/contractSearch/itemsSearchActive';
 import { useEarlyOffers, useOfferIndex } from '@/features/contractSearch/useIndexedOffers';
-import { useBelowMarket } from '@/features/contractSearch/belowMarketData';
+import { useBelowMarket, useBelowMarketSide } from '@/features/contractSearch/belowMarketData';
+import type { BelowMarketContract } from '@/engine/contracts/belowMarket';
 import { BelowMarketResults } from '@/features/contractSearch/BelowMarketResults';
 import {
   MAX_SUMMARY_CONTRACTS,
@@ -186,6 +193,8 @@ const ITEMS_FILTER_PARAMS = {
   'items.type': optionalIdParam(),
   /** Below market (#3989): one row per contract, valued at the hub. */
   'items.belowMarket': boolParam(),
+  /** Below market: also list contracts valued only through other contracts' asks (#5427). */
+  'items.bmOther': boolParam(),
 };
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
 
@@ -204,6 +213,13 @@ interface ContractSearchFilterBarProps {
   itemFlagMultiple: number;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
+  /** Below market on: its two valuation controls join the filters. They write their own settings at once, not into the draft. */
+  belowMarket?: {
+    side: PriceSide;
+    onSideChange: (side: PriceSide) => void;
+    includeOther: boolean;
+    onIncludeOtherChange: (next: boolean) => void;
+  };
 }
 
 function ContractSearchFilterBar({
@@ -213,6 +229,7 @@ function ContractSearchFilterBar({
   currentSystem,
   itemFlagMultiple,
   actions,
+  belowMarket,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
   // Counted off the controls, not off the parsed engine filter: a half-typed
@@ -290,6 +307,7 @@ function ContractSearchFilterBar({
               <FilterChip
                 key={kind}
                 label={t(`contractSearch.saleKind.${kind}`)}
+                size="md"
                 selected={draft.saleKind === kind}
                 onToggle={() =>
                   setDraft({ ...draft, saleKind: draft.saleKind === kind ? null : kind })
@@ -300,6 +318,7 @@ function ContractSearchFilterBar({
           <FilterField label={t('contractSearch.excludeLabel')}>
             <CheckboxSelect
               label={t('contractSearch.excludeLabel')}
+              size="md"
               className="w-44"
               options={[
                 { value: 'auctions' as const, label: t('contractSearch.hideAuctions') },
@@ -327,6 +346,7 @@ function ContractSearchFilterBar({
           {/* A filter, not a view control: it sits in the funnel as Market Browser's Hide bait sells does. */}
           <FilterChip
             label={t('contractSearch.filterHideOverpriced')}
+            size="md"
             tooltip={t('contractSearch.filterHideOverpricedHint', {
               times: itemFlagMultiple,
             })}
@@ -341,6 +361,34 @@ function ContractSearchFilterBar({
           </FilterField>
           {/* Writes its own setting straight away — not part of this draft, see `currentSystem.ts`. */}
           <CurrentSystemPicker current={currentSystem} />
+          {belowMarket && (
+            <>
+              <FilterField label={t('contractSearch.belowMarket.sideLabel')}>
+                <Select
+                  value={belowMarket.side}
+                  onValueChange={(next) => belowMarket.onSideChange(next as PriceSide)}
+                >
+                  <SelectTrigger
+                    aria-label={t('contractSearch.belowMarket.sideLabel')}
+                    className="w-36"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sell">{t('contractSearch.belowMarket.sideSell')}</SelectItem>
+                    <SelectItem value="buy">{t('contractSearch.belowMarket.sideBuy')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterChip
+                label={t('contractSearch.belowMarket.includeOther')}
+                size="md"
+                selected={belowMarket.includeOther}
+                onToggle={() => belowMarket.onIncludeOtherChange(!belowMarket.includeOther)}
+                tooltip={t('contractSearch.belowMarket.includeOtherTooltip')}
+              />
+            </>
+          )}
         </>
       )}
     </FilterBar>
@@ -675,11 +723,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     [selectedTypeId, shownRows, plexPrice]
   );
 
+  const belowMarketSide = useBelowMarketSide((state) => state.value);
+  useHydratedStore(useBelowMarketSide);
+  const includeOther = itemsParams['items.bmOther'];
   const belowMarketState = useBelowMarket(
     rows,
     mode === 'items' && belowMarket && !awaitingRows,
-    activeCharacterId,
-    plexPrice
+    plexPrice,
+    belowMarketSide,
+    includeOther
   );
   /**
    * The bar's filters at contract grain: every field but quantity and type is
@@ -928,6 +980,16 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 regionOptions={regionOptions}
                 currentSystem={currentSystem}
                 itemFlagMultiple={itemFlagMultiple}
+                belowMarket={
+                  belowMarket
+                    ? {
+                        side: belowMarketSide,
+                        onSideChange: (side) => void useBelowMarketSide.getState().setValue(side),
+                        includeOther,
+                        onIncludeOtherChange: (next) => setItemsParams({ 'items.bmOther': next }),
+                      }
+                    : undefined
+                }
                 actions={
                   <>
                     {/* A view control, not a filter: it changes the rows and columns at once (§4b). */}
@@ -1065,6 +1127,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   state={belowMarketState}
                   contracts={belowMarketRows}
                   lastSyncedAt={lastSyncedAt}
+                  side={belowMarketSide}
                   typeNames={typeNames}
                   offerLocations={offerLocations}
                   offerJumps={offerJumps}
@@ -1162,9 +1225,23 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           bpcCheck={selectedBpcCheck}
           flag={flagFor(selectedRow)}
           flagMultiple={itemFlagMultiple}
+          {...(belowMarket && belowMarketState.status === 'ready'
+            ? {
+                defaultPriceSide: belowMarketState.side,
+                otherValue: otherValueOf(belowMarketState.contracts, selectedRow.contractId),
+              }
+            : {})}
           onClose={() => setSelectedRow(null)}
         />
       )}
     </>
   );
+}
+
+/** The board's estimate from other contracts for the contract the slide-over opened on, when it has one. */
+function otherValueOf(contracts: readonly BelowMarketContract[], contractId: number) {
+  const contract = contracts.find((c) => c.contractId === contractId);
+  return contract && contract.other > 0
+    ? { value: contract.other, lines: contract.otherLines }
+    : null;
 }

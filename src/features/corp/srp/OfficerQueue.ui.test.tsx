@@ -23,6 +23,8 @@ const mailResult = vi.hoisted(() => vi.fn());
 vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
 
 import { OfficerQueue } from './OfficerQueue';
+import { setSrpMemberBackendOverride, type SrpMemberBackend } from './srpMemberBackend';
+import type { SrpClaimValues } from '../srpTypes';
 import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
 
 /** A Toast renders its line twice on purpose (visible, aria-hidden + sr-only live region); take the first. */
@@ -72,6 +74,11 @@ function setup(claims: SrpClaim[], history: SrpHistoryState = { status: 'idle' }
       results: items.map((i) => ({ ok: true as const, ...outcome(i.killmailId, 'paid') })),
     })),
     claimAudit: vi.fn(async () => []),
+    claimValues: vi.fn<(killmailId: number) => Promise<SrpClaimValues>>(async () => ({
+      hullValue: null,
+      fitValue: null,
+      doctrineValue: null,
+    })),
   } satisfies SrpQueueData;
   render(
     <MemoryRouter>
@@ -93,6 +100,59 @@ afterEach(() => useActiveCharacter.setState({ activeCharacterId: null }));
 beforeEach(() => {
   vi.clearAllMocks();
   mailResult.mockResolvedValue({ queued: [], failed: [], missingScope: false });
+});
+
+describe('OfficerQueue killmail and appraisal', () => {
+  const HASH = 'a'.repeat(40);
+  afterEach(() => setSrpMemberBackendOverride(null));
+
+  it('compares the lost ship with the doctrine fit in the detail, and opens the killmail over it', async () => {
+    setSrpMemberBackendOverride({
+      killmail: async (killmailId: number) => ({
+        killmail_id: killmailId,
+        victim: {
+          ship_type_id: 10,
+          items: [{ item_type_id: 519, flag: 11, quantity_destroyed: 1, singleton: 0 }],
+        },
+        attackers: [{ final_blow: true, ship_type_id: 10 }],
+      }),
+    } as unknown as SrpMemberBackend);
+    const data = setup([
+      claim(1, {
+        killmailHash: HASH,
+        doctrineCheck: {
+          status: 'off-doctrine',
+          doctrineName: 'Hurricane - artillery',
+          diff: { missingModules: [], extraModules: [519], missingRigs: [], extraRigs: [] },
+        },
+      }),
+    ]);
+    data.claimValues.mockResolvedValue({
+      hullValue: 71_000_000,
+      fitValue: 116_000_000,
+      doctrineValue: 100_000_000,
+    });
+    await userEvent.click(screen.getAllByText('Pilot1')[0]!);
+    const detail = await screen.findByRole('dialog');
+    expect(await within(detail).findByText('+87.0%')).toBeInTheDocument();
+    await userEvent.click(within(detail).getByRole('button', { name: 'Open killmail' }));
+    const modals = await screen.findAllByRole('dialog');
+    const killmail = modals[modals.length - 1]!;
+    expect(await within(killmail).findByRole('img', { name: 'Off doctrine' })).toBeInTheDocument();
+    expect(within(killmail).queryByRole('button', { name: 'File claim' })).toBeNull();
+  });
+
+  it('says the doctrine value is unavailable when there is no doctrine to compare', async () => {
+    const data = setup([claim(2, { killmailHash: HASH })]);
+    data.claimValues.mockResolvedValue({
+      hullValue: 71_000_000,
+      fitValue: 116_000_000,
+      doctrineValue: null,
+    });
+    await userEvent.click(screen.getAllByText('Pilot2')[0]!);
+    expect(await screen.findByText('Doctrine value unavailable')).toBeInTheDocument();
+    expect(screen.queryByText(/%$/)).toBeNull();
+  });
 });
 
 describe('OfficerQueue pending', () => {

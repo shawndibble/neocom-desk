@@ -294,6 +294,27 @@ describe('Clones', () => {
     expect(unnamed).toHaveLength(2);
   });
 
+  it('flashes the clone a ?highlight= link names, and leaves the others plain', async () => {
+    const station = { location_id: 60003760, location_type: 'station' as const, implants: [] };
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({
+          jump_clones: [
+            { ...station, jump_clone_id: 1, name: 'Alpha' },
+            { ...station, jump_clone_id: 2, name: 'Beta' },
+          ],
+        })
+      )
+    );
+    window.history.pushState({}, '', '/clones?highlight=2');
+    render(<App />);
+    const beta = (await screen.findByText('Beta')).closest('li') as HTMLElement;
+    expect(beta).toHaveClass('row-pulse');
+    expect(beta).toHaveAttribute('data-row-key', '2');
+    expect(screen.getByText('Alpha').closest('li')).not.toHaveClass('row-pulse');
+    await waitFor(() => expect(window.location.search).toBe(''));
+  });
+
   it("names a clone in place, keeps the pilot's name over ESI's, and clears back to the place", async () => {
     render(<App />);
     await screen.findByText('High-grade Ascendancy Alpha');

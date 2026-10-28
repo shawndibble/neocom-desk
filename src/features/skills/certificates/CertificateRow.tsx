@@ -98,6 +98,10 @@ export function CertificateRow({
     action = (
       <Button
         size="sm"
+        aria-label={t('skills.certificates.addLabel', {
+          grade: nextGrade,
+          name: certificate.name,
+        })}
         disabled={!onAdd}
         onClick={
           onAdd
@@ -108,7 +112,7 @@ export function CertificateRow({
             : undefined
         }
       >
-        {t('skills.certificates.add', { grade: nextGrade })}
+        {t('skills.certificates.add')}
       </Button>
     );
   }
@@ -138,7 +142,9 @@ export function CertificateRow({
           <span className="truncate">{certificate.name}</span>
         </button>
         <GradePips grade={grade} alphaReach={alphaReach} />
-        <p className="col-span-2 min-w-0 text-text-dim sm:col-span-1">
+        {/* The needs line and the action share a phone row. Only the Alpha
+            warning is long enough to take a full-width row and push the action below. */}
+        <p className={cx('min-w-0 text-text-dim', capped && 'col-span-2 sm:col-span-1')}>
           {elite ? (
             <span className="text-success">{t('skills.certificates.eliteDone')}</span>
           ) : capped ? (
@@ -158,7 +164,14 @@ export function CertificateRow({
             })
           )}
         </p>
-        <div className="col-span-2 flex justify-end sm:col-span-1">{action}</div>
+        <div
+          className={cx(
+            'flex shrink-0 justify-end whitespace-nowrap',
+            capped && 'col-span-2 sm:col-span-1'
+          )}
+        >
+          {action}
+        </div>
       </div>
       {expanded && (
         <div id={panelId} className="mx-3 mb-3 border border-line bg-bg px-3 py-2">

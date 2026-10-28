@@ -15,8 +15,19 @@
  */
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterAll, afterEach } from 'vitest';
+import { afterAll, afterEach, beforeEach } from 'vitest';
 import { settleEsiCacheLoads } from '@/esi/cache';
+import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
+
+/**
+ * A one-time hint is a Popover with `role="dialog"`; opened over a test that
+ * asserts on a bare dialog it breaks it. Each test starts with the session's
+ * one hint already taken. A test of a hint calls `resetSessionHints()` itself.
+ */
+beforeEach(() => {
+  resetSessionHints();
+  claimSessionHint('test-setup');
+});
 
 /**
  * Default is 1000ms. Under the CPU contention of several `/next-ticket`

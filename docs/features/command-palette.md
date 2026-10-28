@@ -1,6 +1,6 @@
 # Command palette ("Go to")
 
-Global modal launcher: one search box over grouped results to jump to a page or tab, run a command, switch Character, find an owned asset, open an item or an LP Store, or open a contact. Not a page; no route. Mounted once in `Layout` for every authenticated route. User goal: get anywhere in the app from the keyboard (or one tap) without learning the nav. It is explicitly not a page filter: a page's own search box filters that page, the palette goes elsewhere (footer note `commandPalette.scopeNote`).
+Global modal launcher: one search box over grouped results to jump to a page or tab, run a command, switch Character, find an owned asset, open an item or an LP Store, or open a contact. Not a page; no route. Mounted once in `Layout` for every authenticated route. User goal: get anywhere in the app from the keyboard (or one tap) without learning the nav. It is explicitly not a page filter: a page's own search box filters that page, the palette goes elsewhere (the empty state says what it searches).
 
 Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.tsx`, `store.ts`, `types.ts`, `usePaletteSearch.ts`, `providers.ts`, `assetsProvider.ts`, `marketItems.ts`, `lpStoresProvider.ts`, `contactsProvider.ts`), nav descriptor `src/app/navDestinations.ts`, chord helpers `src/lib/shortcuts.ts`, ranking `src/lib/rankedSearch.ts`, openers `src/app/RailNav.tsx:47`, `src/app/MobileMoreSheet.tsx:106`.
 
@@ -25,7 +25,7 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 - **Top jobs (ranked):** 1. "Go to that page or tab by name." 2. "Switch to that Character." 3. "Where is this item, across my Characters?" (assets, market items).
 - **Device and cadence:** desktop primary (owner, 2026-10-11), by keyboard chord, many times a session (inferred). Phone parity: the More sheet's search field opens it (`20261002-145653-go-to-button-opens-the-command-palette`); phone use is one-off lookups (owner, 2026-10-11), so the palette matters little there.
 - **Above the fold:** n/a. Moment of use: mid-session, opened by Ctrl/Cmd K or Go to; the search field and the first group of results.
-- **Not for:** filtering the page underneath (its own search box does that, footer `commandPalette.scopeNote`).
+- **Not for:** filtering the page underneath (its own search box does that).
 - **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); #2318; decisions `20260929-235256` (superseded), `20261002-145653-go-to-button-opens-the-command-palette`.
 - **Unconfirmed:** usage cadence.
 
@@ -66,7 +66,7 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 | 5     | LP Stores    | 2         | NPC corp name; hint "N LP" for corps the active Character holds LP with | navigate `/market/lp-store/<corpId>`                     | SDE `loadLpCorporations` + cached loyalty balances                  |
 | 6     | Contacts     | 1         | contact name; sublabel type + "+standing Character" per holder          | open Public Info modal                                   | cached contacts across Characters whose token has contacts scope    |
 
-- Pages: empty query lists pages only (kind `page`), uncapped, as a quick navigator; with a query, tabs and sub-views are included, capped to 6 (`providers.ts:34-53`). Corp pages are listed only while the Corp entry is visible (hidden, never locked); other scope-gated pages are marked locked, never hidden. Contacts is `tablessNav` so its views are not listed separately (no `/contacts/across` entry).
+- Pages: empty query lists pages only (kind `page`), uncapped, as a quick navigator; with a query, tabs and sub-views are included, capped to 6 (`providers.ts:34-53`). Corp pages are listed only while the Corp entry is visible (hidden, never locked); other scope-gated pages are marked locked, never hidden. Contacts lists Standings but not its character-filter views (`controlTabs`: no `/contacts/across` entry).
 - Commands (`PALETTE_COMMANDS`, `providers.ts:70-95`): Open settings (`/settings`), Keyboard shortcuts (`/help/shortcuts`), Add character (`beginAddCharacterLogin()`), Open notification feed (`/alerts`).
 - Assets href (`assetsHref`): `chars=all` added when any holder is not the active Character, so an alt-only item never opens an empty search. A type with no cached name is dropped. Scope check uses `requiredScopesForEndpoints(['getCharacterAssets'])` against `db.tokens.scopes`; a Character without it contributes nothing; with no grant anywhere the group never shows. No request is ever made.
 - Contacts: cache-only; names read from the name cache (`readCachedNames`), unresolved names are dropped, factions dropped (no Public Info). Open goes through `openPublicInfoModal` (URL-backed `?info=`).
@@ -98,7 +98,7 @@ Ctrl+K from a text field (:120), no stacking over dialogs (:137), empty query li
 ## Observed gaps
 
 - No recent items. Settings sections and Help tabs are listed as tabs (`SETTINGS_TABS`, Help tabs; Settings sections hidden-from-tab-bar only at `md+`, still palette-listed), but individual settings (e.g. Week starts on) are not searchable.
-- No palette entry for the Contacts All-characters view (tablessNav) or for Alerts filters/mute.
+- No palette entry for the Contacts All-characters view (controlTabs) or for Alerts filters/mute.
 - Characters, commands and contacts groups need >= 1 char; group results capped at 6 with no "show more".
 - Assets/contacts groups are only as fresh as the caches; a never-opened alt contributes nothing, with no hint that it is missing.
 - Only four commands; none for refresh, theme, log out or export.

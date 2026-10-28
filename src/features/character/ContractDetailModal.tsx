@@ -254,6 +254,7 @@ export function ContractDetailModal({
   const itemColumns: DataTableColumn<ContractItem>[] | undefined = items && [
     {
       id: 'name',
+      stickyStart: true,
       header: t('contracts.detailItemName'),
       sortValue: (item) => items.typeNames.get(item.type_id) ?? `#${item.type_id}`,
       render: (item) => (
@@ -324,7 +325,11 @@ export function ContractDetailModal({
         <span className="flex flex-wrap items-center gap-x-1">
           <span className="tabular-nums">{contract.contract_id}</span>
           <CopyContractIdButton contractId={contract.contract_id} />
-          <OpenInEveButton kind="contract" id={contract.contract_id} />
+          <OpenInEveButton
+            kind="contract"
+            id={contract.contract_id}
+            name={t('contractDetail.openInEveName', { id: contract.contract_id })}
+          />
         </span>
       }
     >

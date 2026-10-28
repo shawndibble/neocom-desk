@@ -203,6 +203,47 @@ describe('structures and moon extractions', () => {
   });
 });
 
+describe('structures row detail', () => {
+  const feeds = (): Feeds => ({
+    structures: ok({
+      structures: [
+        {
+          structureId: 1,
+          name: 'Efa - Helios Prime',
+          fuelExpiresMs: NOW + 20 * 24 * HOUR,
+          state: 'shield_vulnerable',
+          stateTimerEndMs: null,
+          unanchorsAtMs: null,
+          services: [
+            { name: 'Market', state: 'online' },
+            { name: 'Reprocessing', state: 'offline' },
+          ],
+        },
+      ],
+      structureCount: 1,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    }),
+  });
+
+  it('opens the structure with fuel, timer and its services on both boards', () => {
+    for (const show of ['all', 'problems'] as const) {
+      const row = buildView('structures', feeds(), ctx({ show })).table!.rows[0]!;
+      const S = 'overview.widgets.structures';
+      expect(row.detail!.title).toBe('Helios Prime');
+      expect(row.detail!.facts.map((f) => f.label)).toEqual([`${S}.col.fuel`, `${S}.col.timer`]);
+      expect(row.detail!.list!.items).toEqual([
+        expect.objectContaining({ text: 'Market', badge: `${S}.detail.serviceState.online` }),
+        expect.objectContaining({
+          text: 'Reprocessing',
+          badge: `${S}.detail.serviceState.offline`,
+          tone: 'danger',
+        }),
+      ]);
+    }
+  });
+});
+
 describe('stock', () => {
   it('is empty with no Stock List', () => {
     const feeds: Feeds = { stock: ok({ board: null }) };
@@ -275,6 +316,7 @@ describe('training', () => {
       { at: finish, note: 'overview.board.nextSkill', severity: 'clear', to: '/skills/plans' },
     ]);
     expect(view.rows[0].title).toContain('Gunnery');
+    expect(view.table?.rows[0]?.info).toEqual({ typeId: 3300 });
   });
 
   it('warns about an idle queue only where the not-training alert is on', () => {
@@ -334,6 +376,24 @@ describe('comingUp', () => {
     const all = buildView('comingUp', feeds, ctx({ calendarEvents: 'all' }));
     expect(all.number.secondary?.text).toBe('Mass op');
     expect(all.rows).toHaveLength(1);
+  });
+
+  it('links each table row to its event on the Calendar', () => {
+    const events = [
+      {
+        event_id: 42,
+        title: 'Fleet op',
+        event_date: new Date(NOW + 2 * HOUR).toISOString(),
+        event_response: 'accepted',
+        importance: 1,
+      },
+    ];
+    const feeds: Feeds = {
+      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+    };
+    const rows = buildView('comingUp', feeds, ctx()).table?.rows ?? [];
+    expect(rows.map((row) => row.to)).toEqual(['/calendar?open=42']);
+    expect(rows.every((row) => row.detail === undefined)).toBe(true);
   });
 
   it('points an empty accepted-and-tentative widget at the menu', () => {
@@ -424,6 +484,10 @@ describe('industry', () => {
     expect(view.number.value).toBe('1');
     expect(view.number.unit).toBe('overview.widgets.industry.ready');
     expect(view.rows[0].tone).toBe('warning');
+    expect(view.table?.rows.map((r) => r.to)).toEqual([
+      '/industry?highlight=1',
+      '/industry?highlight=2',
+    ]);
     // Only the running job is a clock still ahead.
     expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR]);
   });
@@ -680,6 +744,19 @@ describe('mail table', () => {
     ]);
   });
 
+  it('each row opens its mail in the reader, for the mailbox owner', () => {
+    const data = {
+      unread: 1,
+      recent: [],
+      inbox: [{ mailId: 7, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true }],
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const rows = buildView('mail', { mail: ok(data) }, ctx()).table?.rows ?? [];
+    expect(rows.map((r) => r.to)).toEqual(['/mail?open=7&owner=91']);
+    expect(rows.every((r) => r.detail === undefined)).toBe(true);
+  });
+
   it('falls back to the unread mail when the read has no inbox', () => {
     const data = {
       unread: 1,
@@ -819,6 +896,11 @@ describe('contracts table', () => {
     ]);
     expect(table?.rows[0]?.cells[1]).toBe('overview.widgets.contracts.overdue');
     expect(table?.rows[0]?.tone).toBe('critical');
+    expect(table?.rows.map((r) => r.to)).toEqual([
+      '/contracts/history?open=2',
+      '/contracts/history?open=1',
+      '/contracts/history?open=3',
+    ]);
     expect(table?.rows[1]?.cells[3]).toMatchObject({ iskAmount: 2_000_000 });
     expect(table?.rows[2]?.cells[2]).toBe('overview.widgets.contracts.statusOutstanding');
     expect(table?.rows[2]?.cells[3]).toMatchObject({ iskAmount: 5_000_000 });

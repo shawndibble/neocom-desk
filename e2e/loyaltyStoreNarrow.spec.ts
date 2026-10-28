@@ -96,7 +96,7 @@ test('the headers carry no corporation select and fit a 390px phone (issue #3265
   await expectNoPicker();
 
   await page.goto(`./wallet/lp-store/${CORPORATION_ID}`);
-  await expect(page.getByRole('link', { name: 'Change store' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toBeVisible();
   await expectNoPicker();
 });
 
@@ -109,11 +109,11 @@ for (const width of [390, 1024, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     await expect(page.getByRole('cell').filter({ hasText: /Tritanium|Pyerite/ })).toHaveCount(2);
 
-    const header = page.getByRole('heading', { level: 1 }).locator('xpath=ancestor::header[1]');
+    const header = page.getByRole('dialog').locator('header').first();
     await expect(header.getByText('Offers shown')).toHaveCount(0);
 
     // Direct children of the header's meta row never sit on top of each other.
-    const meta = page.getByRole('link', { name: 'Corporation info' }).locator('xpath=..');
+    const meta = header.locator('> div').first();
     const boxes = await meta.locator('> *').evaluateAll((nodes) =>
       nodes.map((node) => {
         const r = node.getBoundingClientRect();

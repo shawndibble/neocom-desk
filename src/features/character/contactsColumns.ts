@@ -1,7 +1,8 @@
 /**
  * Contacts route — optional-column catalogs and device-local visible-columns
- * preferences for its two tables ("This character", "Across characters"), the
- * `createColumnVisibilitySetting` pattern (`src/lib/columnVisibility.ts`).
+ * preferences for its three tables ("This character", "Across characters",
+ * "Standings"), the `createColumnVisibilitySetting` pattern
+ * (`src/lib/columnVisibility.ts`).
  * Each table's `name` column is its identity and never appears here.
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
@@ -35,4 +36,29 @@ export type ContactsAcrossColumnId = (typeof CONTACTS_ACROSS_COLUMN_IDS)[number]
 export const contactsAcrossColumnsStore = createColumnVisibilitySetting({
   key: 'contactsAcrossVisibleColumns',
   ids: CONTACTS_ACROSS_COLUMN_IDS,
+});
+
+export const NPC_STANDINGS_COLUMN_IDS = [
+  'kind',
+  'belongsTo',
+  'effective',
+  'standing',
+  'access',
+  'jumps',
+  'fees',
+] as const;
+export type NpcStandingsColumnId = (typeof NPC_STANDINGS_COLUMN_IDS)[number];
+
+/**
+ * Standing (with skills) is the number the game shows and uses; Base is ESI's
+ * figure, which only broker fees read, so it starts off (it is shown anyway
+ * when the skills could not be read and Standing has nothing to say).
+ */
+export const NPC_STANDINGS_DEFAULT_COLUMNS: readonly NpcStandingsColumnId[] =
+  NPC_STANDINGS_COLUMN_IDS.filter((id) => id !== 'standing');
+
+export const npcStandingsColumnsStore = createColumnVisibilitySetting({
+  key: 'npcStandingsVisibleColumns',
+  ids: NPC_STANDINGS_COLUMN_IDS,
+  defaultVisible: NPC_STANDINGS_DEFAULT_COLUMNS,
 });

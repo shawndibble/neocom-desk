@@ -32,7 +32,7 @@ describe('HubComparisonLine', () => {
     expect(screen.getByText('−35%')).toBeInTheDocument();
     expect(screen.getByText('buys for 325,800')).toBeInTheDocument();
     expect(screen.getByText('125×')).toBeInTheDocument();
-    expect(screen.getByText('13 jumps away')).toBeInTheDocument();
+    expect(screen.getByText('13 jumps')).toBeInTheDocument();
   });
 
   it('clears the range from its View button, so the book reads the hub again', async () => {
@@ -242,6 +242,10 @@ describe('OrderSideCard', () => {
       )
     );
     expect(await screen.findByText('price 100')).toBeInTheDocument();
+    // First click is high to low (the first row anyway); the second, low to high, pulls
+    // the smallest from beyond the cap, which only a whole-book sort can do.
+    await userEvent.click(screen.getByRole('button', { name: /Qty/ }));
+    expect(screen.getByText('qty 900')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Qty/ }));
     expect(screen.getByText('qty 100')).toBeInTheDocument();
     expect(screen.queryByText('qty 900')).not.toBeInTheDocument();

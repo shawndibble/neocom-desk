@@ -159,3 +159,50 @@ export function isClosedDatabaseEvent(event: {
 }): boolean {
   return event.exception?.values?.some((v) => v.type === 'DatabaseClosedError') ?? false;
 }
+
+/**
+ * `beforeSend`'s filter for a bare `AbortError` that reaches the global
+ * unhandled-rejection handler: a fetch or Firestore stream cancelled by a
+ * navigation, a tab going to the background or Safari dropping the connection.
+ * It has no stack and names nothing, and `isNetworkFailure` already treats the
+ * same error as noise wherever the app catches it. Handled aborts never get
+ * here; only the ones nothing awaited do.
+ */
+export function isStrayAbortEvent(event: {
+  exception?: { values?: { value?: string; mechanism?: { type?: string } }[] };
+}): boolean {
+  return (
+    event.exception?.values?.some(
+      (v) =>
+        v.mechanism?.type === 'auto.browser.global_handlers.onunhandledrejection' &&
+        /^(Error: )?AbortError\b/.test(v.value ?? '')
+    ) ?? false
+  );
+}
+
+// Same wording as `DYNAMIC_IMPORT_FAILURE` in app/routeChunks.ts, kept apart: importing app code here
+// reorders module loading for every test that mocks around it.
+const CHUNK_LOAD_MESSAGE = /dynamically imported module|importing a module script failed/i;
+
+/**
+ * `beforeSend`'s half of the chunk-failure downgrade `main.tsx` does for React's
+ * error hooks. The reports seen in production arrive by a path that never
+ * passed through those hooks (a generic, handled capture with no
+ * `chunk_load` tag), so the level is set here, where every path ends. A failed
+ * chunk is the visitor's network, a blocker or a retired build the recovery
+ * could not reload past; a burst of them after a deploy is what the
+ * `chunk_load` tag is for.
+ */
+export function markChunkLoadFailure<
+  E extends {
+    level?: string;
+    tags?: Record<string, unknown>;
+    exception?: { values?: { type?: string; value?: string }[] };
+  },
+>(event: E): E {
+  const failed = event.exception?.values?.some(
+    (v) => v.type === 'TypeError' && CHUNK_LOAD_MESSAGE.test(v.value ?? '')
+  );
+  if (!failed) return event;
+  return { ...event, level: 'warning', tags: { ...event.tags, chunk_load: 'failed' } };
+}

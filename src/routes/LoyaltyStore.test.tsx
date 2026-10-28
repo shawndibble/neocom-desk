@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
@@ -29,6 +29,8 @@ vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
     pricing: false,
   }),
 }));
+
+vi.mock('@/features/loyalty/NearestStationLine', () => ({ NearestStationLine: () => null }));
 
 const { LoyaltyStore } = await import('./LoyaltyStore');
 const { useMarketHub } = await import('@/features/market/hub');
@@ -210,8 +212,13 @@ describe('LoyaltyStore LP Value cog', () => {
   it('opens the LP Value setting in a modal', async () => {
     const user = userEvent.setup();
     renderStore();
-    await user.click(screen.getByRole('button', { name: /LP Store settings/i }));
-    const dialog = screen.getByRole('dialog');
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Federal Navy Academy' })).getByRole('button', {
+        name: /LP Store settings/i,
+      })
+    );
+    // The settings modal opens over the store modal: it is the last in the tree.
+    const dialog = screen.getAllByRole('dialog').at(-1)!;
     expect(
       await within(dialog).findByRole('textbox', { name: /Your LP value/ })
     ).toBeInTheDocument();
@@ -476,6 +483,62 @@ describe('LoyaltyStore linked offer', () => {
       'aria-current',
       'true'
     );
+  });
+
+  function mockRows(rows: LoyaltyOfferRow[]) {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows,
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+  }
+
+  it('keeps a linked offer the pilot cannot afford listed and selected despite Affordable only', () => {
+    useDesktopViewport();
+    const unaffordable: LoyaltyOfferRow = {
+      ...ITEM_ROW,
+      profit: { ...PROFIT, affordableLp: false },
+    };
+    mockRows([unaffordable, BLUEPRINT_ROW]);
+    renderStore(`?offer=${ITEM_ROW.offer.offer_id}`);
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+  });
+
+  it('hides an unaffordable offer that is not the linked one', () => {
+    useDesktopViewport();
+    const unaffordable: LoyaltyOfferRow = {
+      ...ITEM_ROW,
+      profit: { ...PROFIT, affordableLp: false },
+    };
+    mockRows([unaffordable, BLUEPRINT_ROW]);
+    renderStore(`?offer=${BLUEPRINT_ROW.offer.offer_id}`);
+
+    expect(screen.queryByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toBeNull();
+  });
+
+  it('opens normally, with nothing selected, for an offer id the store no longer has', () => {
+    useDesktopViewport();
+    mockRows([ITEM_ROW, BLUEPRINT_ROW]);
+    renderStore('?offer=999999');
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).not.toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 
@@ -825,11 +888,75 @@ describe('LoyaltyStore switching stores through the search', () => {
     expect(screen.queryByRole('tab', { name: 'Appraisal' })).not.toBeInTheDocument();
   });
 
-  it('offers a crumb back to the search only when a result opened the store', () => {
-    const { unmount } = renderAt('/loyalty/1000168');
-    expect(screen.queryByRole('link', { name: /LP Store search/ })).not.toBeInTheDocument();
-    unmount();
+  it('renders the landing search with the store dialog over it', () => {
+    renderAt('/loyalty/1000168');
+    expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Federal Navy Academy' })).toBeInTheDocument();
+  });
 
+  it('renders no dialog on the landing, and the landing alone for an invalid id', () => {
+    const { unmount } = renderAt('/loyalty');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    unmount();
+    renderAt('/loyalty/abc');
+    expect(screen.getByRole('searchbox', { name: 'Search LP Stores' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('has no Change store, Corporation info or Wallet tab bar inside the store', () => {
+    renderAt('/loyalty/1000168');
+    const dialog = screen.getByRole('dialog', { name: 'Federal Navy Academy' });
+    expect(screen.queryByRole('link', { name: /Change store/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Corporation info' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('tablist', { name: 'Wallet' })).not.toBeInTheDocument();
+  });
+
+  it('shows Your LP in the default tone, not the accent', () => {
+    renderAt('/loyalty/1000168');
+    const dialog = screen.getByRole('dialog', { name: 'Federal Navy Academy' });
+    expect(within(dialog).getByText('12,000').className).not.toMatch(/accent/);
+  });
+
+  it('closes by going Back when the app pushed the store, keeping the search', async () => {
+    const user = userEvent.setup();
+    function Opener() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/loyalty/1000168')}>open store</button>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/loyalty?q=tritanium']}>
+        <Routes>
+          <Route
+            path="/loyalty"
+            element={
+              <>
+                <LoyaltyStore />
+                <Opener />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route
+            path="/loyalty/:corporationId"
+            element={
+              <>
+                <LoyaltyStore />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+    await user.click(screen.getByRole('button', { name: 'open store' }));
+    expect(probe.pathname).toBe('/loyalty/1000168');
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(probe.pathname).toBe('/loyalty'));
+    expect(probe.search).toBe('?q=tritanium');
+  });
+
+  it('closes by replacing with the search when the store was opened directly', async () => {
+    const user = userEvent.setup();
     render(
       <MemoryRouter
         initialEntries={[
@@ -837,30 +964,37 @@ describe('LoyaltyStore switching stores through the search', () => {
         ]}
       >
         <Routes>
-          <Route path="/loyalty/:corporationId" element={<LoyaltyStore />} />
+          <Route
+            path="/loyalty/:corporationId"
+            element={
+              <>
+                <LoyaltyStore />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="*" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.getByRole('link', { name: /LP Store search/ })).toHaveAttribute(
-      'href',
-      '/wallet/lp-store?q=tritanium'
-    );
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(probe.pathname).toBe('/wallet/lp-store'));
+    expect(probe.search).toBe('?q=tritanium');
   });
 
-  it('has no store select in the header, and an open store links back to the landing', () => {
-    renderAt('/loyalty/1000168');
-    expect(screen.queryByRole('button', { name: /LP Store corporation/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Change store/ })).toHaveAttribute(
-      'href',
-      '/wallet/lp-store'
+  it('sets the trade hub from the gear, the same setting as the filter row', async () => {
+    const user = userEvent.setup();
+    renderStore();
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Federal Navy Academy' })).getByRole('button', {
+        name: /LP Store settings/i,
+      })
     );
-  });
-
-  it("offers the corporation's Show Info from the header", () => {
-    renderAt('/loyalty/1000168');
-    expect(screen.getByRole('link', { name: 'Corporation info' }).getAttribute('href')).toContain(
-      'info=corporation-1000168'
-    );
+    const settings = screen.getAllByRole('dialog').at(-1)!;
+    await user.click(within(settings).getByRole('combobox', { name: 'Market hub' }));
+    await user.click(await screen.findByRole('option', { name: OTHER_HUB.systemName }));
+    expect(useMarketHub.getState().value).toBe(OTHER_HUB.id);
+    expect(screen.getByTestId('lp-basis-readout')).toHaveTextContent(OTHER_HUB.systemName);
   });
 
   it('keeps the offer count off the header and on the list panel, following the search', async () => {

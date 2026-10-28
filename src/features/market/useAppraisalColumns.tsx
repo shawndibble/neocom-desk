@@ -9,6 +9,7 @@ import {
   refineBeatsSellAsIs,
   sellAfterTax,
   sellSalesTax,
+  splitEach,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
@@ -116,6 +117,8 @@ export function useAppraisalColumns({
     },
     {
       id: 'item',
+      stickyStart: true,
+      stickyStartOnPanel: true,
       header: t('market.appraisal.columnItem'),
       primary: true,
       // A priced line is nearly always followed by "…and what is the book
@@ -165,6 +168,15 @@ export function useAppraisalColumns({
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => eachCell(row.sellEach),
       sortValue: (row) => row.sellEach ?? undefined,
+    },
+    splitEach: {
+      id: 'splitEach',
+      header: t('market.appraisal.columnSplitEach'),
+      headerTooltip: t('market.appraisal.columnSplitEachHelp'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => eachCell(splitEach(row)),
+      sortValue: (row) => splitEach(row) ?? undefined,
     },
     buyTotal: {
       id: 'buyTotal',
@@ -240,7 +252,11 @@ export function useAppraisalColumns({
         return comparisonCell(
           <span className="inline-flex items-center gap-1">
             {totalCell(row.lpIskCost ?? null)}
-            <LpStoreLink corporationId={row.lpCorporationId} label={label} />
+            <LpStoreLink
+              corporationId={row.lpCorporationId}
+              offerId={row.lpOfferId}
+              label={label}
+            />
           </span>,
           lpBeatsMarket(row),
           row.lpAffordable === false && (

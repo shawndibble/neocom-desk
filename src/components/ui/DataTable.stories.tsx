@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { DataTable, type DataTableColumn } from './DataTable';
+import { DataTable, DataTableSortPicker, type DataTableColumn } from './DataTable';
 
 interface Row {
   name: string;
@@ -65,6 +65,20 @@ export const Compact: Story = { args: { density: 'compact' } };
  */
 export const PhoneCards: Story = {
   args: { stacked: true, mobileSort: true, stackSummary: '3 materials' },
+  ...phone,
+};
+
+/** @summary Icon-only sort picker: a 36px icon button with the OS picker laid over it. */
+export const SortPickerIconOnly: Story = {
+  render: () => (
+    <DataTableSortPicker
+      iconOnly
+      columns={columns}
+      rows={rows}
+      sort={{ columnId: 'quantity', direction: 'desc' }}
+      onSortChange={() => {}}
+    />
+  ),
   ...phone,
 };
 

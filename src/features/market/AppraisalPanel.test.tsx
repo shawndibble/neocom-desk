@@ -45,6 +45,7 @@ function controller(overrides: Partial<AppraisalController> = {}): AppraisalCont
     text: '',
     setText: vi.fn(),
     appraiseText: vi.fn(),
+    submitted: '',
     result: null,
     compare: null,
     loading: false,
@@ -523,6 +524,18 @@ describe('AppraisalPanel', () => {
       }
     });
 
+    it('carries a short Sell / Buy label for the phone layout, hidden from assistive tech', async () => {
+      renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
+      const list = await compareCards();
+      const card = hubCard(list, TRADE_HUBS[1].systemName);
+      const short = within(card).getByText('Sell');
+      expect(short).toHaveClass('sm:hidden');
+      expect(short).toHaveAttribute('aria-hidden', 'true');
+      expect(within(card).getByText('Sell total')).toHaveClass('max-sm:hidden');
+      expect(within(card).getByText('Buy')).toHaveClass('sm:hidden');
+      expect(within(card).getByText('Buy total')).toHaveClass('max-sm:hidden');
+    });
+
     it('is expanded on mount when opened via defaultCompareExpanded (issue #726)', () => {
       renderPanel({
         controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
@@ -713,6 +726,28 @@ describe('AppraisalPanel', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
     });
 
+    it('hides the refine chips with the Refine column, and brings them back with it', async () => {
+      renderPanel({ controller: controller({ result: refineOutcome() }) });
+      expect(screen.getByText('Facility yield')).toBeInTheDocument();
+      expect(screen.getByText('Reprocessing tax')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+      await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Refine total' }));
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('columnheader', { name: 'Refine total' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Facility yield')).not.toBeInTheDocument();
+      expect(screen.queryByText('Reprocessing tax')).not.toBeInTheDocument();
+      expect(screen.queryAllByText('Refine total')).toHaveLength(0);
+      expect(screen.getByText('Volume')).toBeInTheDocument();
+      expect(screen.getByText('Items')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+      await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Refine total' }));
+      await userEvent.keyboard('{Escape}');
+      expect(screen.getByText('Facility yield')).toBeInTheDocument();
+      expect(screen.getByText('Reprocessing tax')).toBeInTheDocument();
+    });
+
     it('omits the refine column entirely with no active Character', () => {
       renderPanel({ controller: controller({ result: outcome() }) });
       expect(screen.queryAllByText('Refine total')).toHaveLength(0);
@@ -857,6 +892,7 @@ describe('AppraisalPanel', () => {
               sellTotal: 95_000_000,
               volume: 1,
               lpCorporationId: 1000125,
+              lpOfferId: 3001,
               lpCorpName: 'Sisters of EVE',
               lpCost: 400_000,
               lpIskCost: 850_000,
@@ -901,7 +937,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: lpOutcome() }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
       const link = within(asteroRow).getByRole('link', { name: /Sisters of EVE/ });
-      expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125');
+      expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125?offer=3001');
       expect(screen.getAllByText('Cheapest total').length).toBeGreaterThan(0);
     });
 
@@ -1431,19 +1467,55 @@ describe('AppraisalPanel — the row as an item', () => {
   describe('Sell and Buy totals', () => {
     afterEach(() => configureClipboard(null));
 
-    it('read as shorthand only, and copy the full figure on click', async () => {
+    it('read as shorthand only, and the whole card copies the full figure', async () => {
       const written: string[] = [];
       configureClipboard(async (text) => {
         written.push(text);
       });
       renderPanel({ controller: controller({ result: outcome() }) });
 
-      const sell = screen.getByRole('button', { name: 'Copy 1.4M ISK (1,386,400)' });
-      expect(sell).toHaveTextContent(/^1\.4M$/);
+      const card = screen.getByRole('region', { name: 'Sell' });
+      expect(card).toHaveTextContent('1.4M');
+      expect(card).toHaveClass('relative');
+      const sell = within(card).getByRole('button', { name: 'Sell: copy 1.4M ISK (1,386,400)' });
+      expect(sell).toHaveClass('after:absolute', 'after:inset-0');
+      expect(within(card).getAllByRole('button')).toHaveLength(1);
       await userEvent.click(sell);
 
       expect(written).toEqual(['1,386,400']);
       expect(await screen.findAllByText('Copied 1,386,400 ISK')).not.toHaveLength(0);
+    });
+
+    it('the Split card copies the midpoint, by keyboard, and its net hint does not copy', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({
+        controller: controller({
+          result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
+        }),
+      });
+
+      const split = screen.getByRole('region', { name: 'Split' });
+      const sell = screen.getByRole('region', { name: 'Sell' });
+      const buy = screen.getByRole('region', { name: 'Buy' });
+      const digits = (card: HTMLElement) =>
+        Number(
+          /\(([\d,]+)\)/
+            .exec(within(card).getByRole('button').getAttribute('aria-label') ?? '')![1]
+            .replaceAll(',', '')
+        );
+      const midpoint = (digits(buy) + digits(sell)) / 2;
+
+      await userEvent.click(within(sell).getByText('List it, after fees'));
+      expect(written).toEqual([]);
+
+      within(split).getByRole('button').focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+      expect(written).toHaveLength(2);
+      expect(Number(written[0].replaceAll(',', ''))).toBe(midpoint);
     });
   });
 });
@@ -1684,6 +1756,27 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getByTestId('hold-bar')).toHaveTextContent('1,255.5 of 1,000 m³');
     expect(screen.getByText('Does not fit in one trip.')).toBeInTheDocument();
+  });
+
+  it('picks a hauling ship from the actions menu, and the item goes once one is set', async () => {
+    const user = userEvent.setup();
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.queryByTestId('hold-bar')).not.toBeInTheDocument();
+    const menuButton = screen.getByRole('button', { name: /Appraisal actions/ });
+    await user.click(menuButton);
+    await user.click(await screen.findByRole('menuitem', { name: 'Pick hauling ship' }));
+    expect(await screen.findByRole('dialog', { name: 'Pick hauling ship' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Enter m³' }));
+    await user.type(screen.getByRole('textbox', { name: 'Cargo space (m³)' }), '5000');
+    await user.click(screen.getByRole('button', { name: 'Use' }));
+
+    await waitFor(() => expect(screen.getByTestId('hold-bar')).toBeInTheDocument());
+    expect(screen.queryByRole('dialog', { name: 'Pick hauling ship' })).not.toBeInTheDocument();
+    await waitFor(() => expect(menuButton).toHaveFocus());
+    await user.click(menuButton);
+    expect(await screen.findByRole('menuitem', { name: /Open in Janice/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Pick hauling ship' })).not.toBeInTheDocument();
   });
 
   it('opens the cargo picker from the ship name on the hold bar', async () => {

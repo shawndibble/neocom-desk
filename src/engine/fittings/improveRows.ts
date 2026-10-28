@@ -45,8 +45,12 @@ const COMPARE: Record<ImproveSort, (a: ImproveOption, b: ImproveOption) => numbe
   cheapest: (a, b) => nullsLast(a.iskDelta, b.iskDelta, 1) || byGain(a, b),
 };
 
+/** Replacing a module the pilot cannot fly comes before any gain. */
+const fixFirst = (a: ImproveOption, b: ImproveOption) =>
+  Number(b.candidate.fixesUnflyable === true) - Number(a.candidate.fixesUnflyable === true);
+
 export function groupByModule(options: readonly ImproveOption[], sort: ImproveSort): ModuleGroup[] {
-  const compare = COMPARE[sort];
+  const compare = (a: ImproveOption, b: ImproveOption) => fixFirst(a, b) || COMPARE[sort](a, b);
   const byModule = new Map<string, ImproveOption[]>();
   for (const option of options) {
     const key = moduleKey(option.candidate);

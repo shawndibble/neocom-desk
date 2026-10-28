@@ -15,14 +15,15 @@
  * No view-cyclers in the header: view switching lives in the settings menu, so
  * a stray click changes nothing.
  */
-import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type MouseEvent, type ReactElement, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRosterNames } from './useRosterNames';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   Button,
   IskAmount,
+  RowMoreActions,
   SEVERITY_TEXT,
   SeverityIcon,
   Tooltip,
@@ -62,8 +63,11 @@ interface WidgetProps {
   widget: WidgetModel;
   /** The pilot is customizing: a dashed edge; the controls arrive as `headerStart` and `editControls`. */
   editing?: boolean;
-  /** The settings menu (its own trigger, so Radix owns focus and Esc); absent in the Gallery's preview. */
-  menu?: ReactNode;
+  /**
+   * Wraps the card in its right-click menu (`WidgetMenu`) and, with it, puts the ⋮ in the header and
+   * makes the card a click-through to the widget's page; absent in the Gallery's preview.
+   */
+  menu?: (card: ReactElement, to: string | null) => ReactElement;
   /** Before the title in the header: the drag handle while customizing on desktop. */
   headerStart?: ReactNode;
   /** A strip under the body while customizing: size, move and remove. */
@@ -86,6 +90,13 @@ const SECONDARY_TONE = {
   bad: 'text-danger',
   caution: 'text-warning',
 } as const;
+
+/**
+ * What a click on the card leaves alone: a control or link (with or without a target of its own),
+ * an open menu or dialog, a chart. A table row with no target of its own is plain space.
+ */
+const CARD_CLICK_IGNORES =
+  'a[href], button, input, textarea, select, label, summary, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="dialog"], [data-card-click-ignore]';
 
 const DIRECTION_GLYPH = {
   up: Icon.Ascending,
@@ -163,12 +174,16 @@ function TableViewBody({
   size,
   title,
   paging,
+  inert,
 }: {
   view: KindView;
   size: WidgetModel['size'];
   title: string;
   paging: TableBodyProps['paging'];
+  /** The landing demo has no page to go to: its rows draw no links. */
+  inert: boolean;
 }) {
+  const table = tableOf(view);
   return (
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
@@ -176,7 +191,9 @@ function TableViewBody({
         model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
       />
       <TableBody
-        table={tableOf(view)}
+        table={
+          inert ? { ...table, rows: table.rows.map((row) => ({ ...row, to: undefined })) } : table
+        }
         columnsFor={size}
         rowLimit={TABLE_ROWS[size]}
         paging={paging}
@@ -320,6 +337,7 @@ function WidgetFrame({
   const scope = scopePresentation(widget.kind, widget.scope, widget);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
+  const navigate = useNavigate();
   const sizeKey = heightKey(widget, characterId, isPhone);
   const drawn = state === 'ok' || state === 'empty';
   // A view that draws (or reads empty) while one of its first reads is still out (the Wallet's
@@ -339,6 +357,18 @@ function WidgetFrame({
   const title = widget.title ?? t(keys.titleKey);
   const endpoints = endpointsOf(widget.kind, widget);
   const grantTarget = view.grantCharacterId ?? characterId;
+  // The landing page's demo (`inertTitle`) and the Gallery's preview (no menu) have no page to go to.
+  const cardTo = menu !== undefined && !inertTitle && !editing ? view.to : null;
+  const onCardClick = (event: MouseEvent<HTMLElement>) => {
+    if (cardTo === null || event.defaultPrevented) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    // A portaled menu, tooltip or modal bubbles here through React, but is not on the card.
+    if (!(event.target instanceof Element) || !event.currentTarget.contains(event.target)) return;
+    if (event.target.closest(CARD_CLICK_IGNORES) !== null) return;
+    // A drag that selects text ends in a click.
+    if (window.getSelection()?.toString()) return;
+    navigate(cardTo);
+  };
 
   let body;
   if (state === 'loading') {
@@ -416,6 +446,7 @@ function WidgetFrame({
           view={view}
           size={widget.size}
           title={title}
+          inert={inertTitle}
           paging={{
             rowsPerPage: widget.rowsPerPage ?? DEFAULT_ROWS_PER_PAGE,
             onRowsPerPage: (rows) => setRowsPerPage(widget.id, rows),
@@ -457,13 +488,15 @@ function WidgetFrame({
     );
   }
 
-  return (
+  const card = (
     <section
       aria-label={title}
       aria-busy={state === 'loading'}
+      onClick={cardTo === null ? undefined : onCardClick}
       className={cx(
         'flex h-full w-full min-w-0 flex-col rounded-xs border bg-panel',
-        editing ? 'border-dashed border-line-bright' : 'border-line'
+        editing ? 'border-dashed border-line-bright' : 'border-line',
+        cardTo !== null && 'cursor-pointer hover:border-line-bright'
       )}
     >
       {!hideHeader && (
@@ -498,7 +531,9 @@ function WidgetFrame({
           </h2>
           {scope.chip && <AllCharactersReadout compact={widget.size === 'S'} />}
           <span className="flex-1" />
-          {menu}
+          {menu && (
+            <RowMoreActions label={t('overview.widgets.settingsFor', { title })} focusTarget />
+          )}
         </div>
       )}
       <div className="flex-1" style={settling ? { minHeight: reserved() } : undefined}>
@@ -513,4 +548,5 @@ function WidgetFrame({
       )}
     </section>
   );
+  return menu ? menu(card, view.to) : card;
 }

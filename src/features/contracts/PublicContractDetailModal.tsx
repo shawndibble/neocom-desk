@@ -40,9 +40,17 @@
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, SlideOver, Spinner, StatChip, StatChips, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  SlideOver,
+  Spinner,
+  StatChip,
+  StatChips,
+  TypeIcon,
+} from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -70,6 +78,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { ContractAbyssalValue } from './ContractAbyssalValue';
 import { loadAbyssalContractValue, type AbyssalContractValue } from './abyssalValueMath';
+import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { ContractPriceCheck, type PriceCheckRowModel } from './ContractPriceCheck';
 import { CopyContractIdButton } from './CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
@@ -126,6 +135,10 @@ export interface PublicContractDetailModalProps {
   flag?: ContractFlag | null;
   /** The pilot's flag multiple, named in the overpriced sentence so the setting is findable. */
   flagMultiple?: number;
+  /** Which side of the hub book the price check opens on; default sell orders. */
+  defaultPriceSide?: PriceSide;
+  /** Below market's estimate for the lines the hub cannot price (#5427); absent outside that board. */
+  otherValue?: { value: number; lines: number } | null;
   onClose: () => void;
 }
 
@@ -151,6 +164,8 @@ export function PublicContractDetailModal({
   bpcCheck,
   flag = null,
   flagMultiple,
+  defaultPriceSide = 'sell',
+  otherValue,
   onClose,
 }: PublicContractDetailModalProps) {
   const { t } = useTranslation();
@@ -252,8 +267,9 @@ export function PublicContractDetailModal({
     asking: askingIsk ?? 0,
     basis: LIVE,
     hub,
-    defaultSide: 'sell',
+    defaultSide: defaultPriceSide,
     sellOverrides,
+    otherValue,
     searchedTypeIds: anySearched ? searchedTypeIds : null,
   });
 
@@ -328,16 +344,20 @@ export function PublicContractDetailModal({
       onClose={onClose}
       maxWidthClassName="max-w-[28rem]"
       title={
-        <span className="flex flex-wrap items-center gap-2">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           {title}
           <Pill>{t('contractDetail.publicLabel')}</Pill>
         </span>
       }
       subtitle={
-        <span className="flex flex-wrap items-center gap-x-1">
+        <span className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
           <span className="tabular-nums">{contractId}</span>
           <CopyContractIdButton contractId={contractId} />
-          <OpenInEveButton kind="contract" id={contractId} />
+          <OpenInEveButton
+            kind="contract"
+            id={contractId}
+            name={t('contractDetail.openInEveName', { id: contractId })}
+          />
         </span>
       }
     >
@@ -375,12 +395,15 @@ export function PublicContractDetailModal({
         ) : twoSided ? (
           <>
             <ItemGroup
+              // Keyed on contractId so each group's expanded state resets when another contract opens.
+              key={`${contractId}-hand`}
               heading={t('contractDetail.youHandOverHeading')}
               lines={requested}
               typeNames={items.typeNames}
               searched={searchedMark}
             />
             <ItemGroup
+              key={`${contractId}-receive`}
               heading={t('contractDetail.youReceiveHeading')}
               lines={included}
               typeNames={items.typeNames}
@@ -389,6 +412,7 @@ export function PublicContractDetailModal({
           </>
         ) : (
           <ItemGroup
+            key={`${contractId}-all`}
             heading={oneSidedHeading}
             lines={lines}
             typeNames={items.typeNames}
@@ -493,9 +517,18 @@ function BpcPriceCheck({ check }: { check: BpcPerRunCheck | null }) {
   );
 }
 
+/** A group longer than this shows only this many lines until expanded. */
+const ITEM_CAP = 10;
+/** A group this short shows everything: hiding a row or two behind a button saves nothing. */
+const ITEM_NO_CAP_MAX = 12;
+
 /**
  * One headed list of lines. `searched` is `undefined` when no search is
  * active; otherwise it says whether a line is the one asked for.
+ *
+ * Display-only cap: searched lines are pinned first, then the list stops at
+ * `ITEM_CAP` behind a "Show N more" button. The caller's price check reads the
+ * full `lines`, never what is visible here.
  */
 function ItemGroup({
   heading,
@@ -508,11 +541,21 @@ function ItemGroup({
   typeNames: ReadonlyMap<number, string>;
   searched: (line: ContractItemLine) => boolean | undefined;
 }) {
+  const { t } = useTranslation();
+  const listId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const capped = lines.length > ITEM_NO_CAP_MAX;
+  const matches = lines.filter((line) => searched(line) === true);
+  const ordered =
+    matches.length > 0 ? [...matches, ...lines.filter((line) => searched(line) !== true)] : lines;
+  const shown =
+    capped && !expanded ? ordered.slice(0, Math.max(ITEM_CAP, matches.length)) : ordered;
+  const hidden = ordered.length - shown.length;
   return (
     <div>
       <h3 className={cx(eyebrowClassName, 'flex items-center gap-1.5 pb-1.5')}>{heading}</h3>
-      <ul className="flex flex-col gap-1">
-        {lines.map((line) => (
+      <ul id={listId} className="flex flex-col gap-1">
+        {shown.map((line) => (
           <ContractItemRow
             key={line.key}
             line={line}
@@ -521,6 +564,20 @@ function ItemGroup({
           />
         ))}
       </ul>
+      {capped && (
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={expanded}
+          aria-controls={listId}
+          onClick={() => setExpanded((open) => !open)}
+          className="mt-1 w-full"
+        >
+          {expanded
+            ? t('contractDetail.showFewerItems')
+            : t('contractDetail.showMoreItems', { count: hidden })}
+        </Button>
+      )}
     </div>
   );
 }

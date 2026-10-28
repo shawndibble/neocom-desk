@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -44,17 +45,19 @@ function renderSummary(
 ) {
   hubJumps.next = jumps;
   return render(
-    <HaulingTripSummary
-      plan={plan(GENERAL)}
-      cargoSet
-      laneLabel="Amarr to Jita"
-      fromSystemId={30002187}
-      toSystemId={30000142}
-      freeM3={64_500 - 20_038}
-      cargoControl={<button type="button">Mastodon</button>}
-      cargoValueAfterFill={null}
-      {...props}
-    />
+    <MemoryRouter>
+      <HaulingTripSummary
+        plan={plan(GENERAL)}
+        cargoSet
+        laneLabel="Amarr to Jita"
+        fromSystemId={30002187}
+        toSystemId={30000142}
+        freeM3={64_500 - 20_038}
+        cargoControl={<button type="button">Mastodon</button>}
+        cargoValueAfterFill={null}
+        {...props}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -162,7 +165,12 @@ describe('HaulingTripSummary', () => {
   it('reads the lane with its jumps by route preference, the free m³ with a meter, and per-jump profit', () => {
     renderSummary({ cargoValueAfterFill: 619_395_524 });
     expect(hubJumps.calls.at(-1)).toEqual([30002187, 30000142]);
-    expect(screen.getByText('Amarr to Jita · 45 jumps (Prefer safer)')).toBeInTheDocument();
+    expect(screen.getByText(/Amarr to Jita ·/)).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: '45 jumps (Prefer safer)' });
+    const href = new URL(link.getAttribute('href') ?? '', 'http://x');
+    expect(href.searchParams.get('from')).toBe('30002187');
+    expect(href.searchParams.get('pref')).not.toBeNull();
+    expect(href.searchParams.get('stops')).toContain('30000142');
     expect(screen.getByRole('button', { name: 'Mastodon' })).toBeInTheDocument();
     expect(screen.getByText('213,965,524', { selector: 'b' })).toBeInTheDocument();
     expect(screen.getByText('→ 619,395,524 with the fill')).toBeInTheDocument();
@@ -186,6 +194,7 @@ describe('HaulingTripSummary', () => {
     renderSummary({}, { status });
     expect(screen.getByText('Amarr to Jita')).toBeInTheDocument();
     expect(screen.queryByText(/jumps/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByText(/Profit per jump/)).not.toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ import {
   ItemMoreActions,
   type ItemMenuFor,
 } from '@/features/market/ItemContextMenu';
+import { BpcSourcingMenuItem } from './BpcSourcingMenuItem';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
 
 /**
@@ -15,18 +16,32 @@ import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
  *
  * This page is already a Build Plan and has no Compare drawer, so the menu
  * leaves out "Build Plan" and "Add to Compare".
+ *
+ * Given `onSearchBpcSourcing`, an item whose blueprint is known (the item is
+ * one, or something builds it) also offers "Find BPC in BPC Sourcing".
  */
-export function buildItemMenuProps(catalog: BlueprintCatalog): {
+export function buildItemMenuProps(
+  catalog: BlueprintCatalog,
+  onSearchBpcSourcing?: (blueprintTypeID: number) => void
+): {
   itemMenuFor: ItemMenuFor;
   itemActionsFor: (typeId: number, bordered?: boolean) => ReactElement;
 } {
-  const menuProps = (typeId: number) => ({
-    typeId,
-    itemName: nameForType(catalog, typeId),
-    blueprintTypeID: catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null,
-    hideBuildPlan: true,
-    hideCompare: true,
-  });
+  const menuProps = (typeId: number) => {
+    const blueprintTypeID = catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
+    const sourcingBlueprint = catalog.byBlueprintTypeID.has(typeId) ? typeId : blueprintTypeID;
+    return {
+      typeId,
+      itemName: nameForType(catalog, typeId),
+      blueprintTypeID,
+      hideBuildPlan: true,
+      hideCompare: true,
+      extraItems:
+        onSearchBpcSourcing && sourcingBlueprint !== null ? (
+          <BpcSourcingMenuItem blueprintTypeID={sourcingBlueprint} onSearch={onSearchBpcSourcing} />
+        ) : undefined,
+    };
+  };
 
   /** The menu on every item name the page shows — product heading, the recipe and acquisition modals. */
   const itemMenuFor: ItemMenuFor = (typeId, trigger) => (

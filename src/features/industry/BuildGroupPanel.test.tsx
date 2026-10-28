@@ -9,6 +9,7 @@ import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { ItemActionsContext, type ItemActions } from '@/features/market/itemActions';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -195,23 +196,25 @@ function renderPanel(
   } = {}
 ) {
   render(
-    <MemoryRouter>
-      <BuildGroupPanel
-        group={overrides.group ?? GROUP}
-        plans={plans}
-        catalog={overrides.catalog ?? CATALOG}
-        pi={null}
-        ownedBlueprints={[]}
-        modifiers={NO_CHARACTER_MODIFIERS}
-        pricingInputs={PRICING_INPUTS_FIXTURE}
-        ownedStockSnapshot={SNAPSHOT}
-        onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
-        onOpenPlan={() => {}}
-        onRetarget={() => {}}
-        onOwnedStockChange={overrides.onOwnedStockChange ?? (() => {})}
-        onOwnedStockScopeChange={() => {}}
-      />
-    </MemoryRouter>
+    <ItemActionsContext.Provider value={ITEM_ACTIONS}>
+      <MemoryRouter>
+        <BuildGroupPanel
+          group={overrides.group ?? GROUP}
+          plans={plans}
+          catalog={overrides.catalog ?? CATALOG}
+          pi={null}
+          ownedBlueprints={[]}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          pricingInputs={PRICING_INPUTS_FIXTURE}
+          ownedStockSnapshot={SNAPSHOT}
+          onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
+          onOpenPlan={() => {}}
+          onRetarget={() => {}}
+          onOwnedStockChange={overrides.onOwnedStockChange ?? (() => {})}
+          onOwnedStockScopeChange={() => {}}
+        />
+      </MemoryRouter>
+    </ItemActionsContext.Provider>
   );
 }
 
@@ -224,6 +227,15 @@ function loadingRow(planId: string): ComparedBuildRow {
     error: null,
   } as ComparedBuildRow;
 }
+
+const ITEM_ACTIONS: ItemActions = {
+  canAddToQuickbar: false,
+  addToQuickbar: vi.fn(),
+  showInfo: vi.fn(),
+  blueprints: null,
+  blueprintFor: () => null,
+  requestBlueprints: vi.fn(),
+};
 
 describe('BuildGroupPanel — mixed-hub multibuy', () => {
   afterEach(() => configureClipboard(null));

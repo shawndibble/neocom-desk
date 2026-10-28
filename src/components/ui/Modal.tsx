@@ -17,7 +17,8 @@ import { RowTappableContext } from './tooltipHold';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { useSheetSwipe } from './useSheetSwipe';
 
-export type ModalPlacement = 'center' | 'sheet' | 'sheet-full' | 'wide' | 'media';
+export type ModalPlacement =
+  'center' | 'sheet' | 'sheet-full' | 'medium' | 'wide' | 'page' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -46,7 +47,7 @@ interface ModalProps {
    * dialog exists to fill (a quantity), so the user can type straight away.
    */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
+  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `sheet-full` for the same drawer at full viewport height (long lists), `page` for a whole page's worth of content as a layer over another (full screen on a phone, content-area wide and tall from `md`), `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
   /**
    * Whether the modal owns a history entry so Back closes it (default). Pass
@@ -81,9 +82,14 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
     dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
     heightClass: 'h-dvh max-h-dvh',
   },
+  medium: { dialogClass: 'm-auto w-full max-w-3xl', heightClass: 'h-fit max-h-[85vh]' },
   wide: {
     dialogClass: 'm-auto w-full max-w-[min(64rem,100vw)]',
     heightClass: 'h-fit max-h-[85vh]',
+  },
+  page: {
+    dialogClass: 'm-0 w-full max-w-none max-md:rounded-none md:m-auto md:w-[min(72rem,95vw)]',
+    heightClass: 'h-dvh max-h-dvh md:h-[90dvh] md:max-h-[90dvh]',
   },
   media: { dialogClass: 'm-auto w-fit max-w-[95vw]', heightClass: 'h-fit max-h-[95vh]' },
 };

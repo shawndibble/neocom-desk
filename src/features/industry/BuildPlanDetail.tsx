@@ -1093,7 +1093,7 @@ export function BuildPlanDetail({
     setStrategyUndo({ previous: [...previous], built: picked.size });
   }
 
-  const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog);
+  const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog, onSearchBpcSourcing);
 
   /**
    * Puts the plan's outstanding materials on the clipboard as multibuy text,
@@ -1893,6 +1893,8 @@ export function BuildPlanDetail({
               </div>
               <MaterialsTable
                 exportProps={materialsExport.tableProps}
+                itemMenuFor={itemMenuFor}
+                itemActionsFor={itemActionsFor}
                 materials={visibleMaterials}
                 nameFor={(typeID) => nameForType(catalog, typeID)}
                 volumeFor={(typeID) => volumeForType(catalog, typeID)}

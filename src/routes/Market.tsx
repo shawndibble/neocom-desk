@@ -79,6 +79,7 @@ import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/c
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { usePageHeaderSlots } from '@/features/market/pageHeaderSlots';
+import { useAppraisalListUrl } from '@/features/market/useAppraisalListUrl';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import {
@@ -575,6 +576,8 @@ export function Market() {
   // "Open Neocom Desk" on a stored Appraisal Share Link lands here with
   // `?share=<id>`, its hub and percent riding `?hub=` and `?percent=`.
   const sharedSeed = useSharedAppraisalSeed((text) => appraisal.appraiseText(text));
+  // The appraised list rides `?list=`, so Back and a reload restore it.
+  useAppraisalListUrl(appraisal, tab === 'appraisal');
   // Feeds the net-of-fees chips' broker fee — resolved once per character,
   // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);

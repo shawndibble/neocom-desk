@@ -8,15 +8,21 @@
  * src/features/loyalty/useLoyaltyStoreOffers.ts for how the numbers are
  * assembled.
  *
- * The landing search opens any NPC corporation's store, LP or not; an open
- * store's "Change store" link returns to it (`/wallet/lp-store` with no
- * corporation is the landing state).
+ * The landing search opens any NPC corporation's store, LP or not. An open
+ * store is a large modal over that search at its own URL; closing it returns
+ * to the search (`/wallet/lp-store` with no corporation is the landing state).
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useCallback, useDeferredValue, useMemo, useState, type ReactElement } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { CorporationLink } from '@/features/entities/EntityLink';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+} from 'react';
+import { useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,13 +32,10 @@ import {
   EmptyState,
   Modal,
   Panel,
-  PageHeader,
   LiveStatus,
   Spinner,
   StatChip,
   StatChips,
-  TabPanel,
-  useTabsId,
   CachedNotice,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -58,7 +61,9 @@ import { LoyaltyOfferFilterBar } from '@/features/loyalty/LoyaltyOfferFilterBar'
 import { OfferDetail } from '@/features/loyalty/OfferDetail';
 import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
-import { LpStoreActions, StoreCrumbs, WalletTabBar } from '@/features/loyalty/LpStoreChrome';
+import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
+import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
+import type { LpSearchCrumbState } from '@/features/loyalty/itemSearch';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -88,18 +93,22 @@ const FILTER_PARAMS = {
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 
 /**
- * The route: `/wallet/lp-store` (landing) or `/wallet/lp-store/:corporationId`.
- * Keyed on the corporation so switching stores remounts the
- * page — no previous store's offers, selection or loaded state carried over
- * under the new store's URL.
+ * The route: `/wallet/lp-store` (landing) or `/wallet/lp-store/:corporationId`
+ * (the landing with the store modal open on top). The modal's content is keyed
+ * on the corporation so switching stores remounts it — no previous store's
+ * offers, selection or loaded state carried over under the new store's URL.
  */
 export function LoyaltyStore() {
   const { corporationId: corporationIdParam } = useParams<{ corporationId?: string }>();
   const corporationId = Number(corporationIdParam);
-  if (corporationIdParam === undefined || !Number.isInteger(corporationId) || corporationId <= 0) {
-    return <LoyaltyStoreLanding />;
-  }
-  return <LoyaltyStoreView key={corporationId} corporationId={corporationId} />;
+  const valid =
+    corporationIdParam !== undefined && Number.isInteger(corporationId) && corporationId > 0;
+  return (
+    <>
+      <LoyaltyStoreLanding />
+      {valid && <LoyaltyStoreView key={corporationId} corporationId={corporationId} />}
+    </>
+  );
 }
 
 function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
@@ -107,7 +116,13 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const tabsId = useTabsId();
+  // Read once, on arrival: a push is an entry this app stacked over where the
+  // pilot was (Back returns there); anything else (a pasted link, a reload,
+  // Forward) has nowhere in the app to go back to, so Close replaces the URL.
+  const navigationType = useNavigationType();
+  const location = useLocation();
+  const [arrivedByPush] = useState(() => navigationType === 'PUSH');
+  const [arrivedState] = useState(() => location.state as Partial<LpSearchCrumbState> | null);
 
   const hubId = useMarketHub((s) => s.value);
   const setHubId = useMarketHub((s) => s.setValue);
@@ -147,6 +162,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
   const selectedOfferId = filterParams.offer;
+  // The offer the link arrived on: the table scrolls to it once, not on every later pick.
+  const [arrivedOfferId] = useState(selectedOfferId);
   // A phone arriving on a linked offer opens its breakdown straight away.
   const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
@@ -156,12 +173,16 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const filteredRows = useMemo(() => {
     const q = rowsSearch.trim().toLowerCase();
     return rows.filter((row) => {
+      // The offer a link arrived on stays listed whatever the filters say, so its
+      // detail never vanishes behind "affordable only".
+      if (row.offer.offer_id === arrivedOfferId && row.offer.offer_id === selectedOfferId)
+        return true;
       if (affordableOnly && row.profit.affordableLp === false) return false;
       if (blueprintsOnly && !row.isBlueprint) return false;
       if (q && !row.itemName.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [rows, rowsSearch, affordableOnly, blueprintsOnly]);
+  }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId, arrivedOfferId]);
 
   const affordableCount = useMemo(
     () => rows.filter((row) => row.profit.affordableLp !== false).length,
@@ -174,6 +195,17 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // the table itself is sorted differently. The prompt below stands until an
   // explicit click picks a row.
   const selectedRow = filteredRows.find((row) => row.offer.offer_id === selectedOfferId);
+
+  // Not `DataTable`'s `highlightRowKey`: that re-marks the row `aria-current="location"`
+  // and steals focus, where a selected row already announces itself. The list isn't
+  // windowed, so the row is in the DOM once the offers have loaded.
+  const arrivedRowPresent = rows.some((row) => row.offer.offer_id === arrivedOfferId);
+  useEffect(() => {
+    if (arrivedOfferId === null || !arrivedRowPresent) return;
+    document
+      .querySelector(`[data-row-key="${arrivedOfferId}"]`)
+      ?.scrollIntoView?.({ block: 'center' });
+  }, [arrivedOfferId, arrivedRowPresent]);
 
   function selectRow(row: LoyaltyOfferRow) {
     setFilterParams({ offer: row.offer.offer_id });
@@ -240,6 +272,17 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     columns: offersCsvColumns,
     qualifier: corpName ?? undefined,
   });
+
+  function closeStore() {
+    if (arrivedByPush) {
+      navigate(-1);
+      return;
+    }
+    const q = arrivedState?.from === 'lp-search' && arrivedState.q ? arrivedState.q : null;
+    navigate(`/wallet/lp-store${q === null ? '' : `?q=${encodeURIComponent(q)}`}`, {
+      replace: true,
+    });
+  }
 
   const list = (
     <Panel
@@ -349,7 +392,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
             rows={filteredRows}
             rowKey={offerRowKey}
             density="compact"
-            virtualize="auto"
+            // Not windowed: the virtualizer follows the window scroll, and the modal body scrolls instead.
             sort={offersSortProps.sort}
             onSortChange={offersSortProps.onSortChange}
             mobileSort
@@ -385,31 +428,29 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-3">
-        <StoreCrumbs />
-        <PageHeader
-          title={corpName ?? t('loyaltyStore.title')}
-          meta={
-            <div className="flex flex-wrap items-center gap-2">
-              {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
-              <CorporationLink id={corporationId} className="text-xs">
-                {t('loyaltyStore.corporationInfo')}
-              </CorporationLink>
-              <StatChips>
-                <StatChip
-                  label={t('loyaltyStore.yourLp')}
-                  value={playerLp === null ? '—' : formatNumber(playerLp)}
-                  tone="accent"
-                  emphasis
-                />
-              </StatChips>
-            </div>
-          }
-          actions={<LpStoreActions />}
-        />
-        <WalletTabBar tabsId={tabsId} />
-
-        <TabPanel tabsId={tabsId} tabId="lp-store" className="flex flex-col gap-3">
+      <Modal
+        open
+        onClose={closeStore}
+        // A URL already backs this modal: Back pops its entry, not a second one.
+        closeOnBack={false}
+        placement="page"
+        title={corpName ?? t('loyaltyStore.title')}
+        titleActions={
+          <div className="flex shrink-0 items-center gap-2">
+            {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
+            <StatChips>
+              <StatChip
+                label={t('loyaltyStore.yourLp')}
+                value={playerLp === null ? '—' : formatNumber(playerLp)}
+                emphasis
+              />
+            </StatChips>
+            <LpStoreActions />
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <NearestStationLine corporationId={corporationId} />
           <LoyaltyOfferFilterBar
             value={{ hubId, priceBasis, lpBasis, affordableOnly, blueprintsOnly }}
             onChange={(next) => {
@@ -458,8 +499,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               </Modal>
             </>
           )}
-        </TabPanel>
-      </div>
+        </div>
+      </Modal>
     </ItemActionsProvider>
   );
 }

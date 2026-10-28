@@ -8,3 +8,28 @@
  * and React Router into `sw.mjs` for one string.
  */
 export const HIGHLIGHT_PARAM = 'highlight';
+
+/**
+ * The `?open=` query key (`useOpenParam.ts`): the sibling of `?highlight=` that
+ * also opens the row's modal. Same React-free module for the same reason.
+ */
+export const OPEN_PARAM = 'open';
+
+/** `path?open=<id>` (`&` after an existing query), the link a widget row builds to open a record's modal on its page. */
+export function openHref(path: string, id: number | string): string {
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}${OPEN_PARAM}=${encodeURIComponent(String(id))}`;
+}
+
+/** `path?highlight=<id>`, the link a widget row builds to scroll to and flash a record on its page. */
+export function highlightHref(path: string, id: number | string): string {
+  return `${path}?${HIGHLIGHT_PARAM}=${encodeURIComponent(String(id))}`;
+}
+
+/** Mail's `?open=` link: a mail id repeats across mailboxes, so the owner rides along as `owner`. */
+export const MAIL_OWNER_PARAM = 'owner';
+
+export function mailOpenHref(mailId: number, ownerId: number | null): string {
+  const href = openHref('/mail', mailId);
+  return ownerId === null ? href : `${href}&${MAIL_OWNER_PARAM}=${ownerId}`;
+}

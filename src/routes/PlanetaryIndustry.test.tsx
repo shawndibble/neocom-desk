@@ -822,6 +822,18 @@ describe('PlanetaryIndustry', () => {
     );
   });
 
+  it('flashes the colony a ?highlight= link names, then drops the param', async () => {
+    window.history.pushState({}, '', `/planetary-industry/colonies?highlight=${PLANET_ID}`);
+    render(<App />);
+
+    const row = (await screen.findByRole('heading', { name: /Jita IV/ })).closest(
+      '[data-colony-status]'
+    ) as HTMLElement;
+    expect(row).toHaveClass('row-pulse');
+    expect(row).toHaveAttribute('data-row-key', String(PLANET_ID));
+    await waitFor(() => expect(window.location.search).toBe(''));
+  });
+
   it("plans the URL's goals over the colony: Lift first, then the change list", async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>

@@ -67,6 +67,14 @@ describe('journalTable', () => {
     expect(table.rows.map((r) => r.key)).toEqual(['2', '4', '5', '6', '7', '8']);
   });
 
+  it('links each row to its entry on the Journal, flashed', () => {
+    const table = journalTable(t, [entry(2, 1, 10), entry(4, 3, -20)], NOW);
+    expect(table.rows.map((r) => r.to)).toEqual([
+      '/wallet/journal?highlight=2',
+      '/wallet/journal?highlight=4',
+    ]);
+  });
+
   it('reads type, signed amount, age and the balance after it', () => {
     const table = journalTable(t, [entry(2, 1, 1_500_000, 4_800_000_000)], NOW);
     expect(table.columns.map((c) => c.key)).toEqual(['type', 'amount', 'when', 'balance']);
@@ -446,6 +454,13 @@ describe('price watch', () => {
     const [hit] = priceWatchTable(t, [alert('Hit', 'above', 100, 130, true)]).rows;
     expect(hit!.cells[1]).toEqual({ text: '+30%', tone: 'good' });
     expect(far!.cells[3]).toBe('overview.widgets.priceWatch.target.above{"isk":"100"}');
+  });
+
+  it('opens Show info for the watched item', () => {
+    const [row] = priceWatchTable(t, [alert('Near', 'below', 100, 105)]).rows;
+    expect(row!.info).toEqual({ typeId: 4 });
+    expect(row!.to).toBeUndefined();
+    expect(row!.detail).toBeUndefined();
   });
 
   it('shows a dash for a target the poller has not priced, and tones a hit target', () => {

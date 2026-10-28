@@ -56,6 +56,20 @@ export const SheetFull: Story = {
   },
 };
 
+/** @summary `medium`: two columns that outgrow `center` but not `wide` (max-w-3xl). */
+export const Medium: Story = {
+  args: {
+    placement: 'medium',
+    title: 'Hurricane Fleet Issue',
+    children: (
+      <div className="grid grid-cols-2 gap-4 p-4 text-sm">
+        <span>Killmail facts</span>
+        <span>Fit</span>
+      </div>
+    ),
+  },
+};
+
 /** @summary `wide`: multi-column content such as a comparison matrix. */
 export const Wide: Story = {
   args: {
@@ -68,6 +82,15 @@ export const Wide: Story = {
         <span>Executioner</span>
       </div>
     ),
+  },
+};
+
+/** @summary `page`: a whole page as a layer over another; full screen on a phone, 72rem or 95% wide and tall from `md`. */
+export const Page: Story = {
+  args: {
+    placement: 'page',
+    title: 'Corporation store',
+    children: <p className="p-4 text-sm">The page's content scrolls inside the layer.</p>,
   },
 };
 

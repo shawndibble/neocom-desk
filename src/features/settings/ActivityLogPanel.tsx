@@ -41,6 +41,8 @@ export function ActivityLogPanel() {
     () => [
       {
         id: 'endpoint',
+        stickyStart: true,
+        stickyStartOnPanel: true,
         header: t('activityLog.columnEndpoint'),
         className: 'font-mono text-[0.6875rem] text-text-dim',
         sortValue: (entry) => ENDPOINT_ROUTES[entry.endpointId],

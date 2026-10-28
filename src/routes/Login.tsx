@@ -1,7 +1,7 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { BootScreen } from '@/app/BootScreen';
 import { releaseLandingShell } from '@/app/landingShell';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
@@ -22,6 +22,7 @@ import { cx } from '@/lib/cx';
 import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
+import { setLoginReturnTo, usableLoginReturnTo } from '@/auth/loginReturnTo';
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
@@ -42,6 +43,13 @@ export function Login() {
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
   const characterCount = useCharacterCountOrLoading();
+
+  // Sent here by the auth gate (`RequireCharacter`): stash the page the
+  // visitor asked for so the login lands there, not on the default.
+  const from = usableLoginReturnTo((useLocation().state as { from?: unknown } | null)?.from);
+  useEffect(() => {
+    if (characterCount === 0 && from !== null) setLoginReturnTo(from);
+  }, [characterCount, from]);
 
   // The prerendered hero (`app/landingShell.ts`) stands in through the boot
   // screen. Let it go once this page knows what it renders: a layout effect,

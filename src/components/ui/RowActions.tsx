@@ -16,6 +16,8 @@ import {
   isValidElement,
   useContext,
   useEffect,
+  useId,
+  useState,
   type ComponentProps,
   type MouseEvent,
   type PointerEvent,
@@ -24,10 +26,22 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTouchContext } from '@/lib/useMediaQuery';
+import {
+  claimSessionHint,
+  dismissSessionHint,
+  hintSeenCount,
+  recordHintSeen,
+  releaseSessionHint,
+  useHintCounts,
+  useSessionHintShown,
+} from '@/lib/hintFlags';
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
@@ -38,8 +52,10 @@ import {
 } from './ContextMenu';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -48,6 +64,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './DropdownMenu';
+import { Button } from './Button';
 import { IconButton } from './IconButton';
 import type { IconButtonSize, IconButtonVariant } from './iconButtonClassName';
 import * as Icon from './icons';
@@ -55,8 +72,10 @@ import {
   MenuKindContext,
   RowActionsContext,
   RowMenuExtrasContext,
+  RowOpenHrefContext,
   type RowActions,
 } from './rowActionsContext';
+import { Popover, PopoverAnchor, PopoverContent } from './Popover';
 import { Tooltip } from './Tooltip';
 import { TooltipHoldContext } from './tooltipHold';
 
@@ -65,6 +84,22 @@ export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
     <DropdownMenuItem {...props} />
   ) : (
     <ContextMenuItem {...props} />
+  );
+}
+
+/**
+ * "Open in new tab" for a row whose click goes to another page. A real link,
+ * so the browser offers its own link menu on it too; same-origin, so no
+ * `ExternalLink` mark. Row menus render it themselves from `openHref`.
+ */
+export function OpenInNewTabMenuItem({ href }: { href: string }) {
+  const { t } = useTranslation();
+  return (
+    <MenuItem asChild>
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {t('common.openInNewTab')}
+      </a>
+    </MenuItem>
   );
 }
 
@@ -132,6 +167,22 @@ export function MenuRadioGroup(props: ComponentProps<typeof ContextMenuRadioGrou
   );
 }
 
+export function MenuLabel(props: ComponentProps<typeof ContextMenuLabel>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuLabel {...props} />
+  ) : (
+    <ContextMenuLabel {...props} />
+  );
+}
+
+export function MenuCheckboxItem(props: ComponentProps<typeof ContextMenuCheckboxItem>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuCheckboxItem {...props} />
+  ) : (
+    <ContextMenuCheckboxItem {...props} />
+  );
+}
+
 export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>) {
   return useContext(MenuKindContext) === 'dropdown' ? (
     <DropdownMenuRadioItem {...props} />
@@ -150,14 +201,14 @@ function countMenuItems(node: ReactNode): number | undefined {
   let count = 0;
   for (const child of Children.toArray(node)) {
     if (!isValidElement<{ children?: ReactNode }>(child)) continue;
-    if (child.type === MenuSeparator) continue;
+    if (child.type === MenuSeparator || child.type === MenuLabel) continue;
     if (child.type === MenuItem || child.type === DisabledMenuItem) count += 1;
     else if (child.type === MenuSub) count += 2;
     else if (child.type === Fragment || child.type === MenuRadioGroup) {
       const inner = countMenuItems(child.props.children);
       if (inner === undefined) return undefined;
       count += inner;
-    } else if (child.type === MenuRadioItem) count += 1;
+    } else if (child.type === MenuRadioItem || child.type === MenuCheckboxItem) count += 1;
     else return undefined;
   }
   return count;
@@ -219,11 +270,15 @@ export function RowActionsMenu({
   items,
   onOpenChange,
   onCloseAutoFocus,
+  modal,
+  openHref,
   tooltip,
   linksKeepBrowserMenu = false,
   children,
 }: RowActions & {
   tooltip?: string;
+  /** A click on the row goes to this page: both menus lead with "Open in new tab". Never makes a row earn a menu alone (§6c). */
+  openHref?: string;
   /** Right-click or hold on a link or text field stays the browser's (§6c "Entities", guardrail 2). */
   linksKeepBrowserMenu?: boolean;
   children: ReactElement;
@@ -237,11 +292,15 @@ export function RowActionsMenu({
   // `RowMoreActions` appends the same itself, so the context value stays
   // the row's own items and a hand-rolled wrapper gets the extras too.
   const extras = useContext(RowMenuExtrasContext);
+  const rowHref = useContext(RowOpenHrefContext);
+  const href = openHref ?? rowHref;
   useEffect(() => warnRestraint(name, items), [name, items]);
   return (
-    <RowActionsContext.Provider value={{ name, items, onOpenChange, onCloseAutoFocus }}>
+    <RowActionsContext.Provider
+      value={{ name, items, onOpenChange, onCloseAutoFocus, modal, openHref: href }}
+    >
       <TooltipHoldContext.Provider value={false}>
-        <ContextMenu onOpenChange={onOpenChange}>
+        <ContextMenu onOpenChange={onOpenChange} modal={modal}>
           {tooltip === undefined ? (
             trigger
           ) : (
@@ -250,6 +309,7 @@ export function RowActionsMenu({
             <Tooltip content={tooltip}>{trigger}</Tooltip>
           )}
           <ContextMenuContent onCloseAutoFocus={onCloseAutoFocus}>
+            {href && <OpenInNewTabMenuItem href={href} />}
             {items}
             {extras}
           </ContextMenuContent>
@@ -257,6 +317,32 @@ export function RowActionsMenu({
       </TooltipHoldContext.Provider>
     </RowActionsContext.Provider>
   );
+}
+
+const ROW_MENU_TIP = 'rowMenuTip';
+const ROW_HINT = 'rowHint';
+/** How many ⋮ opens carry the "right-click any row" footer. */
+const ROW_MENU_TIP_OPENS = 3;
+
+/**
+ * The one-time hint on the first ⋮ a pilot sees (§6c "Hints"): shows once ever,
+ * on one ⋮ only, and never in a session that already showed another hint.
+ */
+function useRowMoreHint(active: boolean): [shown: boolean, dismiss: () => void] {
+  const owner = `${ROW_HINT}:${useId()}`;
+  const hydrated = useHintCounts((state) => state.hydrated);
+  const shown = useSessionHintShown(owner);
+  useEffect(() => {
+    if (!active || !hydrated) return;
+    if (hintSeenCount(useHintCounts.getState().value, ROW_HINT) > 0) return;
+    if (claimSessionHint(owner)) return () => releaseSessionHint(owner);
+  }, [active, hydrated, owner]);
+  // Counted when answered, not when claimed: a hint that never reached the screen is not spent.
+  const dismiss = () => {
+    recordHintSeen(ROW_HINT);
+    dismissSessionHint(owner);
+  };
+  return [shown, dismiss];
 }
 
 /**
@@ -275,8 +361,14 @@ export function RowMoreActions({
   className,
   variant = 'plain',
   size = 'row',
+  label,
+  focusTarget = false,
 }: {
   className?: string;
+  /** The button's accessible name, when "More actions for {name}" is not the wording ("Settings for Wallet"). */
+  label?: string;
+  /** Marks the button as the place focus returns to (`data-focus-target`). */
+  focusTarget?: boolean;
   /** `ghost` draws the hairline border, for a ⋮ that stands beside a `Button` rather than inside a row. */
   variant?: Extract<IconButtonVariant, 'ghost' | 'plain'>;
   /** `sm` matches `Button size="sm"`'s height. */
@@ -285,18 +377,57 @@ export function RowMoreActions({
   const { t } = useTranslation();
   const actions = useContext(RowActionsContext);
   const extras = useContext(RowMenuExtrasContext);
+  const [tip, setTip] = useState(false);
+  const [hintShown, dismissHint] = useRowMoreHint(actions !== null);
+  const context = useTouchContext();
   if (!actions) return null;
+  const onOpenChange = (open: boolean) => {
+    if (open) {
+      if (hintShown) dismissHint();
+      // Counted per open, but the footer stays for the open that earned it.
+      const { value, hydrated } = useHintCounts.getState();
+      const earned = hydrated && hintSeenCount(value, ROW_MENU_TIP) < ROW_MENU_TIP_OPENS;
+      setTip(earned);
+      if (earned) recordHintSeen(ROW_MENU_TIP);
+    }
+    actions.onOpenChange?.(open);
+  };
   return (
-    <DropdownMenu onOpenChange={actions.onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-          label={t('common.moreActionsLabel', { name: actions.name })}
-          variant={variant}
-          size={size}
-          className={className}
-        />
-      </DropdownMenuTrigger>
+    <DropdownMenu onOpenChange={onOpenChange} modal={actions.modal}>
+      <Popover open={hintShown} onOpenChange={(open) => !open && dismissHint()}>
+        <PopoverAnchor asChild>
+          <DropdownMenuTrigger asChild>
+            <IconButton
+              icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+              label={label ?? t('common.moreActionsLabel', { name: actions.name })}
+              variant={variant}
+              size={size}
+              className={className}
+              data-focus-target={focusTarget ? true : undefined}
+            />
+          </DropdownMenuTrigger>
+        </PopoverAnchor>
+        <PopoverContent
+          align="end"
+          className="flex max-w-60 flex-col items-start gap-2 p-2 text-xs"
+          // A hint never takes focus from where the pilot is working.
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          // Portalled, so React still bubbles these to the row's own handlers.
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+          // Focus moving elsewhere is not an answer; a press outside or Escape is.
+          onFocusOutside={(event) => event.preventDefault()}
+        >
+          <p>{t('common.rowHint', { context })}</p>
+          <Button size="sm" onClick={dismissHint}>
+            {t('common.hintGotIt')}
+          </Button>
+        </PopoverContent>
+      </Popover>
       {/* Stops a right-click on an item bubbling (through the React tree,
           portal or not) to the row's own context-menu trigger. */}
       <DropdownMenuContent
@@ -305,8 +436,14 @@ export function RowMoreActions({
         onCloseAutoFocus={actions.onCloseAutoFocus}
       >
         <MenuKindContext.Provider value="dropdown">
+          {actions.openHref && <OpenInNewTabMenuItem href={actions.openHref} />}
           {actions.items}
           {extras}
+          {tip && (
+            <p className="mt-1 border-t border-line px-2 pt-1.5 pb-1 text-xs text-text-dim">
+              {t('common.rowMenuTip', { context })}
+            </p>
+          )}
         </MenuKindContext.Provider>
       </DropdownMenuContent>
     </DropdownMenu>
