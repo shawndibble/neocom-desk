@@ -1,6 +1,14 @@
 import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -17,6 +25,7 @@ import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
+import { routePaste } from '@/app/pasteRouting';
 import { listNavDestinations, NAV_LOCK_PATHS, type NavDestination } from '@/app/navDestinations';
 import { recentNavFor, viewPathFor } from '@/app/navRail';
 import { useRecentNav } from '@/app/navPreferences';
@@ -225,7 +234,10 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
   const { providers, destinations } = useShippedProviders(onShowItem);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  // Only the latest paste may navigate, whichever classifies first.
+  const latestPaste = useRef(0);
   // The rail's layouts only: below `md` the More sheet already showed Recent
   // before the palette opened.
   const isDesktop = useMediaQuery(MD_UP_QUERY);
@@ -256,6 +268,14 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     inputRef.current?.focus();
   }, []);
 
+  // A closed palette (Escape, a pick) must not be navigated by a paste still classifying.
+  useEffect(
+    () => () => {
+      latestPaste.current = -1;
+    },
+    []
+  );
+
   // The item catalogue starts loading as the palette opens, not at the third
   // keystroke — and off the render path, so typing never waits on it. Each
   // opening retries a failed load once; a failure is the Market Items
@@ -274,6 +294,25 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     // from, and a navigation's own route focus then lands after it.
     onClose();
     result.run();
+  }
+
+  /**
+   * A multi-line paste the app recognises (a fit, a skill plan, an item list…)
+   * goes where `GlobalPasteRouter` would send it, no confirm step. The text
+   * still lands in the input meanwhile, so one that matches nothing — or an
+   * item list read offline, which says nothing here — just stays as typed.
+   * A single line is a search.
+   */
+  function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
+    const text = event.clipboardData.getData('text/plain');
+    const id = ++latestPaste.current;
+    if (!text.trim().includes('\n')) return;
+    void routePaste(text, { pathname, search }).then(({ route }) => {
+      if (id !== latestPaste.current || route === null) return;
+      // Closed first, as `activate` does, so focus hands back before the route's own.
+      onClose();
+      void navigate(...route);
+    });
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -338,6 +377,7 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={t('commandPalette.placeholder')}
           aria-label={t('commandPalette.inputLabel')}
           role="combobox"

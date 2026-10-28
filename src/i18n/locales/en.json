@@ -13840,7 +13840,7 @@
     "cycleModuleState": "Step a focused Ring module through its states (Fittings)",
     "submitPaste": "Submit a pasted list or fit (any paste box)",
     "pasteTitle": "Paste anywhere",
-    "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Back returns you where you were.",
+    "pasteHint": "Outside a text field, a pasted fit, blueprint list, skill plan, item list (inventory, cargo or contract), Local list or D-Scan opens where it belongs. Pasting several lines into Go to does the same. Back returns you where you were.",
     "paste": "Paste",
     "pasteOffline": "Couldn't read that paste offline — item data isn't downloaded yet.",
     "pasteDestinations": {
