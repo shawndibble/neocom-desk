@@ -1449,6 +1449,14 @@ Every interactive element takes its states from one shared recipe in
 - **Hover:** one step brighter. Rows and ghost controls use the `panel-2`
   fill and no other. Raw CSS `:hover` goes inside `@media (hover: hover)` so
   it never sticks after a tap.
+  - **Exception, trigger on a Panel body:** a small inline trigger on a
+    `Panel` body (`bg-panel/85`, about `#101519`) takes
+    `hover:bg-line-bright/40` (about `#2d3845`, 29–44 levels per channel
+    brighter; bare `hover:bg-line` is a retired fill) and `active:bg-panel-2`.
+    `panel-2` is only 6–14 levels from that surface, so it reads as no
+    change. `bg` is 5–7 levels away, just as faint. The cost index trigger
+    in `CostIndexTrend` is the example. Full-width rows and `bg-bg` areas
+    keep `panel-2`.
 - **Pressed:** a colour step darker than hover (`active:`). On touch, this is
   the tap feedback.
 - **Focus:** a 2px accent outline on every interactive element, navigation
