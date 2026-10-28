@@ -57,7 +57,7 @@ describe('claimValuesOf', () => {
     });
   });
   it('is null where a type has no price', async () => {
-    const odd = { ...victim, items: [{ item_type_id: 405, flag: 27, quantity_destroyed: 1 }] };
+    const odd = { ...victim, items: [{ item_type_id: 380, flag: 19, quantity_destroyed: 1 }] };
     expect((await claimValuesOf(source, odd, undefined)).fitValue).toBeNull();
   });
 });
