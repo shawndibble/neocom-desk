@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { parsePositiveInt } from '@/engine/market/urlState';
 import { MAIL_OWNER_PARAM, OPEN_PARAM } from '@/lib/highlightParam';
@@ -34,5 +34,9 @@ export function useMailOpenParam(): MailOpenTarget | null {
     );
   }, [setSearchParams]);
 
-  return initial.mailId === null ? null : { mailId: initial.mailId, ownerId: initial.ownerId };
+  // Stable identity: Mail re-renders when the strip above rewrites the URL, and a fresh object would read as a new request.
+  return useMemo(
+    () => (initial.mailId === null ? null : { mailId: initial.mailId, ownerId: initial.ownerId }),
+    [initial]
+  );
 }
