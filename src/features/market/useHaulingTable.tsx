@@ -144,9 +144,11 @@ export function useHaulingTable({
       header: t('market.hauling.columns.item'),
       headerClassName: 'whitespace-nowrap',
       primary: true,
-      // Takes the spare width and wraps a long name, so the longest name never
-      // sets the table's minimum; below `min-w-28` the table scrolls in its wrapper.
-      className: cards ? undefined : 'w-full max-w-0 min-w-28',
+      // The one width-less column: it takes the spare width and wraps a long
+      // name. A `w-full` here would, in a windowed table's fixed layout, mean
+      // 100% of the table and starve it; the floor is `minWidth`, below which
+      // the table scrolls in its wrapper.
+      minWidth: '7rem',
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
         // The name is the row's handle, not a link: the row click is its action (§6c).

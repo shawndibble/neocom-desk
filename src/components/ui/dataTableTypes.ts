@@ -40,6 +40,12 @@ export interface DataTableColumn<T> {
    */
   width?: string;
   /**
+   * Least a width-less column of a fixed-layout (windowed) table squeezes to,
+   * a CSS length; default `16ch`. A `min-w-*` class on the cell does nothing
+   * there, so the table's own `min-width` is where the floor lives.
+   */
+  minWidth?: string;
+  /**
    * Pins the column at the left edge while the rest scroll sideways under it
    * (a table that overflows its wrapper, e.g. `responsive="table"` on a
    * phone), so row labels stay on screen. Below `md` it also gets a right
