@@ -145,6 +145,7 @@ function useColumns(
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       cardCorner: true,
+      sortFirst: 'asc',
       sortValue: jumpsSortValue,
       render: (row) => <JumpsCell row={row} />,
     },

@@ -140,6 +140,7 @@ export function activeJobColumns({
           success: 'font-semibold text-success',
         }),
       // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
+      sortFirst: 'asc',
       sortValue: (job) => Date.parse(job.end_date),
       render: (job) => <JobEndsInCell job={job} doneLabel={t('industry.jobsDone')} />,
     },
@@ -147,6 +148,7 @@ export function activeJobColumns({
       id: 'ends',
       header: t('industry.jobsColEnds'),
       className: 'whitespace-nowrap text-text-dim',
+      sortFirst: 'asc',
       sortValue: (job) => Date.parse(job.end_date),
       render: (job) => {
         const endDate = new Date(job.end_date);

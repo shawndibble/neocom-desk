@@ -19,7 +19,8 @@ interface AppraisalSummaryProps {
   loading: boolean;
   net: ReturnType<typeof appraisalNet> | null;
   itemCount: number;
-  hasRefine: boolean;
+  /** Rows carry refine data and the Refine column is shown. */
+  showRefine: boolean;
   hasLpOption: boolean;
   /** The "Minus owned" provenance line; null when the filter is off. */
   minusOwnedLabel: string | null;
@@ -39,7 +40,7 @@ export function AppraisalSummary({
   loading,
   net,
   itemCount,
-  hasRefine,
+  showRefine,
   hasLpOption,
   minusOwnedLabel,
   cargo,
@@ -62,7 +63,7 @@ export function AppraisalSummary({
           totals={totals}
           net={net}
           itemCount={itemCount}
-          showRefine={hasRefine}
+          showRefine={showRefine}
           showCheapest={hasLpOption}
           implantBonusPct={implantBonusPct}
           pricesUnavailable={result.pricesUnreachable}
@@ -81,7 +82,7 @@ export function AppraisalSummary({
 
       {net && <AssumesBaseStandingsNote hint={t('market.appraisal.assumesBaseStandingsHint')} />}
 
-      {hasRefine && refinesOreOrIce && (
+      {showRefine && refinesOreOrIce && (
         <div className="empty:hidden">
           <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
         </div>

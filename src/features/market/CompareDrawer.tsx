@@ -373,6 +373,7 @@ export function CompareDrawer({
           ) : (
             '—'
           ),
+        sortFirst: 'asc',
         sortValue: (row) => row.summary?.bestSell ?? undefined,
       },
       {

@@ -10,7 +10,7 @@
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTranslation } from 'react-i18next';
-import { IskAmount, TypeIcon, sortRows } from '@/components/ui';
+import { IskAmount, TypeIcon, firstSortDirection, sortRows } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { BlueprintBadge } from '@/features/assets/assetBrowserRows';
 import { iskToneClass } from '@/features/character/format';
@@ -116,7 +116,11 @@ export function MobileOwnedBlueprintList({
     <div className="-mx-3 flex flex-col">
       <MobileSortToolbar
         count={groups.length}
-        fields={SORT_FIELD_ORDER.map((id) => ({ id, label: fieldLabel[id] }))}
+        fields={SORT_FIELD_ORDER.map((id) => ({
+          id,
+          label: fieldLabel[id],
+          firstDirection: firstSortDirection({ sortValue: OWNED_BLUEPRINT_SORT_VALUE[id] }, rows),
+        }))}
         sort={sort}
         onSortChange={setSort}
         className="px-3"

@@ -1255,6 +1255,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     {isPhone && openRows.length > 1 && (
                       <DataTableSortPicker
                         columns={openColumns}
+                        rows={openRows}
                         sort={taxSort.sort}
                         onSortChange={taxSort.onSortChange}
                         size="sm"

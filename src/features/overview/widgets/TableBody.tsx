@@ -30,7 +30,7 @@ import {
   SeverityIcon,
 } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { nextDataTableSort } from '@/components/ui/dataTableSort';
+import { firstSortDirection, nextDataTableSort } from '@/components/ui/dataTableSort';
 import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
@@ -462,7 +462,16 @@ export function TableBody({
                         column={column}
                         direction={direction}
                         onSort={() => {
-                          setSort(nextDataTableSort(sort, column.key));
+                          setSort(
+                            nextDataTableSort(
+                              sort,
+                              column.key,
+                              firstSortDirection(
+                                { sortValue: (row) => row.sort?.[table.columns.indexOf(column)] },
+                                table.rows
+                              )
+                            )
+                          );
                           setPageState({ page: 1, perPage: paging?.rowsPerPage });
                         }}
                       />

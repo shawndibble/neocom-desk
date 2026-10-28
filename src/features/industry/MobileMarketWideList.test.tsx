@@ -101,7 +101,7 @@ describe('MobileMarketWideList', () => {
     const onSortChange = renderList();
     await user.click(screen.getByRole('button', { name: /Sort by/ }));
     await user.click(await screen.findByRole('menuitem', { name: 'Build cost' }));
-    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'buildCost', direction: 'asc' });
+    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'buildCost', direction: 'desc' });
   });
 
   it('gives every card one trailing control: Start a plan, no item menu', () => {
