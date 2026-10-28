@@ -12020,6 +12020,7 @@
         "multibuy": "Multibuy"
       },
       "openInJanice": "Open in Janice",
+      "pickHaulingShip": "Pick hauling ship",
       "janiceFetching": "Fetching your Janice URL…",
       "janiceFailed": {
         "failed": "Janice didn't answer, so no tab was opened. Try again in a moment.",

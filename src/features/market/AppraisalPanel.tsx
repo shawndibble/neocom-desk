@@ -328,7 +328,7 @@ export function AppraisalPanel({
             loading={loading}
             net={net}
             itemCount={rows.length}
-            hasRefine={hasRefine}
+            showRefine={hasRefine && visibleColumns.includes('refineTotal')}
             hasLpOption={hasLpOption}
             minusOwnedLabel={minusOwnedLabel}
             cargo={cargo}
@@ -371,6 +371,8 @@ export function AppraisalPanel({
                 copy={{ copied, copyLists, handleCopy }}
                 janice={{ janice, handleOpenInJanice, canOpen: text.trim() !== '' }}
                 characterId={characterId}
+                cargo={cargo}
+                onCargoChange={(next) => void setCargo(next)}
                 rowCount={rows.length}
               />
             )
