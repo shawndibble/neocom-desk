@@ -15,7 +15,6 @@ function renderList(overrides: Partial<QuickbarListProps> = {}) {
     onSelect: vi.fn(),
     onRemove: vi.fn(),
     onReorder: vi.fn(),
-    onSetTarget: vi.fn(),
     onViewInAppraisal: vi.fn(),
     ...overrides,
   };
@@ -31,12 +30,44 @@ function renderList(overrides: Partial<QuickbarListProps> = {}) {
 }
 
 describe('QuickbarList row controls', () => {
-  it('has no item menu and no More actions button: the bell and × are its controls', () => {
+  it('has a ⋮ menu with Show info and Remove, and no bell or ×', async () => {
+    const user = userEvent.setup();
+    renderList();
+    expect(screen.queryByRole('button', { name: /price alert/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Remove Tritanium/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Tritanium' }));
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Remove' })).toHaveClass('text-danger');
+  });
+
+  it('opens the same menu on right-click', () => {
     renderList();
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
 
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
+  it('Show info opens the item detail', async () => {
+    const user = userEvent.setup();
+    const { actions } = renderList();
+    await user.click(screen.getByRole('button', { name: 'More actions for Tritanium' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+    expect(actions.showInfo).toHaveBeenCalledWith(34, 'Tritanium');
+  });
+
+  it('Remove calls onRemove', async () => {
+    const user = userEvent.setup();
+    const props = renderList();
+    await user.click(screen.getByRole('button', { name: 'More actions for Tritanium' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
+    expect(props.onRemove).toHaveBeenCalledWith(34);
+  });
+
+  it('keeps the target text on the row', () => {
+    renderList({
+      items: [{ ...items[0], targetPrice: 5_000_000, targetDirection: 'above' }],
+    });
+    expect(screen.getByRole('button', { name: /^Tritanium/ })).toHaveTextContent('≥ 5M');
   });
 
   it('selects the item on a name click', async () => {

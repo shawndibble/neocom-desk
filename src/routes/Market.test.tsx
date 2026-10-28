@@ -1449,9 +1449,7 @@ describe('Quickbar (issue #7)', () => {
     const quickbar = await screen.findByTestId('quickbar');
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
 
-    // Two bells now (the Quickbar row's, then the item header's): use the header's.
-    const bells = await screen.findAllByRole('button', { name: 'Set price alert for Rifter' });
-    await user.click(bells[bells.length - 1]);
+    await user.click(await screen.findByRole('button', { name: 'Set price alert for Rifter' }));
     await user.click(await screen.findByRole('button', { name: 'Save' }));
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
   });
@@ -1467,22 +1465,21 @@ describe('Quickbar (issue #7)', () => {
     expect(await within(quickbar).findByText('Rifter')).toBeInTheDocument();
 
     const toggle = await screen.findAllByRole('button', { name: 'Remove Rifter from Quickbar' });
-    // The Quickbar row's × and the header toggle share the label: the header's is pressed.
     const header = toggle.find((b) => b.getAttribute('aria-pressed') === 'true')!;
     await user.click(header);
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
   });
 
-  it('has no More actions button on a Quickbar row: its bell and × are the controls', async () => {
+  it('opens a ⋮ menu on a Quickbar row with Show info and Remove', async () => {
     const user = userEvent.setup();
     render(<App />);
     await pinRifterFromHeaderBell(user);
 
     const quickbar = await screen.findByTestId('quickbar');
     await within(quickbar).findByText('Rifter');
-    expect(within(quickbar).queryByRole('button', { name: /^More actions/ })).toBeNull();
-    fireEvent.contextMenu(within(quickbar).getByText('Rifter'));
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    await user.click(within(quickbar).getByRole('button', { name: 'More actions for Rifter' }));
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Remove' })).toBeInTheDocument();
   });
 
   it('removes an item, restoring the empty hint', async () => {
@@ -1493,11 +1490,16 @@ describe('Quickbar (issue #7)', () => {
 
     await user.click(
       within(screen.getByTestId('quickbar')).getByRole('button', {
-        name: 'Remove Rifter from Quickbar',
+        name: 'More actions for Rifter',
       })
     );
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
 
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
+    expect(screen.getAllByText('Quickbar item Rifter removed.').length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(await within(screen.getByTestId('quickbar')).findByText('Rifter')).toBeInTheDocument();
   });
 
   it('clicking a Quickbar item selects it and loads its order book', async () => {
