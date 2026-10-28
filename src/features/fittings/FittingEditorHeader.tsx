@@ -34,6 +34,8 @@ interface FittingEditorHeaderProps {
   onSavedToEve: () => void;
   /** Opens Improve. */
   onImprove: () => void;
+  /** The pilot can't fly a fitted module, so Improve opens on fixing the fit first. */
+  unflyable?: boolean;
 }
 
 /** The Permission Save to EVE needs, from the registry so a regrouping can't strand a hard-coded name. */
@@ -58,6 +60,7 @@ export function FittingEditorHeader({
   onLibrary,
   onSavedToEve,
   onImprove,
+  unflyable,
 }: FittingEditorHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -76,6 +79,7 @@ export function FittingEditorHeader({
         onRename={workspace.rename}
         onLibrary={onLibrary}
         onImprove={onImprove}
+        unflyable={unflyable}
         onCompare={() => {
           // Unsaved edits against a saved Fitting: Compare opens saved vs.
           // current rather than just the one code already in the URL.
