@@ -22,6 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import { IconButton, MenuItem, RowActionsMenu, RowMoreActions, TypeIcon } from '@/components/ui';
+import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import {
   focusRingClassName,
@@ -31,19 +32,28 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { buildQuickbarAnnouncements } from './quickbarAnnouncer';
-import { formatIskCompact } from '@/lib/isk';
+import { formatCount } from '@/lib/formatCount';
+import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { ShowInfoMenuItem } from './ItemContextMenu';
 import { hasQuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
+import type { VsPaid } from './useQuickbarVsPaid';
+
+/** `+50%`, `-12%`, `0%`. */
+function formatPercent(percent: number): string {
+  return `${percent > 0 ? '+' : ''}${percent}%`;
+}
 
 interface QuickbarRowProps {
   item: QuickbarItem;
+  /** Current price against what was paid; absent when no wallet basis covers the item. */
+  vsPaid?: VsPaid;
   selected: boolean;
   onSelect: (typeId: number) => void;
   onRemove: (typeId: number) => void;
 }
 
-function QuickbarRow({ item, selected, onSelect, onRemove }: QuickbarRowProps) {
+function QuickbarRow({ item, vsPaid, selected, onSelect, onRemove }: QuickbarRowProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.typeId,
@@ -108,6 +118,29 @@ function QuickbarRow({ item, selected, onSelect, onRemove }: QuickbarRowProps) {
             )}
           </button>
         </div>
+        {vsPaid && (
+          // Hidden below the list's own width, so the name keeps its room first.
+          <HintText
+            className={cx(
+              'hidden shrink-0 font-semibold tabular-nums @[15rem]:inline',
+              vsPaid.percent > 0 && 'text-success',
+              vsPaid.percent < 0 && 'text-danger',
+              vsPaid.percent === 0 && 'text-text-dim'
+            )}
+            content={t('market.quickbar.vsPaid.tooltip', {
+              price: formatIskAuto(vsPaid.price),
+              paid: formatIskAuto(vsPaid.paid),
+              count: vsPaid.units,
+              units: formatCount(vsPaid.units),
+            })}
+          >
+            {formatPercent(vsPaid.percent)}
+            <span className="sr-only">
+              {' '}
+              {t('market.quickbar.vsPaid.label', { name: item.name })}
+            </span>
+          </HintText>
+        )}
         <RowMoreActions />
       </li>
     </RowActionsMenu>
@@ -116,6 +149,8 @@ function QuickbarRow({ item, selected, onSelect, onRemove }: QuickbarRowProps) {
 
 export interface QuickbarListProps {
   items: readonly QuickbarItem[];
+  /** Price against paid, by type id; omitted items show no chip. */
+  vsPaid?: ReadonlyMap<number, VsPaid>;
   selectedTypeId: number | null;
   onSelect: (typeId: number) => void;
   onRemove: (typeId: number) => void;
@@ -125,6 +160,7 @@ export interface QuickbarListProps {
 
 export function QuickbarList({
   items,
+  vsPaid,
   selectedTypeId,
   onSelect,
   onRemove,
@@ -171,11 +207,12 @@ export function QuickbarList({
             items={items.map((i) => i.typeId)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="max-h-80 overflow-y-auto rounded-xs border border-line">
+            <ul className="@container max-h-80 overflow-y-auto rounded-xs border border-line">
               {items.map((item) => (
                 <QuickbarRow
                   key={item.typeId}
                   item={item}
+                  vsPaid={vsPaid?.get(item.typeId)}
                   selected={item.typeId === selectedTypeId}
                   onSelect={onSelect}
                   onRemove={onRemove}
