@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { iskPerM3, type AppraisalRow } from '@/engine/market/appraisal';
+import { iskPerM3, splitEach, type AppraisalRow } from '@/engine/market/appraisal';
 
 /**
  * CSV columns for the Appraisal tab. Prices are raw numbers already scaled to
@@ -16,6 +16,7 @@ export function appraisalCsvColumns(t: CsvTranslate): CsvColumn<AppraisalRow>[] 
     { header: t('market.appraisal.columnItem'), value: (row) => row.name },
     { header: t('market.appraisal.columnBuyEach'), value: (row) => row.buyEach },
     { header: t('market.appraisal.columnSellEach'), value: (row) => row.sellEach },
+    { header: t('market.appraisal.columnSplitEach'), value: (row) => splitEach(row) },
     { header: t('market.appraisal.columnBuyTotal'), value: (row) => row.buyTotal },
     { header: t('market.appraisal.columnSellTotal'), value: (row) => row.sellTotal },
     // Packaged m³ (issue #2337); unknown exports empty, the same as an unpriced side.

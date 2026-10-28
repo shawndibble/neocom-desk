@@ -12,7 +12,7 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import type { AppraisalRow } from '@/engine/market/appraisal';
+import { splitEach, type AppraisalRow } from '@/engine/market/appraisal';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import { formatIskAuto } from '@/lib/isk';
 import { appraisalCsvColumns } from './appraisalCsv';
@@ -102,6 +102,16 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => eachCell(row.sellEach),
       sortValue: (row) => row.sellEach ?? undefined,
+    },
+    {
+      id: 'splitEach',
+      header: t('market.appraisal.columnSplitEach'),
+      headerTooltip: t('market.appraisal.columnSplitEachHelp'),
+      phoneHidden: true,
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => eachCell(splitEach(row)),
+      sortValue: (row) => splitEach(row) ?? undefined,
     },
     {
       id: 'buyTotal',

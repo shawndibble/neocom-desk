@@ -12052,6 +12052,8 @@
       "columnItem": "Item",
       "columnBuyEach": "Buy each",
       "columnSellEach": "Sell each",
+      "columnSplitEach": "Split each",
+      "columnSplitEachHelp": "Midpoint of the buy and sell price.",
       "columnBuyTotal": "Buy total",
       "columnSellTotal": "Sell total",
       "columnRefineTotal": "Refine total",

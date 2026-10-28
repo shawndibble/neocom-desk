@@ -40,7 +40,9 @@ here — they go one per file in `docs/context/decisions/`.
   by side on their own prices: an Appraisal answers "what is this pile
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
-  most") and is not the **Compare** drawer.
+  most") and is not the **Compare** drawer. Its optional "Split each" column
+  is the **split**: the midpoint of a line's buy and sell price, also shown
+  on a **Shared Appraisal**.
 - **Collector**: A corporation whose **Corp Tax Book** also collects moon mining tax for moons it does not own, billing the miners and accounting to each **Feeder**. Dev term: to a moon owner it is "the accounting corporation".
 - **Coverage period**: A run of UTC days (`from`, optional `to`, both inclusive) during which a **Feeder**'s mined volume counts toward a **Collector**'s book; a rejoin adds a new one on the same record, and rows outside every period owe nothing.
 - **Disconnected**: A **Feeder**'s status after 30 days of a stale grant. Player-facing: "Disconnected".

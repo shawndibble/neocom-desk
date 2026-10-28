@@ -9,6 +9,12 @@ describe('appraisal columns', () => {
     expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).toContain('volume');
   });
 
+  it('offers split each straight after sell each, off until ticked', () => {
+    const ids = [...APPRAISAL_COLUMN_IDS];
+    expect(ids[ids.indexOf('sellEach') + 1]).toBe('splitEach');
+    expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('splitEach');
+  });
+
   it('offers sales tax and the after-tax sell total, off until ticked', () => {
     const ids = [...APPRAISAL_COLUMN_IDS];
     expect(ids.indexOf('sellAfterTax')).toBe(ids.indexOf('salesTax') + 1);

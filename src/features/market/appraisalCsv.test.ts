@@ -26,6 +26,7 @@ describe('appraisalCsvColumns', () => {
       'market.appraisal.columnItem',
       'market.appraisal.columnBuyEach',
       'market.appraisal.columnSellEach',
+      'market.appraisal.columnSplitEach',
       'market.appraisal.columnBuyTotal',
       'market.appraisal.columnSellTotal',
       'market.appraisal.columnVolume',
@@ -39,18 +40,36 @@ describe('appraisalCsvColumns', () => {
       appraisalCsvColumns(t)
     );
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['100', '"Tritanium"', '4.869', '6', '606190.5', '600', '1.5', '400']);
+    expect(fields).toEqual([
+      '100',
+      '"Tritanium"',
+      '4.869',
+      '6',
+      '5.4345',
+      '606190.5',
+      '600',
+      '1.5',
+      '400',
+    ]);
   });
 
   it('exports an unpriced side empty rather than as zero', () => {
     const csv = toCsv([row({ buyEach: null, buyTotal: null })], appraisalCsvColumns(t));
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['100', '"Tritanium"', '', '6', '', '600', '', '']);
+    expect(fields).toEqual(['100', '"Tritanium"', '', '6', '', '', '600', '', '']);
   });
 
   it('exports an unknown volume empty rather than as zero', () => {
     const csv = toCsv([row({ volume: null })], appraisalCsvColumns(t));
     expect(csv.split('\r\n')[1].split(',').at(-2)).toBe('');
+  });
+
+  it('exports split each as a raw number, empty when a side is unpriced', () => {
+    const split = appraisalCsvColumns(t).find(
+      (c) => c.header === 'market.appraisal.columnSplitEach'
+    );
+    expect(split?.value(row())).toBe(5.5);
+    expect(split?.value(row({ buyEach: null }))).toBeNull();
   });
 
   it('exports ISK per m³ as a raw number, empty when there is no volume', () => {

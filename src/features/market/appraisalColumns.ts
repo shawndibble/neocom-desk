@@ -11,6 +11,7 @@ import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 export const APPRAISAL_COLUMN_IDS = [
   'buyEach',
   'sellEach',
+  'splitEach',
   'buyTotal',
   'sellTotal',
   'refineTotal',
@@ -24,7 +25,12 @@ export const APPRAISAL_COLUMN_IDS = [
 export type AppraisalColumnId = (typeof APPRAISAL_COLUMN_IDS)[number];
 
 /** Columns added after the table shipped: there to tick in the picker, not on screen by default. */
-const OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['iskPerM3', 'salesTax', 'sellAfterTax'];
+const OFF_BY_DEFAULT: readonly AppraisalColumnId[] = [
+  'splitEach',
+  'iskPerM3',
+  'salesTax',
+  'sellAfterTax',
+];
 
 /** Every column shown before the opt-in ones existed, so adding one changes nothing on its own. */
 export const DEFAULT_VISIBLE_APPRAISAL_COLUMNS: readonly AppraisalColumnId[] =

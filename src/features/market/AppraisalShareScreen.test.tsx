@@ -53,3 +53,32 @@ describe('AppraisalShareScreen — Time format', () => {
     expect(screen.queryByText(formatTimestamp(new Date(EXPIRES_AT)))).not.toBeInTheDocument();
   });
 });
+
+describe('AppraisalShareScreen — split each', () => {
+  it('shows the midpoint of buy and sell per line, a dash when a side is unpriced', () => {
+    const row = (name: string, buyEach: number | null, sellEach: number | null) => ({
+      typeId: name.length,
+      name,
+      quantity: 1,
+      buyEach,
+      sellEach,
+      buyTotal: buyEach,
+      sellTotal: sellEach,
+      volume: null,
+    });
+    const priced = {
+      ...view,
+      appraisal: {
+        ...view.appraisal,
+        rows: [row('Tritanium', 100, 200), row('Pyerite', null, 50)],
+      },
+    } as unknown as AppraisalShareView;
+    render(
+      <MemoryRouter>
+        <AppraisalShareScreen state={{ status: 'ready', view: priced }} expiresAt={EXPIRES_AT} />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('columnheader', { name: /Split each/ })).toBeInTheDocument();
+    expect(screen.getByText('150')).toBeInTheDocument();
+  });
+});

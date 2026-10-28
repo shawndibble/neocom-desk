@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
   iskPerM3,
+  splitEach,
   sellSalesTax,
   sellAfterTax,
   appraisalUndercut,
@@ -733,6 +734,18 @@ describe('iskPerM3', () => {
 
   it('is null when nobody sells it, rather than a free cargo', () => {
     expect(iskPerM3({ ...base, sellTotal: null })).toBeNull();
+  });
+});
+
+describe('splitEach', () => {
+  it('is the midpoint of the buy and sell each price', () => {
+    expect(splitEach({ buyEach: 5, sellEach: 7 })).toBe(6);
+  });
+
+  it('is null when either side has no price, never half a price or zero', () => {
+    expect(splitEach({ buyEach: null, sellEach: 7 })).toBeNull();
+    expect(splitEach({ buyEach: 5, sellEach: null })).toBeNull();
+    expect(splitEach({ buyEach: null, sellEach: null })).toBeNull();
   });
 });
 

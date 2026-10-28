@@ -9,6 +9,7 @@ import {
   refineBeatsSellAsIs,
   sellAfterTax,
   sellSalesTax,
+  splitEach,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
@@ -165,6 +166,15 @@ export function useAppraisalColumns({
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => eachCell(row.sellEach),
       sortValue: (row) => row.sellEach ?? undefined,
+    },
+    splitEach: {
+      id: 'splitEach',
+      header: t('market.appraisal.columnSplitEach'),
+      headerTooltip: t('market.appraisal.columnSplitEachHelp'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => eachCell(splitEach(row)),
+      sortValue: (row) => splitEach(row) ?? undefined,
     },
     buyTotal: {
       id: 'buyTotal',
