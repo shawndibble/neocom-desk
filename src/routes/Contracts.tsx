@@ -213,7 +213,8 @@ export function Contracts() {
   // A switch of Character, source or corporation drops the open contract, so the modal
   // never pairs one party's reads with another's contract id.
   const selectionScope = `${source}:${activeCharacterId}:${view.corporationId}`;
-  const [paramOpenDismissed, setParamOpenDismissed] = useState(false);
+  // A param read off the History tab is spent: a later switch to History must not open it.
+  const [paramOpenDismissed, setParamOpenDismissed] = useState(tab !== 'history');
   const openContract = useCallback(
     (contract: Contract | null) => {
       setParamOpenDismissed(true);

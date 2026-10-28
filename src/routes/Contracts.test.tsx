@@ -316,6 +316,15 @@ describe('Contracts', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('opens nothing for ?highlight= on a non-History tab, even after switching to History', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/contracts/search/items?highlight=1');
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'History' }));
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('does not reopen a ?highlight= contract once closed', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
