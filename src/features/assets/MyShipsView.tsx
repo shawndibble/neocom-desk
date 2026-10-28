@@ -16,6 +16,7 @@ import {
   TypeIcon,
   CachedNotice,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { DataGate } from '@/components/DataGate';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
@@ -313,8 +314,15 @@ function ShipRowView({
                 {t('assets.myShips.quantity', { count: row.quantity })}
               </span>
             )}
-            {shipClass && (
-              <span className="text-xs text-text-dim max-sm:ml-2 sm:block">{shipClass}</span>
+            {(shipClass || row.packaged) && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-text-dim max-sm:ml-2 sm:flex">
+                {shipClass}
+                {row.packaged && (
+                  <Pill tone="warning" className="shrink-0">
+                    {t('assets.myShips.packaged')}
+                  </Pill>
+                )}
+              </span>
             )}
           </span>
           {openInFittings.pending && (
@@ -324,36 +332,34 @@ function ShipRowView({
         {showCharacter && (
           <span
             role="cell"
-            className="min-w-0 text-xs break-words text-text-dim max-sm:order-3 max-sm:flex-1 max-sm:truncate"
+            className="min-w-0 text-xs break-words text-text-dim max-sm:order-5 max-sm:basis-full max-sm:truncate"
           >
             {data.characterNames.get(row.characterId)}
           </span>
         )}
-        <span role="cell" className="min-w-0 text-xs break-words max-sm:order-2 max-sm:basis-full">
+        <span
+          role="cell"
+          className="min-w-0 text-xs break-words max-sm:order-3 max-sm:flex-1 max-sm:truncate"
+        >
           {name}
           {trail && (
-            <span className="text-text-dim max-sm:block">
-              <span className="max-sm:hidden"> · </span>
-              {trail}
-            </span>
+            <>
+              <span className="text-text-dim"> · </span>
+              <span className="text-text-dim">{trail}</span>
+            </>
           )}
         </span>
-        <span role="cell" className="text-xs max-sm:order-4">
+        <span role="cell" className="text-xs max-sm:order-2">
           <SecurityValue security={security} />
         </span>
         <span
           role="cell"
-          className="flex items-center gap-2 text-xs whitespace-nowrap max-sm:order-5"
+          className="flex items-center gap-2 text-xs whitespace-nowrap max-sm:order-4"
         >
           {jumps?.kind === 'known' && jumps.jumps === 0 ? (
             <span>{t('assets.myShips.here')}</span>
           ) : (
             <JumpsAwayText result={jumps} t={t} />
-          )}
-          {row.packaged && (
-            <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.6875rem] text-warning">
-              {t('assets.myShips.packaged')}
-            </span>
           )}
         </span>
         <span className="relative flex max-sm:absolute max-sm:top-2 max-sm:right-2">
