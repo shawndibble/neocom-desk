@@ -267,8 +267,9 @@ across Characters · whether other alert types than danger raise the banner.
   No new synced field.
 - **Snooze 1h** is device-local (`createLocalSetting`, group key -> until ms),
   offered only where the type is snoozable (price alerts).
-- **Undo toast is persistent** (the existing `Toast` with an `undo` action closes
-  on its close button, Esc, the next toast or a route change — WCAG 2.2.1), not 8 s.
+- **Undo toast is 8 s** (the existing `Toast` with an `undo` action expires after
+  8 s, paused while hovered or focused; the close button, Esc, the next toast or a
+  route change close it sooner — WCAG 2.2.1). Was persistent until #5334.
 - **Old Alerts page features** (per-Character filter, search, muted-type chips)
   move to the panel footer: "Notify me about…" links to Settings >
   Notifications. "Older alerts (N)" is not built: dismissed alerts have no

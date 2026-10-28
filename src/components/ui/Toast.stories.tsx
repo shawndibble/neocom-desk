@@ -6,7 +6,7 @@ const noop = () => {};
 
 /**
  * Fixed-position confirmation, portalled to the body. Feedback cue (§6c
- * Undo): a plain note expires; one offering Undo or an action stays until dismissed.
+ * Undo): a plain or Undo toast expires; one offering only an action stays until dismissed.
  *
  * @summary Transient confirmation floating above the tab bar.
  */
@@ -23,7 +23,7 @@ type Story = StoryObj<typeof meta>;
 /** @summary Feedback cue (§6c Undo): a plain note ("Copied") that expires; hover or focus pauses it. */
 export const Plain: Story = { args: { onClose: noop } };
 
-/** @summary Feedback cue (§6c Undo): an Undo link; stays until closed, Escape or a route change. */
+/** @summary Feedback cue (§6c Undo): an Undo link; expires after 8s, or closes sooner on Escape or a route change. */
 export const WithUndo: Story = {
   args: {
     message: 'Plan deleted',
@@ -32,7 +32,7 @@ export const WithUndo: Story = {
   },
 };
 
-/** @summary Feedback cue (§6c Undo): one follow-up action ("Open") on a persistent toast. */
+/** @summary Feedback cue (§6c Undo): one follow-up action ("Open") on a toast that stays until dismissed. */
 export const WithAction: Story = {
   args: {
     message: 'Appraisal saved',
