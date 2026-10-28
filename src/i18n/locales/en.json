@@ -13782,8 +13782,8 @@
     }
   },
   "commandPalette": {
-    "emptyHint": "Search a page, item, asset, pilot or command, or paste a fit, item list, Local list or D-Scan to be taken to the right page.",
-    "scopeNote": "Jumps to pages, items, assets and contacts. It doesn't filter the page you're on.",
+    "emptyTitle": "Search a page, item, asset, pilot or command",
+    "emptyHint": "Or paste a fit, item list, Local list or D-Scan",
     "title": "Command palette",
     "placeholder": "Go to a page, run a command, switch character, find an asset or item…",
     "inputLabel": "Search pages, commands, characters, assets and items",
