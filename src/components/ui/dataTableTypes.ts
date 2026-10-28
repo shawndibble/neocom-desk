@@ -412,6 +412,15 @@ export interface DataTableProps<T> {
    */
   virtualize?: boolean | 'auto';
   /**
+   * Gives an unwindowed table (`table-layout: auto`) what a windowed one gets
+   * from `width`: each sized column's header takes its width and the table's
+   * `min-width` is their sum plus a floor for every width-less column
+   * (`minWidth`, default 16ch), so the wrapper scrolls sideways rather than
+   * squeezing a text column to a few letters, and slack goes to the
+   * width-less columns, never to the sized ones. Off by default.
+   */
+  hugColumns?: boolean;
+  /**
    * Hands the caller the rows in on-screen order — the table sorts
    * internally, so an export that wants to match what the reader sees reads
    * them through this rather than re-sorting its own copy. Usually spread

@@ -16,21 +16,22 @@ import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 
-const TRANSACTIONS = [
-  {
-    transaction_id: 5001,
-    date: '2026-09-20T12:00:00Z',
+function makeTransactions(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    transaction_id: 5001 + i,
+    date: new Date(Date.UTC(2026, 8, 20, 12) - i * 3_600_000).toISOString(),
     location_id: 60003760,
     type_id: 34,
-    unit_price: 5.68,
-    quantity: 3_400_000,
+    unit_price: 5.68 + i,
+    quantity: 3_400_000 - i,
     client_id: 90000002,
-    is_buy: false,
-    journal_ref_id: 7001,
-  },
-];
+    is_buy: i % 3 === 0,
+    journal_ref_id: 7001 + i,
+  }));
+}
 
-async function mockTransactions(page: Page) {
+async function mockTransactions(page: Page, count = 1) {
+  const body = JSON.stringify(makeTransactions(count));
   // Before signing in: boot prefetch reads this, and an empty answer from the
   // shared mock would be cached as fresh.
   await page.route(
@@ -40,7 +41,7 @@ async function mockTransactions(page: Page) {
         status: 200,
         contentType: 'application/json',
         headers: { 'X-Pages': '1' },
-        body: JSON.stringify(TRANSACTIONS),
+        body,
       })
   );
 }
@@ -79,3 +80,23 @@ test.describe('Market history ledger at 390px', () => {
     );
   });
 });
+
+// ~30 rows lay out as `table-layout: auto`, ~200 as windowed `fixed`; Item must
+// keep room to read in both (#5456).
+for (const width of [360, 390, 414]) {
+  for (const count of [30, 200]) {
+    test(`Item keeps 110px at ${width}px with ${count} rows`, async ({ page }) => {
+      await mockTransactions(page, count);
+      await page.setViewportSize({ width, height: 844 });
+      await signInAndGoto(page);
+      await page.goto('./market/history');
+      const table = page.getByRole('table', { name: 'Transactions' });
+      await expect(table.locator('tbody tr[data-row-key]').first()).toBeVisible({
+        timeout: 15_000,
+      });
+      const item = await table.getByRole('columnheader', { name: 'Item' }).boundingBox();
+      expect(item?.width ?? 0).toBeGreaterThanOrEqual(110);
+      await expectNoPageOverflow(page);
+    });
+  }
+}

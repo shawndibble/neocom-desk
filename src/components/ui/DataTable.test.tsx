@@ -1544,7 +1544,11 @@ describe('DataTable virtualize', () => {
       { id: 'item', header: 'Item', render: (row) => row.item },
       { id: 'amount', header: 'Amount', width: '12ch', render: (row) => row.amount },
     ];
-    const renderSized = (props: { virtualize?: boolean; cols?: DataTableColumn<Row>[] }) =>
+    const renderSized = (props: {
+      virtualize?: boolean;
+      hugColumns?: boolean;
+      cols?: DataTableColumn<Row>[];
+    }) =>
       render(
         <DataTable
           label="Offers"
@@ -1552,6 +1556,7 @@ describe('DataTable virtualize', () => {
           rows={many}
           rowKey={(row) => row.id}
           virtualize={props.virtualize}
+          hugColumns={props.hugColumns}
         />
       );
 
@@ -1561,7 +1566,7 @@ describe('DataTable virtualize', () => {
         cols: [{ ...sized[0], minWidth: '7rem' }, sized[1]],
       });
       const style = screen.getByRole('table').getAttribute('style') ?? '';
-      expect(style).toContain('7rem');
+      expect(style).toContain('8.5rem');
       expect(style).not.toContain('16ch');
     });
 
@@ -1611,6 +1616,16 @@ describe('DataTable virtualize', () => {
       } finally {
         window.matchMedia = real;
       }
+    });
+
+    it('hugColumns sizes headers and the table floor but keeps the auto layout', () => {
+      renderSized({ hugColumns: true });
+      const table = screen.getByRole('table');
+      expect(table).not.toHaveClass('table-fixed');
+      expect(table.getAttribute('style')).toContain('min-width');
+      expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('style')).toContain(
+        '12ch'
+      );
     });
 
     it('keeps the auto layout when not windowed', () => {

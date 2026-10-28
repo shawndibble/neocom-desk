@@ -364,6 +364,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'item',
         header: t('wallet.item'),
         stickyStart: true,
+        // Takes the width the number columns leave; never under ~18ch, so names wrap on words.
+        minWidth: '18ch',
         // Wraps to two lines on a phone rather than truncating to "Repu…".
         className: 'sm:truncate',
         render: (txn) => (
@@ -668,6 +670,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                   rowKey={transactionRowKey}
                   highlightRowKey={highlightId}
                   virtualize="auto"
+                  hugColumns
                   responsive="table"
                   // `transactions` already arrives newest-first (the `sort` above) —
                   // matches that so a header click is the first thing that reorders it.

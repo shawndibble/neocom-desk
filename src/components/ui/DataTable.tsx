@@ -86,7 +86,10 @@ function fixedLayoutMinWidth<T>(
     column.width ? [columnCellWidth(column.width, density)] : []
   );
   const grows = shown.filter((column) => !column.width);
-  const floors = grows.map((column) => column.minWidth ?? `${GROW_COLUMN_MIN}ch`);
+  // The floor is content width; the cell's padding comes on top, as for a sized column.
+  const floors = grows.map((column) =>
+    columnCellWidth(column.minWidth ?? `${GROW_COLUMN_MIN}ch`, density)
+  );
   return `calc(${[...sized, ...floors, `${trailingRem}rem`].join(' + ')})`;
 }
 
@@ -132,6 +135,7 @@ export function DataTable<T>({
   groupBy,
   fullWidthRow,
   virtualize = false,
+  hugColumns = false,
   exportRef,
   exportable,
 }: DataTableProps<T>) {
@@ -289,6 +293,9 @@ export function DataTable<T>({
   // windowed table) and only for a table that opted in with a width; a
   // stacked card has no columns to fix.
   const fixedLayout = windowed && !isStacked && columns.some((column) => column.width);
+  // `hugColumns`: the same widths and sideways-scroll floor in an auto layout.
+  const sizedLayout =
+    fixedLayout || (hugColumns && !isStacked && columns.some((column) => column.width));
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
   const estimatedRowHeight =
@@ -457,7 +464,7 @@ export function DataTable<T>({
       // An open row's detail is a row too.
       aria-rowcount={windowed ? sortedRows.length + 1 + (expandedIndex >= 0 ? 1 : 0) : undefined}
       style={
-        fixedLayout
+        sizedLayout
           ? { minWidth: fixedLayoutMinWidth(columns, density, isPhone, trailingRem) }
           : undefined
       }
@@ -477,7 +484,7 @@ export function DataTable<T>({
         sort={sort}
         density={density}
         isStacked={isStacked}
-        fixedLayout={fixedLayout}
+        fixedLayout={sizedLayout}
         expandable={expandable}
         rowMoreActions={rowMoreActions}
         onToggleSort={toggleSort}
@@ -537,7 +544,7 @@ export function DataTable<T>({
       sort={sort}
       density={density}
       isStacked={isStacked}
-      fixedLayout={fixedLayout}
+      fixedLayout={sizedLayout}
       expandable={expandable}
       rowMoreActions={rowMoreActions}
       onToggleSort={toggleSort}
