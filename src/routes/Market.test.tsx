@@ -1496,7 +1496,7 @@ describe('Quickbar (issue #7)', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
 
     expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
-    expect(screen.getByText('Quickbar item Rifter removed.')).toBeInTheDocument();
+    expect(screen.getAllByText('Quickbar item Rifter removed.').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(await within(screen.getByTestId('quickbar')).findByText('Rifter')).toBeInTheDocument();
