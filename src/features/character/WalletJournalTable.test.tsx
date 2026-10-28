@@ -243,7 +243,7 @@ describe('JournalTable filtered summary status', () => {
     it('puts the sort in the summary row as an icon, with no sort bar in the table', () => {
       phone.value = true;
       render(<Harness rows={days} />);
-      const picker = screen.getByRole('combobox', { name: /^Sort by, now Sort: Date/ });
+      const picker = screen.getByRole('combobox', { name: /^Sort by, now Date/ });
       expect(screen.getByText(/^\d+ entries$/).closest('div')?.parentElement).toContainElement(
         picker
       );

@@ -65,7 +65,7 @@ export function DataTableSortPicker<T>({
   const { t } = useTranslation();
   const sortable = columns.filter((column) => column.sortValue !== undefined);
   const sortColumn = sort ? sortable.find((column) => column.id === sort.columnId) : undefined;
-  const arrowLabel =
+  const currentLabel =
     sortColumn && sort
       ? t('common.dataTable.sortLabel', {
           column: sortColumn.header,
@@ -93,13 +93,20 @@ export function DataTableSortPicker<T>({
       ) : (
         <>
           <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-dim" />
-          <span aria-hidden="true">{arrowLabel}</span>
+          <span aria-hidden="true">{currentLabel}</span>
         </>
       )}
       <select
         aria-label={
           iconOnly
-            ? t('common.dataTable.sortByCurrent', { current: arrowLabel })
+            ? sortColumn && sort
+              ? t('common.dataTable.sortByCurrent', {
+                  current: t('common.dataTable.sortOption', {
+                    column: sortColumn.header,
+                    arrow: SORT_ARROW[sort.direction],
+                  }),
+                })
+              : t('common.dataTable.sortBy')
             : t('common.dataTable.sortBy')
         }
         className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
