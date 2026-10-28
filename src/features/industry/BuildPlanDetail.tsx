@@ -88,6 +88,8 @@ import { usePlanMaterials } from './usePlanMaterials';
 import { useResolvedPlan } from './useResolvedPlan';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
+import { InputCostMoveLine } from './InputCostMoveLine';
+import { useInputCostMove } from './useInputCostMove';
 import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -108,6 +110,7 @@ import {
   shoppingListText,
 } from '@/engine/industry/shoppingList';
 import { buildRecipe } from './subBuildPlan';
+import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
@@ -271,6 +274,8 @@ interface BuildPlanDetailProps {
    */
   pendingLogProductionKey?: string;
 }
+
+const NO_MATERIALS: readonly ResolvedMaterial[] = [];
 
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
 export function BuildPlanDetail({
@@ -722,6 +727,12 @@ export function BuildPlanDetail({
   });
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
+  const costMove = useInputCostMove(
+    hub.regionId,
+    productTypeID,
+    result?.materials ?? NO_MATERIALS,
+    materialPriceBasisOf(plan.materialPriceBasis)
+  );
 
   /**
    * Runs at which this plan's profit first reaches zero — buying a BPO is the
@@ -1726,6 +1737,14 @@ export function BuildPlanDetail({
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
           slotLine={planSchedule && <PlanScheduleLine plan={planSchedule} />}
           vs90dPct={productVs90d ?? null}
+          costMoveNote={
+            costMove && (
+              <InputCostMoveLine
+                move={costMove}
+                inputName={nameForType(catalog, costMove.topInput.typeID)}
+              />
+            )
+          }
         />
       ) : (
         <Panel title={t('industry.setup')}>
