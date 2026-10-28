@@ -6528,6 +6528,7 @@
     },
     "dataTable": {
       "sortBy": "Sort by",
+      "sortByCurrent": "Sort by, now {{current}}",
       "sortLabel": "Sort: {{column}} {{arrow}}",
       "sortOption": "{{column}} {{arrow}}",
       "sortNone": "Sort",
