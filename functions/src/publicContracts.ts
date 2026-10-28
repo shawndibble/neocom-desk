@@ -264,7 +264,7 @@ export function emptyRequestedSide(): RequestedSide {
  * — an ineligible or lapsed contract publishes no offer rows to carry it.
  *
  * Exposed on its own so the production sync's single streaming pass over
- * `contract_items.csv` (`index.ts`'s `syncPublicContractOffers`, which cannot
+ * `contract_items.csv` (`publicDataContractOffers.ts`, which cannot
  * hold the whole `items` array — see `publicContractsArchive.ts`'s doc
  * comment) can fold every line as it streams past instead of a second pass.
  */

@@ -106,7 +106,7 @@ import { useHaulingFill, useHaulingFillOffer } from './useHaulingFill';
 import {
   HAUL_MODES,
   MAX_BOOK_CANDIDATES,
-  MAX_PRICED_CANDIDATES,
+  MAX_HISTORY_READS,
   type HaulingProgress,
   type HaulMode,
 } from './haulingData';
@@ -777,11 +777,23 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   slow: hidden.slow,
                   low: hidden.lowMargin,
                 })}
+          {state.scan.demandSource
+            ? ` ${t(`market.hauling.demand${state.scan.demandSource === 'esi' ? 'Fallback' : 'Daily'}Line`)}`
+            : ''}
           {state.scan.capped
-            ? ` ${t('market.hauling.cappedLine', {
-                priced: MAX_PRICED_CANDIDATES,
-                books: MAX_BOOK_CANDIDATES,
-              })}`
+            ? ` ${
+                instant
+                  ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
+                  : state.scan.demandSource === 'daily'
+                    ? t('market.hauling.cappedLineDaily', {
+                        passed: state.scan.demandPassed,
+                        books: MAX_BOOK_CANDIDATES,
+                      })
+                    : t('market.hauling.cappedLine', {
+                        reads: MAX_HISTORY_READS,
+                        books: MAX_BOOK_CANDIDATES,
+                      })
+              }`
             : ''}
         </p>
       </Panel>

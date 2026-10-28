@@ -6,10 +6,15 @@ import { TRADE_HUBS } from '@/market/hubs';
 const getHubPrices = vi.fn();
 const loadPriceHistory = vi.fn();
 const getOrderBook = vi.fn();
+const loadHaulingDemand = vi.fn();
 
 vi.mock('@/market/prices', () => ({ getHubPrices: (...a: unknown[]) => getHubPrices(...a) }));
 vi.mock('@/features/market/priceHistory', () => ({
   loadPriceHistory: (...a: unknown[]) => loadPriceHistory(...a),
+}));
+// Default: no daily demand object, so pass 2 takes the ESI history path.
+vi.mock('@/features/market/haulingDemand', () => ({
+  loadHaulingDemand: (...a: unknown[]) => loadHaulingDemand(...a),
 }));
 vi.mock('@/features/market/orderBook', () => ({
   getOrderBook: (...a: unknown[]) => getOrderBook(...a),
@@ -32,7 +37,7 @@ const {
   evictHaulingScan,
   haulingScanCacheKey,
   MAX_BOOK_CANDIDATES,
-  MAX_PRICED_CANDIDATES,
+  MAX_HISTORY_READS,
   runHaulingScan,
 } = await import('./haulingData');
 
@@ -59,6 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   clearMarketTypeIndex();
   loadMarketTypes.mockResolvedValue([]);
+  loadHaulingDemand.mockResolvedValue(null);
   getHubPrices.mockImplementation(async (hub: { id: string }) =>
     hub.id === FROM.id ? new Map([[34, aggregate(100, 90)]]) : new Map([[34, aggregate(200, 115)]])
   );
@@ -272,8 +278,9 @@ describe('runHaulingScan, selling into buy orders', () => {
 
 describe('runHaulingScan, shortlist order', () => {
   const TODAY = '2026-10-15';
-  /** More high-ratio, thin items than the price pass keeps, and one bulk steady seller at a lower ratio. */
-  const THIN = Array.from({ length: MAX_PRICED_CANDIDATES + 5 }, (_, i) => 2000 + i);
+  /** Many high-ratio items that never sell (history drops them), and one bulk steady seller at a lower ratio. */
+  const THIN_COUNT = 85;
+  const THIN = Array.from({ length: THIN_COUNT }, (_, i) => 2000 + i);
   const BULK = 5000;
 
   function history(average: number, volume: number) {
@@ -289,7 +296,7 @@ describe('runHaulingScan, shortlist order', () => {
     );
   }
   const BULK_HISTORY = history(120, 5_000);
-  const THIN_HISTORY = history(300, 1);
+  const THIN_HISTORY = history(300, 0);
 
   beforeEach(() => {
     getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
@@ -325,14 +332,14 @@ describe('runHaulingScan, shortlist order', () => {
       types: typesFor(typeIds),
       today: TODAY,
     });
-    // Ranked by price ratio it was cut at the price pass, behind every thin item.
+    // Ranked below every thin item at pass 1, it still reaches history: those items drop out there.
     expect(loadPriceHistory).toHaveBeenCalledWith(TO.regionId, BULK);
     expect(getOrderBook).toHaveBeenCalledWith(TO.regionId, BULK);
     expect(scan.rows.map((r) => r.typeId)).toContain(BULK);
-    expect(scan.capped).toBe(true);
+    expect(scan.capped).toBeUndefined();
   });
 
-  it('names what it examined: dropped by history or given books, never what a cap cut first', async () => {
+  it('names what it examined: dropped by history or given books', async () => {
     // Every tenth thin item has no market at the destination: dropped by pass 2.
     loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => {
       if (typeId !== BULK && typeId % 10 === 0) throw new EsiError(400, 'no market');
@@ -348,14 +355,10 @@ describe('runHaulingScan, shortlist order', () => {
       today: TODAY,
     });
     const historyIds = loadPriceHistory.mock.calls.map(([, id]) => id as number);
-    const dropped = historyIds.filter((id) => id !== BULK && id % 10 === 0);
-    const booked = getOrderBook.mock.calls
-      .filter(([region]) => region === TO.regionId)
-      .map(([, id]) => id as number);
-    expect(new Set(scan.examinedTypeIds)).toEqual(new Set([...dropped, ...booked]));
-    // Cut at the price pass, or past history but cut before the books: a later scan's.
-    expect(historyIds.length).toBe(MAX_PRICED_CANDIDATES);
-    expect(scan.examinedTypeIds.length).toBeLessThan(historyIds.length);
+    expect(new Set(scan.examinedTypeIds)).toEqual(new Set(historyIds));
+    // Every candidate was read; each is examined unless it failed history without a verdict.
+    expect(historyIds.length).toBe(typeIds.length);
+    expect(scan.examinedTypeIds.length).toBe(historyIds.length);
   });
 });
 
@@ -653,5 +656,292 @@ describe('runHaulingScan, Any hub at one end', () => {
       runHaulingScan({ from: 'any', to: 'any', typeIds: [34], scope: 4, types: TYPES })
     ).rejects.toThrow();
     expect(getHubPrices).not.toHaveBeenCalled();
+  });
+});
+
+describe('runHaulingScan, history pass feeding', () => {
+  const TODAY = '2026-10-15';
+  const points = (average: number, volume: number) =>
+    Array.from({ length: 30 }, (_, day) =>
+      historyPoint({
+        date: new Date(Date.parse(`${TODAY}T00:00:00Z`) - day * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+        average,
+        volume,
+        orderCount: 10,
+      })
+    );
+  /** Ids 1000.. rank by price in id order: a lower id has the bigger gap. */
+  const idAt = (rank: number) => 1000 + rank;
+
+  function setup(count: number, passes: (rank: number) => boolean) {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => [
+          id,
+          atOrigin ? aggregate(100, 90, 100) : aggregate(2000 - (id - 1000), 250, 100),
+        ])
+      );
+    });
+    loadPriceHistory.mockImplementation(async (_region: number, typeId: number) => ({
+      points: passes(typeId - 1000) ? points(300, 50) : points(300, 0),
+    }));
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const hub = regionId === FROM.regionId ? FROM : TO;
+      return {
+        orders: [
+          {
+            price: hub === FROM ? 100 : 300,
+            volume_remain: 50_000,
+            is_buy_order: false,
+            location_id: hub.stationId,
+          },
+        ],
+      };
+    });
+    const typeIds = Array.from({ length: count }, (_, i) => idAt(i));
+    return { typeIds, types: typesFor(typeIds) };
+  }
+
+  const bookedIds = () =>
+    getOrderBook.mock.calls
+      .filter(([region]) => region === TO.regionId)
+      .map(([, id]) => id as number);
+
+  it('reaches liquid candidates ranked past the old 80 when the top ones fail history', async () => {
+    const { typeIds, types } = setup(200, (rank) => rank >= 100);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 1,
+      types,
+      today: TODAY,
+    });
+    expect(bookedIds()).toHaveLength(MAX_BOOK_CANDIDATES);
+    expect(bookedIds().every((id) => id >= idAt(100))).toBe(true);
+    expect(scan.rows.length).toBe(MAX_BOOK_CANDIDATES);
+  });
+
+  it('books only the best 40 by history score and says capped when more pass', async () => {
+    const { typeIds, types } = setup(100, () => true);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 2,
+      types,
+      today: TODAY,
+    });
+    expect(bookedIds()).toHaveLength(MAX_BOOK_CANDIDATES);
+    expect(scan.capped).toBe(true);
+    // The scan stops feeding once enough passed: not every candidate was read.
+    expect(loadPriceHistory.mock.calls.length).toBeLessThan(100);
+  });
+
+  it('is not capped when the candidates run out before 40 pass', async () => {
+    const { typeIds, types } = setup(120, (rank) => rank % 10 === 0);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 3,
+      types,
+      today: TODAY,
+    });
+    expect(loadPriceHistory).toHaveBeenCalledTimes(120);
+    expect(bookedIds()).toHaveLength(12);
+    expect(scan.capped).toBeUndefined();
+  });
+
+  it('instant mode: capped only when more than 40 pass the price pass', async () => {
+    const run = async (count: number, scope: number) => {
+      const { typeIds, types } = setup(count, () => true);
+      return runHaulingScan({
+        from: FROM,
+        to: TO,
+        typeIds,
+        scope,
+        types,
+        today: TODAY,
+        mode: 'instant',
+      });
+    };
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(ids.map((id) => [id, atOrigin ? aggregate(100, 90) : aggregate(200, 150)]));
+    });
+    expect((await run(MAX_BOOK_CANDIDATES, 5)).capped).toBeUndefined();
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(ids.map((id) => [id, atOrigin ? aggregate(100, 90) : aggregate(200, 150)]));
+    });
+    expect((await run(MAX_BOOK_CANDIDATES + 1, 6)).capped).toBe(true);
+    expect(loadPriceHistory).not.toHaveBeenCalled();
+  });
+
+  it('never reads more history than the safety cap, and says capped', async () => {
+    const count = MAX_HISTORY_READS + 30;
+    const { typeIds, types } = setup(count, () => false);
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 4,
+      types,
+      today: TODAY,
+    });
+    expect(loadPriceHistory).toHaveBeenCalledTimes(MAX_HISTORY_READS);
+    expect(scan.capped).toBe(true);
+  });
+});
+
+describe('runHaulingScan, demand from the daily R2 object', () => {
+  const TODAY = '2026-10-15';
+  const idAt = (rank: number) => 1000 + rank;
+  const aggregate_ = (price: number) => ({
+    volume: 1500,
+    daysWithTrades: 30,
+    orderSum: 300,
+    recentSalePrice: price,
+    latestDay: { date: '2026-10-14', highest: price, lowest: price },
+  });
+
+  /** Ids 1000.. rank by price in id order; `demand(rank)` is the aggregate the object holds, or undefined for absent. */
+  function setup(
+    count: number,
+    demand: (rank: number) => ReturnType<typeof aggregate_> | undefined
+  ) {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => [
+          id,
+          atOrigin ? aggregate(100, 90, 100) : aggregate(2000 - (id - 1000), 250, 100),
+        ])
+      );
+    });
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const hub = regionId === FROM.regionId ? FROM : TO;
+      return {
+        orders: [
+          {
+            price: hub === FROM ? 100 : 300,
+            volume_remain: 50_000,
+            is_buy_order: false,
+            location_id: hub.stationId,
+          },
+        ],
+      };
+    });
+    const typeIds = Array.from({ length: count }, (_, i) => idAt(i));
+    const types = new Map<number, ReturnType<typeof aggregate_>>();
+    typeIds.forEach((id, rank) => {
+      const found = demand(rank);
+      if (found) types.set(id, found);
+    });
+    loadHaulingDemand.mockResolvedValue({ asOf: '2026-10-14', lastSyncedAt: Date.now(), types });
+    return {
+      typeIds,
+      types: Object.fromEntries(
+        typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
+      ) as never,
+    };
+  }
+
+  const bookedIds = () =>
+    getOrderBook.mock.calls
+      .filter(([region]) => region === TO.regionId)
+      .map(([, id]) => id as number);
+
+  it('books liquid items ranked past the old read cap, with no ESI history call', async () => {
+    const count = MAX_HISTORY_READS + 50;
+    const { typeIds, types } = setup(count, (rank) =>
+      rank >= MAX_HISTORY_READS + 10 ? aggregate_(300) : undefined
+    );
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 20,
+      types,
+      today: TODAY,
+    });
+    expect(loadPriceHistory).not.toHaveBeenCalled();
+    expect(bookedIds()).toHaveLength(MAX_BOOK_CANDIDATES);
+    expect(bookedIds().every((id) => id >= idAt(MAX_HISTORY_READS + 10))).toBe(true);
+    expect(scan.demandSource).toBe('daily');
+    expect(scan.capped).toBeUndefined();
+  });
+
+  it('books the best 40 by history score, not the first 40 by price, and says capped', async () => {
+    // A higher id sold for more, but ranks lower on the price pass.
+    const { typeIds, types } = setup(100, (rank) => aggregate_(300 + rank));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 21,
+      types,
+      today: TODAY,
+    });
+    expect(bookedIds().sort()).toEqual(Array.from({ length: 40 }, (_, i) => idAt(60 + i)));
+    expect(scan.capped).toBe(true);
+    expect(scan.demandPassed).toBe(100);
+    expect(scan.examinedTypeIds).not.toContain(idAt(0));
+  });
+
+  it('is not capped when 40 or fewer survive', async () => {
+    const { typeIds, types } = setup(100, (rank) => (rank < 40 ? aggregate_(300) : undefined));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 22,
+      types,
+      today: TODAY,
+    });
+    expect(bookedIds()).toHaveLength(40);
+    expect(scan.capped).toBeUndefined();
+    expect(scan.examinedTypeIds).toHaveLength(100);
+  });
+
+  it('falls back to ESI history when the object is missing, and says so', async () => {
+    const { typeIds, types } = setup(5, () => aggregate_(300));
+    loadHaulingDemand.mockResolvedValue(null);
+    loadPriceHistory.mockResolvedValue({ points: [] });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 23,
+      types,
+      today: TODAY,
+    });
+    expect(loadPriceHistory).toHaveBeenCalledTimes(5);
+    expect(scan.demandSource).toBe('esi');
+  });
+
+  it('never reads the object in instant mode', async () => {
+    const { typeIds, types } = setup(5, () => aggregate_(300));
+    getHubPrices.mockImplementation(
+      async (hub: { id: string }, ids: number[]) =>
+        new Map(
+          ids.map((id) => [id, hub.id === FROM.id ? aggregate(100, 90) : aggregate(200, 150)])
+        )
+    );
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 24,
+      types,
+      today: TODAY,
+      mode: 'instant',
+    });
+    expect(loadHaulingDemand).not.toHaveBeenCalled();
+    expect(scan.demandSource).toBeUndefined();
   });
 });

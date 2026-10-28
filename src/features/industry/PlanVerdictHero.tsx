@@ -119,6 +119,8 @@ interface PlanVerdictHeroProps {
    * an amber note under the figure warns the revenue may not last.
    */
   vs90dPct?: number | null;
+  /** The 7-day input cost move line (`InputCostMoveLine`), beside the vs-90d note; omitted when there is none. */
+  costMoveNote?: ReactNode;
   /** Wraps the product heading in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
   /**
@@ -198,6 +200,7 @@ export function PlanVerdictHero({
   slotLine,
   locationBlock,
   vs90dPct = null,
+  costMoveNote,
   footer,
   expansion,
 }: PlanVerdictHeroProps) {
@@ -338,6 +341,7 @@ export function PlanVerdictHero({
                   {t('industry.heroVs90dSpike', { value: `${Math.round(vs90dPct)}%` })}
                 </p>
               )}
+            {!pricesLoading && pricesReady && profit !== null && costMoveNote}
             {locationBlock && (
               <div
                 role="status"

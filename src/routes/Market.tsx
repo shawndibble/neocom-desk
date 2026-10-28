@@ -58,12 +58,15 @@ import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
+import type { QuickbarItem } from '@/db';
 import { QuickbarList } from '@/features/market/QuickbarList';
+import { useQuickbarVsPaid } from '@/features/market/useQuickbarVsPaid';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { VariationsTable } from '@/features/market/VariationsTable';
 import {
   quickbarToPasteText,
   removeQuickbarItem,
+  restoreQuickbarItem,
   reorderQuickbarItems,
 } from '@/features/market/quickbar';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
@@ -380,12 +383,27 @@ export function Market() {
   const {
     items: quickbarItems,
     write: writeQuickbar,
-    setTarget: handleSetQuickbarTarget,
     pinWithTarget: handlePinWithTarget,
   } = itemActions.quickbar;
 
+  // Remove keeps the row and its slot so the Undo toast can put it back.
+  const [quickbarUndo, setQuickbarUndo] = useState<{
+    item: QuickbarItem;
+    index: number;
+    characterId: number;
+  } | null>(null);
   function handleRemoveFromQuickbar(typeId: number) {
+    const index = quickbarItems.findIndex((i) => i.typeId === typeId);
+    if (index === -1) return;
+    if (activeCharacterId !== null) {
+      setQuickbarUndo({ item: quickbarItems[index], index, characterId: activeCharacterId });
+    }
     void writeQuickbar(removeQuickbarItem(quickbarItems, typeId));
+  }
+  function handleUndoQuickbarRemove() {
+    if (!quickbarUndo || quickbarUndo.characterId !== activeCharacterId) return;
+    void writeQuickbar(restoreQuickbarItem(quickbarItems, quickbarUndo.item, quickbarUndo.index));
+    setQuickbarUndo(null);
   }
   function handleReorderQuickbar(activeTypeId: number, overTypeId: number) {
     void writeQuickbar(reorderQuickbarItems(quickbarItems, activeTypeId, overTypeId));
@@ -505,6 +523,9 @@ export function Market() {
   const selectedInCompare = useCompareSet((state) =>
     state.items.some((item) => item.typeId === selectedTypeId)
   );
+  // Issue #5333: each pinned item's hub price against what the wallet says was paid.
+  const quickbarTypeIds = useMemo(() => quickbarItems.map((i) => i.typeId), [quickbarItems]);
+  const quickbarVsPaid = useQuickbarVsPaid(activeCharacterId, quickbarTypeIds, effectiveHub);
   const selectedPinned = quickbarItems.some((item) => item.typeId === selectedTypeId);
 
   // The finder Panel's own root, so Back can look up the tree button the
@@ -1063,11 +1084,11 @@ export function Market() {
 
                 <QuickbarList
                   items={quickbarItems}
+                  vsPaid={quickbarVsPaid}
                   selectedTypeId={selectedTypeId}
                   onSelect={handleSelectItem}
                   onRemove={handleRemoveFromQuickbar}
                   onReorder={handleReorderQuickbar}
-                  onSetTarget={handleSetQuickbarTarget}
                   onViewInAppraisal={handleViewQuickbarInAppraisal}
                 />
               </Panel>
@@ -1458,6 +1479,14 @@ export function Market() {
               onAction: sharedSeed.retrying ? () => {} : sharedSeed.retry,
             }}
             onClose={sharedSeed.dismiss}
+          />
+        )}
+
+        {quickbarUndo && quickbarUndo.characterId === activeCharacterId && (
+          <Toast
+            message={t('market.quickbar.removed', { name: quickbarUndo.item.name })}
+            undo={{ label: t('market.quickbar.undo'), onUndo: handleUndoQuickbarRemove }}
+            onClose={() => setQuickbarUndo(null)}
           />
         )}
 

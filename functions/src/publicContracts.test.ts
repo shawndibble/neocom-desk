@@ -260,7 +260,7 @@ describe('requestedSideByContract', () => {
   });
 
   it('folds line by line to the same answer whichever line comes first', () => {
-    // `syncPublicContractOffers` folds contract_items.csv one line at a time as
+    // The contract-offers job folds contract_items.csv one line at a time as
     // it streams past; the CSV gives no guarantee a contract's offered line
     // comes before its requested ones.
     const items = parseContractItemsCsv(

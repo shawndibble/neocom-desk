@@ -25,6 +25,18 @@ export function removeQuickbarItem(items: readonly QuickbarItem[], typeId: numbe
   return items.filter((i) => i.typeId !== typeId);
 }
 
+/** Puts a removed item back at `index` (clamped), keeping its target; a no-op if it is already there. */
+export function restoreQuickbarItem(
+  items: readonly QuickbarItem[],
+  item: QuickbarItem,
+  index: number
+): QuickbarItem[] {
+  if (items.some((i) => i.typeId === item.typeId)) return [...items];
+  const next = [...items];
+  next.splice(Math.min(Math.max(index, 0), next.length), 0, item);
+  return next;
+}
+
 export function reorderQuickbarItems(
   items: readonly QuickbarItem[],
   activeTypeId: number,

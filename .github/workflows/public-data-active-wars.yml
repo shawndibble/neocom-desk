@@ -1,11 +1,11 @@
 name: Public data - active wars
 
-# Publishes the open-wars list to R2 (active-wars/wars.json) every 12 h; the
+# Publishes the open-wars list to R2 (active-wars/wars.json) every 6 h; the
 # app reads it from https://data.neocomdesk.com. Pattern and secrets:
 # public-data-job.yml.
 on:
   schedule:
-    - cron: '17 3,15 * * *'
+    - cron: '17 3,9,15,21 * * *'
   workflow_dispatch:
 
 permissions:

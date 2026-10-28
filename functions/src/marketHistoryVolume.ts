@@ -7,6 +7,9 @@
  * daily run cannot afford. The figure matches the hauling engine's
  * `summarizeDemand().dailyVolume`: total over the window, days without a trade
  * counting as zero.
+ *
+ * The same fold also keeps each traded day's price band and order count, for the
+ * hauling scan's demand object (issue #5344, `demandFor`).
  */
 import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';
@@ -17,6 +20,10 @@ const EVEREF_HISTORY_BASE = 'https://data.everef.net/market-history';
 export const LP_VOLUME_WINDOW_DAYS = 30;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 const REQUIRED_COLUMNS = ['region_id', 'type_id', 'volume'] as const;
+/** Read when present, for the hauling demand fold (issue #5344); a file without them still feeds `perDay`. */
+const DEMAND_COLUMNS = ['date', 'highest', 'lowest', 'order_count'] as const;
+const RECENT_PRICE_DAYS = 7;
+const DAY_MS = 86_400_000;
 
 export function historyDayUrl(date: string): string {
   return `${EVEREF_HISTORY_BASE}/${date.slice(0, 4)}/market-history-${date}.csv.bz2`;
@@ -28,12 +35,95 @@ export function historyWindow(now: Date, days: number = LP_VOLUME_WINDOW_DAYS): 
   return Array.from({ length: days }, (_, i) => addDays(yesterday, -i));
 }
 
+/** One type's demand over the window, as the hauling scan reads it back: `[volume, daysWithTrades, orderSum, recentSalePrice, latestDate, latestHighest, latestLowest]`. */
+export type StoredDemand = [
+  volume: number,
+  daysWithTrades: number,
+  orderSum: number,
+  recentSalePrice: number | null,
+  latestDate: string,
+  latestHighest: number,
+  latestLowest: number,
+];
+
+export interface DemandDay {
+  date: string;
+  volume: number;
+  highest: number;
+  lowest: number;
+  orderCount: number;
+}
+
+function dayNumber(date: string): number {
+  return Math.floor(Date.parse(`${date}T00:00:00Z`) / DAY_MS);
+}
+
+/** The price half of the volume sold at or below, by each day's `highest`: the hauling engine's `volumeWeightedMedian`. */
+function volumeWeightedMedian(days: readonly DemandDay[]): number | null {
+  const total = days.reduce((sum, d) => sum + d.volume, 0);
+  if (total <= 0) return null;
+  const byPrice = [...days].sort((a, b) => a.highest - b.highest);
+  let cumulative = 0;
+  for (const d of byPrice) {
+    cumulative += d.volume;
+    if (cumulative >= total / 2) return d.highest;
+  }
+  return byPrice[byPrice.length - 1]!.highest;
+}
+
 /** Total traded volume per tracked region and type across the days folded in. */
 export class VolumeFold {
   private readonly totals = new Map<number, Map<number, number>>();
+  private readonly daysByType = new Map<number, Map<number, DemandDay[]>>();
 
   constructor(regionIds: readonly number[] = MARKET_OPEN_PRICES_REGION_IDS) {
-    for (const id of regionIds) this.totals.set(id, new Map());
+    for (const id of regionIds) {
+      this.totals.set(id, new Map());
+      this.daysByType.set(id, new Map());
+    }
+  }
+
+  /** `add` plus the day's price band and order count, for `demandFor`. */
+  addDay(regionId: number, typeId: number, day: DemandDay): void {
+    const region = this.daysByType.get(regionId);
+    // Volume counts even where the price columns are unreadable, as `perDay` always did.
+    this.add(regionId, typeId, day.volume);
+    if (!region || !Number.isInteger(typeId) || !(day.volume > 0)) return;
+    if (!Number.isFinite(day.highest) || !Number.isFinite(day.lowest)) return;
+    const orderCount = Number.isFinite(day.orderCount) ? day.orderCount : 0;
+    const days = region.get(typeId) ?? [];
+    days.push({ ...day, orderCount });
+    region.set(typeId, days);
+  }
+
+  /**
+   * Each traded type's demand over the `windowDays` ending `asOf`, the facts
+   * `summarizeDemand` reads off the same daily points: the recent sale price is
+   * the volume-weighted median of the last `RECENT_PRICE_DAYS` days' highest,
+   * else of the window's.
+   */
+  demandFor(regionId: number, asOf: string, windowDays: number): Record<number, StoredDemand> {
+    const out: Record<number, StoredDemand> = {};
+    const asOfNumber = dayNumber(asOf);
+    for (const [typeId, days] of this.daysByType.get(regionId) ?? []) {
+      const inWindow = days.filter((d) => {
+        const age = asOfNumber - dayNumber(d.date);
+        return age >= 0 && age < windowDays;
+      });
+      if (inWindow.length === 0) continue;
+      const recent = inWindow.filter((d) => asOfNumber - dayNumber(d.date) < RECENT_PRICE_DAYS);
+      const latest = inWindow.reduce((best, d) => (d.date > best.date ? d : best));
+      out[typeId] = [
+        inWindow.reduce((sum, d) => sum + d.volume, 0),
+        inWindow.length,
+        inWindow.reduce((sum, d) => sum + d.orderCount, 0),
+        volumeWeightedMedian(recent.length > 0 ? recent : inWindow),
+        latest.date,
+        latest.highest,
+        latest.lowest,
+      ];
+    }
+    return out;
   }
 
   add(regionId: number, typeId: number, volume: number): void {
@@ -78,6 +168,7 @@ export async function foldHistoryBz2(compressed: Readable, fold: VolumeFold): Pr
 
 async function foldRows(rows: ReturnType<typeof historyCsvParser>, fold: VolumeFold) {
   let columns: Record<(typeof REQUIRED_COLUMNS)[number], number> | null = null;
+  let demandColumns: Record<(typeof DEMAND_COLUMNS)[number], number> | null = null;
   let count = 0;
   for await (const row of rows as AsyncIterable<string[]>) {
     if (!columns) {
@@ -89,14 +180,32 @@ async function foldRows(rows: ReturnType<typeof historyCsvParser>, fold: VolumeF
         );
       }
       columns = { region_id: found[0], type_id: found[1], volume: found[2] };
+      const extra = DEMAND_COLUMNS.map((name) => row.indexOf(name));
+      if (extra.every((i) => i >= 0)) {
+        demandColumns = {
+          date: extra[0],
+          highest: extra[1],
+          lowest: extra[2],
+          order_count: extra[3],
+        };
+      }
       continue;
     }
     count += 1;
-    fold.add(
-      Number(row[columns.region_id]),
-      Number(row[columns.type_id]),
-      Number(row[columns.volume])
-    );
+    const regionId = Number(row[columns.region_id]);
+    const typeId = Number(row[columns.type_id]);
+    const volume = Number(row[columns.volume]);
+    if (demandColumns) {
+      fold.addDay(regionId, typeId, {
+        date: row[demandColumns.date] ?? '',
+        volume,
+        highest: Number(row[demandColumns.highest]),
+        lowest: Number(row[demandColumns.lowest]),
+        orderCount: Number(row[demandColumns.order_count]),
+      });
+    } else {
+      fold.add(regionId, typeId, volume);
+    }
   }
   return count;
 }

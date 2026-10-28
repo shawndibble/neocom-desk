@@ -32,6 +32,8 @@ interface FittingStatsColumnProps {
   onOpenMakeItFit: (resource: FitResource) => void;
   /** Improve's ticked or hovered rows, to show in place as `current → after`. */
   preview?: FittingStatsDelta | null;
+  /** What Improve's previewed rows add to the fit's price, for the Price figure. */
+  previewIsk?: number | null;
   /** The fit's rule breaks as sentences. */
   ruleBreaks?: readonly string[];
 }
@@ -55,6 +57,7 @@ export function FittingStatsColumn({
   overlay,
   onOpenMakeItFit,
   preview,
+  previewIsk,
   ruleBreaks,
 }: FittingStatsColumnProps) {
   const { t } = useTranslation();
@@ -83,6 +86,7 @@ export function FittingStatsColumn({
         fitting={fitting}
         moduleResults={moduleResults}
         preview={preview}
+        previewIsk={previewIsk}
         ruleBreaks={ruleBreaks}
         whatToTrain={
           <FittingWhatToTrainPanel

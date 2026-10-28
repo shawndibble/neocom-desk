@@ -8,7 +8,7 @@ import { sortPriceHistory, type MarketHistoryPoint } from './priceHistory';
 const DAY_MS = 86_400_000;
 
 /** `YYYY-MM-DD` shifted by whole days (UTC, so no DST drift). */
-function shiftDay(date: string, days: number): string {
+export function shiftDay(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 

@@ -244,8 +244,8 @@ service cloud.firestore {
     // either: R2 is their only store (ADR 0019, issue #4270). Their rules are
     // gone too, so the implicit deny covers the orphaned collections.
 
-    // `systemConditions` holds only the backend's own state docs (the R2 publish markers),
-    // all read and written with admin privileges. The lawless and active-wars docs are gone:
+    // `systemConditions` is no longer written (the R2 publish markers moved to R2 objects,
+    // contract-offers-state/). The lawless and active-wars docs are gone:
     // both lists are R2 objects (issue #5072), so the implicit deny covers the collection.
     // EVE Workbench fits are not in Firestore: each hull is a static object
     // in Cloudflare R2 (decision

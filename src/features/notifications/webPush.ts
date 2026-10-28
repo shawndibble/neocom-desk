@@ -1,7 +1,7 @@
 /**
  * The one real entry point into Web Push (issue #356): called from a
  * deliberate user tap (the permission explainer's Enable button, and
- * Settings' own Enable button — the same two callers `permission.ts`
+ * Settings' Device pop-ups checkbox — the same two callers `permission.ts`
  * documents for `requestNotificationPermission`), so the FCM token
  * acquisition and the permission request share the gesture Safari requires.
  *

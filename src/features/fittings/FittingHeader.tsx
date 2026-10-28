@@ -31,9 +31,9 @@ import { FittingNameModal } from './SavedFittingModals';
 /** What the Fittings menu opens: the hull search, Import, or the list of saved and In-game Fittings. */
 export type LibraryAction = 'new' | 'import' | 'open';
 
-/** What the header's Alpha/Omega and Mastery badges show; null `mastery` is no logged-in Character. */
+/** What the header's Alpha/Omega and Mastery badges show; null `mastery` is no logged-in Character, absent `alpha` is a badge shown elsewhere (the phone's tab row). */
 interface HeaderBadges {
-  alpha: {
+  alpha?: {
     blockers: readonly AlphaBlocker[] | null;
     skillName: (skillTypeId: number) => string;
   };
@@ -159,7 +159,7 @@ function CompactFittingHeader({
             {badges && (
               <>
                 <DropdownMenuSeparator />
-                <AlphaCloneMenuRow {...badges.alpha} />
+                {badges.alpha && <AlphaCloneMenuRow {...badges.alpha} />}
                 {mastery && masteryAvailable && (
                   <DropdownMenuItem onSelect={() => setMasteryOpen(true)}>
                     {t('fittings.mastery.menuItem')}
@@ -272,7 +272,7 @@ export function FittingHeader({
   );
   const context = badges && (
     <>
-      <AlphaCloneChip {...badges.alpha} />
+      {badges.alpha && <AlphaCloneChip {...badges.alpha} />}
       {badges.mastery && <MasteryChip {...badges.mastery} />}
     </>
   );
@@ -332,6 +332,7 @@ export function FittingHeader({
               {libraryItems}
             </DropdownMenuContent>
           </DropdownMenu>
+          {onImprove && <Button onClick={onImprove}>{t('fittings.improve.button')}</Button>}
           <FittingExportMenu
             fitting={fitting}
             price={price}

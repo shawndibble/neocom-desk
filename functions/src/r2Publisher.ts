@@ -7,7 +7,7 @@
  *
  * Config: `R2_ENDPOINT` (https://<account>.r2.cloudflarestorage.com) and
  * `R2_BUCKET` in functions/.env; the access key pair
- * comes from the Firebase secrets `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`.
+ * comes from the `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` secrets (GitHub repository secrets for the runner jobs).
  *
  * An R2 lifecycle rule deletes objects after a few days, which would also
  * delete a long-unchanged type that `index.json` still names. So every
@@ -308,7 +308,7 @@ export function r2PublishOutcome(result: {
 }
 
 /**
- * What `syncPublicContractOffers` does with both publishes' outcomes (issue
+ * What the contract-offers job does with both publishes' outcomes (issue
  * #4270): any failure fails the run, naming each snapshot that failed; the
  * archive fingerprint is stored only when both are complete, so a failed or
  * budget-cut run is retried next cycle rather than skipped as "archive

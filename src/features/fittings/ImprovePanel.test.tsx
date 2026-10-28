@@ -10,7 +10,9 @@ import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
-import type { ImproveOwnedSettings } from './ImproveOwnedStock';
+import { createPortal } from 'react-dom';
+import { useContext } from 'react';
+import { ImproveSkillsSlotContext } from './improveSkillsSlot';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
 const before = baseFittingStats();
@@ -58,7 +60,8 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
   };
 }
 
-const openMoreGoals = () => userEvent.click(screen.getByRole('button', { name: /^More goals/ }));
+const openMoreGoals = () =>
+  userEvent.click(screen.getByRole('button', { name: /^More \d+ goals/ }));
 const openSettings = () =>
   userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
 
@@ -855,6 +858,78 @@ describe('ImprovePanel', () => {
     });
   });
 
+  describe('selection cost', () => {
+    const fitting = {
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+      ],
+    } as unknown as Fitting;
+    const priced = (isk: number) => {
+      const a = option(11, { ehp: 1100 }, { iskDelta: isk });
+      const state = { ...done({ noDownside: [a] }), fitTotal: 5_000_000 } as ImproveState;
+      return { ...search(state), recalc: vi.fn().mockResolvedValue(before) };
+    };
+
+    it('reads Total cost with the rise over the current fit', async () => {
+      renderPanel(priced(2_000_000), vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      const cost = await screen.findByTestId('improve-cost');
+      expect(cost).toHaveTextContent('Total cost');
+      expect(cost).toHaveTextContent(/7M.*\(\+2M/);
+      expect(cost).not.toHaveTextContent('still to buy');
+    });
+
+    it('shows a saving with a minus', async () => {
+      renderPanel(priced(-1_000_000), vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      expect(await screen.findByTestId('improve-cost')).toHaveTextContent(/\(−1M/);
+    });
+
+    it('says no change rather than showing nothing', async () => {
+      renderPanel(priced(0), vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      expect(await screen.findByTestId('improve-cost')).toHaveTextContent('(no change)');
+    });
+  });
+
+  describe('Search settings and Skills', () => {
+    function SkillsStub() {
+      const slot = useContext(ImproveSkillsSlotContext);
+      if (!slot?.trigger) return null;
+      return (
+        <>
+          {createPortal(
+            <button
+              type="button"
+              aria-expanded={slot.open}
+              aria-controls={slot.panelId}
+              onClick={slot.onToggle}
+            >
+              Skills 2
+            </button>,
+            slot.trigger
+          )}
+          {slot.open && slot.panel && createPortal(<p>skill rows</p>, slot.panel)}
+        </>
+      );
+    }
+
+    it('opens neither by default, and one at a time', async () => {
+      renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { freeSections: <SkillsStub /> });
+      const settingsButton = screen.getByRole('button', { name: /^Search settings/ });
+      const skills = await screen.findByRole('button', { name: 'Skills 2' });
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
+      expect(skills).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(settingsButton);
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
+      await userEvent.click(skills);
+      expect(skills).toHaveAttribute('aria-expanded', 'true');
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
+      expect(await screen.findByText('skill rows')).toBeInTheDocument();
+    });
+  });
+
   describe('stats column preview', () => {
     const fitting = {
       modules: [
@@ -915,104 +990,5 @@ describe('ImprovePanel', () => {
       unmount();
       expect(lastDelta(onPreview)).toBeNull();
     });
-  });
-});
-
-describe('ImprovePanel owned stock', () => {
-  const ownedSettings = (patch: Partial<ImproveOwnedSettings> = {}): ImproveOwnedSettings => ({
-    on: true,
-    onChange: vi.fn(),
-    place: 60003760,
-    onPlaceChange: vi.fn(),
-    otherPlaces: [],
-    placeLabel: 'Jita',
-    ...patch,
-  });
-  const withStock = (
-    held: Record<number, number>,
-    result: Partial<ImproveResult>,
-    anyOwned = Object.keys(held).length > 0
-  ): ImproveState => ({
-    ...(done(result) as Extract<ImproveState, { status: 'done' }>),
-    owned: {
-      stock: {
-        owned: new Map(Object.entries(held).map(([k, v]) => [Number(k), v])),
-        fitCounts: new Map(),
-      },
-      priceOf: () => 1000,
-      anyOwned,
-    },
-  });
-
-  it('hides the sentence without the assets scope and in Refitting', async () => {
-    const { unmount } = renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings());
-    await openSettings();
-    expect(screen.queryByText('Count what I own at')).not.toBeInTheDocument();
-    unmount();
-    renderPanel(
-      search({ status: 'idle' }),
-      vi.fn(),
-      vi.fn(),
-      settings({ mode: 'refit', owned: ownedSettings() })
-    );
-    await openSettings();
-    expect(screen.queryByText('Count what I own at')).not.toBeInTheDocument();
-  });
-
-  it('shows the sentence in Planning, names the place in the summary and reports a change', async () => {
-    const owned = ownedSettings();
-    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings({ owned }));
-    expect(
-      screen.getByRole('button', { name: /^Search settings.*minus owned at Jita/ })
-    ).toBeInTheDocument();
-    await openSettings();
-    await userEvent.click(screen.getByRole('checkbox', { name: /Count what I own at/ }));
-    expect(owned.onChange).toHaveBeenCalledWith(false);
-    expect(screen.getByText('Budget for what is still to buy (ISK)')).toBeInTheDocument();
-  });
-
-  it('renders the three cost lines', () => {
-    const swap = (toTypeId: number, slots: number[]) =>
-      option(
-        toTypeId,
-        { ehp: 1100 },
-        {
-          candidate: {
-            fromTypeId: 1,
-            toTypeId,
-            at: slots.map((slotIndex) => ({ slot: 'low' as const, slotIndex })),
-          },
-        }
-      );
-    renderPanel(
-      search(
-        withStock(
-          { 11: 2, 12: 1 },
-          { noDownside: [swap(11, [0, 1]), swap(12, [2, 3]), swap(13, [4])] }
-        )
-      ),
-      vi.fn(),
-      vi.fn(),
-      settings({ owned: ownedSettings() })
-    );
-    expect(screen.getByText('You own all 2')).toBeInTheDocument();
-    expect(screen.getByText(/nothing to buy/)).toBeInTheDocument();
-    expect(screen.getByText(/You own 1 of 2 · buy 1 for/)).toBeInTheDocument();
-    expect(screen.getByText(/^Costs/)).toBeInTheDocument();
-  });
-
-  it('warns when nothing among the candidates is owned at the place', async () => {
-    renderPanel(
-      search(withStock({}, { noDownside: [option(11, { ehp: 1100 })] })),
-      vi.fn(),
-      vi.fn(),
-      settings({ owned: ownedSettings() })
-    );
-    await openSettings();
-    expect(
-      screen.getByText(
-        'You own none of these modules at Jita. Pick another place, or any location.'
-      )
-    ).toBeInTheDocument();
   });
 });

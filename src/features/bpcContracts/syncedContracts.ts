@@ -1,7 +1,7 @@
 /**
  * Reads the Public Contract Offers snapshot (issues #906, #907, ADR 0013) from
- * Cloudflare R2 (ADR 0019), published by the `syncPublicContractOffers`
- * scheduled function and narrowed here to the blueprint copies (and originals)
+ * Cloudflare R2 (ADR 0019), published by the contract-offers
+ * GitHub Actions job (`public-data-contract-offers.yml`) and narrowed here to the blueprint copies (and originals)
  * BPC Search searches. Until #907 that narrowing was a second, blueprint-only
  * ingestion pipeline; the snapshot now carries every for-sale item type and
  * each consumer takes the slice it wants.
@@ -31,12 +31,12 @@ const CACHE_KEY = 'publicContractOffers';
 /**
  * How often the backend republishes the snapshot, and therefore the soonest a
  * refetch can return anything new. `STALE_AFTER.default`'s ten minutes is the
- * app-wide promise for a *Character's* own mutable data; against an hourly
- * publish it just re-reads a byte-identical snapshot up to six times per
+ * app-wide promise for a *Character's* own mutable data; against a 30-minute
+ * publish it just re-reads a byte-identical snapshot up to three times per
  * cycle. The UI shows the snapshot's `lastSyncedAt` rather than when this
  * browser last read it.
  */
-const SNAPSHOT_PUBLISH_INTERVAL_MS = 60 * 60_000;
+const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * 60_000;
 
 export interface PublicBpcContractsSnapshot {
   rows: BpcContractRow[];

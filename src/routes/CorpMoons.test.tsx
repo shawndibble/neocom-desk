@@ -86,3 +86,12 @@ describe('CorpMoons load errors', () => {
     expect(screen.getByText('auth/invalid-api-key')).toBeInTheDocument();
   });
 });
+
+describe('CorpMoons loading (#5310)', () => {
+  it('shows the skeleton with no tabs while the book mode is unknown', () => {
+    bookState = { status: 'loading' };
+    mount({ state: 'ready' });
+    expect(screen.getByTestId('moons-loading')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+  });
+});

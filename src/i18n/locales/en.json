@@ -1357,8 +1357,9 @@
       "costs": "Costs"
     },
     "improve": {
-      "menuItem": "Improve",
-      "title": "Improve",
+      "menuItem": "Improve Fit",
+      "button": "Improve",
+      "title": "Improve Fit",
       "goalLabel": "Improve Goal",
       "goal": {
         "overall": "Best overall",
@@ -1415,7 +1416,6 @@
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
         "fixFirst": "Fix this first",
-        "train": "Train",
         "implants": "Implants",
         "noDownside": "No downside",
         "tradeOffs": "Trade-offs"
@@ -1464,7 +1464,6 @@
       "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
       "cap": {
         "buy": "Total budget (ISK)",
-        "buyOwned": "Budget for what is still to buy (ISK)",
         "refit": "Extra spend cap (ISK)"
       },
       "defenseLabel": "Defense Choice",
@@ -1474,16 +1473,14 @@
       "sideNone": "no gain",
       "sideGain": "up to +{{percent}}%",
       "moreLabel": "Rigs and officer modules",
-      "moreGoals": "More goals ({{count}})",
+      "more": "More",
+      "moreCount": "{{count}} goals",
+      "skills": "Skills",
+      "skillsCount": "{{count}} to train",
+      "implantsHelp_one": "{{count}} implant would help",
+      "implantsHelp_other": "{{count}} implants would help",
+      "findImplants": "Find implants",
       "settingsLabel": "Search settings",
-      "owned": {
-        "label": "Count what I own at",
-        "summary": "minus owned at {{place}}",
-        "noneHere": "You own none of these modules at {{place}}. Pick another place, or any location.",
-        "all": "You own all {{count}}",
-        "nothingToBuy": "nothing to buy",
-        "some": "You own {{own}} of {{need}} · buy {{buy}} for"
-      },
       "summaryNoCap": "no budget",
       "summaryCap": {
         "buy": "budget {{cap}}",
@@ -1508,8 +1505,9 @@
       "selection": {
         "changes_one": "{{count}} change",
         "changes_other": "{{count}} changes",
-        "total": "fit costs",
-        "stillToBuy": "still to buy",
+        "totalCost": "Total cost",
+        "costChange": "Cost change",
+        "noChange": "no change",
         "ofBudget": "of a {{cap}} budget",
         "unpriced_one": "{{count}} unpriced",
         "unpriced_other": "{{count}} unpriced",
@@ -3643,6 +3641,8 @@
       "teNote": "Sub-jobs are timed at TE 0"
     },
     "heroVs90dSpike": "Sell price is {{value}} above its 90-day median",
+    "inputCostMove": "Build cost {{cost}} in 7d ({{input}} is {{share}}% of cost)",
+    "inputCostMoveWithProduct": "Build cost {{cost}} in 7d ({{input}} is {{share}}% of cost) · product {{product}}",
     "heroNoPrices": "No price data yet",
     "bpcCoverageWarning": "{{name}}: your BPC covers {{covered}} of {{needed}} runs",
     "bpcCoverageSetRuns": "Set runs to {{count}}",
@@ -11751,7 +11751,11 @@
       "hiddenLineInstantMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
       "emptyHiddenHintInstant": "We looked at {{scanned}} items. Hidden by your filters: {{low}} have a margin under your minimum.",
       "emptyHiddenHintInstantMaxPrice": "We looked at {{scanned}} items. Hidden by your filters: {{dear}} cost more than your max price per item, {{low}} have a margin under your minimum.",
-      "cappedLine": "Only the best {{priced}} price gaps were checked for demand and the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
+      "cappedLine": "We checked demand in order of price gap, up to {{reads}} items, and at most the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
+      "cappedLineDaily": "{{passed}} items passed the demand check, and only the best {{books}} got order books, so more routes may exist. Narrow the category to see them.",
+      "demandDailyLine": "Demand comes from the daily market summary.",
+      "demandFallbackLine": "The daily demand summary was not available, so demand was read from ESI history instead.",
+      "cappedLineInstant": "Only the best {{books}} price gaps got order books, so more routes may exist. Narrow the category to see them.",
       "scannedLine": "{{count}} items looked at. Prices and history come from public market data.",
       "hiddenLine": "Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "hiddenLineMaxPrice": "Hidden by your filters: {{dear}} cost more than your max price per item, {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
@@ -12213,6 +12217,9 @@
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
+      "removeMenu": "Remove",
+      "removed": "Quickbar item {{name}} removed.",
+      "undo": "Undo",
       "reorderItem": "Reorder {{name}}",
       "drag": {
         "start": "Picked up {{name}}.",
@@ -12222,7 +12229,12 @@
         "cancelled": "Reordering cancelled. {{name}} stayed at its original position.",
         "instructions": "Press space to pick up an item. Use the up and down arrow keys to move it, space again to drop it, or escape to cancel."
       },
-      "addItem": "Add {{name}} to Quickbar"
+      "addItem": "Add {{name}} to Quickbar",
+      "vsPaid": {
+        "label": "against what you paid for {{name}}",
+        "tooltip_one": "vs paid: {{price}} now against {{paid}} paid for the {{units}} unit you still hold, before fees.",
+        "tooltip_other": "vs paid: {{price}} now against {{paid}} average paid per unit, before fees. Covers the {{units}} units you still hold."
+      }
     },
     "priceAlert": {
       "button": "Set price alert for {{name}}",
@@ -13323,8 +13335,20 @@
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
-      "enableHint": "This device hasn't granted notification permission yet.",
-      "enableButton": "Turn on device notifications",
+      "missingGrantBadge": {
+        "base": "Needs Alerts when closed. Turn it on in Manage Alerts when closed.",
+        "mail": "Needs Alerts when closed with mail. Turn it on in Manage Alerts when closed.",
+        "nearby": "Needs Alerts when closed with location. Turn it on in Manage Alerts when closed."
+      },
+      "channelOff": {
+        "masterOff": "Notifications are off. Tick Enable notifications above.",
+        "permissionDenied": "Your browser blocks device pop-ups for this site. Allow them in its site settings.",
+        "permissionDefault": "This device hasn't granted notification permission yet. Tick Device pop-ups above to ask.",
+        "permissionUnsupported": "This browser can't show device notifications.",
+        "installRequired": "Install Neocom to your home screen to get device notifications.",
+        "deviceToggleOff": "Device pop-ups are off. Tick Device pop-ups above.",
+        "alertsToggleOff": "The Alerts list is off. Tick Alerts list above."
+      },
       "masterSwitchLabel": "Enable notifications",
       "searchPlaceholder": "Search events or characters",
       "noResults": "No matching events or characters",
@@ -13391,7 +13415,7 @@
       "marketOrderUndercutStationOnlyHint": "Checks your order's own station only, and only while the app is open.",
       "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
-      "scheduledPushBadge": "Arrives even with the app closed, up to 72 hours ahead. Needs notification permission; on iPhone and iPad, the installed app.",
+      "scheduledPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
       "serverPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
       "nearbyPushBadge": "Arrives even with the app closed, within about 15 minutes, for Characters whose Alerts when closed includes nearby alerts. Needs notification permission; on iPhone and iPad, the installed app.",
       "mailPushBadge": "Arrives even with the app closed, within about 15 minutes, for Characters whose Alerts when closed includes mail. Needs notification permission; on iPhone and iPad, the installed app.",
@@ -17373,6 +17397,8 @@
       "externalLink": "Trailing external icon: leaves Neocom Desk",
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
+      "missingGrantMark": "Red slashed broadcast icon: this row needs a grant the Character lacks",
+      "channelOff": "Greyed checkbox that keeps its tick: its channel is off",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
@@ -17441,6 +17467,7 @@
       "hintContent": "The full name, in a tooltip.",
       "figureHistory": "4.4%",
       "communityMark": "Shared in a Community",
+      "channelOffLabel": "Device",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
       "chartLast": "This week",
       "chartPrev": "Last week",

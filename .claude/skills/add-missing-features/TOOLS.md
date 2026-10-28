@@ -202,6 +202,8 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
 `SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
+- #5327 NARROW Build Plan "input costs moved in 7d" line (EveBoosters
+  Material Influence Explorer, Build Plan only).
 - #5134 NARROW Build Plans "Buy ore instead": compressed ore bought and
   refined vs buying minerals, cheapest/lightest only (Omnitool, MoMa).
 - #5128 NARROW Net worth "In contracts" layer (EVE Farm). #5127 NARROW LP Store
@@ -260,6 +262,24 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   order↔transaction correlation makes it proposable). **32**: Production Run
   using `IndustryJob.cost`. **47**: ratting ISK/h, optimizer score, swing
   scanner.
+- **EveBoosters.com** (28-video series, fully watched): 40 tools, every one
+  maps to a built module or a closed class. **Market Seeding** (busy systems
+  with no market): kill-tests 46, 3, 9, 16; premium unmeasurable, nothing
+  per-station in ESI. **Manipulation Detector** (cornered supply): public
+  orders carry no issuer, so "one seller holds N%" is a guess; book walk,
+  `classifyOrderDepth`, `vs90d`, `sellThrough` already say the honest part.
+  **Master List** (drift since ticked): #858 rejection, Market Trend widget.
+  **Material Influence Explorer** market-wide: kill-test 14 (one history call
+  per type), only #5327 survives. **Plot a Course** (kill-scored route):
+  `routeSafety.ts`, decision `20260912-165245`. **PvP set** (Compare Targets,
+  Wardec Targets, Hunting Grounds, PvP Overview, Live Killstream, Warzone
+  Board, Universe Map): killmail crawl (1) or non-ISK. **Wormhole Finder**:
+  the J-space weak gap above. **SP Market**, **PI Planner**, **Planet Finder**,
+  **Where to Build**, **Industry**, **Appraisal**, **Station Trader**,
+  **Margin Finder**, **Arbitrage**, **Swing**, **Trade/Wealth Planner**,
+  **Watchlist**, **Skills order**: built (`20261007-191323`, `pi/`,
+  `cheaperNearbySystems.ts`, Build Plan, Appraisal, closed class 3, Quickbar
+  alerts, #822/#827/#925).
 - **Reach (few players):** Equinox skyhook reagent/theft tracker (needs a corp
   role in a sov corp; `esi-structures` scope group missing, kill-test 9; 13
   does NOT apply, the first candidate to reopen if a sov-nullsec audience

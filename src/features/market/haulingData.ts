@@ -9,13 +9,19 @@
  *
  * 1. **Prices.** Fuzzwork aggregates at both hub stations (`getHubPrices`,
  *    batched and cached). Keep items dearer at the destination by a wide
- *    enough gap, most a trip could earn first (`priceScore`), capped at
- *    `MAX_PRICED_CANDIDATES`.
- * 2. **History.** The destination region's daily history per survivor
- *    (`loadPriceHistory`, cached until ESI's own daily rollover). This is
- *    where a dead market drops out — a huge listed gap on an item that never
- *    sells is the trap. Keep the `MAX_BOOK_CANDIDATES` best by what a lot
- *    could earn at the recent sale price (`historyScore`).
+ *    enough gap, most a trip could earn first (`priceScore`).
+ * 2. **Demand.** This is where a dead market drops out — a huge listed gap on
+ *    an item that never sells is the trap, and over a broad category the
+ *    dearest, thinnest items fill the top of pass 1. Keep the
+ *    `MAX_BOOK_CANDIDATES` best by what a lot could earn at the recent sale
+ *    price (`historyScore`). Demand comes from the destination region's daily
+ *    R2 object (`loadHaulingDemand`, issue #5344): every pass-1 survivor is
+ *    summarised locally, no ESI call, no read cap, and the best 40 overall
+ *    are kept. When that object is missing or stale, the fallback reads the
+ *    region's ESI history per survivor (`loadPriceHistory`, cached until ESI's
+ *    own daily rollover), in rank order in batches until
+ *    `MAX_BOOK_CANDIDATES` items pass or the list runs out — never past
+ *    `MAX_HISTORY_READS` reads — and keeps the best of those.
  * 3. **Order books.** The two hubs' books for those few, station-filtered,
  *    turned into ladders and estimated by `engine/market/haulingMarket`.
  *
@@ -40,6 +46,7 @@
 import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { getOrderBook } from '@/features/market/orderBook';
 import { loadPriceHistory } from '@/features/market/priceHistory';
+import { loadHaulingDemand, type HaulingDemand } from '@/features/market/haulingDemand';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { EsiError } from '@/esi/errors';
 import { getHubPrices } from '@/market/prices';
@@ -52,6 +59,7 @@ import {
   ROUGH_FEE_FACTOR,
 } from '@/engine/market/haulingRank';
 import {
+  demandFromAggregate,
   estimateSale,
   hubLadders,
   summarizeDemand,
@@ -73,8 +81,11 @@ export const MIN_LISTED_GAP = 1.1;
  * skill, so it would only spend order-book requests on rows that never show.
  */
 export const MIN_INSTANT_GAP = 1.035;
-export const MAX_PRICED_CANDIDATES = 80;
+/** Safety cap on destination-history reads (1 ESI request each, cached) in one list-mode scan. */
+export const MAX_HISTORY_READS = 400;
 export const MAX_BOOK_CANDIDATES = 40;
+/** History reads go out in rank-ordered batches so the scan can stop once enough items pass. */
+const HISTORY_BATCH = 20;
 /** The history pass keeps anything whose recent sale price, after the rough fee, could clear this gap. */
 const MIN_RECENT_GAP = 1.03;
 /** Books and history are 1 request each per item: stay well under `ESI_FANOUT_CONCURRENCY`. */
@@ -133,7 +144,11 @@ export interface HaulingScan {
   rows: HaulingScanRow[];
   /** How many items were looked at in the first pass. */
   scanned: number;
-  /** True when the price or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
+  /** List mode: where demand came from, the daily R2 object or the ESI fallback. Absent when no item reached the demand pass. */
+  demandSource?: 'daily' | 'esi';
+  /** Daily source only: how many items passed the demand check, of which the best `MAX_BOOK_CANDIDATES` got books. */
+  demandPassed?: number;
+  /** True when the history-read or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
   capped?: boolean;
   /**
    * Ids past pass 1 not worth another look: dropped by history, or given books.
@@ -252,6 +267,36 @@ function byRank(a: Ranked, b: Ranked): number {
   return b.score - a.score || b.gap - a.gap || a.typeId - b.typeId;
 }
 
+/** What the demand check keeps of one candidate, scored for the books cut; null when it never sold above the origin price. */
+function withDemand(candidate: Ranked, demand: DemandSummary, originListed: number) {
+  if (demand.recentSalePrice === null || !(demand.dailyVolume > 0)) return null;
+  const recentGap = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
+  if (recentGap < MIN_RECENT_GAP) return null;
+  return {
+    typeId: candidate.typeId,
+    lane: candidate.lane,
+    buy: candidate.buy,
+    demand,
+    score: historyScore({
+      buy: candidate.buy,
+      recentSalePrice: demand.recentSalePrice,
+      dailyVolume: demand.dailyVolume,
+      originListed,
+    }),
+    gap: recentGap,
+  } satisfies ShortlistCandidate;
+}
+
+/** The daily demand object of every destination region the candidates use; null when any is unavailable, so one lane never runs on mixed sources. */
+async function loadDailyDemand(
+  candidates: readonly PricedCandidate[]
+): Promise<Map<number, HaulingDemand> | null> {
+  const regionIds = [...new Set(candidates.map((c) => c.lane.to.regionId))];
+  const loaded = await Promise.all(regionIds.map((id) => loadHaulingDemand(id)));
+  if (loaded.some((demand) => demand === null)) return null;
+  return new Map(regionIds.map((id, i) => [id, loaded[i]!]));
+}
+
 export async function runHaulingScan(request: HaulingScanRequest): Promise<HaulingScan> {
   const { from, to, typeIds, types, onProgress, signal } = request;
   const today = request.today ?? new Date().toISOString().slice(0, 10);
@@ -320,47 +365,56 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       return best === null ? [] : [best];
     })
     .sort(byRank);
-  const priced = pricedAll.slice(0, MAX_PRICED_CANDIDATES);
-
-  // 2. History: drop what never sells or only sold below the origin price.
-  // An instant sale skips it: the standing buy order is the demand.
+  // An instant sale skips history: the standing buy order is the demand, and pass 1's order is the shortlist.
   const withHistory: ShortlistCandidate[] =
-    mode === 'instant' ? priced.map((c) => ({ ...c, demand: null })) : [];
+    mode === 'instant'
+      ? pricedAll.slice(0, MAX_BOOK_CANDIDATES).map((c) => ({ ...c, demand: null }))
+      : [];
+  const dailyDemand =
+    mode === 'list' && pricedAll.length > 0 ? await loadDailyDemand(pricedAll) : null;
+  throwIfAborted(signal);
+  // The daily object answers for every candidate at once; the ESI fallback reads a capped slice.
+  const historyPass =
+    mode === 'instant' ? [] : dailyDemand ? pricedAll : pricedAll.slice(0, MAX_HISTORY_READS);
+
+  // 2. History: drop what never sells or only sold below the origin price,
+  // feeding candidates in rank order until enough survive or none are left.
   let historyDone = 0;
+  let historyNext = 0;
   // A read that failed for now (rate limit, network) is not a verdict: a later scan may look again.
   const historyUnread = new Set<number>();
-  const historyPass = mode === 'instant' ? [] : priced;
-  if (mode === 'list') onProgress?.({ stage: 'history', done: 0, total: priced.length });
-  await mapWithConcurrencyLimit(historyPass, SCAN_CONCURRENCY, async (candidate) => {
-    throwIfAborted(signal);
-    try {
-      const { points } = await loadPriceHistory(candidate.lane.to.regionId, candidate.typeId);
-      const demand = summarizeDemand(points, today);
-      if (demand.recentSalePrice !== null && demand.dailyVolume > 0) {
-        const recentGap = (demand.recentSalePrice * ROUGH_FEE_FACTOR) / candidate.buy;
-        if (recentGap >= MIN_RECENT_GAP) {
-          withHistory.push({
-            typeId: candidate.typeId,
-            lane: candidate.lane,
-            buy: candidate.buy,
-            demand,
-            score: historyScore({
-              buy: candidate.buy,
-              recentSalePrice: demand.recentSalePrice,
-              dailyVolume: demand.dailyVolume,
-              originListed: candidate.originListed,
-            }),
-            gap: recentGap,
-          });
-        }
-      }
-    } catch (error) {
-      // ESI's 400 is "no market for this type": nothing to sell it for, for good.
-      if (!(error instanceof EsiError && error.status === 400)) historyUnread.add(candidate.typeId);
+  if (mode === 'list') onProgress?.({ stage: 'history', done: 0, total: historyPass.length });
+  if (dailyDemand) {
+    for (const candidate of historyPass) {
+      const aggregate = dailyDemand.get(candidate.lane.to.regionId)?.types.get(candidate.typeId);
+      // Absent from the object: it never traded in the window, so there is no demand to haul into.
+      const kept =
+        aggregate && withDemand(candidate, demandFromAggregate(aggregate), candidate.originListed);
+      if (kept) withHistory.push(kept);
     }
-    historyDone += 1;
-    onProgress?.({ stage: 'history', done: historyDone, total: priced.length });
-  });
+    historyNext = historyPass.length;
+    historyDone = historyPass.length;
+  }
+  while (historyNext < historyPass.length && withHistory.length < MAX_BOOK_CANDIDATES) {
+    const batch = historyPass.slice(historyNext, historyNext + HISTORY_BATCH);
+    historyNext += batch.length;
+    await mapWithConcurrencyLimit(batch, SCAN_CONCURRENCY, async (candidate) => {
+      throwIfAborted(signal);
+      try {
+        const { points } = await loadPriceHistory(candidate.lane.to.regionId, candidate.typeId);
+        const kept = withDemand(candidate, summarizeDemand(points, today), candidate.originListed);
+        if (kept) withHistory.push(kept);
+      } catch (error) {
+        // ESI's 400 is "no market for this type": nothing to sell it for, for good.
+        if (!(error instanceof EsiError && error.status === 400))
+          historyUnread.add(candidate.typeId);
+      }
+      historyDone += 1;
+      onProgress?.({ stage: 'history', done: historyDone, total: historyPass.length });
+    });
+  }
+  // Stopped early once enough passed: close the bar on what was actually read.
+  if (mode === 'list') onProgress?.({ stage: 'history', done: historyDone, total: historyDone });
   withHistory.sort(byRank);
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 
@@ -418,11 +472,15 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     onProgress?.({ stage: 'books', done: booksDone, total: shortlist.length });
   });
 
+  // Cut = candidates left unlooked-at, by the book cap (enough passed) or the read cap.
   const capped =
-    pricedAll.length > MAX_PRICED_CANDIDATES || withHistory.length > MAX_BOOK_CANDIDATES;
+    mode === 'instant'
+      ? pricedAll.length > MAX_BOOK_CANDIDATES
+      : historyNext < pricedAll.length || withHistory.length > MAX_BOOK_CANDIDATES;
   const passedHistory = new Set(withHistory.map((c) => c.typeId));
   const examinedTypeIds = [
-    ...priced
+    ...historyPass
+      .slice(0, historyNext)
       .filter((c) => !passedHistory.has(c.typeId) && !historyUnread.has(c.typeId))
       .map((c) => c.typeId),
     ...shortlist.map((c) => c.typeId),
@@ -431,6 +489,12 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     rows,
     scanned: ids.length,
     ...(capped ? { capped } : {}),
+    ...(mode === 'list' && pricedAll.length > 0
+      ? {
+          demandSource: dailyDemand ? ('daily' as const) : ('esi' as const),
+          ...(dailyDemand ? { demandPassed: withHistory.length } : {}),
+        }
+      : {}),
     examinedTypeIds,
     overMaxPrice,
     fetchedAt: Date.now(),

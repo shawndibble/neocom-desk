@@ -933,6 +933,29 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
     expect(d.credited - d.forgiven + d.forgiven + d.writtenOff + d.remaining).toBe(d.billed);
   });
 
+  it('a partial write-off with no payment lowers Outstanding on the table, the period rows and the panel (#5310)', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [a],
+      writeOffs: [
+        { id: 'w1', minerId: a.minerId, amount: 150_000, at: '2026-09-10T00:00:00Z', reason: 'x' },
+      ],
+    });
+    const left = a.amount - 150_000;
+    expect(periodStatements(view, '2026-08-01')![0]).toMatchObject({
+      billed: a.amount,
+      paid: 150_000,
+      outstanding: left,
+      settled: false,
+    });
+    expect(periodRows(view).find((r) => r.start === '2026-08-01')).toMatchObject({
+      outstanding: left,
+    });
+    const d = statementDetail(view, a.id)!;
+    expect(d).toMatchObject({ forgiven: 150_000, writtenOff: 0, remaining: left });
+    expect(d.billed - d.credited - d.remaining).toBe(0);
+  });
+
   it('a sub-ISK credit is not a payment: nothing paid, all of it outstanding', () => {
     const fractional = { ...a, amount: 1_000_000.6 };
     const view = buildBookView({

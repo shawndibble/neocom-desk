@@ -148,20 +148,55 @@ export function summarizeDemand(
   const daysWithTrades = inWindow.length;
   const ordersPerTradingDay =
     daysWithTrades > 0 ? inWindow.reduce((sum, p) => sum + p.orderCount, 0) / daysWithTrades : 0;
-  const demand: DemandKind =
-    ordersPerTradingDay < thresholds.minOrdersPerTradingDay
-      ? 'rarely'
-      : daysWithTrades >= thresholds.mostDaysMin
-        ? 'most-days'
-        : daysWithTrades >= thresholds.burstsMin
-          ? 'bursts'
-          : 'rarely';
   return {
     dailyVolume: totalVolume / thresholds.historyDays,
     daysWithTrades,
     recentSalePrice: volumeWeightedMedian(recent.length > 0 ? recent : inWindow),
     latestDay: latestDayOf(inWindow),
-    demand,
+    demand: demandKind(ordersPerTradingDay, daysWithTrades, thresholds),
+  };
+}
+
+function demandKind(
+  ordersPerTradingDay: number,
+  daysWithTrades: number,
+  thresholds: HaulingThresholds
+): DemandKind {
+  if (ordersPerTradingDay < thresholds.minOrdersPerTradingDay) return 'rarely';
+  if (daysWithTrades >= thresholds.mostDaysMin) return 'most-days';
+  return daysWithTrades >= thresholds.burstsMin ? 'bursts' : 'rarely';
+}
+
+/**
+ * One type's demand folded ahead of time over the history window (the daily
+ * `hauling-demand/<regionId>.json` object, issue #5344): the same facts
+ * `summarizeDemand` reads off the daily points, without the points.
+ */
+export interface DemandAggregate {
+  /** Total units traded over the window. */
+  volume: number;
+  /** Days of the window with any trade. */
+  daysWithTrades: number;
+  /** Sum of each trading day's `order_count`. */
+  orderSum: number;
+  /** `summarizeDemand`'s `recentSalePrice`, folded server-side. */
+  recentSalePrice: number | null;
+  latestDay: { date: string; highest: number; lowest: number } | null;
+}
+
+/** The `summarizeDemand` answer for a stored aggregate: the same on the same daily points. */
+export function demandFromAggregate(
+  aggregate: DemandAggregate,
+  thresholds: HaulingThresholds = HAULING_THRESHOLDS
+): DemandSummary {
+  const { daysWithTrades } = aggregate;
+  const ordersPerTradingDay = daysWithTrades > 0 ? aggregate.orderSum / daysWithTrades : 0;
+  return {
+    dailyVolume: aggregate.volume / thresholds.historyDays,
+    daysWithTrades,
+    recentSalePrice: aggregate.recentSalePrice,
+    latestDay: aggregate.latestDay,
+    demand: demandKind(ordersPerTradingDay, daysWithTrades, thresholds),
   };
 }
 

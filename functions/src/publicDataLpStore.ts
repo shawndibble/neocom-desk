@@ -23,7 +23,11 @@ import {
   historyWindow,
   type FoldHistoryDay,
 } from './marketHistoryVolume.js';
-import { publishLpStoreOffersToR2, publishLpStoreVolumeToR2 } from './r2DailySnapshots.js';
+import {
+  publishHaulingDemandToR2,
+  publishLpStoreOffersToR2,
+  publishLpStoreVolumeToR2,
+} from './r2DailySnapshots.js';
 import { createR2Get, createR2Put, type R2Get, type R2Put } from './r2Client.js';
 
 const ESI_PUBLIC_HEADERS = {
@@ -78,7 +82,7 @@ export async function publishLpStoreOffers(deps: PublicLpStoreDeps): Promise<voi
 }
 
 /**
- * Publishes each Trade Hub region's units-per-day (issue #5127) from EVE Ref's daily
+ * Publishes each Trade Hub region's units-per-day (issue #5127) and hauling demand (#5344) from EVE Ref's daily
  * market-history files; throws, publishing nothing, when too few days were readable.
  */
 export async function publishLpStoreVolume(deps: PublicLpStoreDeps): Promise<void> {
@@ -87,7 +91,8 @@ export async function publishLpStoreVolume(deps: PublicLpStoreDeps): Promise<voi
   let folded = 0;
   const failed: string[] = [];
   const missing: string[] = [];
-  for (const date of historyWindow(new Date((deps.now ?? Date.now)()), LP_VOLUME_WINDOW_DAYS)) {
+  const window = historyWindow(new Date((deps.now ?? Date.now)()), LP_VOLUME_WINDOW_DAYS);
+  for (const date of window) {
     for (let attempt = 1; attempt <= LP_VOLUME_FETCH_ATTEMPTS; attempt += 1) {
       try {
         if ((await foldDay(date, fold)) === 'folded') folded += 1;
@@ -111,6 +116,17 @@ export async function publishLpStoreVolume(deps: PublicLpStoreDeps): Promise<voi
     await publishLpStoreVolumeToR2(
       regionId,
       { lastSyncedAt, days: folded, perDay: fold.perDay(regionId, folded) },
+      deps.put
+    );
+    // A sibling object (issue #5344): the hauling scan's demand, `lp-store-volume` stays as it was.
+    await publishHaulingDemandToR2(
+      regionId,
+      {
+        lastSyncedAt,
+        asOf: window[0]!,
+        days: folded,
+        types: fold.demandFor(regionId, window[0]!, LP_VOLUME_WINDOW_DAYS),
+      },
       deps.put
     );
   }

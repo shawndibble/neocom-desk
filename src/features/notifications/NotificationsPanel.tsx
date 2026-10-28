@@ -7,9 +7,9 @@
  *
  * - **denied**: the blocked notice and a disabled Device column. JS cannot
  *   re-request a denied grant, so a toggle here would do nothing.
- * - **default**: the toggles stay, with an Enable button above them: the
+ * - **default**: the toggles stay, with Device pop-ups reading unticked: the
  *   second chance for someone who dismissed the one-time explainer
- *   (`NotificationPermissionPrompt`). That tap is the only thing in this file
+ *   (`NotificationExplainer`). Ticking Device pop-ups is the only thing in this file
  *   that reaches the browser prompt; nothing requests permission on mount.
  * - **granted** (and browsers with no Notification API at all): unchanged.
  *
@@ -39,6 +39,8 @@ import { filterNotificationEvents } from './notificationSearch';
 import { useSeenEveTypesStore } from './seenEveTypes';
 import { refreshAppBadge } from './appBadge';
 import { useNotificationPermission, notificationsBlocked } from './permission';
+import { channelOffReasons } from './channelOff';
+import { webPushSupport } from '@/sync/webPushSupport';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
@@ -199,13 +201,23 @@ export function NotificationsPanel() {
   // cannot re-request one. It does not blank the panel, because the Overview
   // feed works with no grant at all.
   const browserBlocked = notificationsBlocked(permission);
+  // Which channels the event boxes can use right now (issue #5330); one object per change, not per render.
+  const channelOff = useMemo(
+    () =>
+      channelOffReasons({
+        permission,
+        installRequired: webPushSupport() === 'requires-install',
+        prefsValue,
+      }),
+    [permission, prefsValue]
+  );
 
   const rowContext: EventRowContext = {
     characters: orderedCharacters,
     scopesByCharacterId,
     capabilitiesByCharacterId,
     prefsValue,
-    browserBlocked,
+    channelOff,
     visibleCharacterIds: filterResult?.characterIds ?? null,
     // A search that names Characters opens every row to show just those chips.
     forceExpanded: filterResult?.characterIds != null,

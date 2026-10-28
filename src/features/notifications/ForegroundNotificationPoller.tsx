@@ -19,7 +19,7 @@ import { isOnline, onReconnect } from '@/stores/network';
  * immediate catch-up check runs on regaining visibility — and
  * shortly after mount (`FIRST_POLL_DELAY_MS`), since opening the app is itself
  * the strongest case of "becoming visible", just not one worth contending
- * with the first route's own reads for. Mounted once in `Layout`, beside `NotificationPermissionPrompt`;
+ * with the first route's own reads for. Mounted once in `Layout`;
  * `runForegroundPoll` (features/notifications/foregroundPoller.ts) owns every
  * decision about whether a poll actually does anything.
  */

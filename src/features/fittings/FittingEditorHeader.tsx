@@ -25,6 +25,8 @@ interface FittingEditorHeaderProps {
   hullName: string;
   compact: boolean;
   alpha: FittingAlpha;
+  /** The Alpha/Omega badge sits in the phone's tab row, so the header leaves it out. */
+  alphaInTabs?: boolean;
   share: EditorShare;
   saved: ReturnType<typeof useSavedFittingRecord>;
   onLibrary: (action: LibraryAction) => void;
@@ -50,6 +52,7 @@ export function FittingEditorHeader({
   hullName,
   compact,
   alpha,
+  alphaInTabs = false,
   share,
   saved: { savedRecord, currentShareCode, hasUnsavedEdits },
   onLibrary,
@@ -92,7 +95,7 @@ export function FittingEditorHeader({
         stats={stats}
         share={share}
         badges={{
-          alpha: { blockers: alpha.blockers, skillName: alpha.skillName },
+          alpha: alphaInTabs ? undefined : { blockers: alpha.blockers, skillName: alpha.skillName },
           mastery:
             characterId !== null ? { hullTypeId: fitting.shipTypeId, hullName, characterId } : null,
         }}

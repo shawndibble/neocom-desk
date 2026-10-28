@@ -83,7 +83,7 @@ test.describe('Fittings header', () => {
     });
   }
 
-  test('is one compact row at 390, the badges in its ⋮ menu', async ({ page }) => {
+  test('is one compact row at 390, the badges out of it', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
@@ -98,8 +98,11 @@ test.describe('Fittings header', () => {
     await expectButtonsInsideAndApart(page, header);
     await expectNoHorizontalOverflow(page);
 
+    // The verdict moved out of the menu to the end of the Ring | List | Stats row.
+    await expect(page.getByRole('button', { name: /^(Alpha OK|Omega only)$/ })).toBeVisible();
     await header.getByRole('button', { name: 'Fitting actions' }).click();
-    await expect(page.getByText(/^(Alpha OK|Omega only)$/)).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Compare' })).toBeVisible();
+    await expect(page.getByText(/^(Alpha OK|Omega only)$/)).toHaveCount(0);
   });
 });
 

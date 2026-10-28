@@ -473,6 +473,7 @@ function FittingsPage() {
   const editor = (
     <FittingEditorPanes
       view={view}
+      onViewChange={addMode === 'sheet' ? undefined : (next) => void setView(next)}
       fitting={fitting}
       stats={stats}
       moduleResults={moduleResults}
@@ -511,6 +512,7 @@ function FittingsPage() {
       overlay={overlay}
       onOpenMakeItFit={makeItFit.open}
       preview={improve.preview}
+      previewIsk={improve.previewIsk}
       ruleBreaks={ruleBreaks.lines}
     />
   );
@@ -553,6 +555,7 @@ function FittingsPage() {
               hullName={hullName}
               compact={headerCompact}
               alpha={alpha}
+              alphaInTabs={layoutAddMode === 'sheet'}
               share={editorShare}
               saved={saved}
               onLibrary={openLibrary}
@@ -587,6 +590,7 @@ function FittingsPage() {
               editor={editor}
               statsSections={statsSections}
               statsFirst={statsFirst}
+              alpha={{ blockers: alpha.blockers, skillName: alpha.skillName }}
               improveColumn={improve.column}
             />
             {makeItFit.dialog}
