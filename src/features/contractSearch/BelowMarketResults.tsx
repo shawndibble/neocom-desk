@@ -13,9 +13,7 @@ import {
   Button,
   DataTable,
   EmptyState,
-  FilterChip,
   IskAmount,
-  SegmentedControl,
   Spinner,
   Tooltip,
   type DataTableColumn,
@@ -45,10 +43,6 @@ interface BelowMarketResultsProps {
   lastSyncedAt: number | null;
   /** Which side of the hub book values the Value column. */
   side: PriceSide;
-  onSideChange: (side: PriceSide) => void;
-  /** Contracts valued only through other contracts' asks are listed too. */
-  includeOther: boolean;
-  onIncludeOtherChange: (next: boolean) => void;
   typeNames: ReadonlyMap<number, string>;
   offerLocations: ReadonlyMap<number, OfferLocation>;
   offerJumps: (row: PublicContractOfferRow) => JumpsCellValue;
@@ -62,9 +56,6 @@ export function BelowMarketResults({
   contracts,
   lastSyncedAt,
   side,
-  onSideChange,
-  includeOther,
-  onIncludeOtherChange,
   typeNames,
   offerLocations,
   offerJumps,
@@ -242,24 +233,6 @@ export function BelowMarketResults({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 px-3 pt-2">
-        <SegmentedControl
-          label={t('contractSearch.belowMarket.sideLabel')}
-          size="sm"
-          value={side}
-          onChange={onSideChange}
-          options={[
-            { value: 'sell', label: t('contractSearch.belowMarket.sideSell') },
-            { value: 'buy', label: t('contractSearch.belowMarket.sideBuy') },
-          ]}
-        />
-        <FilterChip
-          label={t('contractSearch.belowMarket.includeOther')}
-          selected={includeOther}
-          onToggle={() => onIncludeOtherChange(!includeOther)}
-          tooltip={t('contractSearch.belowMarket.includeOtherTooltip')}
-        />
-      </div>
       {note !== null && (
         <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
           {note}
