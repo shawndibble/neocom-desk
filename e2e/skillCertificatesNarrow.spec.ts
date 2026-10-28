@@ -1,6 +1,6 @@
 /**
  * Skills › Certificates add-to-plan action (issue #2523): every certificate
- * row's "Add {grade} to plan" was a `primary` (accent-filled) button — about
+ * row's "Add to plan" was a `primary` (accent-filled) button — about
  * 70 solid accent blocks down the page, against DESIGN.md's one-primary-per-
  * view rule. It now uses `Button`'s default ghost variant at every width.
  *
@@ -24,7 +24,7 @@ async function gotoCertificates(page: Page, size: { width: number; height: numbe
 }
 
 async function assertNoAccentFilledAddButtons(page: Page) {
-  const addButtons = page.getByRole('button', { name: /^Add \w+ to plan$/ });
+  const addButtons = page.getByRole('button', { name: /^Add to plan: \w+ for / });
   await expect(addButtons.first()).toBeVisible();
 
   const { accent, backgrounds } = await addButtons.evaluateAll((buttons) => {
