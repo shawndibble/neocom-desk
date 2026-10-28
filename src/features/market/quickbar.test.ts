@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addQuickbarItem,
   removeQuickbarItem,
+  restoreQuickbarItem,
   reorderQuickbarItems,
   setQuickbarItemTarget,
   pinWithTarget,
@@ -204,5 +205,23 @@ describe('pinWithTarget', () => {
     const next = pinWithTarget(items, 2, 'Rifter', null);
     expect(next).toEqual(items);
     expect(next).not.toBe(items);
+  });
+});
+
+describe('restoreQuickbarItem', () => {
+  const a = { typeId: 1, name: 'A' };
+  const b = { typeId: 2, name: 'B', targetPrice: 9, targetDirection: 'above' as const };
+  const c = { typeId: 3, name: 'C' };
+
+  it('puts the item back at its old index with its target', () => {
+    expect(restoreQuickbarItem([a, c], b, 1)).toEqual([a, b, c]);
+  });
+
+  it('clamps an index past the end', () => {
+    expect(restoreQuickbarItem([a], b, 5)).toEqual([a, b]);
+  });
+
+  it('does not duplicate an item already present', () => {
+    expect(restoreQuickbarItem([a, b], b, 0)).toEqual([a, b]);
   });
 });

@@ -12215,6 +12215,9 @@
       "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
+      "removeMenu": "Remove",
+      "removed": "Quickbar item {{name}} removed.",
+      "undo": "Undo",
       "reorderItem": "Reorder {{name}}",
       "drag": {
         "start": "Picked up {{name}}.",
