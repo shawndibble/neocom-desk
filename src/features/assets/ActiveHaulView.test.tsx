@@ -236,6 +236,39 @@ describe('ActiveHaulView', () => {
     expect(screen.queryByRole('button', { name: /cargo for leg/ })).toBeNull();
   });
 
+  it('heads each leg with what it is, so the empty trip to a pickup is named', () => {
+    const flight: HaulLeg[] = [
+      { ...legs[0], m3: 0, ships: ['Rifter'] },
+      { ...legs[1], m3: 0, ships: ['Rifter'] },
+    ];
+    renderView(undefined, {
+      haul: {
+        ...haul,
+        capacityM3: 0,
+        plan: {
+          ...haul.plan,
+          sections: [{ ...haul.plan.sections[0], legs: flight }],
+          leftOut: [],
+          flown: [],
+          totals: { legs: 2, jumps: 10, m3: 0 },
+        },
+      },
+    });
+    const blocks = document.querySelectorAll('[data-leg-id]');
+    expect(blocks[0].textContent).toContain('Travel to Dodixie IX');
+    expect(blocks[0].textContent).toContain('Take Rifter at Dodixie IX');
+    expect(blocks[1].textContent).toContain('Fly Rifter to Jita 4-4');
+    expect(blocks[1].textContent).not.toContain('Take Rifter');
+  });
+
+  it('heads a cargo leg as a trip to the load, then the haul that drops it', () => {
+    renderView();
+    const blocks = document.querySelectorAll('[data-leg-id]');
+    expect(blocks[0].textContent).toContain('Travel to Dodixie IX');
+    expect(blocks[1].textContent).toContain('Haul to Jita 4-4');
+    expect(blocks[1].textContent).toContain('Drop 80 m³ at Jita 4-4');
+  });
+
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {
     renderView();
     await userEvent.click(screen.getByRole('button', { name: 'Set waypoint, leg 1' }));

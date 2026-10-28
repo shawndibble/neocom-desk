@@ -333,7 +333,6 @@ function Section({
               />
               <Stop
                 name={leg.to.name}
-                leg={leg}
                 last={index === legs.length - 1}
                 done={done.includes(leg.id)}
                 current={currentIds.has(leg.id)}
@@ -346,17 +345,15 @@ function Section({
   );
 }
 
-/** A place on the rail: the system in full, the station and moon on a dim second line. */
+/** A place on the rail: the system in full, the station and moon on a dim second line. What the pilot does on the way here belongs to the Leg block above it. */
 function Stop({
   name,
-  leg,
   start,
   last,
   done,
   current,
 }: {
   name: string;
-  leg?: HaulLeg;
   start?: boolean;
   last?: boolean;
   /** Reached: the pilot has ticked the Leg that ends here (the start always is). */
@@ -364,7 +361,6 @@ function Stop({
   /** The stop the pilot is flying to next. */
   current?: boolean;
 }) {
-  const { t } = useTranslation();
   const { system, detail } = splitPlaceName(name);
   return (
     <div className="relative py-1.5 pl-5">
@@ -380,24 +376,6 @@ function Stop({
       />
       <div className="text-sm font-semibold">{system}</div>
       {detail && <div className="text-xs text-text-dim [overflow-wrap:anywhere]">{detail}</div>}
-      {leg && (
-        <span
-          className={cx(
-            'mt-1 inline-block rounded-xs border px-2 py-0.5 text-xs tabular-nums',
-            leg.kind === 'pickup' ? 'border-accent text-accent' : 'border-warning text-warning'
-          )}
-        >
-          {leg.ships
-            ? t(leg.kind === 'pickup' ? 'assets.movePlan.haul.take' : 'assets.movePlan.haul.fly', {
-                ships: leg.ships.join(', '),
-                place: system,
-              })
-            : t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
-                volume: formatCubicMetres(leg.m3),
-                place: system,
-              })}
-        </span>
-      )}
     </div>
   );
 }
@@ -430,6 +408,26 @@ function LegBlock({
   const href = legRouteHref(leg);
   const condition = rows?.status === 'ready' ? legCondition(rows.rows) : null;
   const volume = formatCubicMetres(leg.m3);
+  const destination = splitPlaceName(leg.to.name).system;
+  // A pickup Leg is the empty trip to where the load or ship waits; a delivery Leg is the trip
+  // that carries it. Either way the heading says what this Leg is and the note what happens at its end.
+  const ships = leg.ships?.join(', ');
+  const heading = ships
+    ? t(leg.kind === 'pickup' ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.fly', {
+        ships,
+        place: destination,
+      })
+    : t(leg.kind === 'pickup' ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.haul', {
+        place: destination,
+      });
+  const arrival = ships
+    ? leg.kind === 'pickup'
+      ? t('assets.movePlan.haul.take', { ships, place: destination })
+      : null
+    : t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
+        volume,
+        place: destination,
+      });
   const hold = legHold(legs, leg);
   const carried = hold.aboard.reduce((sum, l) => sum + l.m3, 0);
   const aboardItems = heldItems(hold.aboard);
@@ -442,6 +440,7 @@ function LegBlock({
         done && 'opacity-60'
       )}
     >
+      <div className="text-sm font-semibold">{heading}</div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <label className={touchCheckboxLabelClassName}>
@@ -493,6 +492,12 @@ function LegBlock({
         </div>
       </div>
       {rows?.status === 'ready' && <HaulStrip rows={rows.rows} />}
+      {arrival && (
+        <div className={cx('text-xs', leg.kind === 'pickup' ? 'text-accent' : 'text-warning')}>
+          <span aria-hidden="true">↳ </span>
+          {arrival}
+        </div>
+      )}
       {/* A flight has no hold to show: the pilot flies the ship itself. */}
       {!leg.ships && (
         <>
