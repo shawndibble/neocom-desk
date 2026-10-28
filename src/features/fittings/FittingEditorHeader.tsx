@@ -25,11 +25,15 @@ interface FittingEditorHeaderProps {
   hullName: string;
   compact: boolean;
   alpha: FittingAlpha;
+  /** The Alpha/Omega badge sits in the phone's tab row, so the header leaves it out. */
+  alphaInTabs?: boolean;
   share: EditorShare;
   saved: ReturnType<typeof useSavedFittingRecord>;
   onLibrary: (action: LibraryAction) => void;
   /** A Save to EVE landed, so In-game Fittings should refetch. */
   onSavedToEve: () => void;
+  /** Opens Improve. */
+  onImprove: () => void;
 }
 
 /** The Permission Save to EVE needs, from the registry so a regrouping can't strand a hard-coded name. */
@@ -48,10 +52,12 @@ export function FittingEditorHeader({
   hullName,
   compact,
   alpha,
+  alphaInTabs = false,
   share,
   saved: { savedRecord, currentShareCode, hasUnsavedEdits },
   onLibrary,
   onSavedToEve,
+  onImprove,
 }: FittingEditorHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -69,6 +75,7 @@ export function FittingEditorHeader({
         subtitle={subtitle}
         onRename={workspace.rename}
         onLibrary={onLibrary}
+        onImprove={onImprove}
         onCompare={() => {
           // Unsaved edits against a saved Fitting: Compare opens saved vs.
           // current rather than just the one code already in the URL.
@@ -88,7 +95,7 @@ export function FittingEditorHeader({
         stats={stats}
         share={share}
         badges={{
-          alpha: { blockers: alpha.blockers, skillName: alpha.skillName },
+          alpha: alphaInTabs ? undefined : { blockers: alpha.blockers, skillName: alpha.skillName },
           mastery:
             characterId !== null ? { hullTypeId: fitting.shipTypeId, hullName, characterId } : null,
         }}

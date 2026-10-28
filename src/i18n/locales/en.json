@@ -1357,7 +1357,8 @@
       "costs": "Costs"
     },
     "improve": {
-      "title": "Improve",
+      "menuItem": "Improve Fit",
+      "title": "Improve Fit",
       "goalLabel": "Improve Goal",
       "goal": {
         "overall": "Best overall",

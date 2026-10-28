@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Panel, SlideOver, Tabs, TabPanel, useTabsId } from '@/components/ui';
+import { AlphaCloneChip } from './AlphaCloneChip';
 import { RING_ROOM_ATTR } from './ring/useRingChrome';
 import { type AddMode, editorColumnClass, editorGridClass } from './fittingLayout';
 import type { FittingView } from './fittingViewPreference';
@@ -22,6 +23,8 @@ interface FittingEditorLayoutProps {
   statsFirst?: boolean;
   /** Improve, open on desktop: a column left of the editor and stats, where the docked browser sits. */
   improveColumn?: ReactNode;
+  /** The Alpha/Omega badge, at the far end of the phone's tab row. */
+  alpha?: ComponentProps<typeof AlphaCloneChip>;
 }
 
 /**
@@ -42,6 +45,7 @@ export function FittingEditorLayout({
   statsSections,
   statsFirst = false,
   improveColumn,
+  alpha,
 }: FittingEditorLayoutProps) {
   const { t } = useTranslation();
   // Below desktop the Ring, the List and the stats are one set of tabs.
@@ -54,24 +58,28 @@ export function FittingEditorLayout({
       {viewHydrated &&
         (addMode === 'sheet' ? (
           <div className="space-y-3">
-            <Tabs
-              tabsId={viewTabsId}
-              tabs={[
-                { id: 'ring', label: t('fittings.view.ring') },
-                { id: 'list', label: t('fittings.view.list') },
-                { id: 'stats', label: t('fittings.phoneTabs.stats') },
-              ]}
-              value={phoneTab === 'stats' ? 'stats' : view}
-              onChange={(id) => {
-                if (id === 'stats') {
-                  setPhoneTab('stats');
-                  return;
-                }
-                setPhoneTab('editor');
-                onViewChange(id as FittingView);
-              }}
-              label={t('fittings.phoneTabs.label')}
-            />
+            <div className="flex items-center gap-2">
+              <Tabs
+                className="min-w-0 flex-1"
+                tabsId={viewTabsId}
+                tabs={[
+                  { id: 'ring', label: t('fittings.view.ring') },
+                  { id: 'list', label: t('fittings.view.list') },
+                  { id: 'stats', label: t('fittings.phoneTabs.stats') },
+                ]}
+                value={phoneTab === 'stats' ? 'stats' : view}
+                onChange={(id) => {
+                  if (id === 'stats') {
+                    setPhoneTab('stats');
+                    return;
+                  }
+                  setPhoneTab('editor');
+                  onViewChange(id as FittingView);
+                }}
+                label={t('fittings.phoneTabs.label')}
+              />
+              {alpha && <AlphaCloneChip {...alpha} />}
+            </div>
             <TabPanel
               tabsId={viewTabsId}
               tabId={phoneTab === 'stats' ? 'stats' : view}

@@ -57,6 +57,23 @@ export function AlphaCloneMenuRow(props: AlphaCloneChipProps) {
   );
 }
 
+/** The verdict's sentence, then the skill levels between a rule above and below (none when there is nothing to list). */
+function AlphaTooltip({ lines }: { lines: readonly string[] }) {
+  const [verdict, ...skills] = lines;
+  return (
+    <div className="space-y-1">
+      <p>{verdict}</p>
+      {skills.length > 0 && (
+        <ul className="border-y border-line py-1">
+          {skills.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /**
  * "Alpha OK" / "Omega only" for the open Fitting, by skill caps (see
  * `engine/fittings/alphaClone.ts`) — whoever flies it, so it shows without a
@@ -75,7 +92,7 @@ export function AlphaCloneChip(props: AlphaCloneChipProps) {
     <IconButton
       icon={<span className="text-lg leading-none font-semibold">{ok ? 'α' : 'Ω'}</span>}
       label={label}
-      tooltip={lines.join('\n')}
+      tooltip={<AlphaTooltip lines={lines} />}
       tone={ok ? 'positive' : 'warning'}
       openOnTap
     />
