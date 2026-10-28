@@ -14,10 +14,18 @@ id>`), so a Route Safety "N jumps" link inside it and Back return to the page
   count, age, tax rate, CEO, founder, founding date, shares): they mean
   nothing for a corporation no player runs. A player corporation's modal is
   unchanged, including the Faction row of a Faction Warfare corporation.
-- **ESI's `GET /characters/{id}/standings` is assumed to return BASE
-  standings** (UNVERIFIED: no CCP source says). The assumption is one constant,
-  `ESI_STANDINGS_ARE_BASE`; the check is a comparison with the in-game
-  Standings tab on a pilot with Connections trained.
+- **ESI's `GET /characters/{id}/standings` returns BASE standings.** No CCP
+  source says; a pilot confirmed it by matching the in-game Standings window to
+  the with-skills figures the app works out from ESI's number. The reading is
+  one constant, `ESI_STANDINGS_ARE_BASE`.
+- **Standing (with skills) is the table's main number; Base is optional.** The
+  game shows and uses the with-skills number (agent access, reprocessing); base
+  only matters to broker fees, which the app works out itself, so the Base
+  column starts off. With the skills unknown Standing has nothing to say and
+  Base is shown in its place.
+- **The table has a Jumps column**: jumps from the pilot's current system to a
+  corporation's or faction's nearest station, or to the station an agent sits
+  in, as a link to Route Safety.
 - **Access (the agent levels a chain opens) needs the pilot's skills.**
   Access is gated by the standing skills lift (Connections, Criminal
   Connections, Diplomacy), so with skills unknown the table's With skills and

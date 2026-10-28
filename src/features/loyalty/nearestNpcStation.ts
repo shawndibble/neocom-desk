@@ -13,19 +13,18 @@ export interface NearestNpcStation {
 }
 
 /**
- * The corporation's station with the fewest jumps; ties go to the lowest
- * station id. Null when distances are not known, no station is reachable, or
- * the snapshot has no `ownerCorporationId` (owner unknown).
+ * The station `owns` accepts with the fewest jumps; ties go to the lowest
+ * station id. Null when distances are not known or none is reachable.
  */
-export function nearestNpcStation(
-  corporationId: number,
+export function nearestStationWhere(
   stations: readonly NpcStationEntry[],
-  jumps: ReadonlyMap<number, number> | null
+  jumps: ReadonlyMap<number, number> | null,
+  owns: (station: NpcStationEntry) => boolean
 ): NearestNpcStation | null {
   if (jumps === null) return null;
   let best: NearestNpcStation | null = null;
   for (const station of stations) {
-    if (station.ownerCorporationId !== corporationId) continue;
+    if (!owns(station)) continue;
     const count = jumps.get(station.systemId);
     if (count === undefined) continue;
     if (
@@ -42,4 +41,21 @@ export function nearestNpcStation(
     }
   }
   return best;
+}
+
+/**
+ * The corporation's station with the fewest jumps; ties go to the lowest
+ * station id. Null when distances are not known, no station is reachable, or
+ * the snapshot has no `ownerCorporationId` (owner unknown).
+ */
+export function nearestNpcStation(
+  corporationId: number,
+  stations: readonly NpcStationEntry[],
+  jumps: ReadonlyMap<number, number> | null
+): NearestNpcStation | null {
+  return nearestStationWhere(
+    stations,
+    jumps,
+    (station) => station.ownerCorporationId === corporationId
+  );
 }
