@@ -38,6 +38,7 @@ import {
 } from '@/features/character/characterFilterValue';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useOpenParam } from '@/lib/useOpenParam';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {} from '@/lib/useUrlState';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -159,11 +160,14 @@ export function OpenOrdersPanel({
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
    * row that prompted the click, decision `20260908-123516`.
    */
-  const highlightId = useHighlightParam();
+  const highlightParamId = useHighlightParam();
+  /** `?open=` opens the order's modal as a row click would, and flashes the row too. */
+  const openParamId = useOpenParam();
+  const highlightId = highlightParamId ?? openParamId;
   /** A segment click ends the highlighted row's hold on the segment shown. */
   const [viewPicked, setViewPicked] = useState(false);
   const isPhone = useIsPhone();
-  const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
+  const [detailOrderId, setDetailOrderId] = useState<number | null>(openParamId);
   /** Set only by a work-through row's "See exits": the detail opens at its exits. */
   const [detailAtExits, setDetailAtExits] = useState(false);
   /** The table's header-click sort, held here so the work-through walks rows in the order they show. */

@@ -367,6 +367,14 @@ describe('Calendar', () => {
     expect(screen.queryByText('Fleet Op')).not.toBeInTheDocument();
   });
 
+  it('opens the event detail from ?open=<eventId>, leaving a clean URL', async () => {
+    window.history.pushState({}, '', '/calendar?open=1');
+    render(<App />);
+
+    expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).not.toContain('open='));
+  });
+
   it('opens the event detail from a calendar row', async () => {
     render(<App />);
     await userEvent.click(await screen.findByText('Fleet Op'));

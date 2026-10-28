@@ -283,6 +283,26 @@ describe('Contracts', () => {
     expect(screen.getAllByRole('button', { name: /^More actions/ }).length).toBeGreaterThan(0);
   });
 
+  it('opens the contract detail modal from ?open=<contractId>', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    window.history.pushState({}, '', '/contracts/history?open=1');
+    render(<App />);
+    const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
+    expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).not.toContain('open='));
+  });
+
+  it('ignores an ?open= contract that never loads', async () => {
+    window.history.pushState({}, '', '/contracts/history?open=987654');
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('opens the contract detail modal on click', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
