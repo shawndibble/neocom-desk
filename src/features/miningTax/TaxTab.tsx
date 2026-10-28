@@ -1211,6 +1211,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     key={book.loaded.corporationId}
                     book={book}
                     owedNow={corpOwedNow(book.loaded.corporationId)}
+                    showCredit={false}
                   />
                 ))}
 
