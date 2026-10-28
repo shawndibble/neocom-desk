@@ -30,6 +30,8 @@ vi.mock('@/features/loyalty/useLpStoreSearch', () => ({
   }),
 }));
 
+vi.mock('@/features/loyalty/NearestStationLine', () => ({ NearestStationLine: () => null }));
+
 const { LoyaltyStore } = await import('./LoyaltyStore');
 const { useMarketHub } = await import('@/features/market/hub');
 const { usePriceBasis } = await import('@/features/loyalty/priceBasis');

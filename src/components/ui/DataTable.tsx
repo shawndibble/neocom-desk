@@ -117,6 +117,7 @@ export function DataTable<T>({
   rowContextMenu,
   rowMoreActions = false,
   onRowClick,
+  rowHref,
   rowClickable,
   expandableRow,
   responsive = 'stack',
@@ -388,6 +389,7 @@ export function DataTable<T>({
         onActivate={activateRow}
         rowClassName={rowClassName}
         rowContextMenu={rowContextMenu}
+        href={rowHref?.(row)}
         rowMoreActions={rowMoreActions}
         cellPadding={cellPadding}
         compact={density === 'compact'}

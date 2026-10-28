@@ -6492,6 +6492,7 @@
     "aboutLabel": "About {{label}}",
     "scrollTabsBefore": "Scroll tabs left",
     "scrollTabsAfter": "Scroll tabs right",
+    "openInNewTab": "Open in new tab",
     "moreActionsLabel": "More actions for {{name}}",
     "moreActions": "More actions",
     "tableExport": {
@@ -11121,6 +11122,13 @@
       "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down.",
       "crumb": "LP Store search",
       "changeStore": "Change store"
+    },
+    "nearestStation": {
+      "found_one": "Nearest station: {{station}} · {{count}} jump",
+      "found_other": "Nearest station: {{station}} · {{count}} jumps",
+      "loading": "Nearest station: …",
+      "noOrigin": "Set your location to see the nearest station",
+      "noStation": "No station of this corporation is reachable from your system"
     },
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",

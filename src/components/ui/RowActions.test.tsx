@@ -50,6 +50,42 @@ function Row({ onInto }: { onInto: () => void }) {
   );
 }
 
+describe('openHref', () => {
+  it('leads the ⋮ menu with a new-tab link, and none without one', async () => {
+    const { unmount } = render(
+      <RowActionsMenu name="Row" items={<MenuItem>Show info</MenuItem>} openHref="/market/1">
+        <div>
+          Row
+          <RowMoreActions />
+        </div>
+      </RowActionsMenu>
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for Row' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    const link = await screen.findByRole('menuitem', { name: 'Open in new tab' });
+    expect(link).toHaveAttribute('href', '/market/1');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    unmount();
+    render(
+      <RowActionsMenu name="Row" items={<MenuItem>Show info</MenuItem>}>
+        <div>
+          Row
+          <RowMoreActions />
+        </div>
+      </RowActionsMenu>
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for Row' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByRole('menuitem', { name: 'Open in new tab' })).toBeNull();
+  });
+});
+
 function openMore() {
   fireEvent.pointerDown(
     screen.getByRole('button', { name: 'More actions for Heavy Missile Launcher II' }),
