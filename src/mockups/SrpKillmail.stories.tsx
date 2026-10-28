@@ -91,6 +91,12 @@ function Facts() {
   );
 }
 
+/** The sample doctrine check: the Reactor Control Unit is off doctrine, the probe launcher isn't listed. */
+function doctrineStatus(item: string): 'ok' | 'off' | null {
+  if (item.startsWith('Core Probe')) return null;
+  return item.startsWith('Reactor') ? 'off' : 'ok';
+}
+
 function Fit({ flag }: { flag?: (item: string) => 'ok' | 'off' | null }) {
   return (
     <div className="space-y-2">
@@ -138,6 +144,20 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+/** The payout answer: the amount, its Hull Rule, then the claim's notes. */
+function PayoutSummary({ children }: { children: ReactNode }) {
+  return (
+    <NewComponent name="PayoutSummary">
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-semibold tabular-nums">{formatIsk(SHIP.amount)}</span>
+        <Pill tone="success">Covered</Pill>
+      </div>
+      <p className="mt-1 text-xs text-text-dim">{SHIP.rule}</p>
+      {children}
+    </NewComponent>
+  );
+}
+
 function Dialog({ footer, children }: { footer: ReactNode; children: ReactNode }) {
   const phone = useIsPhone();
   return (
@@ -159,14 +179,9 @@ export const ClaimFirst: Story = {
     <Shell>
       <Dialog footer={<FileButtons />}>
         <div className="space-y-4">
-          <NewComponent name="PayoutSummary">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-semibold tabular-nums">{formatIsk(SHIP.amount)}</span>
-              <Pill tone="success">Covered</Pill>
-            </div>
-            <p className="mt-1 text-xs text-text-dim">{SHIP.rule}</p>
+          <PayoutSummary>
             <p className="text-xs text-text-dim">Fit matches your corp's doctrine. 1 day old.</p>
-          </NewComponent>
+          </PayoutSummary>
           <Facts />
           <Fit />
         </div>
@@ -214,11 +229,7 @@ export const FitAgainstDoctrine: Story = {
             doctrine. You can still file; an officer will see this.
           </p>
           <NewComponent name="DoctrineFitCheck">
-            <Fit
-              flag={(item) =>
-                item.startsWith('Reactor') ? 'off' : item.startsWith('Core Probe') ? null : 'ok'
-              }
-            />
+            <Fit flag={(item) => doctrineStatus(item)} />
           </NewComponent>
           <Facts />
           <p className="text-sm tabular-nums">
@@ -232,13 +243,13 @@ export const FitAgainstDoctrine: Story = {
   ),
 };
 
-const phone = { globals: { viewport: { value: 'phone390', isRotated: false } } };
+const phoneGlobals = { globals: { viewport: { value: 'phone390', isRotated: false } } };
 /** @summary A on a phone: bottom sheet. */
-export const ClaimFirstPhone: Story = { ...ClaimFirst, ...phone };
+export const ClaimFirstPhone: Story = { ...ClaimFirst, ...phoneGlobals };
 /** @summary B on a phone: single column, amount above the buttons. */
-export const KillmailFirstPhone: Story = { ...KillmailFirst, ...phone };
+export const KillmailFirstPhone: Story = { ...KillmailFirst, ...phoneGlobals };
 /** @summary C on a phone: bottom sheet. */
-export const FitAgainstDoctrinePhone: Story = { ...FitAgainstDoctrine, ...phone };
+export const FitAgainstDoctrinePhone: Story = { ...FitAgainstDoctrine, ...phoneGlobals };
 
 function DoctrineMark({ ok }: { ok: boolean }) {
   return (
@@ -259,6 +270,21 @@ function DoctrineMark({ ok }: { ok: boolean }) {
   );
 }
 
+function CombinedDialog({ children }: { children: ReactNode }) {
+  const phone = useIsPhone();
+  return (
+    <Modal
+      open
+      onClose={() => undefined}
+      placement={phone ? 'sheet' : 'medium'}
+      title={SHIP.hull}
+      footer={<FileButtons />}
+    >
+      {children}
+    </Modal>
+  );
+}
+
 function CheckedFit() {
   return (
     <div className="space-y-2">
@@ -272,8 +298,8 @@ function CheckedFit() {
             {g.items.map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <span>{item}</span>
-                {item.startsWith('Core Probe') ? null : (
-                  <DoctrineMark ok={!item.startsWith('Reactor')} />
+                {doctrineStatus(item) !== null && (
+                  <DoctrineMark ok={doctrineStatus(item) === 'ok'} />
                 )}
               </li>
             ))}
@@ -299,33 +325,27 @@ function CheckedFit() {
 export const Combined: Story = {
   render: () => (
     <Shell>
-      <Modal
-        open
-        onClose={() => undefined}
-        placement="medium"
-        title={SHIP.hull}
-        footer={<FileButtons />}
-      >
+      <CombinedDialog>
         <div className="space-y-4">
-          <NewComponent name="PayoutSummary">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-semibold tabular-nums">{formatIsk(SHIP.amount)}</span>
-              <Pill tone="success">Covered</Pill>
-            </div>
-            <p className="mt-1 text-xs text-text-dim">{SHIP.rule}</p>
+          <PayoutSummary>
             <p className="flex items-center gap-1 text-xs text-warning">
               <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />1 module off doctrine. You
               can still file; an officer will see this.
             </p>
-          </NewComponent>
+          </PayoutSummary>
           <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
             <NewComponent name="KillmailFacts">
               <Facts />
             </NewComponent>
-            <CheckedFit />
+            <NewComponent name="DoctrineMark">
+              <CheckedFit />
+            </NewComponent>
           </div>
         </div>
-      </Modal>
+      </CombinedDialog>
     </Shell>
   ),
 };
+
+/** @summary Combined on a phone: the same content as a bottom sheet, columns stacked. */
+export const CombinedPhone: Story = { ...Combined, ...phoneGlobals };
