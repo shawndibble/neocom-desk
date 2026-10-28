@@ -1,3 +1,4 @@
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { useState, type ReactNode } from 'react';
@@ -197,12 +198,14 @@ export function InteractionGrammar() {
         </Cue>
         <Cue rule={k('rules.channelOff')}>
           <ChannelOffTip reason="deviceToggleOff">
-            <Checkbox
-              checked
-              disabled
-              onChange={() => {}}
-              aria-label={k('samples.channelOffLabel')}
-            />
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                checked
+                disabled
+                onChange={() => {}}
+                aria-label={k('samples.channelOffLabel')}
+              />
+            </label>
           </ChannelOffTip>
         </Cue>
         <Cue rule={k('rules.figureHistory')}>
