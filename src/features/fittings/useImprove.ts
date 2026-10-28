@@ -27,7 +27,6 @@ import {
   type ImproveReach,
   type ImproveResult,
   type ModulePool,
-  type OwnedStock,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import {
@@ -58,7 +57,6 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import { loadFittingPrice } from './fittingPrice';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
@@ -162,13 +160,6 @@ export const useImproveHold = createLocalSetting<ImproveHold>({
       : DEFAULT_IMPROVE_HOLD,
 });
 
-/** Planning counts what the pilot owns as already bought; on by default, remembered on this device. */
-export const useImproveCountOwned = createLocalSetting<boolean>({
-  key: 'fittingsImproveCountOwned',
-  defaultValue: true,
-  parse: (raw) => (typeof raw === 'boolean' ? raw : true),
-});
-
 const parseCap = (raw: unknown) =>
   typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
 
@@ -216,8 +207,6 @@ export interface ImproveConfig {
   oreFamily: string;
   /** Carry more: the hold scored. */
   hold: ImproveHold;
-  /** Planning: what the pilot owns at the picked place, counted as already bought; null counts nothing. */
-  owned: ReadonlyMap<number, number> | null;
 }
 
 /** After this long a search offers "Show best so far". */
@@ -236,10 +225,8 @@ export type ImproveState =
       status: 'done';
       result: ImproveResult;
       before: FittingStats;
-      /** What the fit costs now at the hub, for the selection summary; null when not loaded. Still to buy when `owned` is counted. */
+      /** What the fit costs now at the hub, for the selection summary; null when not loaded. */
       fitTotal: number | null;
-      /** Planning with owned stock counted: the stock, the hub prices, and whether any candidate is owned at all. */
-      owned?: { stock: OwnedStock; priceOf: (typeId: number) => number | null; anyOwned: boolean };
       elapsedMs: number;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
@@ -370,18 +357,6 @@ async function crystalPlan(
     : { crystalFor: forKey(best), bestKey: best, crystalsOf: crystalsFor };
 }
 
-/** What the fit costs to buy once `owned` units are in hand; a type with no price adds nothing, as the Price section's total. */
-function stillToBuyTotal(
-  counts: ReadonlyMap<number, number>,
-  owned: ReadonlyMap<number, number>,
-  priceOf: (typeId: number) => number | null
-): number {
-  let total = 0;
-  for (const [typeId, need] of counts)
-    total += (priceOf(typeId) ?? 0) * Math.max(0, need - (owned.get(typeId) ?? 0));
-  return total;
-}
-
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
 function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   const ids = new Set<number>();
@@ -415,8 +390,7 @@ export function useImprove(
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
-  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold, owned } =
-    config;
+  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -483,7 +457,6 @@ export function useImprove(
               includeOfficer,
               oreFamily,
               hold,
-              owned,
             },
             own.slotCounts
           ),
@@ -494,21 +467,15 @@ export function useImprove(
         );
         const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
         const typeIds = candidateTypeIds(sets.flatMap((set) => set.candidates));
-        // Planning counts what the pilot owns as already bought.
-        const fitCounts = mode === 'buy' && owned ? fittingItemCounts(variants.fitting) : null;
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
-          // The Price section's own total, for Planning's budget; less what is owned when counted.
+          // The Price section's own total, for Planning's budget.
           mode === 'buy'
-            ? (fitCounts && owned
-                ? getHubPrices(hub, [...fitCounts.keys()]).then((prices) =>
-                    stillToBuyTotal(fitCounts, owned, (id) => prices.get(id)?.sellMin ?? null)
-                  )
-                : loadFittingPrice(variants.fitting, hub).then((price) => price.totals.sell)
-              ).catch(() => null)
+            ? loadFittingPrice(variants.fitting, hub)
+                .then((price) => price.totals.sell)
+                .catch(() => null)
             : Promise.resolve(null),
         ]);
-        const stock: OwnedStock | undefined = fitCounts && owned ? { owned, fitCounts } : undefined;
         if (cancelled) return;
         // A cap that cannot be checked is not silently waived.
         if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
@@ -558,7 +525,6 @@ export function useImprove(
             mode,
             spendCap,
             fitTotal,
-            ...(stock ? { stock } : {}),
             onProgress: (checked) => {
               if (!cancelled)
                 setState((current) =>
@@ -611,15 +577,6 @@ export function useImprove(
               }
             : {}),
           fitTotal,
-          ...(stock
-            ? {
-                owned: {
-                  stock,
-                  priceOf: (typeId: number) => priceMap?.get(typeId)?.sellMin ?? null,
-                  anyOwned: typeIds.some((id) => (stock.owned.get(id) ?? 0) > 0),
-                },
-              }
-            : {}),
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults, neutral: onlyNeutral(results[0], groupOf) } : {}),
         });
@@ -651,7 +608,6 @@ export function useImprove(
     includeOfficer,
     oreFamily,
     hold,
-    owned,
     chargePlanKey,
   ]);
 

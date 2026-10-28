@@ -1462,7 +1462,6 @@
       "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
       "cap": {
         "buy": "Total budget (ISK)",
-        "buyOwned": "Budget for what is still to buy (ISK)",
         "refit": "Extra spend cap (ISK)"
       },
       "defenseLabel": "Defense Choice",
@@ -1480,14 +1479,6 @@
       "implantsHelp_other": "{{count}} implants would help",
       "findImplants": "Find implants",
       "settingsLabel": "Search settings",
-      "owned": {
-        "label": "Count what I own at",
-        "summary": "minus owned at {{place}}",
-        "noneHere": "You own none of these modules at {{place}}. Pick another place, or any location.",
-        "all": "You own all {{count}}",
-        "nothingToBuy": "nothing to buy",
-        "some": "You own {{own}} of {{need}} · buy {{buy}} for"
-      },
       "summaryNoCap": "no budget",
       "summaryCap": {
         "buy": "budget {{cap}}",
@@ -1514,7 +1505,6 @@
         "changes_other": "{{count}} changes",
         "totalCost": "Total cost",
         "costChange": "Cost change",
-        "ownedCounted": "minus what you own",
         "noChange": "no change",
         "ofBudget": "of a {{cap}} budget",
         "unpriced_one": "{{count}} unpriced",
