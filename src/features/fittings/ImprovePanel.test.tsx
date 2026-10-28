@@ -62,7 +62,7 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
 }
 
 const openMoreGoals = () =>
-  userEvent.click(screen.getByRole('button', { name: /^More \d+ more goals/ }));
+  userEvent.click(screen.getByRole('button', { name: /^More \d+ goals/ }));
 const openSettings = () =>
   userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
 

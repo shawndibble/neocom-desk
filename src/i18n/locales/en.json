@@ -1415,7 +1415,6 @@
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
         "fixFirst": "Fix this first",
-        "train": "Train",
         "implants": "Implants",
         "noDownside": "No downside",
         "tradeOffs": "Trade-offs"
@@ -1475,7 +1474,7 @@
       "sideGain": "up to +{{percent}}%",
       "moreLabel": "Rigs and officer modules",
       "more": "More",
-      "moreCount": "{{count}} more goals",
+      "moreCount": "{{count}} goals",
       "skills": "Skills",
       "skillsCount": "{{count}} to train",
       "implantsHelp_one": "{{count}} implant would help",

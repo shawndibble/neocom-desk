@@ -64,6 +64,13 @@ interface FilterChipProps {
    * so a caller-side `Tooltip` would have nothing to attach to.
    */
   tooltip?: string;
+  /**
+   * @summary For a chip that opens a region instead of filtering: whether that region is open.
+   * Reported as `aria-expanded` (with `controls`) in place of `aria-pressed`.
+   */
+  expanded?: boolean;
+  /** The id of the region `expanded` opens. */
+  controls?: string;
 }
 
 /**
@@ -85,6 +92,8 @@ export function FilterChip({
   size = 'sm',
   disabled = false,
   tooltip,
+  expanded,
+  controls,
 }: FilterChipProps) {
   const hasGloss = countLabel !== undefined;
   /*
@@ -96,7 +105,9 @@ export function FilterChip({
   const chip = (
     <button
       type="button"
-      aria-pressed={selected}
+      aria-pressed={expanded === undefined ? selected : undefined}
+      aria-expanded={expanded}
+      aria-controls={controls}
       disabled={disabled && !explained}
       aria-disabled={explained || undefined}
       onClick={explained ? undefined : onToggle}

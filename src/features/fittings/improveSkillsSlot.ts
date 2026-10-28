@@ -2,8 +2,7 @@ import { createContext } from 'react';
 
 /**
  * Where Improve's Skills control and its panel sit in the panel's header, for
- * `ImproveTrain` (which owns the skill data) to portal into. Absent outside the
- * panel: Train then draws itself as an ordinary section.
+ * `ImproveTrain` (which owns the skill data) to portal into.
  */
 export interface ImproveSkillsSlot {
   /** The right-hand end of the Search settings row. */

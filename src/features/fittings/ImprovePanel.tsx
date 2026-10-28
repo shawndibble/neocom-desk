@@ -247,6 +247,12 @@ export function ImprovePanel({
   const togglePanel = (panel: 'settings' | 'skills') =>
     setOpenPanel((current) => (current === panel ? null : panel));
   const skillsId = useId();
+  // A new Goal may have nothing to train: don't leave an empty Skills panel open.
+  const [panelGoal, setPanelGoal] = useState(goal);
+  if (panelGoal !== goal) {
+    setPanelGoal(goal);
+    if (openPanel === 'skills') setOpenPanel(null);
+  }
   const [skillsTrigger, setSkillsTrigger] = useState<HTMLElement | null>(null);
   const [skillsPanel, setSkillsPanel] = useState<HTMLElement | null>(null);
   const goalsId = useId();
@@ -918,6 +924,8 @@ export function ImprovePanel({
             <FilterChip
               label={t('fittings.improve.more')}
               selected={goalsOpen}
+              expanded={goalsOpen}
+              controls={goalsId}
               onToggle={() => setGoalsOpen((open) => !open)}
               count={otherGoals.length}
               countLabel={t('fittings.improve.moreCount', { count: otherGoals.length })}
