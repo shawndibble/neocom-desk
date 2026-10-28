@@ -12,6 +12,8 @@ interface Props {
   inline?: boolean;
   /** A change clears the error: navigating away from a failed page recovers. */
   resetKey?: string;
+  /** Shown in place of the error screen, for a boundary around one widget such as a modal body. */
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -111,10 +113,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   render(): ReactNode {
-    return this.state.failed ? (
-      <ErrorScreen inline={this.props.inline ?? false} />
-    ) : (
-      this.props.children
-    );
+    if (!this.state.failed) return this.props.children;
+    return this.props.fallback ?? <ErrorScreen inline={this.props.inline ?? false} />;
   }
 }

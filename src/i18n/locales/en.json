@@ -17432,6 +17432,7 @@
     "covered": "Covered",
     "officerWillReview": "An officer will review your claim",
     "previewFailed": "Couldn't check this loss. You can still file it.",
+    "openFailed": "Couldn't open this killmail. Close this and try again.",
     "offDoctrine_one": "{{count}} module off doctrine. You can still file; an officer will see this.",
     "offDoctrine_other": "{{count}} modules off doctrine. You can still file; an officer will see this.",
     "offDoctrineMissing": "Your fit is missing doctrine modules. You can still file; an officer will see this.",
