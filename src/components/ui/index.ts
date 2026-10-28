@@ -15,6 +15,8 @@ export { CachedNotice } from './CachedNotice';
 export { LoadFailedState } from './LoadFailedState';
 export { EmptyState } from './EmptyState';
 export { Toast } from './Toast';
+export { ToastStack } from './ToastStack';
+export { useDeferredCommits } from './useDeferredCommits';
 export { useTimedToast } from './useTimedToast';
 export { useOpenAfterMenu } from './useOpenAfterMenu';
 export { Tabs, TabPanel } from './Tabs';
