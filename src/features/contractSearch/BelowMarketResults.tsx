@@ -3,7 +3,7 @@
  * contract worth more than it asks — Value · Other · Asking · Profit · Jumps,
  * best Profit first. Value is the hub market only; Other is what lines with
  * no market would fetch at other contracts' asks, and is never in Profit
- * unless the bar's toggle says so (#5427). The valuation is `engine/contracts/belowMarket.ts`; the
+ * unless the Include Other filter says so (#5427). The valuation is `engine/contracts/belowMarket.ts`; the
  * prices come from `belowMarketData.ts`. The panel owns the filters and hands
  * over only the contracts that pass them.
  */
