@@ -58,6 +58,7 @@ import { LoyaltyOfferFilterBar } from '@/features/loyalty/LoyaltyOfferFilterBar'
 import { OfferDetail } from '@/features/loyalty/OfferDetail';
 import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
+import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions, StoreCrumbs, WalletTabBar } from '@/features/loyalty/LpStoreChrome';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -407,6 +408,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           }
           actions={<LpStoreActions />}
         />
+        <NearestStationLine corporationId={corporationId} />
         <WalletTabBar tabsId={tabsId} />
 
         <TabPanel tabsId={tabsId} tabId="lp-store" className="flex flex-col gap-3">
