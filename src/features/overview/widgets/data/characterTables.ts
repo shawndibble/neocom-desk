@@ -15,6 +15,7 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
+import { openHref } from '@/lib/highlightParam';
 import type { BoardMail } from '../../data/boardData';
 import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
@@ -185,6 +186,7 @@ export function comingUpTable(
         t(`overview.board.response.${event.response}`),
       ],
       tone: toneOf(event.atMs, now),
+      to: openHref('/calendar', event.eventId),
     })),
   };
 }

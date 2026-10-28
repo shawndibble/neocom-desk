@@ -336,6 +336,24 @@ describe('comingUp', () => {
     expect(all.rows).toHaveLength(1);
   });
 
+  it('links each table row to its event on the Calendar', () => {
+    const events = [
+      {
+        event_id: 42,
+        title: 'Fleet op',
+        event_date: new Date(NOW + 2 * HOUR).toISOString(),
+        event_response: 'accepted',
+        importance: 1,
+      },
+    ];
+    const feeds: Feeds = {
+      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+    };
+    const rows = buildView('comingUp', feeds, ctx()).table?.rows ?? [];
+    expect(rows.map((row) => row.to)).toEqual(['/calendar?open=42']);
+    expect(rows.every((row) => row.detail === undefined)).toBe(true);
+  });
+
   it('points an empty accepted-and-tentative widget at the menu', () => {
     const feeds: Feeds = {
       calendar: ok({ events: [], needsReauth: false, fetchedAt: new Date(NOW) }),
