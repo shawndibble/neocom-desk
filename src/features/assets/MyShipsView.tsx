@@ -16,6 +16,7 @@ import {
   TypeIcon,
   CachedNotice,
 } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
 import { DataGate } from '@/components/DataGate';
 import { OpenInEveItemMenuItems, ShowInfoMenuItem } from '@/features/market/ItemContextMenu';
@@ -217,16 +218,6 @@ function useShipClasses(groupIds: readonly number[]): ReadonlyMap<number, string
   return data ?? NO_CLASSES;
 }
 
-/** Marks a packaged stack, beside the ship class. */
-function PackagedBadge() {
-  const { t } = useTranslation();
-  return (
-    <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.6875rem] text-warning">
-      {t('assets.myShips.packaged')}
-    </span>
-  );
-}
-
 interface ShipRowViewProps {
   row: ShipRow;
   data: ShipData;
@@ -326,7 +317,11 @@ function ShipRowView({
             {(shipClass || row.packaged) && (
               <span className="inline-flex items-center gap-1.5 text-xs text-text-dim max-sm:ml-2 sm:flex">
                 {shipClass}
-                {row.packaged && <PackagedBadge />}
+                {row.packaged && (
+                  <Pill tone="warning" className="shrink-0">
+                    {t('assets.myShips.packaged')}
+                  </Pill>
+                )}
               </span>
             )}
           </span>
