@@ -3,6 +3,7 @@
  * status derivation, the empty `KindView` every builder fills in, and the
  * placeholder figure for "cannot answer".
  */
+import type { DeadlineSeverity } from '@/engine/character/severity';
 import { formatAge } from '@/lib/age';
 import type { WidgetStateInput } from '../state';
 import type { WidgetShow } from '../kinds';
@@ -10,6 +11,7 @@ import type { EsiEndpointId } from '@/esi/registry';
 import type { SettingsContext } from './viewSettings';
 import type {
   BuildContext,
+  DetailTone,
   FeedId,
   FeedState,
   Feeds,
@@ -139,4 +141,10 @@ export interface KindDef {
    * catalogue's `endpoints` every endpoint it may need.
    */
   bySettings?: (settings: SettingsContext) => SettingsReads;
+}
+
+/** A row's severity as its detail modal's badge tone: the modal reads the same as the row's dot. */
+export function detailToneOf(severity: DeadlineSeverity): DetailTone {
+  if (severity === 'critical') return 'danger';
+  return severity === 'warning' || severity === 'watch' ? 'warning' : 'neutral';
 }

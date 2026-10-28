@@ -17,7 +17,7 @@ import {
   structuresSeverity,
   structuresView,
 } from '../../data/corpCards';
-import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { blank, count, detailToneOf, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import type {
@@ -159,10 +159,7 @@ export const structures: Builder = (feeds, { t, now, show }) => {
     const S = 'overview.widgets.structures';
     const detail: RowDetailModel = {
       title: shortStructureName(source.name),
-      status: {
-        badge: state,
-        tone: tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'neutral',
-      },
+      status: { badge: state, tone: detailToneOf(tone) },
       facts: [
         { label: t(`${S}.col.fuel`), value: fuel ? structureWhen(fuel, t) : UNKNOWN },
         {
@@ -186,7 +183,11 @@ export const structures: Builder = (feeds, { t, now, show }) => {
               items: source.services.map((service) => ({
                 key: service.name,
                 badge: t(SERVICE_STATE[service.state]),
-                tone: (service.state === 'offline' ? 'danger' : 'neutral') as DetailTone,
+                tone: (service.state === 'online'
+                  ? 'neutral'
+                  : service.state === 'offline'
+                    ? 'danger'
+                    : 'warning') as DetailTone,
                 text: service.name,
                 value: '',
               })),

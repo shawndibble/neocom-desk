@@ -511,7 +511,7 @@ describe('corpJobs row detail', () => {
       ctx
     );
     const detail = view.table!.rows[0]!.detail!;
-    expect(detail.status).toMatchObject({ badge: 'overview.board.ready', tone: 'warning' });
+
     expect(detail.facts[2]!.value).toBe('overview.board.ready');
   });
 });

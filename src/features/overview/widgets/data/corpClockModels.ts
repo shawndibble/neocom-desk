@@ -335,9 +335,6 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
 
   const detailOf = (f: JobFacts): RowDetailModel => ({
     title: f.label,
-    status: f.done
-      ? { badge: t('overview.board.ready'), tone: 'warning' }
-      : { badge: left(f), tone: f.tone === 'watch' ? 'warning' : 'neutral' },
     facts: [
       { label: t('overview.widgets.corpJobs.col.activity'), value: activityOf(f.job) },
       {

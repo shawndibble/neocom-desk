@@ -14,15 +14,17 @@ import { STARBASE_FUEL_WARNING_HOURS, fuelHoursLeft } from '@/engine/corp/starba
 import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
-import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  blank,
+  corpUnreadable,
+  count,
+  detailToneOf,
+  statusOf,
+  UNKNOWN,
+  type Builder,
+} from './builderKit';
 import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
-import type {
-  DetailTone,
-  NumberSecondary,
-  RowDetailModel,
-  TableRowModel,
-  Translate,
-} from './types';
+import type { NumberSecondary, RowDetailModel, TableRowModel, Translate } from './types';
 
 const W = 'overview.widgets.corpStarbases';
 const HOUR_MS = 3_600_000;
@@ -139,11 +141,9 @@ export const corpStarbases: Builder = (feeds, { t, now }) => {
 
   const detailOf = (tower: Tower): RowDetailModel => {
     const { row } = tower;
-    const tone: DetailTone =
-      tower.tone === 'critical' ? 'danger' : tower.tone === 'warning' ? 'warning' : 'neutral';
     return {
       title: tower.type,
-      status: { badge: stateText(row.state), tone },
+      status: { badge: stateText(row.state), tone: detailToneOf(tower.tone) },
       facts: [
         { label: t(`${W}.col.system`), value: tower.system },
         { label: t(`${W}.col.fuel`), value: fuelText(tower) },
