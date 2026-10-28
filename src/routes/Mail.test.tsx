@@ -270,6 +270,22 @@ describe('Mail', () => {
     expect(screen.getByText('now').tagName).toBe('STRONG');
   });
 
+  it('?open= opens that mail in the reader and strips the params (issue #5372)', async () => {
+    useDesktopViewport();
+    window.history.pushState({}, '', `/mail?open=1&owner=${CHAR_ID}`);
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Fleet up!' })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe(''));
+  });
+
+  it('?open= for a mail not in the mailbox opens nothing', async () => {
+    useDesktopViewport();
+    window.history.pushState({}, '', `/mail?open=1&owner=${CHAR_ID_2}`);
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByText('No message open')).toBeInTheDocument();
+  });
+
   it('focuses the reader heading on open, and the mail row on Back (issue #1485)', async () => {
     const user = userEvent.setup();
     render(<App />);

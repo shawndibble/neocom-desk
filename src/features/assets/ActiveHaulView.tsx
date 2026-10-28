@@ -14,10 +14,12 @@ import {
   heldItems,
   legHold,
   legCondition,
+  legStopAction,
   legWaypointIds,
   sectionWaypointIds,
   splitPlaceName,
   type LegCondition,
+  type StopAction,
 } from '@/engine/route/haulLeg';
 import type { HaulLeg, HaulSection, HaulStack } from '@/engine/route/haulPlan';
 import {
@@ -72,16 +74,16 @@ export function ActiveHaulView({
   const allLegs = useMemo(() => plan.sections.flatMap((s) => s.legs), [plan]);
   const legRows = useHaulLegRows(allLegs);
   // Each section's current Leg shows its cargo and the rest fold; a toggle flips that.
-  const [flipped, setFlipped] = useState<ReadonlySet<number>>(new Set());
+  const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
   const [clearing, setClearing] = useState(false);
   const [marked, setMarked] = useState<{ n: number; before: number[] } | null>(null);
   const [replanNote, setReplanNote] = useState<string | null>(null);
   const [replanning, setReplanning] = useState(false);
-  const toggle = (id: number) =>
+  const toggle = (key: string) =>
     setFlipped((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   const currentIds = new Set(
@@ -269,8 +271,8 @@ function Section({
   section: HaulSection;
   done: readonly number[];
   currentIds: ReadonlySet<number>;
-  flipped: ReadonlySet<number>;
-  onToggle: (id: number) => void;
+  flipped: ReadonlySet<string>;
+  onToggle: (key: string) => void;
   onTick: (leg: HaulLeg, n: number, checked: boolean) => void;
   many: boolean;
   legRows: ReadonlyMap<number, LegRows>;
@@ -324,8 +326,8 @@ function Section({
                 n={index + 1}
                 done={done.includes(leg.id)}
                 current={currentIds.has(leg.id)}
-                expanded={currentIds.has(leg.id) !== flipped.has(leg.id)}
-                onToggle={() => onToggle(leg.id)}
+                expanded={currentIds.has(leg.id) !== flipped.has(holdKey(leg))}
+                onToggle={() => onToggle(holdKey(leg))}
                 onTick={(checked) => onTick(leg, index + 1, checked)}
                 rows={legRows.get(leg.id)}
                 capacityM3={capacityM3}
@@ -336,6 +338,11 @@ function Section({
                 last={index === legs.length - 1}
                 done={done.includes(leg.id)}
                 current={currentIds.has(leg.id)}
+                actionRow={stopActionRow(legStopAction(legs, leg), {
+                  n: index + 1,
+                  expanded: currentIds.has(leg.id) !== flipped.has(stopKey(leg)),
+                  onToggle: () => onToggle(stopKey(leg)),
+                })}
               />
             </li>
           ))}
@@ -345,13 +352,23 @@ function Section({
   );
 }
 
-/** A place on the rail: the system in full, the station and moon on a dim second line. What the pilot does on the way here belongs to the Leg block above it. */
+/** Which fold a toggle belongs to: a Leg's hold, or what happens at the stop the Leg ends at. */
+const holdKey = (leg: HaulLeg) => `hold:${leg.id}`;
+const stopKey = (leg: HaulLeg) => `stop:${leg.id}`;
+
+/**
+ * A place on the rail: the system in full, the station and moon on a dim
+ * second line, and what the pilot does there (load, drop or take a ship) when
+ * the Leg that ends here has something to do. The items to pick up or drop
+ * unfold under that line, so the list sits where the pilot is standing.
+ */
 function Stop({
   name,
   start,
   last,
   done,
   current,
+  actionRow,
 }: {
   name: string;
   start?: boolean;
@@ -360,6 +377,8 @@ function Stop({
   done?: boolean;
   /** The stop the pilot is flying to next. */
   current?: boolean;
+  /** What happens here; absent at the start and where a flight just lands. */
+  actionRow?: StopActionRowProps | null;
 }) {
   const { system, detail } = splitPlaceName(name);
   return (
@@ -376,7 +395,87 @@ function Stop({
       />
       <div className="text-sm font-semibold">{system}</div>
       {detail && <div className="text-xs text-text-dim [overflow-wrap:anywhere]">{detail}</div>}
+      {actionRow && <StopActionRow {...actionRow} done={done} />}
     </div>
+  );
+}
+
+interface StopActionRowProps {
+  action: StopAction;
+  /** The ending Leg's number, for the toggle's name. */
+  n: number;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+/** The row for a Stop, or `null` where the Leg ending there has nothing to do. */
+function stopActionRow(
+  action: StopAction | null,
+  rest: Omit<StopActionRowProps, 'action'>
+): StopActionRowProps | null {
+  return action && { action, ...rest };
+}
+
+/** "Load 25 m³", "Drop 118.99 m³" or "Take Omen", opening to the items where there are some. */
+function StopActionRow({
+  action,
+  n,
+  done,
+  expanded,
+  onToggle,
+}: StopActionRowProps & { done?: boolean }) {
+  const { t } = useTranslation();
+  const label =
+    action.kind === 'take'
+      ? t('assets.movePlan.haul.stopTake', { ships: action.ships.join(', ') })
+      : t(
+          action.kind === 'load'
+            ? 'assets.movePlan.haul.stopLoad'
+            : 'assets.movePlan.haul.stopDrop',
+          {
+            volume: formatCubicMetres(action.m3),
+          }
+        );
+  const tone = cx(
+    'text-sm font-medium',
+    action.kind === 'drop' ? 'text-warning' : 'text-accent',
+    done && 'opacity-60'
+  );
+  const items = action.kind === 'take' ? null : action.stacks;
+  if (!items) {
+    return (
+      <div className={cx('mt-1', tone)}>
+        <span aria-hidden="true">↳ </span>
+        {label}
+      </div>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={t(
+          expanded ? 'assets.movePlan.haul.stopItemsHide' : 'assets.movePlan.haul.stopItemsShow',
+          { action: label, n }
+        )}
+        onClick={onToggle}
+        className={cx(
+          'mt-1 flex min-h-9 items-center gap-2 text-left',
+          tone,
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
+      >
+        <Caret expanded={expanded} />
+        {label}
+      </button>
+      {expanded && (
+        <div className={cx('ml-1', done && 'opacity-60')}>
+          <ItemList items={items} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -407,12 +506,11 @@ function LegBlock({
   const { t } = useTranslation();
   const href = legRouteHref(leg);
   const condition = rows?.status === 'ready' ? legCondition(rows.rows) : null;
-  const volume = formatCubicMetres(leg.m3);
   const destination = splitPlaceName(leg.to.name).system;
   const hold = legHold(legs, leg);
   // The heading says what this Leg is: the trip out to a ship or load while the hold is empty, a
   // flight of that ship, or a haul of what is already aboard (a later pickup in a trip, or the
-  // delivery). The note says what happens at its end.
+  // delivery). What happens at its end is the next Stop's to say.
   const ships = leg.ships?.join(', ');
   const heading = ships
     ? t(leg.kind === 'pickup' ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.fly', {
@@ -422,17 +520,8 @@ function LegBlock({
     : t(hold.aboard.length === 0 ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.haul', {
         place: destination,
       });
-  const arrival = ships
-    ? leg.kind === 'pickup'
-      ? t('assets.movePlan.haul.take', { ships, place: destination })
-      : null
-    : t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
-        volume,
-        place: destination,
-      });
   const carried = hold.aboard.reduce((sum, l) => sum + l.m3, 0);
   const aboardItems = heldItems(hold.aboard);
-  const loadingItems = hold.loadsOnArrival?.stacks?.length ? hold.loadsOnArrival.stacks : null;
   return (
     <div
       className={cx(
@@ -493,37 +582,29 @@ function LegBlock({
         </div>
       </div>
       {rows?.status === 'ready' && <HaulStrip rows={rows.rows} />}
-      {arrival && (
-        <div className={cx('text-xs', leg.kind === 'pickup' ? 'text-accent' : 'text-warning')}>
-          <span aria-hidden="true">↳ </span>
-          {arrival}
-        </div>
-      )}
       {/* A flight has no hold to show: the pilot flies the ship itself. */}
-      {!leg.ships && (
-        <>
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-label={t(
-              expanded ? 'assets.movePlan.haul.cargoHide' : 'assets.movePlan.haul.cargoShow',
-              { n }
-            )}
-            onClick={onToggle}
-            className={cx(
-              'flex min-h-9 items-center gap-2 border-t border-dashed border-line pt-2 text-left text-sm text-text-dim',
-              rowInteractiveClassName,
-              focusRingInsetClassName
-            )}
-          >
-            <Caret expanded={expanded} />
-            {carried > 0
-              ? t('assets.movePlan.haul.carryLoaded', { volume: formatCubicMetres(carried) })
-              : t('assets.movePlan.haul.carryEmpty')}
-          </button>
-          {expanded && (
-            <div className="flex flex-col gap-1 text-sm tabular-nums">
-              {hold.aboard.length > 0 && (
+      {!leg.ships &&
+        (carried > 0 ? (
+          <>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={t(
+                expanded ? 'assets.movePlan.haul.cargoHide' : 'assets.movePlan.haul.cargoShow',
+                { n }
+              )}
+              onClick={onToggle}
+              className={cx(
+                'flex min-h-9 items-center gap-2 border-t border-dashed border-line pt-2 text-left text-sm text-text-dim',
+                rowInteractiveClassName,
+                focusRingInsetClassName
+              )}
+            >
+              <Caret expanded={expanded} />
+              {t('assets.movePlan.haul.carryLoaded', { volume: formatCubicMetres(carried) })}
+            </button>
+            {expanded && (
+              <div className="flex flex-col gap-1 text-sm tabular-nums">
                 <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
                   {hold.aboard.map((load, i) => (
                     <li key={i}>
@@ -534,35 +615,23 @@ function LegBlock({
                     </li>
                   ))}
                 </ul>
-              )}
-              {aboardItems && <ItemList items={aboardItems} />}
-              {hold.loadsOnArrival ? (
-                <p className="m-0 text-text-dim">
-                  {t('assets.movePlan.haul.carryLoadsOnArrival', {
-                    volume: formatCubicMetres(hold.loadsOnArrival.m3),
-                    place: splitPlaceName(hold.loadsOnArrival.place).system,
-                  })}
-                </p>
-              ) : (
-                <p className="m-0 text-text-dim">
-                  {t('assets.movePlan.haul.carryDrops', {
-                    volume,
-                    place: splitPlaceName(leg.to.name).system,
-                  })}
-                </p>
-              )}
-              {loadingItems && <ItemList items={loadingItems} />}
-              {carried > 0 && capacityM3 > 0 && (
-                <p className="m-0 text-text-dim">
-                  {t('assets.movePlan.haul.holdFill', {
-                    percent: Math.round((carried / capacityM3) * 100),
-                  })}
-                </p>
-              )}
-            </div>
-          )}
-        </>
-      )}
+                {aboardItems && <ItemList items={aboardItems} />}
+                {capacityM3 > 0 && (
+                  <p className="m-0 text-text-dim">
+                    {t('assets.movePlan.haul.holdFill', {
+                      percent: Math.round((carried / capacityM3) * 100),
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          // Nothing aboard, so nothing to open: what loads at the end is the next Stop's.
+          <div className="flex min-h-9 items-center border-t border-dashed border-line pt-2 text-sm text-text-dim">
+            {t('assets.movePlan.haul.carryEmpty')}
+          </div>
+        ))}
     </div>
   );
 }

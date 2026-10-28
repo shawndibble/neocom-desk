@@ -484,6 +484,10 @@ describe('industry', () => {
     expect(view.number.value).toBe('1');
     expect(view.number.unit).toBe('overview.widgets.industry.ready');
     expect(view.rows[0].tone).toBe('warning');
+    expect(view.table?.rows.map((r) => r.to)).toEqual([
+      '/industry?highlight=1',
+      '/industry?highlight=2',
+    ]);
     // Only the running job is a clock still ahead.
     expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR]);
   });
@@ -740,6 +744,19 @@ describe('mail table', () => {
     ]);
   });
 
+  it('each row opens its mail in the reader, for the mailbox owner', () => {
+    const data = {
+      unread: 1,
+      recent: [],
+      inbox: [{ mailId: 7, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true }],
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const rows = buildView('mail', { mail: ok(data) }, ctx()).table?.rows ?? [];
+    expect(rows.map((r) => r.to)).toEqual(['/mail?open=7&owner=91']);
+    expect(rows.every((r) => r.detail === undefined)).toBe(true);
+  });
+
   it('falls back to the unread mail when the read has no inbox', () => {
     const data = {
       unread: 1,
@@ -879,6 +896,11 @@ describe('contracts table', () => {
     ]);
     expect(table?.rows[0]?.cells[1]).toBe('overview.widgets.contracts.overdue');
     expect(table?.rows[0]?.tone).toBe('critical');
+    expect(table?.rows.map((r) => r.to)).toEqual([
+      '/contracts/history?open=2',
+      '/contracts/history?open=1',
+      '/contracts/history?open=3',
+    ]);
     expect(table?.rows[1]?.cells[3]).toMatchObject({ iskAmount: 2_000_000 });
     expect(table?.rows[2]?.cells[2]).toBe('overview.widgets.contracts.statusOutstanding');
     expect(table?.rows[2]?.cells[3]).toMatchObject({ iskAmount: 5_000_000 });

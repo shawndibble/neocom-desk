@@ -66,6 +66,25 @@ export function legHold(
   };
 }
 
+/** What the pilot does at the stop a leg ends at. */
+export type StopAction =
+  | { kind: 'load' | 'drop'; m3: number; stacks: HaulStack[] | null }
+  | { kind: 'take'; ships: string[] };
+
+/**
+ * What happens where `leg` ends: a pickup loads its items, a delivery drops
+ * everything aboard (the trip's pickups, merged by type), a pickup flight
+ * takes the ship, and a flight's delivery does nothing. `stacks` is `null`
+ * for a haul saved before items, so the stop has nothing to unfold.
+ */
+export function legStopAction(legs: readonly HaulLeg[], leg: HaulLeg): StopAction | null {
+  if (leg.ships) return leg.kind === 'pickup' ? { kind: 'take', ships: leg.ships } : null;
+  if (leg.kind === 'pickup') {
+    return { kind: 'load', m3: leg.m3, stacks: leg.stacks?.length ? leg.stacks : null };
+  }
+  return { kind: 'drop', m3: leg.m3, stacks: heldItems(legHold(legs, leg).aboard) };
+}
+
 /** A place name as the system, then the rest (station, moon) for a dimmer second line. */
 export function splitPlaceName(name: string): { system: string; detail: string | null } {
   const at = name.indexOf(' - ');

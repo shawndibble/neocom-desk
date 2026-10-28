@@ -16,6 +16,11 @@ import {
   Spinner,
   Toast,
   CachedNotice,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PlanEntry } from '@/engine/types';
@@ -178,60 +183,88 @@ export function SkillCertificates() {
           aria-label={t('skills.certificates.filtersLabel')}
           className="flex flex-wrap items-center gap-2"
         >
-          {/* A select rather than a chip per group: ten chips wrapped to five
-              lines on a phone before the first certificate. */}
-          <Select
-            value={group ?? ALL_GROUPS}
-            onValueChange={(next) => setGroup(next === ALL_GROUPS ? null : next)}
-          >
-            <SelectTrigger
-              size="sm"
-              aria-label={t('skills.certificates.groupLabel')}
-              className="w-40"
+          {/* One row that never wraps on a phone: the two selects shrink
+              (`flex-1 min-w-0`), the sort icon keeps its size. */}
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+            {/* A select rather than a chip per group: ten chips wrapped to five
+                lines on a phone before the first certificate. */}
+            <Select
+              value={group ?? ALL_GROUPS}
+              onValueChange={(next) => setGroup(next === ALL_GROUPS ? null : next)}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_GROUPS}>{t('skills.certificates.allGroups')}</SelectItem>
-              {groupNames.map((name) => (
-                <SelectItem key={name} value={name}>
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* Each grade carries its count, so the filter doubles as the summary. */}
-          <CheckboxSelect
-            label={t('skills.certificates.gradeFilter')}
-            className="w-44"
-            options={GRADES.map((grade) => ({
-              value: grade,
-              label: t('skills.certificates.gradeOption', {
-                grade: t(`skills.certificates.grade.${grade}`),
-                count: counts[grade],
-              }),
-            }))}
-            selected={grades}
-            onToggle={toggleGrade}
-          />
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <TargetPlanPicker target={target} />
-            <Select value={sort} onValueChange={(next) => setSort(next as CertificateSort)}>
               <SelectTrigger
                 size="sm"
-                aria-label={t('skills.certificates.sortLabel')}
-                className="w-36"
+                aria-label={t('skills.certificates.groupLabel')}
+                className="min-w-0 flex-1 sm:w-40 sm:flex-none"
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SORTS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {t(`skills.certificates.sort.${option}`)}
+                <SelectItem value={ALL_GROUPS}>{t('skills.certificates.allGroups')}</SelectItem>
+                {groupNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {/* Each grade carries its count, so the filter doubles as the summary. */}
+            <CheckboxSelect
+              label={t('skills.certificates.gradeFilter')}
+              className="min-w-0 flex-1 sm:w-44 sm:flex-none"
+              options={GRADES.map((grade) => ({
+                value: grade,
+                label: t('skills.certificates.gradeOption', {
+                  grade: t(`skills.certificates.grade.${grade}`),
+                  count: counts[grade],
+                }),
+              }))}
+              selected={grades}
+              onToggle={toggleGrade}
+            />
+            {/* Phone only: the sort select is too wide to share the row, so an
+                icon opens the same three choices. A deliberate exception to
+                one DOM at every width, like `mobileSort` (DESIGN.md §4). */}
+            <div className="shrink-0 sm:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton icon={<Icon.Sort />} label={t('skills.certificates.sortLabel')} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup
+                    value={sort}
+                    onValueChange={(next) => setSort(next as CertificateSort)}
+                  >
+                    {SORTS.map((option) => (
+                      <DropdownMenuRadioItem key={option} value={option}>
+                        {t(`skills.certificates.sort.${option}`)}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <TargetPlanPicker target={target} />
+            <div className="hidden sm:block">
+              <Select value={sort} onValueChange={(next) => setSort(next as CertificateSort)}>
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('skills.certificates.sortLabel')}
+                  className="w-36"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORTS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {t(`skills.certificates.sort.${option}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
         {visible.length === 0 ? (

@@ -25,3 +25,11 @@ export function openHref(path: string, id: number | string): string {
 export function highlightHref(path: string, id: number | string): string {
   return `${path}?${HIGHLIGHT_PARAM}=${encodeURIComponent(String(id))}`;
 }
+
+/** Mail's `?open=` link: a mail id repeats across mailboxes, so the owner rides along as `owner`. */
+export const MAIL_OWNER_PARAM = 'owner';
+
+export function mailOpenHref(mailId: number, ownerId: number | null): string {
+  const href = openHref('/mail', mailId);
+  return ownerId === null ? href : `${href}&${MAIL_OWNER_PARAM}=${ownerId}`;
+}
