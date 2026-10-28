@@ -159,7 +159,13 @@ export function BelowMarketResults({
             +<IskAmount value={row.profit} decimals={0} />
             {row.includesOther && (
               <Tooltip content={t('contractSearch.belowMarket.profitIncludesOther')}>
-                <span className="ml-1 text-text-dim">*</span>
+                <span
+                  tabIndex={0}
+                  aria-label={t('contractSearch.belowMarket.profitIncludesOther')}
+                  className="ml-1 text-text-dim"
+                >
+                  *
+                </span>
               </Tooltip>
             )}
           </>
@@ -228,7 +234,7 @@ export function BelowMarketResults({
           age: formatAge(Math.max(0, now - lastSyncedAt), t),
           hub: hubName ?? '…',
           side: t(
-            side === 'buy'
+            (state.status === 'ready' ? state.side : side) === 'buy'
               ? 'contractSearch.belowMarket.sideBuyNote'
               : 'contractSearch.belowMarket.sideSellNote'
           ),

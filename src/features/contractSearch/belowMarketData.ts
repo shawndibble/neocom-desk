@@ -11,7 +11,7 @@ import {
   type BelowMarketContract,
   type BelowMarketPricing,
 } from '@/engine/contracts/belowMarket';
-import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import { PLEX_TYPE_ID, type PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
@@ -49,6 +49,8 @@ async function loadBelowMarketPricing(
   for (const [typeId, aggregate] of books) {
     prices.set(typeId, side === 'buy' ? aggregate.buyMax : aggregate.sellMin);
   }
+  // No hub lists PLEX; the slide-over prices it from its own market, on the sell side only.
+  if (side === 'sell' && plexPrice !== null) prices.set(PLEX_TYPE_ID, plexPrice);
   return { pricing: { prices, plexPrice, isAbyssalType }, hub, unreachable };
 }
 
