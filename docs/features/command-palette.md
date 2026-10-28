@@ -1,6 +1,6 @@
 # Command palette ("Go to")
 
-Global modal launcher: one search box over grouped results to jump to a page or tab, run a command, switch Character, find an owned asset, open an item or an LP Store, or open a contact. Not a page; no route. Mounted once in `Layout` for every authenticated route. User goal: get anywhere in the app from the keyboard (or one tap) without learning the nav. It is explicitly not a page filter: a page's own search box filters that page, the palette goes elsewhere (footer note `commandPalette.scopeNote`).
+Global modal launcher: one search box over grouped results to jump to a page or tab, run a command, switch Character, find an owned asset, open an item or an LP Store, or open a contact. Not a page; no route. Mounted once in `Layout` for every authenticated route. User goal: get anywhere in the app from the keyboard (or one tap) without learning the nav. It is explicitly not a page filter: a page's own search box filters that page, the palette goes elsewhere (the empty state says what it searches).
 
 Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.tsx`, `store.ts`, `types.ts`, `usePaletteSearch.ts`, `providers.ts`, `assetsProvider.ts`, `marketItems.ts`, `lpStoresProvider.ts`, `contactsProvider.ts`), nav descriptor `src/app/navDestinations.ts`, chord helpers `src/lib/shortcuts.ts`, ranking `src/lib/rankedSearch.ts`, openers `src/app/RailNav.tsx:47`, `src/app/MobileMoreSheet.tsx:106`.
 
@@ -25,7 +25,7 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 - **Top jobs (ranked):** 1. "Go to that page or tab by name." 2. "Switch to that Character." 3. "Where is this item, across my Characters?" (assets, market items).
 - **Device and cadence:** desktop primary (owner, 2026-10-11), by keyboard chord, many times a session (inferred). Phone parity: the More sheet's search field opens it (`20261002-145653-go-to-button-opens-the-command-palette`); phone use is one-off lookups (owner, 2026-10-11), so the palette matters little there.
 - **Above the fold:** n/a. Moment of use: mid-session, opened by Ctrl/Cmd K or Go to; the search field and the first group of results.
-- **Not for:** filtering the page underneath (its own search box does that, footer `commandPalette.scopeNote`).
+- **Not for:** filtering the page underneath (its own search box does that).
 - **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); #2318; decisions `20260929-235256` (superseded), `20261002-145653-go-to-button-opens-the-command-palette`.
 - **Unconfirmed:** usage cadence.
 
