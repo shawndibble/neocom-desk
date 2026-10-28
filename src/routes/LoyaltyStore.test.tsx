@@ -484,6 +484,62 @@ describe('LoyaltyStore linked offer', () => {
       'true'
     );
   });
+
+  function mockRows(rows: LoyaltyOfferRow[]) {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      offersError: false,
+      reloadOffers: () => {},
+      rows,
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+  }
+
+  it('keeps a linked offer the pilot cannot afford listed and selected despite Affordable only', () => {
+    useDesktopViewport();
+    const unaffordable: LoyaltyOfferRow = {
+      ...ITEM_ROW,
+      profit: { ...PROFIT, affordableLp: false },
+    };
+    mockRows([unaffordable, BLUEPRINT_ROW]);
+    renderStore(`?offer=${ITEM_ROW.offer.offer_id}`);
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+  });
+
+  it('hides an unaffordable offer that is not the linked one', () => {
+    useDesktopViewport();
+    const unaffordable: LoyaltyOfferRow = {
+      ...ITEM_ROW,
+      profit: { ...PROFIT, affordableLp: false },
+    };
+    mockRows([unaffordable, BLUEPRINT_ROW]);
+    renderStore(`?offer=${BLUEPRINT_ROW.offer.offer_id}`);
+
+    expect(screen.queryByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toBeNull();
+  });
+
+  it('opens normally, with nothing selected, for an offer id the store no longer has', () => {
+    useDesktopViewport();
+    mockRows([ITEM_ROW, BLUEPRINT_ROW]);
+    renderStore('?offer=999999');
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).not.toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });
 
 describe('LoyaltyStore item context menu (issue #716)', () => {

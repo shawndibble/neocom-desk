@@ -121,6 +121,7 @@ export function toLpOfferInputs(
       requiredItemsCostPerRedemption += unitPrice * required.quantity;
     }
     return {
+      offerId: offer.offer_id,
       corporationId,
       corpName,
       quantityPerRedemption: offer.quantity,
