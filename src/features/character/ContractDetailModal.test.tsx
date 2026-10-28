@@ -832,7 +832,7 @@ describe('ContractDetailModal', () => {
       expect(within(dialog).getByText('12345')).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
       expect(
-        await within(dialog).findByRole('button', { name: /Open contract in EVE/ })
+        await within(dialog).findByRole('button', { name: 'Open in EVE: contract 12345' })
       ).toBeInTheDocument();
     });
 

@@ -635,9 +635,15 @@ export function CourierContractDetailModal({
               <span className="flex items-center gap-1">
                 {String(row.contractId)}
                 <CopyContractIdButton contractId={row.contractId} />
-                <OpenInEveButton kind="contract" id={row.contractId} />
               </span>
             }
+          />
+          {/* Its own cell, so the button keeps its natural width; nothing renders when unavailable. */}
+          <OpenInEveButton
+            kind="contract"
+            id={row.contractId}
+            name={t('contractDetail.openInEveName', { id: row.contractId })}
+            className="self-end"
           />
         </div>
       </div>

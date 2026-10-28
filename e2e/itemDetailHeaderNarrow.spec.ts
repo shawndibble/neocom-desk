@@ -1,6 +1,6 @@
 /**
  * Item Detail's header actions by width (DESIGN.md §6c Header controls).
- * Below `md` "Open market in EVE" and "View in Market" share one ⋮, so the
+ * Below `md` "Open in EVE" and "View in Market" share one ⋮, so the
  * item name keeps the header's room; from `md` up they are two text buttons.
  * Two text buttons at 390px squeezed the title to one letter (#3962).
  */
@@ -34,14 +34,12 @@ for (const width of [390, 768, 1280]) {
       }));
       expect(scroll).toBeLessThanOrEqual(client);
       await more.click();
-      await expect(page.getByRole('menuitem', { name: /Open market in EVE/ })).toBeVisible();
+      await expect(page.getByRole('menuitem', { name: /Open in EVE/ })).toBeVisible();
       await page.getByRole('menuitem', { name: 'View in Market' }).click();
       await expect(page).toHaveURL(new RegExp(`/market/browser\\?.*type=${TYPE_ID}`));
     } else {
       await expect(market).toBeVisible();
-      await expect(
-        dialog.getByRole('button', { name: 'Open market in EVE: Rifter' })
-      ).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Open in EVE: Rifter' })).toBeVisible();
       await expect(more).toHaveCount(0);
     }
   });

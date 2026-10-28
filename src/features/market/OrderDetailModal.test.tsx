@@ -18,7 +18,7 @@ import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/ch
 import { loadMutaplasmids } from '@/sde/loadSde';
 import { resetMutaplasmidLookupForTests } from '@/features/abyssal/mutaplasmidData';
 
-// Open market in EVE asks whether the type is abyssal; default: nothing is.
+// Open in EVE asks whether the type is abyssal; default: nothing is.
 const { NO_ABYSSAL } = vi.hoisted(() => ({
   NO_ABYSSAL: { attributeNames: {}, mutaplasmids: {}, abyssalTypeIds: [] as number[] },
 }));
@@ -1317,14 +1317,14 @@ describe('OrderDetailModal — buy order copy (#1733)', () => {
 
 const OPEN_WINDOW_CHARACTER = 4242;
 
-describe('OrderDetailModal — Open market in EVE (#4025)', () => {
-  it('offers Open market in EVE for the item beside View in Market', async () => {
+describe('OrderDetailModal — Open in EVE (#4025)', () => {
+  it('offers Open in EVE for the item beside View in Market', async () => {
     await seedGrant(OPEN_WINDOW_CHARACTER, ['esi-ui.open_window.v1']);
     useActiveCharacter.setState({ activeCharacterId: OPEN_WINDOW_CHARACTER, hydrated: true });
     renderModal();
     await waitFor(() => expect(mockedLoadMutaplasmids).toHaveBeenCalled());
     expect(
-      await screen.findByRole('button', { name: 'Open market in EVE: Tritanium' })
+      await screen.findByRole('button', { name: 'Open in EVE: Tritanium' })
     ).toBeInTheDocument();
   });
 
@@ -1334,7 +1334,7 @@ describe('OrderDetailModal — Open market in EVE (#4025)', () => {
     renderModal({ row: { ...BASE_ROW, typeId: ABYSSAL_TYPE } });
     await waitFor(() => expect(mockedLoadMutaplasmids).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /Open market in EVE/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Open in EVE/ })).not.toBeInTheDocument()
     );
   });
 });

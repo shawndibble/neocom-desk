@@ -235,7 +235,7 @@ describe('HaulingItemDetail — listing', () => {
       'Set price alert',
       'Set stock target',
       'Show info',
-      'Open market in EVE',
+      'Open in EVE',
       'Add to Compare',
       'View in Market',
       'Copy name',

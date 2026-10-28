@@ -915,7 +915,7 @@ describe('Contracts row right-click (issue #676)', () => {
     const user = userEvent.setup();
     render(<App />);
     await openContractMenu('Rifter fit');
-    await user.click(await screen.findByRole('menuitem', { name: 'Open contract in EVE' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
     await waitFor(() => expect(openContractMock).toHaveBeenCalledWith(CHAR_ID, 1));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
