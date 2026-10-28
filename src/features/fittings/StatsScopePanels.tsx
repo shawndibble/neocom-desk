@@ -17,12 +17,15 @@ export function StatsScopeTrigger({
   label,
   open,
   onClick,
+  className,
   children,
 }: {
   ref?: Ref<HTMLButtonElement>;
   label: string;
-  open: boolean;
+  /** Whether its panel is open; absent for a trigger that opens no dialog (Improve), which then carries no popup state. */
+  open?: boolean;
   onClick: () => void;
+  className?: string;
   /** The current value, with any notes; none shows the label alone. */
   children?: ReactNode;
 }) {
@@ -30,11 +33,11 @@ export function StatsScopeTrigger({
     <Button
       ref={ref}
       size="sm"
-      aria-haspopup="dialog"
+      aria-haspopup={open === undefined ? undefined : 'dialog'}
       aria-expanded={open}
       onClick={onClick}
       // The `sm` height on a pointer, the 36px touch tier on a phone or touch screen.
-      className={cx('max-w-full min-w-0 gap-2', tappableRowClassName)}
+      className={cx('max-w-full min-w-0 gap-2', tappableRowClassName, className)}
     >
       <span className="shrink-0 text-text-dim">{label}</span>
       {children && <span className="min-w-0 truncate">{children}</span>}
