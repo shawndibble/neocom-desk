@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { parseEsiKillmail, srpKillmailSource } from './srpKillmailEsi.js';
+import { clearShipGroupCache, parseEsiKillmail, srpKillmailSource } from './srpKillmailEsi.js';
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -37,6 +37,8 @@ describe('parseEsiKillmail', () => {
 });
 
 describe('srpKillmailSource', () => {
+  beforeEach(clearShipGroupCache);
+
   it('zkill returns hash and value, and never throws', async () => {
     const hash = 'c'.repeat(40);
     const ok = srpKillmailSource(() => json([{ zkb: { hash, totalValue: 12.5e6 } }]));
@@ -51,6 +53,17 @@ describe('srpKillmailSource', () => {
         totalValue: null,
       });
     }
+  });
+
+  it('asks ESI for each hull group once', async () => {
+    let calls = 0;
+    const source = srpKillmailSource((() => {
+      calls += 1;
+      return json({ group_id: 25 });
+    }) as unknown as typeof fetch);
+    expect(await source.shipGroupId(587)).toBe(25);
+    expect(await source.shipGroupId(587)).toBe(25);
+    expect(calls).toBe(1);
   });
 
   it('sends the identifying headers to ESI', async () => {
