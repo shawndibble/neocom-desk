@@ -78,6 +78,43 @@ const reference: NpcStandingsReference = {
       })[id],
     divisionName: (id) => ({ 24: 'Security', 18: 'Mining' })[id],
   },
+  stations: [
+    {
+      id: 11,
+      name: 'Navy far',
+      systemId: 30000009,
+      ownerCorporationId: NAVY,
+      ownerFactionId: CALDARI,
+    },
+    {
+      id: 12,
+      name: 'Navy near',
+      systemId: 30000002,
+      ownerCorporationId: NAVY,
+      ownerFactionId: CALDARI,
+    },
+    {
+      id: 13,
+      name: 'Ishukone',
+      systemId: 30000001,
+      ownerCorporationId: ISHUKONE,
+      ownerFactionId: CALDARI,
+    },
+    // The level 3 agent's station
+    {
+      id: 1,
+      name: 'Agent station',
+      systemId: 30000003,
+      ownerCorporationId: ISHUKONE,
+      ownerFactionId: CALDARI,
+    },
+  ],
+  jumps: new Map([
+    [30000001, 0],
+    [30000002, 4],
+    [30000003, 7],
+    [30000009, 12],
+  ]),
 };
 
 const rows = buildNpcStandingRows(entries, names, owners, reference);
@@ -88,6 +125,42 @@ const row = (id: number, from: readonly NpcStandingRow[] = rows): NpcStandingRow
 };
 
 describe('buildNpcStandingRows', () => {
+  describe('nearest', () => {
+    it("is a corporation's nearest station, and a faction's nearest of any of its corporations", () => {
+      expect(row(NAVY).nearest).toEqual({ stationId: 12, systemId: 30000002, jumps: 4 });
+      // Ishukone's station is in the current system: the faction's nearest is 0 jumps
+      expect(row(CALDARI).nearest).toEqual({ stationId: 13, systemId: 30000001, jumps: 0 });
+    });
+
+    it('is the station an agent sits in, whatever else its corporation owns', () => {
+      expect(row(AGENT_L3).nearest).toEqual({ stationId: 1, systemId: 30000003, jumps: 7 });
+    });
+
+    it('is unknown for an owner of no known station, an agent without one, or a faction that owns none', () => {
+      expect(row(GURISTAS_CORP).nearest).toBeNull();
+      expect(row(GURISTAS).nearest).toBeNull();
+      expect(row(STORYLINE_AGENT).nearest).toBeNull();
+      // The level 1 agent's station is not in the snapshot
+      expect(row(AGENT_L1).nearest).toBeNull();
+    });
+
+    it('is unknown on every row when the distances or the stations could not be read', () => {
+      for (const missing of [{ jumps: null }, { stations: null }] as const) {
+        const unknown = buildNpcStandingRows(entries, names, owners, { ...reference, ...missing });
+        expect(unknown.every((r) => r.nearest === null)).toBe(true);
+      }
+    });
+
+    it('skips a station whose system is unreachable', () => {
+      const cut = buildNpcStandingRows(entries, names, owners, {
+        ...reference,
+        jumps: new Map([[30000009, 12]]),
+      });
+      expect(row(NAVY, cut).nearest).toEqual({ stationId: 11, systemId: 30000009, jumps: 12 });
+      expect(row(AGENT_L3, cut).nearest).toBeNull();
+    });
+  });
+
   it('maps the ESI kind to faction / corp / agent', () => {
     expect(row(CALDARI).kind).toBe('faction');
     expect(row(NAVY).kind).toBe('corp');
