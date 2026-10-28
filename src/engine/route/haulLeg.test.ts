@@ -5,6 +5,7 @@ import {
   heldItems,
   legCondition,
   legHold,
+  legStopAction,
   legWaypointIds,
   sectionWaypointIds,
   splitPlaceName,
@@ -143,6 +144,67 @@ describe('legHold', () => {
       loadsOnArrival: null,
     });
     expect(legHold(legs, legs[3]).aboard).toEqual([]);
+  });
+});
+
+describe('legStopAction', () => {
+  const at = (n: number) => ({ systemId: n, stationId: null, name: `P${n}` });
+  const trit = { typeId: 34, name: 'Tritanium', unitM3: 1 };
+  const pye = { typeId: 35, name: 'Pyerite', unitM3: 2 };
+  const legs = [
+    leg({
+      id: 0,
+      trip: 1,
+      kind: 'pickup',
+      to: at(1),
+      m3: 30,
+      stacks: [{ ...trit, quantity: 30 }],
+    }),
+    leg({
+      id: 1,
+      trip: 1,
+      kind: 'pickup',
+      to: at(2),
+      m3: 40,
+      stacks: [
+        { ...trit, quantity: 10 },
+        { ...pye, quantity: 15 },
+      ],
+    }),
+    leg({ id: 2, trip: 1, kind: 'delivery', to: at(9), m3: 70 }),
+  ];
+
+  it('loads what a pickup leg picks up, with its items', () => {
+    expect(legStopAction(legs, legs[1])).toEqual({
+      kind: 'load',
+      m3: 40,
+      stacks: legs[1].stacks,
+    });
+  });
+
+  it('drops everything aboard at the delivery, items merged by type', () => {
+    expect(legStopAction(legs, legs[2])).toEqual({
+      kind: 'drop',
+      m3: 70,
+      stacks: [
+        { ...trit, quantity: 40 },
+        { ...pye, quantity: 15 },
+      ],
+    });
+  });
+
+  it('has no item list where a saved haul predates stacks', () => {
+    const old = [leg({ id: 0, kind: 'pickup', to: at(1), m3: 5 })];
+    expect(legStopAction(old, old[0])).toEqual({ kind: 'load', m3: 5, stacks: null });
+  });
+
+  it('takes the ship at a pickup flight and does nothing at its delivery', () => {
+    const flight = [
+      leg({ id: 0, kind: 'pickup', to: at(1), m3: 0, ships: ['Rifter'] }),
+      leg({ id: 1, kind: 'delivery', to: at(9), m3: 0, ships: ['Rifter'] }),
+    ];
+    expect(legStopAction(flight, flight[0])).toEqual({ kind: 'take', ships: ['Rifter'] });
+    expect(legStopAction(flight, flight[1])).toBeNull();
   });
 });
 

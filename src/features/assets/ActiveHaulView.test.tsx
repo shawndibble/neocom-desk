@@ -175,12 +175,17 @@ describe('ActiveHaulView', () => {
     expect(screen.getAllByText(/Ship kills, last hour: 3/).length).toBeGreaterThan(0);
   });
 
-  it("opens the next leg's cargo and folds the others until asked", async () => {
+  it('says what happens at each stop, and what is in the hold on the way there', async () => {
     renderView();
-    expect(screen.getByText(/Loads 80 m³ at Dodixie IX on arrival/)).toBeTruthy();
-    expect(screen.queryByText(/Drops 80 m³ at Jita 4-4\./)).toBeNull();
+    // Leg 1 flies out empty, then loads where it ends: two lines, two places.
+    expect(screen.getAllByText('Flying empty')).toHaveLength(2);
+    expect(screen.getByText(/Load 80 m³/)).toBeTruthy();
+    expect(screen.getByText(/Drop 80 m³/)).toBeTruthy();
+    expect(screen.queryByText(/on arrival/)).toBeNull();
+    // An empty hold has nothing to open; a loaded one folds until asked.
+    expect(screen.queryByRole('button', { name: 'Show cargo for leg 1' })).toBeNull();
+    expect(screen.queryByText('Dodixie IX: 80 m³')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 2' }));
-    expect(screen.getByText(/Drops 80 m³ at Jita 4-4\./)).toBeTruthy();
     expect(screen.getByText('Carrying 80 m³')).toBeTruthy();
     expect(screen.getByText('Dodixie IX: 80 m³')).toBeTruthy();
   });
@@ -206,10 +211,35 @@ describe('ActiveHaulView', () => {
         plan: { ...haul.plan, sections: [{ ...haul.plan.sections[0], legs: stacked }] },
       },
     });
+    // The stop the pilot is flying to opens on what to pick up there.
     expect(screen.getByText('3,200,000 × Item 34')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 3' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show items for Load 20 m³ at the end of leg 3' })
+    );
     await userEvent.click(screen.getByRole('button', { name: 'and 2 more types' }));
     expect(screen.getByText('11 × Item 1')).toBeTruthy();
+  });
+
+  it('lists what to drop at the delivery stop, folded until asked', async () => {
+    const stacked: HaulLeg[] = [
+      {
+        ...legs[0],
+        stacks: [{ typeId: 34, name: 'Item 34', quantity: 5, unitM3: 16 }],
+      },
+      legs[1],
+    ];
+    renderView(undefined, {
+      haul: {
+        ...haul,
+        plan: { ...haul.plan, sections: [{ ...haul.plan.sections[0], legs: stacked }] },
+      },
+    });
+    expect(screen.getAllByText('5 × Item 34')).toHaveLength(1);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show items for Drop 80 m³ at the end of leg 2' })
+    );
+    expect(screen.getAllByText('5 × Item 34')).toHaveLength(2);
+    expect(screen.getByText(/Drop 80 m³/)).toBeTruthy();
   });
 
   it('reads a flight as take the ship, fly it out, with no hold to open', () => {
@@ -231,7 +261,7 @@ describe('ActiveHaulView', () => {
       },
     });
     expect(screen.getByText('2 legs · 10 jumps to Jita 4-4')).toBeTruthy();
-    expect(screen.getByText('Take Rifter at Dodixie IX')).toBeTruthy();
+    expect(screen.getByText(/Take Rifter/)).toBeTruthy();
     expect(screen.getByText('Fly Rifter to Jita 4-4')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /cargo for leg/ })).toBeNull();
   });
@@ -256,7 +286,7 @@ describe('ActiveHaulView', () => {
     });
     const blocks = document.querySelectorAll('[data-leg-id]');
     expect(blocks[0].textContent).toContain('Travel to Dodixie IX');
-    expect(blocks[0].textContent).toContain('Take Rifter at Dodixie IX');
+    expect(blocks[0].textContent).toContain('Take Rifter');
     expect(blocks[1].textContent).toContain('Fly Rifter to Jita 4-4');
     expect(blocks[1].textContent).not.toContain('Take Rifter');
   });
@@ -281,7 +311,7 @@ describe('ActiveHaulView', () => {
     const blocks = document.querySelectorAll('[data-leg-id]');
     expect(blocks[0].textContent).toContain('Travel to Dodixie IX');
     expect(blocks[1].textContent).toContain('Haul to Jita IV');
-    expect(blocks[1].textContent).toContain('Load 20 m³ at Jita IV');
+    expect(blocks[1].textContent).toContain('Load 20 m³');
   });
 
   it('heads a cargo leg as a trip to the load, then the haul that drops it', () => {
@@ -289,7 +319,7 @@ describe('ActiveHaulView', () => {
     const blocks = document.querySelectorAll('[data-leg-id]');
     expect(blocks[0].textContent).toContain('Travel to Dodixie IX');
     expect(blocks[1].textContent).toContain('Haul to Jita 4-4');
-    expect(blocks[1].textContent).toContain('Drop 80 m³ at Jita 4-4');
+    expect(blocks[1].textContent).toContain('Drop 80 m³');
   });
 
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {
@@ -347,7 +377,7 @@ describe('ActiveHaulView', () => {
     expect(rows[0].hasAttribute('data-done')).toBe(true);
     expect(rows[1].hasAttribute('data-done')).toBe(false);
     expect(screen.getByRole('button', { name: 'Hide cargo for leg 2' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Show cargo for leg 1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show cargo for leg 1' })).toBeNull();
     expect(screen.getByText('2 legs · 12 jumps · 20 m³ to Jita 4-4')).toBeTruthy();
   });
 
