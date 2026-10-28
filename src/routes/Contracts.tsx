@@ -114,7 +114,7 @@ export function Contracts() {
       'history.status': next.status,
       'history.type': next.type,
     });
-  // The contract a `contractAccepted` alert pointed at, if any.
+  // The contract a `contractAccepted` alert pointed at, if any. It opens the modal too, as `?open=` does.
   const highlightParamId = useHighlightParam();
   // `?open=` opens the contract's modal as a row click would, and flashes the row too.
   const openParamId = useOpenParam();
@@ -266,11 +266,11 @@ export function Contracts() {
     [contractsResult]
   );
 
-  // `?open=` waits for the contract to load and shows it until the reader picks or closes one;
-  // a contract that never appears opens nothing.
+  // `?open=` and `?highlight=` wait for the contract to load and show it until the reader picks
+  // or closes one; a contract that never appears opens nothing.
   const paramContract =
-    openParamId !== null && !paramOpenDismissed
-      ? (contracts.find((c) => c.contract_id === openParamId) ?? null)
+    highlightedContractId !== null && !paramOpenDismissed
+      ? (contracts.find((c) => c.contract_id === highlightedContractId) ?? null)
       : null;
   const selectedContract = picked?.scope === selectionScope ? picked.contract : paramContract;
 
