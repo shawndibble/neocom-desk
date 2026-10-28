@@ -15,6 +15,8 @@ import {
   Spinner,
   TabPanel,
   Toast,
+  ToastStack,
+  useDeferredCommits,
   useTimedToast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -178,6 +180,9 @@ export function Industry() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = usePageTab(INDUSTRY_TABS);
 
+  // A plan the pilot just deleted stays hidden until its Undo toast ends and
+  // the write lands, so a sync pull in that window can't bring it back.
+  const pendingDeletes = useDeferredCommits();
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
     return {
@@ -185,7 +190,12 @@ export function Industry() {
       rows: await db.buildPlans.where('characterId').equals(activeCharacterId).toArray(),
     };
   }, [activeCharacterId]);
-  const plans = plansQuery?.characterId === activeCharacterId ? plansQuery.rows : undefined;
+  const allPlans = plansQuery?.characterId === activeCharacterId ? plansQuery.rows : undefined;
+  const { hiddenIds: hiddenPlanIds } = pendingDeletes;
+  const plans = useMemo(
+    () => (hiddenPlanIds.size === 0 ? allPlans : allPlans?.filter((p) => !hiddenPlanIds.has(p.id))),
+    [allPlans, hiddenPlanIds]
+  );
 
   const itemActions = usePageItemActions({ activeCharacterId });
 
@@ -285,7 +295,6 @@ export function Industry() {
     t,
   ]);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
   const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -566,10 +575,15 @@ export function Industry() {
     // page.
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     if (activeCharacterId === null) return;
-    setDeletingPlanId(null);
-    await removeBuildPlan(activeCharacterId, id);
+    const characterId = activeCharacterId;
+    const name = plans?.find((p) => p.id === id)?.name ?? '';
+    pendingDeletes.defer({
+      id,
+      message: t('industry.planDeleted', { name }),
+      commit: () => removeBuildPlan(characterId, id),
+    });
   }
 
   async function handleRename(id: string, name: string) {
@@ -934,7 +948,7 @@ export function Industry() {
                       // it immediately. `void`: `onCreate` only takes the entry.
                       onCreate={(entry) => void createPlan(entry)}
                       onDuplicate={(id) => void handleDuplicate(id)}
-                      onDelete={setDeletingPlanId}
+                      onDelete={handleDelete}
                       onRename={(id, name) => void handleRename(id, name)}
                       compareMode={compareMode}
                       compareSelectedIds={compareSelectedIds}
@@ -965,30 +979,6 @@ export function Industry() {
         </TabPanel>
 
         <Modal
-          open={deletingPlanId !== null}
-          onClose={() => setDeletingPlanId(null)}
-          title={t('industry.deletePlan')}
-        >
-          <p className="text-xs text-text-dim">
-            {t('industry.deletePlanConfirm', {
-              name: plans?.find((p) => p.id === deletingPlanId)?.name ?? '',
-            })}
-          </p>
-          <div className="mt-3 flex justify-end gap-2">
-            <Button size="sm" onClick={() => setDeletingPlanId(null)}>
-              {t('industry.cancel')}
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => deletingPlanId && void handleDelete(deletingPlanId)}
-            >
-              {t('industry.delete')}
-            </Button>
-          </div>
-        </Modal>
-
-        <Modal
           open={deletingGroupId !== null}
           onClose={() => setDeletingGroupId(null)}
           title={t('industry.deleteGroup')}
@@ -1009,6 +999,13 @@ export function Industry() {
         </Modal>
 
         {blueprintPasteNote && <Toast message={blueprintPasteNote} />}
+
+        <ToastStack
+          items={pendingDeletes.items}
+          undoLabel={t('industry.errands.undo')}
+          onUndo={pendingDeletes.undo}
+          onClose={pendingDeletes.commit}
+        />
 
         {fitImportOpen && catalog && (
           <Suspense fallback={null}>

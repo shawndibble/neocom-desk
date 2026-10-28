@@ -59,6 +59,8 @@ interface UseImproveDrawerArgs {
   moduleResults: FittingModuleResult[] | null;
   /** Opens Make it fit on a budget, for "Fix this first". */
   openMakeItFit: (resource: FitResource) => void;
+  /** Asks the stats column to open What to train, for Skills' "See all" link. */
+  showWhatToTrain: () => void;
 }
 
 /**
@@ -77,6 +79,7 @@ export function useImproveDrawer({
   context,
   moduleResults,
   openMakeItFit,
+  showWhatToTrain,
 }: UseImproveDrawerArgs): {
   open: () => void;
   close: () => void;
@@ -274,6 +277,7 @@ export function useImproveDrawer({
               characterId={characterId}
               fittingName={fitting.name}
               catalogue={catalogue}
+              onShowWhatToTrain={showWhatToTrain}
             />
             {workspace.profile && (
               <ImproveImplants

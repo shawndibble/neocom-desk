@@ -22,8 +22,11 @@
  *    own daily rollover), in rank order in batches until
  *    `MAX_BOOK_CANDIDATES` items pass or the list runs out — never past
  *    `MAX_HISTORY_READS` reads — and keeps the best of those.
- * 3. **Order books.** The two hubs' books for those few, station-filtered,
- *    turned into ladders and estimated by `engine/market/haulingMarket`.
+ * 3. **Order books.** The two hubs' books, turned into ladders and estimated by
+ *    `engine/market/haulingMarket`. They come from each hub station's
+ *    30-minute R2 object (`loadHaulingBooks`): every survivor is read locally, no
+ *    ESI call, no cap. When an object is missing or stale, the fallback reads the
+ *    best `MAX_BOOK_CANDIDATES` items' books from ESI (station-filtered).
  *
  * Demand is read from the destination's whole *region* history (ESI has no
  * per-station history) while the ladders are the hub *station's*; the popover
@@ -47,6 +50,7 @@ import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { getOrderBook } from '@/features/market/orderBook';
 import { loadPriceHistory } from '@/features/market/priceHistory';
 import { loadHaulingDemand, type HaulingDemand } from '@/features/market/haulingDemand';
+import { loadHaulingBooks, type HaulingBooks } from '@/features/market/haulingBooks';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { EsiError } from '@/esi/errors';
 import { getHubPrices } from '@/market/prices';
@@ -148,6 +152,10 @@ export interface HaulingScan {
   demandSource?: 'daily' | 'esi';
   /** Daily source only: how many items passed the demand check, of which the best `MAX_BOOK_CANDIDATES` got books. */
   demandPassed?: number;
+  /** Where the order books came from: the 30-minute R2 snapshot or the ESI fallback. Absent when no item reached the books pass. */
+  booksSource?: 'snapshot' | 'esi';
+  /** Snapshot source only: when EVE Ref published the market snapshot the books were built from (ms). */
+  booksAsOf?: number;
   /** True when the history-read or order-book cap cut the shortlist, so better-than-shown rows may exist unlooked-at. */
   capped?: boolean;
   /**
@@ -233,6 +241,18 @@ async function resolveVolume(
   const type = await loadTypeDetail(typeId);
   const volume = type?.packaged_volume ?? type?.volume;
   return volume !== undefined && volume > 0 ? volume : null;
+}
+
+/** The books object of every hub station the candidates use; null when any is unavailable, so one lane never runs on mixed sources. */
+async function loadSnapshotBooks(
+  candidates: readonly PricedCandidate[]
+): Promise<Map<number, HaulingBooks> | null> {
+  const stations = [
+    ...new Set(candidates.flatMap((c) => [c.lane.from.stationId, c.lane.to.stationId])),
+  ];
+  const loaded = await Promise.all(stations.map((id) => loadHaulingBooks(id)));
+  if (loaded.some((books) => books === null)) return null;
+  return new Map(stations.map((id, i) => [id, loaded[i]!]));
 }
 
 async function stationLadders(
@@ -365,14 +385,16 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
       return best === null ? [] : [best];
     })
     .sort(byRank);
+  // The snapshot books answer for every candidate at once, so no book cap applies; the ESI fallback books a short list.
+  const [books, dailyDemand] = await Promise.all([
+    pricedAll.length > 0 ? loadSnapshotBooks(pricedAll) : null,
+    mode === 'list' && pricedAll.length > 0 ? loadDailyDemand(pricedAll) : null,
+  ]);
+  throwIfAborted(signal);
+  const bookCap = books ? Infinity : MAX_BOOK_CANDIDATES;
   // An instant sale skips history: the standing buy order is the demand, and pass 1's order is the shortlist.
   const withHistory: ShortlistCandidate[] =
-    mode === 'instant'
-      ? pricedAll.slice(0, MAX_BOOK_CANDIDATES).map((c) => ({ ...c, demand: null }))
-      : [];
-  const dailyDemand =
-    mode === 'list' && pricedAll.length > 0 ? await loadDailyDemand(pricedAll) : null;
-  throwIfAborted(signal);
+    mode === 'instant' ? pricedAll.slice(0, bookCap).map((c) => ({ ...c, demand: null })) : [];
   // The daily object answers for every candidate at once; the ESI fallback reads a capped slice.
   const historyPass =
     mode === 'instant' ? [] : dailyDemand ? pricedAll : pricedAll.slice(0, MAX_HISTORY_READS);
@@ -395,7 +417,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     historyNext = historyPass.length;
     historyDone = historyPass.length;
   }
-  while (historyNext < historyPass.length && withHistory.length < MAX_BOOK_CANDIDATES) {
+  while (historyNext < historyPass.length && withHistory.length < bookCap) {
     const batch = historyPass.slice(historyNext, historyNext + HISTORY_BATCH);
     historyNext += batch.length;
     await mapWithConcurrencyLimit(batch, SCAN_CONCURRENCY, async (candidate) => {
@@ -416,9 +438,15 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   // Stopped early once enough passed: close the bar on what was actually read.
   if (mode === 'list') onProgress?.({ stage: 'history', done: historyDone, total: historyDone });
   withHistory.sort(byRank);
-  const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
+  const shortlist = withHistory.slice(0, bookCap);
 
-  // 3. Order books, then hauled volume, for the shortlist only.
+  // 3. Order books, then hauled volume, for the shortlist.
+  const ladders = async (hub: TradeHub, typeId: number) => {
+    const snapshot = books?.get(hub.stationId)?.types.get(typeId);
+    // Absent from the snapshot: no orders at the station, so an empty book.
+    if (books) return snapshot ?? { sell: [], buy: [] };
+    return stationLadders(hub, typeId);
+  };
   const catalogue: MarketCatalogue = shortlist.length > 0 ? await loadMarketCatalogue() : new Map();
   const rows: HaulingScanRow[] = [];
   let booksDone = 0;
@@ -427,8 +455,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     throwIfAborted(signal);
     try {
       const [origin, dest] = await Promise.all([
-        stationLadders(candidate.lane.from, candidate.typeId),
-        stationLadders(candidate.lane.to, candidate.typeId),
+        ladders(candidate.lane.from, candidate.typeId),
+        ladders(candidate.lane.to, candidate.typeId),
       ]);
       const buyLadder = origin.sell;
       const known = types[String(candidate.typeId)];
@@ -475,8 +503,8 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   // Cut = candidates left unlooked-at, by the book cap (enough passed) or the read cap.
   const capped =
     mode === 'instant'
-      ? pricedAll.length > MAX_BOOK_CANDIDATES
-      : historyNext < pricedAll.length || withHistory.length > MAX_BOOK_CANDIDATES;
+      ? pricedAll.length > bookCap
+      : historyNext < pricedAll.length || withHistory.length > bookCap;
   const passedHistory = new Set(withHistory.map((c) => c.typeId));
   const examinedTypeIds = [
     ...historyPass
@@ -489,6 +517,12 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     rows,
     scanned: ids.length,
     ...(capped ? { capped } : {}),
+    ...(shortlist.length > 0
+      ? {
+          booksSource: books ? ('snapshot' as const) : ('esi' as const),
+          ...(books ? { booksAsOf: Math.min(...[...books.values()].map((b) => b.asOf)) } : {}),
+        }
+      : {}),
     ...(mode === 'list' && pricedAll.length > 0
       ? {
           demandSource: dailyDemand ? ('daily' as const) : ('esi' as const),

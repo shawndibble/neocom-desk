@@ -26,6 +26,11 @@ interface ToastBaseProps {
    * message is what marks a new toast.
    */
   instance?: unknown;
+  /**
+   * Drawn in flow inside a `ToastStack` instead of fixed and portalled: the
+   * stack owns the position. Leave unset everywhere else.
+   */
+  stacked?: boolean;
 }
 
 /** Plain toasts expire on their own; with `onClose` the toast runs that timer itself. */
@@ -79,6 +84,7 @@ export type ToastProps = PlainToastProps | ActionToastProps;
 export function Toast({
   message,
   instance,
+  stacked,
   undo,
   action,
   onClose,
@@ -161,10 +167,14 @@ export function Toast({
     if (back?.isConnected) back.focus();
   }
 
-  return createPortal(
+  const toast = (
     <div
       ref={rootRef}
-      className="toast-in bg-panel-2 border-line-bright text-text fixed bottom-32 left-1/2 z-40 flex w-[95vw] -translate-x-1/2 items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]"
+      className={`toast-in bg-panel-2 border-line-bright text-text flex items-center gap-3 rounded-xs border px-4 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.6)] ${
+        stacked
+          ? 'pointer-events-auto max-w-full'
+          : 'fixed bottom-32 left-1/2 z-40 w-[95vw] -translate-x-1/2 md:bottom-16 md:w-auto md:max-w-[calc(100vw-2rem)]'
+      }`}
       // Mouse only: a tap emulates mouseenter and nothing ever sends the leave.
       onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
       onPointerLeave={(e) => e.pointerType === 'mouse' && setHeld(false)}
@@ -209,7 +219,7 @@ export function Toast({
           onClick={onClose}
         />
       )}
-    </div>,
-    portalContainer ?? document.body
+    </div>
   );
+  return stacked ? toast : createPortal(toast, portalContainer ?? document.body);
 }

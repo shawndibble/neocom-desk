@@ -345,12 +345,7 @@ export function FittingHeader({
             <DropdownMenuTrigger asChild>
               <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="min-w-48"
-              onCloseAutoFocus={improveMenu.onCloseAutoFocus}
-            >
-              {improveItem}
+            <DropdownMenuContent align="end" className="min-w-48">
               {compareItem}
               <DropdownMenuItem
                 disabled={!copyStats.canCopy}

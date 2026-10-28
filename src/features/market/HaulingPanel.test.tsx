@@ -368,6 +368,17 @@ describe('HaulingPanel table', () => {
     expect(screen.getByText('Buy orders in Amarr')).toBeInTheDocument();
   });
 
+  it('the strip’s info icon opens a modal on how the items were picked and where the data came from', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    expect(screen.queryByRole('dialog', { name: 'How these items were picked' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'How these items were picked' }));
+    const dialog = await screen.findByRole('dialog', { name: 'How these items were picked' });
+    expect(dialog).toHaveTextContent('1. Price gap');
+    expect(dialog).toHaveTextContent('3. Order books');
+    expect(dialog).toHaveTextContent('Order books: live from ESI');
+  });
+
   it('select all in the strip unticks and reticks every row', async () => {
     const user = userEvent.setup();
     renderPanel();
