@@ -172,7 +172,7 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
                 className={textActionClassName('inline-flex whitespace-nowrap')}
                 onClick={workThrough.openCurrent}
               >
-                {t('openInEve.marketDetails')}
+                {t('openInEve.label')}
               </button>
             </NeedsConnection>
             {workThrough.currentSent && <SentMark />}

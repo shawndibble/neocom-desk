@@ -38,10 +38,17 @@ function Where() {
   return <output data-testid="where">{pathname + search}</output>;
 }
 
-function openMenu(kind: 'information' | 'marketDetails' | 'contract', id: number) {
+function openMenu(
+  kind: 'information' | 'marketDetails' | 'contract',
+  id: number,
+  specific = false
+) {
   render(
     <MemoryRouter>
-      <RowActionsMenu name="row" items={<OpenInEveMenuItem kind={kind} id={id} />}>
+      <RowActionsMenu
+        name="row"
+        items={<OpenInEveMenuItem kind={kind} id={id} specific={specific} />}
+      >
         <div>row</div>
       </RowActionsMenu>
       <Where />
@@ -91,13 +98,44 @@ describe('OpenInEveMenuItem', () => {
   });
 
   it.each([
-    ['marketDetails', 'Open market in EVE', marketMock],
-    ['contract', 'Open contract in EVE', contractMock],
-  ] as const)('%s calls its own endpoint', async (kind, label, mock) => {
+    ['marketDetails', marketMock],
+    ['contract', contractMock],
+  ] as const)('%s reads "Open in EVE" and calls its own endpoint', async (kind, mock) => {
     await seed([SCOPE]);
     openMenu(kind, 42);
-    await userEvent.click(await screen.findByRole('menuitem', { name: label }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
     await waitFor(() => expect(mock).toHaveBeenCalledWith(ONE, 42));
+  });
+
+  it.each([
+    ['marketDetails', 'Open market in EVE'],
+    ['contract', 'Open contract in EVE'],
+  ] as const)('%s shows its long form when specific', async (kind, label) => {
+    await seed([SCOPE]);
+    openMenu(kind, 42, true);
+    expect(await screen.findByRole('menuitem', { name: label })).toBeInTheDocument();
+  });
+
+  it('keeps two distinguishable labels when a menu carries a market window and a place window', async () => {
+    await seed([SCOPE]);
+    render(
+      <MemoryRouter>
+        <RowActionsMenu
+          name="row"
+          items={
+            <>
+              <OpenInEveMenuItem kind="marketDetails" id={34} specific />
+              <OpenInEveMenuItem kind="information" id={60003760} />
+            </>
+          }
+        >
+          <div>row</div>
+        </RowActionsMenu>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByText('row'));
+    expect(await screen.findByRole('menuitem', { name: 'Open market in EVE' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Open in EVE' })).toBeInTheDocument();
   });
 
   it('shows ESI’s refusal in the menu rather than failing silently', async () => {

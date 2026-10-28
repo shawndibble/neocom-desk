@@ -10044,6 +10044,7 @@
     "unknownLocation": "Unknown location (#{{id}})",
     "expiresLabel": "Expires",
     "contractIdLabel": "Contract",
+    "openInEveName": "contract {{id}}",
     "copyContractId": "Copy contract ID",
     "contractIdCopied": "Contract ID copied",
     "openLink": "Open {{host}}",
@@ -14462,6 +14463,7 @@
     "jumpsUnknownLabel": "Jumps unknown",
     "routePathLabel": "Route, system by system",
     "pickUpLabel": "Pick up",
+    "planRoute": "Plan route",
     "dropOffLabel": "Drop off",
     "playerStructureShort": "Player structure",
     "reverseLaneCount_one": "{{count}} haul runs the reverse lane",
@@ -14627,7 +14629,7 @@
     "unknownHint": "Neocom Desk has no record of this location."
   },
   "openInEve": {
-    "information": "Open in EVE",
+    "label": "Open in EVE",
     "marketDetails": "Open market in EVE",
     "contract": "Open contract in EVE",
     "sending": "Opening in EVE…",

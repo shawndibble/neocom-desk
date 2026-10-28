@@ -545,7 +545,7 @@ function OpenInMarketLink({
 
 /**
  * Below `md`, the header's two actions as one ⋮ (DESIGN.md §6c Header
- * controls): Open market in EVE, and View in Market doing what
+ * controls): Open in EVE, and View in Market doing what
  * `OpenInMarketLink` does.
  */
 function ItemDetailMoreActions({

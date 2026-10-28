@@ -204,7 +204,7 @@ describe('CommunityLibrary', () => {
     await open();
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
       en.market.contextMenu.showInfo,
-      en.openInEve.marketDetails,
+      en.openInEve.label,
       en.industry.contextMenu.buildPlan,
       l.openInSourcing,
       en.travel.waypoints.viewRoute,

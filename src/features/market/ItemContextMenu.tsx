@@ -109,10 +109,17 @@ export function ShowInfoMenuItem({
  * Market details only: ESI's information window opens characters,
  * corporations and alliances, and silently ignores an inventory type.
  */
-export function OpenInEveItemMenuItems({ typeId }: { typeId: number }) {
+export function OpenInEveItemMenuItems({
+  typeId,
+  specific,
+}: {
+  typeId: number;
+  /** The menu also offers another Open in EVE item (a place's window). */
+  specific?: boolean;
+}) {
   return (
     <MarketOnly typeId={typeId}>
-      <OpenInEveMenuItem kind="marketDetails" id={typeId} />
+      <OpenInEveMenuItem kind="marketDetails" id={typeId} specific={specific} />
     </MarketOnly>
   );
 }
