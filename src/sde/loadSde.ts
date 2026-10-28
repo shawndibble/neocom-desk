@@ -1,4 +1,5 @@
 import type {
+  AgentsFile,
   BlueprintMap,
   Certificate,
   CertifiedPlan,
@@ -7,6 +8,7 @@ import type {
   MarketWideTreeMap,
   MasteryMap,
   MutaplasmidData,
+  NpcCorporationsFile,
   PiData,
   PiSystemPlanets,
   ReprocessingMap,
@@ -138,6 +140,18 @@ export const loadGameTypeNames = cached<string[]>('typeNames.json');
 export const loadWormholeMass = cached<Record<string, [number, number]>>('wormholeMass.json');
 /** ESI `character_title_id` (UUID) -> English title name (issue #4777). */
 export const loadCharacterTitles = cached<Record<string, string>>('characterTitles.json');
+/**
+ * The NPC agents a pilot can talk to (`AgentsFile`). Read through `agents.ts`'s
+ * `loadAgents` index, not directly. Not precached: ~140 KB gzipped, and only
+ * the Contacts standings view reads it.
+ */
+export const loadAgentsFile = cached<AgentsFile>('agents.json');
+/**
+ * Every NPC corporation and the faction names (`NpcCorporationsFile`). Read
+ * through `npcCorporations.ts`'s `loadNpcCorporations` index. Precached: ~6 KB
+ * gzipped, and a corporation's faction is wanted wherever its standing is.
+ */
+export const loadNpcCorporationsFile = cached<NpcCorporationsFile>('npcCorporations.json');
 /**
  * Published hull typeId -> [name, groupID, mass in kg, base jump drive?], for
  * the same check. The drive (issue #3147) is `[rangeLy, fuelTypeId, fuelPerLy]`

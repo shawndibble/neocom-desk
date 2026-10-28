@@ -2,6 +2,8 @@
 // Extracted from scripts/build-sde.mjs; see lib/bakeConstants.mjs for the shared bands.
 import { isDeepStrictEqual } from 'node:util';
 import {
+  AGENTS_MAX,
+  AGENTS_MIN,
   ALPHA_SKILLS_MAX,
   ALPHA_SKILLS_MIN,
   CERTIFICATES_MAX,
@@ -23,6 +25,11 @@ import {
   MARKET_VOLUME_CONTROL_TYPE_ID,
   MASTERY_SHIPS_MAX,
   MASTERY_SHIPS_MIN,
+  NPC_CORPORATION_CONTROL,
+  NPC_CORPORATIONS_MAX,
+  NPC_CORPORATIONS_MIN,
+  NPC_FACTIONS_MAX,
+  NPC_FACTIONS_MIN,
   PACKAGED_VOLUME_CONTROL_EXPECTED,
   PACKAGED_VOLUME_CONTROL_TYPE_ID,
   REPROCESSING_SPECIALISATION_MAX,
@@ -76,6 +83,8 @@ export function runSanityChecks({
   piUnclassifiedPins,
   piDisagreeingPins,
   alphaGradesDisagree,
+  agents,
+  npcCorporationData,
   masteries,
   certifiedPlans,
   skillPlanRecords,
@@ -390,6 +399,53 @@ export function runSanityChecks({
     if (empty.length) {
       console.error(
         `  FAIL: certified plans with no entries: ${empty.map((p) => p.name).join(', ')}`
+      );
+      process.exitCode = 1;
+    }
+  }
+  {
+    const { corporations, factions } = npcCorporationData;
+    console.log(
+      `  agents: ${agents.agents.length}, NPC corporations: ${corporations.length}, factions: ${factions.length}`
+    );
+    if (agents.agents.length < AGENTS_MIN || agents.agents.length > AGENTS_MAX) {
+      console.error(
+        `  FAIL: ${agents.agents.length} agents, outside the plausible ${AGENTS_MIN}-${AGENTS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    if (corporations.length < NPC_CORPORATIONS_MIN || corporations.length > NPC_CORPORATIONS_MAX) {
+      console.error(
+        `  FAIL: ${corporations.length} NPC corporations, outside the plausible ${NPC_CORPORATIONS_MIN}-${NPC_CORPORATIONS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    if (factions.length < NPC_FACTIONS_MIN || factions.length > NPC_FACTIONS_MAX) {
+      console.error(
+        `  FAIL: ${factions.length} factions, outside the plausible ${NPC_FACTIONS_MIN}-${NPC_FACTIONS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    const control = corporations.find((c) => c.id === NPC_CORPORATION_CONTROL.id);
+    if (control?.factionId !== NPC_CORPORATION_CONTROL.factionId) {
+      console.error(
+        `  FAIL: ${NPC_CORPORATION_CONTROL.name} is in faction ${control?.factionId ?? 'none'}, expected ${NPC_CORPORATION_CONTROL.factionId}`
+      );
+      process.exitCode = 1;
+    }
+    // An agent whose corporation, station or division the app cannot name would
+    // show as a bare id; every one of them should resolve.
+    const corporationIds = new Set(corporations.map((c) => c.id));
+    const stationIds = new Set(npcStations.map((s) => s.id));
+    const unresolved = agents.agents.filter(
+      ([, , , divisionId, corporationId, stationId]) =>
+        !(divisionId in agents.divisions) ||
+        !corporationIds.has(corporationId) ||
+        !stationIds.has(stationId)
+    );
+    if (unresolved.length > 0) {
+      console.error(
+        `  FAIL: ${unresolved.length} agents with an unknown division, corporation or station, e.g. ${unresolved[0][1]}`
       );
       process.exitCode = 1;
     }
