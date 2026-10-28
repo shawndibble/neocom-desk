@@ -2,7 +2,7 @@
  * The **Shared Appraisal** page at 390px: a plain table, not stacked cards
  * (DESIGN.md §6c Restraint). Six numeric columns hang off the item name, a
  * table read across columns, so it keeps real columns on a phone — item pinned
- * (`stickyStart`), Buy each / Sell each / Volume shed (`phoneHidden`) — and the
+ * (`stickyStart`), Buy each / Sell each / Split each / Volume shed (`phoneHidden`) — and the
  * page never scrolls sideways. History: #1113 paired the six values into a
  * two-up card; that card is gone.
  *
@@ -255,10 +255,19 @@ test.describe('Shared appraisal — phone table', () => {
     await openShare(page);
 
     const { display, contentWidth, rowHeight, cells } = await readRow(page, PYERITE);
-    // Above `sm` nothing is shed: all six values plus the name on one line.
+    // Above `sm` nothing is shed: all seven values plus the name on one line.
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
-      ['Qty', 'Item', 'Buy each', 'Sell each', 'Buy total', 'Sell total', 'Volume (m³)'],
+      [
+        'Qty',
+        'Item',
+        'Buy each',
+        'Sell each',
+        'Split each',
+        'Buy total',
+        'Sell total',
+        'Volume (m³)',
+      ],
     ]);
     // Not just "one line group": a single dense row of text, so a cell that
     // started wrapping onto a second line would fail here rather than pass by
