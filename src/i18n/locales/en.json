@@ -3751,6 +3751,7 @@
     "opportunitiesStockCovers": "Stock covers",
     "opportunitiesStillToBuy": "Still to buy",
     "opportunitiesUseMyStock": "Use my stock",
+    "opportunitiesStockPrefix": "Stock",
     "opportunitiesStockAny": "Any",
     "opportunitiesStockMostly": "{{pct}}%+ covered",
     "opportunitiesStockFull": "Fully covered",
