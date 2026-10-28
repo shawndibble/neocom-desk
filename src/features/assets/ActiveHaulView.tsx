@@ -338,10 +338,11 @@ function Section({
                 last={index === legs.length - 1}
                 done={done.includes(leg.id)}
                 current={currentIds.has(leg.id)}
-                action={legStopAction(legs, leg)}
-                n={index + 1}
-                expanded={currentIds.has(leg.id) !== flipped.has(stopKey(leg))}
-                onToggle={() => onToggle(stopKey(leg))}
+                actionRow={stopActionRow(legStopAction(legs, leg), {
+                  n: index + 1,
+                  expanded: currentIds.has(leg.id) !== flipped.has(stopKey(leg)),
+                  onToggle: () => onToggle(stopKey(leg)),
+                })}
               />
             </li>
           ))}
@@ -367,10 +368,7 @@ function Stop({
   last,
   done,
   current,
-  action,
-  n,
-  expanded,
-  onToggle,
+  actionRow,
 }: {
   name: string;
   start?: boolean;
@@ -380,11 +378,7 @@ function Stop({
   /** The stop the pilot is flying to next. */
   current?: boolean;
   /** What happens here; absent at the start and where a flight just lands. */
-  action?: StopAction | null;
-  /** The ending Leg's number, for the toggle's name. */
-  n?: number;
-  expanded?: boolean;
-  onToggle?: () => void;
+  actionRow?: StopActionRowProps | null;
 }) {
   const { system, detail } = splitPlaceName(name);
   return (
@@ -401,17 +395,25 @@ function Stop({
       />
       <div className="text-sm font-semibold">{system}</div>
       {detail && <div className="text-xs text-text-dim [overflow-wrap:anywhere]">{detail}</div>}
-      {action && (
-        <StopActionRow
-          action={action}
-          n={n ?? 0}
-          done={done}
-          expanded={expanded ?? false}
-          onToggle={onToggle ?? (() => {})}
-        />
-      )}
+      {actionRow && <StopActionRow {...actionRow} done={done} />}
     </div>
   );
+}
+
+interface StopActionRowProps {
+  action: StopAction;
+  /** The ending Leg's number, for the toggle's name. */
+  n: number;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+/** The row for a Stop, or `null` where the Leg ending there has nothing to do. */
+function stopActionRow(
+  action: StopAction | null,
+  rest: Omit<StopActionRowProps, 'action'>
+): StopActionRowProps | null {
+  return action && { action, ...rest };
 }
 
 /** "Load 25 m³", "Drop 118.99 m³" or "Take Omen", opening to the items where there are some. */
@@ -421,13 +423,7 @@ function StopActionRow({
   done,
   expanded,
   onToggle,
-}: {
-  action: StopAction;
-  n: number;
-  done?: boolean;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
+}: StopActionRowProps & { done?: boolean }) {
   const { t } = useTranslation();
   const label =
     action.kind === 'take'
@@ -461,7 +457,7 @@ function StopActionRow({
         aria-expanded={expanded}
         aria-label={t(
           expanded ? 'assets.movePlan.haul.stopItemsHide' : 'assets.movePlan.haul.stopItemsShow',
-          { n }
+          { action: label, n }
         )}
         onClick={onToggle}
         className={cx(

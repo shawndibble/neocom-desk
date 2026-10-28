@@ -213,7 +213,9 @@ describe('ActiveHaulView', () => {
     });
     // The stop the pilot is flying to opens on what to pick up there.
     expect(screen.getByText('3,200,000 × Item 34')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Show items at the end of leg 3' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show items for Load 20 m³ at the end of leg 3' })
+    );
     await userEvent.click(screen.getByRole('button', { name: 'and 2 more types' }));
     expect(screen.getByText('11 × Item 1')).toBeTruthy();
   });
@@ -233,7 +235,9 @@ describe('ActiveHaulView', () => {
       },
     });
     expect(screen.getAllByText('5 × Item 34')).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Show items at the end of leg 2' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show items for Drop 80 m³ at the end of leg 2' })
+    );
     expect(screen.getAllByText('5 × Item 34')).toHaveLength(2);
     expect(screen.getByText(/Drop 80 m³/)).toBeTruthy();
   });
