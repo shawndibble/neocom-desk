@@ -740,6 +740,19 @@ describe('mail table', () => {
     ]);
   });
 
+  it('each row opens its mail in the reader, for the mailbox owner', () => {
+    const data = {
+      unread: 1,
+      recent: [],
+      inbox: [{ mailId: 7, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true }],
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    };
+    const rows = buildView('mail', { mail: ok(data) }, ctx()).table?.rows ?? [];
+    expect(rows.map((r) => r.to)).toEqual(['/mail?open=7&owner=91']);
+    expect(rows.every((r) => r.detail === undefined)).toBe(true);
+  });
+
   it('falls back to the unread mail when the read has no inbox', () => {
     const data = {
       unread: 1,
