@@ -209,11 +209,14 @@ export type BpcSearchRow =
       lpCost: number;
       /** False when nothing priced the LP: `price` is the ISK cost only. */
       lpPriced: boolean;
-      /** A store has no region/location of its own here, so a Region, Space or Jump Range filter drops the row. */
+      /** A store has no region/space of its own here, so a Region or Space filter drops the row. */
       regionId: null;
       locationName: null;
       space: null;
-      systemId: null;
+      /** The corporation's nearest station's system (`placeLpRows`), so Jump Range and Jumps see the row; `null` until placed. */
+      systemId: number | null;
+      /** That nearest station's name, or `null` until placed. */
+      stationName: string | null;
     }
   | {
       /** A Shared Blueprint a Community Member holds (issue #3602): free to the buyer, a BPO is "ask <name> to copy". */
@@ -311,6 +314,7 @@ export function lpOfferToSearchRow(offer: LpOfferInput): BpcSearchRow {
     locationName: null,
     space: null,
     systemId: null,
+    stationName: null,
   };
 }
 
