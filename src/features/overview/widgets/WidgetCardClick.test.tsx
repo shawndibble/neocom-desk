@@ -88,6 +88,23 @@ describe('Overview widget card', () => {
     expect(where()).toBe('/mail');
   });
 
+  it('puts Open in new tab right after Open page, linking to the same page', async () => {
+    const card = setup();
+    fireEvent.contextMenu(card);
+    const menu = await screen.findByRole('menu');
+    expect(itemTexts(menu).slice(0, 2)).toEqual(['Open Mail page', 'Open in new tab']);
+    const link = within(menu).getByRole('menuitem', { name: 'Open in new tab' });
+    expect(link).toHaveAttribute('href', '/mail');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('leaves out Open in new tab for a kind with no page', async () => {
+    const card = setup({ to: null });
+    fireEvent.contextMenu(card);
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).queryByRole('menuitem', { name: 'Open in new tab' })).toBeNull();
+  });
+
   it('shows the right-click items in the ⋮ menu too', async () => {
     const card = setup();
     fireEvent.contextMenu(card);

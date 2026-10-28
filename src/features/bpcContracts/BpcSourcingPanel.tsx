@@ -1005,6 +1005,18 @@ export function BpcSourcingPanel({
                     setOpenRow(asContract(row));
                   }}
                   rowMoreActions
+                  // The routes a click opens: an LP offer's store and a market row's Market
+                  // entry. A contract row opens a modal, and an owned row creates a plan
+                  // (async, no URL until it does).
+                  rowHref={(row) => {
+                    if (row.source === 'lp') {
+                      return `/wallet/lp-store/${row.corporationId}?${new URLSearchParams({ offer: String(row.offerId), affordableOnly: '0' })}`;
+                    }
+                    if (row.source === 'market') {
+                      return `/market/browser?${new URLSearchParams(marketLinkParams(row.typeId, location.search)).toString()}`;
+                    }
+                    return undefined;
+                  }}
                   rowContextMenu={(row, tr) => (
                     // The Offer's own ME/TE/runs, not the defaults, so a pilot
                     // shopping a specific copy sees what *that* copy builds. A

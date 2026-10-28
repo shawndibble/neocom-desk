@@ -30,6 +30,7 @@ import { planDropId } from './groupDrop';
 import type { PlanIndexStats } from './BuildPlanList';
 import { ProfitCell, RunsCell, VerdictTag } from './BuildPlanCells';
 import { DROP_INTO_CLASS, DROP_OUT_CLASS } from './buildPlanDnd';
+import { planHref } from './planLinkClick';
 
 /**
  * The inline rename both a plan row and a group header use: commit on Enter or
@@ -160,7 +161,7 @@ export const PlanRow = memo(function PlanRow({
   );
 
   return (
-    <RowActionsMenu name={plan.name} items={items}>
+    <RowActionsMenu name={plan.name} items={items} openHref={planHref(plan.id)}>
       <li
         ref={(node) => {
           setDropRef(node);

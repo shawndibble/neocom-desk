@@ -1,6 +1,7 @@
 /** The whole demand: every chain line, how much is made, and from where. */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import type { TFunction } from 'i18next';
 import { DataTable, Panel, Tooltip, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -10,6 +11,7 @@ import { PiProductLink } from '../PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { TierChip } from '../DirectiveRow';
 import { commodityName, formatUnits } from '../goalPlannerFormat';
+import { piProductHref } from '../piPlanLink';
 import { HOURS_PER_DAY, formatPercent, planetTypesText, type PlanNames } from './format';
 
 /** Under this short of one, a made fraction is float dust. */
@@ -70,6 +72,7 @@ export function Flow({
   names: PlanNames;
 }) {
   const { t } = useTranslation();
+  const { search } = useLocation();
   const { pi } = names;
   // The live chain first, the blocked goals' chain folded below it: a type
   // both need then reads as two lines in two places, not a duplicate.
@@ -200,6 +203,8 @@ export function Flow({
         density="compact"
         stackColumns={2}
         rowMoreActions
+        // The product name opens its PI page.
+        rowHref={(line) => piProductHref(line.typeId, search)}
         rowContextMenu={(line, tr) => (
           <ItemContextMenu
             typeId={line.typeId}

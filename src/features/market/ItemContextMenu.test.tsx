@@ -60,6 +60,38 @@ describe('ItemContextMenu — Open in EVE', () => {
   });
 });
 
+describe('ItemContextMenu — Open in new tab', () => {
+  it('leads with a new-tab link to the page a click on the row opens', async () => {
+    render(
+      <MemoryRouter initialEntries={['/planetary-industry/plan']}>
+        <FakeItemActions>
+          <ItemContextMenu
+            typeId={TRITANIUM}
+            itemName="Tritanium"
+            blueprintTypeID={null}
+            openHref="/planetary-industry/map?product=34"
+          >
+            <button type="button">Tritanium</button>
+          </ItemContextMenu>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    const item = await screen.findByRole('menuitem', { name: 'Open in new tab' });
+    expect(item).toHaveAttribute('href', '/planetary-industry/map?product=34');
+    expect(item).toHaveAttribute('target', '_blank');
+    expect(screen.getAllByRole('menuitem')[0]).toBe(item);
+  });
+
+  it('leaves it out where the row opens no page', async () => {
+    renderMenu(TRITANIUM, 'Tritanium');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    expect(screen.queryByRole('menuitem', { name: 'Open in new tab' })).not.toBeInTheDocument();
+  });
+});
+
 describe('ItemContextMenu — Abyssal types', () => {
   const MARKET_ONLY = [
     'Add to Quickbar',
