@@ -100,6 +100,18 @@ describe('corpContracts', () => {
     expect(rows[1]!.cells[5]).toBe('—');
   });
 
+  it('opens each contract on the Corp contracts view, never also a modal', () => {
+    const rows = corpContracts(
+      feed([contract(2), contract(1, { date_expired: iso(NOW + 5 * HOUR) })]),
+      ctx
+    ).table!.rows;
+    expect(rows.map((r) => r.to)).toEqual([
+      '/contracts/history?scope=corp&open=1',
+      '/contracts/history?scope=corp&open=2',
+    ]);
+    expect(rows.every((r) => r.detail === undefined)).toBe(true);
+  });
+
   it('draws no countdown finer than the 300 s cache window, and marks an overdue haul', () => {
     const view = corpContracts(
       feed([

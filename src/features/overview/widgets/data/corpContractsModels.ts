@@ -12,6 +12,7 @@ import { summarizeCorpContracts, type CorpContractRow } from '@/engine/contracts
 import { CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import { formatIskCompact } from '@/lib/isk';
 import { formatCountdown } from '@/lib/duration';
+import { openHref } from '@/lib/highlightParam';
 import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import type { TableCell, TableRowModel, Translate } from './types';
 
@@ -92,6 +93,7 @@ export const corpContracts: Builder = (feeds, { t, now }) => {
           collateralCell(row),
         ],
         tone: toneOf(row),
+        to: openHref(TO, row.contractId),
       })),
     },
     summary: t(`${C}.summary`, {
