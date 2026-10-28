@@ -65,6 +65,14 @@ export async function lookupNpcStation(
   return byId.get(stationId) ?? null;
 }
 
+/** What a station keeps of reprocessed output at zero standing, when its entry has no `reprocessingStationsTake`. */
+const DEFAULT_REPROCESSING_TAKE = 0.05;
+
+/** The station's reprocessing take as a fraction: its own where the snapshot carries one, else 0.05. */
+export function stationReprocessingTake(station: NpcStationEntry): number {
+  return station.reprocessingStationsTake ?? DEFAULT_REPROCESSING_TAKE;
+}
+
 /**
  * Drops the memoized index. For tests, which swap the snapshot between cases;
  * nothing in the app has a reason to call it, since the underlying file cannot

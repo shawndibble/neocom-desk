@@ -1191,6 +1191,9 @@ Browser Back is unchanged; the crumb is a labelled way up, not a second Back.
 | Solar system                | Route Safety, with that system as the destination                                              |
 | Station, structure, region  | Place Info (`PlaceLink`, `?info=place-<id>`)                                                   |
 
+An NPC faction (`FactionLink`, `?info=faction-<id>`) opens Show Info too, as its
+own view without tabs.
+
 The table is the destination for a name that stands alone. **Unless the row
 has its own primary action** (Restraint, below): then the name is not a link,
 and the entity link lives in the opened modal or detail, or the page the row

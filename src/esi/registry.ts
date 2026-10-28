@@ -689,6 +689,11 @@ export const ESI_REGISTRY = {
     route: '/universe/systems/{system_id}',
     scope: PUBLIC,
   },
+  // The Standings modal's faction facts: description, capital, size, station counts.
+  getUniverseFactions: {
+    route: '/universe/factions',
+    scope: PUBLIC,
+  },
   postUniverseNames: {
     route: '/universe/names',
     scope: PUBLIC,

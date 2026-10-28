@@ -34,6 +34,8 @@ export async function writeOutputs({
   wormholeMass,
   shipMass,
   characterTitles,
+  agents,
+  npcCorporationData,
   marketGroups,
   marketTypes,
   solarSystems,
@@ -106,6 +108,9 @@ export async function writeOutputs({
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],
     ['characterTitles.json', characterTitles],
+    // NPC agents and corporations for the Contacts standings view; lazy, see lib/npcAgents.mjs.
+    ['agents.json', agents],
+    ['npcCorporations.json', npcCorporationData],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
