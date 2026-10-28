@@ -153,6 +153,7 @@ export function useBpcColumns({
         width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (row) => jumpsCellSortValue(bpcRowJumps(row)),
         // The dense phone card has no header row, and a bare "7" beside a
         // system name says nothing about what it counts.
@@ -225,6 +226,7 @@ export function useBpcColumns({
         // top of the table while rendering — and now summarising — at its real
         // price. An owned row costs nothing, so it sorts at 0 beside Community
         // rows: sorted last it fell past the result cap and never showed.
+        sortFirst: 'asc',
         sortValue: (row) => {
           if (row.source === 'market' || row.source === 'lp' || row.source === 'community') {
             return row.price;

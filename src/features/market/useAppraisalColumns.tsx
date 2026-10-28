@@ -252,7 +252,11 @@ export function useAppraisalColumns({
         return comparisonCell(
           <span className="inline-flex items-center gap-1">
             {totalCell(row.lpIskCost ?? null)}
-            <LpStoreLink corporationId={row.lpCorporationId} label={label} />
+            <LpStoreLink
+              corporationId={row.lpCorporationId}
+              offerId={row.lpOfferId}
+              label={label}
+            />
           </span>,
           lpBeatsMarket(row),
           row.lpAffordable === false && (

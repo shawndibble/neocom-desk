@@ -111,6 +111,8 @@ export interface AppraisalRow {
   refineUnitsLeftOver?: number;
   /** Undefined when nothing the character holds LP with sells this item. */
   lpCorporationId?: number;
+  /** The store `offer_id` the LP option priced — the Appraisal's link opens the store on it. */
+  lpOfferId?: number;
   lpCorpName?: string;
   lpCost?: number;
   lpIskCost?: number;
@@ -306,6 +308,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       refinePricedAll,
       refineUnitsLeftOver,
       lpCorporationId: item.lpOption?.corporationId,
+      lpOfferId: item.lpOption?.offerId,
       lpCorpName: item.lpOption?.corpName,
       lpCost: item.lpOption?.lpCost,
       lpIskCost: item.lpOption?.iskCost,

@@ -880,6 +880,7 @@ describe('AppraisalPanel', () => {
               sellTotal: 95_000_000,
               volume: 1,
               lpCorporationId: 1000125,
+              lpOfferId: 3001,
               lpCorpName: 'Sisters of EVE',
               lpCost: 400_000,
               lpIskCost: 850_000,
@@ -924,7 +925,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: lpOutcome() }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
       const link = within(asteroRow).getByRole('link', { name: /Sisters of EVE/ });
-      expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125');
+      expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125?offer=3001');
       expect(screen.getAllByText('Cheapest total').length).toBeGreaterThan(0);
     });
 

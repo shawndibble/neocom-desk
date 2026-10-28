@@ -387,14 +387,14 @@ test('Open Orders sort headers meet the 36px touch floor at 390px', async ({ pag
   for (const box of boxes) expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
   expect(await hasHorizontalOverflow(page)).toBe(false);
 
-  // Sorting still works: Expires sets aria-sort, a second tap flips it.
+  // Sorting still works: Expires (a date) sets aria-sort newest first, a second tap flips it.
   const header = page.locator('main section th', {
     has: page.locator('button[aria-label^="Expires"], button[aria-label$="Expires"]'),
   });
   await page.getByRole('button', { name: 'Sort by Expires' }).click();
-  await expect(header).toHaveAttribute('aria-sort', 'ascending');
-  await page.getByRole('button', { name: 'Expires, sorted ascending' }).click();
   await expect(header).toHaveAttribute('aria-sort', 'descending');
+  await page.getByRole('button', { name: 'Expires, sorted descending' }).click();
+  await expect(header).toHaveAttribute('aria-sort', 'ascending');
 });
 
 test('Open Orders sort headers stay compact with a fine pointer at 1280px', async ({ page }) => {

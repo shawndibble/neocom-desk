@@ -57,18 +57,18 @@ describe('TableBody sorting', () => {
     expect(screen.getByRole('columnheader', { name: 'Note' })).not.toHaveAttribute('aria-sort');
   });
 
-  it('sorts ascending, then descending, naming the direction, with a row missing a value last', async () => {
+  it('sorts high to low first, then low to high, naming the direction, with a row missing a value last', async () => {
     const user = userEvent.setup();
     setup(model(4));
     await user.click(screen.getByRole('button', { name: 'Sort by Price' }));
     expect(screen.getByRole('columnheader', { name: /Price/ })).toHaveAttribute(
       'aria-sort',
-      'ascending'
+      'descending'
     );
-    expect(firstCells()).toEqual(['Item 1', 'Item 2', 'Item 4', 'Item 3']);
-    await user.click(screen.getByRole('button', { name: 'Price, sorted ascending' }));
-    expect(screen.getByRole('button', { name: 'Price, sorted descending' })).toBeInTheDocument();
     expect(firstCells()).toEqual(['Item 4', 'Item 2', 'Item 1', 'Item 3']);
+    await user.click(screen.getByRole('button', { name: 'Price, sorted descending' }));
+    expect(screen.getByRole('button', { name: 'Price, sorted ascending' })).toBeInTheDocument();
+    expect(firstCells()).toEqual(['Item 1', 'Item 2', 'Item 4', 'Item 3']);
   });
 
   it('sorts a table that is not paged too', async () => {
@@ -79,7 +79,7 @@ describe('TableBody sorting', () => {
       </MemoryRouter>
     );
     await user.click(screen.getByRole('button', { name: 'Sort by Price' }));
-    expect(firstCells()[0]).toBe('Item 1');
+    expect(firstCells()[0]).toBe('Item 4');
   });
 });
 

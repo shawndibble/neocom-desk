@@ -14,7 +14,14 @@
  */
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useCallback, useDeferredValue, useMemo, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+} from 'react';
 import { useLocation, useNavigate, useNavigationType, useParams } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
@@ -155,6 +162,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // (`useUrlFilter`'s rule); the search box keeps the immediate one.
   const rowsSearch = useDeferredValue(search);
   const selectedOfferId = filterParams.offer;
+  // The offer the link arrived on: the table scrolls to it once, not on every later pick.
+  const [arrivedOfferId] = useState(selectedOfferId);
   // A phone arriving on a linked offer opens its breakdown straight away.
   const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
@@ -164,12 +173,16 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const filteredRows = useMemo(() => {
     const q = rowsSearch.trim().toLowerCase();
     return rows.filter((row) => {
+      // The offer a link arrived on stays listed whatever the filters say, so its
+      // detail never vanishes behind "affordable only".
+      if (row.offer.offer_id === arrivedOfferId && row.offer.offer_id === selectedOfferId)
+        return true;
       if (affordableOnly && row.profit.affordableLp === false) return false;
       if (blueprintsOnly && !row.isBlueprint) return false;
       if (q && !row.itemName.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [rows, rowsSearch, affordableOnly, blueprintsOnly]);
+  }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId, arrivedOfferId]);
 
   const affordableCount = useMemo(
     () => rows.filter((row) => row.profit.affordableLp !== false).length,
@@ -182,6 +195,17 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   // the table itself is sorted differently. The prompt below stands until an
   // explicit click picks a row.
   const selectedRow = filteredRows.find((row) => row.offer.offer_id === selectedOfferId);
+
+  // Not `DataTable`'s `highlightRowKey`: that re-marks the row `aria-current="location"`
+  // and steals focus, where a selected row already announces itself. The list isn't
+  // windowed, so the row is in the DOM once the offers have loaded.
+  const arrivedRowPresent = rows.some((row) => row.offer.offer_id === arrivedOfferId);
+  useEffect(() => {
+    if (arrivedOfferId === null || !arrivedRowPresent) return;
+    document
+      .querySelector(`[data-row-key="${arrivedOfferId}"]`)
+      ?.scrollIntoView?.({ block: 'center' });
+  }, [arrivedOfferId, arrivedRowPresent]);
 
   function selectRow(row: LoyaltyOfferRow) {
     setFilterParams({ offer: row.offer.offer_id });

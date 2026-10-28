@@ -491,7 +491,7 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
     mockedFindLpOfferMatches.mockResolvedValue(lpResult([lpMatch()]));
     renderModal();
     const link = await screen.findByRole('link', { name: /Sisters of EVE/ });
-    expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125');
+    expect(link).toHaveAttribute('href', '/wallet/lp-store/1000125?offer=1');
   });
 
   it('lists every corp that sells it, when more than one does', async () => {
