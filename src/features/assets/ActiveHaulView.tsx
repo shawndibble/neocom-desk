@@ -409,15 +409,17 @@ function LegBlock({
   const condition = rows?.status === 'ready' ? legCondition(rows.rows) : null;
   const volume = formatCubicMetres(leg.m3);
   const destination = splitPlaceName(leg.to.name).system;
-  // A pickup Leg is the empty trip to where the load or ship waits; a delivery Leg is the trip
-  // that carries it. Either way the heading says what this Leg is and the note what happens at its end.
+  const hold = legHold(legs, leg);
+  // The heading says what this Leg is: the trip out to a ship or load while the hold is empty, a
+  // flight of that ship, or a haul of what is already aboard (a later pickup in a trip, or the
+  // delivery). The note says what happens at its end.
   const ships = leg.ships?.join(', ');
   const heading = ships
     ? t(leg.kind === 'pickup' ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.fly', {
         ships,
         place: destination,
       })
-    : t(leg.kind === 'pickup' ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.haul', {
+    : t(hold.aboard.length === 0 ? 'assets.movePlan.haul.travel' : 'assets.movePlan.haul.haul', {
         place: destination,
       });
   const arrival = ships
@@ -428,7 +430,6 @@ function LegBlock({
         volume,
         place: destination,
       });
-  const hold = legHold(legs, leg);
   const carried = hold.aboard.reduce((sum, l) => sum + l.m3, 0);
   const aboardItems = heldItems(hold.aboard);
   const loadingItems = hold.loadsOnArrival?.stacks?.length ? hold.loadsOnArrival.stacks : null;

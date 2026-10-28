@@ -261,6 +261,29 @@ describe('ActiveHaulView', () => {
     expect(blocks[1].textContent).not.toContain('Take Rifter');
   });
 
+  it('heads a second pickup in a trip as a haul, since the hold is already loaded', () => {
+    const second = pickup(30000142, 60003760, 'Jita IV');
+    const chained: HaulLeg[] = [
+      legs[0],
+      { ...legs[0], id: 1, from: legs[0].to, to: second, m3: 20 },
+      { ...legs[1], id: 2, from: second, m3: 100 },
+    ];
+    renderView(undefined, {
+      haul: {
+        ...haul,
+        plan: {
+          ...haul.plan,
+          sections: [{ ...haul.plan.sections[0], legs: chained }],
+          totals: { legs: 3, jumps: 14, m3: 100 },
+        },
+      },
+    });
+    const blocks = document.querySelectorAll('[data-leg-id]');
+    expect(blocks[0].textContent).toContain('Travel to Dodixie IX');
+    expect(blocks[1].textContent).toContain('Haul to Jita IV');
+    expect(blocks[1].textContent).toContain('Load 20 m³ at Jita IV');
+  });
+
   it('heads a cargo leg as a trip to the load, then the haul that drops it', () => {
     renderView();
     const blocks = document.querySelectorAll('[data-leg-id]');
