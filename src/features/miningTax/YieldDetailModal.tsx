@@ -67,11 +67,13 @@ interface YieldDetailModalProps {
   today: string;
 }
 
-const CARD = 'rounded-xs border bg-panel-2 p-2.5';
+const CARD = 'rounded-xs border bg-panel-2 p-2 sm:p-2.5';
 /** Marks the exit worth more — a recommendation, not decoration, so accent is
  *  in bounds per DESIGN.md §6. Same treatment as `BuildGroupPanel`'s best row. */
 const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
-const CARD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
+/** Two lines tall below sm so the three figures share a baseline when a label wraps. */
+const CARD_LABEL =
+  'min-h-8 text-[0.6875rem] font-semibold tracking-wider uppercase sm:min-h-0 sm:tracking-widest';
 const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
 /**
  * A table's title strip: the title, with that table's export button at the right.
@@ -347,7 +349,7 @@ export function YieldDetailModal({
             much. Raw and refined sit side by side so neither reads as the
             headline number on its own — with refining hidden there is
             nothing to compare, so just the raw figure stands alone. */}
-        <div className={cx('grid gap-3', showRefining && 'sm:grid-cols-3')}>
+        <div className={cx('grid gap-2 sm:gap-3', showRefining && 'grid-cols-3')}>
           <div
             className={cx(
               CARD,
@@ -362,7 +364,7 @@ export function YieldDetailModal({
             >
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums">
+            <p className="mt-1 text-lg font-semibold tabular-nums sm:text-xl">
               <UnpricedIsk valuation={valuation} value={valuation.rawValue} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
@@ -378,7 +380,7 @@ export function YieldDetailModal({
                 >
                   {t('miningTax.overview.detail.refineCard')}
                 </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums">
+                <p className="mt-1 text-lg font-semibold tabular-nums sm:text-xl">
                   <UnpricedIsk valuation={valuation} value={valuation.refineValue} />
                 </p>
                 <p className={CARD_HINT}>
@@ -398,7 +400,7 @@ export function YieldDetailModal({
                         ? t('miningTax.overview.detail.refineLossCard')
                         : t('miningTax.overview.detail.refineEvenCard')}
                 </p>
-                <p className={cx('mt-1 text-xl font-semibold tabular-nums', deltaTone)}>
+                <p className={cx('mt-1 text-lg font-semibold tabular-nums sm:text-xl', deltaTone)}>
                   {/* Nothing priced is unknown, not break-even: an em dash says so,
                       "0 ISK" would claim the two exits were measured and tied. */}
                   {!anyValue ? (
