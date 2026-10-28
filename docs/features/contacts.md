@@ -57,6 +57,10 @@ Code: `src/routes/Contacts.tsx`, `src/features/character/contactsColumns.ts`, `s
 
 `/contacts/standings` lists the Character's NPC faction, corp and agent standings (`ContactsStandings.tsx`, rows from `features/character/npcStandingsRows.ts`): name, kind, standing with the tier icon, and a "Used for fees" marker on the Trade Hub owner corps and factions the broker-fee path applies (#2859). Other NPC stations use their own owner and agents never count; refine/reprocessing applies no standing. A missing standings scope shows a `GrantBanner` in the tab, not an empty table. Skill-adjusted effective standing is not shown. Standings to a contact are the contact's own number, not these.
 
+### NPC info modal
+
+A Standings name opens the shared info modal (`?info=faction-<id>`, `corporation-<id>` or `character-<agent id>`: `src/features/standings/modal/`; the URL holds the open state, so a Route Safety "N jumps" link inside it and Back return to the page with the modal open). A faction is its own tabless view; an NPC corporation's Corporation tab and an NPC agent's card carry the same cards, each loaded on its own and left out when its data is missing: **Your standing** (the **Standing chain**, effective numbers, base on hover), **Agent access** / "Can you use this agent?", **At their stations** (broker fee on base standings and the real Broker Relations level at the Trade Hub the faction or corporation owns; reprocessing tax with `~` from the station's own take and the station owner's effective standing), **Where** (headquarters, capital, station count, nearest station, an agent's station), **Agents you know** / **Corporations you know**, and **Loyalty points** with a link to the LP store. Without a signed-in Character only the facts show. Player corporations and pilots keep the tabbed modal. Faction contacts on the Contacts page still open nothing.
+
 ## States
 
 - Not hydrated: spinner. No active Character: redirect `/characters`.
