@@ -251,13 +251,11 @@ export function FittingStatsSections({
             {situationValue}
           </StatsScopeTrigger>
           {onImprove && (
-            <div className="ml-auto">
-              <StatsScopeTrigger
-                label={t('fittings.improve.title')}
-                open={false}
-                onClick={onImprove}
-              />
-            </div>
+            <StatsScopeTrigger
+              className="ml-auto"
+              label={t('fittings.improve.title')}
+              onClick={onImprove}
+            />
           )}
         </div>
         {statsError && (

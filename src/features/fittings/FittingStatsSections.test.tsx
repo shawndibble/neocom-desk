@@ -222,7 +222,8 @@ describe('FittingStatsSections Improve trigger', () => {
     const onImprove = vi.fn();
     render(sections(onImprove));
     const button = screen.getByRole('button', { name: 'Improve' });
-    expect(button.parentElement?.className).toMatch(/ml-auto/);
+    expect(button.className).toMatch(/ml-auto/);
+    expect(button).not.toHaveAttribute('aria-expanded');
     await userEvent.click(button);
     expect(onImprove).toHaveBeenCalledOnce();
   });
