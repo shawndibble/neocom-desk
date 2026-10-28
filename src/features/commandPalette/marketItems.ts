@@ -127,7 +127,7 @@ export function createMarketItemsProvider({
   return {
     id: 'marketItems',
     labelKey: 'commandPalette.groups.marketItems',
-    order: 7,
+    order: 8,
     // The catalogue is fetched on first use, not precached: offline, a failure
     // here is "never downloaded". Online it is some other failure, so the
     // generic copy reads. A getter, so the browser's state is read when the

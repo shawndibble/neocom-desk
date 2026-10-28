@@ -6,10 +6,12 @@
  * opens its Ship Info window. The page header and tab bar are the Ships
  * route's.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
-import { enumParam, enumSetParam, intParam } from '@/lib/urlState';
+import { ENTITY_INFO_PUSHED_STATE, wasPushedHere } from '@/features/entities/entityInfoState';
+import { enumParam, enumSetParam, intParam, optionalIdParam } from '@/lib/urlState';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParams } from '@/lib/useUrlState';
@@ -45,6 +47,8 @@ const TREE_PARAMS = {
   faction: intParam(DEFAULT_FACTION_ID, { min: 0 }),
   fly: enumParam(['all', 'canFly', 'cantFly'] as const, 'all'),
   mastery: enumSetParam(MASTERY_KEYS, []),
+  // The hull whose Ship Info window is open: linkable, so the palette can open it.
+  ship: optionalIdParam(),
 };
 
 export function ShipTreeTab() {
@@ -115,7 +119,44 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     [setParams, masteriesLoaded]
   );
   const tree = useFactionTree(source, factionID);
-  const [selected, setSelected] = useState<ShipTreeShip | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const selected = useMemo<ShipTreeShip | null>(
+    () =>
+      params.ship === null
+        ? null
+        : (source.data.ships.find((ship) => ship.typeID === params.ship) ?? null),
+    [params.ship, source.data.ships]
+  );
+  // Arrival with `?ship=`: show the faction behind the window; an unknown id
+  // is dropped without a word.
+  // Once per hull: the window is non-modal on a desktop, so a later faction pick stands.
+  const shownFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (params.ship === null) {
+      shownFor.current = null;
+      return;
+    }
+    if (!selected) setParams({ ship: null });
+    else if (shownFor.current !== selected.typeID) {
+      shownFor.current = selected.typeID;
+      if (selected.factionID !== params.faction) setParams({ faction: selected.factionID });
+    }
+  }, [params.ship, params.faction, selected, setParams]);
+  // A hull opened while a window is already open replaces; otherwise Back closes it.
+  const openShip = useCallback(
+    (ship: ShipTreeShip) =>
+      setParams(
+        { ship: ship.typeID, faction: ship.factionID },
+        params.ship === null ? { push: true, state: ENTITY_INFO_PUSHED_STATE } : undefined
+      ),
+    [setParams, params.ship]
+  );
+  // ADR 0015's entity-modal rule: Back when the app pushed the entry, else replace.
+  const closeShip = useCallback(() => {
+    if (wasPushedHere(location.state)) void navigate(-1);
+    else setParams({ ship: null });
+  }, [location.state, navigate, setParams]);
 
   const isPhone = useIsPhone();
   const storedView = useShipTreeViewPreference((state) => state.value);
@@ -177,7 +218,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           tree={tree}
           selectedTypeID={selected?.typeID ?? null}
           onFaction={onFaction}
-          onOpenShip={setSelected}
+          onOpenShip={openShip}
           viewSwitch={viewSwitch}
           showFactionGrid={!isPhone}
         />
@@ -191,11 +232,11 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           factionBar={factionBar}
           selectedTypeID={selected?.typeID ?? null}
           onFaction={onFaction}
-          onOpenShip={setSelected}
+          onOpenShip={openShip}
           viewSwitch={viewSwitch}
         />
       )}
-      <ShipInfoWindow ship={selected} source={source} onClose={() => setSelected(null)} />
+      <ShipInfoWindow ship={selected} source={source} onClose={closeShip} />
     </>
   );
 }
