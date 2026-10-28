@@ -879,6 +879,11 @@ describe('contracts table', () => {
     ]);
     expect(table?.rows[0]?.cells[1]).toBe('overview.widgets.contracts.overdue');
     expect(table?.rows[0]?.tone).toBe('critical');
+    expect(table?.rows.map((r) => r.to)).toEqual([
+      '/contracts/history?open=2',
+      '/contracts/history?open=1',
+      '/contracts/history?open=3',
+    ]);
     expect(table?.rows[1]?.cells[3]).toMatchObject({ iskAmount: 2_000_000 });
     expect(table?.rows[2]?.cells[2]).toBe('overview.widgets.contracts.statusOutstanding');
     expect(table?.rows[2]?.cells[3]).toMatchObject({ iskAmount: 5_000_000 });

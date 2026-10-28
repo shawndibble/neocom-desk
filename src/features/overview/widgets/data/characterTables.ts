@@ -28,6 +28,8 @@ import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const W = 'overview.widgets';
+/** The Contracts History table, where `?open=` finds a contract of the Character's own. */
+const CONTRACTS_PATH = '/contracts/history';
 
 /** `finish_date` as an instant, null when ESI gave none (a paused queue). */
 function instant(date: string | undefined): number | null {
@@ -231,6 +233,7 @@ export function contractsTable(
         : item.state === 'in_progress' && left <= DAY_MS
           ? 'warning'
           : 'clear',
+      to: openHref(CONTRACTS_PATH, item.contractId),
     };
   });
   return {
