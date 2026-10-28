@@ -484,6 +484,10 @@ describe('industry', () => {
     expect(view.number.value).toBe('1');
     expect(view.number.unit).toBe('overview.widgets.industry.ready');
     expect(view.rows[0].tone).toBe('warning');
+    expect(view.table?.rows.map((r) => r.to)).toEqual([
+      '/industry?highlight=1',
+      '/industry?highlight=2',
+    ]);
     // Only the running job is a clock still ahead.
     expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR]);
   });
