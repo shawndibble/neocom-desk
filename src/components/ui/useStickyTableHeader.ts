@@ -66,11 +66,25 @@ function horizontalScroller(table: HTMLElement): HTMLElement | null {
   return null;
 }
 
-/** First opaque ancestor fill, so rows do not show through the copy. */
+/** Alpha of a computed colour: `rgba(r, g, b, a)` or `oklab(l a b / a)`; 1 when absent. */
+function alphaOf(color: string): number {
+  const match = /(?:\/\s*|,\s*)([\d.]+%?)\)$/.exec(color);
+  if (!match) return 1;
+  return match[1].endsWith('%') ? parseFloat(match[1]) / 100 : parseFloat(match[1]);
+}
+
+/**
+ * First ancestor fill, so rows do not show through the copy. A translucent
+ * panel fill (`bg-panel` is 85% opaque) is laid over the page colour, since
+ * the copy floats above rows rather than sitting on the panel.
+ */
 function backgroundBehind(el: HTMLElement): string {
   for (let node: HTMLElement | null = el; node; node = node.parentElement) {
     const color = getComputedStyle(node).backgroundColor;
-    if (color && color !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(color)) return color;
+    if (!color || color === 'transparent') continue;
+    const alpha = alphaOf(color);
+    if (alpha === 0) continue;
+    return alpha < 1 ? `linear-gradient(${color}, ${color}), var(--color-bg)` : color;
   }
   return 'var(--color-bg)';
 }
@@ -110,10 +124,11 @@ export function useStickyTableHeader(
       left: hRect.left,
       width: hScroller ? hScroller.clientWidth : table.offsetWidth,
       tableWidth: table.offsetWidth,
-      columnWidths: Array.from(
-        head.rows[0]?.cells ?? [],
-        (cell) => cell.getBoundingClientRect().width
-      ),
+      // Only rendered cells: a `max-sm:hidden` column has no `<th>` in the
+      // copy, so its zero-width entry would shift every column after it.
+      columnWidths: Array.from(head.rows[0]?.cells ?? [])
+        .filter((cell) => getComputedStyle(cell).display !== 'none')
+        .map((cell) => cell.getBoundingClientRect().width),
       scrollLeft: hScroller?.scrollLeft ?? 0,
       background: backgroundBehind(table),
       container: table.closest('dialog'),
