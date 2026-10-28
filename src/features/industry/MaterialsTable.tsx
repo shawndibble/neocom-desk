@@ -259,6 +259,14 @@ export function MaterialsTable({
   // The value whose field Enter or Escape just closed: it takes focus back as
   // it remounts (§6c, `useInPlaceEdit`'s contract), keyed "have-34" / "price-34".
   const [refocus, setRefocus] = useState<string | null>(null);
+  // Stable across the keystrokes of a Have/Price edit: `DataTable` memoizes its rows on it.
+  const rowContextMenu = useMemo(
+    () =>
+      itemMenuFor
+        ? (material: MaterialTableRow, tr: ReactElement) => itemMenuFor(material.typeID, tr)
+        : undefined,
+    [itemMenuFor]
+  );
   const clearRefocus = useCallback(() => setRefocus(null), []);
   const settleHave = (typeID: number) => () => {
     editHave(null);
@@ -1013,9 +1021,7 @@ export function MaterialsTable({
                 <div className="overflow-x-auto">
                   <DataTable
                     {...exportProps}
-                    rowContextMenu={
-                      itemMenuFor ? (material, tr) => itemMenuFor(material.typeID, tr) : undefined
-                    }
+                    rowContextMenu={rowContextMenu}
                     rowMoreActions={itemMenuFor !== undefined}
                     columns={tableColumns}
                     rows={rows}

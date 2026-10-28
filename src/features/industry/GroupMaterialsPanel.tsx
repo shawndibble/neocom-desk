@@ -4,7 +4,7 @@
  * panel scroll-lengths away.
  */
 import { formatCount } from '@/lib/formatCount';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
@@ -75,9 +75,13 @@ export function GroupMaterialsPanel({
 }: GroupMaterialsPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { itemMenuFor } = buildItemMenuProps(catalog, (typeId) =>
-    navigate(bpcSourcingHref(typeId))
-  );
+  // Stable: `DataTable` memoizes its rows on `rowContextMenu`.
+  const rowContextMenu = useMemo(() => {
+    const { itemMenuFor } = buildItemMenuProps(catalog, (typeId) =>
+      navigate(bpcSourcingHref(typeId))
+    );
+    return (material: BuyMaterialRow, tr: ReactElement) => itemMenuFor(material.typeID, tr);
+  }, [catalog, navigate]);
 
   // Every type any member's whole tree can show, not only each blueprint's
   // own materials: the buy table lists sub-build leaves
@@ -308,7 +312,7 @@ export function GroupMaterialsPanel({
             <div className="overflow-x-auto">
               <DataTable
                 {...buyMaterialsExport.tableProps}
-                rowContextMenu={(material, tr) => itemMenuFor(material.typeID, tr)}
+                rowContextMenu={rowContextMenu}
                 rowMoreActions
                 columns={buyMaterialColumns}
                 rows={buyRows}
