@@ -51,12 +51,11 @@ function renderMenu(typeId: number, itemName: string) {
 }
 
 describe('ItemContextMenu — Open in EVE', () => {
-  it('offers only the market window: ESI cannot open an item information window', async () => {
+  it('offers only the market window, as the short label: ESI cannot open an item information window', async () => {
     renderMenu(TRITANIUM, 'Tritanium');
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
-    expect(await screen.findByRole('menuitem', { name: 'Open market in EVE' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Open in EVE' })).not.toBeInTheDocument();
+    expect(await screen.findAllByRole('menuitem', { name: 'Open in EVE' })).toHaveLength(1);
   });
 });
 
@@ -93,12 +92,7 @@ describe('ItemContextMenu — Open in new tab', () => {
 });
 
 describe('ItemContextMenu — Abyssal types', () => {
-  const MARKET_ONLY = [
-    'Add to Quickbar',
-    'Set price alert',
-    'View in Market',
-    'Open market in EVE',
-  ];
+  const MARKET_ONLY = ['Add to Quickbar', 'Set price alert', 'View in Market', 'Open in EVE'];
 
   it('leaves out the market-only actions for an Abyssal type: no order book exists for it', async () => {
     renderMenu(ABYSSAL_NEUT, 'Heavy Abyssal Energy Neutralizer');

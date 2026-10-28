@@ -10033,6 +10033,7 @@
     "unknownLocation": "Unknown location (#{{id}})",
     "expiresLabel": "Expires",
     "contractIdLabel": "Contract",
+    "openInEveName": "contract {{id}}",
     "copyContractId": "Copy contract ID",
     "contractIdCopied": "Contract ID copied",
     "openLink": "Open {{host}}",
@@ -14525,7 +14526,7 @@
     "unknownHint": "Neocom Desk has no record of this location."
   },
   "openInEve": {
-    "information": "Open in EVE",
+    "label": "Open in EVE",
     "marketDetails": "Open market in EVE",
     "contract": "Open contract in EVE",
     "sending": "Opening in EVE…",

@@ -325,7 +325,11 @@ export function ContractDetailModal({
         <span className="flex flex-wrap items-center gap-x-1">
           <span className="tabular-nums">{contract.contract_id}</span>
           <CopyContractIdButton contractId={contract.contract_id} />
-          <OpenInEveButton kind="contract" id={contract.contract_id} />
+          <OpenInEveButton
+            kind="contract"
+            id={contract.contract_id}
+            name={t('contractDetail.openInEveName', { id: contract.contract_id })}
+          />
         </span>
       }
     >

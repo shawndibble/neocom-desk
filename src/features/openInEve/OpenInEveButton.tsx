@@ -20,6 +20,8 @@ export function OpenInEveButton({
   inRow = false,
   characterId,
   label: labelOverride,
+  specific = false,
+  className,
 }: OpenInEveTarget & {
   /** What is being opened, for the button's accessible name. */
   name?: string;
@@ -37,6 +39,10 @@ export function OpenInEveButton({
   characterId?: number;
   /** Replaces the kind's label, e.g. to name the Character it sends from. */
   label?: string;
+  /** The surface shows more than one Open in EVE control: say what this one opens. */
+  specific?: boolean;
+  /** Extra classes on the wrapper, e.g. to place it in a grid cell. */
+  className?: string;
 }) {
   const { t } = useTranslation();
   const { unavailable, blockedReason, sending, outcome, send } = useOpenInEve(
@@ -44,13 +50,19 @@ export function OpenInEveButton({
     lookup,
     characterId === undefined ? undefined : { characterId }
   );
-  const label = labelOverride ?? t(`openInEve.${kind}`);
+  const label =
+    labelOverride ??
+    (specific && kind !== 'information' ? t(`openInEve.${kind}`) : t('openInEve.label'));
   const reasonId = useId();
 
   if (unavailable) return null;
 
   return (
-    <span className={inRow ? 'contents' : 'inline-flex flex-wrap items-center gap-2'}>
+    <span
+      className={
+        inRow ? 'contents' : `inline-flex flex-wrap items-center gap-2 ${className ?? ''}`.trimEnd()
+      }
+    >
       <Button
         size={size}
         // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
@@ -60,7 +72,7 @@ export function OpenInEveButton({
         aria-label={name ? `${label}: ${name}` : undefined}
         onClick={send}
       >
-        {label}
+        <span className="whitespace-nowrap">{label}</span>
       </Button>
       {blockedReason !== null && (
         <span id={reasonId} className="self-center text-[0.6875rem] text-text-dim">

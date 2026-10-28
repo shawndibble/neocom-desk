@@ -15,6 +15,17 @@ vi.mock('@/features/route/routeExposure', () => ({
   routeExposure: () => routeExposure(),
 }));
 
+const openInEve = vi.hoisted(() => ({ unavailable: false }));
+vi.mock('@/features/openInEve/useOpenInEve', () => ({
+  useOpenInEve: () => ({
+    unavailable: openInEve.unavailable,
+    blockedReason: null,
+    sending: false,
+    outcome: null,
+    send: vi.fn(),
+  }),
+}));
+
 let lawlessSystems: ReadonlySet<number> = new Set();
 vi.mock('@/features/travel/useLawlessSystems', () => ({
   useLawlessSystems: () => lawlessSystems,
@@ -88,6 +99,7 @@ function renderModal(
 beforeEach(() => {
   routeExposure.mockReset();
   lawlessSystems = new Set();
+  openInEve.unavailable = false;
 });
 
 describe('CourierContractDetailModal route path', () => {
@@ -164,6 +176,33 @@ describe('CourierContractDetailModal contract ID', () => {
     routeExposure.mockResolvedValue(KNOWN);
     renderModal();
     expect(screen.getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
+  });
+});
+
+describe('CourierContractDetailModal Open in EVE', () => {
+  it('is a one-line button in its own grid cell, outside the Contract figure', () => {
+    routeExposure.mockResolvedValue(KNOWN);
+    renderModal();
+    const button = screen.getByRole('button', { name: 'Open in EVE: contract 1' });
+    expect(button).toHaveTextContent(/^Open in EVE$/);
+    const grid = button.closest('.grid');
+    expect(button.closest('.grid > *')?.parentElement).toBe(grid);
+    const contractCell = screen
+      .getByRole('button', { name: 'Copy contract ID' })
+      .closest('.grid > *');
+    expect(contractCell).not.toContainElement(button);
+    expect(grid?.lastElementChild).toContainElement(button);
+  });
+
+  it('leaves no empty grid item when unavailable', () => {
+    routeExposure.mockResolvedValue(KNOWN);
+    openInEve.unavailable = true;
+    renderModal();
+    expect(screen.queryByRole('button', { name: /Open in EVE/ })).toBeNull();
+    const grid = screen.getByRole('button', { name: 'Copy contract ID' }).closest('.grid');
+    expect(grid?.lastElementChild).toContainElement(
+      screen.getByRole('button', { name: 'Copy contract ID' })
+    );
   });
 });
 

@@ -13,7 +13,14 @@ import { DisabledMenuItem, MenuItem } from '@/components/ui';
 import type { OpenInEveTarget } from './sendOpenInEve';
 import { useOpenInEve } from './useOpenInEve';
 
-export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
+export function OpenInEveMenuItem({
+  kind,
+  id,
+  specific = false,
+}: OpenInEveTarget & {
+  /** The menu carries more than one Open in EVE item: say what this one opens. */
+  specific?: boolean;
+}) {
   const { t } = useTranslation();
   const {
     blockedReason,
@@ -28,7 +35,7 @@ export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
     kind,
     id,
   });
-  const label = t(`openInEve.${kind}`);
+  const label = specific && kind !== 'information' ? t(`openInEve.${kind}`) : t('openInEve.label');
   // Kept when the connection drops mid-send, so the result is still shown in the blocked branch.
   const content = sending ? (
     t('openInEve.sending')

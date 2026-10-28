@@ -113,6 +113,27 @@ describe('OpenInEveButton', () => {
   });
 });
 
+describe('OpenInEveButton label', () => {
+  it('reads "Open in EVE" for every kind, with the target in its accessible name', async () => {
+    render(
+      <MemoryRouter>
+        <OpenInEveButton kind="contract" id={237550188} name="contract 237550188" />
+      </MemoryRouter>
+    );
+    const button = await screen.findByRole('button', { name: 'Open in EVE: contract 237550188' });
+    expect(button).toHaveTextContent(/^Open in EVE$/);
+  });
+
+  it('shows the long form only when specific', async () => {
+    render(
+      <MemoryRouter>
+        <OpenInEveButton kind="marketDetails" id={34} specific />
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('button', { name: 'Open market in EVE' })).toBeInTheDocument();
+  });
+});
+
 describe('OpenInEveButton from a fixed Character', () => {
   const PAYER = 92;
 

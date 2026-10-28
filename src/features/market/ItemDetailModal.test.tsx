@@ -96,7 +96,7 @@ describe('ItemDetailModal', () => {
     // Waits for the mutaplasmid data: an abyssal type offers no View in Market.
     const link = await screen.findByRole('link', { name: 'View in Market' });
     expect(link).toHaveAttribute('href', `/market/browser?type=${TYPE_ID}`);
-    expect(screen.getByRole('button', { name: 'Open market in EVE: Rifter' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open in EVE: Rifter' })).toBeInTheDocument();
     await userEvent.setup().click(link);
     expect(onClose).toHaveBeenCalledTimes(1);
 
@@ -1122,7 +1122,7 @@ describe('ItemDetailModal — an owned abyssal module', () => {
     // and no in-game market window to open (the type has no market group).
     expect(orderReads).toBe(0);
     expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Open market in EVE/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open in EVE/ })).not.toBeInTheDocument();
   });
 });
 
@@ -1146,7 +1146,7 @@ describe('ItemDetailModal header actions on a phone', () => {
       }) as MediaQueryList;
   }
 
-  it('folds Open market in EVE and View in Market into one ⋮, so the name keeps the room', async () => {
+  it('folds Open in EVE and View in Market into one ⋮, so the name keeps the room', async () => {
     goNarrow();
     server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
@@ -1159,13 +1159,11 @@ describe('ItemDetailModal header actions on a phone', () => {
     );
     const more = await screen.findByRole('button', { name: 'More actions for Rifter' });
     expect(screen.queryByRole('link', { name: 'View in Market' })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Open market in EVE: Rifter' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open in EVE: Rifter' })).not.toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(more);
-    expect(await screen.findByRole('menuitem', { name: /Open market in EVE/ })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('location')).toHaveTextContent(`/market/browser?type=${TYPE_ID}`);
@@ -1182,9 +1180,7 @@ describe('ItemDetailModal header actions on a phone', () => {
         <ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />
       </MemoryRouter>
     );
-    expect(
-      await screen.findByRole('button', { name: 'Open market in EVE: Rifter' })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Open in EVE: Rifter' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'More actions for Rifter' })
     ).not.toBeInTheDocument();
