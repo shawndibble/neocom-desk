@@ -14,9 +14,17 @@ import { STARBASE_FUEL_WARNING_HOURS, fuelHoursLeft } from '@/engine/corp/starba
 import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
-import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import {
+  blank,
+  corpUnreadable,
+  count,
+  detailToneOf,
+  statusOf,
+  UNKNOWN,
+  type Builder,
+} from './builderKit';
 import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
-import type { NumberSecondary, TableRowModel, Translate } from './types';
+import type { NumberSecondary, RowDetailModel, TableRowModel, Translate } from './types';
 
 const W = 'overview.widgets.corpStarbases';
 const HOUR_MS = 3_600_000;
@@ -131,6 +139,23 @@ export const corpStarbases: Builder = (feeds, { t, now }) => {
     return until <= now ? t(`${W}.reinforceEnded`) : untilText(t, until - now);
   };
 
+  const detailOf = (tower: Tower): RowDetailModel => {
+    const { row } = tower;
+    return {
+      title: tower.type,
+      status: { badge: stateText(row.state), tone: detailToneOf(tower.tone) },
+      facts: [
+        { label: t(`${W}.col.system`), value: tower.system },
+        { label: t(`${W}.col.fuel`), value: fuelText(tower) },
+        { label: t(`${W}.col.strontium`), value: strontiumText(tower) },
+        { label: t(`${W}.col.reinforced`), value: reinforceText(tower) },
+      ],
+      place: data.systemNames.has(row.systemId)
+        ? { systemId: row.systemId, name: tower.system }
+        : undefined,
+    };
+  };
+
   const lowFuel = towers.filter(
     (tower) => tower.expiresMs !== null && fuelTone(tower.expiresMs - now) !== 'clear'
   ).length;
@@ -188,6 +213,7 @@ export const corpStarbases: Builder = (feeds, { t, now }) => {
           reinforceText(tower),
         ],
         tone: tower.tone,
+        detail: detailOf(tower),
       })),
     },
     summary: t(`${W}.summary`, { count: towers.length, low: lowFuel }),

@@ -203,6 +203,47 @@ describe('structures and moon extractions', () => {
   });
 });
 
+describe('structures row detail', () => {
+  const feeds = (): Feeds => ({
+    structures: ok({
+      structures: [
+        {
+          structureId: 1,
+          name: 'Efa - Helios Prime',
+          fuelExpiresMs: NOW + 20 * 24 * HOUR,
+          state: 'shield_vulnerable',
+          stateTimerEndMs: null,
+          unanchorsAtMs: null,
+          services: [
+            { name: 'Market', state: 'online' },
+            { name: 'Reprocessing', state: 'offline' },
+          ],
+        },
+      ],
+      structureCount: 1,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+    }),
+  });
+
+  it('opens the structure with fuel, timer and its services on both boards', () => {
+    for (const show of ['all', 'problems'] as const) {
+      const row = buildView('structures', feeds(), ctx({ show })).table!.rows[0]!;
+      const S = 'overview.widgets.structures';
+      expect(row.detail!.title).toBe('Helios Prime');
+      expect(row.detail!.facts.map((f) => f.label)).toEqual([`${S}.col.fuel`, `${S}.col.timer`]);
+      expect(row.detail!.list!.items).toEqual([
+        expect.objectContaining({ text: 'Market', badge: `${S}.detail.serviceState.online` }),
+        expect.objectContaining({
+          text: 'Reprocessing',
+          badge: `${S}.detail.serviceState.offline`,
+          tone: 'danger',
+        }),
+      ]);
+    }
+  });
+});
+
 describe('stock', () => {
   it('is empty with no Stock List', () => {
     const feeds: Feeds = { stock: ok({ board: null }) };

@@ -136,3 +136,22 @@ describe('corpCustomsOffices', () => {
     expect(view.status.hasData).toBe(false);
   });
 });
+
+describe('corpCustomsOffices row detail', () => {
+  it('lists the system, the window and each rate ESI sent', () => {
+    const view = corpCustomsOffices(
+      feeds({ offices: [office({ good_standing_tax_rate: 0.08 })] }),
+      ctx
+    );
+    const detail = view.table!.rows[0]!.detail!;
+    const K = 'overview.widgets.corpCustomsOffices';
+    expect(detail.title).toBe('Customs Office');
+    expect(detail.facts).toEqual([
+      { label: `${K}.col.system`, value: 'Tama' },
+      { label: `${K}.col.window`, value: `${K}.window{"start":"18","end":"20"}` },
+      { label: `${K}.rate.corporation`, value: '5%' },
+      { label: `${K}.rate.good`, value: '8%' },
+    ]);
+    expect(detail.place).toEqual({ systemId: 30002813, name: 'Tama' });
+  });
+});

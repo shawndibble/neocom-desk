@@ -21,6 +21,7 @@ import type { LayerId } from '@/engine/netWorth/series';
 import { summarizeRouteKills, type KillLevel } from '@/engine/route/routeKillTrend';
 import type { ChartColor, StackPart } from '../charts/types';
 import {
+  ageText,
   blank,
   count,
   NEUTRAL_NUMBER,
@@ -47,7 +48,7 @@ import {
 } from './moneyModels';
 import { journalCoverageDays, withinRange } from './chartSeries';
 import { dayTitle, rollingTitles } from './chartTips';
-import type { ListRow, NumberModel, TableCell } from './types';
+import type { ListRow, NumberModel, RowDetailModel, TableCell } from './types';
 import { formatNumber } from '@/lib/numberLocale';
 
 const D = 'overview.widgets.data';
@@ -872,7 +873,30 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
             ? { text: t(`${W}.kills.side.loss`), tone: 'bad' }
             : { text: t(`${W}.kills.side.kill`), tone: 'good' },
         ];
-        return { key: String(entry.killmailId), cells };
+        const detail: RowDetailModel = {
+          title: shipName(entry.shipTypeId),
+          status:
+            entry.side === 'loss'
+              ? { badge: t(`${W}.kills.side.loss`), tone: 'danger' }
+              : { badge: t(`${W}.kills.side.kill`), tone: 'success' },
+          facts: [
+            { label: t(`${W}.kills.col.system`), value: systemName(entry.systemId) },
+            {
+              label: t(`${W}.kills.col.value`),
+              value: entry.value === null ? UNKNOWN : formatIskCompact(entry.value),
+            },
+            {
+              label: t('overview.widgets.kills.detail.when'),
+              value: ageText(t, now, entry.timeMs),
+            },
+            { label: t('overview.widgets.kills.detail.killmail'), value: `#${entry.killmailId}` },
+          ],
+          place:
+            entry.systemId !== null && data.systemNames.has(entry.systemId)
+              ? { systemId: entry.systemId, name: systemName(entry.systemId) }
+              : undefined,
+        };
+        return { key: String(entry.killmailId), cells, detail };
       }),
     },
     summary,
