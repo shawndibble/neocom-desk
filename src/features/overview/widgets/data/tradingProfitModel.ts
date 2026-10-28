@@ -10,6 +10,7 @@ import { sumBrokerFees, sumMargins, marginsByItem } from '@/engine/market/tradin
 import { pooledTransactionMargins, transactionMargins } from '@/features/market/transactionMargins';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { DAY_MS } from '@/lib/age';
+import { highlightHref } from '@/lib/highlightParam';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { signedCell } from './cellKit';
@@ -165,6 +166,8 @@ export const tradingProfit: Builder = (feeds, ctx) => {
         String(item.sales),
         item.matched === 0 ? UNKNOWN : signedCell(formatIskCompactSigned(item.margin), item.margin),
       ],
+      // History's `?highlight=` reads an item id and flashes that item's newest sale.
+      to: highlightHref(HISTORY_PATH, item.typeId),
     })),
     footer: t(`${D}.fees`, { amount: formatIskCompact(brokerFees) }),
   };

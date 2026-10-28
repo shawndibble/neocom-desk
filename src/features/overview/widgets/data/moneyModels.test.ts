@@ -67,6 +67,14 @@ describe('journalTable', () => {
     expect(table.rows.map((r) => r.key)).toEqual(['2', '4', '5', '6', '7', '8']);
   });
 
+  it('links each row to its entry on the Journal, flashed', () => {
+    const table = journalTable(t, [entry(2, 1, 10), entry(4, 3, -20)], NOW);
+    expect(table.rows.map((r) => r.to)).toEqual([
+      '/wallet/journal?highlight=2',
+      '/wallet/journal?highlight=4',
+    ]);
+  });
+
   it('reads type, signed amount, age and the balance after it', () => {
     const table = journalTable(t, [entry(2, 1, 1_500_000, 4_800_000_000)], NOW);
     expect(table.columns.map((c) => c.key)).toEqual(['type', 'amount', 'when', 'balance']);

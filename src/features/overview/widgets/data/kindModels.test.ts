@@ -1480,6 +1480,7 @@ describe('profit on Trading', () => {
   it('lists margin per item in the table', () => {
     const view = build({ scopeAll: true });
     expect(view.table?.rows.map((r) => r.cells[0])).toEqual(['Tritanium']);
+    expect(view.table?.rows.map((r) => r.to)).toEqual(['/market/history?highlight=34']);
   });
 
   it('asks for the wallet grant when the header Character has no wallet read', () => {
