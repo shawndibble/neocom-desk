@@ -1,0 +1,29 @@
+name: Public data - contract offers
+
+# Publishes EVE Ref's public contracts (offers and couriers) to R2 (contract-offers/) every
+# 30 min; the app reads them from https://data.neocomdesk.com. It replaces the
+# syncPublicContractOffers Cloud Function. GitHub starts scheduled runs hours late, so a
+# Cloudflare Worker also fires workflow_dispatch on time (workers/public-data-dispatch); this
+# `schedule:` is the fallback. A run whose archive is unchanged exits after one small R2 read,
+# so a Worker run plus a late schedule run in the same slot costs next to nothing. Pattern and
+# secrets: public-data-job.yml.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never two runs at once: both read and write the same state objects, so an overlap could skip
+# a type the other just overwrote.
+concurrency:
+  group: public-data-contract-offers
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/public-data-job.yml
+    with:
+      script: scripts/public-data/contract-offers.mjs
+    secrets: inherit

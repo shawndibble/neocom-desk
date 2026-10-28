@@ -13,6 +13,9 @@ describe('workflowsForCron', () => {
   it('maps the 15 min cron to the lawless workflow', () => {
     expect(workflowsForCron('*/15 * * * *')).toEqual(['public-data-lawless-systems.yml']);
   });
+  it('maps the 30 min cron to the contract offers workflow', () => {
+    expect(workflowsForCron('*/30 * * * *')).toEqual(['public-data-contract-offers.yml']);
+  });
   it('returns nothing for an unknown cron', () => {
     expect(workflowsForCron('0 0 * * *')).toEqual([]);
   });

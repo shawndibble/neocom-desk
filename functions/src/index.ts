@@ -25,7 +25,6 @@ import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js'
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
 import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
-import { runSyncPublicContractOffers } from './snapshotJobs.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
   AlertGrantError,
@@ -1402,71 +1401,6 @@ export const dailyHousekeeping = onSchedule(
       ],
       logError
     )
-);
-
-/**
- * syncPublicContractOffers: the public contract search's data source
- * (issues #608, #906, ADR 0013). Pulls EVE Ref's public-contracts snapshot
- * (no CORS, so the client can't fetch it directly) and republishes every
- * for-sale line of every public item_exchange/auction contract, any item
- * type, to Cloudflare R2 (`contract-offers/`) for clients to search. R2 is the
- * only store (ADR 0019; issue #4270 removed the Firestore copies).
- *
- * Every 60 minutes (issue #5066, was 30): the job was ~70% of billable function
- * time. An hourly publish leaves a snapshot up to ~90 minutes behind EVE Ref.
- * Memory is 1GiB (issue #5108, was 2GiB): the Cloud Run memory-utilization
- * metric put the 14-day p99 at 35% of 2GiB (~720MiB), after the bundle-shard
- * read of #4820. The 2GiB was sized for the Firestore row write #4286 removed.
- * To roll back, set it to 2GiB and redeploy.
- *
- * The archive is streamed rather than buffered: `contracts.csv` is read into
- * a lookup of only the fields the join needs, then `contract_items.csv` is
- * joined against it row by row. Holding the two CSVs as text and parsing them
- * whole needed ~1.1GB of heap for 37MB of input; the streaming pass peaks far
- * below that against the same live data.
- *
- * It publishes a second snapshot off the same pass: the courier snapshot,
- * every outstanding public courier contract as a route and a fee (issue #909).
- * Courier contracts have no item lines to join, so they cost one more
- * accumulator and ~2 more R2 puts per run — deliberately not a second scheduled
- * function or a second archive fetch, which is the shape #907 spent a ticket
- * undoing.
- *
- * This is the only public-contract sync. #906 added it beside a
- * blueprint-copies-only one as the expand half of an expand/contract, and
- * #907 retired that one once BPC Sourcing learned to take its blueprint slice
- * out of this snapshot client-side — so the archive is fetched once per cycle
- * again rather than twice.
- *
- * History: memory was provisioned at 2GiB against the retired blueprint-only
- * sync's 1GiB, and the timeout 540s against its 300s, for ~3x the rows on the
- * evidence that existed then (superseded for memory by the note above). That evidence is specific: a
- * 512MiB ceiling died at 527MiB *during the (then Firestore) write* with ~122k rows, having
- * survived the streaming parse — so the ceiling scales with the retained rows
- * and their encoding, which is exactly what triples here. Under-provisioning
- * reproduces a failure this project has already had (every scheduled run
- * OOM-looping silently after deploy); over-provisioning costs pennies on a
- * 48-runs/day cron. The `rowCount` logged below is the checkpoint: the first
- * live runs say what the real volume is, and these numbers can come down.
- *
- * 540s is the gen2 ceiling, not a chosen value, so there is no knob left if
- * the ~3x estimate is badly low: a run that can't finish inside it needs the
- * write restructured (incremental chunk commits, or the join split by region)
- * rather than a config bump. `rowCount` is the early warning for that too.
- *
- * One of the deployment's five Cloud Scheduler jobs (this, `dispatchProjections`,
- * `dailyHousekeeping`, `pollEveNotifications`, `syncCorpTaxBooks`); issue #5072 retired
- * the wars and lawless syncs and folded the removals finalizer into `dispatchProjections`.
- * Each job past the free three costs $0.10 a month.
- */
-export const syncPublicContractOffers = onSchedule(
-  {
-    schedule: 'every 60 minutes',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  runSyncPublicContractOffers
 );
 
 // mutamarketEstimate (mutamarket.ts). Session required: an import publishes

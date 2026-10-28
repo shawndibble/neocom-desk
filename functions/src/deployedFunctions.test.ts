@@ -23,7 +23,6 @@ const DEPLOYED = [
   'pushCommunityAlert',
   'pushCommunityPledge',
   'syncCorpTaxBooks',
-  'syncPublicContractOffers',
 ];
 
 describe('deployed functions', () => {

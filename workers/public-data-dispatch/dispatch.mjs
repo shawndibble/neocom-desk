@@ -8,6 +8,7 @@ export const REF = 'develop';
 // `triggers.crons` in wrangler.toml exactly (event.cron echoes the string).
 export const SCHEDULES = {
   '*/15 * * * *': ['public-data-lawless-systems.yml'],
+  '*/30 * * * *': ['public-data-contract-offers.yml'],
 };
 
 export function workflowsForCron(cron) {

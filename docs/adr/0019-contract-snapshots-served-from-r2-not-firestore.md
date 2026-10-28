@@ -68,8 +68,8 @@ plus a small index, and have the client fetch only the types a search needs.
   (`Cache-Control: public, max-age=31536000, immutable`); `index.json` is
   short-lived (`max-age=60`). An R2 lifecycle rule deletes objects older than a
   few days so superseded hashes do not accumulate.
-- **Writer:** `syncPublicContractOffers` uploads through R2's S3-compatible API
-  after the existing archive-unchanged skip. Credentials are Firebase secrets
+- **Writer:** the contract-offers job (a Cloud Function `syncPublicContractOffers` until 2026-10-27, now `public-data-contract-offers.yml` on a GitHub runner) uploads through R2's S3-compatible API
+  after the existing archive-unchanged skip. Credentials are the secrets
   `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`; `R2_ENDPOINT`, `R2_BUCKET` and
   `R2_PUBLIC_BASE_URL` are plain env in `functions/.env`. No credential reaches
   the client.
