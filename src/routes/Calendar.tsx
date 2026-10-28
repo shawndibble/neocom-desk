@@ -51,6 +51,7 @@ import { cellOf, dayStart, type DayZone } from '@/engine/localDay';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useOpenParam } from '@/lib/useOpenParam';
 import { useUrlParam } from '@/lib/useUrlState';
 import type { UrlParamCodec } from '@/lib/urlState';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
@@ -176,7 +177,9 @@ export function Calendar() {
   const [selectedDay, setSelectedDay] = useState<{ zone: DayZone; ms: number } | null>(null);
   const selectedDayMs = selectedDay !== null && selectedDay.zone === zone ? selectedDay.ms : null;
   const setSelectedDayMs = (ms: number | null) => setSelectedDay(ms === null ? null : { zone, ms });
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const openParamId = useOpenParam();
+  // `?open=` selects the event as a click would; it shows once the events load.
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(openParamId);
   const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
 
   /**

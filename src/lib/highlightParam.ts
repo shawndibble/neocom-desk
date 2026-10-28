@@ -8,3 +8,14 @@
  * and React Router into `sw.mjs` for one string.
  */
 export const HIGHLIGHT_PARAM = 'highlight';
+
+/**
+ * The `?open=` query key (`useOpenParam.ts`): the sibling of `?highlight=` that
+ * also opens the row's modal. Same React-free module for the same reason.
+ */
+export const OPEN_PARAM = 'open';
+
+/** `path?open=<id>`, the link a widget row builds to open a record's modal on its page. */
+export function openHref(path: string, id: number | string): string {
+  return `${path}?${OPEN_PARAM}=${encodeURIComponent(String(id))}`;
+}
