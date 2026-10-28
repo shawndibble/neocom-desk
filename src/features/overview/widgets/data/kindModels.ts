@@ -39,6 +39,7 @@ import {
   flowBars,
   flowSecondary,
   flowTable,
+  LP_STORE_PATH,
   lpTable,
   netWorthSeries,
   netWorthTable,
@@ -227,7 +228,7 @@ const LP_CHART_ROWS = 6;
 const lp: Builder = (feeds, { t }) => {
   const feed = feeds.lp;
   const data = feed?.data ?? null;
-  const to = '/wallet';
+  const to = LP_STORE_PATH;
   if (!data) return blank(to, statusOf(feed));
   const total = data.entries.reduce((sum, entry) => sum + entry.points, 0);
   const nameOf = (entry: (typeof data.entries)[number]) =>

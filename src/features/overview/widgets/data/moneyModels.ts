@@ -504,6 +504,9 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
 
 // --- Loyalty points ------------------------------------------------------------------
 
+/** The LP Store (a Wallet tab); a corporation's own store is `/<corporationId>` below it. */
+export const LP_STORE_PATH = '/wallet/lp-store';
+
 /** Each corporation's points and its share of all of them (a sliver reads `<1%`, never `0%`). */
 export function lpTable(
   t: Translate,
@@ -524,6 +527,7 @@ export function lpTable(
     ],
     rows: entries.map((entry) => ({
       key: String(entry.corporationId),
+      to: `${LP_STORE_PATH}/${entry.corporationId}`,
       cells: [
         entry.name ?? t(`${W}.data.lp.corporation`, { id: entry.corporationId }),
         formatCompactNumber(entry.points),

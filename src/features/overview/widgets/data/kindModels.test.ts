@@ -390,6 +390,8 @@ describe('lp', () => {
     );
     expect(view.number.value).toBe('1.2K');
     expect(view.rows).toEqual([]);
+    expect(view.to).toBe('/wallet/lp-store');
+    expect(view.table?.rows.map((r) => r.to)).toEqual(['/wallet/lp-store/1', '/wallet/lp-store/2']);
     expect(view.table?.rows.map((r) => r.cells)).toEqual([
       ['Sisters of EVE', '800', { text: '67%', bar: 800 / 1200 }],
       [expect.stringContaining('lp.corporation'), '400', { text: '33%', bar: 400 / 1200 }],
