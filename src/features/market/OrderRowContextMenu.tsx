@@ -65,7 +65,7 @@ export function OrderRowContextMenu({
             {t('market.contextMenu.copyPrice')}
           </MenuItem>
           <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
-          <OpenInEveItemMenuItems typeId={typeId} />
+          <OpenInEveItemMenuItems typeId={typeId} specific />
           <MenuItem onSelect={() => onFilterToStation(order.location_id)}>
             {t('market.contextMenu.filterToStation')}
           </MenuItem>

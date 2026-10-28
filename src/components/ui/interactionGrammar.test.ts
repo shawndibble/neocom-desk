@@ -177,7 +177,7 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/industry/BuildGroupHeader.tsx',
       'src/features/industry/BuildPlanRow.tsx',
       'src/features/market/ItemContextMenu.tsx',
-      // Item Detail's header below md: Open market in EVE and View in Market, the modal's own actions.
+      // Item Detail's header below md: Open in EVE and View in Market, the modal's own actions.
       'src/features/market/ItemDetailModal.tsx',
       // Quickbar rows: Show info and Remove (owner-approved in #5332: the row click selects, no other route to either).
       'src/features/market/QuickbarList.tsx',

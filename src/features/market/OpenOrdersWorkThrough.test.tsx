@@ -378,7 +378,7 @@ describe('Open Orders work through — phone', () => {
     await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
     expect(await within(current()).findByText('448.90')).toBeInTheDocument();
 
-    await user.click(within(current()).getByRole('button', { name: 'Open market in EVE' }));
+    await user.click(within(current()).getByRole('button', { name: 'Open in EVE' }));
     await waitFor(() =>
       expect(openInEve).toHaveBeenCalledWith(1, { kind: 'marketDetails', id: 34 })
     );
