@@ -1,6 +1,6 @@
 /**
  * The newest wars straight from ESI, for the few days after a war-declared
- * Alert: the open-wars list (`activeWars.ts`) is only rewritten twice a day, so
+ * Alert: the open-wars list (`activeWars.ts`) is only rewritten every 6 hours, so
  * a pilot who has just been told of a declaration would otherwise wait for the
  * next sweep to see the banner. A new war is among the newest ids, so this
  * reads only those. Public reads, nothing signed.

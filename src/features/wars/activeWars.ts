@@ -11,7 +11,7 @@ import { parseStoredWars, type StoredWar } from '@/engine/wars';
 
 export const ACTIVE_WARS_R2_URL = 'https://data.neocomdesk.com/active-wars/wars.json';
 const R2_READ_TIMEOUT_MS = 20_000;
-/** The sweep runs twice a day: reading more often only costs reads. */
+/** The sweep runs every 6 hours: reading more often only costs reads. */
 const ACTIVE_WARS_REREAD_MS = 55 * 60 * 1000;
 /**
  * How often a mounted page asks. Shorter than the re-read window so a tick
@@ -24,7 +24,7 @@ export const ACTIVE_WARS_POLL_MS = 15 * 60 * 1000;
  * listed (an early end moves `finished`, which only a sweep sees): hide it.
  * Four missed runs.
  */
-export const ACTIVE_WARS_STALE_AFTER_MS = 48 * 60 * 60 * 1000;
+export const ACTIVE_WARS_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 const NONE: readonly StoredWar[] = [];
 
