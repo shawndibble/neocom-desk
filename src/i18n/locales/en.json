@@ -6492,6 +6492,7 @@
     "aboutLabel": "About {{label}}",
     "scrollTabsBefore": "Scroll tabs left",
     "scrollTabsAfter": "Scroll tabs right",
+    "openInNewTab": "Open in new tab",
     "moreActionsLabel": "More actions for {{name}}",
     "moreActions": "More actions",
     "tableExport": {

@@ -53,3 +53,24 @@ export const CardMenu: Story = {
     ),
   },
 };
+
+/** @summary A row whose click goes to another page: `openHref` leads both menus with "Open in new tab". */
+export const OpenInNewTab: Story = {
+  args: {
+    name: 'Tritanium',
+    openHref: '/market/browser?type=34',
+    items: (
+      <>
+        <MenuItem>Copy name</MenuItem>
+        <MenuItem>Show info</MenuItem>
+      </>
+    ),
+    children: (
+      <div className="flex w-72 items-center rounded-xs border border-line bg-panel px-2.5 py-1">
+        Tritanium
+        <span className="flex-1" />
+        <RowMoreActions />
+      </div>
+    ),
+  },
+};

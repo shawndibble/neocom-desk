@@ -59,6 +59,7 @@ import {
   MenuKindContext,
   RowActionsContext,
   RowMenuExtrasContext,
+  RowOpenHrefContext,
   type RowActions,
 } from './rowActionsContext';
 import { Tooltip } from './Tooltip';
@@ -69,6 +70,22 @@ export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
     <DropdownMenuItem {...props} />
   ) : (
     <ContextMenuItem {...props} />
+  );
+}
+
+/**
+ * "Open in new tab" for a row whose click goes to another page. A real link,
+ * so the browser offers its own link menu on it too; same-origin, so no
+ * `ExternalLink` mark. Row menus render it themselves from `openHref`.
+ */
+export function OpenInNewTabMenuItem({ href }: { href: string }) {
+  const { t } = useTranslation();
+  return (
+    <MenuItem asChild>
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {t('common.openInNewTab')}
+      </a>
+    </MenuItem>
   );
 }
 
@@ -240,11 +257,14 @@ export function RowActionsMenu({
   onOpenChange,
   onCloseAutoFocus,
   modal,
+  openHref,
   tooltip,
   linksKeepBrowserMenu = false,
   children,
 }: RowActions & {
   tooltip?: string;
+  /** A click on the row goes to this page: both menus lead with "Open in new tab". Never makes a row earn a menu alone (§6c). */
+  openHref?: string;
   /** Right-click or hold on a link or text field stays the browser's (§6c "Entities", guardrail 2). */
   linksKeepBrowserMenu?: boolean;
   children: ReactElement;
@@ -258,9 +278,13 @@ export function RowActionsMenu({
   // `RowMoreActions` appends the same itself, so the context value stays
   // the row's own items and a hand-rolled wrapper gets the extras too.
   const extras = useContext(RowMenuExtrasContext);
+  const rowHref = useContext(RowOpenHrefContext);
+  const href = openHref ?? rowHref;
   useEffect(() => warnRestraint(name, items), [name, items]);
   return (
-    <RowActionsContext.Provider value={{ name, items, onOpenChange, onCloseAutoFocus, modal }}>
+    <RowActionsContext.Provider
+      value={{ name, items, onOpenChange, onCloseAutoFocus, modal, openHref: href }}
+    >
       <TooltipHoldContext.Provider value={false}>
         <ContextMenu onOpenChange={onOpenChange} modal={modal}>
           {tooltip === undefined ? (
@@ -271,6 +295,7 @@ export function RowActionsMenu({
             <Tooltip content={tooltip}>{trigger}</Tooltip>
           )}
           <ContextMenuContent onCloseAutoFocus={onCloseAutoFocus}>
+            {href && <OpenInNewTabMenuItem href={href} />}
             {items}
             {extras}
           </ContextMenuContent>
@@ -333,6 +358,7 @@ export function RowMoreActions({
         onCloseAutoFocus={actions.onCloseAutoFocus}
       >
         <MenuKindContext.Provider value="dropdown">
+          {actions.openHref && <OpenInNewTabMenuItem href={actions.openHref} />}
           {actions.items}
           {extras}
         </MenuKindContext.Provider>

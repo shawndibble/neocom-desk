@@ -114,10 +114,11 @@ export {
   MenuSub,
   MenuSubTrigger,
   MenuSubContent,
+  OpenInNewTabMenuItem,
   RowActionsMenu,
   RowMoreActions,
 } from './RowActions';
-export { RowActionsContext, RowMenuExtrasContext } from './rowActionsContext';
+export { RowActionsContext, RowMenuExtrasContext, RowOpenHrefContext } from './rowActionsContext';
 export type { RowActions } from './rowActionsContext';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
 export { CheckboxSelect } from './CheckboxSelect';
