@@ -138,4 +138,16 @@ describe('CommandPalette paste', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
+
+  it('does not navigate once the palette was closed while the paste classified', async () => {
+    const input = await openPalette();
+    act(() => {
+      fireEvent.paste(input, { clipboardData: { getData: () => SAMPLES.fitting } });
+      fireEvent.keyDown(input, { key: 'Escape' });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
+  });
 });

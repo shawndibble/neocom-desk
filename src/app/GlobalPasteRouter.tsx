@@ -40,8 +40,6 @@ export function GlobalPasteRouter() {
       void routePaste(text, locationRef.current).then(({ route, unreadable }) => {
         if (id !== latestPaste.current) return;
         if (route !== null) void navigate(...route);
-        // The pilot can still paste into Fittings' Load or the Appraisal box
-        // by hand, and is told so.
         else if (unreadable) setNotice(t('shortcuts.pasteOffline'));
       });
     }

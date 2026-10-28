@@ -15,8 +15,11 @@ import { MARKET_TABS, MINING_TABS } from './pageTabs';
 
 const SKILL_PLANS_PATH = '/skills/plans';
 
+/** A path and the route state carrying the pasted text. */
+export type RouteTarget = [string, { state: unknown }];
+
 /** A Local list and a D-Scan share a route: Pilot Lookup reads either. */
-const pilotLookup = (text: string): [string, { state: unknown }] => [
+const pilotLookup = (text: string): RouteTarget => [
   '/travel/pilot',
   { state: { pilotListText: text } satisfies PilotListState },
 ];
@@ -28,7 +31,7 @@ const pilotLookup = (text: string): [string, { state: unknown }] => [
  */
 export const DESTINATIONS: Record<
   PasteDestination,
-  (text: string, here: Pick<Location, 'pathname' | 'search'>) => [string, { state: unknown }]
+  (text: string, here: Pick<Location, 'pathname' | 'search'>) => RouteTarget
 > = {
   survey: (text) => [
     tabPath(MINING_TABS, 'survey'),
@@ -55,7 +58,7 @@ export const DESTINATIONS: Record<
 };
 
 /** What {@link classifyPaste} made of a paste. */
-export interface Classified {
+interface Classified {
   destination: PasteDestination | null;
   /**
    * The market catalogue or the hull names could not be loaded (offline, never
@@ -73,7 +76,7 @@ export interface Classified {
  * precached `types.json`, so a skill plan, D-Scan, fit or blueprint list
  * still routes with no connection.
  */
-export async function classifyPaste(text: string): Promise<Classified> {
+async function classifyPaste(text: string): Promise<Classified> {
   const [
     { pasteDestination },
     { loadAppraisalCatalogue },
@@ -111,7 +114,7 @@ export async function classifyPaste(text: string): Promise<Classified> {
  * columns), as an inventory copy or multibuy is. An ordinary paragraph is not,
  * so a pilot pasting prose offline is not told about item data.
  */
-export function looksLikeList(text: string): boolean {
+function looksLikeList(text: string): boolean {
   if (looksLikeEftFit(text)) return true;
   const lines = text
     .split(/\r?\n/)
@@ -128,7 +131,7 @@ export function looksLikeList(text: string): boolean {
 /** Where a paste goes: a route and its state, or nowhere. */
 export interface PasteRoute {
   /** `null`: the paste is ordinary text and stays where it landed. */
-  route: [string, { state: unknown }] | null;
+  route: RouteTarget | null;
   /** A list-shaped paste could not be read for want of data (offline, parsers failed to load). */
   unreadable: boolean;
 }

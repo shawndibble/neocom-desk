@@ -268,6 +268,14 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
     inputRef.current?.focus();
   }, []);
 
+  // A closed palette (Escape, a pick) must not be navigated by a paste still classifying.
+  useEffect(
+    () => () => {
+      latestPaste.current = -1;
+    },
+    []
+  );
+
   // The item catalogue starts loading as the palette opens, not at the third
   // keystroke — and off the render path, so typing never waits on it. Each
   // opening retries a failed load once; a failure is the Market Items
@@ -297,8 +305,8 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
    */
   function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
     const text = event.clipboardData.getData('text/plain');
-    if (!/\S\s*\r?\n\s*\S/.test(text)) return;
     const id = ++latestPaste.current;
+    if (!text.trim().includes('\n')) return;
     void routePaste(text, { pathname, search }).then(({ route }) => {
       if (id !== latestPaste.current || route === null) return;
       // Closed first, as `activate` does, so focus hands back before the route's own.
