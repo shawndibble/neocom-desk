@@ -19,7 +19,7 @@ import {
   UNKNOWN,
   type Builder,
 } from './builderKit';
-import type { TableModel } from './types';
+import type { RowDetailModel, TableModel } from './types';
 
 const K = 'overview.widgets.corpRoleAudit';
 const PATH = '/corp/members/roles';
@@ -53,6 +53,33 @@ export const corpRoleAudit: Builder = (feeds, { t, now }) => {
   const rolesOf = (roles: readonly string[]) => roles.map(roleLabel).join(', ');
   const changeOf = (id: number) => ageText(t, now, lastChange.get(id)?.changedAtMs ?? null);
 
+  const detailOf = (holder: (typeof holders)[number]): RowDetailModel => {
+    const change = lastChange.get(holder.characterId);
+    return {
+      title: nameOf(holder.characterId),
+      facts: [
+        { label: t(`${K}.col.roles`), value: rolesOf(holder.roles) },
+        { label: t(`${K}.col.change`), value: change ? changeOf(holder.characterId) : UNKNOWN },
+        ...(change
+          ? [
+              {
+                label: t('overview.widgets.corpRoleAudit.fact.granted'),
+                value: rolesOf(change.granted) || UNKNOWN,
+              },
+              {
+                label: t('overview.widgets.corpRoleAudit.fact.removed'),
+                value: rolesOf(change.removed) || UNKNOWN,
+              },
+              {
+                label: t('overview.widgets.corpRoleAudit.fact.changedBy'),
+                value: nameOf(change.issuerId),
+              },
+            ]
+          : []),
+      ],
+    };
+  };
+
   const changeText =
     recent === null
       ? t(`${K}.changesUnknown`)
@@ -76,6 +103,7 @@ export const corpRoleAudit: Builder = (feeds, { t, now }) => {
             }
           : UNKNOWN,
       ],
+      detail: detailOf(holder),
     })),
     footer: changes === null ? t(`${K}.historyUnknown`) : undefined,
   };

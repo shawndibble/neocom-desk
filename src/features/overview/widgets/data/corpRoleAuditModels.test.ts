@@ -99,3 +99,28 @@ describe('corpRoleAudit', () => {
     expect(view.status.needsPermission).toBe(true);
   });
 });
+
+describe('corpRoleAudit row detail', () => {
+  const K = 'overview.widgets.corpRoleAudit';
+  const detailFor = (key: string) =>
+    corpRoleAudit(feeds(), ctx).table!.rows.find((r) => r.key === key)!.detail!;
+
+  it('names the person, their roles and who changed them last', () => {
+    const detail = detailFor('3');
+    expect(detail.title).toBe('Cole');
+    expect(detail.facts.map((f) => f.label)).toEqual([
+      `${K}.col.roles`,
+      `${K}.col.change`,
+      `${K}.fact.granted`,
+      `${K}.fact.removed`,
+      `${K}.fact.changedBy`,
+    ]);
+    expect(detail.facts.at(-1)!.value).toBe('Aria');
+  });
+
+  it('shows only the roles for a member with no recorded change', () => {
+    const view = corpRoleAudit(feeds({ changes: [] }), ctx);
+    const detail = view.table!.rows[0]!.detail!;
+    expect(detail.facts).toHaveLength(2);
+  });
+});

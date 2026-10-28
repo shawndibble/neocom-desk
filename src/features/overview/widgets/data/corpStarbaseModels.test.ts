@@ -232,3 +232,27 @@ describe('toBoardStarbases', () => {
     expect(sources.map((s) => s.fuelExpiresMs)).toEqual([null, null, null]);
   });
 });
+
+describe('corpStarbases row detail', () => {
+  const detailOf = (row: CorpStarbaseRow) => build(ok(feedOf([row]))).table!.rows[0]!.detail!;
+
+  it('opens a modal with the tower, its state, fuel, strontium and system', () => {
+    const detail = detailOf(tower());
+    const W = 'overview.widgets.corpStarbases';
+    expect(detail.title).toBe('Caldari Control Tower');
+    expect(detail.status).toMatchObject({ badge: `${W}.state.online` });
+    expect(detail.facts.map((f) => f.label)).toEqual([
+      `${W}.col.system`,
+      `${W}.col.fuel`,
+      `${W}.col.strontium`,
+      `${W}.col.reinforced`,
+    ]);
+    expect(detail.facts[0]!.value).toBe('Efa');
+    expect(detail.facts[2]!.value).toBe('400');
+    expect(detail.place).toEqual({ systemId: 100, name: 'Efa' });
+  });
+
+  it('has no place for a system it cannot name', () => {
+    expect(detailOf(tower({ systemId: 999 })).place).toBeUndefined();
+  });
+});

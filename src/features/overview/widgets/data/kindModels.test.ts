@@ -1192,6 +1192,28 @@ describe('kills', () => {
     ]);
   });
 
+  it('opens a killmail modal with the ship, side, system, value and time', () => {
+    const rows = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 })).table!.rows;
+    expect(rows[0]!.detail).toMatchObject({
+      title: 'Vexor',
+      status: { badge: 'overview.widgets.kills.side.kill', tone: 'success' },
+      place: { systemId: 30000142, name: 'Jita' },
+    });
+    expect(rows[0]!.detail!.facts).toContainEqual({
+      label: 'overview.widgets.kills.col.value',
+      value: '5M',
+    });
+    expect(rows[0]!.detail!.facts).toContainEqual({
+      label: 'overview.widgets.kills.detail.killmail',
+      value: '#1',
+    });
+    expect(rows[1]!.detail!.status).toMatchObject({ tone: 'danger' });
+    expect(rows[1]!.detail!.facts).toContainEqual({
+      label: 'overview.widgets.kills.col.value',
+      value: '—',
+    });
+  });
+
   it('charts kills and losses per day over the range, with a text summary', () => {
     const view = buildView('kills', { kills: ok(data()) }, ctx({ range: 7 }));
     if (view.chart?.kind !== 'bars') throw new Error('bars');

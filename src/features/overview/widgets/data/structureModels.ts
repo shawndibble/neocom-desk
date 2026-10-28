@@ -20,9 +20,21 @@ import {
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
-import type { NumberModel, TableCell, TableModel, Translate } from './types';
+import type {
+  DetailTone,
+  NumberModel,
+  RowDetailModel,
+  TableCell,
+  TableModel,
+  Translate,
+} from './types';
 
 const C = 'overview.widgets.chart';
+const SERVICE_STATE = {
+  online: 'overview.widgets.structures.detail.serviceState.online',
+  offline: 'overview.widgets.structures.detail.serviceState.offline',
+  cleanup: 'overview.widgets.structures.detail.serviceState.cleanup',
+} as const;
 
 // --- Structures -------------------------------------------------------------------
 
@@ -144,8 +156,45 @@ export const structures: Builder = (feeds, { t, now, show }) => {
         : lowFuel
           ? t('overview.widgets.structures.state.lowFuel')
           : t('overview.widgets.structures.state.ok');
+    const S = 'overview.widgets.structures';
+    const detail: RowDetailModel = {
+      title: shortStructureName(source.name),
+      status: {
+        badge: state,
+        tone: tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'neutral',
+      },
+      facts: [
+        { label: t(`${S}.col.fuel`), value: fuel ? structureWhen(fuel, t) : UNKNOWN },
+        {
+          label: t(`${S}.col.timer`),
+          value: timer && timer.timing === 'timed' ? structureWhen(timer, t) : UNKNOWN,
+        },
+        ...(unanchor && unanchor.timing === 'timed'
+          ? [
+              {
+                label: t('overview.widgets.structures.detail.unanchors'),
+                value: structureWhen(unanchor, t),
+              },
+            ]
+          : []),
+      ],
+      list:
+        source.services.length === 0
+          ? undefined
+          : {
+              title: t('overview.widgets.structures.detail.services'),
+              items: source.services.map((service) => ({
+                key: service.name,
+                badge: t(SERVICE_STATE[service.state]),
+                tone: (service.state === 'offline' ? 'danger' : 'neutral') as DetailTone,
+                text: service.name,
+                value: '',
+              })),
+            },
+    };
     return {
       id,
+      detail,
       // Every board item of this structure, so Problems only can keep exactly these.
       items: unanchor ? [...own, unanchor] : own,
       name: shortStructureName(source.name),
@@ -193,7 +242,12 @@ export const structures: Builder = (feeds, { t, now, show }) => {
         priority: 3,
       },
     ],
-    rows: rows.map((row) => ({ key: String(row.id), cells: row.cells, tone: row.tone })),
+    rows: rows.map((row) => ({
+      key: String(row.id),
+      cells: row.cells,
+      tone: row.tone,
+      detail: row.detail,
+    })),
   };
 
   return {

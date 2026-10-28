@@ -5355,6 +5355,15 @@
           "fuel": "Fuel left",
           "state": "State",
           "timer": "Timer"
+        },
+        "detail": {
+          "unanchors": "Unanchors in",
+          "services": "Services",
+          "serviceState": {
+            "online": "Online",
+            "offline": "Offline",
+            "cleanup": "Going offline"
+          }
         }
       },
       "moonChunks": {
@@ -5444,6 +5453,10 @@
         "side": {
           "kill": "Kill",
           "loss": "Loss"
+        },
+        "detail": {
+          "when": "When",
+          "killmail": "Killmail"
         }
       },
       "comingUp": {
@@ -5822,6 +5835,11 @@
         "changes_other": "{{count}} role changes in {{days}} days",
         "changesUnknown": "Role changes unavailable",
         "historyUnknown": "Role history could not be read, so last changes are not shown.",
+        "fact": {
+          "granted": "Granted",
+          "removed": "Removed",
+          "changedBy": "Changed by"
+        },
         "summary_one": "{{count}} Director. Members with a sensitive role: {{holders}}.",
         "summary_other": "{{count}} Directors. Members with a sensitive role: {{holders}}."
       },

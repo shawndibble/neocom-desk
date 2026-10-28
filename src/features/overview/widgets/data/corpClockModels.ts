@@ -26,7 +26,14 @@ import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
-import type { NumberSecondary, TableCell, TableModel, TableRowModel, Translate } from './types';
+import type {
+  NumberSecondary,
+  RowDetailModel,
+  TableCell,
+  TableModel,
+  TableRowModel,
+  Translate,
+} from './types';
 
 // --- Due soon ---------------------------------------------------------------------
 
@@ -326,6 +333,24 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
   const activityOf = (job: CorporationIndustryJob) =>
     t(activityI18nKey(job.activity_id), { id: job.activity_id });
 
+  const detailOf = (f: JobFacts): RowDetailModel => ({
+    title: f.label,
+    status: f.done
+      ? { badge: t('overview.board.ready'), tone: 'warning' }
+      : { badge: left(f), tone: f.tone === 'watch' ? 'warning' : 'neutral' },
+    facts: [
+      { label: t('overview.widgets.corpJobs.col.activity'), value: activityOf(f.job) },
+      {
+        label: t('overview.widgets.corpJobs.col.installer'),
+        value: data.installerNames.get(f.job.installer_id) ?? UNKNOWN,
+      },
+      {
+        label: t('overview.widgets.corpJobs.col.ends'),
+        value: f.done ? t('overview.board.ready') : left(f),
+      },
+    ],
+  });
+
   return {
     ...blank(null, statusOf(feed, { isEmpty: facts.length === 0 })),
     fetchedAt: data.fetchedAt,
@@ -370,6 +395,7 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
           activityOf(f.job),
         ],
         tone: f.tone,
+        detail: detailOf(f),
       })),
     },
     summary: t('overview.widgets.corpJobs.summary', {

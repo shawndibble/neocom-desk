@@ -483,3 +483,35 @@ describe('corpJobs', () => {
     expect(corpJobs({ corpJobs: loading() }, ctx).status.loading).toBe(true);
   });
 });
+
+describe('corpJobs row detail', () => {
+  it('names the product, activity, installer and when it ends', () => {
+    const view = corpJobs(
+      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 5 * HOUR).toISOString() })]) },
+      ctx
+    );
+    const detail = view.table!.rows[0]!.detail!;
+    const J = 'overview.widgets.corpJobs';
+    expect(detail.title).toContain('Rifter');
+    expect(detail.facts.map((f) => f.label)).toEqual([
+      `${J}.col.activity`,
+      `${J}.col.installer`,
+      `${J}.col.ends`,
+    ]);
+    expect(detail.facts[1]!.value).toBe('Ada Pilot');
+  });
+
+  it('reads Ready for a finished job', () => {
+    const view = corpJobs(
+      {
+        corpJobs: jobsFeed([
+          job({ status: 'ready', end_date: new Date(NOW - HOUR).toISOString() }),
+        ]),
+      },
+      ctx
+    );
+    const detail = view.table!.rows[0]!.detail!;
+    expect(detail.status).toMatchObject({ badge: 'overview.board.ready', tone: 'warning' });
+    expect(detail.facts[2]!.value).toBe('overview.board.ready');
+  });
+});

@@ -6,7 +6,7 @@
 import type { CorporationCustomsOffice } from '@/esi/endpoints';
 import { formatNumber } from '@/lib/numberLocale';
 import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
-import type { Translate } from './types';
+import type { RowDetailModel, Translate } from './types';
 
 const K = 'overview.widgets.corpCustomsOffices';
 
@@ -56,6 +56,21 @@ export const corpCustomsOffices: Builder = (feeds, { t }) => {
       end: hour(office.reinforce_exit_end),
     });
 
+  const detailOf = (office: CorporationCustomsOffice): RowDetailModel => ({
+    title: nameOf(office),
+    facts: [
+      { label: t(`${K}.col.system`), value: systemOf(office) },
+      { label: t(`${K}.col.window`), value: windowOf(office) },
+      ...RATES.flatMap(({ key, label }) => {
+        const rate = office[key];
+        return rate === undefined ? [] : [{ label: t(`${K}.rate.${label}`), value: percent(rate) }];
+      }),
+    ],
+    place: data.systemNames.has(office.system_id)
+      ? { systemId: office.system_id, name: systemOf(office) }
+      : undefined,
+  });
+
   const offices = [...data.offices].sort(
     (a, b) => systemOf(a).localeCompare(systemOf(b)) || a.office_id - b.office_id
   );
@@ -88,6 +103,7 @@ export const corpCustomsOffices: Builder = (feeds, { t }) => {
       rows: offices.map((office) => ({
         key: String(office.office_id),
         cells: [nameOf(office), systemOf(office), ratesOf(office, t), windowOf(office)],
+        detail: detailOf(office),
       })),
     },
     summary: t(`${K}.summary`, { count: offices.length, systems }),
