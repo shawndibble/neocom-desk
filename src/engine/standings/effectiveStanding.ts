@@ -2,7 +2,7 @@
  * An NPC standing as the game applies it. The standing ESI reports is lifted
  * by the pilot's social skills into the one that gates agents, faction police
  * and reprocessing; broker fees read the unlifted one. Sources:
- * docs/design/mockups/npc-standings/research-standings-rules.md section 3.
+ * docs/research/npc-standings-rules.md section 3.
  */
 
 /** Skill type ids, verified against `public/data/skills.json`. */

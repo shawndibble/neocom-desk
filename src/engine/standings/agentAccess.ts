@@ -1,6 +1,6 @@
 /**
  * Which agent levels a chain of standings opens. Sources:
- * docs/design/mockups/npc-standings/research-standings-rules.md section 2.
+ * docs/research/npc-standings-rules.md section 2.
  * Storyline, R&D and COSMOS agents follow other rules and are not modelled.
  */
 import type { ChainLink, StandingChain } from './chain';

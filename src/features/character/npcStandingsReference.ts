@@ -4,10 +4,10 @@
  * the agents data. Each is optional: one that cannot be read leaves its part
  * of the table empty rather than guessed (`NpcStandingsReference`).
  *
- * The corporation to faction map comes from `npcCorporations.json`, which holds
- * every NPC corporation; `loadCorporationFactions` (LP stores and stations)
- * misses about a third of the ones that have a faction.
+ * The corporation to faction map is `loadCorporationFactions`, built from
+ * `npcCorporations.json`, which holds every NPC corporation.
  */
+import { loadCorporationFactions } from '@/features/standings/corporationFactions';
 import { loadStandingSkills } from '@/features/standings/standingSkills';
 import { loadAgents } from '@/sde/agents';
 import { loadNpcCorporationsFile } from '@/sde/loadSde';
@@ -15,12 +15,11 @@ import { buildNpcCorporationIndex } from '@/sde/npcCorporations';
 import type { NpcCorporationsFile } from '@/sde/types';
 import type { NpcCorporationLookup, NpcStandingsReference } from './npcStandingsRows';
 
-export function npcCorporationLookup(file: NpcCorporationsFile): NpcCorporationLookup {
+export function npcCorporationLookup(
+  file: NpcCorporationsFile,
+  factions: ReadonlyMap<number, number>
+): NpcCorporationLookup {
   const index = buildNpcCorporationIndex(file);
-  const factions = new Map<number, number>();
-  for (const corporation of file.corporations) {
-    if (corporation.factionId !== undefined) factions.set(corporation.id, corporation.factionId);
-  }
   return {
     factions,
     corporationName: (id) => index.corporationById(id)?.name,
@@ -33,8 +32,8 @@ export async function loadNpcStandingsReference(
 ): Promise<NpcStandingsReference> {
   const [skills, corporations, agents] = await Promise.all([
     loadStandingSkills(characterId).catch(() => null),
-    loadNpcCorporationsFile()
-      .then(npcCorporationLookup)
+    Promise.all([loadNpcCorporationsFile(), loadCorporationFactions()])
+      .then(([file, factions]) => npcCorporationLookup(file, factions))
       .catch(() => null),
     loadAgents().catch(() => null),
   ]);

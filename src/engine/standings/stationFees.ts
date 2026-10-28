@@ -1,7 +1,7 @@
 /**
  * What standing buys at an NPC station: a cheaper reprocessing tax and a
  * cheaper broker fee. Sources:
- * docs/design/mockups/npc-standings/research-reprocessing-tax.md.
+ * docs/research/npc-standings-reprocessing-tax.md.
  */
 import { brokerFeePct } from '@/engine/industry/fees';
 

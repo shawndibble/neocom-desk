@@ -1,6 +1,6 @@
 /**
  * NPC standings engine: pure functions over a pilot's standings and social
- * skills. Rules and sources: docs/design/mockups/npc-standings/. Standings are
+ * skills. Rules and sources: docs/research/npc-standings-*.md. Standings are
  * -10..10; "base" is what ESI reports (assumed, see `ESI_STANDINGS_ARE_BASE`),
  * "effective" is base lifted by Connections / Criminal Connections / Diplomacy.
  *

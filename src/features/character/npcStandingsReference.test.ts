@@ -12,14 +12,18 @@ const FILE: NpcCorporationsFile = {
 const skillsMock = vi.hoisted(() => vi.fn());
 const corporationsMock = vi.hoisted(() => vi.fn());
 const agentsMock = vi.hoisted(() => vi.fn());
+const factionsMock = vi.hoisted(() => vi.fn());
 vi.mock('@/features/standings/standingSkills', () => ({ loadStandingSkills: skillsMock }));
 vi.mock('@/sde/loadSde', () => ({ loadNpcCorporationsFile: corporationsMock }));
 vi.mock('@/sde/agents', () => ({ loadAgents: agentsMock }));
+vi.mock('@/features/standings/corporationFactions', () => ({
+  loadCorporationFactions: factionsMock,
+}));
 
 import { loadNpcStandingsReference, npcCorporationLookup } from './npcStandingsReference';
 
 describe('npcCorporationLookup', () => {
-  const lookup = npcCorporationLookup(FILE);
+  const lookup = npcCorporationLookup(FILE, new Map([[1000035, 500001]]));
 
   it('maps a corporation to its faction and leaves a factionless one out', () => {
     expect(lookup.factions.get(1000035)).toBe(500001);
@@ -41,6 +45,7 @@ describe('loadNpcStandingsReference', () => {
     skillsMock.mockReset().mockResolvedValue({ social, brokerRelationsLevel: 3 });
     corporationsMock.mockReset().mockResolvedValue(FILE);
     agentsMock.mockReset().mockResolvedValue(agents);
+    factionsMock.mockReset().mockResolvedValue(new Map([[1000035, 500001]]));
   });
 
   it('gathers skills, corporations and agents', async () => {
