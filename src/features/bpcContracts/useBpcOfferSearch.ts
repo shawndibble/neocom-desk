@@ -25,11 +25,17 @@ const NO_OFFERS: BpcOfferSearch = {
 
 export interface BpcOfferSearchAnswer extends BpcOfferSearch {
   /**
-   * The worker has not answered this exact question yet. The fields may be the
-   * previous answer (or empty); callers show a spinner, not those rows, so a
-   * new filter never sits under the last one's table and summary.
+   * The worker has not answered this exact question yet and there is nothing
+   * fit to show: the first load, or a filter edit. The fields are empty;
+   * callers show a spinner, so a new filter never sits under the last one's
+   * table and summary.
    */
   awaiting: boolean;
+  /**
+   * Only the snapshot changed (a background reload) and the worker is still
+   * ranking it. The fields are the previous answer, kept on screen.
+   */
+  refreshing: boolean;
 }
 
 interface Settled {
@@ -122,11 +128,16 @@ export function useBpcOfferSearch(
     };
   }, [viaWorker, data, prepareInput, query]);
 
-  const awaiting =
+  const pending =
     viaWorker &&
     (settled?.data !== data || settled.prepareInput !== prepareInput || settled.query !== query);
   const search = onPage ?? settled?.search ?? NO_OFFERS;
-  // Suggestions stay up between keystrokes; everything about the rows waits for the answer.
-  if (awaiting) return { ...NO_OFFERS, suggestions: search.suggestions, awaiting };
-  return { ...search, awaiting };
+  // A background reload keeps the last answer up; a filter edit or the first load blanks.
+  const keepsLastAnswer =
+    pending && settled !== null && settled.prepareInput === prepareInput && settled.query === query;
+  if (pending && !keepsLastAnswer) {
+    // Suggestions stay up between keystrokes; everything about the rows waits for the answer.
+    return { ...NO_OFFERS, suggestions: search.suggestions, awaiting: true, refreshing: false };
+  }
+  return { ...search, awaiting: false, refreshing: keepsLastAnswer };
 }
