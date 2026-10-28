@@ -1,6 +1,7 @@
 /** A pilot's own loss, opened from "Or pick a lost ship": the payout, the facts, the fit checked against doctrine, File claim. */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { Button, Modal, Spinner } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { repaymentHidden, shipFitValue } from '@/engine/srpAppraisal';
@@ -8,7 +9,7 @@ import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, DoctrinePreview } from '../srpTypes';
 import { basisText } from './srpClaimText';
-import { esiKillmailLink } from './srpMemberModel';
+import { esiKillmailLink, isUsablePreview } from './srpMemberModel';
 import {
   OffDoctrineLine,
   SrpKillmailView,
@@ -36,7 +37,8 @@ function usePreview(
   useEffect(() => {
     let cancelled = false;
     previewDoctrine(esiKillmailLink(killmailId, killmailHash)).then(
-      (value) => !cancelled && setRead({ id: killmailId, value }),
+      (value) =>
+        !cancelled && setRead({ id: killmailId, value: isUsablePreview(value) ? value : 'failed' }),
       () => !cancelled && setRead({ id: killmailId, value: 'failed' })
     );
     return () => {
@@ -112,17 +114,21 @@ export function MemberKillmailModal({
         </div>
       }
     >
-      <SrpKillmailView
-        subject={subject}
-        check={ready?.check}
-        values={ready ? ready.values : null}
-        top={
-          <div>
-            <Payout preview={preview} />
-            <OffDoctrineLine check={ready?.check} />
-          </div>
-        }
-      />
+      <ErrorBoundary
+        fallback={<p className="text-sm text-text-dim">{t('srpKillmail.openFailed')}</p>}
+      >
+        <SrpKillmailView
+          subject={subject}
+          check={ready?.check}
+          values={ready ? ready.values : null}
+          top={
+            <div>
+              <Payout preview={preview} />
+              <OffDoctrineLine check={ready?.check} />
+            </div>
+          }
+        />
+      </ErrorBoundary>
     </Modal>
   );
 }
