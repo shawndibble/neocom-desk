@@ -328,6 +328,8 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
   const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
   const { leg, holes, nameOf } = props;
+  // One way is no comparison; the Ansiblex setup box still offers something to do.
+  const showWays = leg.ways.length > 1 || props.bridges === 'none';
   // A pin waiting on the hole list: said once the list is off or unreachable, not while it loads.
   const noteKey =
     leg.pinNote === 'no-list' ? (holes === 'loading' ? null : `no-list-${holes}`) : leg.pinNote;
@@ -347,23 +349,30 @@ export function LegBody({ children, ...props }: LegWaysProps & { children: React
       )}
       {/* Beside the rows only when this panel, not the screen, has room: the rules column and the nav rail both eat into it. */}
       <div className="@container">
-        <div className="grid items-start gap-3 @5xl:grid-cols-[minmax(0,1fr)_17rem]">
-          <div className="@5xl:order-last">
-            {isPhone ? (
-              <>
-                <PhoneLine
-                  leg={leg}
-                  number={props.number}
-                  nameOf={nameOf}
-                  open={open}
-                  onToggle={() => setOpen((was) => !was)}
-                />
-                {open && <LegWaysPanel {...props} />}
-              </>
-            ) : (
-              <LegWaysPanel {...props} />
-            )}
-          </div>
+        <div
+          className={cx(
+            'grid items-start gap-3',
+            showWays && '@5xl:grid-cols-[minmax(0,1fr)_17rem]'
+          )}
+        >
+          {showWays && (
+            <div className="@5xl:order-last">
+              {isPhone ? (
+                <>
+                  <PhoneLine
+                    leg={leg}
+                    number={props.number}
+                    nameOf={nameOf}
+                    open={open}
+                    onToggle={() => setOpen((was) => !was)}
+                  />
+                  {open && <LegWaysPanel {...props} />}
+                </>
+              ) : (
+                <LegWaysPanel {...props} />
+              )}
+            </div>
+          )}
           <div className="min-w-0">{children}</div>
         </div>
       </div>

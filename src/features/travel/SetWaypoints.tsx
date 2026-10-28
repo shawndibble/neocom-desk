@@ -73,8 +73,11 @@ export function SetWaypoints({
   useHydratedStore(useWaypointsDismissed);
   const holders = useCharacterIdsWithScopes(requiredScopesForEndpoints(ENDPOINTS));
   // Unknown holders hide it too: a dismissed pilot must not see the button flash on a cold load.
+  // So does a selected Character without the scope, or Dismiss would leave a dead button behind.
   const hidden =
-    dismissed && characters.length > 0 && (holders === undefined || holders.size === 0);
+    dismissed &&
+    characters.length > 0 &&
+    (holders === undefined || holders.size === 0 || lacksScope);
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -171,18 +174,14 @@ export function SetWaypoints({
             )}
             {/* `aria-disabled`, not `disabled`: the blocked reason stays reachable in a tooltip. */}
             {/* Always the Tooltip, so the button is not remounted when the reason comes and goes. */}
-            <Tooltip content={lacksScope && !dismissed ? null : blockedReason}>
-              {sendButton}
-            </Tooltip>
+            <Tooltip content={lacksScope ? null : blockedReason}>{sendButton}</Tooltip>
           </div>
         )}
       </div>
-      {/* A dismissed note leaves the reason as the disabled button's only explanation. */}
-      {blockedReason !== null && (!lacksScope || dismissed) && !hidden && (
+      {blockedReason !== null && !lacksScope && !hidden && (
         <p className="text-text-dim sm:text-right">{blockedReason}</p>
       )}
-      {/* The raw flag, not `hidden`: Dismiss clears the note even while another Character holds the scope. */}
-      {lacksScope && characterId !== null && !dismissed && (
+      {lacksScope && characterId !== null && !hidden && (
         <div className="space-y-2 py-2">
           <p className="text-xs font-semibold tracking-widest text-warning uppercase">
             {t('travel.waypoints.grantTitle', { character: characterName ?? '' })}

@@ -233,7 +233,7 @@ describe('SetWaypoints', () => {
     );
   });
 
-  it('Dismiss hides the note even while another Character holds the scope', async () => {
+  it('Dismiss hides the whole control even while another Character holds the scope', async () => {
     await seed([
       { id: ONE, name: 'Pilot One', scopes: [] },
       { id: TWO, name: 'Pilot Two', scopes: [WAYPOINT_SCOPE] },
@@ -244,7 +244,9 @@ describe('SetWaypoints', () => {
 
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull());
     expect(screen.queryByRole('button', { name: 'Grant permission' })).toBeNull();
-    expect(screen.getByText('Grant missing Permissions')).toBeInTheDocument();
+    expect(screen.queryByText('Grant missing Permissions')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 
   it('shows the button for a Character that holds the scope even when dismissed', async () => {
