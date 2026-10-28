@@ -12767,8 +12767,8 @@
       "sells": "{{place}} sells for {{price}}",
       "buys": "buys for {{price}}",
       "jumps_zero": "in your system",
-      "jumps_one": "{{count}} jump away",
-      "jumps_other": "{{count}} jumps away",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
       "view": "View {{place}}"
     },
     "sideToggle": {
