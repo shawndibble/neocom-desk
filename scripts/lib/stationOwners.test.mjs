@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { npcCorpFactions, stationOwnerFields } from './stationOwners.mjs';
+import {
+  DEFAULT_REPROCESSING_TAKE,
+  npcCorpFactions,
+  stationOwnerFields,
+  stationReprocessingFields,
+} from './stationOwners.mjs';
 
 const CORP_ROWS = [
   ['corporationID', 'size', 'factionID', 'corporationName'],
@@ -38,5 +43,22 @@ describe('stationOwnerFields', () => {
   it('leaves both keys off for a blank or malformed owner column', () => {
     expect(stationOwnerFields('', factions)).toEqual({});
     expect(stationOwnerFields(undefined, factions)).toEqual({});
+  });
+});
+
+describe('stationReprocessingFields', () => {
+  it('leaves the key off for the usual 5% take', () => {
+    expect(DEFAULT_REPROCESSING_TAKE).toBe(0.05);
+    expect(stationReprocessingFields('0.05')).toEqual({});
+  });
+
+  it("carries a station's own take where it differs", () => {
+    expect(stationReprocessingFields('0.025')).toEqual({ reprocessingStationsTake: 0.025 });
+  });
+
+  it('leaves the key off for a blank or malformed column rather than writing NaN', () => {
+    expect(stationReprocessingFields('')).toEqual({});
+    expect(stationReprocessingFields(undefined)).toEqual({});
+    expect(stationReprocessingFields('n/a')).toEqual({});
   });
 });

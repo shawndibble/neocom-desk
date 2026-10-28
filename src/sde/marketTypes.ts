@@ -90,6 +90,12 @@ export interface NpcStationEntry {
    * endpoint cannot supply it for NPC corps, so there is nothing to fall back to.
    */
   ownerFactionId?: number;
+  /**
+   * `staStations.reprocessingStationsTake` as a fraction: what the station
+   * keeps of reprocessed output at zero standing. Absent means the usual 0.05;
+   * only the 119 stations that differ (0.025) carry it.
+   */
+  reprocessingStationsTake?: number;
 }
 
 /**

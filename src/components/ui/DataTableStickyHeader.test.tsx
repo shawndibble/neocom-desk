@@ -128,4 +128,41 @@ describe('DataTable sticky header on a phone', () => {
     );
     expect(screen.queryByTestId('dt-sticky-header')).toBeNull();
   });
+
+  it('lays a translucent panel fill over the page colour so rows do not show through', () => {
+    phone(true);
+    render(
+      <div style={{ backgroundColor: 'rgba(10, 20, 30, 0.85)' }}>
+        <DataTable
+          label="Items"
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.id}
+          responsive="table"
+        />
+      </div>
+    );
+    const background = screen.getByTestId('dt-sticky-header').style.background;
+    expect(background).toContain('linear-gradient');
+    expect(background).toContain('var(--color-bg)');
+  });
+
+  it('keeps an opaque fill whose blue channel is 0 as it is', () => {
+    phone(true);
+    render(
+      <div style={{ backgroundColor: 'rgb(255, 128, 0)' }}>
+        <DataTable
+          label="Items"
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.id}
+          responsive="table"
+        />
+      </div>
+    );
+    expect(screen.getByTestId('dt-sticky-header').style.background).toContain('rgb(255, 128, 0)');
+    expect(screen.getByTestId('dt-sticky-header').style.background).not.toContain(
+      'linear-gradient'
+    );
+  });
 });

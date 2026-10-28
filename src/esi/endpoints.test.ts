@@ -29,6 +29,7 @@ import {
   getUniverseStargate,
   getUniverseStation,
   getUniverseSystem,
+  getUniverseFactions,
   getCharacterMailHeaders,
   getCharacterMail,
   putCharacterMail,
@@ -444,6 +445,38 @@ describe('public info endpoints', () => {
     const result = await getUniverseSystem(30000142);
 
     expect(result.data?.security_status).toBeCloseTo(0.9459);
+  });
+
+  it('getUniverseFactions is unauthenticated and lists every faction', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/factions`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json([
+          {
+            faction_id: 500001,
+            name: 'Caldari State',
+            description: 'The Caldari State is ruled by corporations.',
+            corporation_id: 1000035,
+            militia_corporation_id: 1000180,
+            size_factor: 5,
+            solar_system_id: 30000145,
+            station_count: 1535,
+            station_system_count: 534,
+            is_unique: true,
+          },
+        ]);
+      })
+    );
+
+    const result = await getUniverseFactions();
+
+    expect(result.data?.[0]).toMatchObject({
+      faction_id: 500001,
+      corporation_id: 1000035,
+      militia_corporation_id: 1000180,
+      station_count: 1535,
+    });
   });
 
   it('postRoute sends the preference, penalty and avoid list as JSON and unwraps the route', async () => {

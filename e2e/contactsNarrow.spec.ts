@@ -133,11 +133,11 @@ test.describe('Contacts standings cards', () => {
     await page.goto('./contacts/standings');
 
     const rows = page.getByRole('table').getByRole('row');
-    const feeRow = rows.filter({ hasText: 'Used for fees' });
+    const feeRow = rows.filter({ hasText: 'Broker fee' });
     await expect(feeRow).toHaveCount(1);
-    await expect(feeRow.getByText('Used for fees')).toBeVisible();
+    await expect(feeRow.getByText('Broker fee')).toBeVisible();
 
-    const plainRow = rows.filter({ hasNotText: 'Used for fees' }).filter({ hasText: 'NPC corp' });
+    const plainRow = rows.filter({ hasNotText: 'Broker fee' }).filter({ hasText: 'Corporation' });
     await expect(plainRow).toHaveCount(1);
     const feesCell = plainRow.locator('td').last();
     await expect(feesCell).toBeAttached();

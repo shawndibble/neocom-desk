@@ -176,6 +176,21 @@ export const MASTERY_SHIPS_MAX = 700;
 // lands at 0, not slightly off (issue #2392).
 export const CERTIFIED_PLANS_MIN = 25;
 export const CERTIFIED_PLANS_MAX = 80;
+// Stations whose reprocessing take is not the usual 5%, as counted against the
+// same build: 119 of 5,210, all 2.5%. A renamed column lands at 0, not slightly off.
+export const STATION_TAKE_EXCEPTIONS_MIN = 50;
+export const STATION_TAKE_EXCEPTIONS_MAX = 300;
+// Basic agents, NPC corporations (CCP's deleted ones left out) and factions in
+// CCP's export on 2026-10-28 (build 3654997): 8,775, 280 and 27. A broken
+// filter (a renamed `agent` field) lands at 0, not slightly off. Caldari Navy
+// belongs to the Caldari State: a control for the corporation -> faction join.
+export const AGENTS_MIN = 7000;
+export const AGENTS_MAX = 11000;
+export const NPC_CORPORATIONS_MIN = 250;
+export const NPC_CORPORATIONS_MAX = 320;
+export const NPC_FACTIONS_MIN = 20;
+export const NPC_FACTIONS_MAX = 40;
+export const NPC_CORPORATION_CONTROL = { id: 1000035, name: 'Caldari Navy', factionId: 500001 };
 // Combat-group certificates, as counted against CCP's export on 2026-09-30:
 // 68. Same idea — a broken group filter lands at 0 (issue #2390).
 export const CERTIFICATES_MIN = 50;
