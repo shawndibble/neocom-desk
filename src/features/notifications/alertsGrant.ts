@@ -11,6 +11,7 @@
  */
 import { useLiveQuery } from 'dexie-react-hooks';
 import { completeAlertsLogin } from '@/auth/session';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { db } from '@/db';
 import { reportFailure } from '@/observability/reportFailure';
 import type { AlertsWalkStep } from './alertsNeeds';
@@ -150,6 +151,22 @@ export async function recordAlertsGrantScopes(
 ): Promise<void> {
   await recordExtra('nearby', result?.nearbyGrants);
   await recordExtra('mail', result?.mailGrants);
+}
+
+/** {@link readAlertsGrants}, live. Empty until loaded. */
+export function useAlertsGrants(): Record<number, AlertsGrantRecord> {
+  return useLiveQuery(readAlertsGrants, []) ?? {};
+}
+
+/**
+ * Whether no Character has an active Alerts Grant: true/false, or null when
+ * the backend is not configured and there is nothing to grant. One live query
+ * for the caller; the ~100 type rows share the answer instead of each asking.
+ */
+export function useEveGrantMissing(): boolean | null {
+  const grants = useAlertsGrants();
+  if (!isSyncConfigured()) return null;
+  return !Object.values(grants).some((grant) => grant.status === 'active');
 }
 
 /** The server told us, or a poll learned, that this Character's grant is dead. */

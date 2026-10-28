@@ -93,7 +93,7 @@ export function NotificationEventRow({
       }
       onToggleOne={(id, channel) => toggleEventChannelPref(id, currentValue(), eventId, channel)}
       omitUnavailableNote={omitUnavailableNote}
-      browserBlocked={context.browserBlocked}
+      channelOff={context.channelOff}
       visibleCharacterIds={context.visibleCharacterIds}
       forceExpanded={context.forceExpanded}
       isDesktop={context.isDesktop}

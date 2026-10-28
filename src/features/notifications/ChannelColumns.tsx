@@ -11,6 +11,7 @@
 import { HintText } from '@/components/ui/HintText';
 import { useTranslation } from 'react-i18next';
 import { NOTIFICATION_CHANNELS } from './eventSelection';
+import { NO_CHANNEL_OFF, type ChannelOffMap } from './channelOff';
 
 /**
  * From `md` up: Event, Device, Alerts, Warn ahead, Characters. Rows are
@@ -31,7 +32,14 @@ export const ALERTS_CELL = 'md:col-start-3 md:row-start-1 md:justify-self-center
  * `pinned` glues it to the top of the viewport while its rows scroll beneath
  * it (opaque, so rows don't show through); it leaves with its own table.
  */
-export function ChannelColumnHeadings({ pinned = false }: { pinned?: boolean }) {
+export function ChannelColumnHeadings({
+  pinned = false,
+  channelOff = NO_CHANNEL_OFF,
+}: {
+  pinned?: boolean;
+  /** A channel that is off dims its caption, with its boxes below (issue #5330). */
+  channelOff?: ChannelOffMap;
+}) {
   const { t } = useTranslation();
   const caption =
     'text-[0.6875rem] leading-tight font-semibold tracking-widest text-text-dim uppercase';
@@ -49,7 +57,7 @@ export function ChannelColumnHeadings({ pinned = false }: { pinned?: boolean }) 
         <HintText
           key={channel}
           content={t(`settings.notifications.columnHint.${channel}`)}
-          className={`${caption} justify-self-center`}
+          className={`${caption} justify-self-center${channelOff[channel] === null ? '' : ' opacity-60'}`}
         >
           {t(`settings.notifications.column.${channel}`)}
         </HintText>

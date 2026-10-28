@@ -10,6 +10,7 @@ import { CharacterAvatar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { ChannelCheckbox } from './ChannelCheckbox';
+import type { ChannelOffMap } from './channelOff';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from './eventSelection';
 
 export interface CharacterRef {
@@ -32,7 +33,7 @@ interface CharacterChipGridProps {
   availability: (characterId: number) => CharacterAvailability;
   readValue: (characterId: number, channel: NotificationChannel) => boolean;
   onToggle: (characterId: number, channel: NotificationChannel) => void | Promise<void>;
-  browserBlocked: boolean;
+  channelOff: ChannelOffMap;
 }
 
 export function CharacterChipGrid({
@@ -42,7 +43,7 @@ export function CharacterChipGrid({
   availability,
   readValue,
   onToggle,
-  browserBlocked,
+  channelOff,
 }: CharacterChipGridProps) {
   const { t } = useTranslation();
   return (
@@ -75,7 +76,8 @@ export function CharacterChipGrid({
                   <ChannelCheckbox
                     channel={channel}
                     eventLabel={`${label}, ${character.name}`}
-                    enabled={state.enabled && !(channel === 'browser' && browserBlocked)}
+                    enabled={state.enabled}
+                    channelOff={channelOff[channel]}
                     disabledReason={state.reason}
                     missingPermissionLabel={state.permissionLabel}
                     checked={readValue(character.characterId, channel)}

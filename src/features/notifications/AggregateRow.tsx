@@ -20,6 +20,8 @@ import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { EVENT_ROW_GRID, DEVICE_CELL, ALERTS_CELL } from './ChannelColumns';
+import { ChannelOffTip } from './ChannelOffTip';
+import type { ChannelOffMap } from './channelOff';
 import { applyToAllFlips, summarizeChannels } from './channelSummary';
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from './eventSelection';
 import {
@@ -41,7 +43,7 @@ export interface AggregateRowProps {
   onToggleAll: (applicableIds: number[], channel: NotificationChannel) => void;
   /** Awaited by "Apply to all": each write reads the store, so they must not overlap. */
   onToggleOne: (characterId: number, channel: NotificationChannel) => void | Promise<void>;
-  browserBlocked: boolean;
+  channelOff: ChannelOffMap;
   /** A search that names Characters narrows the chips to them; null shows all. */
   visibleCharacterIds: ReadonlySet<number> | null;
   /** Open the row because a search asked for it. Honoured on desktop only: a phone never opens sheets on its own. The user can still close it. */
@@ -64,7 +66,7 @@ export function AggregateRow({
   readValue,
   onToggleAll,
   onToggleOne,
-  browserBlocked,
+  channelOff,
   visibleCharacterIds,
   forceExpanded,
   isDesktop,
@@ -93,8 +95,8 @@ export function AggregateRow({
   async function applyToAll() {
     const flips = applyToAllFlips(applicableIds, readValue);
     for (const channel of NOTIFICATION_CHANNELS) {
-      // The Device boxes are disabled while the browser is blocked; Apply must not write behind them.
-      if (channel === 'browser' && browserBlocked) continue;
+      // A greyed channel's boxes are disabled; Apply must not write behind them.
+      if (channelOff[channel] !== null) continue;
       for (const characterId of flips[channel]) await onToggleOne(characterId, channel);
     }
   }
@@ -122,7 +124,7 @@ export function AggregateRow({
         availability={availability}
         readValue={readValue}
         onToggle={onToggleOne}
-        browserBlocked={browserBlocked}
+        channelOff={channelOff}
       />
     </div>
   );
@@ -179,16 +181,18 @@ export function AggregateRow({
         <div className="flex flex-wrap items-center gap-x-5 pl-6 md:contents">
           {NOTIFICATION_CHANNELS.map((channel, index) => (
             <div key={channel} className={index === 0 ? DEVICE_CELL : ALERTS_CELL}>
-              <SelectionCheckbox
-                state={summary.state[channel]}
-                disabled={applicableIds.length === 0 || (channel === 'browser' && browserBlocked)}
-                onToggle={() => onToggleAll(applicableIds, channel)}
-                label={t(`settings.notifications.toggleAllCharactersLabel.${channel}`, {
-                  event: label,
-                })}
-                caption={t(`settings.notifications.column.${channel}`)}
-                captionClassName="md:hidden"
-              />
+              <ChannelOffTip reason={channelOff[channel]}>
+                <SelectionCheckbox
+                  state={summary.state[channel]}
+                  disabled={applicableIds.length === 0 || channelOff[channel] !== null}
+                  onToggle={() => onToggleAll(applicableIds, channel)}
+                  label={t(`settings.notifications.toggleAllCharactersLabel.${channel}`, {
+                    event: label,
+                  })}
+                  caption={t(`settings.notifications.column.${channel}`)}
+                  captionClassName="md:hidden"
+                />
+              </ChannelOffTip>
             </div>
           ))}
           {summaryText !== null && (

@@ -558,6 +558,8 @@ async function openEvent(user: ReturnType<typeof userEvent.setup>, event: string
 
 describe('Settings — Notifications (issue #170)', () => {
   beforeEach(async () => {
+    // The Device column is greyed without a grant (issue #5330); these tests act on it.
+    stubNotification('granted');
     await db.tokens.put({
       characterId: CHAR_ID,
       accessToken: 'a',
@@ -1149,6 +1151,17 @@ describe('Settings — Notifications (issue #170)', () => {
   });
 
   describe('Row-level broadcast (issue #738, now the page itself)', () => {
+    it('greys the Device boxes, ticks kept, until this device grants permission (issue #5330)', async () => {
+      stubNotification('default');
+      const user = userEvent.setup();
+      render(<App />);
+      await notificationsPanel();
+      await openTopic(user, 'Skills');
+      await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
+      expect(rowCheckbox('Skill level complete', 'device')).toBeDisabled();
+      expect(rowCheckbox('Skill level complete', 'Alerts')).toBeEnabled();
+    });
+
     it('writes to every Character the event applies to, and skips one whose own scope is missing', async () => {
       const user = userEvent.setup();
       render(<App />);

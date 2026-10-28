@@ -8,6 +8,7 @@ import { eventEntry } from './eventEntries';
 import type { NotificationEventId } from './events';
 import { isMailServerEvent, isNearbyServerEvent, isServerPushedEvent } from './serverEvents';
 import type { NotificationPreferencesValue } from './preferences';
+import type { ChannelOffMap } from './channelOff';
 import type { CharacterAvailability, CharacterRef } from './CharacterChipGrid';
 
 export const EMPTY_SCOPES: ReadonlySet<string> = new Set();
@@ -36,7 +37,8 @@ export interface EventRowContext {
   scopesByCharacterId: ReadonlyMap<number, ReadonlySet<string>>;
   capabilitiesByCharacterId: ReadonlyMap<number, CorpCapabilities>;
   prefsValue: NotificationPreferencesValue;
-  browserBlocked: boolean;
+  /** Which delivery channels are unusable right now, and why (`channelOff.ts`). */
+  channelOff: ChannelOffMap;
   visibleCharacterIds: ReadonlySet<number> | null;
   forceExpanded: boolean;
   isDesktop: boolean;
