@@ -180,7 +180,7 @@ describe('SetWaypoints', () => {
       'true'
     );
     expect(screen.getByRole('button', { name: 'Grant permission' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Manage permissions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage permissions' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
   });
 
@@ -203,7 +203,7 @@ describe('SetWaypoints', () => {
       await screen.findByRole('combobox', { name: 'Character to set waypoints for' })
     );
     await userEvent.click(await screen.findByRole('option', { name: 'Pilot Two' }));
-    await userEvent.click(await screen.findByRole('link', { name: 'Manage permissions' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Manage permissions' }));
 
     expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions?grant=autopilot');
     expect(useActiveCharacter.getState().activeCharacterId).toBe(TWO);
@@ -227,7 +227,10 @@ describe('SetWaypoints', () => {
     first.unmount();
     show([leg([JITA, PERIMETER])]);
     expect(await screen.findByText('facts')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull();
+    // The flag hydrates from Dexie after the first paint.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Set waypoints in game' })).toBeNull()
+    );
   });
 
   it('shows the button for a Character that holds the scope even when dismissed', async () => {
