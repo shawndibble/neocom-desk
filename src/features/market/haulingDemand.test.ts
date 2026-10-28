@@ -11,9 +11,12 @@ vi.mock('@/features/contractSearch/r2OfferSnapshot', () => ({
 }));
 const { loadHaulingDemand, parseHaulingDemand } = await import('./haulingDemand');
 
+const isoDay = (daysAgo: number) =>
+  new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+
 const OBJECT = {
   lastSyncedAt: Date.now(),
-  asOf: '2026-10-26',
+  asOf: isoDay(1),
   days: 30,
   types: { 34: [110, 4, 20, 110, '2026-10-14', 120, 100] },
 };
@@ -42,12 +45,12 @@ describe('parseHaulingDemand', () => {
 describe('loadHaulingDemand', () => {
   it('returns the cached object', async () => {
     loadWithCache.mockResolvedValue({ data: parseHaulingDemand(OBJECT) });
-    expect((await loadHaulingDemand(10000002))?.asOf).toBe('2026-10-26');
+    expect((await loadHaulingDemand(10000002))?.asOf).toBe(OBJECT.asOf);
     expect(loadWithCache.mock.calls[0]![1]).toBe('haulingDemandR2:10000002');
   });
 
-  it('is null when the object is older than three days', async () => {
-    const old = { ...OBJECT, lastSyncedAt: Date.now() - 4 * 24 * 60 * 60_000 };
+  it('is null when the newest day of data is over four days old', async () => {
+    const old = { ...OBJECT, asOf: isoDay(6) };
     loadWithCache.mockResolvedValue({ data: parseHaulingDemand(old) });
     expect(await loadHaulingDemand(10000002)).toBeNull();
   });

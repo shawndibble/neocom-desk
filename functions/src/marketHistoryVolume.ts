@@ -86,9 +86,10 @@ export class VolumeFold {
   /** `add` plus the day's price band and order count, for `demandFor`. */
   addDay(regionId: number, typeId: number, day: DemandDay): void {
     const region = this.daysByType.get(regionId);
+    // Volume counts even where the price columns are unreadable, as `perDay` always did.
+    this.add(regionId, typeId, day.volume);
     if (!region || !Number.isInteger(typeId) || !(day.volume > 0)) return;
     if (!Number.isFinite(day.highest) || !Number.isFinite(day.lowest)) return;
-    this.add(regionId, typeId, day.volume);
     const orderCount = Number.isFinite(day.orderCount) ? day.orderCount : 0;
     const days = region.get(typeId) ?? [];
     days.push({ ...day, orderCount });

@@ -12,8 +12,8 @@ import type { DemandAggregate } from '@/engine/market/haulingMarket';
 
 /** The backend republishes once a day. */
 const STALE_AFTER_MS = 12 * 60 * 60_000;
-/** An object this old means the daily job stopped: three missed runs, then ESI is the better source. */
-export const MAX_DEMAND_AGE_MS = 3 * 24 * 60 * 60_000;
+/** Newest day of data older than this means the daily job stopped (it is normally 1 to 2 days old): ESI is the better source. */
+export const MAX_DEMAND_AGE_MS = 4 * 24 * 60 * 60_000;
 
 export interface HaulingDemand {
   /** The newest day the 30-day window ends on (ISO date). */
@@ -81,7 +81,9 @@ export async function loadHaulingDemand(regionId: number): Promise<HaulingDemand
       { staleAfterMs: STALE_AFTER_MS, allowStaleServe: true }
     );
     const demand = cached?.data ?? null;
-    return demand && Date.now() - demand.lastSyncedAt <= MAX_DEMAND_AGE_MS ? demand : null;
+    return demand && Date.now() - Date.parse(`${demand.asOf}T00:00:00Z`) <= MAX_DEMAND_AGE_MS
+      ? demand
+      : null;
   } catch {
     return null;
   }

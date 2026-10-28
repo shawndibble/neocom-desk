@@ -777,7 +777,9 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   slow: hidden.slow,
                   low: hidden.lowMargin,
                 })}
-          {state.scan.demandSource === 'esi' ? ` ${t('market.hauling.demandFallbackLine')}` : ''}
+          {state.scan.demandSource
+            ? ` ${t(`market.hauling.demand${state.scan.demandSource === 'esi' ? 'Fallback' : 'Daily'}Line`)}`
+            : ''}
           {state.scan.capped
             ? ` ${
                 instant
