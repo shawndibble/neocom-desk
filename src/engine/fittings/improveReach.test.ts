@@ -530,6 +530,9 @@ describe('onlySide', () => {
   const option = (toTypeId: number, score: number) =>
     ({ candidate: { fromTypeId: 1, toTypeId, at: [] }, score }) as never;
   const result = {
+    makeFlyable: [],
+    flyableOverrun: [],
+    flyableBlocked: [],
     noDownside: [option(2, 0.11), option(11, 0.05), option(5, 0.02)],
     tradeOffs: [option(4, 0.3)],
     rejected: [option(3, 0.4)],

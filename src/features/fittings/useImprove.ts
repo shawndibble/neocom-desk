@@ -48,10 +48,10 @@ import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCha
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
-import type { Resource } from '@/engine/fittings/makeItFit';
+import type { FitSwap, Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
-import { buildVariationIndex } from '@/engine/market/variations';
+import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
@@ -371,6 +371,43 @@ async function crystalPlan(
     : { crystalFor: forKey(best), bestKey: best, crystalsOf: crystalsFor };
 }
 
+/** Officer and Deadspace meta groups: never offered as a stand-in, as in the search proper. */
+const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
+
+/**
+ * The module and rig swaps that can pay for an unflyable-module fix that runs
+ * the fit out of CPU, powergrid or calibration: every other fitted module's
+ * and rig's siblings the hull takes and the pilot can fly, whatever the Reach
+ * or the rigs tick. Empty when the fit has no module to replace.
+ */
+function compensationSwaps(
+  variants: VariantEvaluator,
+  catalogue: FittingCatalogue,
+  hasFix: boolean
+): FitSwap[] {
+  if (!hasFix) return [];
+  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
+  const pool = modulePool(catalogue, variants);
+  return variants.fitting.modules.flatMap((module) => {
+    if (module.slot === 'subsystem') return [];
+    return getVariations(index, module.typeId)
+      .members.filter(
+        (member) =>
+          member.typeId !== module.typeId &&
+          catalogue.rackOf[String(member.typeId)] === module.slot &&
+          pool.published(member.typeId) &&
+          !EXCLUDED_META_GROUPS.has(index.types[member.typeId]?.metaGroupId ?? 0) &&
+          (pool.flyable?.(module.slot, member.typeId) ?? true)
+      )
+      .map((member) => ({
+        slot: module.slot,
+        slotIndex: module.slotIndex,
+        fromTypeId: module.typeId,
+        toTypeId: member.typeId,
+      }));
+  });
+}
+
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
 function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   const ids = new Set<number>();
@@ -480,7 +517,18 @@ export function useImprove(
           current.status === 'searching' ? { ...current, checked: 0, total } : current
         );
         const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-        const typeIds = candidateTypeIds(sets.flatMap((set) => set.candidates));
+        const candidates = sets.flatMap((set) => set.candidates);
+        const compensation = compensationSwaps(
+          variants,
+          catalogue,
+          candidates.some((candidate) => candidate.fixesUnflyable)
+        );
+        const typeIds = [
+          ...new Set([
+            ...candidateTypeIds(candidates),
+            ...compensation.flatMap((swap) => [swap.fromTypeId, swap.toTypeId]),
+          ]),
+        ];
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
           // The Price section's own total, for Planning's budget.
@@ -539,6 +587,11 @@ export function useImprove(
             mode,
             spendCap,
             fitTotal,
+            compensators: (_fitting, fix) =>
+              compensation.filter(
+                (swap) =>
+                  !fix.at.some((at) => at.slot === swap.slot && at.slotIndex === swap.slotIndex)
+              ),
             onProgress: (checked) => {
               if (!cancelled)
                 setState((current) =>

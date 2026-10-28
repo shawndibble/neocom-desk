@@ -8,15 +8,17 @@ import {
   type DefenseChoice,
   type ImproveGoal,
   type ImproveOption,
+  type RejectedOption,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import { hullRoleOf, rememberedGoal } from '@/engine/fittings/improveRole';
 import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
-import type { Fitting, FittingModuleResult } from '@/engine/fittings/types';
+import type { Fitting, FittingImplantSet, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import type { FittingContext } from './fittingContext';
 import { useChargeChoices } from './useChargeChoices';
 import type { ChargeLoading } from './useChargeLoading';
+import { ImproveFlyableImplants as FlyableImplants } from './ImproveFlyableImplants';
 import { ImproveImplants } from './ImproveImplants';
 import { ImprovePanel } from './ImprovePanel';
 import { ImproveTrain } from './ImproveTrain';
@@ -247,6 +249,17 @@ export function useImproveDrawer({
     });
   }
 
+  function applyWithImplants(fix: RejectedOption, implantSet: FittingImplantSet) {
+    if (!fitting) return;
+    const applied = { ...applyImproveCandidate(fitting, fix.candidate), implantSet };
+    edit(() => applied);
+    setUndo({
+      before: fitting,
+      applied,
+      message: t('fittings.improve.appliedWithImplants'),
+    });
+  }
+
   const body = (
     <ImprovePanel
       goal={search.goal}
@@ -254,6 +267,27 @@ export function useImproveDrawer({
       search={search}
       catalogue={catalogue}
       onApply={apply}
+      renderFlyableImplants={
+        fitting && workspace.profile
+          ? (fix, label) => (
+              <FlyableImplants
+                fix={fix}
+                label={label}
+                open={isOpen}
+                implants={{
+                  fitting,
+                  profile: workspace.profile!,
+                  basis: workspace.implantBasis,
+                  onChange: workspace.setImplantSet,
+                }}
+                mode={mode}
+                spendCap={spendCap}
+                fitTotal={search.state.status === 'done' ? search.state.fitTotal : null}
+                onApply={applyWithImplants}
+              />
+            )
+          : undefined
+      }
       fitting={fitting}
       target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
       onPreview={onPreview}
@@ -321,7 +355,10 @@ export function useImproveDrawer({
   // drawn for results alone, and an empty footer is a stray line.
   const found =
     search.state.status === 'done' &&
-    search.state.result.noDownside.length + search.state.result.tradeOffs.length > 0;
+    search.state.result.makeFlyable.length +
+      search.state.result.noDownside.length +
+      search.state.result.tradeOffs.length >
+      0;
   const footer = found && <div ref={setFooterTarget} />;
 
   // Desktop: a column in the page, left of the editor (FittingEditorLayout's

@@ -1,0 +1,7 @@
+# Scope decisions — Make Flyable is a section whose every row can be applied
+
+_Recorded 2026-10-28._
+
+- **Replacements for modules the pilot cannot fly have their own section, "Make Flyable", apart from No downside and Trade-offs.** Supersedes the "listed ahead of real gains" placement in `20261028-093206-improve-replaces-unflyable-modules-and-cheaper-tolerates-10.md`.
+- **A Make Flyable row is never one the pilot cannot apply.** A replacement that runs the fit out of CPU, powergrid or calibration carries the module and rig swaps that bring it back under, applied with it as one change, fewest changes first, then cheapest. Any fitted module or rig may be swapped, whatever the Reach and the rigs tick. A replacement no swap covers, or that passes the budget, stays as a greyed row saying what it needs. Rules out a Make Flyable row that locks Apply once ticked.
+- **An overrunning replacement also gets an implant alternative beside the swaps (CPU and powergrid only; no implant moves calibration).** The pilot may be sent to buy the implants, but only a set that keeps the bundle inside the Planning budget or Refit spend cap is offered, so a rig swap shows as the cheaper way when the implants are too dear. Rules out implants the pilot must already own.

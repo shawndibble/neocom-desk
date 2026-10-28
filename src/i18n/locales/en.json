@@ -1407,6 +1407,12 @@
       "swap_other": "{{count}}× {{from}} → {{to}}",
       "givesUp": "Gives up:",
       "unflyable": "You can't fly the current module yet; this one you can.",
+      "flyableWith": "Also swaps {{swaps}} to keep the fit within CPU, powergrid and calibration.",
+      "flyableImplants": "Or fly {{fix}} with implants instead:",
+      "appliedWithImplants": "Made the module flyable and set the implants.",
+      "flyableShort": "{{amount}} more {{resource}}",
+      "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
+      "flyableNoCover": "Needs {{short}}, and no module or rig swap frees it.",
       "noPrice": "No price",
       "gain": "+{{percent}}%",
       "moreOptions_one": "{{count}} more option",
@@ -1418,6 +1424,7 @@
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
         "fixFirst": "Fix this first",
+        "makeFlyable": "Make Flyable",
         "implants": "Implants",
         "noDownside": "No downside",
         "tradeOffs": "Trade-offs"

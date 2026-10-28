@@ -61,7 +61,7 @@ import {
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { crystalParts } from '@/engine/fittings/improveMining';
-import type { Resource } from '@/engine/fittings/makeItFit';
+import { overageOf, RESOURCES, type Resource } from '@/engine/fittings/makeItFit';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
@@ -90,6 +90,9 @@ import type { ImproveSearch } from './useImprove';
 
 /** How many stat changes a row spells out before counting the rest. */
 const CHANGES_SHOWN = 4;
+
+/** How many overrun fixes get an implant search: each runs the Implant Finder whole. */
+const FLYABLE_IMPLANT_FIXES = 3;
 
 const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
@@ -163,6 +166,8 @@ interface Props {
   search: ImproveSearch;
   catalogue: FittingCatalogue | null;
   onApply: (options: ImproveOption[]) => void;
+  /** The implant alternative under a Make Flyable fix that overran CPU or powergrid; absent: none. */
+  renderFlyableImplants?: (fix: RejectedOption, label: string) => ReactNode;
   settings: ImproveSettings;
   /** Opens Make it fit on that budget, from "Fix this first". */
   onFixFirst: (resource: Resource) => void;
@@ -223,6 +228,7 @@ export function ImprovePanel({
   search,
   catalogue,
   onApply,
+  renderFlyableImplants,
   settings,
   onFixFirst,
   unloaded,
@@ -302,13 +308,21 @@ export function ImprovePanel({
           from: name(candidate.fromTypeId),
           to: name(candidate.toTypeId),
         });
+  /** The swaps chained behind a Make Flyable fix, each named: what frees the CPU or powergrid it takes. */
+  const flyableSwaps = (candidate: ImproveOption['candidate']): string[] =>
+    candidate.pairedWith
+      ? [moveLabel(candidate.pairedWith), ...flyableSwaps(candidate.pairedWith)]
+      : [];
+
   const swapLabel = (option: ImproveOption) =>
-    option.candidate.pairedWith
-      ? t('fittings.improve.pair', {
-          add: moveLabel({ ...option.candidate, pairedWith: undefined }),
-          downgrade: moveLabel(option.candidate.pairedWith),
-        })
-      : moveLabel(option.candidate);
+    option.candidate.fixesUnflyable
+      ? moveLabel({ ...option.candidate, pairedWith: undefined })
+      : option.candidate.pairedWith
+        ? t('fittings.improve.pair', {
+            add: moveLabel({ ...option.candidate, pairedWith: undefined }),
+            downgrade: moveLabel(option.candidate.pairedWith),
+          })
+        : moveLabel(option.candidate);
 
   /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
   function changeLine(
@@ -658,6 +672,13 @@ export function ImprovePanel({
             {option.candidate.fixesUnflyable && (
               <span className="text-warning block text-xs">{t('fittings.improve.unflyable')}</span>
             )}
+            {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
+              <span className="block text-xs">
+                {t('fittings.improve.flyableWith', {
+                  swaps: flyableSwaps(option.candidate).join('; '),
+                })}
+              </span>
+            )}
             {lead && <span className="block text-xs">{lead.node}</span>}
             <span className="text-text-dim block text-xs">
               {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
@@ -722,6 +743,38 @@ export function ImprovePanel({
           );
         })}
       </ul>
+    );
+  }
+
+  /** A fix that cannot be applied as it stands: greyed, with what it needs and why nothing covers it. */
+  function blockedRow(option: RejectedOption, own: FittingStats, fitTotal: number | null) {
+    const short = RESOURCES.filter((resource) => overageOf(option.after, resource) > 0).map(
+      (resource) =>
+        t('fittings.improve.flyableShort', {
+          amount: m3sFormat(overageOf(option.after, resource)),
+          resource: t(`fittings.improve.resource.${resource}`),
+        })
+    );
+    return (
+      <li
+        key={optionKey(option)}
+        className="border-line text-text-dim rounded-xs border p-2 text-sm"
+        data-testid="improve-flyable-blocked"
+      >
+        <span className="flex items-start gap-2">
+          <TypeIcon typeId={option.candidate.toTypeId} size={32} width={24} height={24} />
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">{swapLabel(option)}</span>
+            <span className="block text-xs">{t('fittings.improve.unflyable')}</span>
+            <span className="text-warning block text-xs">
+              {option.guardrail === 'budget'
+                ? t('fittings.improve.flyableNoCover', { short: short.join(', ') })
+                : brokeText(t, option, settings, fitTotal)}
+            </span>
+            <span className="block text-xs">{changeLine(option, own)}</span>
+          </span>
+        </span>
+      </li>
     );
   }
 
@@ -1214,7 +1267,10 @@ export function ImprovePanel({
       )}
 
       {state.status === 'done' &&
-        (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
+        (state.result.makeFlyable.length === 0 &&
+        state.result.flyableBlocked.length === 0 &&
+        state.result.noDownside.length === 0 &&
+        state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
             <p className="text-sm">
               {t(
@@ -1295,6 +1351,27 @@ export function ImprovePanel({
               onChange={setSort}
               fill
             />
+            {(state.result.makeFlyable.length > 0 || state.result.flyableBlocked.length > 0) && (
+              <MakeItFitSection heading={t('fittings.improve.section.makeFlyable')}>
+                {state.result.makeFlyable.length > 0 &&
+                  rows(state.result.makeFlyable, state.before, 'mf')}
+                {renderFlyableImplants &&
+                  state.result.flyableOverrun
+                    .slice(0, FLYABLE_IMPLANT_FIXES)
+                    .map((fix) => (
+                      <Fragment key={optionKey(fix)}>
+                        {renderFlyableImplants(fix, swapLabel(fix))}
+                      </Fragment>
+                    ))}
+                {state.result.flyableBlocked.length > 0 && (
+                  <ul className="space-y-1">
+                    {state.result.flyableBlocked.map((option) =>
+                      blockedRow(option, state.before, state.fitTotal)
+                    )}
+                  </ul>
+                )}
+              </MakeItFitSection>
+            )}
             {state.result.noDownside.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.noDownside')}>
                 {rows(state.result.noDownside, state.before, 'nd')}
