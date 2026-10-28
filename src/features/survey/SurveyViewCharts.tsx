@@ -168,6 +168,7 @@ export function DepletionChart({ summary }: { summary: SurveySummary }) {
               dataKey={ore}
               name={ore}
               stroke={oreTone(i)}
+              strokeOpacity={0.75}
               strokeWidth={2}
               dot={nodeDot}
               connectNulls
@@ -394,13 +395,20 @@ interface SliceShapeProps {
   fill?: string;
 }
 
-/** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. */
+/** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. The fill is as translucent as the ore-left and ISK-left areas. */
 function SliceShape({ x, y, width, height, fill }: SliceShapeProps) {
   if (x === undefined || y === undefined || width === undefined || height === undefined) {
     return <g />;
   }
   return (
-    <rect x={x} y={y + 1} width={Math.max(0, width)} height={Math.max(0, height - 2)} fill={fill} />
+    <rect
+      x={x}
+      y={y + 1}
+      width={Math.max(0, width)}
+      height={Math.max(0, height - 2)}
+      fill={fill}
+      fillOpacity={0.45}
+    />
   );
 }
 
