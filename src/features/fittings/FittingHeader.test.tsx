@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -65,6 +65,33 @@ describe('FittingHeader on desktop', () => {
     expect(onCompare).toHaveBeenCalledOnce();
   });
 
+  it('opens Improve from the ⋮ menu once the menu has closed and refocused its button', async () => {
+    const trigger = () => screen.getByRole('button', { name: 'Fitting actions' });
+    const onImprove = vi.fn();
+    renderHeader({ onImprove });
+    const user = userEvent.setup();
+    await user.click(trigger());
+    await user.click(await screen.findByRole('menuitem', { name: 'Improve Fit' }));
+    expect(onImprove).toHaveBeenCalledOnce();
+    // The button holds focus as Improve's column renders, so the column can give it back on close.
+    await waitFor(() => expect(document.activeElement).toBe(trigger()));
+  });
+
+  it('puts an Improve button between Open and Export, the same height as they are', async () => {
+    const onImprove = vi.fn();
+    renderHeader({ onImprove });
+    const open = screen.getByRole('button', { name: 'Open' });
+    const improve = screen.getByRole('button', { name: 'Improve' });
+    const exportButton = screen.getByRole('button', { name: 'Export' });
+    expect(open.compareDocumentPosition(improve) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      improve.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(improve.className).toBe(open.className);
+    await userEvent.setup().click(improve);
+    expect(onImprove).toHaveBeenCalledOnce();
+  });
+
   it('copies the headline stats from the ⋮ menu and says so', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
@@ -87,6 +114,16 @@ describe('FittingHeader on desktop', () => {
 });
 
 describe('FittingHeader below desktop', () => {
+  it('leaves the Alpha/Omega verdict out of the ⋮ menu when the tab row carries it', async () => {
+    renderHeader({
+      compact: true,
+      badges: { mastery: { hullTypeId: 1, hullName: 'Test', characterId: 1 } },
+    });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Fitting actions' }));
+    await screen.findByRole('menuitem', { name: 'Compare' });
+    expect(screen.queryByText('Alpha OK')).toBeNull();
+  });
+
   it('folds the badges into the ⋮ menu as text and out of the header row', async () => {
     const user = userEvent.setup();
     renderHeader({ compact: true });

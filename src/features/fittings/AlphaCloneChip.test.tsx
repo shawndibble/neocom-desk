@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { iconButtonClassName } from '@/components/ui/iconButtonClassName';
@@ -32,6 +32,16 @@ describe('AlphaCloneChip', () => {
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Heavy Assault Cruisers I (Alphas can’t train it)');
     expect(tooltip).toHaveTextContent('Gallente Cruiser V (Alpha max IV)');
+    // The skill levels sit in one ruled list under the verdict.
+    const list = within(tooltip).getByRole('list');
+    expect(list).toHaveClass('border-y');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('lists nothing under the verdict when an Alpha can fly it', async () => {
+    render(<AlphaCloneChip blockers={[]} skillName={skillName} />);
+    await userEvent.hover(screen.getByRole('button', { name: 'Alpha OK' }));
+    expect(within(await screen.findByRole('tooltip')).queryByRole('list')).toBeNull();
   });
 
   it('is an α icon in the positive tone when Alpha can fly it, an Ω in the warning tone otherwise', () => {

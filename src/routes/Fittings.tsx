@@ -514,7 +514,6 @@ function FittingsPage() {
       preview={improve.preview}
       previewIsk={improve.previewIsk}
       ruleBreaks={ruleBreaks.lines}
-      onImprove={improve.open}
     />
   );
 
@@ -556,10 +555,12 @@ function FittingsPage() {
               hullName={hullName}
               compact={headerCompact}
               alpha={alpha}
+              alphaInTabs={layoutAddMode === 'sheet'}
               share={editorShare}
               saved={saved}
               onLibrary={openLibrary}
               onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
+              onImprove={improve.open}
             />
             {workspace.tooLargeToShare && (
               <p role="alert" className="text-xs text-warning">
@@ -589,6 +590,7 @@ function FittingsPage() {
               editor={editor}
               statsSections={statsSections}
               statsFirst={statsFirst}
+              alpha={{ blockers: alpha.blockers, skillName: alpha.skillName }}
               improveColumn={improve.column}
             />
             {makeItFit.dialog}

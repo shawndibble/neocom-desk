@@ -62,7 +62,7 @@ interface UseImproveDrawerArgs {
 }
 
 /**
- * Improve: `open()` from the stats column's Improve trigger, and the `drawer` (with its
+ * Improve: `open()` from the header's ⋮ menu, and the `drawer` (with its
  * Undo toast) to render once in the editor. A `SlideOver` beside the fit on
  * desktop, so the Ring stays steerable; a bottom sheet on a phone.
  */
@@ -147,7 +147,8 @@ export function useImproveDrawer({
   // stats are a tab of their own) a sheet.
   const asColumn = useIsDesktop();
   // The column's heading takes focus as it opens, so a keyboard user lands in it;
-  // closing gives focus back to what held it (the Improve trigger), as the slide-out used to.
+  // closing gives focus back to what held it (the ⋮ menu's button, which the menu
+  // has refocused by then: `useOpenAfterMenu`), as the slide-out used to.
   const columnHeading = useRef<HTMLHeadingElement | null>(null);
   const columnRef = useFitToViewport(isOpen && asColumn);
   const opener = useRef<HTMLElement | null>(null);

@@ -101,8 +101,6 @@ interface FittingStatsSectionsProps {
   previewIsk?: number | null;
   /** One sentence per fitting rule the fit breaks; empty or absent for a legal fit. */
   ruleBreaks?: readonly string[];
-  /** Opens Improve, a trigger at the row's far end; absent where the Fitting cannot be edited. */
-  onImprove?: () => void;
 }
 
 /**
@@ -139,7 +137,6 @@ export function FittingStatsSections({
   moduleResults = null,
   preview = null,
   previewIsk = null,
-  onImprove,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   // The ship data never downloaded and there is no connection to fetch it: say so, not "couldn't load".
@@ -250,13 +247,6 @@ export function FittingStatsSections({
           >
             {situationValue}
           </StatsScopeTrigger>
-          {onImprove && (
-            <StatsScopeTrigger
-              className="ml-auto"
-              label={t('fittings.improve.title')}
-              onClick={onImprove}
-            />
-          )}
         </div>
         {statsError && (
           <div
