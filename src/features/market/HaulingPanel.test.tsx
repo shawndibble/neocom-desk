@@ -422,7 +422,8 @@ describe('HaulingPanel trip rail', () => {
   it('names the lane and its profit per jump', () => {
     renderPanel();
     expect(jumpCalls.at(-1)).toEqual([JITA.systemId, AMARR.systemId]);
-    expect(screen.getByText(/Jita to Amarr · 9 jumps/)).toBeInTheDocument();
+    expect(screen.getByText(/Jita to Amarr ·/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^9 jumps/ })).toBeInTheDocument();
     expect(screen.getByText('Profit per jump (9)')).toBeInTheDocument();
   });
 
