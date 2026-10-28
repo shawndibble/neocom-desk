@@ -54,6 +54,11 @@ describe('RequireCharacter', () => {
     expect(await screen.findByText(/from: \/market/)).toBeInTheDocument();
   });
 
+  it('keeps the query and hash in the preserved destination', async () => {
+    renderAt('/market?info=123#x');
+    expect(await screen.findByText('login page (from: /market?info=123#x)')).toBeInTheDocument();
+  });
+
   it('lets a logged-in Character through', async () => {
     await addCharacter();
     renderAt('/market');
