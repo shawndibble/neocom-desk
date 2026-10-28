@@ -209,7 +209,11 @@ function Cell({
         widget={widget}
         editing={editing}
         onRemove={onRemove}
-        menu={<WidgetMenu widget={widget} />}
+        menu={(card, to) => (
+          <WidgetMenu widget={widget} to={to}>
+            {card}
+          </WidgetMenu>
+        )}
         headerStart={handle}
         editControls={
           editing ? <EditControls widget={widget} title={title} first={first} last={last} /> : null

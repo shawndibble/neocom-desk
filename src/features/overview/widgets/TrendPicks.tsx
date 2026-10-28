@@ -10,9 +10,9 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
   IconButton,
+  MenuCheckboxItem,
+  MenuLabel,
   Modal,
   NativeSelect,
   SearchInput,
@@ -58,11 +58,11 @@ export function TrendHubsMenuGroup({ widget }: { widget: Widget }) {
   };
   return (
     <>
-      <DropdownMenuLabel>{t('overview.menu.trendHubs')}</DropdownMenuLabel>
+      <MenuLabel>{t('overview.menu.trendHubs')}</MenuLabel>
       {TRADE_HUBS.map((hub) => {
         const on = current.includes(hub.id);
         return (
-          <DropdownMenuCheckboxItem
+          <MenuCheckboxItem
             key={hub.id}
             checked={on}
             disabled={on ? current.length === 1 : current.length >= MAX_TREND_HUBS}
@@ -71,7 +71,7 @@ export function TrendHubsMenuGroup({ widget }: { widget: Widget }) {
             onCheckedChange={(next) => toggle(hub.id, next)}
           >
             {hub.systemName}
-          </DropdownMenuCheckboxItem>
+          </MenuCheckboxItem>
         );
       })}
     </>

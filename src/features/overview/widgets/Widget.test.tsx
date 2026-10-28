@@ -648,12 +648,17 @@ describe('Widget header', () => {
     expect(screen.queryByRole('button', { name: /settings for/i })).not.toBeInTheDocument();
 
     renderWidget(model({ id: 'w2', kind: 'priceWatch', title: 'Second' }), ready, {
-      menu: <button type="button">Menu here</button>,
+      menu: (card) => (
+        <div>
+          {card}
+          <span>Menu here</span>
+        </div>
+      ),
       headerStart: <span>Handle here</span>,
       editControls: <div>Controls here</div>,
     });
     const region = screen.getByRole('region', { name: 'Second' });
-    expect(within(region).getByText('Menu here')).toBeInTheDocument();
+    expect(screen.getByText('Menu here')).toBeInTheDocument();
     expect(within(region).getByText('Handle here')).toBeInTheDocument();
     expect(within(region).getByText('Controls here')).toBeInTheDocument();
   });

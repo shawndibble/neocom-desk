@@ -26,8 +26,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
@@ -38,8 +40,10 @@ import {
 } from './ContextMenu';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -132,6 +136,22 @@ export function MenuRadioGroup(props: ComponentProps<typeof ContextMenuRadioGrou
   );
 }
 
+export function MenuLabel(props: ComponentProps<typeof ContextMenuLabel>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuLabel {...props} />
+  ) : (
+    <ContextMenuLabel {...props} />
+  );
+}
+
+export function MenuCheckboxItem(props: ComponentProps<typeof ContextMenuCheckboxItem>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuCheckboxItem {...props} />
+  ) : (
+    <ContextMenuCheckboxItem {...props} />
+  );
+}
+
 export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>) {
   return useContext(MenuKindContext) === 'dropdown' ? (
     <DropdownMenuRadioItem {...props} />
@@ -150,14 +170,14 @@ function countMenuItems(node: ReactNode): number | undefined {
   let count = 0;
   for (const child of Children.toArray(node)) {
     if (!isValidElement<{ children?: ReactNode }>(child)) continue;
-    if (child.type === MenuSeparator) continue;
+    if (child.type === MenuSeparator || child.type === MenuLabel) continue;
     if (child.type === MenuItem || child.type === DisabledMenuItem) count += 1;
     else if (child.type === MenuSub) count += 2;
     else if (child.type === Fragment || child.type === MenuRadioGroup) {
       const inner = countMenuItems(child.props.children);
       if (inner === undefined) return undefined;
       count += inner;
-    } else if (child.type === MenuRadioItem) count += 1;
+    } else if (child.type === MenuRadioItem || child.type === MenuCheckboxItem) count += 1;
     else return undefined;
   }
   return count;
@@ -219,6 +239,7 @@ export function RowActionsMenu({
   items,
   onOpenChange,
   onCloseAutoFocus,
+  modal,
   tooltip,
   linksKeepBrowserMenu = false,
   children,
@@ -239,9 +260,9 @@ export function RowActionsMenu({
   const extras = useContext(RowMenuExtrasContext);
   useEffect(() => warnRestraint(name, items), [name, items]);
   return (
-    <RowActionsContext.Provider value={{ name, items, onOpenChange, onCloseAutoFocus }}>
+    <RowActionsContext.Provider value={{ name, items, onOpenChange, onCloseAutoFocus, modal }}>
       <TooltipHoldContext.Provider value={false}>
-        <ContextMenu onOpenChange={onOpenChange}>
+        <ContextMenu onOpenChange={onOpenChange} modal={modal}>
           {tooltip === undefined ? (
             trigger
           ) : (
@@ -275,8 +296,14 @@ export function RowMoreActions({
   className,
   variant = 'plain',
   size = 'row',
+  label,
+  focusTarget = false,
 }: {
   className?: string;
+  /** The button's accessible name, when "More actions for {name}" is not the wording ("Settings for Wallet"). */
+  label?: string;
+  /** Marks the button as the place focus returns to (`data-focus-target`). */
+  focusTarget?: boolean;
   /** `ghost` draws the hairline border, for a ⋮ that stands beside a `Button` rather than inside a row. */
   variant?: Extract<IconButtonVariant, 'ghost' | 'plain'>;
   /** `sm` matches `Button size="sm"`'s height. */
@@ -287,14 +314,15 @@ export function RowMoreActions({
   const extras = useContext(RowMenuExtrasContext);
   if (!actions) return null;
   return (
-    <DropdownMenu onOpenChange={actions.onOpenChange}>
+    <DropdownMenu onOpenChange={actions.onOpenChange} modal={actions.modal}>
       <DropdownMenuTrigger asChild>
         <IconButton
           icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-          label={t('common.moreActionsLabel', { name: actions.name })}
+          label={label ?? t('common.moreActionsLabel', { name: actions.name })}
           variant={variant}
           size={size}
           className={className}
+          data-focus-target={focusTarget ? true : undefined}
         />
       </DropdownMenuTrigger>
       {/* Stops a right-click on an item bubbling (through the React tree,

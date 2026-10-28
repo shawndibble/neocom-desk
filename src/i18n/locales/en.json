@@ -6272,6 +6272,7 @@
       }
     },
     "menu": {
+      "openPage": "Open {{title}} page",
       "view": "View",
       "views": {
         "number": "Number",

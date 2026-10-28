@@ -79,6 +79,8 @@ export {
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuCheckboxItem,
+  ContextMenuLabel,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
@@ -104,6 +106,8 @@ export {
 export {
   MenuItem,
   DisabledMenuItem,
+  MenuCheckboxItem,
+  MenuLabel,
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
