@@ -10036,6 +10036,9 @@
   },
   "contractDetail": {
     "regionLabel": "Region",
+    "showMoreItems_one": "Show {{count}} more item",
+    "showMoreItems_other": "Show {{count}} more items",
+    "showFewerItems": "Show fewer",
     "systemLabel": "System",
     "locationLabel": "Location",
     "unknownLocation": "Unknown location (#{{id}})",
