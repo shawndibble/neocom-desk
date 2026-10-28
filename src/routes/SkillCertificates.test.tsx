@@ -33,6 +33,15 @@ const CERTS: Certificate[] = [
     groupName: 'Navigation',
     levels: ladder(20),
   },
+  // Untrained, in Armor's group: grade order puts it above Armor Tanking, name order below.
+  {
+    id: 3,
+    name: 'Zeal Basics',
+    description: 'Competence in zeal.',
+    groupId: 1210,
+    groupName: 'Armor',
+    levels: ladder(30),
+  },
 ];
 
 function skill(typeID: number, name: string, alphaMaxLevel?: number): EngineSkill {
@@ -50,12 +59,14 @@ function skill(typeID: number, name: string, alphaMaxLevel?: number): EngineSkil
 const ENGINE_SKILLS = new Map([
   [10, skill(10, 'Hull Upgrades', 4)],
   [20, skill(20, 'Navigation', 2)],
+  [30, skill(30, 'Zeal', 5)],
 ]);
 const CATALOG = {
   engineSkills: ENGINE_SKILLS,
   bySkillTypeID: new Map([
     [10, { name: 'Hull Upgrades' }],
     [20, { name: 'Navigation' }],
+    [30, { name: 'Zeal' }],
   ]),
 } as unknown as SkillCatalog;
 
@@ -150,7 +161,9 @@ describe('SkillCertificates', () => {
   it('adds the next grade to a Skill Plan and offers Undo', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Add Improved to plan' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Add to plan: Improved for Navigation' })
+    );
     await waitFor(async () => {
       const plans = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
       expect(plans).toHaveLength(1);
@@ -158,6 +171,22 @@ describe('SkillCertificates', () => {
     });
     expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
     expect(await screen.findByText('In plan')).toBeInTheDocument();
+  });
+
+  it('re-sorts from the phone sort icon button', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Standard (2 of 5)');
+    const order = () =>
+      screen
+        .getAllByRole('button', { name: /^(About|What) / })
+        .map((b) => b.textContent)
+        .filter((name) => name === 'Armor Tanking' || name === 'Zeal Basics');
+    expect(order()).toEqual(['Zeal Basics', 'Armor Tanking']);
+    await user.click(screen.getByRole('button', { name: 'Sort certificates' }));
+    expect(await screen.findByRole('menuitemradio', { name: 'Lowest grade' })).toBeChecked();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Name' }));
+    expect(order()).toEqual(['Armor Tanking', 'Zeal Basics']);
   });
 
   it('marks a grade an Alpha clone cannot reach, only for an Alpha character', async () => {

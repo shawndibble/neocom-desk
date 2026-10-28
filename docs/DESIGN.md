@@ -608,6 +608,10 @@ exactly the markup above.
   sits where its best-ranked member did (`groupSortedRows`). Phone only —
   desktop has the width to compare those rows side by side.
 
+Skills › Certificates is a third: below `sm` its sort `Select` is replaced by an
+icon-only `IconButton` + radio `DropdownMenu` (`Icon.Sort`), so the group select,
+the Grade filter and the sort share one phone row.
+
 The sort bar and grouping are **deliberate exceptions to "one DOM at every
 width"**, for the same kind of reason `FilterBar` is (§4b): the bar replaces
 controls CSS has hidden and cannot re-present, and a collapsed group's
