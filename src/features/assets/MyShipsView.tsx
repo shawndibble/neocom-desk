@@ -190,8 +190,9 @@ interface MyShipsViewProps {
 /** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. The Character column only exists when more than one Character's ships are listed. */
 const ROW_GRID_BASE = 'flex flex-wrap items-center gap-x-3 gap-y-1 sm:grid sm:gap-y-0.5';
 const ROW_GRID_WITH_CHARACTER =
-  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_9rem_2rem]';
-const ROW_GRID_SINGLE_CHARACTER = 'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_9rem_2rem]';
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
+const ROW_GRID_SINGLE_CHARACTER =
+  'sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.8fr)_2.5rem_10rem_2rem]';
 
 type SortColumn = 'ship' | 'character' | 'location' | 'security' | 'jumps';
 
@@ -331,7 +332,10 @@ function ShipRowView({
         <span role="cell" className="min-w-0 text-xs break-words max-sm:order-2 max-sm:basis-full">
           {name}
           {trail && (
-            <span className="text-text-dim max-sm:block sm:before:content-['_·_']">{trail}</span>
+            <span className="text-text-dim max-sm:block">
+              <span className="max-sm:hidden"> · </span>
+              {trail}
+            </span>
           )}
         </span>
         <span role="cell" className="text-xs max-sm:order-4">
