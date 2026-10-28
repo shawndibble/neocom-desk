@@ -44,6 +44,7 @@ import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
 import { useHiddenNav, useNavSetupAnswered, useRecentNav } from './navPreferences';
+import { useHintCounts } from '@/lib/hintFlags';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { EntityInfoRoute } from '@/features/entities';
 import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
@@ -327,7 +328,7 @@ function AppEffects() {
   useHydratedStore(useMobileTabs);
 
   // The rail's and More sheet's hidden pages and Recent row: same reason.
-  useHydratedStore(useHiddenNav, useRecentNav, useNavSetupAnswered);
+  useHydratedStore(useHiddenNav, useRecentNav, useNavSetupAnswered, useHintCounts);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).

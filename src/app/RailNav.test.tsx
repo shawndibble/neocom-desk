@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -9,6 +9,7 @@ import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
+import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { defaultHiddenNav } from './navRail';
 import { Layout } from './Layout';
@@ -80,6 +81,8 @@ beforeEach(async () => {
   useHiddenNav.setState({ value: [], hydrated: true });
   useRecentNav.setState({ value: [], hydrated: true });
   useCommandPalette.setState({ open: false });
+  useHintCounts.setState({ value: {}, hydrated: true });
+  resetSessionHints();
   await db.settings.clear();
 });
 
@@ -245,6 +248,43 @@ describe('the rail', () => {
     expect(goTo).toHaveTextContent(/ctrl k|⌘k/i);
     await user.click(goTo);
     expect(useCommandPalette.getState().open).toBe(true);
+  });
+
+  it('tags Go to as New until the palette is first opened, then never again', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderAt('/overview');
+    const goTo = screen.getByRole('button', { name: /go to/i });
+    expect(goTo).toHaveTextContent('New');
+
+    await user.click(goTo);
+    expect(goTo).not.toHaveTextContent('New');
+    expect(hintSeenCount(useHintCounts.getState().value, 'goTo')).toBe(1);
+
+    unmount();
+    resetSessionHints();
+    renderAt('/overview');
+    expect(screen.getByRole('button', { name: /go to/i })).not.toHaveTextContent('New');
+  });
+
+  it('clears the New tag when the chord opens the palette instead', async () => {
+    renderAt('/overview');
+    expect(screen.getByRole('button', { name: /go to/i })).toHaveTextContent('New');
+    act(() => useCommandPalette.getState().show());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /go to/i })).not.toHaveTextContent('New')
+    );
+  });
+
+  it('leaves the New tag off a phone and off a session that showed another hint', () => {
+    setPhone(true);
+    const { unmount } = renderAt('/overview');
+    expect(useHintCounts.getState().value).toEqual({});
+    unmount();
+
+    setPhone(false);
+    expect(claimSessionHint('rowHint:x')).toBe(true);
+    renderAt('/overview');
+    expect(screen.getByRole('button', { name: /go to/i })).not.toHaveTextContent('New');
   });
 
   it('leaves out what the pilot hid, unless it is where they are', () => {
