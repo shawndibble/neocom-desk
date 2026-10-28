@@ -20,7 +20,7 @@ export interface PagesProviderOptions {
  * Every page and tab from the shared nav descriptor (#2317). A tab matches on
  * its own name ("opp" → "Industry › Opportunities") and, below that, on its
  * breadcrumb, so typing a page's name also offers its tabs. An empty query
- * lists the pages alone, uncapped: the palette doubles as a quick navigator.
+ * lists nothing: the empty state shows a hint and Recent instead.
  */
 export function createPagesProvider({
   destinations,
@@ -37,9 +37,10 @@ export function createPagesProvider({
     labelKey: 'commandPalette.groups.pages',
     order: 0,
     search: (query) => {
-      if (!query) {
-        return destinations.filter((destination) => destination.kind === 'page').map(toResult);
-      }
+      // Nothing typed: the rail and the More sheet are the page navigation, so
+      // the empty state shows a hint and Recent. Pages stay searchable,
+      // hidden-from-rail ones included.
+      if (!query) return [];
       return rankedSearch(destinations, query, {
         primary: (destination) => destination.label,
         secondary: [

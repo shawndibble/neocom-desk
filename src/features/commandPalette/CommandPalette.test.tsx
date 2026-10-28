@@ -10,6 +10,7 @@ import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { CommandPaletteHost } from './CommandPaletteHost';
 import { createMarketItemCatalogue, type MarketItemCatalogue } from './marketItems';
 import { useCommandPalette } from './store';
+import { useRecentNav } from '@/app/navPreferences';
 import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { SHIP_TREE } from '@/features/fittings/shipTree/__fixtures__/shipTreeFixture';
@@ -160,19 +161,90 @@ describe('CommandPalette', () => {
     }
   });
 
-  it('lists pages on an empty query as a quick navigator', async () => {
-    const user = userEvent.setup();
-    renderShell();
-    await user.keyboard('{Control>}k{/Control}');
-    const pages = await screen.findByRole('group', { name: 'Pages' });
-    expect(within(pages).getByRole('option', { name: 'Overview' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Commands' })).not.toBeInTheDocument();
+  describe('empty query', () => {
+    function matchDesktop(matches: boolean) {
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        (media) =>
+          ({
+            matches,
+            media,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+          }) as unknown as MediaQueryList
+      );
+    }
+    const HINT = /paste a fit, item list, Local list or D-Scan/;
+
+    it('shows the hint and Recent, not a Pages list, on a desktop layout', async () => {
+      matchDesktop(true);
+      useRecentNav.setState({ value: ['/overview', '/industry', '/assets'], hydrated: true });
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await screen.findByRole('combobox');
+      expect(screen.getByText(HINT)).toBeInTheDocument();
+      const recent = screen.getByRole('region', { name: 'Recent' });
+      // The page the pilot is on is left out, as in the More sheet.
+      expect(
+        within(recent)
+          .getAllByRole('link')
+          .map((link) => link.textContent)
+      ).toEqual(['Industry', 'Assets']);
+      expect(screen.queryByRole('group', { name: 'Pages' })).not.toBeInTheDocument();
+    });
+
+    it('a Recent button closes the palette and navigates', async () => {
+      matchDesktop(true);
+      useRecentNav.setState({ value: ['/industry'], hydrated: true });
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.click(await screen.findByRole('link', { name: 'Industry' }));
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      expect(screen.getByTestId('where')).toHaveTextContent('/industry');
+    });
+
+    it('shows only the hint on a phone layout', async () => {
+      matchDesktop(false);
+      useRecentNav.setState({ value: ['/industry'], hydrated: true });
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await screen.findByRole('combobox');
+      expect(screen.getByText(HINT)).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Recent' })).not.toBeInTheDocument();
+    });
+
+    it('shows no Recent heading before there is a recent view', async () => {
+      matchDesktop(true);
+      useRecentNav.setState({ value: [], hydrated: true });
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await screen.findByRole('combobox');
+      expect(screen.getByText(HINT)).toBeInTheDocument();
+      expect(screen.queryByText('Recent')).not.toBeInTheDocument();
+    });
+
+    it('drops the hint and Recent once a query is typed, and finds pages again', async () => {
+      matchDesktop(true);
+      useRecentNav.setState({ value: ['/industry'], hydrated: true });
+      const user = userEvent.setup();
+      renderShell();
+      await user.keyboard('{Control>}k{/Control}');
+      await user.type(await screen.findByRole('combobox'), 'overview');
+      expect(screen.queryByText(HINT)).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Recent' })).not.toBeInTheDocument();
+      const pages = screen.getByRole('group', { name: 'Pages' });
+      expect(within(pages).getByRole('option', { name: 'Overview' })).toBeInTheDocument();
+    });
   });
 
   it('keeps the decoration-only text-faint token out of the list', async () => {
     const user = userEvent.setup();
     renderShell();
     await user.keyboard('{Control>}k{/Control}');
+    await user.type(await screen.findByRole('combobox'), 'settings');
     const list = await screen.findByRole('listbox');
     expect(list.querySelectorAll('.text-text-faint')).toHaveLength(0);
   });

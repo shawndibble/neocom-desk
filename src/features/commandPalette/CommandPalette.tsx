@@ -2,16 +2,24 @@ import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
 import { Modal, SearchInput, Spinner } from '@/components/ui';
-import { activeOptionClassName } from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
+import {
+  activeOptionClassName,
+  focusRingClassName,
+  interactiveClassName,
+} from '@/components/ui/controlStyles';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { listNavDestinations, NAV_LOCK_PATHS } from '@/app/navDestinations';
+import { listNavDestinations, NAV_LOCK_PATHS, type NavDestination } from '@/app/navDestinations';
+import { recentNavFor, viewPathFor } from '@/app/navRail';
+import { useRecentNav } from '@/app/navPreferences';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useHiddenTabPaths } from '@/app/useHiddenTabPaths';
@@ -54,7 +62,10 @@ function signedStanding(standing: number): string {
 }
 
 /** The live reads behind the shipped groups, turned into providers. */
-function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
+function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
+  providers: PaletteProvider[];
+  destinations: NavDestination[];
+} {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,7 +131,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
     [navigate, shipWindowOpen]
   );
 
-  return useMemo(
+  const providers = useMemo(
     () => [
       createPagesProvider({ destinations, navigate: (path) => void navigate(path) }),
       createCommandsProvider({
@@ -184,6 +195,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       onShowItem,
     ]
   );
+  return { providers, destinations };
 }
 
 interface CommandPaletteProps {
@@ -212,7 +224,12 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const providers = useShippedProviders(onShowItem);
+  const { providers, destinations } = useShippedProviders(onShowItem);
+  const { pathname } = useLocation();
+  // The rail's layouts only: below `md` the More sheet already showed Recent
+  // before the palette opened.
+  const isDesktop = useMediaQuery(MD_UP_QUERY);
+  const recent = useRecentNav((state) => state.value);
   const [query, setQuery] = useState('');
   const groups = usePaletteSearch(providers, query);
 
@@ -287,6 +304,13 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
 
   let optionIndex = 0;
   const trimmed = query.trim();
+  const recentViews =
+    trimmed === '' && isDesktop
+      ? recentNavFor(recent, viewPathFor(pathname)).flatMap((path) => {
+          const destination = destinations.find((candidate) => candidate.path === path);
+          return destination ? [destination] : [];
+        })
+      : [];
   // The error row is not an option, so the live count alone would hide it.
   const failedGroups = groups.filter((group) => group.status === 'error');
   const groupCapped = groups.some(
@@ -414,6 +438,33 @@ export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
           trimmed !== '' && (
             <p className="px-2 py-1.5 text-sm text-text-dim">{t('commandPalette.noResults')}</p>
           )
+        )}
+        {trimmed === '' && (
+          <p className="px-2 py-1.5 text-sm text-text-dim">{t('commandPalette.emptyHint')}</p>
+        )}
+        {recentViews.length > 0 && (
+          <section aria-labelledby={`${baseId}-recent`} className="space-y-1.5 px-2">
+            <h3 id={`${baseId}-recent`} className={cx(eyebrowClassName, 'pb-1')}>
+              {t('nav.recent')}
+            </h3>
+            <div className="flex flex-wrap gap-1.5">
+              {recentViews.map((view) => (
+                <Link
+                  key={view.path}
+                  to={view.path}
+                  onClick={onClose}
+                  className={cx(
+                    'flex min-h-9 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 text-xs text-text hover:border-line-bright',
+                    interactiveClassName,
+                    focusRingClassName
+                  )}
+                >
+                  <Icon.Recent aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                  {view.breadcrumb}
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
         {/* The rail's Go to button opens this too, so say it is not the page's
             own search: a page's search box filters that page; this goes elsewhere. */}
