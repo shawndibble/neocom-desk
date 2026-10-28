@@ -163,7 +163,12 @@ describe('publishLpStoreVolume', () => {
     const fold = foldDay({ missing: ['2026-10-24', '2026-10-23'] });
     await publishLpStoreVolume({ ...base, put, foldDayImpl: fold });
     expect(fold).toHaveBeenCalledTimes(30);
-    expect(put.mock.calls.map((c) => c[0]).sort()).toEqual(
+    expect(
+      put.mock.calls
+        .map((c) => c[0])
+        .filter((k) => k.startsWith('lp-store-volume/'))
+        .sort()
+    ).toEqual(
       [10000002, 10000043, 10000032, 10000030, 10000042]
         .map((r) => `lp-store-volume/${r}.json`)
         .sort()
@@ -177,6 +182,36 @@ describe('publishLpStoreVolume', () => {
     });
     const domain = put.mock.calls.find((c) => c[0] === 'lp-store-volume/10000043.json')!;
     expect(JSON.parse(gunzipSync(domain[1] as Buffer).toString()).perDay).toEqual({});
+  });
+
+  it('publishes a sibling hauling-demand object per hub region, as of the newest day of the window', async () => {
+    const put = vi.fn<Put>(async () => {});
+    const fold = vi.fn<(date: string, fold: VolumeFold) => Promise<'folded' | 'missing'>>(
+      async (date, f) => {
+        if (date === '2026-10-24' || date === '2026-10-23') return 'missing';
+        f.addDay(10000002, 34, { date, volume: 60, highest: 5, lowest: 4, orderCount: 3 });
+        return 'folded';
+      }
+    );
+    await publishLpStoreVolume({ ...base, put, foldDayImpl: fold });
+    expect(
+      put.mock.calls
+        .map((c) => c[0])
+        .filter((k) => k.startsWith('hauling-demand/'))
+        .sort()
+    ).toEqual(
+      [10000002, 10000043, 10000032, 10000030, 10000042]
+        .map((r) => `hauling-demand/${r}.json`)
+        .sort()
+    );
+    const forge = put.mock.calls.find((c) => c[0] === 'hauling-demand/10000002.json')!;
+    expect(JSON.parse(gunzipSync(forge[1] as Buffer).toString())).toEqual({
+      lastSyncedAt: NOW,
+      asOf: '2026-10-24',
+      days: 28,
+      // 28 trading days x 60 units; the newest folded day is the 22nd.
+      types: { 34: [1680, 28, 84, 5, '2026-10-22', 5, 4] },
+    });
   });
 
   it('publishes nothing when a day keeps failing', async () => {

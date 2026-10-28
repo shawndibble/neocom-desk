@@ -777,14 +777,20 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   slow: hidden.slow,
                   low: hidden.lowMargin,
                 })}
+          {state.scan.demandSource === 'esi' ? ` ${t('market.hauling.demandFallbackLine')}` : ''}
           {state.scan.capped
             ? ` ${
                 instant
                   ? t('market.hauling.cappedLineInstant', { books: MAX_BOOK_CANDIDATES })
-                  : t('market.hauling.cappedLine', {
-                      reads: MAX_HISTORY_READS,
-                      books: MAX_BOOK_CANDIDATES,
-                    })
+                  : state.scan.demandSource === 'daily'
+                    ? t('market.hauling.cappedLineDaily', {
+                        passed: state.scan.demandPassed,
+                        books: MAX_BOOK_CANDIDATES,
+                      })
+                    : t('market.hauling.cappedLine', {
+                        reads: MAX_HISTORY_READS,
+                        books: MAX_BOOK_CANDIDATES,
+                      })
               }`
             : ''}
         </p>

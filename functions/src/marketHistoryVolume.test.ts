@@ -72,3 +72,60 @@ describe('VolumeFold', () => {
     expect(fold.perDay(10000002, 1)).toEqual({ 34: 300 });
   });
 });
+
+describe('VolumeFold.demandFor', () => {
+  // The same points and aggregate as src/engine/market/haulingMarket.test.ts reads.
+  const ASOF = '2026-10-15';
+  const day = (
+    date: string,
+    volume: number,
+    highest: number,
+    lowest: number,
+    orderCount: number
+  ) => ({
+    date,
+    volume,
+    highest,
+    lowest,
+    orderCount,
+  });
+  const fold = () => {
+    const f = new VolumeFold();
+    for (const d of [
+      day('2026-10-14', 10, 120, 100, 4),
+      day('2026-10-13', 30, 110, 90, 6),
+      day('2026-10-12', 20, 130, 100, 2),
+      day('2026-10-10', 0, 500, 1, 9),
+      day('2026-10-06', 50, 100, 80, 8),
+      day('2026-09-05', 999, 1, 1, 1),
+    ]) {
+      f.addDay(10000002, 34, d);
+    }
+    return f;
+  };
+
+  it('folds the facts summarizeDemand reads, over the window only', () => {
+    expect(fold().demandFor(10000002, ASOF, 30)).toEqual({
+      34: [110, 4, 20, 110, '2026-10-14', 120, 100],
+    });
+  });
+
+  it('falls back to the window for the price when nothing traded in the last 7 days', () => {
+    const f = new VolumeFold();
+    f.addDay(10000002, 34, day('2026-10-01', 10, 200, 150, 5));
+    f.addDay(10000002, 34, day('2026-10-02', 30, 100, 90, 5));
+    expect(f.demandFor(10000002, ASOF, 30)[34]![3]).toBe(100);
+  });
+
+  it('leaves perDay as it was', () => {
+    expect(fold().perDay(10000002, 30)).toEqual({ 34: Math.round(((1109 + 0) / 30) * 100) / 100 });
+  });
+
+  it('reads the price columns from a file when it has them', async () => {
+    const f = new VolumeFold();
+    await foldHistoryCsv(Readable.from([CSV]), f);
+    expect(f.demandFor(10000002, '2026-10-24', 30)).toEqual({
+      34: [300, 1, 8, 1.7, '2026-10-24', 1.7, 1.7],
+    });
+  });
+});

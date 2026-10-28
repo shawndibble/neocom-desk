@@ -6,10 +6,15 @@ import { TRADE_HUBS } from '@/market/hubs';
 const getHubPrices = vi.fn();
 const loadPriceHistory = vi.fn();
 const getOrderBook = vi.fn();
+const loadHaulingDemand = vi.fn();
 
 vi.mock('@/market/prices', () => ({ getHubPrices: (...a: unknown[]) => getHubPrices(...a) }));
 vi.mock('@/features/market/priceHistory', () => ({
   loadPriceHistory: (...a: unknown[]) => loadPriceHistory(...a),
+}));
+// Default: no daily demand object, so pass 2 takes the ESI history path.
+vi.mock('@/features/market/haulingDemand', () => ({
+  loadHaulingDemand: (...a: unknown[]) => loadHaulingDemand(...a),
 }));
 vi.mock('@/features/market/orderBook', () => ({
   getOrderBook: (...a: unknown[]) => getOrderBook(...a),
@@ -59,6 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   clearMarketTypeIndex();
   loadMarketTypes.mockResolvedValue([]);
+  loadHaulingDemand.mockResolvedValue(null);
   getHubPrices.mockImplementation(async (hub: { id: string }) =>
     hub.id === FROM.id ? new Map([[34, aggregate(100, 90)]]) : new Map([[34, aggregate(200, 115)]])
   );
@@ -789,5 +795,153 @@ describe('runHaulingScan, history pass feeding', () => {
     });
     expect(loadPriceHistory).toHaveBeenCalledTimes(MAX_HISTORY_READS);
     expect(scan.capped).toBe(true);
+  });
+});
+
+describe('runHaulingScan, demand from the daily R2 object', () => {
+  const TODAY = '2026-10-15';
+  const idAt = (rank: number) => 1000 + rank;
+  const aggregate_ = (price: number) => ({
+    volume: 1500,
+    daysWithTrades: 30,
+    orderSum: 300,
+    recentSalePrice: price,
+    latestDay: { date: '2026-10-14', highest: price, lowest: price },
+  });
+
+  /** Ids 1000.. rank by price in id order; `demand(rank)` is the aggregate the object holds, or undefined for absent. */
+  function setup(
+    count: number,
+    demand: (rank: number) => ReturnType<typeof aggregate_> | undefined
+  ) {
+    getHubPrices.mockImplementation(async (hub: { id: string }, ids: number[]) => {
+      const atOrigin = hub.id === FROM.id;
+      return new Map(
+        ids.map((id) => [
+          id,
+          atOrigin ? aggregate(100, 90, 100) : aggregate(2000 - (id - 1000), 250, 100),
+        ])
+      );
+    });
+    getOrderBook.mockImplementation(async (regionId: number) => {
+      const hub = regionId === FROM.regionId ? FROM : TO;
+      return {
+        orders: [
+          {
+            price: hub === FROM ? 100 : 300,
+            volume_remain: 50_000,
+            is_buy_order: false,
+            location_id: hub.stationId,
+          },
+        ],
+      };
+    });
+    const typeIds = Array.from({ length: count }, (_, i) => idAt(i));
+    const types = new Map<number, ReturnType<typeof aggregate_>>();
+    typeIds.forEach((id, rank) => {
+      const found = demand(rank);
+      if (found) types.set(id, found);
+    });
+    loadHaulingDemand.mockResolvedValue({ asOf: '2026-10-14', lastSyncedAt: Date.now(), types });
+    return {
+      typeIds,
+      types: Object.fromEntries(
+        typeIds.map((id) => [String(id), { name: `T${id}`, volume: 1 }])
+      ) as never,
+    };
+  }
+
+  const bookedIds = () =>
+    getOrderBook.mock.calls
+      .filter(([region]) => region === TO.regionId)
+      .map(([, id]) => id as number);
+
+  it('books liquid items ranked past the old read cap, with no ESI history call', async () => {
+    const count = MAX_HISTORY_READS + 50;
+    const { typeIds, types } = setup(count, (rank) =>
+      rank >= MAX_HISTORY_READS + 10 ? aggregate_(300) : undefined
+    );
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 20,
+      types,
+      today: TODAY,
+    });
+    expect(loadPriceHistory).not.toHaveBeenCalled();
+    expect(bookedIds()).toHaveLength(MAX_BOOK_CANDIDATES);
+    expect(bookedIds().every((id) => id >= idAt(MAX_HISTORY_READS + 10))).toBe(true);
+    expect(scan.demandSource).toBe('daily');
+    expect(scan.capped).toBeUndefined();
+  });
+
+  it('books the best 40 by history score, not the first 40 by price, and says capped', async () => {
+    // A higher id sold for more, but ranks lower on the price pass.
+    const { typeIds, types } = setup(100, (rank) => aggregate_(300 + rank));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 21,
+      types,
+      today: TODAY,
+    });
+    expect(bookedIds().sort()).toEqual(Array.from({ length: 40 }, (_, i) => idAt(60 + i)));
+    expect(scan.capped).toBe(true);
+    expect(scan.demandPassed).toBe(100);
+    expect(scan.examinedTypeIds).not.toContain(idAt(0));
+  });
+
+  it('is not capped when 40 or fewer survive', async () => {
+    const { typeIds, types } = setup(100, (rank) => (rank < 40 ? aggregate_(300) : undefined));
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 22,
+      types,
+      today: TODAY,
+    });
+    expect(bookedIds()).toHaveLength(40);
+    expect(scan.capped).toBeUndefined();
+    expect(scan.examinedTypeIds).toHaveLength(100);
+  });
+
+  it('falls back to ESI history when the object is missing, and says so', async () => {
+    const { typeIds, types } = setup(5, () => aggregate_(300));
+    loadHaulingDemand.mockResolvedValue(null);
+    loadPriceHistory.mockResolvedValue({ points: [] });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 23,
+      types,
+      today: TODAY,
+    });
+    expect(loadPriceHistory).toHaveBeenCalledTimes(5);
+    expect(scan.demandSource).toBe('esi');
+  });
+
+  it('never reads the object in instant mode', async () => {
+    const { typeIds, types } = setup(5, () => aggregate_(300));
+    getHubPrices.mockImplementation(
+      async (hub: { id: string }, ids: number[]) =>
+        new Map(
+          ids.map((id) => [id, hub.id === FROM.id ? aggregate(100, 90) : aggregate(200, 150)])
+        )
+    );
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 24,
+      types,
+      today: TODAY,
+      mode: 'instant',
+    });
+    expect(loadHaulingDemand).not.toHaveBeenCalled();
+    expect(scan.demandSource).toBeUndefined();
   });
 });
