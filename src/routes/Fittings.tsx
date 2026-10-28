@@ -514,6 +514,7 @@ function FittingsPage() {
       preview={improve.preview}
       previewIsk={improve.previewIsk}
       ruleBreaks={ruleBreaks.lines}
+      onImprove={improve.open}
     />
   );
 
@@ -559,7 +560,6 @@ function FittingsPage() {
               saved={saved}
               onLibrary={openLibrary}
               onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
-              onImprove={improve.open}
             />
             {workspace.tooLargeToShare && (
               <p role="alert" className="text-xs text-warning">

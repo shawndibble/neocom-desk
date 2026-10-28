@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
   IconButton,
   TypeIcon,
-  useOpenAfterMenu,
 } from '@/components/ui';
 import { Expanded, More, Rename } from '@/components/ui/icons';
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
@@ -47,8 +46,6 @@ interface FittingHeaderProps {
   onLibrary: (action: LibraryAction) => void;
   /** Opens Fitting vs Fitting compare (#1547) for this Fitting. */
   onCompare: () => void;
-  /** Opens Improve in the ⋮ menu; absent where the Fitting cannot be edited. */
-  onImprove?: () => void;
   /** Renames the open Fitting, independent of Save. */
   onRename: (name: string) => void;
   /** The Fitting's Jita price, for Export; null while it loads. */
@@ -103,12 +100,7 @@ function CompactFittingHeader({
   stats,
   share,
   onRename,
-  improveItem,
-  onMenuCloseAutoFocus,
 }: {
-  improveItem: ReactNode;
-  /** The ⋮ menu's close hook, so an item opened after it closes (Improve) gets focus right. */
-  onMenuCloseAutoFocus: (event: Event) => void;
   share?: EditorShare;
   onRename: () => void;
   fitting: Fitting;
@@ -140,13 +132,8 @@ function CompactFittingHeader({
           <DropdownMenuTrigger asChild>
             <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="min-w-56"
-            onCloseAutoFocus={onMenuCloseAutoFocus}
-          >
+          <DropdownMenuContent align="end" className="min-w-56">
             <DropdownMenuItem onSelect={onRename}>{t('fittings.header.rename')}</DropdownMenuItem>
-            {improveItem}
             <DropdownMenuSeparator />
             {libraryItems}
             <DropdownMenuSeparator />
@@ -197,7 +184,6 @@ export function FittingHeader({
   subtitle,
   onLibrary,
   onCompare,
-  onImprove,
   onRename,
   price,
   cloneImplants,
@@ -262,14 +248,6 @@ export function FittingHeader({
   const compareItem = (
     <DropdownMenuItem onSelect={onCompare}>{t('fittings.compare.entryButton')}</DropdownMenuItem>
   );
-  // Opened once the menu has closed and put focus back on its button, so Improve's
-  // column takes focus from there and gives it back on close.
-  const improveMenu = useOpenAfterMenu();
-  const improveItem = onImprove && (
-    <DropdownMenuItem onSelect={() => improveMenu.run(onImprove)}>
-      {t('fittings.improve.menuItem')}
-    </DropdownMenuItem>
-  );
   const context = badges && (
     <>
       <AlphaCloneChip {...badges.alpha} />
@@ -307,8 +285,6 @@ export function FittingHeader({
           stats={stats}
           share={share}
           onRename={() => setRenaming(true)}
-          improveItem={improveItem}
-          onMenuCloseAutoFocus={improveMenu.onCloseAutoFocus}
         />
         {renameModal}
       </>
@@ -344,12 +320,7 @@ export function FittingHeader({
             <DropdownMenuTrigger asChild>
               <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="min-w-48"
-              onCloseAutoFocus={improveMenu.onCloseAutoFocus}
-            >
-              {improveItem}
+            <DropdownMenuContent align="end" className="min-w-48">
               {compareItem}
               <DropdownMenuItem
                 disabled={!copyStats.canCopy}

@@ -204,6 +204,35 @@ async function openPanel(name: 'Pilot' | 'Situation'): Promise<HTMLElement> {
   return screen.findByRole('dialog', { name });
 }
 
+describe('FittingStatsSections Improve trigger', () => {
+  const sections = (onImprove?: () => void) => (
+    <FittingStatsSections
+      stats={stats()}
+      statsProgress={null}
+      statsError={false}
+      price={null}
+      damageProfiles={damageProfiles()}
+      targetProfiles={targetProfiles()}
+      typeName={typeName}
+      onImprove={onImprove}
+    />
+  );
+
+  it('opens Improve from the trigger row, set apart at its far end', async () => {
+    const onImprove = vi.fn();
+    render(sections(onImprove));
+    const button = screen.getByRole('button', { name: 'Improve' });
+    expect(button.parentElement?.className).toMatch(/ml-auto/);
+    await userEvent.click(button);
+    expect(onImprove).toHaveBeenCalledOnce();
+  });
+
+  it('shows no Improve trigger where the Fitting cannot be edited', () => {
+    render(sections());
+    expect(screen.queryByRole('button', { name: 'Improve' })).toBeNull();
+  });
+});
+
 describe('FittingStatsSections rule breaks', () => {
   it('lists each break above the sections with the stats caveat; nothing for a legal fit', () => {
     const line = 'Only 1 Damage Control can be fitted (2 are).';
