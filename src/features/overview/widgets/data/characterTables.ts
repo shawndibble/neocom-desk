@@ -20,6 +20,7 @@ import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
 import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
+import { highlightHref } from '@/lib/highlightParam';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
 // Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
@@ -320,6 +321,8 @@ export function clonesTable(t: Translate, rows: readonly CloneTableRow[]): Table
           row.location === null ? UNKNOWN : placeHead(row.location),
         ],
         tone: 'clear',
+        // The worn clone has no card id to flash.
+        to: row.id === 'worn' ? undefined : highlightHref('/clones', row.id),
       };
     }),
   };

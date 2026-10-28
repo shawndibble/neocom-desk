@@ -193,6 +193,16 @@ describe('planetary', () => {
     expect(visibleColumns(view.table!.columns, 'S').map((c) => c.key)).toEqual(['colony', 'ends']);
   });
 
+  it('sends each colony row to its row on the Colonies tab', () => {
+    const view = buildView('planetary', feeds(base()), ctx());
+    expect(view.table!.rows.map((r) => r.to)).toEqual([
+      '/planetary-industry/colonies?highlight=1',
+      '/planetary-industry/colonies?highlight=2',
+      '/planetary-industry/colonies?highlight=3',
+      '/planetary-industry/colonies?highlight=4',
+    ]);
+  });
+
   it('charts each colony on its own bar, short-fused ones in warning colour, idle with an empty bar', () => {
     const view = buildView('planetary', feeds(base()), ctx());
     if (view.chart?.kind !== 'hbars') throw new Error('hbars');

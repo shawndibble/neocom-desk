@@ -1,4 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { cx } from '@/lib/cx';
 import { memo, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -332,6 +333,8 @@ export interface ColonyRowViewProps {
   /** Stable handler for `switchTo`; called with its `characterId`. */
   onSwitch?: (characterId: number) => void;
   haulLabel: string;
+  /** Pulse the row: the colony an Overview row's `?highlight=` named. Own colonies only. */
+  highlighted?: boolean;
 }
 
 const BUTTON_VARIANT: Record<CheckStatus, 'danger' | 'accent' | 'ghost'> = {
@@ -462,7 +465,11 @@ export const ColonyRowView = memo(function ColonyRowView(props: ColonyRowViewPro
   );
 
   return (
-    <div className="border-b border-line last:border-b-0" data-colony-status={row.status}>
+    <div
+      className={cx('border-b border-line last:border-b-0', props.highlighted && 'row-pulse')}
+      data-colony-status={row.status}
+      data-row-key={props.own ? String(row.planetId) : undefined}
+    >
       <RowActionsMenu name={planetName} items={menu} linksKeepBrowserMenu>
         <div
           {...holdGuard.handlers}
