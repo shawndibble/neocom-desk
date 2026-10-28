@@ -106,7 +106,7 @@ function Graph({
 
   const columns = useMemo<DataTableColumn<AppliedDpsRow>[]>(
     () => [
-      { id: 'x', header: xHeader, render: (row) => formatX(row.x) },
+      { id: 'x', header: xHeader, stickyStart: true, render: (row) => formatX(row.x) },
       { id: 'primary', header: primaryName, render: (row) => fixed1(row.primary) },
       ...(overlayName === undefined
         ? []

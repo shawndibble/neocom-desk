@@ -803,7 +803,13 @@ export function BlueprintAcquisitionModal({
               {lpSection.shown.map((row) =>
                 renderRow(`${row.corporationId}:${row.offerId}`, row, lpSummary(row), {
                   cheapest: row === cheapestLp,
-                  extra: <LpStoreLink corporationId={row.corporationId} label={row.corpName} />,
+                  extra: (
+                    <LpStoreLink
+                      corporationId={row.corporationId}
+                      offerId={row.offerId}
+                      label={row.corpName}
+                    />
+                  ),
                 })
               )}
             </ul>

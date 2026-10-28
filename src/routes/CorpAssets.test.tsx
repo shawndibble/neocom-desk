@@ -382,7 +382,8 @@ describe('group by item', () => {
     await user.click(screen.getByRole('button', { name: /^Qty/ }));
     await waitFor(() => expect(currentLocation()).toContain('sort=quantity'));
     const rows = itemOrder();
-    expect(rows.findIndex((r) => r.includes('Pyerite'))).toBeLessThan(
+    // Quantity is a number, so the first click puts the larger stack first.
+    expect(rows.findIndex((r) => r.includes('Pyerite'))).toBeGreaterThan(
       rows.findIndex((r) => r.includes('Tritanium'))
     );
   });

@@ -84,6 +84,14 @@ export function parseEsiKillmail(killmailId: number, body: unknown): EsiKillmail
   };
 }
 
+/** A type's group never changes, and the source is built per call, so the answers outlive it. */
+const shipGroupByTypeId = new Map<number, number>();
+
+/** Tests only: the cache is module state, so a test that fakes ESI starts it empty. */
+export function clearShipGroupCache(): void {
+  shipGroupByTypeId.clear();
+}
+
 export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailSource {
   return {
     async zkill(killmailId): Promise<ZkillRecord> {
@@ -115,6 +123,8 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
     },
 
     async shipGroupId(typeId) {
+      const known = shipGroupByTypeId.get(typeId);
+      if (known !== undefined) return known;
       const body = await esiGet(`${ESI_BASE}/universe/types/${typeId}/`, fetchImpl);
       const groupId = asNumber((body as { group_id?: unknown } | null)?.group_id);
       if (groupId === null) {
@@ -122,6 +132,7 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
           reason: 'esi-error',
         });
       }
+      shipGroupByTypeId.set(typeId, groupId);
       return groupId;
     },
 

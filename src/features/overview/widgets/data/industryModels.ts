@@ -11,6 +11,7 @@ import {
   summarizeJobs,
 } from '@/features/industry/jobs';
 import { formatCountdown } from '@/lib/duration';
+import { highlightHref } from '@/lib/highlightParam';
 import { jobSeverity, industrySeverity } from '../../data/boardSeverity';
 import { industrySummary } from '../../data/boardSummary';
 import type { IndustryBoardData, IndustryCharacterSlots } from '../../data/boardData';
@@ -217,7 +218,7 @@ export const industry: Builder = (feeds, { t, now, activeCharacterId, scopeAll }
     rows: facts.map((job): TableRowModel => {
       const cells: TableCell[] = [job.label, job.when, percent(job.progress), job.activity];
       if (showLocation) cells.push(job.location ?? UNKNOWN);
-      return { key: job.key, cells, tone: job.tone };
+      return { key: job.key, cells, tone: job.tone, to: highlightHref('/industry', job.key) };
     }),
   };
 

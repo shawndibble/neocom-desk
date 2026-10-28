@@ -129,6 +129,7 @@ export function Hauling({
         header: t('piPlan.legJumps'),
         align: 'right',
         className: 'tabular-nums',
+        sortFirst: 'asc',
         sortValue: (row) => row.jumps ?? undefined,
         render: (row) => {
           if (row.jumps === undefined) {

@@ -23,6 +23,8 @@ interface Props<T> {
   expandable: boolean;
   rowMoreActions: boolean;
   onToggleSort: (column: DataTableColumn<T>) => void;
+  /** The pinned copy shown while the real header is scrolled away. */
+  floating?: boolean;
 }
 
 /** The `<thead>` of `DataTable`: sort buttons, header tooltips, trailing cells. */
@@ -36,10 +38,11 @@ export function DataTableHeader<T>({
   expandable,
   rowMoreActions,
   onToggleSort,
+  floating = false,
 }: Props<T>): ReactNode {
   const { t } = useTranslation();
   return (
-    <thead role="rowgroup">
+    <thead role={floating ? undefined : 'rowgroup'}>
       <tr role="row" className="border-b border-line text-left text-text-dim">
         {columns.map((column, i) => {
           const sortable = column.sortValue !== undefined;
@@ -54,7 +57,7 @@ export function DataTableHeader<T>({
               : Icon.Descending;
           // Its own `<button>`, beside the sort button rather than inside
           // it (nested buttons are invalid HTML).
-          const info = column.headerTooltip && (
+          const info = column.headerTooltip && !floating && (
             <InfoTooltip
               label={t('common.aboutLabel', { label: column.header })}
               content={column.headerTooltip}
@@ -93,6 +96,7 @@ export function DataTableHeader<T>({
                 >
                   <button
                     type="button"
+                    tabIndex={floating ? -1 : undefined}
                     onClick={() => onToggleSort(column)}
                     className={cx(
                       headerTextClass[i],

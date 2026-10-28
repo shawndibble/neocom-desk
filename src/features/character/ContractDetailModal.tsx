@@ -254,6 +254,7 @@ export function ContractDetailModal({
   const itemColumns: DataTableColumn<ContractItem>[] | undefined = items && [
     {
       id: 'name',
+      stickyStart: true,
       header: t('contracts.detailItemName'),
       sortValue: (item) => items.typeNames.get(item.type_id) ?? `#${item.type_id}`,
       render: (item) => (

@@ -50,7 +50,6 @@ describe('BookSection paging', () => {
     renderSection();
     const amount = screen.getByRole('button', { name: /Amount/ });
     await userEvent.click(amount);
-    await userEvent.click(amount);
     expect(ids()[0]).toBe('r12');
     expect(ids()).toHaveLength(10);
   });

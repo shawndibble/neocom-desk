@@ -177,16 +177,17 @@ test.describe('Market Appraisal — stacked result card', () => {
 
     const header = (name: RegExp) => page.getByRole('columnheader', { name }).getByRole('button');
     // Sell total: Veldspar 26.8M against Tritanium 19.3M.
-    await header(/Sell total/).click();
-    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
+    // Numbers start high to low, so the first click leads with the bigger total.
     await header(/Sell total/).click();
     await expect.poll(rowKeys).toEqual([String(VELDSPAR), String(TRITANIUM)]);
+    await header(/Sell total/).click();
+    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
     // Item sorts by name too.
     await header(/Item/).click();
     await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
     // And so does Buy total.
     await header(/Buy total/).click();
-    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
+    await expect.poll(rowKeys).toEqual([String(VELDSPAR), String(TRITANIUM)]);
   });
 
   test('still renders one real table row per item at 1280px', async ({ page }) => {

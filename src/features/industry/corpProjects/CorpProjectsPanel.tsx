@@ -278,6 +278,7 @@ export function CorpProjectsPanel({
       header: t('industry.corpProjects.endsIn'),
       align: 'right',
       className: 'tabular-nums',
+      sortFirst: 'asc',
       sortValue: (row) => row.hoursLeft ?? undefined,
       render: (row) => <EndsIn hours={row.hoursLeft} />,
     },

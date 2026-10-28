@@ -14,6 +14,7 @@ import { humanizeRefType } from '@/features/character/format';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { formatAge } from '@/lib/age';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { highlightHref } from '@/lib/highlightParam';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { RefTypeBreakdownRow } from '@/features/character/walletJournalFilter';
 import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
@@ -55,6 +56,8 @@ export function balanceChange(
 }
 
 const JOURNAL_ROWS = 6;
+/** The Wallet Journal, where `?highlight=` scrolls to an entry and flashes it. */
+const JOURNAL_PATH = '/wallet/journal';
 
 /** The newest journal entries that moved ISK: what it was, how much, how long ago, and the balance after. */
 export function journalTable(
@@ -83,6 +86,7 @@ export function journalTable(
           ? { text: formatIskCompact(entry.balance), iskAmount: entry.balance }
           : UNKNOWN,
       ],
+      to: highlightHref(JOURNAL_PATH, entry.id),
     })),
   };
 }

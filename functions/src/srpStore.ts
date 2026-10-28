@@ -420,7 +420,11 @@ export async function fetchOwnLoss(
   ref: KillmailRef
 ): Promise<{ zkill: ZkillRecord; hash: string; km: EsiKillmail }> {
   await takeFetchSlot(deps, member.corporationId, member.characterId);
-  const zkill = await softZkill(deps.killmails, ref.killmailId);
+  // With the hash in hand the two reads are independent; only a bare id needs zKillboard first.
+  const zkillRead = softZkill(deps.killmails, ref.killmailId);
+  const kmRead = ref.hash ? deps.killmails.killmail(ref.killmailId, ref.hash) : null;
+  kmRead?.catch(() => undefined); // its failure surfaces at the await below
+  const zkill = await zkillRead;
   const hash = ref.hash ?? zkill.hash;
   if (!hash) {
     fail(
@@ -429,7 +433,7 @@ export async function fetchOwnLoss(
       'hash-unavailable'
     );
   }
-  const km = await deps.killmails.killmail(ref.killmailId, hash);
+  const km = await (kmRead ?? deps.killmails.killmail(ref.killmailId, hash));
   if (km.victim.characterId !== member.characterId) {
     fail('permission-denied', 'You can only file your own losses', 'not-your-loss');
   }

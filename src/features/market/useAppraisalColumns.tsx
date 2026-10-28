@@ -117,6 +117,8 @@ export function useAppraisalColumns({
     },
     {
       id: 'item',
+      stickyStart: true,
+      stickyStartOnPanel: true,
       header: t('market.appraisal.columnItem'),
       primary: true,
       // A priced line is nearly always followed by "…and what is the book
@@ -250,7 +252,11 @@ export function useAppraisalColumns({
         return comparisonCell(
           <span className="inline-flex items-center gap-1">
             {totalCell(row.lpIskCost ?? null)}
-            <LpStoreLink corporationId={row.lpCorporationId} label={label} />
+            <LpStoreLink
+              corporationId={row.lpCorporationId}
+              offerId={row.lpOfferId}
+              label={label}
+            />
           </span>,
           lpBeatsMarket(row),
           row.lpAffordable === false && (

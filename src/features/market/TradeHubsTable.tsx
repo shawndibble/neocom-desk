@@ -116,6 +116,7 @@ export function TradeHubsTable({
           headerClassName: isOwn ? 'text-accent' : undefined,
           align: 'right',
           render: (row) => <TradeHubCell row={row} hub={hub} />,
+          sortFirst: 'asc',
           sortValue: (row) => row.quotes[hub.id].sell ?? undefined,
         };
       }),

@@ -15,15 +15,17 @@ import { iconButtonClassName } from '@/components/ui/iconButtonClassName';
 
 export interface LpStoreLinkProps {
   corporationId: number;
+  /** Opens the store with this offer selected (`?offer=`). */
+  offerId?: number;
   /** Full breakdown for the tooltip and accessible name, e.g. "850,000 ISK + 400,000 LP (Sisters of EVE)". */
   label: string;
 }
 
-export function LpStoreLink({ corporationId, label }: LpStoreLinkProps) {
+export function LpStoreLink({ corporationId, offerId, label }: LpStoreLinkProps) {
   return (
     <Tooltip content={label}>
       <Link
-        to={`/wallet/lp-store/${corporationId}`}
+        to={`/wallet/lp-store/${corporationId}${offerId === undefined ? '' : `?offer=${offerId}`}`}
         aria-label={label}
         className={iconButtonClassName({ variant: 'plain', size: 'sm' })}
       >

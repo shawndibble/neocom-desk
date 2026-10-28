@@ -230,7 +230,11 @@ export function MobileOpportunityList({
     <div className="flex flex-col">
       <MobileSortToolbar
         count={groups.length}
-        fields={SORT_FIELD_ORDER.map((id) => ({ id, label: fields[id].label }))}
+        fields={SORT_FIELD_ORDER.map((id) => ({
+          id,
+          label: fields[id].label,
+          firstDirection: 'desc',
+        }))}
         sort={sort}
         onSortChange={setSort}
         className="-mt-1 pb-1"

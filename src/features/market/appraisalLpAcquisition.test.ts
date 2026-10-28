@@ -146,6 +146,7 @@ describe('toLpOfferInputs', () => {
     );
     expect(inputs).toEqual([
       {
+        offerId: 1,
         corporationId: 1000125,
         corpName: 'Sisters of EVE',
         quantityPerRedemption: 1,

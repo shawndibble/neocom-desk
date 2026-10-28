@@ -2,7 +2,7 @@ import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCharacters } from '@/features/character/useCharacters';
 import { Modal, SearchInput, Spinner } from '@/components/ui';
@@ -37,6 +37,9 @@ import {
   type ShownMarketItem,
 } from './marketItems';
 import { loadLpCorporations } from '@/sde/loadMarketSde';
+import { loadShipTree } from '@/sde/loadSde';
+import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
+import { createShipsProvider } from './shipsProvider';
 import { readCachedLoyaltyBalances } from '@/features/character/loyalty';
 import { createCharactersProvider, createCommandsProvider, createPagesProvider } from './providers';
 import { createLpStoresProvider, NO_BALANCES } from './lpStoresProvider';
@@ -54,6 +57,9 @@ function signedStanding(standing: number): string {
 function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): PaletteProvider[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const shipWindowOpen =
+    location.pathname === '/ships/tree' && new URLSearchParams(location.search).has('ship');
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const corpVisible = useCorpNavVisible();
   const srpVisible = useSrpNavVisible();
@@ -96,6 +102,22 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
         balanceHint: (lp) => t('commandPalette.lpBalance', { lp: formatCount(lp) }),
       }),
     [activeCharacterId, navigate, t]
+  );
+
+  // Same reason as LP Stores: it holds the loaded Ship Tree. The pushed-entry
+  // marker makes Back from the window return to the page the pilot was on.
+  const ships = useMemo(
+    () =>
+      createShipsProvider({
+        loadShipTree,
+        // Over an open Ship Info window, replace: one Close or Back still leaves the tree.
+        onOpen: (typeID) =>
+          void navigate(
+            `/ships/tree?ship=${typeID}`,
+            shipWindowOpen ? { replace: true } : { state: ENTITY_INFO_PUSHED_STATE }
+          ),
+      }),
+    [navigate, shipWindowOpen]
   );
 
   return useMemo(
@@ -144,6 +166,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
           t('commandPalette.assetQuantity', { quantity: formatCount(quantity) }),
       }),
       lpStores,
+      ships,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
     ],
     [
@@ -157,6 +180,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
       assets,
       assetsScope,
       lpStores,
+      ships,
       onShowItem,
     ]
   );

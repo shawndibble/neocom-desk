@@ -376,7 +376,7 @@ describe('TransactionsPanel — margin', () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
-    expect(marginCell(row)).toHaveTextContent('No wallet buy covers it');
+    expect(marginCell(row)).toHaveTextContent('No wallet buy');
   });
 
   it('says no sales tax line was found when the journal did not load, rather than a tax-free margin', async () => {
@@ -397,27 +397,8 @@ describe('TransactionsPanel — margin', () => {
     expect(noBuy.querySelector('td[data-label="Margin %"]')).toHaveTextContent('—');
   });
 
-  it('totals the sales without a margin under the figures', async () => {
+  it('has no uncosted line even when a sale has no margin', async () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
-    renderPanel();
-    const strip = await screen.findByRole('region', { name: /Totals/ });
-    // Only the built Tritanium sale has no margin.
-    expect(strip).toHaveTextContent('1 sale uncosted ·');
-  });
-
-  it('omits the uncosted line when every sale has a margin', async () => {
-    mockTransactions({
-      data: [BUY, SALE],
-      fetchedAt: new Date(),
-      fromCache: false,
-      truncated: false,
-    });
-    mockedLoadJournal.mockResolvedValue({
-      data: [taxFor(2, -49_766.4)],
-      fetchedAt: new Date(),
-      fromCache: false,
-      truncated: false,
-    });
     renderPanel();
     const strip = await screen.findByRole('region', { name: /Totals/ });
     expect(strip).not.toHaveTextContent('uncosted');

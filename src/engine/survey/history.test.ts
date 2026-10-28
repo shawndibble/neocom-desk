@@ -73,6 +73,36 @@ describe('recordSurvey', () => {
     }));
     expect(recordSurvey(many, 'def456UVW', NOW)).toHaveLength(HISTORY_MAX);
   });
+
+  it('keeps at most 8: a ninth drops the oldest and the new one is first', () => {
+    expect(HISTORY_MAX).toBe(8);
+    const full = Array.from({ length: 8 }, (_, i) => ({
+      id: `id${String(i).padStart(7, '0')}`,
+      addedAt: NOW - (i + 1) * 1000,
+    }));
+    const next = recordSurvey(full, 'def456UVW', NOW);
+    expect(next).toHaveLength(8);
+    expect(next[0]!.id).toBe('def456UVW');
+    expect(next.map((e) => e.id)).not.toContain('id0000007');
+  });
+
+  it('trims a stored list of 12 to the newest 8', () => {
+    const raw = Array.from({ length: 12 }, (_, i) => ({
+      id: `id${String(i).padStart(7, '0')}`,
+      addedAt: NOW - (i + 1) * 1000,
+    }));
+    const parsed = parseSurveyHistory(raw, NOW);
+    expect(parsed.map((e) => e.id)).toEqual(raw.slice(0, 8).map((e) => e.id));
+  });
+
+  it('a repeat open of the oldest listed survey keeps it and its time', () => {
+    const full = Array.from({ length: 8 }, (_, i) => ({
+      id: `id${String(i).padStart(7, '0')}`,
+      addedAt: NOW - (i + 1) * 1000,
+    }));
+    const next = recordSurvey(full, 'id0000007', NOW);
+    expect(next).toEqual(full);
+  });
 });
 
 describe('survey names', () => {

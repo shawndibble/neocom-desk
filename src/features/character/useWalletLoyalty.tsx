@@ -33,6 +33,8 @@ export function useWalletLoyalty(
     () => [
       {
         id: 'corporation',
+        stickyStart: true,
+        stickyStartOnPanel: true,
         header: t('loyalty.corporation'),
         // The row navigates to the LP Store (§6c): the name is plain accent
         // text, not a link that would steal the row's click, and the caret

@@ -725,6 +725,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // `undefined`, never a stand-in figure: `DataTable` sinks a valueless
         // row to the end in *either* direction, where a large or small
         // sentinel would lead the table on one of them.
+        sortFirst: 'asc',
         sortValue: (row) => jumpsByContract.get(row.contractId) ?? undefined,
         stackAffix: { after: t('contractSearch.courierMobile.jumpsAffix') },
         render: (row) => {
