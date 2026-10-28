@@ -1449,6 +1449,38 @@ describe('AppraisalPanel — the row as an item', () => {
       expect(written).toEqual(['1,386,400']);
       expect(await screen.findAllByText('Copied 1,386,400 ISK')).not.toHaveLength(0);
     });
+
+    it('the Split card copies the midpoint, by keyboard, and its net hint does not copy', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({
+        controller: controller({
+          result: outcome({ accountingLevel: 0, brokerRelationsLevel: 0 }),
+        }),
+      });
+
+      const split = screen.getByRole('region', { name: 'Split' });
+      const sell = screen.getByRole('region', { name: 'Sell' });
+      const buy = screen.getByRole('region', { name: 'Buy' });
+      const digits = (card: HTMLElement) =>
+        Number(
+          /\(([\d,]+)\)/
+            .exec(within(card).getByRole('button').getAttribute('aria-label') ?? '')![1]
+            .replaceAll(',', '')
+        );
+      const midpoint = (digits(buy) + digits(sell)) / 2;
+
+      await userEvent.click(within(sell).getByText('List it, after fees'));
+      expect(written).toEqual([]);
+
+      within(split).getByRole('button').focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+      expect(written).toHaveLength(2);
+      expect(Number(written[0].replaceAll(',', ''))).toBe(midpoint);
+    });
   });
 });
 
