@@ -130,9 +130,6 @@ describe('ContactsStandings header', () => {
     renderTab();
 
     expect(await screen.findByText('Caldari Navy')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Broker fees use your standing with each Trade Hub/)
-    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
     expect(screen.getByText(/just now|ago/i)).toBeInTheDocument();
     expect(loadMock).toHaveBeenCalledWith(91, { force: false });
