@@ -63,7 +63,7 @@ export function TransactionsSummaryStrip({
           <SummaryFigure
             label={t('wallet.tradingMargin')}
             value={signedIsk(trading.margin, 0)}
-            note={t('wallet.tradingMatched', { matched: trading.matched, count: trading.sales })}
+            tooltip={t('wallet.tradingMatched', { matched: trading.matched, count: trading.sales })}
             className={iskToneClass(trading.margin)}
           />
         )}
@@ -90,13 +90,11 @@ export function TransactionsSummaryStrip({
 function SummaryFigure({
   label,
   value,
-  note,
   tooltip,
   className,
 }: {
   label: string;
   value: string;
-  note?: string;
   tooltip?: string;
   className: string;
 }) {
@@ -106,7 +104,6 @@ function SummaryFigure({
         {tooltip ? <HintText content={tooltip}>{label}</HintText> : label}
       </dt>
       <dd className="text-sm font-semibold">{value}</dd>
-      {note && <dd className="text-[0.6875rem] font-normal text-text-dim">{note}</dd>}
     </div>
   );
 }

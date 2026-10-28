@@ -427,8 +427,10 @@ describe('TransactionsPanel — margin', () => {
     renderPanel('/market/history?txn.start=2026-09-01');
     const strip = await screen.findByRole('region', { name: /Totals/ });
     expect(strip).toHaveTextContent('+132,634');
-    expect(strip).toHaveTextContent('1 of 2 sales matched');
+    expect(strip).not.toHaveTextContent('sales matched');
     expect(strip).toHaveTextContent('-8,104,550');
+    await userEvent.hover(within(strip).getByText('Margin'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('1 of 2 sales matched');
   });
 });
 
