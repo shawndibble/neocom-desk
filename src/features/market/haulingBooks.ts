@@ -7,7 +7,7 @@
  * `null` means unavailable or stale, and the scan falls back to ESI books for a short list.
  */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
-import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
+import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { LadderLevel } from '@/engine/market/haulingMarket';
 
 /** The backend republishes every 30 minutes. */
@@ -60,11 +60,16 @@ export function parseHaulingBooks(raw: unknown): HaulingBooks | null {
   return { asOf, lastSyncedAt, types: byType };
 }
 
+/** Jita's object is about 1.2 MB gzipped: more room than the 20 s the small R2 objects get, or a slow link silently drops to the capped ESI path. */
+const READ_TIMEOUT_MS = 60_000;
+
 async function fetchBooks(stationId: number): Promise<HaulingBooks | null> {
   try {
-    return parseHaulingBooks(
-      await fetchJson(`${R2_SNAPSHOT_ORIGIN}/hauling-books/${stationId}.json`)
-    );
+    const response = await fetch(`${R2_SNAPSHOT_ORIGIN}/hauling-books/${stationId}.json`, {
+      signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    return parseHaulingBooks(await response.json());
   } catch {
     return null;
   }

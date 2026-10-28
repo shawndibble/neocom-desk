@@ -67,7 +67,12 @@ export async function publishHaulingBooks(deps: PublicHaulingBooksDeps): Promise
   const headPublishedAt = await (deps.publishedAtImpl ?? fetchPublishedAt)(
     MARKET_ORDERS_LATEST_URL
   );
-  if (headPublishedAt !== null && state?.asOf === headPublishedAt) {
+  // Not newer than the last publish (a CDN may serve a stale HEAD): never overwrite newer data with older.
+  if (
+    headPublishedAt !== null &&
+    typeof state?.asOf === 'number' &&
+    state.asOf >= headPublishedAt
+  ) {
     console.info('Hauling books skipped: snapshot unchanged', { asOf: headPublishedAt });
     return false;
   }
@@ -78,6 +83,10 @@ export async function publishHaulingBooks(deps: PublicHaulingBooksDeps): Promise
     ESI_USER_AGENT
   );
   const asOf = publishedAt ?? now();
+  if (publishedAt !== null && typeof state?.asOf === 'number' && state.asOf >= publishedAt) {
+    console.info('Hauling books skipped: snapshot not newer', { asOf });
+    return false;
+  }
   const counts = Object.fromEntries(
     SNAPSHOT_HUBS.map((hub) => [hub.id, books.typeCount(hub.stationId)])
   );

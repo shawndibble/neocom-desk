@@ -5,8 +5,8 @@
  * request per item. Pure: no fetch, no R2.
  */
 
-/** Price levels kept per side: deep enough for a lot and the crowded band, small enough to ship. */
-export const BOOK_LEVELS = 10;
+/** Price levels kept per side: deep enough for a lot and the 1% crowded band, small enough to ship (Jita is about 1.2 MB gzipped). */
+export const BOOK_LEVELS = 30;
 
 /** `[price, units, orders]`: every order at exactly that price. */
 export type StoredLevel = [number, number, number];

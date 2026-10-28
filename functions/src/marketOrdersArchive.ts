@@ -184,15 +184,22 @@ export async function foldOrderBooksUrl(
     throw new Error(`EVE Ref market-orders fetch failed: HTTP ${response.status}`);
   }
   const modified = Date.parse(response.headers.get('last-modified') ?? '');
-  const rows = snapshotCsvParser();
-  pipeline(
-    Readable.fromWeb(response.body as import('node:stream/web').ReadableStream<Uint8Array>),
-    unbzip2Stream(),
-    rows,
-    () => {}
+  const expectedBytes = Number(response.headers.get('content-length'));
+  const compressed = Readable.fromWeb(
+    response.body as import('node:stream/web').ReadableStream<Uint8Array>
   );
-  return {
-    rows: await foldBookRows(rows, books),
-    publishedAt: Number.isFinite(modified) ? modified : null,
-  };
+  let receivedBytes = 0;
+  compressed.on('data', (chunk: Buffer) => {
+    receivedBytes += chunk.length;
+  });
+  const rows = snapshotCsvParser();
+  pipeline(compressed, unbzip2Stream(), rows, () => {});
+  const count = await foldBookRows(rows, books);
+  // unbzip2-stream ends quietly on a cut stream: a short body must fail the run, not publish a partial book.
+  if (expectedBytes > 0 && receivedBytes !== expectedBytes) {
+    throw new Error(
+      `EVE Ref market-orders download was cut short (${receivedBytes} of ${expectedBytes} bytes)`
+    );
+  }
+  return { rows: count, publishedAt: Number.isFinite(modified) ? modified : null };
 }

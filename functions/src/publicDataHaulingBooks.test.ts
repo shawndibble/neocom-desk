@@ -130,3 +130,26 @@ describe('publishHaulingBooks', () => {
     expect(JSON.parse(r2.objects.get(HAULING_BOOKS_STATE_R2_KEY) as string).asOf).toBe(NOW);
   });
 });
+
+describe('publishHaulingBooks, a stale or repeated snapshot', () => {
+  it('never overwrites newer data with an older snapshot the CDN still serves', async () => {
+    const r2 = fakeR2();
+    await publishHaulingBooks({
+      get: r2.get,
+      put: r2.put,
+      now: () => NOW,
+      publishedAtImpl: async () => PUBLISHED,
+      foldUrlImpl: fold(MIN_TYPES_PER_HUB),
+    });
+    const before = new Map(r2.objects);
+    const ran = await publishHaulingBooks({
+      get: r2.get,
+      put: r2.put,
+      now: () => NOW,
+      publishedAtImpl: async () => PUBLISHED - 60_000,
+      foldUrlImpl: fold(MIN_TYPES_PER_HUB, PUBLISHED - 60_000),
+    });
+    expect(ran).toBe(false);
+    expect(r2.objects).toEqual(before);
+  });
+});

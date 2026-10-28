@@ -1,5 +1,6 @@
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { formatAge } from '@/lib/age';
+import { HaulingHowItWorks } from './HaulingHowItWorks';
 import { formatCount } from '@/lib/formatCount';
 /**
  * The Market page's Hauling tab (back from Travel, #4702): what is worth buying
@@ -355,6 +356,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
 
   // A new route, category or mode starts a fresh plan — the fill and the items added from it included.
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [howOpen, setHowOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [tripOpen, setTripOpen] = useState(false);
   // Crossing the rail's width closes the sheets, so a resize never opens one on its own.
@@ -722,6 +724,21 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
             />
           </label>
           {t('market.hauling.inTrip', { selected: selectedCount, total: tableRows.length })}
+          <IconButton
+            variant="plain"
+            size="sm"
+            className="ml-auto"
+            icon={<Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+            label={t('market.hauling.how.open')}
+            aria-haspopup="dialog"
+            onClick={() => setHowOpen(true)}
+          />
+          <HaulingHowItWorks
+            open={howOpen}
+            onClose={() => setHowOpen(false)}
+            instant={instant}
+            scan={state.scan}
+          />
         </div>
 
         {/* The multibuy text, on request, or opened by a refused copy to copy by hand. */}
