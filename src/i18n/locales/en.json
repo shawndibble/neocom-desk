@@ -11123,6 +11123,13 @@
       "crumb": "LP Store search",
       "changeStore": "Change store"
     },
+    "nearestStation": {
+      "found_one": "Nearest station: {{station}} · {{count}} jump",
+      "found_other": "Nearest station: {{station}} · {{count}} jumps",
+      "loading": "Nearest station: …",
+      "noOrigin": "Set your location to see the nearest station",
+      "noStation": "No station of this corporation is reachable from your system"
+    },
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",
     "buyPriceAt": "Buy price ({{hub}})",
