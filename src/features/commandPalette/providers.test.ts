@@ -57,13 +57,9 @@ describe('createPagesProvider', () => {
     }
   });
 
-  it('lists every page (not tab) for an empty query, so the palette doubles as a navigator', () => {
+  it('lists nothing for an empty query: the empty state shows a hint and Recent instead', () => {
     const provider = createPagesProvider({ destinations: DESTINATIONS, navigate: vi.fn() });
-    expect(searchSync(provider, '').map((r) => r.label)).toEqual([
-      'Overview',
-      'Industry',
-      'Assets',
-    ]);
+    expect(searchSync(provider, '')).toEqual([]);
   });
 
   it('finds a tab by its own name and labels it with the breadcrumb', () => {
