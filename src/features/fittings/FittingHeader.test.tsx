@@ -77,6 +77,21 @@ describe('FittingHeader on desktop', () => {
     await waitFor(() => expect(document.activeElement).toBe(trigger()));
   });
 
+  it('puts an Improve button between Open and Export, the same height as they are', async () => {
+    const onImprove = vi.fn();
+    renderHeader({ onImprove });
+    const open = screen.getByRole('button', { name: 'Open' });
+    const improve = screen.getByRole('button', { name: 'Improve' });
+    const exportButton = screen.getByRole('button', { name: 'Export' });
+    expect(open.compareDocumentPosition(improve) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      improve.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(improve.className).toBe(open.className);
+    await userEvent.setup().click(improve);
+    expect(onImprove).toHaveBeenCalledOnce();
+  });
+
   it('copies the headline stats from the ⋮ menu and says so', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {

@@ -332,6 +332,7 @@ export function FittingHeader({
               {libraryItems}
             </DropdownMenuContent>
           </DropdownMenu>
+          {onImprove && <Button onClick={onImprove}>{t('fittings.improve.button')}</Button>}
           <FittingExportMenu
             fitting={fitting}
             price={price}
