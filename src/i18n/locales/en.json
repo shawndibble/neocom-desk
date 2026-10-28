@@ -11049,7 +11049,6 @@
     "csvIskCost": "ISK cost",
     "csvLpCost": "LP cost",
     "title": "LP Store",
-    "corporationInfo": "Corporation info",
     "searchPlaceholder": "Search offers…",
     "hubLabel": "Market hub",
     "priceBasisLabel": "Revenue basis",
@@ -11119,9 +11118,7 @@
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
       "resultsStatus": "{{stores}}, {{items}}",
-      "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down.",
-      "crumb": "LP Store search",
-      "changeStore": "Change store"
+      "moreItems": "Showing the best {{shown}} of {{total}} matching items. Type more to narrow it down."
     },
     "nearestStation": {
       "found": "Nearest station: {{station}} · ",
