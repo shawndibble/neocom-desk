@@ -19,6 +19,31 @@ export interface StickyHeaderState {
 const SCROLLING = /auto|scroll|overlay/;
 
 /**
+ * `scroll-padding-top` owners per scroller. Two tables share the page, so a
+ * per-table save/restore would leave the first one's value behind.
+ */
+const paddingOwners = new Map<HTMLElement, { before: string; heights: Map<symbol, number> }>();
+
+function setPadding(el: HTMLElement, owner: symbol, height: number) {
+  const entry = paddingOwners.get(el) ?? { before: el.style.scrollPaddingTop, heights: new Map() };
+  entry.heights.set(owner, height);
+  paddingOwners.set(el, entry);
+  el.style.scrollPaddingTop = `${Math.max(...entry.heights.values())}px`;
+}
+
+function clearPadding(el: HTMLElement, owner: symbol) {
+  const entry = paddingOwners.get(el);
+  if (!entry) return;
+  entry.heights.delete(owner);
+  if (entry.heights.size > 0) {
+    el.style.scrollPaddingTop = `${Math.max(...entry.heights.values())}px`;
+    return;
+  }
+  el.style.scrollPaddingTop = entry.before;
+  paddingOwners.delete(el);
+}
+
+/**
  * The nearest ancestor that scrolls the table's rows. `overflow-x: auto`
  * (the sideways wrapper) computes `overflow-y: auto` too, so a plain
  * `position: sticky` sticks to that wrapper, never to the page — which is
@@ -72,14 +97,17 @@ export function useStickyTableHeader(
     const headRect = head.getBoundingClientRect();
     const tableRect = table.getBoundingClientRect();
     const vScroller = verticalScroller(table);
-    const viewTop = vScroller ? Math.max(0, vScroller.getBoundingClientRect().top) : 0;
-    // The real header still in view, or no body left to cover.
+    const scrollerRect = vScroller?.getBoundingClientRect();
+    const viewTop = scrollerRect ? Math.max(0, scrollerRect.top) : 0;
+    // The real header still in view, or no body left to cover, or the
+    // scroller itself has left the screen above the copy.
     if (headRect.top >= viewTop || tableRect.bottom - headRect.height <= viewTop) return null;
+    if (scrollerRect && scrollerRect.bottom - headRect.height <= viewTop) return null;
     const hScroller = horizontalScroller(table);
     const hRect = (hScroller ?? table).getBoundingClientRect();
     return {
       top: Math.min(viewTop, tableRect.bottom - headRect.height),
-      left: Math.max(0, hRect.left),
+      left: hRect.left,
       width: hScroller ? hScroller.clientWidth : table.offsetWidth,
       tableWidth: table.offsetWidth,
       columnWidths: Array.from(
@@ -120,21 +148,18 @@ export function useStickyTableHeader(
     // The scroller's `scroll-padding-top` is the header's height for as long
     // as this table is on screen, shown or not: a row scrolled to the top
     // edge must already clear the copy that appears once it gets there.
+    const owner = Symbol('sticky-table-header');
     let paddedEl: HTMLElement | null = null;
-    let paddedBefore = '';
     function reservePadding() {
       const head = table?.tHead;
       if (!table || !head) return;
       const el = verticalScroller(table) ?? document.documentElement;
-      if (el !== paddedEl) {
-        releasePadding();
-        paddedEl = el;
-        paddedBefore = el.style.scrollPaddingTop;
-      }
-      el.style.scrollPaddingTop = `${head.getBoundingClientRect().height}px`;
+      if (el !== paddedEl) releasePadding();
+      paddedEl = el;
+      setPadding(el, owner, head.getBoundingClientRect().height);
     }
     function releasePadding() {
-      if (paddedEl) paddedEl.style.scrollPaddingTop = paddedBefore;
+      if (paddedEl) clearPadding(paddedEl, owner);
       paddedEl = null;
     }
 
