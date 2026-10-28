@@ -550,10 +550,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // "unknown value falls back to the default" rule the codecs otherwise apply
   // themselves. Emptying out entirely (every id unknown) reads as no filter.
   const resolvedPayeeFilter = useMemo(() => {
-    if (payeeFilter === 'all' || payeeFilter === 'none') return payeeFilter;
+    if (payeeFilter === 'all') return payeeFilter;
+    // No Payees left means no dropdown to leave "none" with.
+    if (payeeFilter === 'none') return ledgerPayees.length === 0 ? ('all' as const) : payeeFilter;
     const known = new Set(ledgerPayees.map((p) => p.id));
     const kept = new Set([...payeeFilter].filter((id) => known.has(id)));
-    return kept.size === 0 ? ('all' as const) : kept;
+    return kept.size === 0 || kept.size === known.size ? ('all' as const) : kept;
   }, [payeeFilter, ledgerPayees]);
 
   // Filtering "by Payee" only makes sense for rows that already have one —
