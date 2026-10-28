@@ -7,13 +7,16 @@ import { fail, type Caller } from './actorAuth.js';
 import { randomBytes } from 'node:crypto';
 import type { BookCall } from './corpTaxBook.js';
 import { doctrinesCollection } from './srpDoctrineRead.js';
-import type { KillmailRef } from './srpKillmail.js';
+import { matchedHullRule, shipFitItems, type KillmailRef } from './srpKillmail.js';
+import type { SrpPricingResult } from './srpPricing.js';
 import {
   appendSrpAudit,
   authorizeMember,
   authorizeSrpOfficer,
   doctrineCheckOf,
   fetchOwnLoss,
+  priceLoss,
+  softJita,
   srpSettingsRef,
   type SrpFileDeps,
   type SrpDeps,
@@ -22,6 +25,7 @@ import {
   MAX_DOCTRINES,
   type DoctrineFit,
   type DoctrinePreview,
+  type PayoutQuote,
   type HullRule,
   type SaveDoctrineInput,
   type SrpSettings,
@@ -143,7 +147,45 @@ export async function previewSrpDoctrineCheck(
   if (!settings || settings.enabled !== true) {
     fail('failed-precondition', 'SRP is not on for this corporation', 'srp-off');
   }
-  const { km } = await fetchOwnLoss(deps, member, ref);
+  const { zkill, km } = await fetchOwnLoss(deps, member, ref);
   const check = await doctrineCheckOf(deps.db, settings, call.corporationId, km.victim);
-  return { killmailId: km.killmailId, hullTypeId: km.victim.shipTypeId, check };
+  const hullTypeId = km.victim.shipTypeId;
+  const { classId, result } = await priceLoss(
+    deps.killmails,
+    settings,
+    km.victim,
+    zkill.totalValue
+  );
+  const rule = matchedHullRule(settings.hullRules, hullTypeId, classId);
+  const { hull, fit } = shipFitItems(km.victim);
+  const [hullValue, fitValue] = await Promise.all([
+    softJita(deps.killmails, hull),
+    softJita(deps.killmails, fit),
+  ]);
+  return {
+    killmailId: km.killmailId,
+    hullTypeId,
+    check,
+    killedAt: km.killedAt,
+    solarSystemId: km.solarSystemId,
+    quote: quoteOf(result),
+    hullRule: rule ? { scope: rule.scope, id: rule.id, kind: rule.kind } : null,
+    values: { killmailValue: zkill.totalValue, hullValue, fitValue },
+  };
+}
+
+/** The pricing result as the pilot is shown it. */
+function quoteOf(result: SrpPricingResult): PayoutQuote {
+  switch (result.kind) {
+    case 'amount':
+      return { kind: 'amount', isk: result.isk, basis: result.basis };
+    case 'officer':
+      return {
+        kind: 'officer',
+        reason: result.reason,
+        ...(result.suggested ? { suggested: result.suggested } : {}),
+      };
+    case 'refused':
+      return { kind: 'not-covered' };
+  }
 }

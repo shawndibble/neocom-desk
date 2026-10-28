@@ -17285,6 +17285,46 @@
       }
     }
   },
+  "srpKillmail": {
+    "close": "Close",
+    "file": "File claim",
+    "covered": "Covered",
+    "officerWillReview": "An officer will review your claim",
+    "previewFailed": "Couldn't check this loss. You can still file it.",
+    "offDoctrine_one": "{{count}} module off doctrine. You can still file; an officer will see this.",
+    "offDoctrine_other": "{{count}} modules off doctrine. You can still file; an officer will see this.",
+    "offDoctrineMissing": "Your fit is missing doctrine modules. You can still file; an officer will see this.",
+    "checkedAgainst": "Fit checked against {{name}}",
+    "system": "System",
+    "lost": "Lost",
+    "killmailValue": "Killmail value",
+    "hullFit": "Hull / fit",
+    "attackers": "Attackers",
+    "attackersFinalBlow": "{{count}} · final blow {{ship}}",
+    "fitFailed": "Couldn't load this fit",
+    "noFit": "Nothing was fitted",
+    "slot": {
+      "high": "High",
+      "medium": "Mid",
+      "low": "Low",
+      "rig": "Rig",
+      "subsystem": "Subsystem",
+      "drone": "Drones"
+    },
+    "mark": {
+      "doctrine": "Doctrine",
+      "off": "Off doctrine"
+    },
+    "openKillmail": "Open killmail",
+    "appraisal": {
+      "title": "Appraisal",
+      "lost": "Ship and fit (Jita)",
+      "doctrine": "Doctrine fit (Jita)",
+      "difference": "Difference",
+      "doctrineUnavailable": "Doctrine value unavailable",
+      "failed": "Couldn't price this loss"
+    }
+  },
   "srpMember": {
     "title": "SRP",
     "notSetUp": {
@@ -17325,7 +17365,6 @@
       "file": "File",
       "fileShip": "File claim for {{hull}}",
       "claimed": "Claimed",
-      "old": "Too old",
       "notCovered": "Not covered",
       "ago": "{{count}}d ago",
       "empty": {

@@ -28,6 +28,7 @@ import type {
   SrpMarkPaidItem,
 } from './srpClaimTypes';
 import { invalidateSrpOfficer } from './srpClient';
+import type { SrpClaimValues } from './srpTypes';
 import { call } from './taxBook/bookClient';
 
 const corpDoc = (characterId: number, corporationId: number, name: string) =>
@@ -133,6 +134,17 @@ export async function readSrpClaimAudit(
   return snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as Omit<SrpAuditEntry, 'id'>) }))
     .sort((a, b) => a.at - b.at);
+}
+
+/** The lost ship's Jita value against the nearest Doctrine Fit's (no cargo), for the claim detail. */
+export async function getSrpClaimValues(
+  characterId: number,
+  corporationId: number,
+  killmailId: number
+): Promise<SrpClaimValues> {
+  const stand = srpOfficerBackendOverride();
+  if (stand) return stand.claimValues(killmailId);
+  return officerCall(characterId, corporationId, 'getSrpClaimValuesCallable', { killmailId });
 }
 
 /** A refusal that says the remembered officer verdict or the view it came from may be stale. */

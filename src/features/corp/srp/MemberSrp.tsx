@@ -10,6 +10,7 @@ import { MemberClaimsList } from './MemberClaimsList';
 import { OffDoctrineFileDialog } from './OffDoctrineFileDialog';
 import { MemberFileForm, type FileFormErrors } from './MemberFileForm';
 import { LostShipsList } from './LostShipsList';
+import { MemberKillmailModal } from './MemberKillmailModal';
 import { useDoctrinePreview } from './useDoctrinePreview';
 import {
   esiKillmailLink,
@@ -88,6 +89,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     check: DoctrineCheckRecord;
   } | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
+  const [killmailRow, setKillmailRow] = useState<LostRow | null>(null);
   const [refiling, setRefiling] = useState<{ claim: MemberClaim; error?: string } | null>(null);
   const [refileBusy, setRefileBusy] = useState(false);
   const fleetRef = useRef<HTMLInputElement>(null);
@@ -216,6 +218,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
     <LostShipsList
       rows={lostRows}
       onFile={fileFromList}
+      onOpen={setKillmailRow}
       busyKillmailId={typeof filing === 'number' ? filing : null}
     />
   ) : null;
@@ -314,6 +317,20 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
             setRefiling({ claim: detail });
             setDetailId(null);
           }}
+        />
+      ) : null}
+      {killmailRow ? (
+        <MemberKillmailModal
+          subject={killmailRow}
+          canFile={killmailRow.kind === 'open'}
+          busy={filing !== null}
+          previewDoctrine={(killmail) => data.previewDoctrine(killmail)}
+          onFile={() => {
+            const row = killmailRow;
+            setKillmailRow(null);
+            fileFromList(row);
+          }}
+          onClose={() => setKillmailRow(null)}
         />
       ) : null}
       {offDoctrine ? (

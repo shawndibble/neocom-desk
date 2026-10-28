@@ -14,6 +14,7 @@ import type {
   SrpClaimState,
   SrpStatus,
 } from '../srpTypes';
+import { getKillmail, type Killmail } from '@/esi/endpoints';
 import { loadLostLosses } from './lostLosses';
 import type { LostLoss, MemberClaim } from './srpMemberModel';
 
@@ -26,6 +27,8 @@ export interface SrpMemberBackend {
     input: FileSrpClaimInput
   ) => Promise<FiledSrpClaim>;
   lostLosses: (characterId: number, corporationId: number) => Promise<LostLoss[]>;
+  /** The public ESI killmail a modal shows the facts and fit of. */
+  killmail: (killmailId: number, killmailHash: string) => Promise<Killmail | null>;
   /** The doctrine check a filing of this killmail would store; nothing is written. */
   previewDoctrine: (
     characterId: number,
@@ -103,6 +106,7 @@ const real: SrpMemberBackend = {
   claims: readMyClaims,
   file: fileSrpClaim,
   lostLosses: loadLostLosses,
+  killmail: async (killmailId, killmailHash) => (await getKillmail(killmailId, killmailHash)).data,
   previewDoctrine: previewSrpDoctrineCheck,
 };
 

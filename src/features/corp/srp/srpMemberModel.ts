@@ -35,6 +35,7 @@ export interface LostLoss {
   killedAt: number;
 }
 
+/** `old` is judged here but never listed (`useMemberSrp` drops it). */
 export type LostRowKind = 'open' | 'claimed' | 'old' | 'notCovered';
 
 export interface LostRowContext {

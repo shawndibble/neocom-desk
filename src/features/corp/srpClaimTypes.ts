@@ -5,6 +5,8 @@ import type { DoctrineCheckRecord, SrpClaimBasis, SrpClaimState } from './srpTyp
 /** `corps/{corporationId}/srpClaims/{killmailId}`: the fields the officer queue reads. */
 export interface SrpClaim {
   killmailId: number;
+  /** What opens the ESI killmail; absent only on a document this client cannot read. */
+  killmailHash?: string;
   corporationId: number;
   /** The pilot the claim belongs to. */
   characterId: number;

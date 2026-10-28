@@ -172,6 +172,7 @@ import {
   type BookDeps,
 } from './corpTaxBookStore.js';
 import { parseSrpSettingsPatch } from './srp.js';
+import { getSrpClaimValues, parseClaimValuesInput } from './srpClaimValues.js';
 import { deleteSrpDoctrine, previewSrpDoctrineCheck, saveSrpDoctrine } from './srpDoctrineStore.js';
 import { parseDeleteDoctrine, parseSaveDoctrine } from './srpDoctrineInput.js';
 import { parseFileClaimInput } from './srpKillmail.js';
@@ -1148,6 +1149,16 @@ corpTaxBookAction('previewSrpDoctrineCheckCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseFileClaimInput(request.data).ref
+  )
+);
+
+// An officer reads a claim's ship and doctrine values (Jita, no cargo); nothing is written.
+corpTaxBookAction('getSrpClaimValuesCallable', (request) =>
+  getSrpClaimValues(
+    srpFileDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseClaimValuesInput(request.data)
   )
 );
 

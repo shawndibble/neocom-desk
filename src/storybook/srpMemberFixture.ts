@@ -23,6 +23,19 @@ const AMARR = 30002187;
 const RENS = 30002510;
 const HEK = 30002053;
 
+/** The preview's price and loss facts, the same for every sample loss. */
+const PREVIEW_FACTS = {
+  killedAt: Date.parse('2026-10-22T20:05:00Z'),
+  solarSystemId: JITA,
+  quote: {
+    kind: 'amount',
+    isk: 130_900_000,
+    basis: { step: 'killmail-percent', percent: 70 },
+  },
+  hullRule: { scope: 'hull', id: HURRICANE, kind: 'pay-percent' },
+  values: { killmailValue: 187_000_000, hullValue: 71_000_000, fitValue: 116_000_000 },
+} as const;
+
 export const SRP_FIXTURE_CORPORATION_ID = 98765432;
 
 export interface SrpFixtureOptions {
@@ -138,10 +151,16 @@ export function createSrpMemberFixture(
       const killmailId = Number(/(?:kill|killmails)\/(\d+)/.exec(killmail)?.[1] ?? 0);
       const hullTypeId = killmailId === 8003 ? FEROX : HURRICANE;
       if (killmail.includes('unchecked') || hullTypeId === FEROX) {
-        return { killmailId, hullTypeId: FEROX, check: { status: 'not-checked' } };
+        return {
+          ...PREVIEW_FACTS,
+          killmailId,
+          hullTypeId: FEROX,
+          check: { status: 'not-checked' },
+        };
       }
       if (killmail.includes('ondoctrine')) {
         return {
+          ...PREVIEW_FACTS,
           killmailId,
           hullTypeId,
           check: {
@@ -152,6 +171,7 @@ export function createSrpMemberFixture(
         };
       }
       return {
+        ...PREVIEW_FACTS,
         killmailId,
         hullTypeId,
         check: {
@@ -167,6 +187,25 @@ export function createSrpMemberFixture(
         },
       };
     },
+    // A Hurricane fit: 519 (Gyrostabilizer-class sample) twice and 2048 on the high rack, a rig, a drone.
+    killmail: async (killmailId) => ({
+      killmail_id: killmailId,
+      killmail_time: new Date(now - DAY).toISOString(),
+      solar_system_id: JITA,
+      victim: {
+        ship_type_id: HURRICANE,
+        items: [
+          { item_type_id: 2420, flag: 27, quantity_destroyed: 1, singleton: 0 },
+          { item_type_id: 2420, flag: 28, quantity_dropped: 1, singleton: 0 },
+          { item_type_id: 519, flag: 11, quantity_destroyed: 1, singleton: 0 },
+          { item_type_id: 519, flag: 12, quantity_destroyed: 1, singleton: 0 },
+          { item_type_id: 31055, flag: 92, quantity_destroyed: 1, singleton: 0 },
+          { item_type_id: 2488, flag: 87, quantity_destroyed: 5, singleton: 0 },
+          { item_type_id: 34, flag: 5, quantity_dropped: 1000, singleton: 0 },
+        ],
+      },
+      attackers: [{ final_blow: true, ship_type_id: GILA }, { ship_type_id: CERBERUS }],
+    }),
     status: async () => status,
     claims: async () => claims,
     lostLosses: async () => losses,
