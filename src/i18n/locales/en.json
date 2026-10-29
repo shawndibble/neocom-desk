@@ -1548,6 +1548,7 @@
           "cpu": "CPU",
           "powergrid": "Powergrid"
         },
+        "speedValue": "{{value}} m/s",
         "capStable": "Stable",
         "capUnstable": "Runs dry",
         "become_one": "{{name}} becomes",
