@@ -5,6 +5,7 @@
  * and keeps the last outcome; `ScanFeedback` renders it, empty when all is well.
  */
 import { useTranslation } from 'react-i18next';
+import { InlineError } from '@/components/ui/InlineError';
 import type { AddScanResult } from './scanResult';
 
 export function ScanFeedback({ busy, error }: { busy: boolean; error: AddScanResult | null }) {
@@ -15,12 +16,12 @@ export function ScanFeedback({ busy, error }: { busy: boolean; error: AddScanRes
         {busy && t('survey.adding')}
       </p>
       {error !== null && (
-        <p role="alert" className="text-xs text-danger">
+        <InlineError>
           {error === 'not-a-scan' && t('survey.notAScan')}
           {error === 'too-large' && t('survey.tooLarge')}
           {error === 'refused' && t('survey.refused')}
           {error === 'failed' && t('survey.saveFailed')}
-        </p>
+        </InlineError>
       )}
     </>
   );

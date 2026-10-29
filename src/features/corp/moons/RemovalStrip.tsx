@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { MoonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
@@ -60,11 +61,7 @@ export function RemovalStrip({
           </>
         }
       />
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t(k('failed'))}
-        </p>
-      )}
+      {failed && <InlineError>{t(k('failed'))}</InlineError>}
     </div>
   );
 }

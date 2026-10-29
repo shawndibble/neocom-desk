@@ -1,4 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { InlineError } from '@/components/ui/InlineError';
 import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -315,11 +316,7 @@ export function PayeeManagerDialog({
           </div>
         )}
 
-        {deleteError && (
-          <p role="alert" className="text-xs text-danger">
-            {deleteError}
-          </p>
-        )}
+        {deleteError && <InlineError>{deleteError}</InlineError>}
         {payees.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.payeesEmpty')}</p>
         ) : (
@@ -437,11 +434,7 @@ export function PayeeManagerDialog({
                 </Select>
               </Field>
             </Fields>
-            {error && (
-              <p role="alert" className="text-xs text-danger">
-                {error}
-              </p>
-            )}
+            {error && <InlineError>{error}</InlineError>}
             <div className="flex justify-end gap-2">
               {draft.id && (
                 <Button

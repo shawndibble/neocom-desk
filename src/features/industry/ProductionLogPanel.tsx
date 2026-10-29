@@ -592,13 +592,7 @@ export function ProductionLogPanel({
 
         {runRows.length > 0 && profitHistoryPoints.length >= 2 && (
           <div className="min-w-0">
-            <Suspense
-              fallback={
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
-              }
-            >
+            <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
               <LazyProductionProfitChart points={profitHistoryPoints} trend={profitHistoryTrend} />
             </Suspense>
           </div>

@@ -44,9 +44,7 @@ export function OrdersTab({ headerSlots }: { headerSlots: PageHeaderSlots }) {
   return (
     <>
       {holdForAccess ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="page" label={t('common.loading')} />
       ) : (
         // Keyed by source: a switch is a fresh load, never the other source's rows for a frame.
         <OpenOrdersPanel

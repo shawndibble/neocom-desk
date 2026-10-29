@@ -313,13 +313,7 @@ function RouteOutlet() {
           throws — or whose chunk will not load — fails inside the shell,
           clearing once the pilot navigates elsewhere. */}
       <ErrorBoundary inline resetKey={location.pathname}>
-        <Suspense
-          fallback={
-            <div className="flex justify-center py-16">
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
+        <Suspense fallback={<Spinner block="page" label={t('common.loading')} />}>
           <Outlet />
         </Suspense>
       </ErrorBoundary>

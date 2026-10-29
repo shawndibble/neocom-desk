@@ -1,4 +1,5 @@
 import { romanLevel } from '@/engine/projection';
+import { InlineError } from '@/components/ui/InlineError';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   useCallback,
@@ -1872,11 +1873,7 @@ export function PlanEditor({
                   </>
                 }
               />
-              {dropError && (
-                <p role="alert" className="text-xs text-danger">
-                  {dropError}
-                </p>
-              )}
+              {dropError && <InlineError>{dropError}</InlineError>}
               {promoteConfirm && confirmation(promoteConfirm)}
               {error ? (
                 <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
@@ -1993,11 +1990,7 @@ export function PlanEditor({
                   </Button>
                 )
               )}
-            {importError && (
-              <p role="alert" className="text-xs text-danger">
-                {importError}
-              </p>
-            )}
+            {importError && <InlineError>{importError}</InlineError>}
           </>,
           headerActionsContainer
         )}

@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
@@ -110,11 +111,7 @@ function RouteButton({
       <Button variant="primary" className="w-full md:w-auto" disabled={resolving} onClick={view}>
         {t('clones.verdict.route', { place: placeName, count: jumps })}
       </Button>
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('travel.waypoints.viewRouteUnavailable')}
-        </p>
-      )}
+      {failed && <InlineError>{t('travel.waypoints.viewRouteUnavailable')}</InlineError>}
     </div>
   );
 }

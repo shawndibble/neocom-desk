@@ -85,9 +85,7 @@ export function WalletLoyaltyPanel({
         </div>
       )}
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="panel" label={t('common.loading')} />
       ) : !loyaltyResult || otherLoyalty.length === 0 ? (
         // A Character needing a new grant already has its banner above.
         (loyaltyResult || reauthCharacters.length === 0) && (

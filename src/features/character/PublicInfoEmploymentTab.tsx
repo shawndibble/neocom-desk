@@ -16,11 +16,7 @@ export default function PublicInfoEmploymentTab({ characterId }: { characterId: 
   const { status, data } = useAsyncLoad(loader);
 
   if (status === 'loading' || status === 'idle') {
-    return (
-      <div className="flex justify-center py-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="panel" label={t('common.loading')} />;
   }
   if (status === 'failed' || !data) {
     return (

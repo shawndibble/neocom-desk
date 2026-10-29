@@ -320,9 +320,7 @@ export function MarketWideOpportunitiesPanel({
         className="py-8"
       >
         {loading ? (
-          <div className="flex justify-center py-8">
-            <Spinner label={t('industry.marketOpportunitiesScanning')} />
-          </div>
+          <Spinner block="panel" label={t('industry.marketOpportunitiesScanning')} />
         ) : error ? (
           <EmptyState
             title={t('industry.marketOpportunitiesErrorTitle')}

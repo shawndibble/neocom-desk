@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
@@ -77,9 +78,7 @@ export function CommunityPlansDialog({
           <Spinner size="sm" label={t('communities.plansDialog.loading')} />
         )}
         {state.status === 'failed' && (
-          <p role="alert" className="text-xs text-danger">
-            {t('communities.plansDialog.failed')}
-          </p>
+          <InlineError>{t('communities.plansDialog.failed')}</InlineError>
         )}
         {state.status === 'ready' &&
           (state.rows.length === 0 ? (

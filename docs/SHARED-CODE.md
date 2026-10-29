@@ -50,4 +50,3 @@ Not yet migrated; move them to the shared helper when you touch the file.
 - `new Date(ms).toISOString().slice(0, 10)` copies of `utcDay` (for example `src/backup/io.ts`, `src/engine/corpTaxBook/{billable,statements,verifyView}.ts`, `src/features/corp/moons/*`).
 - Raw `86_400_000` literals and a local `DAY` in `corp/deadlines.ts`, `market/orderBook.ts`, `netWorth/snapshot.ts`, `ExtractionTimeline.tsx` and others.
 - `src/features/miningTax/paymentLinks.ts` exports a different `utcDay(date: string): number`; do not mistake it for the shared one.
-- Hand-built spinner and inline-error wrappers (96 and 83 sites) where a `Spinner` size option and an `InlineError` primitive do not exist yet.

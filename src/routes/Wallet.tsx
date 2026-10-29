@@ -218,11 +218,7 @@ export function Wallet() {
   }, [balanceResult, loyaltyResult]);
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
   // The corporation wallet was this page's Corporation side until it moved to
@@ -287,9 +283,7 @@ export function Wallet() {
 
       <TabPanel tabsId={tabsId} tabId={tab} className="space-y-4">
         {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : tab === 'balance' ? (

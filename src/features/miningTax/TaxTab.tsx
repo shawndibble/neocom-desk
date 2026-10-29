@@ -1153,9 +1153,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       {tabBar}
       <TabPanel tabsId={tabsId} tabId="tax" className="space-y-4">
         {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : (

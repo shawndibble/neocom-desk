@@ -302,9 +302,7 @@ export function SkillCompareDrawer({ open, onClose, activeCharacterId }: SkillCo
           hint={t('skillCompare.noneSelectedHint')}
         />
       ) : !catalog || baselinePending || (pendingIds.size > 0 && loadedIds.length < 2) ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('skillCompare.loading')} />
-        </div>
+        <Spinner block="page" label={t('skillCompare.loading')} />
       ) : allRows.length === 0 || (split.differing.length === 0 && split.identical.length === 0) ? (
         <EmptyState title={t('skillCompare.noDataTitle')} hint={t('skillCompare.noDataHint')} />
       ) : loadedIds.length === 1 ? (

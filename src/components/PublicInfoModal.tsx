@@ -290,13 +290,7 @@ export function PublicInfoModal() {
             )}
             {activeTab === 'alliance' && <AllianceTab state={alliance} onRetry={retry} />}
             {activeTab === 'employment' && (
-              <Suspense
-                fallback={
-                  <div className="flex justify-center py-8">
-                    <Spinner label={t('common.loading')} />
-                  </div>
-                }
-              >
+              <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
                 <LazyEmploymentTab characterId={request.id} />
               </Suspense>
             )}
@@ -317,11 +311,7 @@ function TabStatus({
 }) {
   const { t } = useTranslation();
   if (status === 'loading') {
-    return (
-      <div className="flex justify-center py-8">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="panel" label={t('common.loading')} />;
   }
   return (
     <EmptyState

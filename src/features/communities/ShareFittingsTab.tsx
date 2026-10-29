@@ -1,4 +1,5 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { InlineError } from '@/components/ui/InlineError';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -119,11 +120,7 @@ export function ShareFittingsTab({
   );
 
   if (loadFailed) {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.fittings.loadFailed')}
-      </p>
-    );
+    return <InlineError>{t('communities.fittings.loadFailed')}</InlineError>;
   }
   if (loaded === null) return <Spinner size="sm" label={t('communities.fittings.loading')} />;
   if (fittings.length === 0 && (savedLoaded?.shared.size ?? 0) === 0) {
@@ -277,11 +274,7 @@ export function ShareFittingsTab({
         </ul>
       )}
       {/* While Add is open the notice shows in it: the page behind is inert. */}
-      {notice !== null && !adding && (
-        <p role="alert" className="text-xs text-danger">
-          {notice}
-        </p>
-      )}
+      {notice !== null && !adding && <InlineError>{notice}</InlineError>}
       <ToastStack
         items={pendingOff.items}
         undoLabel={t('communities.fittings.undo')}

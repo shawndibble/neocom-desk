@@ -4,6 +4,7 @@
  * Wallet's insurance-payout modal, so the two can never drift apart.
  */
 import { useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Spinner } from '@/components/ui';
@@ -103,11 +104,7 @@ function FitView({ fitting, typeLabel }: { fitting: Fitting; typeLabel: TypeLabe
       <Button size="sm" disabled={busy} onClick={() => void openInFittings()}>
         {t('travel.pilot.recent.openInFittings')}
       </Button>
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('travel.pilot.recent.openFailed')}
-        </p>
-      )}
+      {failed && <InlineError>{t('travel.pilot.recent.openFailed')}</InlineError>}
     </div>
   );
 }

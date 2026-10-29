@@ -13,6 +13,11 @@ interface SpinnerProps {
    * appears). Omit for an immediate spinner.
    */
   delayMs?: number;
+  /**
+   * Centre the arc in its own row with vertical padding: `page` (`py-16`) for a
+   * view waiting on its only content, `panel` (`py-8`) inside a card or modal.
+   */
+  block?: 'page' | 'panel';
 }
 
 const SIZE: Record<SpinnerSize, string> = {
@@ -21,7 +26,21 @@ const SIZE: Record<SpinnerSize, string> = {
   lg: 'size-9',
 };
 
-export function Spinner({ size = 'md', label = 'Loading', className = '', delayMs }: SpinnerProps) {
+export function Spinner({ block, ...props }: SpinnerProps) {
+  if (!block) return <SpinnerArc {...props} />;
+  return (
+    <div className={block === 'page' ? 'flex justify-center py-16' : 'flex justify-center py-8'}>
+      <SpinnerArc {...props} />
+    </div>
+  );
+}
+
+function SpinnerArc({
+  size = 'md',
+  label = 'Loading',
+  className = '',
+  delayMs,
+}: Omit<SpinnerProps, 'block'>) {
   const [shown, setShown] = useState(!delayMs);
 
   useEffect(() => {

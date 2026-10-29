@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { EmptyState, RowCaret, SearchInput, Spinner } from '@/components/ui';
@@ -86,11 +87,7 @@ export function CommunitySharedFittings({
     return <Spinner size="sm" label={t('communities.everyone.fittingsLoading')} />;
   }
   if (state.status === 'failed') {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.everyone.fittingsFailed')}
-      </p>
-    );
+    return <InlineError>{t('communities.everyone.fittingsFailed')}</InlineError>;
   }
   if (state.fittings.length === 0) {
     return (

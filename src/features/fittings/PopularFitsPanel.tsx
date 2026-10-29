@@ -1,4 +1,5 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
+import { InlineError } from '@/components/ui/InlineError';
 import { useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
@@ -247,9 +248,7 @@ function WorkbenchFits({
                 <RackIconStrip modules={modules} names={names} />
                 <WorkbenchSightingBadge sighting={sighting} />
                 {loadFailed && (
-                  <p role="alert" className="text-xs text-danger">
-                    {t('fittings.popular.workbench.loadFailed')}
-                  </p>
+                  <InlineError>{t('fittings.popular.workbench.loadFailed')}</InlineError>
                 )}
               </div>
             </>
