@@ -7,6 +7,8 @@ import { conversionSummary, TANK_RACKS, type ImproveOption } from '@/engine/fitt
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 
 export interface ImproveLabels {
+  /** A type's name, as the catalogue gives it. */
+  typeName: (typeId: number) => string;
   moveLabel: (candidate: ImproveOption['candidate']) => string;
   /** The swaps chained behind a Make Flyable fix, each named: what frees the CPU or powergrid it takes. */
   flyableSwaps: (candidate: ImproveOption['candidate']) => string[];
@@ -60,5 +62,5 @@ export function useImproveLabels(catalogue: FittingCatalogue | null): ImproveLab
       .join(' ');
   }
 
-  return { moveLabel, flyableSwaps, swapLabel, conversionLine };
+  return { typeName: name, moveLabel, flyableSwaps, swapLabel, conversionLine };
 }

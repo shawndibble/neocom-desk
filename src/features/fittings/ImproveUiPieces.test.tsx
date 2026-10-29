@@ -60,6 +60,17 @@ describe('ImproveSearchStatus round line', () => {
     expect(screen.getByText('Round 3 of up to 4 · checking 41 of 96 swaps…')).toBeInTheDocument();
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
   });
+  it('names the Makeover phase, counting its calculations', () => {
+    const makeover = {
+      ...search,
+      state: { status: 'searching', checked: 12, total: 300, slow: false, makeover: true },
+    } as unknown as ImproveSearch;
+    render(<ImproveSearchStatus search={makeover} />);
+    expect(
+      screen.getByText('Looking for a Makeover · 12 of up to 300 calculations…')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
   it('keeps the plain line without rounds', () => {
     render(<ImproveSearchStatus search={search} />);
     expect(screen.getByText('Checking 41 of 96 swaps…')).toBeInTheDocument();

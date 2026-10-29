@@ -1503,6 +1503,7 @@
       "includeRigs": "Rigs",
       "summaryRigsOn": "rigs on",
       "rigsHint": "A rig is destroyed when removed, so a rig swap costs the new rig's full price.",
+      "checkingMakeover": "Looking for a Makeover · {{checked}} of up to {{total}} calculations…",
       "checkingRound": "Round {{round}} of up to {{max}} · checking {{checked}} of {{total}} swaps…",
       "reworkNudge": {
         "text": "Rework tries any module that can move this goal, over several rounds, and can return a Makeover.",

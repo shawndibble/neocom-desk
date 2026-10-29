@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ImproveJobChoice } from './ImproveJobChoice';
-import type { ImproveJob, ImproveSpace } from './improveSettings';
+import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
 
 /** @summary The Improve Job setting: PvE / PvP / Explore with a hint, and Explore's space choice. */
 const meta = {
@@ -32,7 +32,7 @@ export const ExploreSafe: Story = { args: { job: 'explore', space: 'safe' } };
 
 function InteractiveJobChoice() {
   const [job, setJob] = useState<ImproveJob>('explore');
-  const [space, setSpace] = useState<ImproveSpace>('dangerous');
+  const [space, setSpace] = useState<ExploreSpace>('dangerous');
   return <ImproveJobChoice job={job} onJobChange={setJob} space={space} onSpaceChange={setSpace} />;
 }
 
