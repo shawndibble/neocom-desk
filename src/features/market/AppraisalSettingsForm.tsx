@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Field, Fields } from '@/components/ui';
-import { InlinePercent } from '@/features/refining/InlinePercent';
+import { Fields } from '@/components/ui';
+import { RefiningSetupFields } from '@/features/refining/RefiningSetupFields';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { SettingsPanelLoading } from '@/features/settings/settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -23,24 +23,7 @@ export function AppraisalSettingsForm({ characterId }: { characterId: number | n
   return (
     <div className="space-y-4">
       <Fields variant="form">
-        <Field label={t('settings.refiningYieldLabel')} note={t('settings.refiningYieldHint')}>
-          <InlinePercent
-            fraction={refining.setup.stationRate}
-            name={t('settings.refiningYieldLabel')}
-            min={1}
-            max={100}
-            onCommit={(fraction) => void refining.setYieldRate(fraction)}
-          />
-        </Field>
-        <Field label={t('settings.refiningTaxLabel')} note={t('settings.refiningTaxHint')}>
-          <InlinePercent
-            fraction={refining.setup.taxRate}
-            name={t('settings.refiningTaxLabel')}
-            min={0}
-            max={100}
-            onCommit={(fraction) => void refining.setTaxRate(fraction)}
-          />
-        </Field>
+        <RefiningSetupFields refining={refining} />
       </Fields>
       <section aria-labelledby="appraisal-settings-ship" className="space-y-2">
         <div>
