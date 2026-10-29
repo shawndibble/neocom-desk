@@ -37,7 +37,8 @@ export function isNetworkFailure(error: unknown): boolean {
     /^(failed to fetch|networkerror|network request failed|load failed)/i.test(error.message)
   )
     return true;
-  if (error instanceof DOMException && error.name === 'AbortError') return true;
+  // Any `AbortError`, not only a DOMException: Dexie's "Transaction aborted" is a DexieError.
+  if (error instanceof Error && error.name === 'AbortError') return true;
   const { code, status } = (error ?? {}) as { code?: unknown; status?: unknown };
   if (typeof code === 'string' && NETWORK_CODES.has(code.replace(/^[a-z]+\//, ''))) return true;
   // Firestore Lite's own wrap of a fetch that threw (no response at all): the
@@ -160,8 +161,13 @@ export function isClosedDatabaseEvent(event: {
   return event.exception?.values?.some((v) => v.type === 'DatabaseClosedError') ?? false;
 }
 
+// A bare `AbortError`, or WebKit's wording for a transaction killed under a reader.
+const STRAY_REJECTION_VALUE =
+  /^(Error: )?(AbortError\b|UnknownError: Attempt to get a record from database without an in-progress transaction)/;
+
 /**
- * `beforeSend`'s filter for a bare `AbortError` that reaches the global
+ * `beforeSend`'s filter for a bare `AbortError` (or WebKit's "without an
+ * in-progress transaction" IndexedDB rejection) that reaches the global
  * unhandled-rejection handler: a fetch or Firestore stream cancelled by a
  * navigation, a tab going to the background or Safari dropping the connection.
  * It has no stack and names nothing, and `isNetworkFailure` already treats the
@@ -175,7 +181,7 @@ export function isStrayAbortEvent(event: {
     event.exception?.values?.some(
       (v) =>
         v.mechanism?.type === 'auto.browser.global_handlers.onunhandledrejection' &&
-        /^(Error: )?AbortError\b/.test(v.value ?? '')
+        STRAY_REJECTION_VALUE.test(v.value ?? '')
     ) ?? false
   );
 }

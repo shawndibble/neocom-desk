@@ -5,7 +5,7 @@
  * "-0", which reads as a loss that isn't real.
  */
 import { formatCompactNumber } from './compactNumber';
-import { createNumberFormat, getDecimalMark } from './numberLocale';
+import { createNumberFormat, getDecimalMark, getGroupMark } from './numberLocale';
 import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 
 const formatters = new Map<number, (value: number) => string>();
@@ -147,7 +147,7 @@ export function maskIskTyping(text: string): string {
   const at = body.indexOf(decimal);
   // A second decimal mark is a figure in another format (a pasted 1.234.567): left for the field's error, not mangled.
   if (at >= 0 && body.indexOf(decimal, at + 1) >= 0) return text;
-  const group = maskIsk(1_000).replace(/\d/g, '')[0] ?? '';
+  const group = getGroupMark();
   const whole = (at < 0 ? body : body.slice(0, at)).replace(/\D/g, '');
   // No cap on fraction digits: a suffix may still follow (1.255m), and the figure is parsed whole.
   const fraction = at < 0 ? null : body.slice(at + 1).replace(/\D/g, '');

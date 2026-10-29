@@ -119,6 +119,8 @@ export interface ImproveCandidate {
   pairedWith?: ImproveCandidate;
   /** Replaces a fitted module the pilot cannot fly yet: accepted even when it scores worse on the goal. */
   fixesUnflyable?: boolean;
+  /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
+  covers?: 'budget' | 'capacitor';
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
@@ -379,6 +381,23 @@ function scoreOf(
 
 /** Cheaper may give up this much damage, tank or speed: a bit worse for a lot less ISK is the point. Deliberately looser than Make it fit's `STAT_TOLERANCE`. */
 const CHEAPER_TOLERANCE = 0.1;
+
+/** Whether the fit has a module the pilot switches on (an MWD, a booster, a weapon). */
+const hasToggledModule = (stats: FittingStats): boolean =>
+  stats.modules.some((module) => module.maxState === 'active' || module.maxState === 'overload');
+
+/** A cover for a fix that breaks the capacitor: the swapped fit holds a stable one. */
+const capacitorHolds = (stats: FittingStats): boolean => stats.capacitor.stable;
+
+/** The fit with every toggled module switched off. */
+const withTogglesOff = (fitting: Fitting): Fitting => ({
+  ...fitting,
+  modules: fitting.modules.map((module) =>
+    module.state === 'active' || module.state === 'overload'
+      ? { ...module, state: 'online' }
+      : module
+  ),
+});
 
 /** The first Guardrail `after` breaks, or null. */
 function brokenGuardrail(
@@ -707,7 +726,7 @@ export interface FindImprovementsParams {
   /** Carry more: the hold scored (default the cargo hold). */
   hold?: ImproveHold;
   /** The total fit price may not pass it. Null: no limit. */
-  spendCap?: number | null;
+  iskBudget?: number | null;
   /** What the fit costs now, for the total budget. */
   fitTotal?: number | null;
   /** Module and rig swaps that pay for an unflyable-module fix that overruns the fit. */
@@ -728,16 +747,16 @@ const PAIR_SEEDS = 5;
  * it) passes the pilot's budget: the total fit price. No cap, or an unpriced
  * change, never blocks.
  */
-export function overSpendCap(
-  spendCap: number | null,
+export function overIskBudget(
+  iskBudget: number | null,
   fitTotal: number | null,
   iskDelta: number | null,
   extra = 0
 ): boolean {
-  if (spendCap === null || (iskDelta === null && extra === 0)) return false;
+  if (iskBudget === null || (iskDelta === null && extra === 0)) return false;
   // An unpriced change adds nothing it can be charged, but the implants bought with it still count.
   const spent = (iskDelta ?? 0) + extra;
-  return (fitTotal ?? 0) + spent > spendCap;
+  return (fitTotal ?? 0) + spent > iskBudget;
 }
 
 /** Fixes over budget that get a compensation search, and the bundles kept for each. */
@@ -755,9 +774,13 @@ const changeCount = (candidate: ImproveCandidate): number =>
   1 + (candidate.pairedWith ? changeCount(candidate.pairedWith) : 0);
 
 /** `fix` with each swap chained behind it as a paired change, so one Apply makes them all. */
-function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCandidate {
+function bundleOf(
+  fix: ImproveCandidate,
+  swaps: readonly FitSwap[],
+  covers: NonNullable<ImproveCandidate['covers']>
+): ImproveCandidate {
   const chain = chainOf(swaps);
-  return chain ? { ...fix, pairedWith: chain } : fix;
+  return chain ? { ...fix, pairedWith: chain, covers } : fix;
 }
 
 /** The swaps as one candidate with the rest chained behind it; undefined for none. */
@@ -795,7 +818,7 @@ export async function findImprovements({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
-  spendCap = null,
+  iskBudget = null,
   fitTotal = null,
   compensators,
   onProgress,
@@ -813,8 +836,23 @@ export async function findImprovements({
   let failed = 0;
   let stopped = false;
 
+  /** Whether a ship with toggled modules is stable once they are off; false for one with none. */
+  async function stableWhenToggledOff(swapped: Fitting, after: FittingStats): Promise<boolean> {
+    if (!hasToggledModule(after)) return false;
+    try {
+      return (await stats(withTogglesOff(swapped))).capacitor.stable;
+    } catch {
+      // Blocked, the cautious side: a failed calculation must not let a fix break the capacitor.
+      return false;
+    }
+  }
+
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
-  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats): boolean {
+  async function take(
+    candidate: ImproveCandidate,
+    swapped: Fitting,
+    after: FittingStats
+  ): Promise<boolean> {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
     const iskDelta = iskDeltaOf(candidate, priceOf);
@@ -829,10 +867,15 @@ export async function findImprovements({
       iskDelta,
       lost: lostStats(before, after),
     };
-    const overSpend = overSpendCap(spendCap, fitTotal, iskDelta);
-    // Flying it beats keeping the stats: only the fit's resources and the spend still bind.
+    const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
+    // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target);
-    const guardrail = (fix && broken !== 'budget' ? null : broken) ?? (overSpend ? 'spend' : null);
+    // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
+    const capStillBinds =
+      fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
+    const guardrail =
+      (fix && broken !== 'budget' && !capStillBinds ? null : broken) ??
+      (overSpend ? 'spend' : null);
     // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
     if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
     else (fix ? flyable : kept).push(option);
@@ -858,7 +901,7 @@ export async function findImprovements({
     onProgress?.(checked, candidates.length);
     if (after === null) continue;
     if (candidate.fromTypeId !== null) swaps.push({ candidate, after });
-    take(candidate, swapped, after);
+    await take(candidate, swapped, after);
   }
   // Every calculation failed: the engine is broken, not the fit beyond improving.
   if (checked > 0 && failed === checked) throw new Error('Every Improve calculation failed');
@@ -893,18 +936,20 @@ export async function findImprovements({
     try {
       const after = await stats(swapped);
       if (isCancelled?.()) return null;
-      if (fitsResourceBudget(after)) take(candidate, swapped, after);
+      if (fitsResourceBudget(after)) await take(candidate, swapped, after);
     } catch {
       // Left out, as a single's failure is.
     }
   }
 
-  // A fix over budget: the module and rig swaps that bring the fit back under, so Apply is never locked.
+  // A fix over budget or breaking a stable capacitor: the module and rig swaps that put the fit right, so Apply is never locked.
   if (compensators) {
-    const seeds = flyableBlocked
-      .filter((option) => option.guardrail === 'budget')
-      .slice(0, FLYABLE_SEEDS);
-    overrun.push(...seeds);
+    const seedsFor = (guardrail: Guardrail) =>
+      flyableBlocked.filter((option) => option.guardrail === guardrail).slice(0, FLYABLE_SEEDS);
+    const overBudget = seedsFor('budget');
+    // Implants shift CPU and powergrid, not the capacitor: only an over-budget fix is offered them.
+    overrun.push(...overBudget);
+    const seeds = [...overBudget, ...seedsFor('capStable')];
     for (const seed of seeds) {
       if (isCancelled?.()) return null;
       if (shouldStop?.()) {
@@ -913,6 +958,7 @@ export async function findImprovements({
       }
       const swaps = compensators(seed.candidate);
       if (swaps.length === 0) continue;
+      const forCapacitor = seed.guardrail === 'capStable';
       let found: Awaited<ReturnType<typeof findFitSwaps>>;
       try {
         found = await findFitSwaps({
@@ -922,6 +968,7 @@ export async function findImprovements({
           stats,
           priceOf,
           isCancelled,
+          ...(forCapacitor ? { accepts: capacitorHolds } : {}),
         });
       } catch {
         // A failed search leaves the fix greyed with its reason; it must not end the whole search.
@@ -930,10 +977,14 @@ export async function findImprovements({
       if (isCancelled?.()) return null;
       if (found.options.length === 0) continue;
       // The fix leaves its greyed row only once a bundle took its place (a rule break can drop them all).
-      const taken = found.options
-        .slice(0, FLYABLE_PER_FIX)
-        .map((option) =>
-          take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
+      const taken: boolean[] = [];
+      for (const option of found.options.slice(0, FLYABLE_PER_FIX))
+        taken.push(
+          await take(
+            bundleOf(seed.candidate, option.swaps, forCapacitor ? 'capacitor' : 'budget'),
+            option.fitting,
+            option.after
+          )
         );
       if (taken.some(Boolean)) flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
     }

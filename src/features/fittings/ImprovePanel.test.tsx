@@ -85,8 +85,8 @@ const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   onReachChange: vi.fn(),
   sort: 'gain',
   onSortChange: vi.fn(),
-  spendCap: null,
-  onSpendCapChange: vi.fn(),
+  iskBudget: null,
+  onIskBudgetChange: vi.fn(),
   defense: 'keep',
   onDefenseChange: vi.fn(),
   includeRigs: false,
@@ -473,7 +473,7 @@ describe('ImprovePanel', () => {
       guardrail: 'spend' as const,
     };
     const state = { ...done({ rejected: [rejected] }), fitTotal: 40_000_000 } as ImproveState;
-    renderPanel(search(state), vi.fn(), vi.fn(), settings({ spendCap: 50_000_000 }));
+    renderPanel(search(state), vi.fn(), vi.fn(), settings({ iskBudget: 50_000_000 }));
     expect(screen.getByText('Over your 50M budget by 2.3M')).toBeInTheDocument();
   });
 

@@ -7,7 +7,7 @@ const before = baseFittingStats();
 const opt = (iskDelta: number | null): ImproveOption =>
   ({ candidate: { fromTypeId: 1, toTypeId: 2, at: [] }, iskDelta }) as unknown as ImproveOption;
 
-const base = { before, after: before, spendCap: null, fitTotal: null };
+const base = { before, after: before, iskBudget: null, fitTotal: null };
 
 describe('summariseSelection', () => {
   it('sums the priced costs and counts the unpriced', () => {
@@ -45,7 +45,7 @@ describe('summariseSelection', () => {
     const s = summariseSelection({
       ...base,
       options: [opt(30), opt(30)],
-      spendCap: 100,
+      iskBudget: 100,
       fitTotal: 50,
     });
     expect(s.total).toBe(110);

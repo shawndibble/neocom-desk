@@ -112,8 +112,8 @@ export function useImproveDrawer({
   const setOreFamily = useImproveOre((state) => state.setValue);
   const hold = useImproveHold((state) => state.value);
   const setHold = useImproveHold((state) => state.setValue);
-  const spendCap = useImproveBudget((state) => state.value);
-  const setSpendCap = useImproveBudget((state) => state.setValue);
+  const iskBudget = useImproveBudget((state) => state.value);
+  const setIskBudget = useImproveBudget((state) => state.setValue);
   useEffect(() => {
     void migrateSpendCap();
   }, []);
@@ -181,7 +181,7 @@ export function useImproveDrawer({
     isOpen,
     {
       reach,
-      spendCap,
+      iskBudget,
       defense,
       includeRigs,
       includeOfficer,
@@ -272,7 +272,7 @@ export function useImproveDrawer({
                   basis: workspace.implantBasis,
                   onChange: workspace.setImplantSet,
                 }}
-                spendCap={spendCap}
+                iskBudget={iskBudget}
                 fitTotal={search.state.status === 'done' ? search.state.fitTotal : null}
                 onApply={applyWithImplants}
               />
@@ -324,8 +324,8 @@ export function useImproveDrawer({
         onReachChange: (next) => void setReach(next),
         sort,
         onSortChange: (next) => void setSort(next),
-        spendCap,
-        onSpendCapChange: (next) => void setSpendCap(next),
+        iskBudget,
+        onIskBudgetChange: (next) => void setIskBudget(next),
         defense,
         onDefenseChange: setDefense,
         includeRigs,

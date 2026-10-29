@@ -39,7 +39,7 @@ import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
-  overSpendCap,
+  overIskBudget,
   bestScore,
   damageOf,
   DEFENSE_CHOICES,
@@ -149,8 +149,8 @@ export interface ImproveSettings {
   sort: ImproveSort;
   onSortChange: (sort: ImproveSort) => void;
   /** Total budget in ISK; null is no limit. */
-  spendCap: number | null;
-  onSpendCapChange: (cap: number | null) => void;
+  iskBudget: number | null;
+  onIskBudgetChange: (cap: number | null) => void;
   defense: DefenseChoice;
   onDefenseChange: (defense: DefenseChoice) => void;
   includeRigs: boolean;
@@ -201,15 +201,15 @@ interface Props {
 function brokeText(
   t: TFunction,
   option: RejectedOption,
-  { spendCap }: Pick<ImproveSettings, 'spendCap'>,
+  { iskBudget }: Pick<ImproveSettings, 'iskBudget'>,
   fitTotal: number | null
 ): string {
-  if (option.guardrail !== 'spend' || spendCap === null || option.iskDelta === null)
+  if (option.guardrail !== 'spend' || iskBudget === null || option.iskDelta === null)
     return t(`fittings.improve.broke.${option.guardrail}`);
-  const over = (fitTotal ?? 0) + option.iskDelta - spendCap;
+  const over = (fitTotal ?? 0) + option.iskDelta - iskBudget;
   return t('fittings.improve.broke.spendBudget', {
     over: formatIskCompact(over),
-    cap: formatIskCompact(spendCap),
+    cap: formatIskCompact(iskBudget),
   });
 }
 
@@ -678,9 +678,12 @@ export function ImprovePanel({
             )}
             {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
               <span className="block text-xs">
-                {t('fittings.improve.flyableWith', {
-                  swaps: flyableSwaps(option.candidate).join('; '),
-                })}
+                {t(
+                  option.candidate.covers === 'capacitor'
+                    ? 'fittings.improve.flyableWithCapacitor'
+                    : 'fittings.improve.flyableWith',
+                  { swaps: flyableSwaps(option.candidate).join('; ') }
+                )}
               </span>
             )}
             {lead && <span className="block text-xs">{lead.node}</span>}
@@ -824,7 +827,7 @@ export function ImprovePanel({
           options: chosen,
           before: state.before,
           after: checked,
-          spendCap: settings.spendCap,
+          iskBudget: settings.iskBudget,
           fitTotal: state.fitTotal,
           target,
         })
@@ -878,8 +881,8 @@ export function ImprovePanel({
     covers?.key === chosenKey && summary
       ? covers.options.filter(
           (option) =>
-            !overSpendCap(
-              settings.spendCap,
+            !overIskBudget(
+              settings.iskBudget,
               state.status === 'done' ? state.fitTotal : null,
               summary.isk + (option.iskDelta ?? 0)
             )
@@ -1003,10 +1006,10 @@ export function ImprovePanel({
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
   const settingsSummary = [
     t(`fittings.improve.reach.${settings.reach}`),
-    settings.spendCap === null
+    settings.iskBudget === null
       ? t('fittings.improve.summaryNoCap')
       : t('fittings.improve.summaryCap', {
-          cap: formatIskCompact(settings.spendCap),
+          cap: formatIskCompact(settings.iskBudget),
         }),
   ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
@@ -1155,8 +1158,10 @@ export function ImprovePanel({
               <span>{t('fittings.improve.cap')}</span>
               <IskInput
                 mask
-                value={settings.spendCap === null ? '' : String(settings.spendCap)}
-                onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
+                value={settings.iskBudget === null ? '' : String(settings.iskBudget)}
+                onChange={(value) =>
+                  settings.onIskBudgetChange(value === '' ? null : Number(value))
+                }
               />
             </label>
             {TANK_GOALS.has(goal) && (
@@ -1489,7 +1494,7 @@ export function ImprovePanel({
                           </p>
                         ))}
                       </div>
-                      <SelectionCost summary={summary} spendCap={settings.spendCap} />
+                      <SelectionCost summary={summary} iskBudget={settings.iskBudget} />
                     </>
                   ) : (
                     <p className="text-text-dim text-xs" role="status">
@@ -1590,10 +1595,10 @@ export function ImprovePanel({
  */
 function SelectionCost({
   summary,
-  spendCap,
+  iskBudget,
 }: {
   summary: SelectionSummary;
-  spendCap: number | null;
+  iskBudget: number | null;
 }) {
   const { t } = useTranslation();
   const tone =
@@ -1627,12 +1632,12 @@ function SelectionCost({
           <span className={tone}>{delta}</span>
         )}
       </p>
-      {(summary.unpriced > 0 || (total !== null && spendCap !== null)) && (
+      {(summary.unpriced > 0 || (total !== null && iskBudget !== null)) && (
         <p className="text-text-dim text-xs">
           {total !== null &&
-            spendCap !== null &&
-            t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(spendCap) })}
-          {total !== null && spendCap !== null && summary.unpriced > 0 && ' · '}
+            iskBudget !== null &&
+            t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(iskBudget) })}
+          {total !== null && iskBudget !== null && summary.unpriced > 0 && ' · '}
           {summary.unpriced > 0 &&
             `+ ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
         </p>

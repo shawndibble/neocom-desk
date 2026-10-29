@@ -185,7 +185,7 @@ export async function migrateSpendCap(): Promise<void> {
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
   reach: ImproveReach;
-  spendCap: number | null;
+  iskBudget: number | null;
   defense: DefenseChoice;
   includeRigs: boolean;
   includeOfficer: boolean;
@@ -439,7 +439,7 @@ export function useImprove(
   const stopRef = useRef(false);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  const { reach, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
+  const { reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -500,7 +500,7 @@ export function useImprove(
             searched,
             {
               reach,
-              spendCap,
+              iskBudget,
               defense: side,
               includeRigs,
               includeOfficer,
@@ -536,10 +536,10 @@ export function useImprove(
         ]);
         if (cancelled) return;
         // A cap that cannot be checked is not silently waived.
-        if (spendCap !== null && (priceMap === null || fitTotal === null))
+        if (iskBudget !== null && (priceMap === null || fitTotal === null))
           throw new Error('Prices unavailable for the spend cap');
-        if (spendCap !== null && fitTotal !== null && spendCap < fitTotal) {
-          setState({ status: 'belowPrice', budget: spendCap, fitTotal });
+        if (iskBudget !== null && fitTotal !== null && iskBudget < fitTotal) {
+          setState({ status: 'belowPrice', budget: iskBudget, fitTotal });
           return;
         }
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
@@ -580,7 +580,7 @@ export function useImprove(
             stats,
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
-            spendCap,
+            iskBudget,
             fitTotal,
             compensators: (fix) =>
               compensation.filter(
@@ -682,7 +682,7 @@ export function useImprove(
     hubId,
     attempt,
     reach,
-    spendCap,
+    iskBudget,
     defense,
     includeRigs,
     includeOfficer,

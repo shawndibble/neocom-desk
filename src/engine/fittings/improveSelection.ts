@@ -26,7 +26,7 @@ interface Params {
   before: FittingStats;
   /** One whole-fit recalculation of every ticked row made together. */
   after: FittingStats;
-  spendCap: number | null;
+  iskBudget: number | null;
   /** What the fit costs now (for the budget). */
   fitTotal: number | null;
   target?: TargetProfile;
@@ -37,7 +37,7 @@ export function summariseSelection({
   options,
   before,
   after,
-  spendCap,
+  iskBudget,
   fitTotal,
   target,
 }: Params): SelectionSummary {
@@ -49,7 +49,7 @@ export function summariseSelection({
       (resource): SelectionProblem => ({ kind: 'over', resource })
     ),
     ...(before.capacitor.stable && !after.capacitor.stable ? [{ kind: 'capStable' } as const] : []),
-    ...(spendCap !== null && total !== null && total > spendCap
+    ...(iskBudget !== null && total !== null && total > iskBudget
       ? [{ kind: 'spend' } as const]
       : []),
   ];

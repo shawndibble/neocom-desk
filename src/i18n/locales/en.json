@@ -1410,6 +1410,7 @@
       "givesUp": "Gives up:",
       "unflyable": "You can't fly the current module yet; this one you can.",
       "flyableWith": "Also swaps {{swaps}} to keep the fit within CPU, powergrid and calibration.",
+      "flyableWithCapacitor": "Also swaps {{swaps}} to keep the capacitor stable.",
       "flyableImplants": "Or fly {{fix}} with implants instead:",
       "appliedWithImplants": "Made the module flyable and set the implants.",
       "cover": {

@@ -1,3 +1,4 @@
+import Dexie from 'dexie';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { captureException } from '@sentry/react';
 import {
@@ -21,6 +22,12 @@ describe('reportFailure', () => {
     vi.mocked(captureException).mockClear();
     resetReportedFailures();
     online.value = true;
+  });
+
+  it("skips Dexie's AbortError (a DexieError, not a DOMException)", () => {
+    const err = new Dexie.AbortError('Transaction aborted');
+    reportFailure('sync', err);
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('captures an unexpected failure tagged with only its subsystem', () => {
@@ -195,6 +202,21 @@ describe('isStrayAbortEvent', () => {
       isStrayAbortEvent({
         exception: {
           values: [{ value: 'Error: AbortError: AbortError', mechanism: { type: rejection } }],
+        },
+      })
+    ).toBe(true);
+  });
+  it("matches WebKit's 'without an in-progress transaction' rejection", () => {
+    expect(
+      isStrayAbortEvent({
+        exception: {
+          values: [
+            {
+              value:
+                'UnknownError: Attempt to get a record from database without an in-progress transaction',
+              mechanism: { type: rejection },
+            },
+          ],
         },
       })
     ).toBe(true);

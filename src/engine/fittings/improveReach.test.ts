@@ -381,7 +381,7 @@ async function run(
   fitting: Fitting,
   candidates: ImproveCandidate[],
   prices: Record<number, number>,
-  extra: { spendCap?: number | null; fitTotal?: number | null } = {}
+  extra: { iskBudget?: number | null; fitTotal?: number | null } = {}
 ) {
   const result = await findImprovements({
     fitting,
@@ -465,13 +465,13 @@ describe('buy accounting', () => {
     const prices = { 4: 100, 5: 300, 20: 50, 21: 500 };
     const result = await run('tank', f, [swap(4, 5, 0)], prices, {
       fitTotal: 150,
-      spendCap: 400,
+      iskBudget: 400,
     });
     // The fit costs 150 now; the swap makes it 350, under the 400 budget.
     expect(result.noDownside[0].iskDelta).toBe(200);
     const over = await run('tank', f, [swap(4, 5, 0)], prices, {
       fitTotal: 150,
-      spendCap: 300,
+      iskBudget: 300,
     });
     expect(over.noDownside).toEqual([]);
     expect(over.rejected[0].guardrail).toBe('spend');
@@ -485,7 +485,7 @@ describe('buy accounting', () => {
       { 4: 100, 5: 200 },
       {
         fitTotal: 0,
-        spendCap: 50,
+        iskBudget: 50,
       }
     );
     // 5 costs 100 extra: over the 50 cap. Fill 9 has no price, and gains no EHP either.
