@@ -8,6 +8,7 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
+import { stubNoViewportMatch, stubViewport } from '@/test/viewport';
 import { seedGrant as seedGrantFor } from '@/test/seed';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -145,27 +146,10 @@ function renderPanel(
  * phone — where a result folds the paste card away (#3135). Every test here
  * but the phone block below is about the desktop two-column layout.
  */
-const realMatchMedia = window.matchMedia;
-function setViewport(desktop: boolean) {
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: desktop && media === DESKTOP_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-}
-beforeEach(() => setViewport(true));
-afterEach(() => {
-  window.matchMedia = realMatchMedia;
-});
+beforeEach(() => stubViewport(DESKTOP_QUERY));
 
 describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => {
-  beforeEach(() => setViewport(false));
+  beforeEach(() => stubNoViewportMatch());
 
   it('folds to a summary once a result exists, and opens on the textarea', async () => {
     const user = userEvent.setup();
@@ -227,7 +211,7 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
   });
 
   it('never folds at desktop width', () => {
-    setViewport(true);
+    stubViewport(DESKTOP_QUERY);
     renderPanel({ controller: controller({ text: 'Tritanium 5', result: outcome() }) });
     expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit list/ })).not.toBeInTheDocument();

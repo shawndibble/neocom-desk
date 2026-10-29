@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
+import { stubNoViewportMatch, stubViewport } from '@/test/viewport';
 import { seedGrant as seedGrantFor } from '@/test/seed';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -12,24 +13,6 @@ import type { SkillPlanRecord } from '@/db';
 import { PlanListPane } from './PlanListPane';
 
 const CHAR_ID = 91;
-
-function stubMatchMedia(matchesDesktop: boolean) {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: matchesDesktop && media === DESKTOP_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  return () => {
-    window.matchMedia = real;
-  };
-}
 
 function scrollerDiv(container: HTMLElement): HTMLElement {
   const div = container.querySelector('.overflow-y-auto');
@@ -43,7 +26,7 @@ beforeEach(async () => {
 
 describe('PlanListPane: viewport height ignoring the mobile tab bar (#1096)', () => {
   it('applies no inline max-height on mobile, leaving the page (which already reserves room for the fixed tab bar) to scroll instead', async () => {
-    const restore = stubMatchMedia(false);
+    const restore = stubNoViewportMatch();
     try {
       const { container } = render(
         <MemoryRouter>
@@ -59,7 +42,7 @@ describe('PlanListPane: viewport height ignoring the mobile tab bar (#1096)', ()
   });
 
   it('still caps the list to the viewport on desktop, where it sits beside another column', async () => {
-    const restore = stubMatchMedia(true);
+    const restore = stubViewport(DESKTOP_QUERY);
     try {
       const { container } = render(
         <MemoryRouter>
