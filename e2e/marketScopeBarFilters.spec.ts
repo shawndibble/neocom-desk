@@ -9,7 +9,7 @@
  * `sm:hidden` and `display: contents`, which jsdom cannot evaluate.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
 async function openTritanium(page: Page) {
@@ -62,7 +62,7 @@ test('with a Jump Range set, neither the distance nor the origin repeats in the 
 });
 
 test('a phone keeps the distance control in the scope bar sheet (390px)', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await openTritanium(page);
   const bar = page.getByRole('region', { name: 'Where the order book is looking' });
 

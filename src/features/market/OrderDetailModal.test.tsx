@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -1222,36 +1223,21 @@ describe('OrderDetailModal', () => {
     });
 
     it('pins Copy to the sheet foot on a phone, once, instead of the verdict block', () => {
-      const original = window.matchMedia;
       // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
-      window.matchMedia = (media: string) =>
-        ({
-          media,
-          matches: true,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList;
+      stubViewport(() => true);
 
-      try {
-        renderModal({
-          row: { ...RICH_ROW, floor: { relist: 400, fill: 390 } },
-          stationChecked: true,
-        });
-        const [copy, ...others] = screen.getAllByRole('button', { name: /^Copy / });
-        expect(others).toHaveLength(0);
-        expect(copy).toHaveAccessibleName('Copy 449.90');
-        // In the Modal footer: outside the scrolling body (the `tabIndex={-1}` scroller).
-        expect(copy.closest('[tabindex="-1"]')).toBeNull();
-        expect(screen.getByRole('dialog')).toContainElement(copy);
-        // View in Market stays with the verdict.
-        expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
-      } finally {
-        window.matchMedia = original;
-      }
+      renderModal({
+        row: { ...RICH_ROW, floor: { relist: 400, fill: 390 } },
+        stationChecked: true,
+      });
+      const [copy, ...others] = screen.getAllByRole('button', { name: /^Copy / });
+      expect(others).toHaveLength(0);
+      expect(copy).toHaveAccessibleName('Copy 449.90');
+      // In the Modal footer: outside the scrolling body (the `tabIndex={-1}` scroller).
+      expect(copy.closest('[tabindex="-1"]')).toBeNull();
+      expect(screen.getByRole('dialog')).toContainElement(copy);
+      // View in Market stays with the verdict.
+      expect(screen.getByRole('link', { name: 'View in Market' })).toBeInTheDocument();
     });
   });
 });

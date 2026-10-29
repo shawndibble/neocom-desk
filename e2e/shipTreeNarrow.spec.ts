@@ -3,7 +3,7 @@
  * the default view, the map is one tap away and back, a tapped hull opens
  * its Ship Info window, and nothing widens the page past the screen.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 
@@ -68,7 +68,7 @@ test.describe('Ship Tree — narrow', () => {
   test('a filter picked in the sheet applies at once and never widens the page', async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await signInAndGoto(page, './ships/tree');
     await expect(page.getByRole('group', { name: 'Ship tree view' })).toBeVisible({
       timeout: 30_000,
@@ -90,7 +90,7 @@ test.describe('Ship Tree — narrow', () => {
   });
 
   test('Back closes the filter sheet and keeps what was picked', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await signInAndGoto(page, './ships/tree');
     await expect(page.getByRole('group', { name: 'Ship tree view' })).toBeVisible({
       timeout: 30_000,

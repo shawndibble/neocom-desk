@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { stubViewport } from '@/test/viewport';
 import { AlertsBell } from './AlertsBell';
 import { AlertsPanelContext, type AlertsPanelState } from './alertsPanelContext';
 import { UnreadAlertsContext, type AlertBadge } from './unreadAlertsContext';
@@ -52,18 +53,8 @@ describe('AlertsBell', () => {
   });
 
   describe('on a phone', () => {
-    const original = window.matchMedia;
     beforeEach(() => {
-      window.matchMedia = ((media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList) as typeof window.matchMedia;
-    });
-    afterEach(() => {
-      window.matchMedia = original;
+      stubViewport(PHONE_QUERY);
     });
 
     it('draws nothing at zero, so a header with other icons stays clear', () => {

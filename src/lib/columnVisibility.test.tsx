@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
 import { createColumnVisibilitySetting, useColumnVisibility } from './columnVisibility';
@@ -121,20 +122,10 @@ describe('useColumnVisibility', () => {
 
 describe('useColumnVisibility phoneOffByDefault', () => {
   const ALL = ['a', 'b', 'c'] as const;
-  const realMatchMedia = window.matchMedia;
 
   function setPhone(isPhone: boolean) {
-    window.matchMedia = ((media: string) =>
-      ({
-        media,
-        matches: isPhone && media === PHONE_QUERY,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    stubViewport((media) => isPhone && media === PHONE_QUERY);
   }
-  afterEach(() => {
-    window.matchMedia = realMatchMedia;
-  });
 
   it('starts those columns unticked on a phone with nothing stored', async () => {
     setPhone(true);

@@ -98,11 +98,7 @@ for (const viewport of [PHONE, DESKTOP]) {
   });
 }
 
-for (const size of [
-  { width: 1024, height: 768 },
-  { width: 1280, height: 800 },
-  { width: 1440, height: 900 },
-]) {
+for (const size of [{ width: 1024, height: 768 }, DESKTOP, { width: 1440, height: 900 }]) {
   test(`finder keeps the Quickbar in view with a search and a pinned item (${size.width}px)`, async ({
     page,
   }) => {

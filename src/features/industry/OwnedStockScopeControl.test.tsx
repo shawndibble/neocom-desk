@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -45,23 +46,8 @@ function stockOf(placements: readonly OwnedStockPlacement[]): DetectedOwnedStock
 }
 
 /** jsdom's `matchMedia` never matches; the bottom sheet needs the narrow query to. */
-const realMatchMedia = window.matchMedia;
-afterEach(() => {
-  window.matchMedia = realMatchMedia;
-});
-
 function goNarrow() {
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as MediaQueryList;
+  stubViewport(NARROW_QUERY);
 }
 
 const corpLocation = {

@@ -1,28 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import '@/i18n';
 import { AttributesPane } from './AttributesPane';
 import type { RemapAvailability } from './remapAvailability';
 
 describe('AttributesPane remap availability (#1726)', () => {
   // The remap note is desktop reference; jsdom's default matchMedia is narrow.
-  const original = window.matchMedia;
   beforeEach(() => {
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-  });
-  afterEach(() => {
-    window.matchMedia = original;
+    stubViewport(() => true);
   });
 
   it('shows nothing about remaps when there is no ESI attributes data', () => {

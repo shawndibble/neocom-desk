@@ -3,7 +3,7 @@
  * 2.4.11 Focus Not Obscured). Asserted on rendered bounding boxes while
  * tabbing through /settings/notifications with the install banner showing.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_NAME } from './support/fixtureData';
 
@@ -13,10 +13,7 @@ test.use({
     'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36',
 });
 
-for (const viewport of [
-  { width: 1280, height: 720 },
-  { width: 390, height: 844 },
-]) {
+for (const viewport of [{ width: 1280, height: 720 }, PHONE]) {
   test(`banner never fully covers the focused control at ${viewport.width}x${viewport.height}`, async ({
     page,
   }) => {
@@ -62,7 +59,7 @@ for (const viewport of [
 
 for (const { viewport, expected } of [
   { viewport: { width: 1280, height: 720 }, expected: 'auto' },
-  { viewport: { width: 390, height: 844 }, expected: '56px' },
+  { viewport: PHONE, expected: '56px' },
 ]) {
   test(`no bar mounted: scroll-padding-bottom is ${expected} at ${viewport.width}px`, async ({
     page,

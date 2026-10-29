@@ -7,7 +7,7 @@
  * pattern `assetsItemColumns.spec.ts` documents). Jita 4-4 is a real NPC
  * station id, so name resolution never needs a live ESI call.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
@@ -33,7 +33,7 @@ test('Move tab fits a phone and keeps its actions reachable', async ({ page }) =
     })
   );
   await signInAndGoto(page);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./assets/move');
 
   const dialog = page.getByRole('region', { name: 'Plan a move' });
@@ -81,7 +81,7 @@ test('pickup heading gives the name a row on a phone and stays one row on deskto
     })
   );
   await signInAndGoto(page);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./assets/move');
 
   const dialog = page.getByRole('region', { name: 'Plan a move' });

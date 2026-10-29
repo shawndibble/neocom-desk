@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
+import { seedCharacter } from '@/test/seed';
 import {
   startLogin,
   completeLogin,
@@ -999,11 +1000,8 @@ const CORP_NEW = 98000002;
 
 /** A signed-in character, optionally with a corporation already recorded. */
 async function seedCharacterInCorp(corporationId?: number): Promise<void> {
-  await db.characters.put({
-    characterId: CHAR_ID,
-    name: 'CCP Alpha',
+  await seedCharacter(CHAR_ID, 'CCP Alpha', {
     ownerHash: 'owner-hash-1',
-    addedAt: 1,
     ...(corporationId !== undefined ? { corporationId } : {}),
   });
 }

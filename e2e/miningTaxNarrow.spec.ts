@@ -573,10 +573,7 @@ test.describe('Mining Tax phone card — tick box on the date line (#2983)', () 
 });
 
 test.describe('Mining Tax table row — tick box clears the date (#2983)', () => {
-  for (const viewport of [
-    { width: 1024, height: 768 },
-    { width: 1280, height: 800 },
-  ]) {
+  for (const viewport of [{ width: 1024, height: 768 }, DESKTOP]) {
     test(`gap between the box and the date at ${viewport.width}px`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await signInAndGoto(page);
@@ -764,7 +761,7 @@ test.describe('Mining Tax ledger — zero values read as muted dashes (#3104)', 
   });
 
   test.describe('desktop', () => {
-    test.use({ viewport: { width: 1280, height: 800 } });
+    test.use({ viewport: DESKTOP });
 
     test('a zero tax amount is muted, a positive one stays red', async ({ page }) => {
       await signInAndGoto(page);
@@ -785,10 +782,7 @@ test.describe('Mining Tax ledger — zero values read as muted dashes (#3104)', 
 });
 
 test.describe('Mining Tax ledger — Needs Review status hint (#3122)', () => {
-  for (const viewport of [
-    { width: 1024, height: 768 },
-    { width: 1280, height: 800 },
-  ]) {
+  for (const viewport of [{ width: 1024, height: 768 }, DESKTOP]) {
     test(`pill stays on one line and the Status column fits at ${viewport.width}px`, async ({
       page,
     }) => {

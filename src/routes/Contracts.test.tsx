@@ -18,6 +18,7 @@ import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { stubViewport } from '@/test/viewport';
 
 const openContractMock = vi.hoisted(() => vi.fn());
 vi.mock('@/esi/endpoints', async (importOriginal) => ({
@@ -511,44 +512,29 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
   });
 
   it('on a narrow viewport, the filter sheet reopens cleared after Reset filters', async () => {
-    const real = window.matchMedia;
-    window.matchMedia = ((media: string) =>
-      ({
-        media,
-        matches: media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList) as typeof window.matchMedia;
-    try {
-      const user = userEvent.setup();
-      render(<App />);
-      await screen.findAllByText('Rifter fit');
+    stubViewport(NARROW_QUERY);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findAllByText('Rifter fit');
 
-      await user.click(screen.getByRole('button', { name: 'Filters' }));
-      let sheet = await screen.findByRole('dialog');
-      await user.click(within(sheet).getByRole('button', { name: 'Outstanding' }));
-      await user.keyboard('{Escape}');
-      await user.type(
-        screen.getByPlaceholderText('Search issuer, receiver or title…'),
-        'zzzznomatch'
-      );
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    let sheet = await screen.findByRole('dialog');
+    await user.click(within(sheet).getByRole('button', { name: 'Outstanding' }));
+    await user.keyboard('{Escape}');
+    await user.type(
+      screen.getByPlaceholderText('Search issuer, receiver or title…'),
+      'zzzznomatch'
+    );
 
-      await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
-      await screen.findAllByText('Rifter fit');
+    await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
+    await screen.findAllByText('Rifter fit');
 
-      await user.click(screen.getByRole('button', { name: 'Filters' }));
-      sheet = await screen.findByRole('dialog');
-      expect(within(sheet).getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
-        'aria-pressed',
-        'false'
-      );
-    } finally {
-      window.matchMedia = real;
-    }
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
   });
 
   it('the truncation notice has a retry action', async () => {

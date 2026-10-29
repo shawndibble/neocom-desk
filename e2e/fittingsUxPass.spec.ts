@@ -5,7 +5,7 @@
  * fonts differ. Structure only; no stat figure is awaited.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
 
@@ -84,7 +84,7 @@ test.describe('Fittings header', () => {
   }
 
   test('is one compact row at 390, the badges out of it', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await openRifter(page);
@@ -108,7 +108,7 @@ test.describe('Fittings header', () => {
 
 test.describe('Ring tab on the phone', () => {
   test('shows CPU and powergrid above the rack buttons, inside the viewport', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await openRifter(page);

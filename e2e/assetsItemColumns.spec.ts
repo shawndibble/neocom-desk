@@ -12,7 +12,7 @@
  * oversized value. Type 269 is a 38-character name.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
@@ -146,7 +146,7 @@ for (const width of [1440, 1280, 1024]) {
 test('the label strip is absent below md', async ({ page }) => {
   await seedAssets(page);
   await signInAndGoto(page);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto(`./assets/items/${STATION}`);
   await expect(page.getByText('Mjolnir Auto-Targeting Light Missile I')).toBeVisible();
   await expect(page.getByTestId('item-column-labels')).toBeHidden();

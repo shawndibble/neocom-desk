@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
@@ -18,6 +17,8 @@ import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedGrant } from '@/test/seed';
+import { mswServer } from '@/test/msw';
+import { stubViewport } from '@/test/viewport';
 import { clearOrderBookCache } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { LocationProbe } from '@/test/LocationProbe';
@@ -57,14 +58,7 @@ const mockedLoadMutaplasmids = vi.mocked(loadMutaplasmids);
 
 const TYPE_ID = 587;
 
-const server = setupServer(
-  // Default: no orders anywhere. Individual price tests override with `server.use`.
-  http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () => HttpResponse.json([]))
-);
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
 afterEach(async () => {
-  server.resetHandlers();
   vi.clearAllMocks();
   // Group names are cached under the global sentinel and would otherwise
   // leak a resolved name into the next test's "unresolvable" case.
@@ -79,6 +73,14 @@ afterEach(async () => {
   clearOrderBookCache();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
+
+// Registered after the `afterEach` above on purpose: hooks unwind last-in
+// first-out, so the server's reset runs before that async cleanup rather
+// than after it, and a late request cannot land on the previous test's handlers.
+const server = mswServer(
+  // Default: no orders anywhere. Individual price tests override with `server.use`.
+  http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () => HttpResponse.json([]))
+);
 
 describe('ItemDetailModal', () => {
   it('offers View in Market only when asked, closing itself on the way', async () => {
@@ -1128,23 +1130,7 @@ describe('ItemDetailModal — an owned abyssal module', () => {
 
 describe('ItemDetailModal header actions on a phone', () => {
   /** jsdom's `matchMedia` never matches; the ⋮ branch needs the narrow query to. */
-  const realMatchMedia = window.matchMedia;
-  afterEach(() => {
-    window.matchMedia = realMatchMedia;
-  });
-  function goNarrow() {
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as MediaQueryList;
-  }
+  const goNarrow = () => stubViewport(NARROW_QUERY);
 
   it('folds Open in EVE and View in Market into one ⋮, so the name keeps the room', async () => {
     goNarrow();

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within, fireEvent } from '@testing-library/react';
@@ -512,19 +513,8 @@ describe('MaterialsTable errand sections', () => {
  * spells out Need − Have = To buy on one line with the Have field in it.
  */
 describe('MaterialsTable on a phone', () => {
-  let realMatchMedia: typeof window.matchMedia;
   beforeEach(() => {
-    realMatchMedia = window.matchMedia;
-    window.matchMedia = ((media: string) =>
-      ({
-        matches: media === PHONE_QUERY,
-        media,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList) as typeof window.matchMedia;
-  });
-  afterEach(() => {
-    window.matchMedia = realMatchMedia;
+    stubViewport(PHONE_QUERY);
   });
 
   it('shows a zero Have in the dim tone, not the faint decoration token (#3348)', () => {

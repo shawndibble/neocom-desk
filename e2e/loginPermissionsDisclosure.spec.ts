@@ -3,7 +3,7 @@
  * paragraph under the trust cards) is body text, not fine
  * print: 14px, capped near 768px so a line stays readable (issue #3514).
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 
 const PARAGRAPHS = [/^Logging in lets it read/];
 
@@ -25,7 +25,7 @@ for (const size of [
 }
 
 test('permissions disclosure stays on screen at 390px', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto('./');
   for (const text of PARAGRAPHS) {
     const p = page.locator('section[aria-labelledby="login-trust-heading"] p', { hasText: text });

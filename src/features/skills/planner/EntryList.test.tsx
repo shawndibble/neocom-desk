@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -63,21 +64,7 @@ const defaultProps = {
 
 /** jsdom's default `window.matchMedia` never matches, so EntryList renders its narrow (below-`md`) layout by default; mock it to exercise the desktop layout. */
 function mockDesktop(matches: boolean): () => void {
-  const original = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  return () => {
-    window.matchMedia = original;
-  };
+  return stubViewport(() => matches);
 }
 
 describe('EntryList step timeline renders in the viewer local timezone (#207)', () => {

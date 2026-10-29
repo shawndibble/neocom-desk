@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -6,6 +6,7 @@ import '@/i18n';
 import type { NpcStandingsReference } from '@/features/character/npcStandingsRows';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { useContactsStandings } from './ContactsStandings';
+import { stubViewport } from '@/test/viewport';
 
 const loadMock = vi.hoisted(() => vi.fn());
 const openNpcInfoMock = vi.hoisted(() => vi.fn());
@@ -403,22 +404,8 @@ describe('ContactsStandings table', () => {
   });
 
   describe('on a phone', () => {
-    const realMatchMedia = window.matchMedia;
     beforeEach(() => {
-      window.matchMedia = (media: string) =>
-        ({
-          media,
-          matches: media === NARROW_QUERY,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList;
-    });
-    afterEach(() => {
-      window.matchMedia = realMatchMedia;
+      stubViewport(NARROW_QUERY);
     });
 
     it('puts the filters behind a funnel that counts the active ones', async () => {

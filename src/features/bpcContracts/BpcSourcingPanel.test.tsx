@@ -33,6 +33,7 @@ import type { GlobalMarketEntry } from '@/sde/marketTypes';
 import type { LocalJumpDistances } from '@/features/route/localRoute';
 import { loadBlueprints } from '@/sde/loadSde';
 import { usePickedSystems } from '@/features/route/currentSystem';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -1494,21 +1495,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
    * pointer viewport — flip it so the shared `FilterBar` renders its sheet.
    */
   function useNarrowViewport(): () => void {
-    const real = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    return () => {
-      window.matchMedia = real;
-    };
+    return stubViewport(NARROW_QUERY);
   }
 
   it('collapses the Source/Exclude/Space dropdowns behind the shared filter funnel on a narrow viewport, leaving ColumnPickerMenu in the row', async () => {

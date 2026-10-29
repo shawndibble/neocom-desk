@@ -32,6 +32,7 @@ function corpAccess(state: CorpAccessState) {
 
 const mockSubscribe = vi.fn();
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
+import { stubViewport } from '@/test/viewport';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   subscribeSyncStatus: (listener: (s: unknown) => void) => mockSubscribe(listener),
@@ -271,46 +272,18 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
 
   it('never mounts the sheet at desktop widths — no CSS-hidden dialog left inert', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
-    const realMatchMedia = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
+    stubViewport(() => true);
+    const user = userEvent.setup();
+    renderLayout();
 
-    try {
-      const user = userEvent.setup();
-      renderLayout();
-
-      const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
-      await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
-      expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
-    } finally {
-      window.matchMedia = realMatchMedia;
-    }
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
   });
 
   describe('skip link', () => {
     function stubDesktop(matches: boolean) {
-      vi.spyOn(window, 'matchMedia').mockImplementation(
-        (media: string) =>
-          ({
-            media,
-            matches,
-            onchange: null,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-            addListener: () => {},
-            removeListener: () => {},
-            dispatchEvent: () => false,
-          }) as unknown as MediaQueryList
-      );
+      stubViewport(() => matches);
     }
 
     it('is the first Tab stop at desktop widths, and Enter focuses the outlet', async () => {
@@ -817,19 +790,7 @@ describe('Layout route fade', () => {
     });
     // Only the reduced-motion query is steered; every other query Layout asks
     // (the `md` breakpoint behind the More sheet) keeps the setup's default.
-    vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          matches: media.includes('prefers-reduced-motion') ? reduceMotion : false,
-          media,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          onchange: null,
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList
-    );
+    stubViewport((media) => (media.includes('prefers-reduced-motion') ? reduceMotion : false));
   });
 
   it('fades the outlet in on a route change', async () => {

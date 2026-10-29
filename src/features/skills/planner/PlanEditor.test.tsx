@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -258,25 +259,10 @@ function sectionFor(title: string): HTMLElement {
   return section as HTMLElement;
 }
 
-/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, then restores it. */
+/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, which lasts to the end of the test. */
 function withDesktopViewport(body: () => void) {
-  const realMatchMedia = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: true,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  try {
-    body();
-  } finally {
-    window.matchMedia = realMatchMedia;
-  }
+  stubViewport(() => true);
+  body();
 }
 describe('PlanEditor tools pane', () => {
   let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;

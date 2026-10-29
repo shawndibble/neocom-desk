@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { stubViewport } from '@/test/viewport';
 import { DataTable, type DataTableColumn } from './DataTable';
 
 interface Row {
@@ -23,17 +24,10 @@ const columns: DataTableColumn<Row>[] = [
   },
 ];
 
-const realMatchMedia = window.matchMedia;
 const realRect = HTMLElement.prototype.getBoundingClientRect;
 
 function phone(matches: boolean) {
-  window.matchMedia = ((media: string) =>
-    ({
-      media,
-      matches: matches && media === PHONE_QUERY,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+  stubViewport((media) => matches && media === PHONE_QUERY);
 }
 
 /** The real header scrolled 50px above the viewport, 400px of rows left. */
@@ -50,7 +44,6 @@ function headerScrolledAway() {
 describe('DataTable sticky header on a phone', () => {
   beforeEach(headerScrolledAway);
   afterEach(() => {
-    window.matchMedia = realMatchMedia;
     HTMLElement.prototype.getBoundingClientRect = realRect;
     document.documentElement.style.scrollPaddingTop = '';
   });

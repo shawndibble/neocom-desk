@@ -5,7 +5,7 @@
  * `20261002-145653-go-to-button-opens-the-command-palette`).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
 /**
@@ -19,7 +19,7 @@ async function shellReady(page: Page): Promise<void> {
 }
 
 test('Ctrl+K opens the palette, searches and navigates', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize(DESKTOP);
   await signInAndGoto(page, './overview');
   await shellReady(page);
 
@@ -42,7 +42,7 @@ test('Ctrl+K opens the palette, searches and navigates', async ({ page }) => {
 });
 
 test('Escape closes the palette even with text typed', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize(DESKTOP);
   await signInAndGoto(page, './overview');
 
   await shellReady(page);
@@ -54,7 +54,7 @@ test('Escape closes the palette even with text typed', async ({ page }) => {
 });
 
 test('the rail’s Go to button opens the palette', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize(DESKTOP);
   await signInAndGoto(page, './overview');
   await shellReady(page);
 
@@ -63,7 +63,7 @@ test('the rail’s Go to button opens the palette', async ({ page }) => {
 });
 
 test('the phone’s More sheet search opens the palette', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await signInAndGoto(page, './overview');
 
   await page

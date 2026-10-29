@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } from '@/lib/hintFlags';
+import { stubViewport } from '@/test/viewport';
 import {
   MenuItem,
   MenuSeparator,
@@ -96,19 +97,7 @@ function openMore() {
 
 /** A phone: the narrow-menu query matches. */
 function narrowViewport() {
-  vi.spyOn(window, 'matchMedia').mockImplementation(
-    (media: string) =>
-      ({
-        media,
-        matches: media.includes('max-width'),
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList
-  );
+  stubViewport((media) => media.includes('max-width'));
 }
 
 describe('RowActions submenus', () => {

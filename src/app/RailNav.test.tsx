@@ -28,6 +28,7 @@ vi.mocked(useCorpAccess).mockReturnValue({
 vi.mock('@/features/corp/srp/useSrpNavVisible', () => ({ useSrpNavVisible: vi.fn() }));
 
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
+import { stubViewport } from '@/test/viewport';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   subscribeSyncStatus: () => () => {},
@@ -57,12 +58,7 @@ function renderAt(path: string) {
 const rail = () => screen.getByRole('navigation', { name: 'Main navigation' });
 
 function setPhone(phone: boolean) {
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: query === '(min-width: 48rem)' ? !phone : false,
-    media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  })) as unknown as typeof window.matchMedia;
+  stubViewport((query) => query === '(min-width: 48rem)' && !phone);
 }
 
 beforeEach(async () => {

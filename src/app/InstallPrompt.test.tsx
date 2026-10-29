@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
+import { stubViewport } from '@/test/viewport';
 import { InstallPrompt } from './InstallPrompt';
 import { useInstallApp } from './installApp';
 import {
@@ -177,19 +178,7 @@ describe('InstallPrompt', () => {
   });
 
   it('does not render when already running standalone', async () => {
-    vi.spyOn(window, 'matchMedia').mockImplementation(
-      (query) =>
-        ({
-          media: query,
-          matches: true,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList
-    );
+    stubViewport(() => true);
     setUserAgent(iosSafariUA);
     renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
