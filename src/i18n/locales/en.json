@@ -7852,9 +7852,7 @@
       "haulerSizingUnavailable": "Hauler sizing needs data that isn't downloaded yet, or your skills couldn't be read. Connect once, then plan again.",
       "showRoute": "Show my route",
       "routeFailed": "Could not work out the route. Try again.",
-      "replaceHaulTitle": "Replace the haul in progress?",
-      "replaceHaulBody": "You have a haul saved already. Showing this route replaces it, and its legs are lost.",
-      "replaceHaul": "Replace haul",
+      "haulReplaced": "Replaced the haul in progress",
       "resumeHaul": "Haul in progress — resume",
       "haul": {
         "title": "Haul in progress",
@@ -7928,8 +7926,7 @@
         "replanFailed": "Could not replan the route. Try again later.",
         "resetProgress": "Reset progress",
         "clear": "Clear haul",
-        "clearTitle": "Clear the haul in progress?",
-        "clearBody": "The saved route and its legs are removed. The Move plan is not affected."
+        "cleared": "Cleared the haul in progress"
       },
       "volumeUnknown": "volume unknown",
       "flyIt": "Fly it",
@@ -10477,9 +10474,8 @@
       "unavailable": "A Fitting no longer on this device",
       "inGame": "In-game",
       "cannot": "That Fitting can't be shared: it is unreadable or too large.",
-      "offTitle": "Stop sharing all your Fittings?",
-      "offBody": "This removes every Fitting you share with this Community, including ones you picked one by one. You can share them again at any time.",
-      "offAction": "Stop sharing all",
+      "stoppedAll": "Stopped sharing all your Fittings",
+      "undo": "Undo",
       "loadFailed": "Couldn't load your Fittings.",
       "failed": "Couldn't update the Fittings. Try again."
     },
@@ -10572,9 +10568,8 @@
         "yourPilot": "Pilot: {{name}}",
         "noShare": "You aren't on this payout's list.",
         "remove": "Remove payout",
-        "removeTitle": "Remove this payout?",
-        "removeBody": "{{name}} and all its shares are deleted for everyone. Pilots you haven't marked paid lose the record of what they're owed.",
-        "removeAction": "Remove payout"
+        "removed": "Removed payout {{name}}",
+        "undo": "Undo"
       },
       "compose": {
         "title": "New payout",
@@ -10696,9 +10691,8 @@
       "stop": "Stop sharing",
       "noneShared": "No blueprints shared yet",
       "limited": "Showing the first {{count}}. Search to narrow the list.",
-      "offTitle": "Stop sharing all your blueprints?",
-      "offBody": "This removes every blueprint you share with this Community, including ones you picked one by one and every station or structure you share. You can share them again at any time.",
-      "offAction": "Stop sharing all",
+      "stoppedAll": "Stopped sharing all your blueprints",
+      "undo": "Undo",
       "skipped_one": "{{count}} blueprint is not shared: Neocom Desk cannot tell which station or structure it is in (inside a container it cannot trace, or in a structure you cannot read). It is added once its place can be worked out.",
       "skipped_other": "{{count}} blueprints are not shared: Neocom Desk cannot tell which station or structure they are in (inside a container it cannot trace, or in a structure you cannot read). They are added once their place can be worked out.",
       "unpublished": "Saved on this device, but it did not reach the Community yet. Neocom Desk retries on its own; blueprints it cannot place at a station are left out."
@@ -10819,17 +10813,14 @@
       },
       "admin": {
         "removeRequest": "Remove request",
-        "removeRequestTitle": "Remove this request?",
-        "removeRequestBody": "{{name}}'s request for {{items}} and every Pledge on it are deleted for the whole Community right away.",
-        "removeRequestAction": "Remove request",
+        "requestRemoved": "Removed {{name}}'s request",
+        "undo": "Undo",
         "pledgesLabel": "Pledges on this request",
         "pledgeSummary_one": "{{count}} line",
         "pledgeSummary_other": "{{count}} lines",
         "removePledge": "Remove",
         "removePledgeFor": "Remove {{name}}'s Pledge",
-        "removePledgeTitle": "Remove {{name}}'s Pledge?",
-        "removePledgeBody": "Their Pledge on this request is deleted. The request and the other Pledges stay.",
-        "removePledgeAction": "Remove Pledge",
+        "pledgeRemoved": "Removed {{name}}'s Pledge",
         "unknownPledger": "Former Member",
         "quoteSummary": "Quote {{price}} ISK"
       },
@@ -18096,10 +18087,7 @@
         "contentsValue": "{{modules}} modules, {{rigs}} rigs",
         "delete": "Delete",
         "deleteLabel": "Delete {{name}}",
-        "deleteTitle": "Delete {{name}}?",
-        "deleteBody": "Hulls stop being checked against it. Claims already filed keep the result they were checked with.",
-        "deleteAction": "Delete Doctrine Fit",
-        "deleteFailed": "Couldn't delete the Doctrine Fit. Try again.",
+        "undo": "Undo",
         "dialog": {
           "fittingTitle": "Add from my Fittings",
           "fittingLabel": "Fitting",

@@ -145,11 +145,21 @@ describe('Doctrine Fits in SRP settings', () => {
     ).toBe('true');
   });
 
-  it('deletes a fit after a confirm', async () => {
+  it('deletes a fit once its Undo toast closes', async () => {
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Delete Vexor - kite' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete Doctrine Fit' }));
+    expect(screen.queryByText('Vexor - kite')).toBeNull();
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith('b'));
     await waitFor(() => expect(screen.queryByText('Vexor - kite')).toBeNull());
+  });
+
+  it('Undo brings a deleted fit back without writing', async () => {
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete Vexor - kite' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(await screen.findByText('Vexor - kite')).toBeTruthy();
+    expect(remove).not.toHaveBeenCalled();
   });
 });

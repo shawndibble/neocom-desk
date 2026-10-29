@@ -5,13 +5,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReportSkipped } from './useReportSkipped';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import {
+  Button,
+  FilterChip,
+  LiveStatus,
+  Spinner,
+  Toast,
+  ToastStack,
+  useDeferredCommits,
+} from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useUrlParams } from '@/lib/useUrlState';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { ActiveHaulView } from './ActiveHaulView';
-import { buildActiveHaul, replanActiveHaul, useActiveHaul } from './activeHaul';
+import { buildActiveHaul, replanActiveHaul, useActiveHaul, type ActiveHaul } from './activeHaul';
 import { loadHaulPrices } from './haulPrices';
 import { useMaxIskPerHaul } from './maxIskPerHaul';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
@@ -320,8 +327,13 @@ function MovePlanTabBody({
   const maxIskReady = useHydratedStore(useMaxIskPerHaul);
   /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
   const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
-  const savedHaul = useActiveHaul((st) => st.value);
+  const storedHaul = useActiveHaul((st) => st.value);
   const setSavedHaul = useActiveHaul((st) => st.setValue);
+  // A cleared haul stays hidden until its Undo toast ends and the write lands.
+  const pendingClears = useDeferredCommits();
+  const savedHaul = storedHaul && !pendingClears.hiddenIds.has(storedHaul.id) ? storedHaul : null;
+  /** The haul a new route just replaced, so its toast can put it back. */
+  const [replacedHaul, setReplacedHaul] = useState<ActiveHaul | null>(null);
   const currentSystem = useCurrentSystem();
   useHydratedStore(useActiveHaul);
   const [urlValues, setUrlValues] = useUrlParams(MOVE_PLAN_URL_SCHEMA);
@@ -348,7 +360,6 @@ function MovePlanTabBody({
   const setShowingHaul = (open: boolean) => setUrlValues({ mvr: open });
   const [routing, setRouting] = useState(false);
   const [routeFailed, setRouteFailed] = useState(false);
-  const [replacing, setReplacing] = useState(false);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({
@@ -744,10 +755,12 @@ function MovePlanTabBody({
     }
   }
 
-  /** Show my route: asks first when a haul is already saved, since this replaces it. */
-  function showRoute() {
-    if (savedHaul) setReplacing(true);
-    else void commitRoute();
+  /** Show my route: a haul already saved is replaced, with an Undo that brings it back. */
+  async function showRoute() {
+    const before = savedHaul;
+    await commitRoute();
+    const now = useActiveHaul.getState().value;
+    if (before && now && now.id !== before.id) setReplacedHaul(before);
   }
 
   // Who the read left out is the header picker's to say (its dot and "Not included" note).
@@ -814,8 +827,16 @@ function MovePlanTabBody({
               if (result.status === 'replanned' && unchanged) await setSavedHaul(result.haul);
               return result;
             }}
-            onClear={async () => {
-              await setSavedHaul(null);
+            onClear={() => {
+              const cleared = savedHaul;
+              pendingClears.defer({
+                id: cleared.id,
+                message: t('assets.movePlan.haul.cleared'),
+                // A newer haul saved since is not this one's to clear.
+                commit: async () => {
+                  if (useActiveHaul.getState().value?.id === cleared.id) await setSavedHaul(null);
+                },
+              });
               setShowingHaul(false);
             }}
           />
@@ -999,17 +1020,24 @@ function MovePlanTabBody({
           </>
         )}
       </div>
-      <ConfirmDialog
-        open={replacing}
-        title={t('assets.movePlan.replaceHaulTitle')}
-        body={t('assets.movePlan.replaceHaulBody')}
-        actionLabel={t('assets.movePlan.replaceHaul')}
-        cancelLabel={t('assets.movePlan.cancel')}
-        onConfirm={async () => {
-          setReplacing(false);
-          await commitRoute();
-        }}
-        onClose={() => setReplacing(false)}
+      {replacedHaul && (
+        <Toast
+          message={t('assets.movePlan.haulReplaced')}
+          undo={{
+            label: t('assets.movePlan.haul.undo'),
+            onUndo: () => {
+              void setSavedHaul(replacedHaul);
+              setReplacedHaul(null);
+            },
+          }}
+          onClose={() => setReplacedHaul(null)}
+        />
+      )}
+      <ToastStack
+        items={pendingClears.items}
+        undoLabel={t('assets.movePlan.haul.undo')}
+        onUndo={pendingClears.undo}
+        onClose={pendingClears.commit}
       />
     </section>
   );

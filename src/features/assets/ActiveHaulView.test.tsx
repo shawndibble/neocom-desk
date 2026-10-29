@@ -344,15 +344,11 @@ describe('ActiveHaulView', () => {
     expect(screen.getByText(/Alice flies out: Rifter/)).toBeTruthy();
   });
 
-  it('clears only after a confirm', async () => {
+  it('asks its parent to clear without a confirm', async () => {
     const onClear = renderView();
     await userEvent.click(screen.getByRole('button', { name: 'Clear haul' }));
-    expect(onClear).not.toHaveBeenCalled();
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Clear haul' }).find((b) => dialog.contains(b))!
-    );
     expect(onClear).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('ticks a leg done with an Undo toast', async () => {
