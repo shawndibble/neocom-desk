@@ -131,9 +131,10 @@ export function SkillPlanEditor() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   const plan = planQuery.plan;
-  // Deleted elsewhere, a stale URL, or another character's plan — the list
-  // is the only page left to send the user back to.
-  if (!plan || plan.characterId !== activeCharacterId) {
+  // Deleted elsewhere or a stale URL — the list is the only page left to send
+  // the user back to. A plan owned by another Character stays open: switching
+  // Characters on a plan re-costs it against the new pilot's skills.
+  if (!plan) {
     return <Navigate to="/skills/plans" replace />;
   }
 
