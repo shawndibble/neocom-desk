@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { SlideOver, NeedsConnection, Button } from '@/components/ui';
+import {
+  SlideOver,
+  NeedsConnection,
+  Button,
+  ToastStack,
+  useDeferredCommits,
+} from '@/components/ui';
 import { permissionsForEndpoints, SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
@@ -23,7 +29,6 @@ import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
 import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
 import { communityRequestsUrl } from './communityStore';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
 import { BuyerQuotes } from './BuyerQuotes';
@@ -74,14 +79,14 @@ function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unkn
  * The requester gets Extend 30 days and Close request (Reopen once closed)
  * and no Pledge controls; everyone else also gets Message <requester>…, which
  * opens an in-game mail to them. The Community admin also gets Remove
- * request… and, per Pledger, Remove on their Pledge (issue #3812), each behind
- * a confirm; the server checks the admin, this only hides the controls.
+ * request… and, per Pledger, Remove on their Pledge (issue #3812), each with an
+ * Undo toast; the server checks the admin, this only hides the controls.
  */
 export function RequestPanel({
   request,
   mine,
   myUid,
-  pledges,
+  pledges: allPledges,
   now,
   characterId,
   communityId,
@@ -91,7 +96,7 @@ export function RequestPanel({
   onClose,
   onChanged,
   onEdit,
-  onRemoved,
+  onRemove,
   refreshPledges,
 }: {
   request: CommunityRequest;
@@ -111,8 +116,8 @@ export function RequestPanel({
   onChanged: () => void;
   /** The requester opens the edit dialog for this Request. */
   onEdit: () => void;
-  /** The admin removed this Request: close the panel and refetch the board. */
-  onRemoved: () => void;
+  /** The admin removed this Request: the board hides it, closes the panel and writes after its Undo toast. */
+  onRemove: (removal: { message: string; commit: () => Promise<void> }) => void;
   /** Re-reads this Request's Pledges into the board after a Pledge write. */
   refreshPledges: (requestId: string) => Promise<RequestPledge[]>;
 }) {
@@ -126,9 +131,12 @@ export function RequestPanel({
   const [mailOutcome, setMailOutcome] = useState<PledgeMailOutcome | null>(null);
   /** Pledge mails settled this session (sent, or already on the server): not asked again on an update. */
   const mailSettled = useRef(false);
-  const [removing, setRemoving] = useState<
-    { kind: 'request' } | { kind: 'pledge'; uid: string; name: string } | null
-  >(null);
+  // A removed Pledge stays hidden until its Undo toast ends and the write lands.
+  const pendingPledgeRemovals = useDeferredCommits();
+  const pledges = useMemo(
+    () => allPledges.filter((p) => !pendingPledgeRemovals.hiddenIds.has(p.uid)),
+    [allPledges, pendingPledgeRemovals.hiddenIds]
+  );
 
   // The board only loads Pledges for open Requests, and may be minutes old: read this one fresh.
   useEffect(() => {
@@ -429,7 +437,16 @@ export function RequestPanel({
                         size="sm"
                         variant="ghost"
                         aria-label={t('communities.board.admin.removePledgeFor', { name })}
-                        onClick={() => setRemoving({ kind: 'pledge', uid: pledge.uid, name })}
+                        onClick={() =>
+                          pendingPledgeRemovals.defer({
+                            id: pledge.uid,
+                            message: t('communities.board.admin.pledgeRemoved', { name }),
+                            commit: async () => {
+                              await removePledge(characterId, communityId, request.id, pledge.uid);
+                              await refreshPledges(request.id);
+                            },
+                          })
+                        }
                       >
                         {t('communities.board.admin.removePledge')}
                       </Button>
@@ -443,7 +460,18 @@ export function RequestPanel({
         {isAdmin && (
           <div>
             <NeedsConnection>
-              <Button size="sm" variant="danger" onClick={() => setRemoving({ kind: 'request' })}>
+              <Button
+                size="sm"
+                variant="danger"
+                onClick={() =>
+                  onRemove({
+                    message: t('communities.board.admin.requestRemoved', {
+                      name: request.ownerName,
+                    }),
+                    commit: () => removeRequest(characterId, communityId, request.id),
+                  })
+                }
+              >
                 {t('communities.board.admin.removeRequest')}
               </Button>
             </NeedsConnection>
@@ -511,33 +539,11 @@ export function RequestPanel({
           </p>
         )}
       </div>
-      <ConfirmDialog
-        open={removing?.kind === 'request'}
-        title={t('communities.board.admin.removeRequestTitle')}
-        body={t('communities.board.admin.removeRequestBody', {
-          name: request.ownerName,
-          items,
-        })}
-        actionLabel={t('communities.board.admin.removeRequestAction')}
-        onClose={() => setRemoving(null)}
-        onConfirm={async () => {
-          await removeRequest(characterId, communityId, request.id);
-          onRemoved();
-        }}
-      />
-      <ConfirmDialog
-        open={removing?.kind === 'pledge'}
-        title={t('communities.board.admin.removePledgeTitle', {
-          name: removing?.kind === 'pledge' ? removing.name : '',
-        })}
-        body={t('communities.board.admin.removePledgeBody')}
-        actionLabel={t('communities.board.admin.removePledgeAction')}
-        onClose={() => setRemoving(null)}
-        onConfirm={async () => {
-          if (removing?.kind !== 'pledge') return;
-          await removePledge(characterId, communityId, request.id, removing.uid);
-          await refreshPledges(request.id);
-        }}
+      <ToastStack
+        items={pendingPledgeRemovals.items}
+        undoLabel={t('communities.board.admin.undo')}
+        onUndo={pendingPledgeRemovals.undo}
+        onClose={pendingPledgeRemovals.commit}
       />
     </SlideOver>
   );

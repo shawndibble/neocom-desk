@@ -188,20 +188,30 @@ describe('ShareBlueprintsTab', () => {
     );
   });
 
-  it('asks before turning share-all off, then shares nothing', async () => {
+  it('turns share-all off with an Undo toast, then shares nothing', async () => {
     await saveShareChoice(1, 'c1', { all: true, excluded: new Set() });
     await db.settings.put({ key: 'communityShare:1:c1:locations', value: [500] });
     const user = userEvent.setup();
     renderTab();
     await user.click(await screen.findByRole('checkbox', { name: b.shareAll }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: b.offAction }));
+    expect((await screen.findAllByText(b.stoppedAll)).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(async () =>
       expect(await loadBlueprintShare(1, 'c1')).toEqual({
         choice: { all: false, allowed: new Set() },
         locations: new Set(),
       })
     );
+  });
+
+  it('Undo on the share-all toast keeps the saved share untouched', async () => {
+    await saveShareChoice(1, 'c1', { all: true, excluded: new Set() });
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(await screen.findByRole('checkbox', { name: b.shareAll }));
+    await user.click(await screen.findByRole('button', { name: b.undo }));
+    expect(screen.getByRole('checkbox', { name: b.shareAll })).toBeChecked();
+    expect((await loadBlueprintShare(1, 'c1')).choice.all).toBe(true);
   });
 
   it('waits for the places before listing, so a location-only share never flashes as none', async () => {

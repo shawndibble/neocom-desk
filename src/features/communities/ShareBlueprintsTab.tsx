@@ -3,7 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { permissionsForEndpoints } from '@/esi/registry';
-import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  SearchInput,
+  Spinner,
+  ToastStack,
+  useDeferredCommits,
+} from '@/components/ui';
 import {
   copiesByPlace,
   noBlueprintsShared,
@@ -18,7 +26,6 @@ import {
 } from '@/engine/communities/shareMode';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddBlueprintsDialog, type DialogPlaces } from './AddBlueprintsDialog';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { publishSharedLibrary, type PublishResult } from './libraryPush';
 import { BlueprintName, PlaceName } from './sharedBlueprintRows';
 import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
@@ -32,6 +39,9 @@ function neighbours<K>(keys: readonly K[], index: number, refs: Map<K, HTMLButto
   const before = keys.slice(0, index).reverse();
   return [...after, ...before].map((key) => () => refs.get(key) ?? null);
 }
+
+/** The deferred-commit id of "stop sharing all"; only one is ever pending. */
+const STOP_ALL_ID = 'stop-all';
 
 const NO_STATUS: ReadonlyMap<number, TypeStatus> = new Map();
 
@@ -55,10 +65,16 @@ export function ShareBlueprintsTab({
   const { t } = useTranslation();
   const owned = useOwnedBlueprintTypes(characterId);
   const copies = useBlueprintCopies(characterId);
-  const [share, setShare] = useState<BlueprintShare | null>(null);
+  const [savedShare, setShare] = useState<BlueprintShare | null>(null);
+  // Stopping everything shows at once but writes after its Undo toast, so Undo is just not writing.
+  const pendingOff = useDeferredCommits();
+  const stoppingAll = pendingOff.hiddenIds.has(STOP_ALL_ID);
+  const share = useMemo(
+    () => (savedShare && stoppingAll ? noBlueprintsShared() : savedShare),
+    [savedShare, stoppingAll]
+  );
   const [query, setQuery] = useState('');
   const [adding, setAdding] = useState(false);
-  const [confirmingOff, setConfirmingOff] = useState(false);
   const [failed, setFailed] = useState(false);
   const [published, setPublished] = useState<PublishResult | null>(null);
 
@@ -141,8 +157,8 @@ export function ShareBlueprintsTab({
   const stopButtons = useRef(new Map<number, HTMLButtonElement>());
   const focusAfterCommit = useFocusAfterCommit();
   useEffect(() => {
-    latest.current = share;
-  }, [share]);
+    latest.current = savedShare;
+  }, [savedShare]);
 
   function update(change: (current: BlueprintShare) => BlueprintShare): Promise<void> {
     setFailed(false);
@@ -193,8 +209,14 @@ export function ShareBlueprintsTab({
           <Checkbox
             checked={share.choice.all}
             onChange={(event) => {
-              if (event.target.checked) update(shareAllBlueprints);
-              else setConfirmingOff(true);
+              if (!event.target.checked) {
+                pendingOff.defer({
+                  id: STOP_ALL_ID,
+                  message: t('communities.blueprints.stoppedAll'),
+                  commit: () => update(noBlueprintsShared),
+                });
+              } else if (pendingOff.items.length > 0) pendingOff.undo(STOP_ALL_ID);
+              else void update(shareAllBlueprints);
             }}
           />
           {t('communities.blueprints.shareAll')}
@@ -306,13 +328,11 @@ export function ShareBlueprintsTab({
           {t('communities.share.saveFailed')}
         </p>
       )}
-      <ConfirmDialog
-        open={confirmingOff}
-        title={t('communities.blueprints.offTitle')}
-        body={t('communities.blueprints.offBody')}
-        actionLabel={t('communities.blueprints.offAction')}
-        onClose={() => setConfirmingOff(false)}
-        onConfirm={() => update(noBlueprintsShared)}
+      <ToastStack
+        items={pendingOff.items}
+        undoLabel={t('communities.blueprints.undo')}
+        onUndo={pendingOff.undo}
+        onClose={pendingOff.commit}
       />
       <AddBlueprintsDialog
         open={adding}
@@ -323,9 +343,18 @@ export function ShareBlueprintsTab({
         places={dialogPlaces}
         sharedLocations={share.locations}
         labels={labels}
-        onShareType={(typeId) => update((current) => shareType(current, typeId))}
-        onShareLocation={(placeId) => update((current) => shareLocation(current, placeId))}
-        onStopLocation={(placeId) => update((current) => stopSharingLocation(current, placeId))}
+        onShareType={(typeId) => {
+          pendingOff.commit(STOP_ALL_ID);
+          void update((current) => shareType(current, typeId));
+        }}
+        onShareLocation={(placeId) => {
+          pendingOff.commit(STOP_ALL_ID);
+          void update((current) => shareLocation(current, placeId));
+        }}
+        onStopLocation={(placeId) => {
+          pendingOff.commit(STOP_ALL_ID);
+          void update((current) => stopSharingLocation(current, placeId));
+        }}
       />
     </div>
   );

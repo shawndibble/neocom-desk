@@ -753,7 +753,7 @@ describe('Admin removal', () => {
     expect(within(panel).queryByText('Pledges on this request')).toBeNull();
   });
 
-  it('names each Pledger in the panel and removes one Pledge after a confirm', async () => {
+  it('names each Pledger in the panel and removes one Pledge once its Undo toast closes', async () => {
     const user = userEvent.setup();
     renderTab([request({})], vi.fn(), pledged, false, true);
     await user.click(screen.getByText('Tritanium'));
@@ -761,34 +761,35 @@ describe('Admin removal', () => {
     expect(within(panel).getByText('Dax Orrelin')).toBeInTheDocument();
     expect(within(panel).getByText('Former Member')).toBeInTheDocument();
     await user.click(within(panel).getByRole('button', { name: "Remove Dax Orrelin's Pledge" }));
-    const confirm = await screen.findByRole('dialog', { name: "Remove Dax Orrelin's Pledge?" });
-    await user.click(within(confirm).getByRole('button', { name: 'Remove Pledge' }));
+    expect(within(panel).queryByText('Dax Orrelin')).toBeNull();
+    expect(store.removePledge).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
     await waitFor(() => expect(store.removePledge).toHaveBeenCalledWith(1, 'c1', 'r1', 'char:3'));
     expect(refreshPledges).toHaveBeenCalledWith('r1');
   });
 
-  it('removes the Request from its panel and closes the panel', async () => {
+  it('removes the Request from its panel, closes the panel and writes once the toast closes', async () => {
     const user = userEvent.setup();
     const reload = renderTab([request({})], vi.fn(), {}, false, true);
     await user.click(screen.getByText('Tritanium'));
     const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
     await user.click(within(panel).getByRole('button', { name: 'Remove request' }));
-    const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
-    await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(store.removeRequest).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(store.removeRequest).toHaveBeenCalledWith(1, 'c1', 'r1'));
     await waitFor(() => expect(reload).toHaveBeenCalled());
   });
 
-  it('says the removal failed and keeps the dialog open', async () => {
-    store.removeRequest.mockRejectedValue(new Error('denied'));
+  it('Undo keeps the Request and writes nothing', async () => {
     const user = userEvent.setup();
     renderTab([request({})], vi.fn(), {}, false, true);
     await user.click(screen.getByText('Tritanium'));
     const panel = screen.getByRole('dialog', { name: /Aria Voss's request/ });
     await user.click(within(panel).getByRole('button', { name: 'Remove request' }));
-    const confirm = await screen.findByRole('dialog', { name: 'Remove this request?' });
-    await user.click(within(confirm).getByRole('button', { name: 'Remove request' }));
-    expect(await within(confirm).findByRole('alert')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(screen.getByText('Tritanium')).toBeInTheDocument();
+    expect(store.removeRequest).not.toHaveBeenCalled();
   });
 });
 
