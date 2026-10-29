@@ -32,6 +32,8 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 const SHIELD_HARDENER = 77;
+/** Hacking and scanning rigs: the Memetic, Emission, Gravity and Signal rigs. */
+const SCANNING_RIGS = 1233;
 
 /**
  * The PvE Drake from issue #5548. A hand review turned it into: Damage Control
@@ -285,6 +287,12 @@ describe('Improve makeover on an Explore Astero (real WASM + real pinned SDE)', 
         );
     }
   );
+
+  it('Dangerous fits a hacking or scanning rig that the calibration allows', () => {
+    const fit = dangerous?.makeover?.fitting ?? astero;
+    const rigs = fit.modules.filter((m) => m.slot === 'rig').map((m) => types[String(m.typeId)]);
+    expect(rigs.some((rig) => rig.groupID === SCANNING_RIGS)).toBe(true);
+  });
 
   it('Safe does not guard the tank modules (any drop shows as lost)', () => {
     const lost = safe?.makeover?.lost ?? [];

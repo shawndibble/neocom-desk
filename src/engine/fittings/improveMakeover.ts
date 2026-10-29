@@ -66,7 +66,7 @@ export interface MakeoverMoveOptions {
  * The one-slot moves the Makeover tries on `modules`. One copy stands for
  * identical copies (the first in the rack), so a split costs no more than a
  * whole-type swap. Targets are the module's own group and the goal's Rework
- * groups (`reworkGroups`), one tier per group: Tech II, else Tech I. Faction,
+ * groups (`reworkGroups`), one tier per group: Tech II, else Tech I (rigs: both, for calibration). Faction,
  * deadspace and officer steps stay in Improve's Upgrade rows, so the Makeover
  * changes the fit's shape and not its price tier; Reach does not apply (it is
  * always Rework-wide). The first empty slot of each rack takes the same groups.
@@ -120,7 +120,9 @@ export function makeoverMoves(
             (pool.flyable?.(slot, typeId) ?? true)
         );
       const techTwo = members.filter((typeId) => metaOf(typeId) === TECH_II);
-      found = techTwo.length > 0 ? techTwo : members.filter((typeId) => metaOf(typeId) === TECH_I);
+      const techOne = members.filter((typeId) => metaOf(typeId) === TECH_I);
+      // A rig's Tech II often needs more calibration than the hull has left, so its Tech I is offered too.
+      found = techTwo.length === 0 ? techOne : slot === 'rig' ? [...techTwo, ...techOne] : techTwo;
       tiers.set(key, found);
     }
     return found;
