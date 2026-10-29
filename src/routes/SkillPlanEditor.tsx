@@ -122,11 +122,7 @@ export function SkillPlanEditor() {
   );
 
   if (!hydrated || planQuery === undefined) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
@@ -191,9 +187,7 @@ export function SkillPlanEditor() {
                 className="py-16"
               />
             ) : (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
+              <Spinner block="page" label={t('common.loading')} />
             )}
           </div>
         </PlanEditorLayout>

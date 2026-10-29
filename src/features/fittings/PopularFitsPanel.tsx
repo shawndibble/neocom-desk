@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { Trans, useTranslation } from 'react-i18next';
 import { IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
@@ -222,9 +223,7 @@ function WorkbenchFits({
               )}
               <WorkbenchSightingBadge sighting={sighting} />
               {loadFailed && (
-                <p role="alert" className="text-xs text-danger">
-                  {t('fittings.popular.workbench.loadFailed')}
-                </p>
+                <InlineError>{t('fittings.popular.workbench.loadFailed')}</InlineError>
               )}
             </PopularFitRow>
           )}

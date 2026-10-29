@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { permissionsForEndpoints } from '@/esi/registry';
@@ -213,11 +214,7 @@ export function CharacterSharePicker({
     );
   }
   if (state.status === 'failed') {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.share.failed')}
-      </p>
-    );
+    return <InlineError>{t('communities.share.failed')}</InlineError>;
   }
   return (
     <SharePicker

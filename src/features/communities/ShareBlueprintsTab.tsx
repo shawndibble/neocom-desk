@@ -1,4 +1,5 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { InlineError } from '@/components/ui/InlineError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
@@ -194,11 +195,7 @@ export function ShareBlueprintsTab({
     );
   }
   if (owned.status === 'failed') {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.share.failed')}
-      </p>
-    );
+    return <InlineError>{t('communities.share.failed')}</InlineError>;
   }
   if (types.length === 0) return <EmptyState title={t('communities.share.noBlueprints')} />;
 
@@ -323,11 +320,7 @@ export function ShareBlueprintsTab({
           {t('communities.blueprints.skipped', { count: published.skipped })}
         </p>
       )}
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('communities.share.saveFailed')}
-        </p>
-      )}
+      {failed && <InlineError>{t('communities.share.saveFailed')}</InlineError>}
       <ToastStack
         items={pendingOff.items}
         undoLabel={t('communities.blueprints.undo')}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -395,11 +396,7 @@ export function RequestPanel({
             })}
           </p>
         )}
-        {pledgeError && (
-          <p role="alert" className="text-xs text-danger">
-            {pledgeError}
-          </p>
-        )}
+        {pledgeError && <InlineError>{pledgeError}</InlineError>}
         {requesterId !== null && (
           <MessageRequesterButton
             characterId={characterId}
@@ -533,11 +530,7 @@ export function RequestPanel({
             )}
           </div>
         )}
-        {error && (
-          <p role="alert" className="text-xs text-danger">
-            {error}
-          </p>
-        )}
+        {error && <InlineError>{error}</InlineError>}
       </div>
       <ToastStack
         items={pendingPledgeRemovals.items}

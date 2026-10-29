@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -194,9 +195,7 @@ export function CommunityJoin() {
           <EmptyState title={t('communities.join.gone')} hint={t('communities.join.goneHint')} />
         )}
         {state.status === 'unavailable' && (
-          <p role="alert" className="text-xs text-danger">
-            {t('communities.join.unavailable')}
-          </p>
+          <InlineError>{t('communities.join.unavailable')}</InlineError>
         )}
 
         {state.status === 'ok' && (

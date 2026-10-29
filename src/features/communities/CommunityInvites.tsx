@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, NeedsConnection } from '@/components/ui';
 import { useOnline } from '@/stores/network';
@@ -61,11 +62,7 @@ export function CommunityInvites({
             <span className="block text-text-dim">{t('communities.approval.hint')}</span>
           </span>
         </label>
-        {failed && (
-          <p role="alert" className="text-xs text-danger">
-            {t('communities.approval.failed')}
-          </p>
-        )}
+        {failed && <InlineError>{t('communities.approval.failed')}</InlineError>}
       </section>
 
       <section className="space-y-2" aria-label={t('communities.invite')}>

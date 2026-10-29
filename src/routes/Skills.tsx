@@ -300,11 +300,7 @@ export function Skills() {
   });
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
@@ -356,9 +352,7 @@ export function Skills() {
       </StatChips>
 
       {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="page" label={t('common.loading')} />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : skillsBlocked ? (

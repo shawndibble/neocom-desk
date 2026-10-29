@@ -559,11 +559,7 @@ export function BpcSourcingPanel({
     // No redirect of its own: the Industry route this sits in already sends a
     // characterless visitor to /characters, and a second `Navigate` racing it
     // from inside a tab is how you get a redirect loop.
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
 
   const showsTable =
@@ -619,9 +615,7 @@ export function BpcSourcingPanel({
       </LiveStatus>
       <Panel padded={false}>
         {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : contractsResult === null && ownedBlueprints.length === 0 ? (
@@ -921,9 +915,7 @@ export function BpcSourcingPanel({
             {sources.size === 0 ? (
               <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
             ) : awaitingOffers ? (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
+              <Spinner block="page" label={t('common.loading')} />
             ) : displayRows.length === 0 ? (
               <EmptyState
                 title={t('bpcContracts.noFilterMatches')}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -189,11 +190,7 @@ export function Communities() {
           </Button>
         </div>
       )}
-      {failed && selected && (
-        <p role="alert" className="text-xs text-danger">
-          {t('communities.loadFailed')}
-        </p>
-      )}
+      {failed && selected && <InlineError>{t('communities.loadFailed')}</InlineError>}
       {selected && communities ? (
         // Inside a Community the list steps back into a switcher: the open one
         // by name, the others a pick away, and "All Communities" for the list.

@@ -557,11 +557,7 @@ export function Industry() {
   }, [groups, groupedPlans, groupedRows]);
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
@@ -864,9 +860,7 @@ export function Industry() {
             characterLoaded ? (
               <BpcSourcingPanel onHeaderChange={setBpcSourcingHeader} />
             ) : (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
+              <Spinner block="page" label={t('common.loading')} />
             )
           ) : (
             <DataGate
@@ -885,13 +879,7 @@ export function Industry() {
               resetKey={activeCharacterId}
             >
               {plans && catalog && buildGroupsHydrated && expandedGroupsHydrated && (
-                <Suspense
-                  fallback={
-                    <div className="flex justify-center py-16">
-                      <Spinner label={t('common.loading')} />
-                    </div>
-                  }
-                >
+                <Suspense fallback={<Spinner block="page" label={t('common.loading')} />}>
                   {tab === 'opportunities' ? (
                     <div className="flex flex-col gap-4">
                       {/* "What's profitable" (the market-wide scan) always leads,

@@ -327,13 +327,7 @@ export function NetWorthPanel({
   );
 
   const chart = hasPoints ? (
-    <Suspense
-      fallback={
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
-      }
-    >
+    <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
       {mode === 'single' ? (
         <LazyNetWorthChart
           mode="single"

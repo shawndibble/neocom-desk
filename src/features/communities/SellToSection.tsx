@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { Button, NeedsConnection, TextArea } from '@/components/ui';
@@ -274,11 +275,7 @@ export function SellToSection({
           {t('communities.board.sellTo.dropped', { count: notes.dropped })}
         </p>
       )}
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
+      {error && <InlineError>{error}</InlineError>}
     </section>
   );
 }

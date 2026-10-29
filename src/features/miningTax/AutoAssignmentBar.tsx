@@ -9,6 +9,7 @@
  * one row; a list synced from an older device can briefly hold two.
  */
 import { useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
@@ -87,11 +88,7 @@ export function AutoAssignmentBar({
           </section>
         );
       })}
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('miningTax.surveyConnections.stopFailed')}
-        </p>
-      )}
+      {failed && <InlineError>{t('miningTax.surveyConnections.stopFailed')}</InlineError>}
     </div>
   );
 }

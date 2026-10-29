@@ -735,11 +735,7 @@ export function OpportunitiesPanel({
         hint={t('industry.opportunitiesLoadFailedHint')}
         onRetry={retry}
         resetKey={characterIdsKey}
-        busy={
-          <div className="flex justify-center py-8">
-            <Spinner label={t('common.loading')} />
-          </div>
-        }
+        busy={<Spinner block="panel" label={t('common.loading')} />}
       >
         <LiveStatus>
           {failedCount > 0 && !allBlueprintsFailed

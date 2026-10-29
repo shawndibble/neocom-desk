@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Panel, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -71,11 +72,7 @@ function RefineryRow({
           {t(k('hint'))}
         </p>
       )}
-      {error && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
+      {error && <InlineError>{error}</InlineError>}
     </li>
   );
 }

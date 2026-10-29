@@ -1068,9 +1068,7 @@ export function Market() {
                     className="py-8"
                   />
                 ) : catalogueLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner label={t('common.loading')} />
-                  </div>
+                  <Spinner block="panel" label={t('common.loading')} />
                 ) : filterResult &&
                   filterResult.visibleGroupIds.size === 0 &&
                   !filterResult.bestMatch ? (
@@ -1241,9 +1239,7 @@ export function Market() {
                       ) : orderBookLoading &&
                         !regionsUnavailable &&
                         (!orderBookView || orderBookFailed) ? (
-                        <div className="flex justify-center py-8">
-                          <Spinner label={t('common.loading')} />
-                        </div>
+                        <Spinner block="panel" label={t('common.loading')} />
                       ) : orderBookFailed ? (
                         // Not the empty book: ESI didn't answer (a 420, or the Error
                         // Budget declining to send), which says nothing about who

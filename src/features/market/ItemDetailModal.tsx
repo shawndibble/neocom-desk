@@ -351,9 +351,7 @@ export function ItemDetailModal({
       }
     >
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="panel" label={t('common.loading')} />
       ) : error || !data ? (
         <div className="space-y-4">
           <EmptyState
