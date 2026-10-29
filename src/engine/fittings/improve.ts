@@ -103,10 +103,6 @@ export type Guardrail = 'budget' | 'capStable' | 'keepsStats' | 'spend';
 export const IMPROVE_REACHES = ['upgrade', 'rebalance', 'rework'] as const;
 export type ImproveReach = (typeof IMPROVE_REACHES)[number];
 
-/** Planning to buy (default: the fit is a shopping list) or Refitting a ship the pilot owns. */
-export const IMPROVE_MODES = ['buy', 'refit'] as const;
-export type ImproveMode = (typeof IMPROVE_MODES)[number];
-
 /** Defense Choice: Keep as is, or free the tank modules for Shield or Armor. */
 export const DEFENSE_CHOICES = ['keep', 'shield', 'armor'] as const;
 export type DefenseChoice = (typeof DEFENSE_CHOICES)[number];
@@ -146,13 +142,9 @@ export interface ImproveOption {
   /** How much the goal gains: a fraction of the fit's own figure, or ISK saved for Cheaper. */
   score: number;
   /**
-   * What the change costs: new minus old when planning to buy; new minus what
-   * the removed part sells for when refitting, a changed rig costing the full
-   * new one. Null when a price is unknown.
+   * What the change costs: new minus old. Null when a price is unknown.
    */
   iskDelta: number | null;
-  /** Refitting changes a rig: the old one is destroyed when removed. */
-  destroysRigs: boolean;
   /** Every stat it makes worse, before and after, so "Gives up" names the size; empty is No downside. */
   lost: LostStat[];
 }
@@ -653,26 +645,19 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
   });
 }
 
-/** Hub sell price of every part, per the mode (`ImproveOption.iskDelta`). */
+/** Hub sell price of every part (`ImproveOption.iskDelta`). */
 export function iskDeltaOf(
   candidate: ImproveCandidate,
-  priceOf: (typeId: number) => number | null,
-  mode: ImproveMode
-): { isk: number | null; destroysRigs: boolean } {
+  priceOf: (typeId: number) => number | null
+): number | null {
   const to = priceOf(candidate.toTypeId);
   const from = candidate.fromTypeId === null ? 0 : priceOf(candidate.fromTypeId);
-  const isRig = candidate.at[0].slot === 'rig';
-  // A removed rig is destroyed, so a refit pays the full new rig and gets nothing back.
-  const destroys = mode === 'refit' && isRig && candidate.fromTypeId !== null;
-  let isk: number | null =
-    to === null || from === null ? null : (to - (destroys ? 0 : from)) * candidate.at.length;
-  let destroysRigs = destroys;
+  let isk: number | null = to === null || from === null ? null : (to - from) * candidate.at.length;
   if (candidate.pairedWith) {
-    const paired = iskDeltaOf(candidate.pairedWith, priceOf, mode);
-    isk = isk === null || paired.isk === null ? null : isk + paired.isk;
-    destroysRigs = destroysRigs || paired.destroysRigs;
+    const paired = iskDeltaOf(candidate.pairedWith, priceOf);
+    isk = isk === null || paired === null ? null : isk + paired;
   }
-  return { isk, destroysRigs };
+  return isk;
 }
 
 /** The best gain among the options, or null when nothing helps: the Defense Choice compares sides by it. */
@@ -740,11 +725,9 @@ export interface FindImprovementsParams {
   target?: TargetProfile;
   /** Carry more: the hold scored (default the cargo hold). */
   hold?: ImproveHold;
-  /** Planning to buy (default) or Refitting a ship the pilot owns. */
-  mode?: ImproveMode;
-  /** Planning: the total fit price may not pass it. Refitting: the extra spend may not. Null: no limit. */
-  spendCap?: number | null;
-  /** What the fit costs now, for Planning's total budget. */
+  /** The total fit price may not pass it. Null: no limit. */
+  iskBudget?: number | null;
+  /** What the fit costs now, for the total budget. */
   fitTotal?: number | null;
   /** Module and rig swaps that pay for an unflyable-module fix that overruns the fit. */
   compensators?: FlyableCompensators;
@@ -761,20 +744,19 @@ const PAIR_SEEDS = 5;
 
 /**
  * Whether a change costing `iskDelta` (plus `extra`, an implant set bought with
- * it) passes the pilot's budget: Planning's total fit price, or Refitting's
- * extra spend. No cap, or an unpriced change, never blocks.
+ * it) passes the pilot's budget: the total fit price. No cap, or an unpriced
+ * change, never blocks.
  */
-export function overSpendCap(
-  mode: ImproveMode,
-  spendCap: number | null,
+export function overIskBudget(
+  iskBudget: number | null,
   fitTotal: number | null,
   iskDelta: number | null,
   extra = 0
 ): boolean {
-  if (spendCap === null || (iskDelta === null && extra === 0)) return false;
+  if (iskBudget === null || (iskDelta === null && extra === 0)) return false;
   // An unpriced change adds nothing it can be charged, but the implants bought with it still count.
   const spent = (iskDelta ?? 0) + extra;
-  return (mode === 'buy' ? (fitTotal ?? 0) + spent : spent) > spendCap;
+  return (fitTotal ?? 0) + spent > iskBudget;
 }
 
 /** Fixes over budget that get a compensation search, and the bundles kept for each. */
@@ -836,8 +818,7 @@ export async function findImprovements({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
-  mode = 'buy',
-  spendCap = null,
+  iskBudget = null,
   fitTotal = null,
   compensators,
   onProgress,
@@ -874,7 +855,7 @@ export async function findImprovements({
   ): Promise<boolean> {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
-    const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
+    const iskDelta = iskDeltaOf(candidate, priceOf);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     const fix = candidate.fixesUnflyable === true;
     if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return false;
@@ -884,10 +865,9 @@ export async function findImprovements({
       after,
       score: score ?? 0,
       iskDelta,
-      destroysRigs,
       lost: lostStats(before, after),
     };
-    const overSpend = overSpendCap(mode, spendCap, fitTotal, iskDelta);
+    const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target);
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.

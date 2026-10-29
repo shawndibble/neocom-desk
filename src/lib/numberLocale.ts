@@ -54,6 +54,9 @@ export function createNumberFormat(options: Intl.NumberFormatOptions): (value: n
 
 const grouped = createNumberFormat({ maximumFractionDigits: 20 });
 
+/** The thousands separator of the active format (a comma, a period, ...), as it prints a million (a locale may skip grouping below 10,000). */
+export const getGroupMark = (): string => grouped(1_000_000).replace(/\d/g, '')[0] ?? '';
+
 /** A number in the active format, keeping whatever decimals it has. */
 export const formatNumber = (value: number): string => grouped(value);
 

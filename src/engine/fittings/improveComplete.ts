@@ -5,13 +5,7 @@
  * back under, so the pilot is never left with Apply locked and nothing to do.
  * Pure.
  */
-import {
-  chainOf,
-  iskDeltaOf,
-  type ImproveCandidate,
-  type ImproveMode,
-  type ImproveOption,
-} from './improve';
+import { chainOf, iskDeltaOf, type ImproveCandidate, type ImproveOption } from './improve';
 import { findFitSwaps, type FitSwap } from './makeItFit';
 import type { Fitting, FittingStats } from './types';
 
@@ -39,7 +33,6 @@ export interface FindCompletionsParams {
   swaps: readonly FitSwap[];
   stats: (fitting: Fitting) => Promise<FittingStats>;
   priceOf: (typeId: number) => number | null;
-  mode: ImproveMode;
   isCancelled?: () => boolean;
 }
 
@@ -50,7 +43,6 @@ export async function findCompletions({
   swaps,
   stats,
   priceOf,
-  mode,
   isCancelled,
 }: FindCompletionsParams): Promise<ImproveOption[]> {
   const found = await findFitSwaps({
@@ -64,7 +56,7 @@ export async function findCompletions({
   return found.options.slice(0, COMPLETIONS_SHOWN).flatMap((option) => {
     const candidate = chainOf(option.swaps);
     if (!candidate) return [];
-    const { isk, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
+    const isk = iskDeltaOf(candidate, priceOf);
     return [
       {
         candidate,
@@ -72,7 +64,6 @@ export async function findCompletions({
         after: option.after,
         score: 0,
         iskDelta: isk,
-        destroysRigs,
         lost: [],
       },
     ];
