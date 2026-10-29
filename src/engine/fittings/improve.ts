@@ -852,6 +852,7 @@ export async function findImprovements({
     try {
       return (await stats(withTogglesOff(swapped))).capacitor.stable;
     } catch {
+      // Blocked, the cautious side: a failed calculation must not let a fix break the capacitor.
       return false;
     }
   }
@@ -881,9 +882,11 @@ export async function findImprovements({
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target);
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
-    const keepsCap = fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
+    const capStillBinds =
+      fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
     const guardrail =
-      (fix && broken !== 'budget' && !keepsCap ? null : broken) ?? (overSpend ? 'spend' : null);
+      (fix && broken !== 'budget' && !capStillBinds ? null : broken) ??
+      (overSpend ? 'spend' : null);
     // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
     if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
     else (fix ? flyable : kept).push(option);

@@ -296,6 +296,22 @@ describe('findImprovements replacing an unflyable module and the capacitor', () 
     expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
   });
 
+  it('still offers another replacement that keeps the capacitor stable', async () => {
+    const table = { 1: {}, 2: { capUnstable: true }, 3: {} };
+    const result = await search('damage', table, [
+      fix,
+      { ...candidate(1, 3), fixesUnflyable: true },
+    ]);
+    expect(toIds(result.makeFlyable)).toEqual([3]);
+    expect(result.flyableBlocked.map((r) => r.candidate.toTypeId)).toEqual([2]);
+  });
+
+  it('leaves a ship whose capacitor was already unstable alone', async () => {
+    const table = { 1: { capUnstable: true }, 2: { capUnstable: true } };
+    const result = await search('damage', table, [fix]);
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+  });
+
   it('blocks an unstable replacement on a ship with nothing to toggle', async () => {
     const table = { 1: {}, 2: { capUnstable: true } };
     const result = await search('damage', table, [fix], {}, running([1]));
