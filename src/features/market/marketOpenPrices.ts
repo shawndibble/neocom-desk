@@ -18,6 +18,7 @@
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
 import { TRADE_HUBS } from '@/market/hubs';
+import { isRecord } from '../../engine/guards';
 
 /** Mirrors `openPricesR2Key` on the Functions side (`functions/src/r2DailySnapshots.ts`). */
 export function openPricesUrl(typeId: number): string {
@@ -54,16 +55,12 @@ function isNumberOrNullArray(value: unknown): value is (number | null)[] {
   return Array.isArray(value) && value.every((v) => v === null || typeof v === 'number');
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 function seriesById(map: unknown, dates: string[]): Map<number, OpenPriceSeries> {
   const out = new Map<number, OpenPriceSeries>();
-  if (!isObject(map)) return out;
+  if (!isRecord(map)) return out;
   for (const [key, series] of Object.entries(map)) {
     const id = Number(key);
-    if (!Number.isInteger(id) || !isObject(series)) continue;
+    if (!Number.isInteger(id) || !isRecord(series)) continue;
     const { buy, sell } = series;
     if (!isNumberOrNullArray(buy) || !isNumberOrNullArray(sell)) continue;
     out.set(id, { dates, buy, sell });
@@ -77,10 +74,10 @@ function seriesById(map: unknown, dates: string[]): Map<number, OpenPriceSeries>
  * `stations.<stationId>.buy|sell` parallel to it. A malformed series is skipped.
  */
 export function parseOpenPricesByType(data: unknown): StoredOpenPrices | null {
-  if (!isObject(data)) return null;
+  if (!isRecord(data)) return null;
   const { dates, stations } = data;
   if (!Array.isArray(dates) || !dates.every((d) => typeof d === 'string')) return null;
-  if (dates.length === 0 || !isObject(stations)) return null;
+  if (dates.length === 0 || !isRecord(stations)) return null;
   return { stations: seriesById(stations, dates) };
 }
 

@@ -16,6 +16,7 @@ import {
   type WormholeShipSize,
 } from '@/engine/route/theraConnections';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { isRecord } from '../engine/guards';
 
 export const EVE_SCOUT_SIGNATURES_URL = 'https://api.eve-scout.com/v2/public/signatures';
 
@@ -23,10 +24,6 @@ export const EVE_SCOUT_CACHE_MS = 5 * 60 * 1000;
 
 export type TheraConnectionsResult =
   { kind: 'ok'; connections: TheraConnection[]; fetchedAt: Date } | { kind: 'unavailable' };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;

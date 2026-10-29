@@ -1,3 +1,4 @@
+import { isRecord } from '../guards';
 /**
  * Corporation Projects as a buyer in Build Opportunities (issue #4786): the
  * pure maths between ESI's project reads and a row. A manufacture project pays
@@ -39,9 +40,6 @@ export interface CorpManufactureProject {
   /** ISO end date; null for a project with none. */
   expires: string | null;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
 
 /**
  * The one item a manufacture project asks for. A project naming a market group,

@@ -13,10 +13,7 @@ import {
   type OreArrivalLog,
 } from '@/engine/miningTax/oreArrival';
 import type { CharacterMiningLedger } from './ledger';
-
-function isRecord(raw: unknown): raw is Record<string, unknown> {
-  return typeof raw === 'object' && raw !== null && !Array.isArray(raw);
-}
+import { isPlainRecord } from '../../engine/guards';
 
 export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
   key: 'miningTaxOreArrivals',
@@ -24,7 +21,7 @@ export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
   // Its own record, never edited by hand: a shape check is enough to fall
   // back to empty after a format change rather than crash.
   parse: (raw) =>
-    isRecord(raw) && isRecord(raw.entries) && isRecord(raw.checkedAt)
+    isPlainRecord(raw) && isPlainRecord(raw.entries) && isPlainRecord(raw.checkedAt)
       ? (raw as unknown as OreArrivalLog)
       : null,
 });

@@ -1,3 +1,4 @@
+import { isRecord } from '../../engine/guards';
 /**
  * Declarative guards for the snapshots `pollerState.ts` persists. The
  * TypeScript shapes live in `engine/notificationDiffs.ts` (and its siblings);
@@ -21,10 +22,6 @@ type Check<T> = (raw: unknown) => raw is T;
 
 /** One check per field of `T`, optional fields included. */
 type ShapeSpec<T> = { readonly [K in keyof T]-?: Check<T[K]> };
-
-function isRecord(raw: unknown): raw is Record<string, unknown> {
-  return typeof raw === 'object' && raw !== null;
-}
 
 /**
  * Builds a guard for `T` from one check per field. A value passes when it is

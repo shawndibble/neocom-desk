@@ -7,6 +7,7 @@
  * price is reported as null, never coerced to 0.
  */
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { chunk } from '../lib/chunk';
 
 export const FUZZWORK_AGGREGATES_URL = 'https://market.fuzzwork.co.uk/aggregates/';
 
@@ -63,12 +64,6 @@ function parseSide(
     price: Number.isFinite(price) && price > 0 ? price : null,
     volume: toNumber(side.volume),
   };
-}
-
-function chunk<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-  return chunks;
 }
 
 /** Whether `locationId` is one station or a whole region — Fuzzwork aggregates either. */

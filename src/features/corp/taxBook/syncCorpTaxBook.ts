@@ -47,6 +47,7 @@ import {
   type ObserverFeed,
 } from './esiFeed';
 import { reconcileFeederPayouts } from './feederClient';
+import { chunk } from '../../../lib/chunk';
 
 /** The server accepts at most this many observer rows in one sync call. */
 export const OBSERVED_PER_CALL = 2000;
@@ -171,12 +172,6 @@ export type MissingSource = 'extractions' | 'donations';
 
 const paymentId = (d: JournalDonation) => `j${d.division}_${d.refId}`;
 
-function chunks<T>(items: readonly T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
-
 export async function syncCorpTaxBook(
   args: { characterId: number; corporationId: number; capabilities: SyncCapabilities },
   deps: SyncDeps = defaultSyncDeps
@@ -255,8 +250,8 @@ export async function syncCorpTaxBook(
     canExtract ? extractions : before.extractions,
     feed.systemIds
   );
-  const batches = chunks(placed, OBSERVED_PER_CALL);
-  const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
+  const batches = chunk(placed, OBSERVED_PER_CALL);
+  const extraCalls = chunk(extractions, EXTRACTIONS_PER_CALL);
   const first = { observed: batches.shift() ?? [], extractions: extraCalls.shift() ?? [] };
   // Verifying again right before writing renews the 10-minute role cache the
   // upload relies on, which the slow ESI reads above may have outlived.
@@ -320,7 +315,7 @@ export async function syncCorpTaxBook(
         startDate: after.book.startDate,
       })
     : [];
-  for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
+  for (const ids of chunk(toSettle, SETTLE_PER_CALL)) {
     await deps.settleStatements(characterId, corporationId, ids);
   }
 

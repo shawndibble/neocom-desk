@@ -1,3 +1,4 @@
+import { isRecord } from './guards';
 /**
  * Wars declared on a pilot's corporation, with no fetch or DOM in it.
  *
@@ -103,10 +104,6 @@ export function warsAgainst(
       Number(b.status.kind === 'active') - Number(a.status.kind === 'active') ||
       b.war.declared - a.war.declared
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 const isNum = (value: unknown): value is number =>
