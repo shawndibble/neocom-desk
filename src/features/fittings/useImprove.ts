@@ -56,6 +56,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { loadFittingPrice } from './fittingPrice';
+import { createWorkerPool, searchPoolSize, type WorkerPool } from './fittingWorker';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
@@ -438,6 +439,8 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
+  // The search's own workers: started with the first search, ended when the drawer closes.
+  const poolRef = useRef<WorkerPool | null>(null);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
   const { reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
@@ -451,6 +454,13 @@ export function useImprove(
         : undefined,
     [hullTypeId, hullGroupId]
   );
+
+  useEffect(() => {
+    if (enabled) return;
+    poolRef.current?.close();
+    poolRef.current = null;
+  }, [enabled]);
+  useEffect(() => () => poolRef.current?.close(), []);
 
   useEffect(() => {
     if (!enabled || !variants || !catalogue) return;
@@ -562,8 +572,9 @@ export function useImprove(
         }
         if (searched !== 'mining' && charges.length > 0)
           scoredBefore = (await variants.compare(load(variants.fitting), controller.signal)).after;
+        const workers = (poolRef.current ??= createWorkerPool(searchPoolSize()));
         const stats = async (fitting: Fitting) => {
-          const { after } = await variants.compare(load(fitting), controller.signal);
+          const { after } = await variants.compare(load(fitting), controller.signal, workers.send);
           // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
           if (plan && minerWithoutCrystal(after.mining.rows, plan.crystalFor))
             throw new Error('A miner takes no crystal of this ore');
@@ -579,6 +590,7 @@ export function useImprove(
             hold: effectiveHold(own.holds, hold),
             candidates: set.candidates,
             stats,
+            concurrency: workers.size,
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
             iskBudget,
