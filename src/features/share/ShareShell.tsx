@@ -17,8 +17,6 @@ export interface OpenInApp {
 
 interface ShareShellProps {
   title: string;
-  /** Keep the title for screen readers only, when the page body already says what it is. */
-  hideTitle?: boolean;
   /** The page's own primary controls, e.g. a table's export menu. On a `compact` or `wide` page they sit at the right of the row under the header. */
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
@@ -38,6 +36,9 @@ interface ShareShellProps {
   children: ReactNode;
 }
 
+/** The frame's max width per layout: `compact` keeps the 768px a share page has always had. */
+const FRAME_WIDTH = { classic: 'max-w-3xl', compact: 'max-w-3xl', wide: 'max-w-4xl' } as const;
+
 /**
  * The frame every Share Link page renders in: no navigation chrome (it sits
  * outside `RequireCharacter` and `ScopeGate`), the brand and one way
@@ -48,7 +49,6 @@ interface ShareShellProps {
  */
 export function ShareShell({
   title,
-  hideTitle,
   actions,
   openInApp,
   layout = 'classic',
@@ -105,7 +105,7 @@ export function ShareShell({
     // The login stays in the header; the page's own action rides in the notice strip.
     return (
       <div
-        className={`mx-auto flex min-h-screen ${layout === 'wide' ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
+        className={`mx-auto flex min-h-screen ${FRAME_WIDTH[layout]} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
       >
         <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
           <Link
@@ -156,9 +156,7 @@ export function ShareShell({
 
       <main className="flex flex-1 flex-col gap-4">
         <div className="flex items-center gap-2">
-          <h1 className={hideTitle ? 'sr-only' : 'text-sm font-semibold tracking-widest uppercase'}>
-            {title}
-          </h1>
+          <h1 className="text-sm font-semibold tracking-widest uppercase">{title}</h1>
           {actions && <span className="ml-auto">{actions}</span>}
         </div>
 
