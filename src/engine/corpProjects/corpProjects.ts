@@ -1,10 +1,11 @@
-import { isRecord } from '../guards';
 /**
  * Corporation Projects as a buyer in Build Opportunities (issue #4786): the
  * pure maths between ESI's project reads and a row. A manufacture project pays
  * a fixed reward per unit, up to a per-Character cap and while its pool lasts.
  * Nothing here fetches; the loader and the pricing hook feed it.
  */
+
+import { isRecord } from '../guards';
 
 /** The parts of a project detail read this module looks at (`getCorporationProject`). */
 export interface ProjectDetailInput {

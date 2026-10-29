@@ -1,10 +1,11 @@
-import { DAY_MS } from '@/lib/age';
-import { shiftUtcDate } from '@/engine/localDay';
 /**
  * Time-series arithmetic for the widget charts: the daily balance a journal
  * implies, and bucketing by week or hour. Pure and independent of the clock
  * (every function is handed `now`), so each is pinned by a plain test.
  */
+
+import { DAY_MS } from '@/lib/age';
+import { shiftUtcDate } from '@/engine/localDay';
 
 /**
  * One value per UTC day over the last `days` days ending at `today`, oldest

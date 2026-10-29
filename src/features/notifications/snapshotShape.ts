@@ -1,4 +1,3 @@
-import { isRecord } from '@/engine/guards';
 /**
  * Declarative guards for the snapshots `pollerState.ts` persists. The
  * TypeScript shapes live in `engine/notificationDiffs.ts` (and its siblings);
@@ -16,6 +15,8 @@ import { isRecord } from '@/engine/guards';
  * added after snapshots already existed is `is.optional(...)` (absent stays
  * readable), anything else is required and a baseline without it is discarded.
  */
+
+import { isRecord } from '@/engine/guards';
 
 /** A check for one field, narrowing to that field's type. */
 type Check<T> = (raw: unknown) => raw is T;

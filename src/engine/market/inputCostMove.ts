@@ -5,7 +5,7 @@
  * history average.
  */
 import type { OpenPricePoint } from './priceHistoryOpen';
-import { shiftDay } from './priceTrend';
+import { shiftUtcDate } from '@/engine/localDay';
 
 export const INPUT_COST_MOVE_DAYS = 7;
 /** The line shows only when build cost moved at least this many percent, up or down. */
@@ -45,7 +45,7 @@ function sideWindow(points: readonly OpenPricePoint[] | undefined, side: Side): 
     .sort((a, b) => a.date.localeCompare(b.date));
   const newest = priced[priced.length - 1];
   if (!newest) return null;
-  const cutoff = shiftDay(newest.date, -INPUT_COST_MOVE_DAYS);
+  const cutoff = shiftUtcDate(newest.date, -INPUT_COST_MOVE_DAYS);
   let base: number | undefined;
   for (const p of priced) if (p.date <= cutoff) base = p.value;
   return base === undefined ? null : { latest: newest.value, base };

@@ -1,4 +1,3 @@
-import { isRecord } from './guards';
 /**
  * Wars declared on a pilot's corporation, with no fetch or DOM in it.
  *
@@ -10,6 +9,8 @@ import { isRecord } from './guards';
  *
  * Times are epoch ms, converted from ESI's ISO strings by the writer.
  */
+
+import { isRecord } from './guards';
 
 export interface WarParty {
   corporationId?: number;

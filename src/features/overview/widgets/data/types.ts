@@ -71,8 +71,6 @@ import type {
 import type { MarketTrendFeed } from './marketTrendLoader';
 import type { Translate } from '@/lib/translate';
 
-/** The narrow slice of i18next's `t` the adapters need. */
-
 /**
  * The one line under the headline figure. It must add a fact the headline
  * lacks (a delta, the nearest item, how old); a line that restates the

@@ -6,11 +6,6 @@
 import { sortPriceHistory, type MarketHistoryPoint } from './priceHistory';
 import { shiftUtcDate } from '@/engine/localDay';
 
-/** `YYYY-MM-DD` shifted by whole days (UTC, so no DST drift). */
-export function shiftDay(date: string, days: number): string {
-  return shiftUtcDate(date, days);
-}
-
 /** A day whose average is a real price: a row of 0 (or garbage) is a day nothing priced, not a crash. */
 export function isPricedDay(point: MarketHistoryPoint): boolean {
   return Number.isFinite(point.average) && point.average > 0;
@@ -26,7 +21,7 @@ export function percentChange(points: readonly MarketHistoryPoint[], days: numbe
   const sorted = sortPriceHistory(points).filter(isPricedDay);
   const latest = sorted[sorted.length - 1];
   if (!latest) return null;
-  const cutoff = shiftDay(latest.date, -days);
+  const cutoff = shiftUtcDate(latest.date, -days);
   let base: MarketHistoryPoint | undefined;
   for (const p of sorted) if (p.date <= cutoff) base = p;
   if (!base) return null;
@@ -61,7 +56,7 @@ export function alignTrendSeries(
     .flatMap((s) => s.map((p) => p.date))
     .reduce<string | null>((max, d) => (max === null || d > max ? d : max), null);
   if (newest === null) return { dates: [], values: series.map(() => []) };
-  const from = shiftDay(newest, -(days - 1));
+  const from = shiftUtcDate(newest, -(days - 1));
   const dates = [
     ...new Set(series.flatMap((s) => s.map((p) => p.date)).filter((d) => d >= from)),
   ].sort();
