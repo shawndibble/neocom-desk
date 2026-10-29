@@ -1,13 +1,11 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, Toast } from '@/components/ui';
-import { textActionClassName } from '@/components/ui/textActionClassName';
 import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
 import type { GroupClaimMember } from '@/engine/industry/groupStockClaims';
 import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import type { ProfitBasis } from '@/engine/industry/profitBasis';
 import { moveSaving } from '@/engine/industry/moveSaving';
-import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { nameForType, toIndustryBlueprint } from './blueprintCatalog';
@@ -18,45 +16,37 @@ import { InputCostMoveLine } from './InputCostMoveLine';
 import { PlanCostsPanel } from './PlanCostsPanel';
 import { PlanMaterialsPanel } from './PlanMaterialsPanel';
 import { PlanScheduleLine } from './PlanScheduleLine';
-import { PlanSetupFacts } from './PlanSetupFacts';
+import { PlanSetupStrip } from './PlanSetupStrip';
 import { PlanSetupForm } from './PlanSetupForm';
 import { PlanRunsControl } from './PlanRunsControl';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import type { MaterialsTableHandle } from './MaterialsTable';
+import { productionLogDefaults } from './productionLogDefaults';
 import { planBreakEvenRuns } from './planBreakEven';
 import { planBreakdownContext } from './planBreakdownContext';
 import { planHeroFigures } from './planHeroFigures';
 import { planLocations } from './planLocations';
-import { planPriceReadiness } from './planPriceReadiness';
-import { materialPriceBasisOf } from './priceBasis';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { useAutoBuildPlan } from './useAutoBuildPlan';
 import { useCheaperNearbySystems } from './useCheaperNearbySystems';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 import { useFacilityMemoryRecall } from './useFacilityMemoryRecall';
-import { useInputCostMove } from './useInputCostMove';
 import { useLogProductionSeed } from './useLogProductionSeed';
 import { useMaterialModals } from './useMaterialModals';
-import { useOwnedSale } from './useOwnedSale';
 import { usePlanEdits } from './usePlanEdits';
 import { usePlanFacilityContexts } from './usePlanFacilityContexts';
 import { usePlanJobSchedule } from './usePlanJobSchedule';
-import { usePlanMarketSnapshots } from './usePlanMarketSnapshots';
-import { usePlanMaterials } from './usePlanMaterials';
 import { usePlanMaterialsExport } from './usePlanMaterialsExport';
 import { usePlanOwnedStock } from './usePlanOwnedStock';
 import { usePlanPricing } from './usePlanPricing';
-import { usePlanRecipes } from './usePlanRecipes';
 import { useReactionLocationBlock } from './useReactionLocationBlock';
-import { useResolvedPlan } from './useResolvedPlan';
+import { usePlanResolution } from './usePlanResolution';
 import { useShoppingListCopy } from './useShoppingListCopy';
 
 export type { PlanPatch } from './planPatch';
 
 const NO_GROUP_MEMBERS: readonly GroupClaimMember[] = [];
-
-const NO_MATERIALS: readonly ResolvedMaterial[] = [];
 
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
 export function BuildPlanDetail({
@@ -92,19 +82,8 @@ export function BuildPlanDetail({
     buildHereAll,
     toggleIncludeReactions,
   } = usePlanEdits(plan, activity, onChange);
-  const {
-    hub,
-    assumedMe,
-    corpBlueprints,
-    standing,
-    bpcOffersFor,
-    bpcLastResortOffersFor,
-    communityOffersFor,
-    typeIds,
-    blueprintPurchaseOffersFor,
-    inventionMarket,
-    blueprintOffersReady,
-  } = usePlanPricing(plan, blueprint, catalog, pi, pricingInputs);
+  const pricing = usePlanPricing(plan, blueprint, catalog, pi, pricingInputs);
+  const { hub, corpBlueprints, standing } = pricing;
   const productTypeID = entry?.productTypeID ?? null;
   const vs90dTargets = useMemo(
     () => (productTypeID === null ? [] : [{ hubId: hub.id, typeId: productTypeID }]),
@@ -169,90 +148,37 @@ export function BuildPlanDetail({
     () => setSetupOpen(true)
   );
 
-  const { snapshot, costIndexMissing, fetchedAt, pricesLoading, reactionSnapshot } =
-    usePlanMarketSnapshots(
-      hub,
-      typeIds,
-      buildSystem?.id,
-      reactionBuildSystem?.id,
-      activity,
-      plan.costIndexOverridePct,
-      refreshTick
-    );
-  useFacilityMemoryRecall(plan, costIndexMissing, latestPlan, latestOnChange);
-
-  const { effectiveOwnedBlueprints, recipeFor, canBuildHere } = usePlanRecipes(
+  const {
+    snapshot,
+    costIndexMissing,
+    fetchedAt,
+    pricesLoading,
+    effectiveOwnedBlueprints,
+    recipeFor,
+    canBuildHere,
+    resolved,
+    resolveAt,
+    costMove,
+    ownedSale,
+    pricesUnreachable,
+    pricesReady,
+    materials,
+  } = usePlanResolution({
     plan,
     catalog,
     pi,
+    activity,
     ownedBlueprints,
-    corpBlueprints,
-    assumedMe,
-    craftScopeList
-  );
-
-  /**
-   * The whole plan, resolved in one pass by `resolveBuildPlan` — the same
-   * call Compare and every Group Rollup make, so this page cannot price a
-   * plan differently from them. Everything the page reads off it:
-   *
-   * - `result`/`error`: the Results panel and materials table.
-   * - `makeOrBuyContext`: every make-or-buy verdict; null until live prices
-   *   land (a fee-free quote would call almost everything worth building).
-   * - `resolvedMe`/`resolvedTe`: the tier Blueprint Acquisition resolved for
-   *   the plan's own product. `plan.me`/`plan.te` stay whatever they
-   *   last were (Setup no longer edits them); every reader below uses the
-   *   resolved pair, so there is exactly one number in play.
-   * - `materialPrices`: the plan's price basis — both sides come from the
-   *   snapshot already in hand, so toggling it re-computes, never refetches.
-   *
-   * One memo, one fresh tier pool: the top-level claim and the tree's nested
-   * claims share it, and a re-run of this memo starts from nothing rather
-   * than re-claiming against copies a previous run already took.
-   */
-  const { resolved, depth, resolveAt } = useResolvedPlan({
-    plan,
-    hub,
-    sources: {
-      catalog,
-      pi,
-      ownedBlueprints,
-      corpBlueprints,
-      assumedMe,
-      modifiers,
-      standing,
-      bpcOffersFor,
-      bpcLastResortOffersFor,
-      blueprintPurchaseOffersFor,
-      inventionMarket,
-      communityOffersFor,
-    },
-    snapshot,
-    reactionSystemCostIndex: reactionSnapshot?.systemCostIndex,
-    fetchedAtMs: fetchedAt?.getTime(),
-  });
-  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
-    resolved;
-  const costMove = useInputCostMove(
-    hub.regionId,
+    modifiers,
+    pricing,
     productTypeID,
-    result?.materials ?? NO_MATERIALS,
-    materialPriceBasisOf(plan.materialPriceBasis)
-  );
-
-  const ownedSale = useOwnedSale(result, snapshot, modifiers, standing);
-
-  const { pricesUnreachable, pricesReady } = planPriceReadiness(snapshot, blueprintOffersReady);
-
-  const materials = usePlanMaterials({
-    result,
-    catalog,
-    depth,
-    materialSourcing: plan.materialSourcing,
-    materialPrices,
-    makeOrBuyContext,
-    recipeFor,
+    craftScopeList,
+    buildSystemId: buildSystem?.id,
+    reactionBuildSystemId: reactionBuildSystem?.id,
+    refreshTick,
   });
+  useFacilityMemoryRecall(plan, costIndexMissing, latestPlan, latestOnChange);
+  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, bpcCoverage } = resolved;
   const { visibleMaterials, materialVolume, shoppingMaterials, boughtDepth, materialAdvice } =
     materials;
 
@@ -292,7 +218,7 @@ export function BuildPlanDetail({
     effectiveOwnedBlueprints,
     ownedBlueprints,
     corpBlueprints,
-    inventionMarket,
+    inventionMarket: pricing.inventionMarket,
     modifiers,
     snapshot,
   });
@@ -396,35 +322,24 @@ export function BuildPlanDetail({
     ) : null;
 
   const setupStrip = (
-    <>
-      {/* While the form is open it is the summary; the strip keeps only its toggle. */}
-      {!setupOpen && (
-        <PlanSetupFacts
-          plan={plan}
-          activity={activity}
-          hub={hub}
-          facilityPreset={facilityPreset}
-          buildSystemName={buildSystem?.name ?? null}
-          buildLocationName={buildLocationName}
-          includeReactions={includeReactions}
-          reactionBuildSystemName={reactionBuildSystem?.name ?? null}
-          reactionBuildLocationName={reactionBuildLocationName}
-          reactionsInHighsec={reactionsInHighsec}
-          resolvedMe={resolvedMe}
-          resolvedTe={resolvedTe}
-          lacksBlueprintRow={lacksBlueprintRow}
-        />
-      )}
-      <button
-        type="button"
-        className={textActionClassName('ml-auto shrink-0')}
-        aria-expanded={setupOpen}
-        aria-controls={setupFormId}
-        onClick={() => setSetupOpen((open) => !open)}
-      >
-        {setupOpen ? t('industry.setupDone') : t('industry.setupEdit')}
-      </button>
-    </>
+    <PlanSetupStrip
+      open={setupOpen}
+      formId={setupFormId}
+      onToggle={() => setSetupOpen((open) => !open)}
+      plan={plan}
+      activity={activity}
+      hub={hub}
+      facilityPreset={facilityPreset}
+      buildSystemName={buildSystem?.name ?? null}
+      buildLocationName={buildLocationName}
+      includeReactions={includeReactions}
+      reactionBuildSystemName={reactionBuildSystem?.name ?? null}
+      reactionBuildLocationName={reactionBuildLocationName}
+      reactionsInHighsec={reactionsInHighsec}
+      resolvedMe={resolvedMe}
+      resolvedTe={resolvedTe}
+      lacksBlueprintRow={lacksBlueprintRow}
+    />
   );
 
   const runsControl = (
@@ -611,26 +526,7 @@ export function BuildPlanDetail({
         blueprintTypeId={plan.blueprintTypeID}
         characterId={plan.characterId}
         buildPlanId={plan.id}
-        defaults={
-          jobLogSeed && jobLogSeed.request === logRequest
-            ? {
-                quantity: jobLogSeed.quantity,
-                // The job seed only speaks to quantity and job fee — material
-                // cost is a plan-level estimate, not something a job carries,
-                // so it still comes from the plan's own live result where
-                // that's ready (falling back to 0 only until pricing is).
-                materialCost: result?.materialCost ?? 0,
-                jobFee: jobLogSeed.jobFee,
-                sourceJobId: jobLogSeed.jobId,
-              }
-            : result
-              ? {
-                  quantity: productQuantity ?? 0,
-                  materialCost: result.materialCost,
-                  jobFee: result.jobFee.total,
-                }
-              : null
-        }
+        defaults={productionLogDefaults(jobLogSeed, logRequest, result, productQuantity)}
         productTypeID={entry.productTypeID}
         productName={entry.productName}
         skills={modifiers.skills}
