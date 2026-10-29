@@ -13,10 +13,11 @@
  * - An Assets drill-down (`/assets/items/<station>/<containers>`) is the
  *   previous Character's station and containers; it collapses to the Items tab.
  *
- * Plan and group pages (`/skills/plans/:planId`, `/industry/plans/:planId`,
+ * Industry plan and group pages (`/industry/plans/:planId`,
  * `/industry/groups/:groupId`) already redirect to their list when the id is
- * not the active Character's, and every other query param is a filter, sort,
- * tab or a global id, so the rest of the origin is kept as is.
+ * not the active Character's. A Skill Plan (`/skills/plans/:planId`) stays
+ * open and is re-costed for the new Character. Every other query param is a
+ * filter, sort, tab or a global id, so the rest of the origin is kept as is.
  */
 import { VIEWED_CHARACTER_PARAM } from './viewedCharacter';
 

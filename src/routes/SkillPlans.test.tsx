@@ -422,6 +422,15 @@ describe('SkillPlans CRUD', () => {
     );
   });
 
+  it('keeps a plan open when it belongs to another Character, as after a Character switch', async () => {
+    await db.skillPlans.add(seedPlan({ characterId: CHAR_ID + 1, name: 'Alt plan' }));
+    goToPlanEditor();
+    render(<App />);
+
+    expect(await screen.findByDisplayValue('Alt plan')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/plans/plan-1');
+  });
+
   it('renames a plan from the list, scheduling a sync', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
