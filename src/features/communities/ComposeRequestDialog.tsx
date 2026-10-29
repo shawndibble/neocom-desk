@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -411,9 +412,7 @@ export function ComposeRequestDialog({
               </p>
             )}
             {catalogueFailed && (
-              <p role="alert" className="text-xs text-danger">
-                {t('communities.board.compose.catalogueFailed')}
-              </p>
+              <InlineError>{t('communities.board.compose.catalogueFailed')}</InlineError>
             )}
             {over > 0 && (
               <p className="text-xs text-warning">
@@ -505,9 +504,9 @@ export function ComposeRequestDialog({
                         </div>
                       )}
                       {duplicate && (
-                        <p role="alert" className="text-xs text-danger">
+                        <InlineError>
                           {t('communities.board.compose.duplicate', { name: line.name })}
-                        </p>
+                        </InlineError>
                       )}
                     </li>
                   );
@@ -547,11 +546,7 @@ export function ComposeRequestDialog({
         )}
         {/* A standing Request takes quotes, not Pledges, so there is nothing to be told about. */}
         {!standingMode && <RequestNotifyChoice value={notify} onChange={setNotify} />}
-        {error && (
-          <p role="alert" className="text-xs text-danger">
-            {error}
-          </p>
-        )}
+        {error && <InlineError>{error}</InlineError>}
         <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost" onClick={onClose}>

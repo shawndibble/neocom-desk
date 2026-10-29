@@ -8,6 +8,7 @@
  * Fittings it reads cost nothing to a visit that never picks a ship.
  */
 import { useMemo, useState, type ReactNode } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -212,11 +213,7 @@ export function CargoPickerBody({ characterId, onPick, onClear, hasCargo }: Carg
       )}
 
       {working && <Spinner label={t('market.hauling.cargo.working')} size="sm" />}
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('market.hauling.cargo.failed')}
-        </p>
-      )}
+      {failed && <InlineError>{t('market.hauling.cargo.failed')}</InlineError>}
 
       {hasCargo && (
         <Button variant="ghost" size="sm" onClick={onClear}>

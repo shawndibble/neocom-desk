@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
@@ -34,7 +34,7 @@ const history = [
 
 let skillCalls = 0;
 
-const server = setupServer(
+const server = mswServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/corporationhistory`, () =>
     HttpResponse.json(history)
   ),
@@ -70,11 +70,6 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => {
-  server.resetHandlers();
-});
 beforeEach(async () => {
   skillCalls = 0;
   await db.characters.clear();

@@ -241,7 +241,7 @@ describe('Ship Info window', () => {
     await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
     expect(usePopularFitsMock.mock.lastCall?.[0]).toBe(HULL_ID);
     expect(within(dialog).getByText('4 losses')).toBeVisible();
-    await user.click(within(dialog).getByRole('button', { name: 'Open' }));
+    await user.click(within(dialog).getByRole('button', { name: '4 losses' }));
     await waitFor(() => {
       expect(screen.getByTestId('location').textContent).toMatch(/\?f=/);
     });

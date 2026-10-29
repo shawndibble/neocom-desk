@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   IskInput,
@@ -203,9 +204,7 @@ export function RebillDialog({
         {fromDate !== '' && <DateReadback date={fromDate} />}
       </Label>
       {fromDate !== '' && !open_ && (
-        <p role="alert" className="text-xs text-danger">
-          {t('corpTaxBook.moons.corrections.rebill.paid')}
-        </p>
+        <InlineError>{t('corpTaxBook.moons.corrections.rebill.paid')}</InlineError>
       )}
       <Label text={t('corpTaxBook.moons.corrections.reason')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />

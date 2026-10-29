@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from './client';
 import { resetEsiBudget } from './budget';
 import { rejectBadEsiHeaders } from './test-helpers';
@@ -8,18 +8,15 @@ import { getCorporationStarbase, getCorporationStarbases } from './endpoints';
 
 const CHARACTER_ID = 95465499;
 const CORPORATION_ID = 98000001;
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   configureEsi({ getToken: vi.fn(async (id: number) => `token-${id}`) });
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
   resetEsiBudget();
 });
-afterAll(() => server.close());
 
 describe('corp starbases', () => {
   it('getCorporationStarbases lists every tower, across pages', async () => {

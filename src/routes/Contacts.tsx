@@ -240,11 +240,7 @@ export function Contacts() {
     truncated: acrossTruncated,
   });
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
@@ -340,9 +336,7 @@ export function Contacts() {
             )}
 
             {loading && !data ? (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
+              <Spinner block="page" label={t('common.loading')} />
             ) : view === 'across' ? (
               <AcrossCharactersPanel
                 lists={acrossLists}

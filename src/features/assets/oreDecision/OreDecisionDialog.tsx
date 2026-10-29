@@ -8,6 +8,7 @@
  * Market Hub's buy price less sales tax, both exits taxed alike so they compare
  * like with like. The refining facility is an assumption the dialog states.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { fixed1, fixed2 } from '@/lib/fixedFormat';
 import { formatCount } from '@/lib/formatCount';
 import { useEffect, useMemo, useState } from 'react';
@@ -59,8 +60,7 @@ const CARD = 'rounded-xs border bg-panel-2 p-2.5';
 const CARD_SUGGESTED = 'border-accent-dim';
 const CARD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
 const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
-const TABLE_TITLE_TEXT =
-  'border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const TABLE_TITLE_TEXT = `border-b border-line bg-panel-2 px-2.5 py-1.5 ${eyebrowClassName}`;
 
 interface OreRecipe {
   portionSize: number;

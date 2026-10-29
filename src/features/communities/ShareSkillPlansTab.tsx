@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, buttonClassName, EmptyState, SearchInput, Spinner } from '@/components/ui';
@@ -74,11 +75,7 @@ export function ShareSkillPlansTab({
   );
 
   if (loadFailed) {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.plans.loadFailed')}
-      </p>
-    );
+    return <InlineError>{t('communities.plans.loadFailed')}</InlineError>;
   }
   if (loaded === null) return <Spinner size="sm" label={t('communities.plans.loading')} />;
 
@@ -166,11 +163,7 @@ export function ShareSkillPlansTab({
         </>
       )}
       {/* While Add is open the notice shows in it: the page behind is inert. */}
-      {notice !== null && !adding && (
-        <p role="alert" className="text-xs text-danger">
-          {notice}
-        </p>
-      )}
+      {notice !== null && !adding && <InlineError>{notice}</InlineError>}
       <AddSharedItemsDialog
         open={adding}
         onClose={() => setAdding(false)}

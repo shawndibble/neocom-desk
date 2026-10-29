@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
@@ -119,9 +120,7 @@ export function GroupingQuestions({
                 </>
               )}
               {failed === id && (
-                <p role="alert" className="text-xs text-danger">
-                  {t('corpTaxBook.verify.grouping.failed')}
-                </p>
+                <InlineError>{t('corpTaxBook.verify.grouping.failed')}</InlineError>
               )}
             </li>
           );

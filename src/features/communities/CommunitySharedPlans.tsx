@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
@@ -102,11 +103,7 @@ export function CommunitySharedPlans({
     return <Spinner size="sm" label={t('communities.plansDialog.loading')} />;
   }
   if (state.status === 'failed') {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.plansDialog.failed')}
-      </p>
-    );
+    return <InlineError>{t('communities.plansDialog.failed')}</InlineError>;
   }
   if (rows.length === 0) {
     return (
@@ -119,11 +116,7 @@ export function CommunitySharedPlans({
   return (
     <div className="space-y-2">
       <SharedPlanList rows={rows} onCopy={(plan) => void copy(plan)} />
-      {copyFailed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('communities.everyone.copyFailed')}
-        </p>
-      )}
+      {copyFailed && <InlineError>{t('communities.everyone.copyFailed')}</InlineError>}
     </div>
   );
 }

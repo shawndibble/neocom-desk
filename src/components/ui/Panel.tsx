@@ -1,3 +1,4 @@
+import { eyebrowClassName } from './eyebrowClassName';
 import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
@@ -136,7 +137,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
               <h2
                 ref={headingRef}
                 tabIndex={headingRef ? -1 : undefined}
-                className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
+                className={`${eyebrowClassName} ${
                   headingRef
                     ? 'max-md:min-w-0 max-md:break-words md:whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
                     : wrapMeta

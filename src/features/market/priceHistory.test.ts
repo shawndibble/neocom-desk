@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { EsiError } from '@/esi/errors';
 import { db } from '@/db';
@@ -9,14 +9,11 @@ import { loadPriceHistory } from './priceHistory';
 const REGION_ID = 10000002; // The Forge
 const TYPE_ID = 34; // Tritanium
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('loadPriceHistory', () => {
   it('fetches, sorts and maps ESI history into chart points', async () => {

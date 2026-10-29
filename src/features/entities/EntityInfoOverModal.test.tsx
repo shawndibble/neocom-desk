@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 
 vi.mock('@/lib/zkillboard', async (importOriginal) => ({
@@ -19,9 +19,7 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { EntityInfoRoute } from './EntityInfoRoute';
 import { CharacterLink } from './EntityLink';
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
+const server = mswServer();
 beforeEach(async () => {
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
@@ -31,7 +29,6 @@ beforeEach(async () => {
     http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
   );
 });
-afterEach(() => server.resetHandlers());
 
 function Where() {
   const { pathname, search } = useLocation();

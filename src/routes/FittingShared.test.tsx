@@ -11,7 +11,7 @@ import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingShared, FittingShareView } from './FittingShared';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly } from '@/lib/timestamp';
 
 const sde = vi.hoisted(() => ({
   loadSkills: vi.fn(async () => [{ typeID: 3300, name: 'Gunnery' }]),
@@ -95,21 +95,21 @@ describe('FittingShared', () => {
     renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
 
     expect(
-      await screen.findByText(
-        'Shown at every skill level V, with no clone — log in to see this fit under your own pilot.'
-      )
+      await screen.findByText('Shown with skill level V - login to see with your skills.')
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
+    // The ring's slot tile is named by item, not `#id`.
+    expect(
+      await screen.findByRole('button', { name: /125mm Gatling AutoCannon I/ })
+    ).toBeInTheDocument();
     await waitFor(() => expect(computeFittingStats).toHaveBeenCalled());
     expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Choose permissions/ })).toBeInTheDocument();
-    // The login rides in the notice strip, not the header.
-    expect(
-      within(screen.getByRole('link', { name: /Neocom Desk/ }).closest('header')!).queryByRole(
-        'button'
-      )
-    ).not.toBeInTheDocument();
+    // The login sits in the header; Copy Fitting rides in the notice strip below it.
+    const header = screen.getByRole('link', { name: /Neocom Desk/ }).closest('header')!;
+    expect(within(header).getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(within(header).queryByRole('button', { name: 'Copy Fitting' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Open in Neocom Desk' })).not.toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
@@ -130,9 +130,7 @@ describe('FittingShared', () => {
         <FittingShareView code={encoded.payload} expiresAt={expiresAt} />
       </MemoryRouter>
     );
-    expect(
-      await screen.findByText(formatTimestamp(new Date(expiresAt), 'UTC'))
-    ).toBeInTheDocument();
+    expect(await screen.findByText(formatDateOnly(new Date(expiresAt), 'UTC'))).toBeInTheDocument();
   });
 
   it('announces a failed copy', async () => {

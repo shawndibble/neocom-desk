@@ -294,11 +294,7 @@ export function Contracts() {
   });
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
   const modalReceiver = selectedContract ? receiverFor(selectedContract) : null;
@@ -406,9 +402,7 @@ export function Contracts() {
         {tab === 'search' ? (
           <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
         ) : sourceHeld || (loading && !active.data) ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="page" label={t('common.loading')} />
         ) : needsReauth ? (
           source === 'corporation' ? (
             <GrantBanner

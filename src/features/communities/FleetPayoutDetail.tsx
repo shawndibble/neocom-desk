@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -37,11 +38,7 @@ function MemberView({
     return <Spinner size="sm" label={t('communities.payouts.myShareLoading')} />;
   }
   if (mine.status === 'failed') {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.payouts.myShareFailed')}
-      </p>
-    );
+    return <InlineError>{t('communities.payouts.myShareFailed')}</InlineError>;
   }
   if (!mine.share)
     return <p className="text-text-dim">{t('communities.payouts.detail.noShare')}</p>;
@@ -178,16 +175,8 @@ export function FleetPayoutDetail({
                 max={Math.max(1, progress.total)}
               />
             </div>
-            {error && (
-              <p role="alert" className="text-xs text-danger">
-                {error}
-              </p>
-            )}
-            {failed && (
-              <p role="alert" className="text-xs text-danger">
-                {t('communities.payouts.detail.loadFailed')}
-              </p>
-            )}
+            {error && <InlineError>{error}</InlineError>}
+            {failed && <InlineError>{t('communities.payouts.detail.loadFailed')}</InlineError>}
             {shares === null && !failed && <Spinner size="sm" label={t('communities.loading')} />}
             {shares && (
               <ul

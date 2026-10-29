@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, Panel, Spinner, StatChip, StatChips } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -350,11 +351,7 @@ function StopReminders({
           </span>
         </span>
       </label>
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('corpTaxBook.verify.stop.failed')}
-        </p>
-      )}
+      {failed && <InlineError>{t('corpTaxBook.verify.stop.failed')}</InlineError>}
     </div>
   );
 }

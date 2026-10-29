@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly } from '@/lib/timestamp';
 import { useTranslation } from 'react-i18next';
 import { onReconnect, useOnline } from '@/stores/network';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
@@ -211,43 +211,54 @@ export function FittingShareView({
       openInApp={openInApp}
       wide
       notice={t('fittingShare.banner')}
-      actions={
-        expiresAt === undefined && state.status !== 'ready' ? undefined : (
-          <span className="flex items-center gap-3">
-            {expiresAt !== undefined && (
-              <StatChips>
-                <StatChip
-                  label={t('fittingShare.expiresLabel')}
-                  value={formatTimestamp(new Date(expiresAt), timeZone)}
-                />
-              </StatChips>
-            )}
-            {state.status === 'ready' && (
-              <>
-                {/* Absolutely positioned, so it adds no flex gap. */}
-                <LiveStatus announceKey={copyCount}>
-                  {copied
-                    ? t('fittingShare.copied')
-                    : copyFailed
-                      ? t('fittingShare.copyFailed')
-                      : null}
-                </LiveStatus>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => void copyEft()}
-                  disabled={typeName === null}
-                >
-                  {copied
-                    ? t('fittingShare.copied')
-                    : copyFailed
-                      ? t('fittingShare.copyFailed')
-                      : t('fittingShare.copyEft')}
-                </Button>
-              </>
-            )}
-          </span>
+      lead={
+        state.status === 'ready' ? (
+          <div className="flex items-center gap-3">
+            <TypeIcon typeId={state.fitting.shipTypeId} size={64} className="size-12 shrink-0" />
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">
+                {typeName?.(state.fitting.shipTypeId) ?? ''}
+              </h2>
+              {typeName !== null &&
+                state.fitting.name !== '' &&
+                state.fitting.name !== typeName(state.fitting.shipTypeId) && (
+                  <p className="truncate text-sm text-text-dim">{state.fitting.name}</p>
+                )}
+            </div>
+          </div>
+        ) : undefined
+      }
+      footer={
+        expiresAt === undefined ? undefined : (
+          <StatChips>
+            <StatChip
+              label={t('fittingShare.expiresLabel')}
+              value={formatDateOnly(new Date(expiresAt), timeZone)}
+            />
+          </StatChips>
         )
+      }
+      actions={
+        state.status === 'ready' ? (
+          <>
+            {/* Absolutely positioned, so it adds no flex gap. */}
+            <LiveStatus announceKey={copyCount}>
+              {copied ? t('fittingShare.copied') : copyFailed ? t('fittingShare.copyFailed') : null}
+            </LiveStatus>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => void copyEft()}
+              disabled={typeName === null}
+            >
+              {copied
+                ? t('fittingShare.copied')
+                : copyFailed
+                  ? t('fittingShare.copyFailed')
+                  : t('fittingShare.copyEft')}
+            </Button>
+          </>
+        ) : undefined
       }
     >
       {/* Always mounted: Retry unmounts while the code resolves again, and focus waits here. */}
@@ -287,19 +298,6 @@ export function FittingShareView({
 
       {state.status === 'ready' && (
         <>
-          <div className="flex items-center gap-3">
-            <TypeIcon typeId={state.fitting.shipTypeId} size={64} className="size-12 shrink-0" />
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">
-                {typeName?.(state.fitting.shipTypeId) ?? ''}
-              </h2>
-              {typeName !== null &&
-                state.fitting.name !== '' &&
-                state.fitting.name !== typeName(state.fitting.shipTypeId) && (
-                  <p className="truncate text-sm text-text-dim">{state.fitting.name}</p>
-                )}
-            </div>
-          </div>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
             <div className="flex min-w-0 flex-col gap-4 lg:w-[30rem] lg:shrink-0">
               <FittingRing
@@ -308,6 +306,7 @@ export function FittingShareView({
                 moduleResults={stats?.modules ?? null}
                 hardpointsUsed={hardpoints.used}
                 hardpointKindOf={hardpoints.kindOf}
+                typeName={typeName ?? ((typeId) => `#${typeId}`)}
               />
               {typeName !== null && (
                 <FittingModuleList

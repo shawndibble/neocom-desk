@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { useCompareAttributes } from './useCompareAttributes';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
@@ -30,11 +30,8 @@ const ITEMS = [
   { typeId: 588, itemName: 'Republic Fleet Rifter' },
 ];
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
+const server = mswServer();
 afterEach(async () => {
-  server.resetHandlers();
   vi.clearAllMocks();
   vi.mocked(loadTypeInfo).mockResolvedValue(null);
   await db.esiCache.clear();

@@ -1,13 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import { loadAccountCorpIndustryJobs, pickCorpReaders, visibleCorpJobs } from './corpJobs';
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+const server = mswServer();
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -15,10 +14,8 @@ beforeEach(async () => {
   await db.tokens.clear();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 function corpJob(overrides: Partial<CorporationIndustryJob> = {}): CorporationIndustryJob {
   return {

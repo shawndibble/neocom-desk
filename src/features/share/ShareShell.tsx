@@ -19,14 +19,18 @@ interface ShareShellProps {
   title: string;
   /** Keep the title for screen readers only, when the page body already says what it is. */
   hideTitle?: boolean;
-  /** Header-right controls, e.g. a table's export menu. */
+  /** The page's own primary controls, e.g. a table's export menu. On a `wide` page they sit at the right of the row under the header. */
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
   openInApp?: OpenInApp;
-  /** Widens the frame for a page that lays out two columns; the other share pages stay a single narrow one. */
+  /** Widens the frame for a page that lays out two columns, and shrinks the header to the brand and the login, the title kept for screen readers only; the other share pages stay a single narrow one. */
   wide?: boolean;
-  /** A note for a signed-out visitor. Setting it moves their login out of the header into one strip beside the note. */
+  /** A note for a signed-out visitor. On a `wide` page it fills the strip beside the page's `actions`. */
   notice?: ReactNode;
+  /** The last thing on a `wide` page, a short chip rather than a sentence (a link's expiry). */
+  footer?: ReactNode;
+  /** Beside the notice strip, on `wide` pages (the shared Fitting's ship and name). */
+  lead?: ReactNode;
   children: ReactNode;
 }
 
@@ -45,6 +49,8 @@ export function ShareShell({
   openInApp,
   wide,
   notice,
+  lead,
+  footer,
   children,
 }: ShareShellProps) {
   const { t } = useTranslation();
@@ -80,28 +86,66 @@ export function ShareShell({
     </div>
   );
 
-  return (
-    <div
-      className={`mx-auto flex min-h-screen ${wide ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
+  const openInAppLink = (
+    <Link
+      to={target.path}
+      state={target.state}
+      onClick={loading ? () => setLoginReturnTo(target.path) : undefined}
+      className={buttonClassName()}
     >
+      {t('share.openInApp')}
+    </Link>
+  );
+
+  if (wide) {
+    // The login stays in the header; the page's own action rides in the notice strip.
+    return (
+      <div className="mx-auto flex min-h-screen max-w-4xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
+        <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
+          <Link
+            to="/"
+            className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-wide sm:text-lg"
+          >
+            <LogoMark className="size-6 shrink-0 sm:size-7" />
+            {/* The icon alone on the narrowest phones, so the login keeps its row. */}
+            <span className="max-[369px]:sr-only">{t('share.brand')}</span>
+          </Link>
+          {/* The page says what it is below; the title is for screen readers. */}
+          <h1 className="sr-only">{title}</h1>
+          <span className="ml-auto shrink-0">{signedOut ? loginControls : openInAppLink}</span>
+        </header>
+
+        <main className="flex flex-1 flex-col gap-4">
+          {(lead !== undefined || actions !== undefined || (signedOut && notice !== undefined)) && (
+            <div className="flex flex-wrap items-center gap-4">
+              {lead !== undefined && <div className="min-w-0 flex-1 basis-72">{lead}</div>}
+              {signedOut && notice !== undefined ? (
+                <div className="flex flex-1 basis-96 flex-wrap items-center justify-between gap-3 rounded-xs border border-warning bg-panel-2 py-2 pr-2 pl-3">
+                  <p className="min-w-48 flex-1 text-xs text-warning">{notice}</p>
+                  {actions && <span className="flex items-center gap-3">{actions}</span>}
+                </div>
+              ) : (
+                actions && <span className="ml-auto flex items-center gap-3">{actions}</span>
+              )}
+            </div>
+          )}
+
+          {children}
+
+          {footer !== undefined && <footer className="mt-auto pt-2">{footer}</footer>}
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
           <LogoMark className="size-9" />
           {t('share.brand')}
         </Link>
-        {signedOut ? (
-          // With a `notice`, the login sits in the strip below instead.
-          notice === undefined && loginControls
-        ) : (
-          <Link
-            to={target.path}
-            state={target.state}
-            onClick={loading ? () => setLoginReturnTo(target.path) : undefined}
-            className={buttonClassName()}
-          >
-            {t('share.openInApp')}
-          </Link>
-        )}
+        {signedOut ? loginControls : openInAppLink}
       </header>
 
       <main className="flex flex-1 flex-col gap-4">
@@ -111,13 +155,6 @@ export function ShareShell({
           </h1>
           {actions && <span className="ml-auto">{actions}</span>}
         </div>
-
-        {signedOut && notice !== undefined && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xs border border-warning bg-panel-2 py-2 pr-2 pl-3">
-            <p className="min-w-48 flex-1 text-xs text-warning">{notice}</p>
-            {loginControls}
-          </div>
-        )}
 
         {children}
       </main>

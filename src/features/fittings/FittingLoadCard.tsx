@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { isOfflineFailure } from '@/esi/client';
 import { Button, entityLinkClassName, Panel, TextArea } from '@/components/ui';
@@ -165,22 +166,14 @@ export function FittingLoadCard({
           {t('fittings.load.button')}
         </Button>
 
-        {shareError && (
-          <p role="alert" className="text-xs text-danger">
-            {t(`fittings.load.shareError.${shareError}`)}
-          </p>
-        )}
-        {loadError && (
-          <p role="alert" className="text-xs text-danger">
-            {t(`fittings.load.loadError.${loadError}`)}
-          </p>
-        )}
+        {shareError && <InlineError>{t(`fittings.load.shareError.${shareError}`)}</InlineError>}
+        {loadError && <InlineError>{t(`fittings.load.loadError.${loadError}`)}</InlineError>}
         {thrown && (
-          <p role="alert" className="text-xs text-danger">
+          <InlineError>
             {t(
               thrown === 'offline' ? 'fittings.load.thrownOffline' : 'fittings.load.thrownUnknown'
             )}
-          </p>
+          </InlineError>
         )}
         {tooLargeToShare && (
           <p role="alert" className="text-xs text-warning">
@@ -209,11 +202,7 @@ export function FittingLoadCard({
             {t('fittings.load.xml.browse')}
           </Button>
 
-          {xmlDocError && (
-            <p role="alert" className="text-xs text-danger">
-              {t(`fittings.load.xml.error.${xmlDocError}`)}
-            </p>
-          )}
+          {xmlDocError && <InlineError>{t(`fittings.load.xml.error.${xmlDocError}`)}</InlineError>}
 
           {xmlList && (
             <div className="rounded-xs border border-line bg-panel-2 p-2">

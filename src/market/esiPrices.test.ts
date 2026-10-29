@@ -1,15 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { rejectBadEsiHeaders } from '@/esi/test-helpers';
 import { fetchAdjustedPrices } from './esiPrices';
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+const server = mswServer();
 
 describe('fetchAdjustedPrices', () => {
   it('sends the mandatory ESI headers and maps type_id to adjusted/average', async () => {

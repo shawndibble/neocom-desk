@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -106,11 +107,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
           t('corpTaxBook.moons.fullyMined.why')
         )}
       </p>
-      {error !== undefined && (
-        <p role="alert" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
+      {error !== undefined && <InlineError>{error}</InlineError>}
       <table
         className="w-full text-sm tabular-nums"
         aria-label={t('corpTaxBook.moons.fullyMined.tableLabel')}

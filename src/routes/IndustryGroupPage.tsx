@@ -148,11 +148,7 @@ export function IndustryGroupPage() {
   }
 
   if (!workspace.hydrated || !workspace.buildGroupsHydrated || plansQuery === undefined) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
   if (groupId === undefined) return <Navigate to={industryTabHref('plans')} replace />;

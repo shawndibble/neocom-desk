@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, SearchInput } from '@/components/ui';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -111,11 +112,7 @@ export function AddSharedItemsDialog({
             )}
           </>
         )}
-        {notice !== null && (
-          <p role="alert" className="text-xs text-danger">
-            {notice}
-          </p>
-        )}
+        {notice !== null && <InlineError>{notice}</InlineError>}
       </div>
     </Modal>
   );

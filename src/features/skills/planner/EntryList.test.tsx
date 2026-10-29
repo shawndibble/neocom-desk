@@ -1,7 +1,5 @@
-import type { ReactElement } from 'react';
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render as rtlRender, screen, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EntryList } from './EntryList';
@@ -11,9 +9,7 @@ import { DEFAULT_COLUMN_VISIBILITY, type ColumnVisibility } from './columnPrefer
 import type { MergedRow } from './queueRows';
 import type { PlanEntry } from '@/engine/types';
 import { formatLocalDate } from '@/lib/localDate';
-
-/** Skill names are links, so every render sits in a router. */
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+import { renderInRouter } from '@/test/render';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
@@ -93,7 +89,7 @@ describe('EntryList step timeline renders in the viewer local timezone (#207)', 
   it('renders the previous local day for a start instant just after UTC midnight', () => {
     process.env.TZ = 'America/Los_Angeles';
     const rows = [entryRow(1, [0])];
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -107,7 +103,7 @@ describe('EntryList step timeline renders in the viewer local timezone (#207)', 
 
 describe('EntryList drag instructions', () => {
   it('does not point at a Move menu that rows do not have', () => {
-    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
     const text = document.querySelector('[id^="DndDescribedBy"]')?.textContent ?? '';
     expect(text).toMatch(/to pick up an entry or remap marker/i);
     expect(text).not.toMatch(/move menu/i);
@@ -117,7 +113,7 @@ describe('EntryList drag instructions', () => {
 describe('EntryList Booster marks', () => {
   it('marks only the entry row owning the boosted step', () => {
     const rows = [entryRow(1, [0]), entryRow(2, [1])];
-    render(
+    renderInRouter(
       <EntryList rows={rows} bandsAt={new Map()} boostedSteps={new Set([0])} {...defaultProps} />
     );
     const marks = screen.getAllByRole('img', { name: /booster speeds this skill up/i });
@@ -127,7 +123,7 @@ describe('EntryList Booster marks', () => {
 
   it('marks nothing when no Booster is active', () => {
     const rows = [entryRow(1, [0]), entryRow(2, [1])];
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
     expect(
       screen.queryByRole('img', { name: /booster speeds this skill up/i })
     ).not.toBeInTheDocument();
@@ -135,7 +131,7 @@ describe('EntryList Booster marks', () => {
 
   it('an entry spanning several boosted step indices still shows exactly one mark', () => {
     const rows = [entryRow(1, [0, 1, 2])];
-    render(
+    renderInRouter(
       <EntryList rows={rows} bandsAt={new Map()} boostedSteps={new Set([1, 2])} {...defaultProps} />
     );
     expect(screen.getAllByRole('img', { name: /booster speeds this skill up/i })).toHaveLength(1);
@@ -154,7 +150,7 @@ describe('EntryList prereq rows', () => {
   ];
 
   it('renders a dimmed prereq row ahead of the entry it was inserted for', () => {
-    render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/prereq/i)).toBeInTheDocument();
     // Still no priority control — a prereq's priority is inherited (#27), not set.
     expect(screen.queryByLabelText(/normal priority, skill 9/i)).not.toBeInTheDocument();
@@ -162,7 +158,7 @@ describe('EntryList prereq rows', () => {
   });
 
   it('offers a drag handle, because dragging a prereq row promotes it into an entry', () => {
-    render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     expect(
       screen.getByRole('button', { name: /drag skill 9 i into the plan/i })
     ).toBeInTheDocument();
@@ -170,7 +166,7 @@ describe('EntryList prereq rows', () => {
 
   it('offers the same promotion without a drag, for anyone not dragging', () => {
     const promoted: string[] = [];
-    render(
+    renderInRouter(
       <EntryList
         rows={prereqRows}
         bandsAt={new Map()}
@@ -183,7 +179,7 @@ describe('EntryList prereq rows', () => {
   });
 
   it('keeps a prereq row’s level numeral out of the truncating name span (#1716)', () => {
-    render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     const row = screen.getByText(/^Skill 9\b/).closest('li') as HTMLElement;
     const numeral = within(row).getByText('I', { exact: true });
     expect(numeral.parentElement).toHaveClass('shrink-0');
@@ -195,14 +191,14 @@ describe('EntryList prereq rows', () => {
 
 describe('EntryList drag handles mention keyboard reordering (#408)', () => {
   it("an entry row's drag handle names the keyboard alternative", () => {
-    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
     expect(
       screen.getByRole('button', { name: /reorder skill 1 i — press space then arrow keys/i })
     ).toBeInTheDocument();
   });
 
   it("a marker row's drag handle names the keyboard alternative", () => {
-    render(
+    renderInRouter(
       <EntryList
         rows={[{ kind: 'marker', id: markerRowId(0), markerIndex: 0 }]}
         bandsAt={new Map()}
@@ -217,7 +213,7 @@ describe('EntryList drag handles mention keyboard reordering (#408)', () => {
 
 describe('EntryList empty state', () => {
   it('shows the empty-entries message when there are no rows', () => {
-    render(<EntryList rows={[]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={[]} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText('No entries yet. Add a skill to get started.')).toBeInTheDocument();
   });
 });
@@ -231,7 +227,7 @@ describe('EntryList column visibility', () => {
       perLevelTime: false,
       cumulativeTime: false,
     };
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -252,7 +248,7 @@ describe('EntryList column visibility', () => {
 
   it('shows the attribute badge, priority control, per-level and cumulative time when enabled', () => {
     const rows = [entryRow(1, [0])];
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -266,7 +262,7 @@ describe('EntryList column visibility', () => {
   });
 
   it('names the attribute pair for screen readers with sr-only text, not a label on a bare span', () => {
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0])]}
         bandsAt={new Map()}
@@ -280,14 +276,14 @@ describe('EntryList column visibility', () => {
   });
 
   it('leaves priority off by default — it is an editing control, not a readout', () => {
-    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.queryByLabelText(/ priority, /i)).not.toBeInTheDocument();
   });
 
   it('sets a priority from the pill menu instead of a full-width select', async () => {
     const user = userEvent.setup();
     const calls: Array<[number, string]> = [];
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0])]}
         bandsAt={new Map()}
@@ -309,7 +305,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     const restore = mockDesktop(false);
     try {
       const rows = [entryRow(1, [5])];
-      render(
+      renderInRouter(
         <EntryList
           rows={rows}
           bandsAt={new Map()}
@@ -341,7 +337,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
   it('collapses to a single line when every optional column is off', () => {
     const restore = mockDesktop(false);
     try {
-      render(
+      renderInRouter(
         <EntryList
           rows={[entryRow(1, [5])]}
           bandsAt={new Map()}
@@ -366,7 +362,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     const restore = mockDesktop(false);
     try {
       const rows = [entryRow(1, [5])];
-      render(
+      renderInRouter(
         <EntryList
           rows={rows}
           bandsAt={new Map()}
@@ -391,7 +387,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
   it('pads the priority pill out to the sm touch tier below the desktop breakpoint', () => {
     const restore = mockDesktop(false);
     try {
-      render(
+      renderInRouter(
         <EntryList
           rows={[entryRow(1, [5])]}
           bandsAt={new Map()}
@@ -412,7 +408,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
   it('leaves the desktop pill unpadded, so it stays flush with the sm controls in its row', () => {
     const restore = mockDesktop(true);
     try {
-      render(
+      renderInRouter(
         <EntryList
           rows={[entryRow(1, [5])]}
           bandsAt={new Map()}
@@ -430,7 +426,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     const restore = mockDesktop(true);
     try {
       const rows = [entryRow(1, [5])];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+      renderInRouter(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
       expect(screen.getByText('Takes')).toBeInTheDocument();
       expect(screen.getByText('Done by')).toBeInTheDocument();
       expect(screen.getByText('1m')).toBeInTheDocument();
@@ -446,7 +442,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
   it("labels each entry row's Takes/Done by cell for screen readers, on desktop only", () => {
     const restore = mockDesktop(true);
     try {
-      render(<EntryList rows={[entryRow(1, [5])]} bandsAt={new Map()} {...defaultProps} />);
+      renderInRouter(<EntryList rows={[entryRow(1, [5])]} bandsAt={new Map()} {...defaultProps} />);
       expect(screen.getByText('Takes:')).toBeInTheDocument();
       expect(screen.getByText('Done by:')).toBeInTheDocument();
     } finally {
@@ -467,7 +463,9 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
 
     let restore = mockDesktop(true);
     try {
-      const { unmount } = render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+      const { unmount } = renderInRouter(
+        <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />
+      );
       // One label per row: the prereq row's own cell, and the entry row's.
       expect(screen.getAllByText('Takes:')).toHaveLength(2);
       expect(screen.getAllByText('Done by:')).toHaveLength(2);
@@ -478,7 +476,7 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
 
     restore = mockDesktop(false);
     try {
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+      renderInRouter(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
       expect(screen.queryByText('Takes:')).not.toBeInTheDocument();
       expect(screen.queryByText('Done by:')).not.toBeInTheDocument();
     } finally {
@@ -496,7 +494,9 @@ describe('EntryList finish date (#20)', () => {
       // 600 cumulative seconds past a start date one full day earlier than the
       // step ahead of it, so the two rows land on different calendar dates.
       const rows = [entryRow(1, [0]), entryRow(2, [864])];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} startDate={startDate} />);
+      renderInRouter(
+        <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} startDate={startDate} />
+      );
       expect(
         screen.getByText(formatLocalDate(new Date('2026-01-01T00:01:40Z')))
       ).toBeInTheDocument();
@@ -511,7 +511,7 @@ describe('EntryList finish date (#20)', () => {
   it('falls back to the running total as a duration when no start date is known', () => {
     const restore = mockDesktop(true);
     try {
-      render(<EntryList rows={[entryRow(1, [5])]} bandsAt={new Map()} {...defaultProps} />);
+      renderInRouter(<EntryList rows={[entryRow(1, [5])]} bandsAt={new Map()} {...defaultProps} />);
       expect(screen.getByText('10m')).toBeInTheDocument();
     } finally {
       restore();
@@ -533,7 +533,9 @@ describe('EntryList reorder affordance', () => {
     for (const desktop of [false, true]) {
       const restore = mockDesktop(desktop);
       try {
-        const { unmount } = render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+        const { unmount } = renderInRouter(
+          <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />
+        );
 
         expect(screen.getByRole('button', { name: /reorder skill 1 i/i })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /^move /i })).not.toBeInTheDocument();
@@ -555,7 +557,7 @@ describe('EntryList drag announcements (#1493)', () => {
       entryRow(1, [0]),
       { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
     ];
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/to pick up an entry or remap marker/i)).toBeInTheDocument();
   });
 });
@@ -567,7 +569,7 @@ describe('EntryList marker row attributes', () => {
   ];
 
   it('shows the plain divider when no target attributes are known for this marker', () => {
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText('Remap marker')).toBeInTheDocument();
     expect(screen.queryByText(/PER 27/)).not.toBeInTheDocument();
   });
@@ -580,7 +582,7 @@ describe('EntryList marker row attributes', () => {
       willpower: 21,
       charisma: 17,
     };
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -603,7 +605,7 @@ describe('EntryList marker row attributes', () => {
       willpower: 21,
       charisma: 17,
     };
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -626,7 +628,7 @@ describe('EntryList marker row attributes', () => {
       charisma: 17,
     };
 
-    const { unmount } = render(
+    const { unmount } = renderInRouter(
       <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} onEditMarker={onEditMarker} />
     );
     await user.click(screen.getByRole('button', { name: 'Remap marker 1' }));
@@ -634,7 +636,7 @@ describe('EntryList marker row attributes', () => {
     unmount();
 
     onEditMarker.mockClear();
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -653,7 +655,7 @@ describe('EntryList marker row attributes', () => {
 describe('EntryList band headers (#115)', () => {
   it('renders a priority band header', () => {
     const rows = [entryRow(1, [0])];
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map([[rows[0].id, { kind: 'priority', priority: 'high' }]])}
@@ -665,7 +667,7 @@ describe('EntryList band headers (#115)', () => {
 
   it('renders an attribute-pair band header', () => {
     const rows = [entryRow(1, [0])];
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={
@@ -692,7 +694,9 @@ describe('EntryList one row per level', () => {
     it(`labels a row with its own single level, and offers no toggle (${width})`, () => {
       const restore = mockDesktop(desktop);
       try {
-        render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
+        renderInRouter(
+          <EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />
+        );
         // Level numeral now lives in its own shrink-0 span, sibling to the
         // truncating name span (#1716) — not one direct text-node run
         // anymore, so match name and numeral separately within the row.
@@ -710,7 +714,7 @@ describe('EntryList one row per level', () => {
   }
 
   it("shows a skill's two levels as two separate rows", () => {
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4]), entryRow(1, [1], [5])]}
         bandsAt={new Map()}
@@ -723,7 +727,9 @@ describe('EntryList one row per level', () => {
   });
 
   it('keeps the level numeral out of the truncating name span (#1716)', () => {
-    render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(
+      <EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />
+    );
     const numeral = screen.getByText('IV', { exact: true });
     expect(numeral.parentElement).toHaveClass('shrink-0');
     const nameEl = screen.getByText('Skill 1', { exact: true });
@@ -732,13 +738,15 @@ describe('EntryList one row per level', () => {
   });
 
   it("leaves the drag handle as the row's only affordance besides remove", () => {
-    render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(
+      <EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />
+    );
     const handle = screen.getByRole('button', { name: /reorder skill 1/i });
     expect(handle).not.toHaveAttribute('aria-expanded');
   });
 
   it('marks the row whose level the Booster speeds up', () => {
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4]), entryRow(1, [1], [5])]}
         bandsAt={new Map()}
@@ -757,7 +765,9 @@ describe('EntryList row menu (#2223: a later entry still needing this level)', (
     user.click(screen.getByRole('button', { name: /more actions for skill 1/i }));
 
   it('ends the row in one ⋮, with no standalone remove button', () => {
-    render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
+    renderInRouter(
+      <EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />
+    );
     expect(screen.getByRole('button', { name: /more actions for skill 1/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^remove skill 1/i })).toBeNull();
   });
@@ -765,7 +775,7 @@ describe('EntryList row menu (#2223: a later entry still needing this level)', (
   it('removes the entry from the menu when nothing depends on the row', async () => {
     const user = userEvent.setup();
     const removed: unknown[] = [];
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
@@ -781,7 +791,7 @@ describe('EntryList row menu (#2223: a later entry still needing this level)', (
   it('marks the item blocked via aria-disabled, so a click no-ops instead of accepting one that would silently undo itself', async () => {
     const user = userEvent.setup();
     const removed: unknown[] = [];
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
@@ -799,7 +809,7 @@ describe('EntryList row menu (#2223: a later entry still needing this level)', (
 
   it('surfaces the blocked reason as the tooltip on hover', async () => {
     const user = userEvent.setup();
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
@@ -817,7 +827,7 @@ describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
   it("offers Add milestone on a row with none, anchored to that row's skill and level", async () => {
     const user = userEvent.setup();
     const added: Array<[number, number]> = [];
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
@@ -836,7 +846,7 @@ describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
     const finish = new Date('2026-09-01T00:00:00Z');
     const renamed: string[] = [];
     const removed: string[] = [];
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
@@ -864,7 +874,7 @@ describe('EntryList Plan Milestones (GLOSSARY.md)', () => {
   });
 
   it('reads Reached instead of a date once the goal is already trained', () => {
-    render(
+    renderInRouter(
       <EntryList
         rows={[entryRow(1, [0], [4])]}
         bandsAt={new Map()}
@@ -890,7 +900,7 @@ describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue'
 
   it('shows the level\'s real remaining time instead of a bare "0m" for the row it pins, on the narrow layout', () => {
     const rows = [entryRow(1, [])]; // zero own steps, entry targets skill 1 level 1
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -907,7 +917,7 @@ describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue'
     const restore = mockDesktop(true);
     try {
       const rows = [entryRow(1, [])];
-      render(
+      renderInRouter(
         <EntryList
           rows={rows}
           bandsAt={new Map()}
@@ -924,7 +934,7 @@ describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue'
 
   it('leaves every other row reading its own duration, pinned or not', () => {
     const rows = [entryRow(1, []), entryRow(2, [0])];
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}
@@ -939,7 +949,7 @@ describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue'
 
   it('renders a plain "0m" when nothing is pinned (no in-game queue lead, or it is paused)', () => {
     const rows = [entryRow(1, [])];
-    render(
+    renderInRouter(
       <EntryList
         rows={rows}
         bandsAt={new Map()}

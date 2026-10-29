@@ -8,6 +8,7 @@
  * leaves both, which this dialog reports rather than hiding.
  */
 import { useEffect, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -263,11 +264,7 @@ export function SaveToEveDialog({
             )}
           </p>
         ) : (
-          offlineFailed && (
-            <p role="alert" className="text-xs text-danger">
-              {t('fittings.saveToEve.offlineFailed')}
-            </p>
-          )
+          offlineFailed && <InlineError>{t('fittings.saveToEve.offlineFailed')}</InlineError>
         )}
         {unconfirmed && (
           <p role="alert" className="text-xs text-warning">
@@ -275,9 +272,9 @@ export function SaveToEveDialog({
           </p>
         )}
         {errorMessage && (
-          <p role="alert" className="text-xs text-danger">
+          <InlineError>
             {t('fittings.saveToEve.errorTitle')}: {errorMessage}
-          </p>
+          </InlineError>
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" onClick={onClose}>

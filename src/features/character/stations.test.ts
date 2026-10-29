@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { clearNpcStationIndex } from '@/sde/npcStations';
@@ -26,17 +26,14 @@ vi.mock('@/sde/loadMarketSde', () => ({
 // `onUnhandledRequest: 'error'` is the real assertion in this file: a test
 // that resolves a name with no handler registered proves no ESI request was
 // made at all, which is stronger than counting calls on a spy.
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
   clearNpcStationIndex();
   loadNpcStations.mockReset();
   loadNpcStations.mockResolvedValue(SNAPSHOT);
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('loadStationName', () => {
   it('resolves from the SDE snapshot without any ESI request', async () => {

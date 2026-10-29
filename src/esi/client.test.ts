@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import {
   esiFetch,
   configureEsi,
@@ -27,17 +27,14 @@ import {
   passEsiGate,
 } from './budget';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
   // The budget is app-wide module state: a test that deliberately serves a 420
   // would otherwise shut the circuit for every test that follows it.
   resetEsiBudget();
 });
-afterAll(() => server.close());
 
 /** Yield to the event loop until esiFetch has scheduled its retry timer. */
 async function untilTimerScheduled(): Promise<void> {

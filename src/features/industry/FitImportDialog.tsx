@@ -9,6 +9,7 @@
  * that before twelve plans appear in their list.
  */
 import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { InlineError } from '@/components/ui/InlineError';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, LiveStatus, Modal, Checkbox, TextArea } from '@/components/ui';
@@ -105,11 +106,7 @@ export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitI
             {t('industry.fitImportParse')}
           </Button>
         </div>
-        {pasteError && (
-          <p role="alert" className="text-xs text-danger">
-            {t('industry.fitImportPasteFailed')}
-          </p>
-        )}
+        {pasteError && <InlineError>{t('industry.fitImportPasteFailed')}</InlineError>}
 
         {preview && (
           <div className="space-y-3 border-t border-line pt-3 text-xs">

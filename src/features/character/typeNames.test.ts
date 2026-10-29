@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import type { TypeMap } from '@/sde/types';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -15,14 +15,11 @@ vi.mock('@/sde/loadSde', () => ({
 
 const { loadTypeName, loadTypeNames } = await import('./typeNames');
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('loadTypeName', () => {
   it('returns the SDE name for a known typeID', async () => {

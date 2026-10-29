@@ -1,13 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
-
-// Entity names are real links, so every render needs a Router.
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+import { renderInRouter } from '@/test/render';
 
 vi.mock('@/features/skills/typeCatalog', () => ({
   loadItemNameMap: async () =>
@@ -69,7 +65,7 @@ describe('ImplantSetPicker — booster side effects', () => {
   it('switches a carried booster’s side effect on, and off again', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    const { rerender } = render(
+    const { rerender } = renderInRouter(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
@@ -101,7 +97,7 @@ describe('ImplantSetPicker — booster side effects', () => {
   it('drops a removed booster’s side effects with it', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(
+    renderInRouter(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
@@ -127,7 +123,7 @@ describe('ImplantSetPicker — planning from the clone', () => {
   it('starts from the clone’s implants, and the first change saves them as the Fitting’s set', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(
+    renderInRouter(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
@@ -152,7 +148,7 @@ describe('ImplantSetPicker — planning from the clone', () => {
     const onChange = vi.fn();
     const onUseClone = vi.fn();
     const own = { implants: [5], boosters: [] };
-    render(
+    renderInRouter(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
@@ -174,7 +170,7 @@ describe('ImplantSetPicker — planning from the clone', () => {
 describe('ImplantSetPicker — item info', () => {
   it('links an item’s name to Show info and opens its details from the ⓘ button', async () => {
     const user = userEvent.setup();
-    render(
+    renderInRouter(
       <ImplantSetPicker
         open
         onClose={vi.fn()}
@@ -195,7 +191,9 @@ describe('ImplantSetPicker — item info', () => {
 describe('ImplantSetPicker — one add box', () => {
   function renderEmpty(implantSet: FittingImplantSet = { implants: [], boosters: [] }) {
     const onChange = vi.fn();
-    render(<ImplantSetPicker open onClose={vi.fn()} implantSet={implantSet} onChange={onChange} />);
+    renderInRouter(
+      <ImplantSetPicker open onClose={vi.fn()} implantSet={implantSet} onChange={onChange} />
+    );
     return onChange;
   }
 

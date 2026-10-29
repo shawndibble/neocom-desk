@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import {
   startLogin,
   completeLogin,
@@ -43,7 +43,7 @@ const cfg = { clientId: 'client-abc', redirectUri: 'https://app.example/neocom-d
 
 let tokenRequests: URLSearchParams[] = [];
 
-const server = setupServer(
+const server = mswServer(
   http.post('https://login.eveonline.com/v2/oauth/token', async ({ request }) => {
     const body = new URLSearchParams(await request.text());
     tokenRequests.push(body);
@@ -70,8 +70,6 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
 beforeEach(async () => {
   sessionStorage.clear();
   tokenRequests = [];
@@ -81,7 +79,6 @@ beforeEach(async () => {
   await db.settings.clear();
   await clearCachePurgePending(CHAR_ID);
 });
-afterEach(() => server.resetHandlers());
 
 describe('startLogin', () => {
   it('stores verifier and state, returns authorize URL whose challenge matches verifier', async () => {

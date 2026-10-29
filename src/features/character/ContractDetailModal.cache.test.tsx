@@ -3,11 +3,11 @@
  * lines are both game constants once a contract is issued, and both loaders
  * already claim a 24h Dexie window.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -43,12 +43,11 @@ function contractAt(locationId: number): Contract {
 const calls = { station: 0, structure: 0, items: 0 };
 
 // The System row's name lookup — not what these tests count; `openAndClose` waits on its link.
-const server = setupServer(
+const server = mswServer(
   http.get(`${ESI_BASE_URL}/universe/systems/30000142`, () =>
     HttpResponse.json({ system_id: 30000142, name: 'Jita', security_status: 0.9 })
   )
 );
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -78,10 +77,8 @@ beforeEach(async () => {
   );
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 /**
  * Waits for every loader to settle before unmounting: the item lines land
