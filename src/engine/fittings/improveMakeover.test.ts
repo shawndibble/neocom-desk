@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyImproveCandidate, type ImproveCandidate } from './improve';
+import {
+  applyImproveCandidate,
+  improveCandidates,
+  iskDeltaOf,
+  type ImproveCandidate,
+} from './improve';
 import {
   findMakeover,
   makeoverMoves,
@@ -295,6 +300,93 @@ describe('findMakeover', () => {
     });
     expect(result?.stopped).toBe(true);
     expect(result?.makeover?.rows).toHaveLength(2);
+  });
+
+  it('concurrency 4 with stats resolving out of order equals a serial run and holds the cap', async () => {
+    const serial = await search(FOUR);
+    let inFlight = 0;
+    let peak = 0;
+    let n = 0;
+    const maxCalcs = 300;
+    const progress: number[] = [];
+    const result = await findMakeover({
+      fitting: FOUR,
+      before: statsOf(FOUR),
+      goal: 'tank',
+      moves: catalogue(TYPES).moves(),
+      stats: async (g) => {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        // Later calls finish sooner, so results arrive out of order.
+        await new Promise((resolve) => setTimeout(resolve, (7 - (n++ % 7)) * 2));
+        inFlight--;
+        return statsOf(g);
+      },
+      priceOf: () => 1,
+      concurrency: 4,
+      maxCalcs,
+      onProgress: (calcs) => progress.push(calcs),
+    });
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(result?.makeover?.rows.map(label)).toEqual(serial.result?.makeover?.rows.map(label));
+    expect(result?.makeover?.fitting.modules).toEqual(serial.result?.makeover?.fitting.modules);
+    expect(result?.makeover?.score).toBe(serial.result?.makeover?.score);
+    // Moves calculated ahead of a lazy stop still count.
+    expect(result!.calcs).toBeGreaterThanOrEqual(serial.result!.calcs);
+    expect(result!.calcs).toBeLessThanOrEqual(maxCalcs);
+    expect(Math.max(...progress)).toBeLessThanOrEqual(maxCalcs);
+  });
+
+  it('concurrency never starts more calculations than the cap allows', async () => {
+    let calls = 0;
+    const result = await findMakeover({
+      fitting: FOUR,
+      before: statsOf(FOUR),
+      goal: 'tank',
+      moves: catalogue(TYPES).moves(),
+      stats: async (g) => {
+        calls++;
+        return statsOf(g);
+      },
+      priceOf: () => 1,
+      concurrency: 4,
+      maxCalcs: 12,
+    });
+    expect(result?.stopped).toBe(true);
+    expect(calls).toBeLessThanOrEqual(12);
+    expect(result!.calcs).toBeLessThanOrEqual(12);
+  });
+
+  it('offers rig swaps by default', () => {
+    const index = buildVariationIndex(
+      {
+        31: { parentTypeId: null, metaGroupId: 1 },
+        30: { parentTypeId: 31, metaGroupId: 2 },
+      },
+      { 1: 'Tech I', 2: 'Tech II' }
+    );
+    const list = improveCandidates(
+      fit([['rig', 0, 31]]).modules,
+      index,
+      { '30': 'rig', '31': 'rig' },
+      { goal: 'tank' }
+    );
+    expect(list.some((c) => c.at[0].slot === 'rig' && c.toTypeId === 30)).toBe(true);
+  });
+
+  it('prices a rig swap at the full new rig, a module swap unchanged', () => {
+    const price = (id: number) => ({ 30: 500, 31: 200, 2: 900, 1: 400 })[id] ?? null;
+    const swap = (from: number, to: number, slot: FittingSlotKind): ImproveCandidate => ({
+      fromTypeId: from,
+      toTypeId: to,
+      at: [{ slot, slotIndex: 0 }],
+    });
+    expect(iskDeltaOf(swap(31, 30, 'rig'), price)).toBe(500);
+    expect(iskDeltaOf(swap(1, 2, 'medium'), price)).toBe(500);
+    expect(iskDeltaOf({ ...swap(1, 2, 'medium'), pairedWith: swap(31, 30, 'rig') }, price)).toBe(
+      1000
+    );
   });
 
   it('Cancel returns null', async () => {

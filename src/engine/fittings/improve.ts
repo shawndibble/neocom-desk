@@ -502,7 +502,7 @@ const DEFAULT_OPTIONS: CandidateOptions = {
   goal: 'overall',
   reach: 'upgrade',
   defense: 'keep',
-  includeRigs: false,
+  includeRigs: true,
   includeOfficer: false,
 };
 
@@ -993,7 +993,9 @@ export function iskDeltaOf(
   priceOf: (typeId: number) => number | null
 ): number | null {
   const to = priceOf(candidate.toTypeId);
-  const from = candidate.fromTypeId === null ? 0 : priceOf(candidate.fromTypeId);
+  // A fitted rig is destroyed when removed: a rig slot costs the full new rig, with no refund for the old one.
+  const rigSlot = candidate.at[0]?.slot === 'rig';
+  const from = candidate.fromTypeId === null || rigSlot ? 0 : priceOf(candidate.fromTypeId);
   let isk: number | null = to === null || from === null ? null : (to - from) * candidate.at.length;
   // A conversion's removed modules (never rigs) are sold or dropped from the shopping list.
   for (const { typeId, at } of candidate.conversion?.removes ?? []) {
