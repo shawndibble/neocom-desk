@@ -677,6 +677,63 @@ describe('improveCandidates', () => {
   });
 });
 
+describe('improveCandidates Rework budget', () => {
+  const members = (base: number, n: number) => Array.from({ length: n }, (_, i) => base + i);
+  // Group id -> its members; every member sits in one rack.
+  const groups: Record<number, number[]> = {
+    213: members(1000, 8), // Tracking Computer
+    212: members(1100, 8), // Sensor Booster
+    46: members(1200, 8), // Propulsion
+    77: members(1300, 4), // Shield Hardener
+    59: members(2000, 30), // Gyrostabilizer
+    302: members(2100, 30), // Magnetic Field Stabilizer
+    60: members(2200, 3), // Damage Control
+  };
+  const rackOf: Record<string, string> = {};
+  for (const id of [...groups[213], ...groups[212], ...groups[46], ...groups[77]])
+    rackOf[id] = 'medium';
+  for (const id of [...groups[59], ...groups[302], ...groups[60]]) rackOf[id] = 'low';
+  const groupOf = new Map<number, number>();
+  for (const [g, ids] of Object.entries(groups)) for (const id of ids) groupOf.set(id, Number(g));
+  const pool = {
+    groupOf: (id: number) => groupOf.get(id),
+    typeIdsInGroup: (g: number) => groups[g] ?? [],
+    published: () => true,
+  };
+  const index = buildVariationIndex({}, {});
+  const opts = { goal: 'overall', reach: 'rework', defense: 'keep', pool } as const;
+  const at = (slot: 'medium' | 'low', typeIds: number[]) =>
+    typeIds.map((typeId, slotIndex) => ({ slot, slotIndex, typeId, state: 'online' as const }));
+
+  it('offers a tank group listed after many damage, reach and speed members', () => {
+    const modules = at('medium', [groups[213][0]]);
+    const targets = improveCandidates(modules, index, rackOf, opts).map((c) => c.toTypeId);
+    expect(targets.some((id) => groups[77].includes(id))).toBe(true);
+  });
+
+  it('offers a Damage Control to a low-slot non-tank module', () => {
+    const modules = at('low', [groups[59][0]]);
+    const targets = improveCandidates(modules, index, rackOf, opts).map((c) => c.toTypeId);
+    expect(targets.some((id) => groups[60].includes(id))).toBe(true);
+  });
+
+  it('prefers the members nearest the fitted module’s meta group', () => {
+    const typed = buildVariationIndex(
+      {
+        [groups[213][0]]: { parentTypeId: null, metaGroupId: 2 },
+        [groups[212][0]]: { parentTypeId: null, metaGroupId: 4 },
+        [groups[212][1]]: { parentTypeId: null, metaGroupId: 2 },
+      },
+      {}
+    );
+    const targets = improveCandidates(at('medium', [groups[213][0]]), typed, rackOf, {
+      ...opts,
+      limit: 100,
+    }).map((c) => c.toTypeId);
+    expect(targets.indexOf(groups[212][1])).toBeLessThan(targets.indexOf(groups[212][0]));
+  });
+});
+
 describe('damageOf', () => {
   const cruiser = BUILT_IN_TARGET_PROFILES.find((p) => p.id === 'builtin:cruiser')!;
   const launchers = (dps: number, reloadDuty: number): FittingStats => {

@@ -844,23 +844,25 @@ export function improveCandidates(
     const seen = new Set<number>([fromTypeId]);
     // Each tier has its own budget, and only an offered target spends it.
     const taken = [0, 0, 0];
-    const offer = (
-      tier: number,
-      typeId: number,
-      group: number | undefined,
-      dropsResourceRig = false
-    ) => {
-      if (taken[tier] >= TARGETS_PER_MODULE || seen.has(typeId)) return;
-      if (!allowed(typeId, slot, from, at.length)) return;
+    const canOffer = (typeId: number, group: number | undefined) => {
+      if (seen.has(typeId) || !allowed(typeId, slot, from, at.length)) return false;
       if (
         freesTank &&
         group !== undefined &&
         TANK_GROUPS.has(group) &&
         !TANK_GROUPS.has(from ?? -1)
       )
-        return;
+        return false;
       // Never the last module doing a job nobody scores.
-      if (guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1) return;
+      return !(guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1);
+    };
+    const offer = (
+      tier: number,
+      typeId: number,
+      group: number | undefined,
+      dropsResourceRig = false
+    ) => {
+      if (taken[tier] >= TARGETS_PER_MODULE || !canOffer(typeId, group)) return;
       seen.add(typeId);
       taken[tier]++;
       tiers[tier].push({
@@ -870,6 +872,25 @@ export function improveCandidates(
         ...(unflyable ? { fixesUnflyable: true } : {}),
         ...(dropsResourceRig ? { dropsResourceRig } : {}),
       });
+    };
+    // Rework: one target per group in turn, so the groups listed first cannot use the whole budget.
+    // Within a group, the members nearest the fitted module's meta group come first.
+    const fromMeta = index.types[fromTypeId]?.metaGroupId ?? 0;
+    const offerRework = () => {
+      const lists = reworkGroups(o.goal, sides)
+        .map((group) => ({
+          group,
+          typeIds: (o.pool?.typeIdsInGroup(group) ?? [])
+            .filter((typeId) => canOffer(typeId, group))
+            .sort(
+              (a, b) =>
+                Math.abs((index.types[a]?.metaGroupId ?? 0) - fromMeta) -
+                Math.abs((index.types[b]?.metaGroupId ?? 0) - fromMeta)
+            ),
+        }))
+        .filter((list) => list.typeIds.length > 0);
+      for (let i = 0; lists.some((list) => i < list.typeIds.length); i++)
+        for (const { group, typeIds } of lists) if (i < typeIds.length) offer(2, typeIds[i], group);
     };
     for (const member of getVariations(index, fromTypeId).members) {
       offer(0, member.typeId, groupOf(member.typeId));
@@ -892,16 +913,13 @@ export function improveCandidates(
         for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group, true);
     }
     if (o.pool && o.reach === 'rework') {
-      for (const group of reworkGroups(o.goal, sides))
-        for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
+      offerRework();
     }
     // Whatever the Reach found, an unflyable module is replaced: the same group when no variant was found, then the goal's groups.
     if (o.pool && unflyable) {
       if (taken[0] + taken[1] + taken[2] === 0 && from !== undefined)
         for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
-      if (taken[0] + taken[1] + taken[2] === 0)
-        for (const group of reworkGroups(o.goal, sides))
-          for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
+      if (taken[0] + taken[1] + taken[2] === 0) offerRework();
     }
   }
 
