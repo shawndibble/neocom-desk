@@ -1,17 +1,12 @@
 // The ESI reads the scheduled Corp Tax Book sync makes with the grant holder's
 // access token (issue #4068, ADR 0025): the same five reads an officer's visit
 // feeds into the book. Same identification headers as every server ESI call
-// (esiNotifications.ts); 401/403 are a refusal of this token (the run stops the
+// (esiClient.ts); 401/403 are a refusal of this token (the run stops the
 // schedule), 420/429 stop the whole run (the error budget is shared by every
 // user of the client id), anything else is "try again next run". Nothing here
 // logs or returns a token.
 
-import {
-  ESI_BASE,
-  ESI_COMPATIBILITY_DATE,
-  ESI_USER_AGENT,
-  isBudgetLow,
-} from './esiNotifications.js';
+import { ESI_BASE, esiHeaders, isBudgetLow } from './esiClient.js';
 import type {
   EsiExtractionLike,
   JournalEntryLike,
@@ -77,13 +72,7 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     let res: Response;
     try {
       res = await fetchImpl(`${ESI_BASE}${path}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'User-Agent': ESI_USER_AGENT,
-          'X-User-Agent': ESI_USER_AGENT,
-          'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-          Accept: 'application/json',
-        },
+        headers: esiHeaders(accessToken),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {

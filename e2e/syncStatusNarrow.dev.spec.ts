@@ -12,15 +12,13 @@
  * must be stamped with `CHARACTER_ID` or it is dropped.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import type { SyncStatus } from '../src/sync/status';
 
 type Viewport = { width: number; height: number };
 
-const PHONE: Viewport = { width: 390, height: 844 };
-const DESKTOP: Viewport = { width: 1280, height: 800 };
 const ERROR_NOTE = 'Sync error — changes saved locally';
 
 test.beforeEach(async ({ page }) => {

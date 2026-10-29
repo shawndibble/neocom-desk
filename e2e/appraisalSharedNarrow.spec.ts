@@ -15,10 +15,7 @@
  * key, so sync stays off.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 
 /** The share view's `DataTable` label (`appraisalShare.title`) — not the live tab's `Appraisal`. */
 const TABLE = 'Shared appraisal';

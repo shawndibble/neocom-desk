@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import { seedCharacter as seedCharacterRow, seedGrant as seedGrantFor } from '@/test/seed';
 import { configureEsi } from '@/esi/client';
 import { useSkillComparisons } from '@/features/skills/comparisons';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -92,14 +93,8 @@ afterEach(() => {
 });
 
 async function seedCharacter(characterId: number, name: string) {
-  await db.characters.put({ characterId, name, ownerHash: `oh-${characterId}`, addedAt: 1 });
-  await db.tokens.put({
-    characterId,
-    accessToken: 'access-token',
-    refreshToken: 'refresh',
-    expiresAt: Date.now() + 3_600_000,
-    scopes: [],
-  });
+  await seedCharacterRow(characterId, name, { ownerHash: `oh-${characterId}` });
+  await seedGrantFor(characterId, [], { expiresAt: Date.now() + 3_600_000 });
 }
 
 beforeEach(async () => {

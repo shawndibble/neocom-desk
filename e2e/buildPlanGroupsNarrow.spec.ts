@@ -15,12 +15,10 @@
  * the plan's own `buildGroupId` (`buildGroups.ts`).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 const GROUP_ID = 'g1';
 const GROUP_NAME = 'Test Group';
 const PLAN_NAME = 'Grouped Plan';

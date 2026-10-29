@@ -10,12 +10,11 @@
  * + SDE download, so it gets the cold-runner headroom the other fitting specs use.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
 import { mockFlatHubPrices } from './support/piPrices';
 
-const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 768, height: 1024 };
 
 const STATS_TIMEOUT = { timeout: 30_000 };

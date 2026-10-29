@@ -5,7 +5,14 @@
       "codebase": "default",
       "runtime": "nodejs24",
       "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"],
-      "ignore": ["node_modules", ".git", "*.log", "src/**/*.test.ts", "vitest.config.ts"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "*.log",
+        "src/**/*.test.ts",
+        "src/testSupport/**",
+        "vitest.config.ts"
+      ]
     }
   ],
   "firestore": {

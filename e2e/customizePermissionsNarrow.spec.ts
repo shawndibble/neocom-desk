@@ -5,9 +5,7 @@
  * that region, so it must sit inside the viewport without scrolling and be a
  * 36px touch target.
  */
-import { test, expect } from './support/testBase';
-
-const PHONE = { width: 390, height: 844 };
+import { test, expect, PHONE } from './support/testBase';
 
 test('Customize permissions footer is reachable without scrolling at 390px', async ({ page }) => {
   await page.setViewportSize(PHONE);

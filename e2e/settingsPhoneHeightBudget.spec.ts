@@ -10,10 +10,9 @@
  *
  * Uses the default seeded character with no Dexie overrides.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const PHONE = { width: 390, height: 844 };
 const LIMIT = 1300;
 
 const SECTIONS = [

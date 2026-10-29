@@ -10,11 +10,9 @@
  * scrollbar so the overflow check measures the layout a phone gets.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 const LONG_NAME = 'Mjolnir Auto-Targeting Heavy Missile I Blueprint';
 
 async function openLongItem(page: Page) {

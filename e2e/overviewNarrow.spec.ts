@@ -8,12 +8,11 @@
  * one the Overview shows its first-run prompt (see overviewWidgets.spec.ts).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto, type SeededWidget } from './support/authSeed';
 import { ALLIANCE_ID, CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import type { MarketOrder } from '../src/esi/endpoints';
 
-const PHONE = { width: 390, height: 844 };
 const HOUR_MS = 60 * 60 * 1000;
 const FIRST_LOAD_MS = 20_000;
 

@@ -2,8 +2,8 @@
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -39,10 +39,6 @@ const PAYEE = 21;
 const STRANGER = 99;
 const PAYEE_CORP_CEO = 31;
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 
@@ -145,18 +141,6 @@ async function reason(promise: Promise<unknown>): Promise<string> {
   throw new Error('expected the call to fail');
 }
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
 /** The moon owner's side sets its payee here: its Director, live role check. */
 const ownerDeps = (): CorpSyncDeps => ({
   ...syncDeps(),
@@ -176,7 +160,7 @@ const changePayeeTo = async (payee: { kind: 'character' | 'corporation'; id: num
   await setPayee(payee);
 };
 
-suite('removing a moon owner', () => {
+emulatorSuite('removing a moon owner', () => {
   beforeEach(async () => {
     await clearEmulator();
     now = T0;

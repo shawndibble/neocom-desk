@@ -1,19 +1,13 @@
 // The ESI reads behind nearby alerts (issue #5122, ADR 0028): one Character's location
 // under its Alerts Grant, and the two public lists, read once per poll run. Same
-// etiquette as esiNotifications.ts: ESI's identification headers (no email address),
-// and a classified result so the poller never reads a status code — 403 is "this grant
-// cannot read the location", 420/429 stop the run, a low budget stops it after this call.
+// etiquette as the other poller reads (esiClient.ts): the shared headers, and a classified
+// result so the poller never reads a status code — 403 is "this grant cannot read the
+// location", 420/429 stop the run, a low budget stops it after this call.
 
-import {
-  ESI_COMPATIBILITY_DATE,
-  ESI_USER_AGENT,
-  isBudgetLow,
-  retryAfterMs,
-} from './esiNotifications.js';
+import { ESI_ROOT, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
 import type { IncursionListing, RaidableSkyhook } from './nearbyAlerts.js';
+import { isRecord } from './guards.js';
 
-/** The compatibility-date routed base the app uses (`src/esi/client.ts`); the raidable list has no `/latest` route. */
-const ESI_ROOT = 'https://esi.evetech.net';
 const TIMEOUT_MS = 15_000;
 
 type Failure =
@@ -31,13 +25,7 @@ async function getJson(
   fetchImpl: typeof fetch
 ): Promise<{ kind: 'ok'; body: unknown; budgetLow: boolean } | Failure> {
   const res = await fetchImpl(`${ESI_ROOT}${path}`, {
-    headers: {
-      ...(accessToken === null ? {} : { Authorization: `Bearer ${accessToken}` }),
-      'User-Agent': ESI_USER_AGENT,
-      'X-User-Agent': ESI_USER_AGENT,
-      'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-      Accept: 'application/json',
-    },
+    headers: esiHeaders(accessToken),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (res.status === 403) return { kind: 'forbidden' };
@@ -48,8 +36,6 @@ async function getJson(
   const body: unknown = await res.json().catch(() => undefined);
   return { kind: 'ok', body, budgetLow: isBudgetLow(res.headers) };
 }
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
 /** `GET /characters/{id}/location` (scope `esi-location.read_location.v1`). */
 export async function fetchCharacterLocation(

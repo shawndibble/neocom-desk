@@ -10,6 +10,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { TRADE_HUBS } from '@/market/hubs';
+import { isFiniteNumber, isPlainRecord, isRecord } from '@/engine/guards';
+import { COMPATIBILITY_DATE } from '@/esi/compatibilityDate';
+import { USER_AGENT } from '@/esi/userAgent';
+import { ESI_COMPATIBILITY_DATE, ESI_USER_AGENT, esiHeaders } from '../functions/src/esiClient';
+import {
+  isFiniteNumber as functionsIsFiniteNumber,
+  isPlainRecord as functionsIsPlainRecord,
+  isRecord as functionsIsRecord,
+} from '../functions/src/guards';
 import { MARKET_OPEN_PRICES_REGION_IDS, SNAPSHOT_HUBS } from '../functions/src/marketOpenPrices';
 import {
   FIRED_RETENTION_MS,
@@ -74,6 +83,52 @@ import {
   parseServerEventFire,
   type ServerEventFire as ClientServerEventFire,
 } from '@/features/notifications/serverEventPayload';
+
+describe('ESI identification', () => {
+  it('the backend sends the compatibility date and User-Agent the client does', () => {
+    expect(ESI_COMPATIBILITY_DATE).toBe(COMPATIBILITY_DATE);
+    expect(ESI_USER_AGENT).toBe(USER_AGENT);
+  });
+
+  it("names us descriptively and never by anyone's address", () => {
+    const headers = esiHeaders();
+    expect(headers['X-User-Agent']).toBe(headers['User-Agent']);
+    expect(headers['X-User-Agent']).not.toMatch(/@/);
+    expect(headers['X-Compatibility-Date']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(headers.Authorization).toBeUndefined();
+    expect(esiHeaders('tok').Authorization).toBe('Bearer tok');
+  });
+});
+
+describe('type guards', () => {
+  const values: unknown[] = [
+    {},
+    { a: 1 },
+    Object.create(null),
+    [],
+    [1],
+    new Date(0),
+    null,
+    undefined,
+    0,
+    1,
+    -1.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    '1',
+    '',
+    true,
+    () => {},
+  ];
+
+  it.each([
+    ['isRecord', isRecord, functionsIsRecord],
+    ['isPlainRecord', isPlainRecord, functionsIsPlainRecord],
+    ['isFiniteNumber', isFiniteNumber, functionsIsFiniteNumber],
+  ])('%s narrows the same values on both sides', (_, client, server) => {
+    expect(values.map(server)).toEqual(values.map(client));
+  });
+});
 
 describe('trade hubs', () => {
   it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {

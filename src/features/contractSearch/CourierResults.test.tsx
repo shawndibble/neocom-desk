@@ -6,6 +6,7 @@ import '@/i18n';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { stubViewport } from '@/test/viewport';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import {
@@ -68,24 +69,6 @@ const REGION_NAMES = new Map([
  * Phone width, where `FilterBar` swaps the inline row for a sheet — a modal
  * that unmounts on close, unlike the pointer-width row.
  */
-function stubNarrowViewport() {
-  const real = window.matchMedia;
-  window.matchMedia = ((media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList) as typeof window.matchMedia;
-  return () => {
-    window.matchMedia = real;
-  };
-}
-
 /** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -274,7 +257,7 @@ describe('CourierResults "From my region" shortcut', () => {
   });
 
   it('survives closing the narrow sheet surface', async () => {
-    const restore = stubNarrowViewport();
+    const restore = stubViewport(NARROW_QUERY);
     try {
       loadCharacterRegionId.mockResolvedValue(THE_FORGE);
       const user = userEvent.setup();
@@ -343,24 +326,6 @@ function knownJumps() {
     kind: 'known',
     counts: routes.map(() => 9),
   }));
-}
-
-function stubPhoneViewport() {
-  const real = window.matchMedia;
-  window.matchMedia = ((media: string) =>
-    ({
-      media,
-      matches: media === PHONE_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList) as typeof window.matchMedia;
-  return () => {
-    window.matchMedia = real;
-  };
 }
 
 function renderLanes() {
@@ -451,7 +416,7 @@ describe('CourierResults ISK/jump cell', () => {
 describe('CourierResults on a phone', () => {
   let restore: () => void;
   beforeEach(() => {
-    restore = stubPhoneViewport();
+    restore = stubViewport(PHONE_QUERY);
     knownJumps();
   });
   afterEach(() => restore());

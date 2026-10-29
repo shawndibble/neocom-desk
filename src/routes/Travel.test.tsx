@@ -11,6 +11,7 @@ import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { clearRouteKillCaches } from '@/features/travel/routeKillsData';
 import { App } from '@/app/App';
+import { stubViewport } from '@/test/viewport';
 import * as routeChunks from '@/app/routeChunks';
 import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import {
@@ -789,15 +790,7 @@ describe('Travel › Route Safety › Stops', () => {
   });
 
   it('leaves zero kill counts off a phone row, keeping its jumps', async () => {
-    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList
-    );
+    const restoreViewport = stubViewport(PHONE_QUERY);
     try {
       visit(`?from=${JITA}&to=${UEDAMA}`);
 
@@ -810,7 +803,7 @@ describe('Travel › Route Safety › Stops', () => {
       expect(lastHour(body[0])).not.toHaveTextContent('ship kills');
       expect(lastHour(body[0])).not.toHaveTextContent('pod kills');
     } finally {
-      matchMedia.mockRestore();
+      restoreViewport();
     }
   });
 
@@ -834,15 +827,7 @@ describe('Travel › Route Safety › Stops', () => {
   });
 
   it('folds the stops to one line on a phone, with Edit to open them', async () => {
-    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList
-    );
+    const restoreViewport = stubViewport(PHONE_QUERY);
     try {
       const user = userEvent.setup();
       visit(`?stops=${SOBASEKI},${UEDAMA}`);
@@ -852,7 +837,7 @@ describe('Travel › Route Safety › Stops', () => {
       await user.click(screen.getByRole('button', { name: 'Edit stops' }));
       expect(screen.getByRole('button', { name: /^add stop/i })).toBeInTheDocument();
     } finally {
-      matchMedia.mockRestore();
+      restoreViewport();
     }
   });
 
@@ -1275,15 +1260,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
     });
 
     it('folds the ways under the leg on a phone', async () => {
-      const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
-        (media: string) =>
-          ({
-            media,
-            matches: media === PHONE_QUERY,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-          }) as unknown as MediaQueryList
-      );
+      const restoreViewport = stubViewport(PHONE_QUERY);
       try {
         const user = userEvent.setup();
         visit(`?from=${JITA}&to=${UEDAMA}&wh=1`);
@@ -1294,7 +1271,7 @@ describe('Travel › Route Safety › Thera / Turnur holes', () => {
         await user.click(toggle);
         expect(await waysPanel()).toBeInTheDocument();
       } finally {
-        matchMedia.mockRestore();
+        restoreViewport();
       }
     });
   });
@@ -1326,18 +1303,6 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
     await userEvent.click(await screen.findByRole('button', { name: /More route options/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Browse open wormholes' }));
     return screen.findByRole('dialog', { name: 'Thera / Turnur' });
-  }
-
-  function stubPhone() {
-    return vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList
-    );
   }
 
   it('has no Thera / Turnur tab, and an old /travel/thera link lands on Route Safety', async () => {
@@ -1509,14 +1474,14 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
   });
 
   it('shows dense cards on a phone', async () => {
-    const matchMedia = stubPhone();
+    const restoreViewport = stubViewport(PHONE_QUERY);
     try {
       const dialog = await openFromBrowse(`?from=${JITA}`, { phone: true });
       const table = await within(dialog).findByRole('table', { name: MAIN_TABLE });
       expect(table).toHaveClass('dt-stacked', 'dt-stack-dense');
       expect(within(holeRow('perimeter')).getByText(/→ PER-002/)).toBeInTheDocument();
     } finally {
-      matchMedia.mockRestore();
+      restoreViewport();
     }
   });
 });

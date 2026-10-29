@@ -20,14 +20,12 @@
  * body size (`text-sm`).
  */
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 import { openTheraModal } from './support/theraModal';
 
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 /** A cold dev server can take longer than Playwright's default 5s to serve the route. */
 const COLD_LOAD = { timeout: 15_000 };
 

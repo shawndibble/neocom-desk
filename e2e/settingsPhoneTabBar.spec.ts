@@ -3,10 +3,9 @@
  * tab bar exists (below `md`). The preference is device-local, so choosing
  * tabs on a laptop cannot reach the phone (issue #1967).
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const PHONE = { width: 390, height: 844 };
 const DESKTOP_SIZES = [
   { width: 1440, height: 900 },
   { width: 1024, height: 768 },

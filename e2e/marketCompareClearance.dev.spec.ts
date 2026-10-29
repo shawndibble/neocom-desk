@@ -5,11 +5,8 @@
  * rendered boxes at desktop and phone width.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /**
  * Fills the Compare Set the way the Market Browser does now that the tree

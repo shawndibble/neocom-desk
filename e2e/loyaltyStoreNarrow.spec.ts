@@ -7,12 +7,9 @@
  * test seeds its own offers via `mockLoyaltyOffers`.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CORPORATION_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /**
  * Tritanium (34) and Pyerite (35): both resolve their names from the app's

@@ -5,7 +5,8 @@
 // are never retried.
 
 import { HttpsError } from 'firebase-functions/v2/https';
-import { ESI_BASE, ESI_COMPATIBILITY_DATE, ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_BASE, ESI_USER_AGENT, esiHeaders } from './esiClient.js';
+import { isFiniteNumber } from './guards.js';
 import type { EsiKillmail, KillmailItem, SrpKillmailSource, ZkillRecord } from './srpKillmail.js';
 
 const ZKILL_API = 'https://zkillboard.com/api/killID';
@@ -15,12 +16,7 @@ export const JITA_STATION_ID = 60003760;
 const FUZZWORK_BATCH = 200;
 const MAX_APPRAISAL_TYPES = 1000;
 
-const headers = {
-  'User-Agent': ESI_USER_AGENT,
-  'X-User-Agent': ESI_USER_AGENT,
-  'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-  Accept: 'application/json',
-};
+const headers = esiHeaders();
 
 async function esiGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
   const res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(15_000) });
@@ -38,8 +34,7 @@ async function esiGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
   return res.json().catch(() => null);
 }
 
-const asNumber = (v: unknown): number | null =>
-  typeof v === 'number' && Number.isFinite(v) ? v : null;
+const asNumber = (v: unknown): number | null => (isFiniteNumber(v) ? v : null);
 
 function cleanItems(raw: unknown): KillmailItem[] {
   if (!Array.isArray(raw)) return [];
