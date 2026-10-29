@@ -123,7 +123,7 @@ describe('PopularFitsPanel', () => {
     const row = (await screen.findByText('5 losses')).closest('li')!;
     fireEvent.click(within(row).getAllByRole('img')[0]);
     expect(onOpen).not.toHaveBeenCalled();
-    fireEvent.click(row.querySelector('div')!);
+    fireEvent.click(row.firstElementChild!);
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 

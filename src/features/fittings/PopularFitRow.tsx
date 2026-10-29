@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
+import { disabledClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { isRowOwnEvent } from '@/components/ui/rowEvents';
 import { cx } from '@/lib/cx';
@@ -40,15 +41,16 @@ export function PopularFitRow({
       }}
       className={cx(
         '-mx-2 -my-1.5 min-w-0 flex-1 px-2 py-1.5',
-        disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-panel-2 active:bg-panel'
+        disabled ? 'cursor-not-allowed' : cx(rowInteractiveClassName, 'cursor-pointer')
       )}
     >
-      <p className="truncate border-b border-line pb-1 text-sm">
+      {/* -mx/px: room inside the truncating box for the title's focus ring. */}
+      <p className="-mx-1 truncate border-b border-line px-1 pb-1 text-sm">
         <button
           type="button"
           disabled={disabled}
           onClick={onOpen}
-          className={entityLinkClassName('disabled:opacity-40')}
+          className={entityLinkClassName(disabledClassName)}
         >
           {title}
         </button>
