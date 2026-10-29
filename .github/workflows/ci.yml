@@ -89,7 +89,11 @@ jobs:
         run: npm run lint
       - if: ${{ !cancelled() }}
         run: npm run format:check
+      # tsc peaks near 4.3 GB on the whole tree, right at Node's default heap
+      # limit, so it OOM-aborted (exit 134) on some runs. The runner has 16 GB.
       - if: ${{ !cancelled() }}
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run typecheck
       - if: ${{ !cancelled() }}
         run: npm run typecheck --prefix functions
