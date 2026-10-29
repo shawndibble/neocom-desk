@@ -18,10 +18,12 @@ const MILLION = 1_000_000;
 
 /** The module a candidate changes: its source and slots, not the paired downgrade. */
 export const moduleKey = (candidate: ImproveCandidate): string =>
-  `${candidate.fromTypeId ?? 'empty'}|${candidate.at
-    .map((at) => `${at.slot}:${at.slotIndex}`)
-    .sort()
-    .join(',')}`;
+  candidate.conversion
+    ? `conversion|${candidate.conversion.side}`
+    : `${candidate.fromTypeId ?? 'empty'}|${candidate.at
+        .map((at) => `${at.slot}:${at.slotIndex}`)
+        .sort()
+        .join(',')}`;
 
 /** Gain per million ISK; a free or saving gain beats every priced one, an unpriced one has none. */
 function valueOf(option: ImproveOption): number | null {

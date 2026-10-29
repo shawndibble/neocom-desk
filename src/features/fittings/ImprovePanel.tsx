@@ -132,14 +132,16 @@ const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navig
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
 const moveKey = (candidate: ImproveOption['candidate']): string =>
-  `${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
+  `${candidate.conversion ? `convert-${candidate.conversion.side}-${candidate.conversion.removes.map((r) => `${r.typeId}:${r.at.map((at) => `${at.slot}${at.slotIndex}`).join('.')}`).join('_')}-` : ''}${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
   (candidate.pairedWith ? `+${moveKey(candidate.pairedWith)}` : '');
 
 const optionKey = (option: ImproveOption) => moveKey(option.candidate);
 
 /** Every slot a suggestion changes, its paired downgrade's included: two ticked rows never share one. */
 function slotsOf(candidate: ImproveOption['candidate']): string[] {
-  const own = candidate.at.map((at) => `${at.slot}${at.slotIndex}`);
+  const own = [...(candidate.conversion?.removes.flatMap((r) => r.at) ?? []), ...candidate.at].map(
+    (at) => `${at.slot}${at.slotIndex}`
+  );
   return candidate.pairedWith ? [...own, ...slotsOf(candidate.pairedWith)] : own;
 }
 
@@ -324,14 +326,37 @@ export function ImprovePanel({
       : [];
 
   const swapLabel = (option: ImproveOption) =>
-    option.candidate.fixesUnflyable
-      ? moveLabel({ ...option.candidate, pairedWith: undefined })
-      : option.candidate.pairedWith
-        ? t('fittings.improve.pair', {
-            add: moveLabel({ ...option.candidate, pairedWith: undefined }),
-            downgrade: moveLabel(option.candidate.pairedWith),
-          })
-        : moveLabel(option.candidate);
+    option.candidate.conversion
+      ? t(`fittings.improve.convert.${option.candidate.conversion.side}`)
+      : option.candidate.fixesUnflyable
+        ? moveLabel({ ...option.candidate, pairedWith: undefined })
+        : option.candidate.pairedWith
+          ? t('fittings.improve.pair', {
+              add: moveLabel({ ...option.candidate, pairedWith: undefined }),
+              downgrade: moveLabel(option.candidate.pairedWith),
+            })
+          : moveLabel(option.candidate);
+
+  /** A conversion's size at a glance: what it removes and adds, and the slots it leaves empty. */
+  function conversionLine(candidate: ImproveOption['candidate']): string | null {
+    const conversion = candidate.conversion;
+    if (!conversion) return null;
+    let added = 0;
+    for (let link: ImproveOption['candidate'] | undefined = candidate; link; link = link.pairedWith)
+      added += link.at.length;
+    const removed = conversion.removes.reduce((sum, r) => sum + r.at.length, 0);
+    const freed = (['high', 'medium', 'low'] as const)
+      .filter((rack) => conversion.freed[rack] > 0)
+      .map((rack) =>
+        t(`fittings.improve.convert.freedRack.${rack}`, { count: conversion.freed[rack] })
+      );
+    return [
+      t('fittings.improve.convert.counts', { count: removed, removed, added }),
+      freed.length > 0 ? t('fittings.improve.convert.freed', { slots: freed.join(', ') }) : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
 
   /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
   function changeLine(
@@ -689,6 +714,11 @@ export function ImprovePanel({
                     : 'fittings.improve.flyableWith',
                   { swaps: flyableSwaps(option.candidate).join('; ') }
                 )}
+              </span>
+            )}
+            {option.candidate.conversion && (
+              <span className="text-text-dim block text-xs">
+                {conversionLine(option.candidate)}
               </span>
             )}
             {lead && <span className="block text-xs">{lead.node}</span>}

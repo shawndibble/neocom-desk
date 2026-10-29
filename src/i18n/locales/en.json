@@ -1513,6 +1513,21 @@
       "fill_one": "Add {{to}}",
       "fill_other": "Add {{count}}× {{to}}",
       "pair": "{{add}}, paid for by {{downgrade}}",
+      "convert": {
+        "shield": "Convert to shield tank",
+        "armor": "Convert to armor tank",
+        "counts_one": "Removes {{removed}} module, adds {{added}}.",
+        "counts_other": "Removes {{removed}} modules, adds {{added}}.",
+        "freed": "Frees {{slots}}.",
+        "freedRack": {
+          "high_one": "{{count}} high slot",
+          "high_other": "{{count}} high slots",
+          "medium_one": "{{count}} mid slot",
+          "medium_other": "{{count}} mid slots",
+          "low_one": "{{count}} low slot",
+          "low_other": "{{count}} low slots"
+        }
+      },
       "partial": "Best of the first {{checked}} swaps checked.",
       "checked_one": "Checked {{count}} swap in {{seconds}} s",
       "checked_other": "Checked {{count}} swaps in {{seconds}} s",

@@ -426,6 +426,7 @@ function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
     if (!candidate) return;
     ids.add(candidate.toTypeId);
     if (candidate.fromTypeId !== null) ids.add(candidate.fromTypeId);
+    candidate.conversion?.removes.forEach((removed) => ids.add(removed.typeId));
     add(candidate.pairedWith);
   };
   candidates.forEach(add);

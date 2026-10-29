@@ -10,7 +10,7 @@
  */
 import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
-import { addModule, type ModuleAt } from './fittingEdit';
+import { addModule, removeModule, type ModuleAt } from './fittingEdit';
 import { peakAppliedDps } from './implantFinder';
 import {
   jobOf,
@@ -116,6 +116,18 @@ export type DefenseChoice = (typeof DEFENSE_CHOICES)[number];
  * not one per copy. A `fromTypeId` of null fills the empty slot in `at`.
  * `pairedWith` is the downgrade that pays for an add no single add fits.
  */
+/**
+ * A whole-tank conversion, carried by the first link of its chain: the other
+ * side's tank modules (and any displaced from a full rack) are removed before
+ * the chain's adds are made. `freed` counts, per rack, the emptied slots the
+ * adds did not refill.
+ */
+export interface TankConversion {
+  side: DefenseSide;
+  removes: { typeId: number; at: ModuleAt[] }[];
+  freed: Record<'high' | 'medium' | 'low', number>;
+}
+
 export interface ImproveCandidate {
   fromTypeId: number | null;
   toTypeId: number;
@@ -125,17 +137,24 @@ export interface ImproveCandidate {
   fixesUnflyable?: boolean;
   /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
   covers?: 'budget' | 'capacitor';
+  /** Strips the other side's tank first; the candidate and its `pairedWith` chain then fill the chosen side's rack. */
+  conversion?: TankConversion;
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
 export function applyImproveCandidate(fitting: Fitting, candidate: ImproveCandidate): Fitting {
+  const start = candidate.conversion
+    ? candidate.conversion.removes
+        .flatMap(({ at }) => at)
+        .reduce((fit, { slot, slotIndex }) => removeModule(fit, slot, slotIndex), fitting)
+    : fitting;
   const changed =
     candidate.fromTypeId === null
       ? candidate.at.reduce(
           (fit, { slot, slotIndex }) => addModule(fit, slot, slotIndex, candidate.toTypeId),
-          fitting
+          start
         )
-      : applyModuleUpgrade(fitting, { ...candidate, fromTypeId: candidate.fromTypeId });
+      : applyModuleUpgrade(start, { ...candidate, fromTypeId: candidate.fromTypeId });
   return candidate.pairedWith ? applyImproveCandidate(changed, candidate.pairedWith) : changed;
 }
 
@@ -487,6 +506,137 @@ function fittedSide(
   return shield > armor ? 'shield' : 'armor';
 }
 
+/** Conversions offered per search: each is a whole-fit calculation. */
+export const CONVERSIONS_PER_SEARCH = 30;
+/** Most modules a conversion displaces from a full chosen-side rack. */
+const MAX_DISPLACED = 3;
+const CONVERSION_RACKS = ['high', 'medium', 'low'] as const;
+
+/** Tech II first, then Tech I, then the rest; a tie goes to the newer type id. */
+const metaRank = (index: VariationIndex, typeId: number) => {
+  const meta = index.types[typeId]?.metaGroupId ?? 0;
+  return meta === 2 ? 0 : meta === 1 ? 1 : 2;
+};
+
+/**
+ * Whole-tank conversions to `side`: every non-rig module of the other side's
+ * tank removed (never one doing a job, never a unique group), the chosen
+ * side's rack refilled with the best allowed module of one or two tank groups,
+ * the other rack's freed slots left empty. A full rack displaces its weakest
+ * unprotected modules (those least tied to the goal, last slot first), a few
+ * counts, as separate candidates; scoring whole decides which beat the fit.
+ */
+function tankConversions(
+  modules: readonly FittingModule[],
+  side: DefenseSide,
+  goal: ImproveGoal,
+  pool: ModulePool,
+  slotCounts: Readonly<Record<FittingSlotKind, number>>,
+  index: VariationIndex,
+  allowed: (
+    typeId: number,
+    slot: FittingSlotKind,
+    removedGroup: number | undefined,
+    removed: number
+  ) => boolean
+): ImproveCandidate[] {
+  const isStripped = (module: FittingModule) => {
+    const group = pool.groupOf(module.typeId);
+    const own = group === undefined ? null : sideOf(group);
+    return (
+      module.slot !== 'rig' &&
+      module.slot !== 'subsystem' &&
+      own !== null &&
+      own !== side &&
+      jobOf(group) === null
+    );
+  };
+  const stripped = modules.filter(isStripped);
+  if (stripped.length === 0) return [];
+
+  // The chosen side's groups, primary first, and the rack each can be fitted to.
+  const bestOf = (group: number, slot: FittingSlotKind): number | null => {
+    const types = pool
+      .typeIdsInGroup(group)
+      .filter((typeId) => allowed(typeId, slot, undefined, 0));
+    return types.length === 0
+      ? null
+      : (types.sort((a, b) => metaRank(index, a) - metaRank(index, b) || b - a)[0] ?? null);
+  };
+  const sideGroups = reworkGroups(goal, [side]).filter(
+    (group) => sideOf(group) === side && group !== 773 && group !== 774
+  );
+  const rack = CONVERSION_RACKS.find((slot) => bestOf(sideGroups[0] ?? -1, slot) !== null);
+  if (rack === undefined) return [];
+  const groups = sideGroups.filter((group) => bestOf(group, rack) !== null);
+
+  const goalGroups = new Set(reworkGroups(goal, []));
+  const remaining = modules.filter((module) => !stripped.includes(module));
+  const inRack = remaining.filter((module) => module.slot === rack);
+  const taken = new Set(inRack.map((module) => module.slotIndex));
+  const free: number[] = [];
+  for (let i = 0; i < slotCounts[rack]; i++) if (!taken.has(i)) free.push(i);
+
+  const displaceable = inRack
+    .filter((module) => {
+      const group = pool.groupOf(module.typeId);
+      return group !== undefined && jobOf(group) === null && !TANK_GROUPS.has(group);
+    })
+    .sort(
+      (a, b) =>
+        Number(goalGroups.has(pool.groupOf(a.typeId) ?? -1)) -
+          Number(goalGroups.has(pool.groupOf(b.typeId) ?? -1)) || b.slotIndex - a.slotIndex
+    );
+  const counts =
+    free.length > 0
+      ? [0]
+      : [1, 2, 3].filter((n) => n <= Math.min(MAX_DISPLACED, displaceable.length));
+
+  const out: ImproveCandidate[] = [];
+  for (const count of counts) {
+    const displaced = displaceable.slice(0, count);
+    const slots = [...free, ...displaced.map((module) => module.slotIndex)].sort((a, b) => a - b);
+    if (slots.length === 0) continue;
+    // One group for every slot, or the primary group first and another for the rest.
+    const plans: (readonly number[])[] = groups.map((group) => slots.map(() => group));
+    if (slots.length > 1 && groups.length > 1)
+      for (const group of groups.slice(1))
+        plans.push(slots.map((_, i) => (i === 0 ? groups[0]! : group)));
+    for (const plan of plans) {
+      const byType = new Map<number, ModuleAt[]>();
+      plan.forEach((group, i) => {
+        const typeId = bestOf(group, rack)!;
+        byType.set(typeId, [...(byType.get(typeId) ?? []), { slot: rack, slotIndex: slots[i]! }]);
+      });
+      const links = [...byType].map(([toTypeId, at]): ImproveCandidate => ({
+        fromTypeId: null,
+        toTypeId,
+        at,
+      }));
+      const removed = [...stripped, ...displaced];
+      const removes: TankConversion['removes'] = [];
+      for (const module of removed) {
+        const entry = removes.find((r) => r.typeId === module.typeId);
+        const at = { slot: module.slot, slotIndex: module.slotIndex };
+        if (entry) entry.at.push(at);
+        else removes.push({ typeId: module.typeId, at: [at] });
+      }
+      const freed = { high: 0, medium: 0, low: 0 };
+      for (const module of removed) {
+        const refilled = module.slot === rack && slots.includes(module.slotIndex);
+        if (!refilled && module.slot !== 'rig' && module.slot !== 'subsystem') freed[module.slot]++;
+      }
+      const chain = links.reduceRight<ImproveCandidate | undefined>(
+        (next, link) => (next ? { ...link, pairedWith: next } : link),
+        undefined
+      )!;
+      out.push({ ...chain, conversion: { side, removes, freed } });
+      if (out.length >= CONVERSIONS_PER_SEARCH) return out;
+    }
+  }
+  return out;
+}
+
 /**
  * The candidates for the fitted modules and the empty slots, each tier in fit
  * order: Upgrade (a module's own variations), Rebalance (the same group),
@@ -550,7 +700,7 @@ export function improveCandidates(
     return true;
   };
 
-  const tiers: ImproveCandidate[][] = [[], [], [], []];
+  const tiers: ImproveCandidate[][] = [[], [], [], [], []];
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
@@ -609,6 +759,21 @@ export function improveCandidates(
     }
   }
 
+  // A fit tanking the other side may convert whole, which no single swap scores well.
+  if (o.pool && o.slotCounts && freesTank && o.reach !== 'upgrade') {
+    tiers[3].push(
+      ...tankConversions(
+        modules,
+        o.defense as DefenseSide,
+        o.goal,
+        o.pool,
+        o.slotCounts,
+        index,
+        allowed
+      )
+    );
+  }
+
   // Empty slots are always free to fill: the first one in each rack, from the goal's groups.
   if (o.pool && o.slotCounts) {
     const pool = o.pool;
@@ -626,7 +791,7 @@ export function improveCandidates(
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
           added++;
-          tiers[3].push({ fromTypeId: null, toTypeId: typeId, at: [{ slot, slotIndex: free }] });
+          tiers[4].push({ fromTypeId: null, toTypeId: typeId, at: [{ slot, slotIndex: free }] });
         }
       }
     }
@@ -667,6 +832,11 @@ export function iskDeltaOf(
   let isk: number | null =
     to === null || from === null ? null : (to - (destroys ? 0 : from)) * candidate.at.length;
   let destroysRigs = destroys;
+  // A conversion's removed modules (never rigs) are sold or dropped from the shopping list.
+  for (const { typeId, at } of candidate.conversion?.removes ?? []) {
+    const price = priceOf(typeId);
+    isk = isk === null || price === null ? null : isk - price * at.length;
+  }
   if (candidate.pairedWith) {
     const paired = iskDeltaOf(candidate.pairedWith, priceOf, mode);
     isk = isk === null || paired.isk === null ? null : isk + paired.isk;
