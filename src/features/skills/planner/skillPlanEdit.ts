@@ -396,3 +396,41 @@ export function removeEntry(
     ),
   };
 }
+
+/**
+ * Drop every row the character has already trained (its level at or below the
+ * trained one), for a pasted plan full of skills they own. Remap Markers keep
+ * their place in front of the same surviving entry and the attributes ride
+ * along; markers that land together collapse, first wins, as in `removeEntry`.
+ * Null when nothing is trained, so the caller skips a pointless write; `undo`
+ * is the plan as it stood.
+ */
+export function removeTrainedEntries(
+  plan: SkillPlanEditable,
+  trainedSkills: ReadonlyMap<number, TrainedSkill>
+): { patch: SkillPlanPatch; removed: number; undo: Required<SkillPlanEditable> } | null {
+  const isTrained = (e: PlanEntry) =>
+    (trainedSkills.get(e.skillTypeID)?.level ?? 0) >= e.targetLevel;
+  const entries = plan.entries.filter((e) => !isTrained(e));
+  const removed = plan.entries.length - entries.length;
+  if (removed === 0) return null;
+  const undo = {
+    entries: plan.entries,
+    markers: plan.markers ?? [],
+    markerAttributes: plan.markerAttributes ?? [],
+  };
+  if (!plan.markers) return { patch: { entries }, removed, undo };
+  // A marker sits in front of entries[m]: it now sits in front of however many survivors precede it.
+  const survivorsBefore = (position: number) =>
+    plan.entries.slice(0, position).filter((e) => !isTrained(e)).length;
+  const shifted = plan.markers.map(survivorsBefore);
+  return {
+    patch: {
+      entries,
+      markers: normalizeMarkers(shifted, entries.length),
+      markerAttributes: normalizeMarkerAttributes(shifted, plan.markerAttributes, entries.length),
+    },
+    removed,
+    undo,
+  };
+}

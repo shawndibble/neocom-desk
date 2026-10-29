@@ -123,6 +123,7 @@ import {
   promotePrereqRow,
   alignedMarkerAttributes,
   removeEntry,
+  removeTrainedEntries,
   removeRemapMarker,
   replaceWithImport,
   setPriority,
@@ -178,6 +179,12 @@ export type PlanPatch = Partial<
     | 'milestones'
   >
 >;
+
+/** What "Remove trained skills" just did: how many rows went, and the plan as it stood for Undo. */
+interface TrainedRemoved {
+  count: number;
+  undo: Required<SkillPlanEditable>;
+}
 
 interface PlanEditorProps {
   characterId: number;
@@ -324,6 +331,10 @@ export function PlanEditor({
   // copyConfirm/importConfirm above: small text next to the triggering
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
+  // "Remove trained skills": the count it removed and the plan as it stood, for the Undo beside it. Scoped to the plan like undoImport.
+  const [trainedRemoved, setTrainedRemoved] = useScopedState<TrainedRemoved>([plan.id]);
+  const { show: showTrainedRemoved, cancel: cancelTrainedRemoved } =
+    useAutoDismiss<TrainedRemoved | null>(setTrainedRemoved, null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const { show: showMarkerConfirm } = useAutoDismiss<boolean>(setMarkerConfirm, false);
   // A promoted prereq row is a quieter change than it looks (a dimmed row
@@ -651,6 +662,12 @@ export function PlanEditor({
     const patch = splitByLevel(editable, catalog.engineSkills, trainedSkills);
     if (patch) onUpdate(patch);
   }, [editable, catalog.engineSkills, trainedSkills, trainedSkillsKnown, onUpdate]);
+
+  // Whether the plan holds any row the character already trained: the button is absent when there is nothing to remove.
+  const hasTrainedEntries = useMemo(
+    () => removeTrainedEntries(editable, trainedSkills) !== null,
+    [editable, trainedSkills]
+  );
 
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
@@ -1224,6 +1241,21 @@ export function PlanEditor({
     [editable, onUpdate]
   );
 
+  function handleRemoveTrained() {
+    const removal = removeTrainedEntries(editable, trainedSkills);
+    if (!removal) return;
+    onUpdate(removal.patch);
+    // Long enough to use the Undo it carries, like Replace's.
+    showTrainedRemoved({ count: removal.removed, undo: removal.undo }, 10000);
+  }
+
+  function undoRemoveTrained() {
+    if (!trainedRemoved) return;
+    cancelTrainedRemoved();
+    onUpdate(trainedRemoved.undo);
+    setTrainedRemoved(null);
+  }
+
   function handleAddMarker() {
     onUpdate(addRemapMarker(editable));
     showMarkerConfirm(true);
@@ -1377,6 +1409,21 @@ export function PlanEditor({
               label: t('plans.fitGoal.add'),
               onClick: () => setFitGoalOpen(true),
             })}
+            {/* Absent, not greyed, when there is nothing to remove (or trained skills are unknown). */}
+            {trainedSkillsKnown &&
+              hasTrainedEntries &&
+              toolAction({
+                icon: <Icon.Done size={Icon.ICON_SIZE.sm} />,
+                label: t('plans.removeTrained'),
+                onClick: handleRemoveTrained,
+              })}
+            {trainedRemoved &&
+              confirmation(
+                t('plans.trainedRemoved', { count: trainedRemoved.count }),
+                <Button size="md" variant="ghost" onClick={undoRemoveTrained}>
+                  {t('plans.importQueueUndo')}
+                </Button>
+              )}
             {markerConfirm && confirmation(t('plans.markerAdded'))}
             {/* Standing, not a post-click toast: the moment the plan carries
                 a Remap Marker, what it saves is a fact about the plan, and
@@ -1772,7 +1819,7 @@ export function PlanEditor({
                         onValueChange={(value) => void setGroupingMode(value as GroupingMode)}
                       >
                         <SelectTrigger
-                          size="sm"
+                          size="md"
                           aria-label={t('plans.groupBy')}
                           className="w-36 lg:scroll-mt-40"
                         >
@@ -1871,7 +1918,7 @@ export function PlanEditor({
           <>
             <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" disabled={queueImporting}>
+                <Button size="md" disabled={queueImporting}>
                   <Icon.ImportClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
                   {t('plans.import')}
                   <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
@@ -1904,7 +1951,7 @@ export function PlanEditor({
             </DropdownMenu>
             <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button size="sm">
+                <Button size="md">
                   <Icon.Export aria-hidden="true" size={Icon.ICON_SIZE.sm} />
                   {t('plans.export')}
                   <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
