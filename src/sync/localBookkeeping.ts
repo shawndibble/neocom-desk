@@ -155,16 +155,6 @@ export async function appendTombstones(key: string, ids: readonly string[]): Pro
   });
 }
 
-/** Forgets `ids`' tombstones, so an undone delete is not pushed as a deletion. */
-export async function removeTombstones(key: string, ids: readonly string[]): Promise<void> {
-  if (ids.length === 0) return;
-  const dropped = new Set(ids);
-  const existing = await readTombstones(key);
-  const remaining = existing.filter((t) => !dropped.has(t.id));
-  if (remaining.length === existing.length) return;
-  await db.settings.put({ key, value: remaining });
-}
-
 /**
  * Drop every device-local sync bookkeeping key for one Character (owner-hash
  * bookmark + every collection's tombstone list). Called when a Character is

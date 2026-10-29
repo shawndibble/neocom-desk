@@ -20,7 +20,7 @@
 // single-doc reads whose ownerHash doesn't match the auth token's claim.
 
 import { collection, doc, setDoc } from 'firebase/firestore/lite';
-import { db, type SkillPlanRecord } from '@/db';
+import { db } from '@/db';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { annotateFailure } from '@/observability/reportFailure';
 import { syncEditableCollection, type SyncContext } from './collectionSync';
@@ -38,7 +38,6 @@ import { getSyncFirestore } from './firebaseApp';
 import { handleOwnerHashChange } from './ownerHash';
 import {
   appendTombstones,
-  removeTombstones,
   clearSeenSyncMarker,
   heartbeatKey,
   readSeenSyncMarker,
@@ -118,16 +117,6 @@ async function recordBulkDeletion(
 /** Delete a Skill Plan locally + tombstone, so the deletion propagates. */
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, SKILL_PLANS, () => db.skillPlans.delete(planId));
-}
-
-/**
- * Undo of `markPlanDeleted`: puts the row back and drops its tombstone. The
- * row is stamped now so it also beats a deletion a sync already pushed.
- */
-export async function restorePlan(plan: SkillPlanRecord): Promise<void> {
-  await db.skillPlans.put({ ...plan, updatedAt: Date.now() });
-  await removeTombstones(tombstoneKey(SKILL_PLANS, plan.characterId), [plan.id]);
-  scheduleSync(plan.characterId, { collections: [SKILL_PLANS.remoteName] });
 }
 
 /** Build Plan analogue of markPlanDeleted — same tombstone semantics. */

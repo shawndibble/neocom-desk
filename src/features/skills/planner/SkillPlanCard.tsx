@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -37,7 +37,6 @@ export function SkillPlanCard({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const isDesktop = useIsDesktop();
-  const [allPlansOpen, setAllPlansOpen] = useState(false);
   const plans = useLiveQuery(
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
     [activeCharacterId]
@@ -63,7 +62,7 @@ export function SkillPlanCard({
       : t('plans.listRowNothingToTrain');
 
   const allPlans = (
-    <Popover open={allPlansOpen} onOpenChange={setAllPlansOpen}>
+    <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm">
           {t('plans.allPlansButton')}
@@ -90,8 +89,7 @@ export function SkillPlanCard({
 
   const actions = (
     <div className="flex items-center justify-between gap-2">
-      {/* Stays while open, so deleting the last plan keeps its Undo toast. */}
-      {plans.length > 0 || allPlansOpen ? allPlans : <span />}
+      {plans.length > 0 ? allPlans : <span />}
       <NewPlanSplitButton activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
     </div>
   );

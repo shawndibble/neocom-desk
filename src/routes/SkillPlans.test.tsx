@@ -39,9 +39,6 @@ import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   markPlanDeleted: (characterId: number, id: string) => markPlanDeletedMock(characterId, id),
-  restorePlan: async (plan: SkillPlanRecord) => {
-    await db.skillPlans.put(plan);
-  },
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
   triggerSync: (characterId: number) => triggerSyncMock(characterId),
   subscribeSyncStatus: (listener: (s: unknown) => void) => subscribeSyncStatusMock(listener),
@@ -466,7 +463,7 @@ describe('SkillPlans CRUD', () => {
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
-  it('deletes a plan at once with an Undo toast, not a confirmation', async () => {
+  it('hides a deleted plan behind an Undo toast and deletes it once the toast ends', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     render(<App />);
@@ -477,18 +474,32 @@ describe('SkillPlans CRUD', () => {
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
 
-    await waitFor(async () =>
-      expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0)
-    );
-    // Deletes MUST go through markPlanDeleted (records a tombstone) — a plain
-    // Dexie delete would let the remote copy resurrect it on next sync.
-    expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1');
     expect(screen.queryByRole('dialog', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    // Pending: the write waits for the toast.
+    expect(markPlanDeletedMock).not.toHaveBeenCalled();
 
-    await user.click(await screen.findByRole('button', { name: 'Undo' }));
-    await waitFor(async () =>
-      expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(1)
+    // Closing the toast commits it. Deletes MUST go through markPlanDeleted
+    // (records a tombstone) — a plain Dexie delete would let the remote copy
+    // resurrect it on next sync.
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1'));
+  });
+
+  it('Undo cancels the delete', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
     );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+
+    expect(markPlanDeletedMock).not.toHaveBeenCalled();
+    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
   });
 
   it('returns to the list via the back link, and via the browser’s own Back after opening a plan', async () => {

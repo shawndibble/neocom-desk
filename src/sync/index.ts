@@ -12,7 +12,6 @@ import { setStatus } from './status';
 import { isOnline } from '@/stores/network';
 import { redactSecrets } from '@/observability/scrub';
 import { reportFailure } from '@/observability/reportFailure';
-import type { SkillPlanRecord } from '@/db';
 import type { ScheduleSyncOptions } from './syncScheduler';
 
 export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
@@ -91,12 +90,6 @@ export function scheduleSync(characterId: number, options?: number | ScheduleSyn
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
   const { markPlanDeleted } = await import('./planSync');
   return markPlanDeleted(characterId, planId);
-}
-
-/** Undo of markPlanDeleted: the plan comes back and its tombstone is dropped. */
-export async function restorePlan(plan: SkillPlanRecord): Promise<void> {
-  const { restorePlan } = await import('./planSync');
-  return restorePlan(plan);
 }
 
 /** Build Plan analogue of markPlanDeleted — same tombstone semantics. */
