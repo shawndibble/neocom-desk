@@ -1058,6 +1058,70 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(caracal.offense.chargelessWeaponCount).toBe(1);
   });
 
+  it('reads hacking and probe strength off a Heron, and a rig or array raises them', async () => {
+    const HERON = 605;
+    const DATA_ANALYZER_II = 30834;
+    const CORE_PROBE_LAUNCHER_II = 4258;
+    const CORE_SCANNER_PROBE_I = 30013;
+    const SCAN_RANGEFINDING_ARRAY_II = 33201;
+    const SMALL_MEMETIC_ALGORITHM_BANK_II = 31244;
+    const SMALL_EMISSION_SCOPE_SHARPENER_II = 31207;
+    const SMALL_GRAVITY_CAPACITOR_UPGRADE_II = 31220;
+    const HACKING = 21718;
+    const modules = (...extra: Fitting['modules']): Fitting['modules'] => [
+      { slot: 'high', slotIndex: 0, typeId: DATA_ANALYZER_II, state: 'active' },
+      {
+        slot: 'high',
+        slotIndex: 1,
+        typeId: CORE_PROBE_LAUNCHER_II,
+        state: 'active',
+        chargeTypeId: CORE_SCANNER_PROBE_I,
+      },
+      ...extra,
+    ];
+    const rig = (typeId: number): Fitting['modules'][number] => ({
+      slot: 'rig',
+      slotIndex: 0,
+      typeId,
+      state: 'online',
+    });
+    const explore = async (list: Fitting['modules']) =>
+      (
+        await computeFittingStats(
+          { name: 'Heron', shipTypeId: HERON, modules: list, drones: [], cargo: [] },
+          buildAllVProfile([...SUPPORT_SKILL_IDS, HACKING])
+        )
+      ).explore;
+
+    const bare = await explore(modules());
+    expect(bare.hacking.coherence).toBeGreaterThan(0);
+    expect(bare.probeStrength).toBeGreaterThan(0);
+
+    // The Data rig raises a Data Analyzer; the Relic rig does not.
+    expect(
+      (await explore(modules(rig(SMALL_MEMETIC_ALGORITHM_BANK_II)))).hacking.coherence
+    ).toBeGreaterThan(bare.hacking.coherence);
+    expect((await explore(modules(rig(SMALL_EMISSION_SCOPE_SHARPENER_II)))).hacking.coherence).toBe(
+      bare.hacking.coherence
+    );
+    // The probe rig and the array raise the loaded probe's strength.
+    expect(
+      (await explore(modules(rig(SMALL_GRAVITY_CAPACITOR_UPGRADE_II)))).probeStrength
+    ).toBeGreaterThan(bare.probeStrength);
+    const array: Fitting['modules'][number] = {
+      slot: 'medium',
+      slotIndex: 0,
+      typeId: SCAN_RANGEFINDING_ARRAY_II,
+      state: 'online',
+    };
+    expect((await explore(modules(array))).probeStrength).toBeGreaterThan(bare.probeStrength);
+    const heron = await computeFittingStats(
+      { name: 'Heron', shipTypeId: HERON, modules: modules(), drones: [], cargo: [] },
+      buildAllVProfile([...SUPPORT_SKILL_IDS, HACKING])
+    );
+    expect(goalAvailability('explore', heron)).toEqual({ available: true });
+  });
+
   it('mines more with a crystal loaded, and counts launched mining drones', () => {
     const hulk = (modules: Fitting['modules'], drones: Fitting['drones'] = []): Fitting => ({
       name: 'Hulk',

@@ -36,6 +36,7 @@ import {
 } from './makeItFit';
 import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
+import { exploreFigures } from './explore';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
 import { gainMetrics, roleChanges, type RoleChange } from './skillGains';
@@ -47,7 +48,7 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats }
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, then command and fleet. */
+/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, then command and fleet, then explore. */
 export const IMPROVE_GOALS = [
   ...COMBAT_GOALS,
   'mining',
@@ -59,6 +60,7 @@ export const IMPROVE_GOALS = [
   'tackle',
   'ewar',
   'command',
+  'explore',
 ] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
@@ -269,7 +271,8 @@ export type GoalAvailability =
         | 'noCapTransfer'
         | 'noTackle'
         | 'noEwar'
-        | 'noCommand';
+        | 'noCommand'
+        | 'noExplore';
     };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
@@ -314,6 +317,8 @@ export function goalAvailability(
   if (goal === 'ewar' && ewarOf(before).strength <= 0)
     return { available: false, reason: 'noEwar' };
   if (goal === 'command' && !hasCommand(before)) return { available: false, reason: 'noCommand' };
+  if (goal === 'explore' && exploreFigures(before.explore, before.explore).length === 0)
+    return { available: false, reason: 'noExplore' };
   return { available: true };
 }
 
@@ -403,6 +408,12 @@ function scoreOf(
       );
       return meanGain([...kinds, [was.range, now.range]]);
     }
+    case 'explore':
+      // Hacking and scanning first; speed and align count half, as an explorer wants to be gone sooner.
+      return (
+        meanGain(exploreFigures(before.explore, after.explore)) +
+        (metrics.speed + metrics.align) / 2
+      );
   }
 }
 

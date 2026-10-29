@@ -63,6 +63,9 @@ const EWAR_GROUPS: readonly number[] = [201, 208, 291, 379];
 /** Command Burst, Compressor, Industrial Core. */
 const COMMAND_GROUPS: readonly number[] = [1770, 4174, 515];
 
+/** Data and Relic Analyzer (538), Scan Rangefinding Array (1223), the speed and align groups, and the scanning rigs (1233: Memetic Algorithm Bank, Emission Scope Sharpener, Gravity Capacitor Upgrade, Signal Focusing Kit). */
+const EXPLORE_GROUPS: readonly number[] = [538, 1223, 1233, ...SPEED_GROUPS];
+
 /** The module groups, beyond a module's own, that Rework tries for each Improve Goal. The tank groups are added per Defense Choice. */
 const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   overall: [...DAMAGE_GROUPS, ...REACH_GROUPS, ...SPEED_GROUPS, ...CAP_GROUPS],
@@ -80,6 +83,7 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   tackle: TACKLE_GROUPS,
   ewar: EWAR_GROUPS,
   command: COMMAND_GROUPS,
+  explore: EXPLORE_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -180,6 +184,7 @@ export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'tackle') return ['scram', 'web'];
   if (goal === 'ewar') return ['ewar'];
   if (goal === 'command') return ['fleet'];
+  if (goal === 'explore') return ['analyzer', 'probeLauncher', 'scanArray', 'propulsion'];
   return [];
 }
 

@@ -226,6 +226,7 @@ const FIT_DERIVED_GOALS: readonly ImproveGoal[] = [
   'tackle',
   'ewar',
   'command',
+  'explore',
 ];
 
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
@@ -473,6 +474,23 @@ export function ImprovePanel({
           });
         })
         .join(' · ');
+    }
+    if (goal === 'explore') {
+      const [was, now] = [own.explore, option.after.explore];
+      const parts = [
+        ['coherence', was.hacking.coherence, now.hacking.coherence],
+        ['access', was.hacking.access, now.hacking.access],
+        ['probe', was.probeStrength, now.probeStrength],
+      ] as const;
+      const changed = parts
+        .filter(([, before, after]) => before > 0 && before !== after)
+        .map(([key, before, after]) =>
+          t(`fittings.improve.explore.${key}`, {
+            before: m3sFormat(before),
+            after: m3sFormat(after),
+          })
+        );
+      return changed.length > 0 ? changed.join(' · ') : null;
     }
     if (goal === 'ewar') {
       const [was, now] = [ewarOf(own), ewarOf(option.after)];

@@ -26,6 +26,7 @@ export function neutralExtendedStats(): Pick<
   | 'tank'
   | 'support'
   | 'mining'
+  | 'explore'
   | 'fleetSupport'
   | 'fighters'
   | 'sensor'
@@ -46,6 +47,7 @@ export function neutralExtendedStats(): Pick<
       bay: { used: 0, total: 0 },
     },
     mining: { rows: [], perSecond: 0, perHour: 0, wastePerSecond: 0, wastePct: 0 },
+    explore: { hacking: { coherence: 0, strength: 0, access: 0 }, probeStrength: 0 },
     fleetSupport: { bursts: [], compressors: [], core: null },
     support: {
       rows: [],

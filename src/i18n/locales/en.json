@@ -1375,7 +1375,8 @@
         "transfer": "Transfer more",
         "tackle": "Hold tighter",
         "ewar": "Stronger EWAR",
-        "command": "Stronger fleet support"
+        "command": "Stronger fleet support",
+        "explore": "Explore better"
       },
       "unavailable": {
         "noWeapons": "Nothing on this fit deals damage",
@@ -1388,7 +1389,8 @@
         "noCapTransfer": "No remote capacitor transmitters on this fit",
         "noTackle": "No warp scramblers, disruptors or webs on this fit",
         "noEwar": "No electronic warfare modules on this fit",
-        "noCommand": "No command bursts, compressors or industrial core on this fit"
+        "noCommand": "No command bursts, compressors or industrial core on this fit",
+        "noExplore": "No running analyzer or loaded scan probe on this fit"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
@@ -1453,7 +1455,8 @@
         "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails.",
         "tackle": "No variation of a fitted scrambler, disruptor or web holds tighter within the guardrails.",
         "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails.",
-        "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails."
+        "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails.",
+        "explore": "No variation of a fitted analyzer, scan module or rig hacks or scans better within the guardrails."
       },
       "belowPrice": "Your budget ({{budget}}) is below this fit's price ({{price}}). Raise it to search.",
       "closest": "Closest swaps",
@@ -1570,6 +1573,11 @@
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
       "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
       "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
+      "explore": {
+        "coherence": "Virus coherence {{before}} → {{after}}",
+        "access": "Access difficulty bonus {{before}} → {{after}}",
+        "probe": "Probe strength {{before}} → {{after}}"
+      },
       "command": {
         "strength": "Burst strength {{before}} → {{after}}",
         "burstRange": "Burst reach {{before}} → {{after}} km",
