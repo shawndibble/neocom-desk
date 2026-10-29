@@ -388,6 +388,20 @@ function scoreOf(
 /** Cheaper may give up this much damage, tank or speed: a bit worse for a lot less ISK is the point. Deliberately looser than Make it fit's `STAT_TOLERANCE`. */
 const CHEAPER_TOLERANCE = 0.1;
 
+/** Whether the fit has a module the pilot switches on (an MWD, a booster, a weapon). */
+const hasToggledModule = (stats: FittingStats): boolean =>
+  stats.modules.some((module) => module.maxState === 'active' || module.maxState === 'overload');
+
+/** The fit with every toggled module switched off. */
+const withTogglesOff = (fitting: Fitting): Fitting => ({
+  ...fitting,
+  modules: fitting.modules.map((module) =>
+    module.state === 'active' || module.state === 'overload'
+      ? { ...module, state: 'online' }
+      : module
+  ),
+});
+
 /** The first Guardrail `after` breaks, or null. */
 function brokenGuardrail(
   goal: ImproveGoal,
@@ -832,8 +846,23 @@ export async function findImprovements({
   let failed = 0;
   let stopped = false;
 
+  /** Whether a ship with toggled modules is stable once they are off; false for one with none. */
+  async function stableWhenToggledOff(swapped: Fitting, after: FittingStats): Promise<boolean> {
+    if (!hasToggledModule(after)) return false;
+    try {
+      return (await stats(withTogglesOff(swapped))).capacitor.stable;
+    } catch {
+      // Blocked, the cautious side: a failed calculation must not let a fix break the capacitor.
+      return false;
+    }
+  }
+
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
-  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats): boolean {
+  async function take(
+    candidate: ImproveCandidate,
+    swapped: Fitting,
+    after: FittingStats
+  ): Promise<boolean> {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
@@ -850,9 +879,14 @@ export async function findImprovements({
       lost: lostStats(before, after),
     };
     const overSpend = overSpendCap(mode, spendCap, fitTotal, iskDelta);
-    // Flying it beats keeping the stats: only the fit's resources and the spend still bind.
+    // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target);
-    const guardrail = (fix && broken !== 'budget' ? null : broken) ?? (overSpend ? 'spend' : null);
+    // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
+    const capStillBinds =
+      fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
+    const guardrail =
+      (fix && broken !== 'budget' && !capStillBinds ? null : broken) ??
+      (overSpend ? 'spend' : null);
     // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
     if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
     else (fix ? flyable : kept).push(option);
@@ -878,7 +912,7 @@ export async function findImprovements({
     onProgress?.(checked, candidates.length);
     if (after === null) continue;
     if (candidate.fromTypeId !== null) swaps.push({ candidate, after });
-    take(candidate, swapped, after);
+    await take(candidate, swapped, after);
   }
   // Every calculation failed: the engine is broken, not the fit beyond improving.
   if (checked > 0 && failed === checked) throw new Error('Every Improve calculation failed');
@@ -913,7 +947,7 @@ export async function findImprovements({
     try {
       const after = await stats(swapped);
       if (isCancelled?.()) return null;
-      if (fitsResourceBudget(after)) take(candidate, swapped, after);
+      if (fitsResourceBudget(after)) await take(candidate, swapped, after);
     } catch {
       // Left out, as a single's failure is.
     }
@@ -950,10 +984,10 @@ export async function findImprovements({
       if (isCancelled?.()) return null;
       if (found.options.length === 0) continue;
       // The fix leaves its greyed row only once a bundle took its place (a rule break can drop them all).
-      const taken = found.options
-        .slice(0, FLYABLE_PER_FIX)
-        .map((option) =>
-          take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
+      const taken: boolean[] = [];
+      for (const option of found.options.slice(0, FLYABLE_PER_FIX))
+        taken.push(
+          await take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
         );
       if (taken.some(Boolean)) flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
     }

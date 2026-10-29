@@ -25,6 +25,8 @@ interface Row {
   cpu?: number;
   /** Turns the capacitor unstable. */
   capUnstable?: boolean;
+  /** A module the pilot switches on; it turns the capacitor unstable only while running. */
+  toggled?: boolean;
   /** Signature radius added, in m. */
   sig?: number;
   /** Capacitor recharge time added, in ms. */
@@ -33,17 +35,20 @@ interface Row {
   breaks?: RuleBreak[];
 }
 
-function stats(rows: Row[]): FittingStats {
+function stats(rows: Row[], states: string[] = []): FittingStats {
   const sum = (key: 'dps' | 'ehp' | 'speed' | 'cpu' | 'sig' | 'recharge') =>
     rows.reduce((total, row) => total + (row[key] ?? 0), 0);
   const base = baseFittingStats();
   return {
     ...base,
     ruleBreaks: rows.flatMap((row) => row.breaks ?? []),
+    modules: rows.flatMap((row, i) =>
+      row.toggled ? [{ state: states[i] ?? 'online', maxState: 'active' }] : []
+    ),
     cpuUsed: sum('cpu'),
     capacitorRechargeTime: base.capacitorRechargeTime + sum('recharge'),
     ehp: base.ehp + sum('ehp'),
-    capacitor: rows.some((row) => row.capUnstable)
+    capacitor: rows.some((row, i) => row.capUnstable || (row.toggled && states[i] === 'active'))
       ? { stable: false, depletesInSeconds: 120 }
       : base.capacitor,
     navigation: { ...base.navigation, maxVelocity: base.navigation.maxVelocity + sum('speed') },
@@ -65,7 +70,10 @@ function fit(typeIds: number[]): Fitting {
 }
 
 const calc = (table: Record<number, Row>) => async (f: Fitting) =>
-  stats(f.modules.map((m) => table[m.typeId] ?? {}));
+  stats(
+    f.modules.map((m) => table[m.typeId] ?? {}),
+    f.modules.map((m) => m.state)
+  );
 
 const candidate = (fromTypeId: number, toTypeId: number, slotIndex = 0): ImproveCandidate => ({
   fromTypeId,
@@ -247,14 +255,67 @@ describe('findImprovements replacing an unflyable module', () => {
     expect(result.tradeOffs).toEqual([]);
   });
 
-  it('ignores the capacitor and Cheaper stat guardrails, but not the fit’s CPU', async () => {
-    const table = { 1: {}, 2: { capUnstable: true, dps: -50 }, 3: { cpu: 999 } };
-    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3)], { 1: 100, 2: 500 });
+  it('ignores the Cheaper stat guardrails, but not the fit’s CPU or a stable capacitor', async () => {
+    const table = { 1: {}, 2: { dps: -50 }, 3: { cpu: 999 }, 4: { capUnstable: true } };
+    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3), fix(1, 4)], {
+      1: 100,
+      2: 500,
+    });
     expect(toIds(result.makeFlyable)).toEqual([2]);
     expect(result.rejected).toEqual([]);
     expect(result.flyableBlocked.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
       [3, 'budget'],
+      [4, 'capStable'],
     ]);
+  });
+});
+
+describe('findImprovements replacing an unflyable module and the capacitor', () => {
+  const fix: ImproveCandidate = { ...candidate(1, 2), fixesUnflyable: true };
+  const running = (typeIds: number[]) =>
+    ({
+      ...fit(typeIds),
+      modules: typeIds.map((typeId, slotIndex) => ({
+        slot: 'low',
+        slotIndex,
+        typeId,
+        state: 'active',
+      })),
+    }) as unknown as Fitting;
+
+  it('allows a toggled replacement that is stable with the toggled modules off', async () => {
+    const table = { 1: {}, 2: { toggled: true } };
+    const result = await search('damage', table, [fix], {}, running([1]));
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+  });
+
+  it('blocks one that is still unstable with the toggled modules off', async () => {
+    const table = { 1: {}, 2: { capUnstable: true }, 5: { toggled: true } };
+    const result = await search('damage', table, [fix], {}, fit([1, 5]));
+    expect(result.makeFlyable).toEqual([]);
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
+  });
+
+  it('still offers another replacement that keeps the capacitor stable', async () => {
+    const table = { 1: {}, 2: { capUnstable: true }, 3: {} };
+    const result = await search('damage', table, [
+      fix,
+      { ...candidate(1, 3), fixesUnflyable: true },
+    ]);
+    expect(toIds(result.makeFlyable)).toEqual([3]);
+    expect(result.flyableBlocked.map((r) => r.candidate.toTypeId)).toEqual([2]);
+  });
+
+  it('leaves a ship whose capacitor was already unstable alone', async () => {
+    const table = { 1: { capUnstable: true }, 2: { capUnstable: true } };
+    const result = await search('damage', table, [fix]);
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+  });
+
+  it('blocks an unstable replacement on a ship with nothing to toggle', async () => {
+    const table = { 1: {}, 2: { capUnstable: true } };
+    const result = await search('damage', table, [fix], {}, running([1]));
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
   });
 });
 
