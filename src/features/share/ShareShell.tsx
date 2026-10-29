@@ -19,17 +19,21 @@ interface ShareShellProps {
   title: string;
   /** Keep the title for screen readers only, when the page body already says what it is. */
   hideTitle?: boolean;
-  /** The page's own primary controls, e.g. a table's export menu. On a `wide` page they sit at the right of the row under the header. */
+  /** The page's own primary controls, e.g. a table's export menu. On a `compact` or `wide` page they sit at the right of the row under the header. */
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
   openInApp?: OpenInApp;
-  /** Widens the frame for a page that lays out two columns, and shrinks the header to the brand and the login, the title kept for screen readers only; the other share pages stay a single narrow one. */
-  wide?: boolean;
-  /** A note for a signed-out visitor. On a `wide` page it fills the strip beside the page's `actions`. */
+  /**
+   * `classic` (default): the original header, a title row, a 768px frame. `compact`: the brand and
+   * login in one header row over a divider, the title kept for screen readers only, the same
+   * 768px frame. `wide`: `compact` in a 896px frame, for a two-column page.
+   */
+  layout?: 'classic' | 'compact' | 'wide';
+  /** A note for a signed-out visitor. On a `compact` or `wide` page it fills the strip beside the page's `actions`. */
   notice?: ReactNode;
-  /** The last thing on a `wide` page, a short chip rather than a sentence (a link's expiry). */
+  /** The last thing on a `compact` or `wide` page, a short chip rather than a sentence (a link's expiry). */
   footer?: ReactNode;
-  /** Beside the notice strip, on `wide` pages (the shared Fitting's ship and name). */
+  /** Beside the notice strip, on `compact` and `wide` pages (the shared Fitting's ship and name). */
   lead?: ReactNode;
   children: ReactNode;
 }
@@ -47,7 +51,7 @@ export function ShareShell({
   hideTitle,
   actions,
   openInApp,
-  wide,
+  layout = 'classic',
   notice,
   lead,
   footer,
@@ -97,10 +101,12 @@ export function ShareShell({
     </Link>
   );
 
-  if (wide) {
+  if (layout !== 'classic') {
     // The login stays in the header; the page's own action rides in the notice strip.
     return (
-      <div className="mx-auto flex min-h-screen max-w-4xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
+      <div
+        className={`mx-auto flex min-h-screen ${layout === 'wide' ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
+      >
         <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
           <Link
             to="/"

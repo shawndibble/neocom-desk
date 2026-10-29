@@ -174,7 +174,7 @@ export function FittingShareView({
   // Same frame as the ready page, so a stored link does not swap frames while the count loads.
   if (characterCount === undefined) {
     return (
-      <ShareShell title={t('fittingShare.title')} wide>
+      <ShareShell title={t('fittingShare.title')} layout="wide">
         <div className="flex justify-center py-10">
           <Spinner label={t('common.loading')} />
         </div>
@@ -209,7 +209,7 @@ export function FittingShareView({
     <ShareShell
       title={t('fittingShare.title')}
       openInApp={openInApp}
-      wide
+      layout="wide"
       notice={t('fittingShare.banner')}
       lead={
         state.status === 'ready' ? (

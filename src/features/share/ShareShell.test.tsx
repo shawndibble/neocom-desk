@@ -16,7 +16,7 @@ describe('ShareShell wide', () => {
       <MemoryRouter>
         <ShareShell
           title="Shared fitting"
-          wide
+          layout="wide"
           footer={<span>Expires soon</span>}
           lead={<span>Heron</span>}
           notice="Shown at every skill level V."
