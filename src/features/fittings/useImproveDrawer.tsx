@@ -340,7 +340,7 @@ export function useImproveDrawer({
     />
   );
 
-  // Only once a search found something: the bar (ImprovePanel's ImproveFooter) is
+  // Only once a search found something: the bar (ImproveFooter) is
   // drawn for results alone, and an empty footer is a stray line.
   const found =
     search.state.status === 'done' &&
