@@ -154,7 +154,8 @@ function BandTable({
             <th
               scope="colgroup"
               className={cx(
-                'border-b border-line bg-panel-2 px-3 py-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
+                eyebrowClassName,
+                'border-b border-line bg-panel-2 px-3 py-1.5 text-left',
                 'sticky left-0 z-10'
               )}
             >

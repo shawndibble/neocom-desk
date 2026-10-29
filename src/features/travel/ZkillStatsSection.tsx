@@ -11,6 +11,7 @@
  * zKillboard sends the same body for either kind of id (`parsePilotStats`);
  * only the no-history wording names which one it is.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, InfoTooltip, IskAmount, TypeIcon } from '@/components/ui';
@@ -30,8 +31,7 @@ const NO_HISTORY_HINT = {
   alliance: 'travel.pilot.noHistoryHintAlliance',
 } as const;
 
-const termClassName =
-  'flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const termClassName = `flex items-center gap-1.5 ${eyebrowClassName}`;
 
 const TONE_CLASS = { positive: 'text-isk-pos', negative: 'text-isk-neg' } as const;
 

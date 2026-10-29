@@ -1,3 +1,4 @@
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, RowMoreActions, TextInput } from '@/components/ui';
@@ -17,8 +18,7 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 import { fixed1 } from '@/lib/fixedFormat';
 
-export const RACK_LABEL_CLASS =
-  'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+export const RACK_LABEL_CLASS = `mb-1 ${eyebrowClassName}`;
 
 interface ResourceBarProps {
   label: string;

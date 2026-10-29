@@ -3,6 +3,7 @@
  * plan's hub and refined, against buying the minerals. The refining facility is
  * stated, and shares the synced structure rate with the Assets ore dialog.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fixed1 } from '@/lib/fixedFormat';
@@ -59,8 +60,7 @@ interface BuyOreData {
   names: ReadonlyMap<number, string>;
 }
 
-const TABLE_TITLE_TEXT =
-  'border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const TABLE_TITLE_TEXT = `border-b border-line bg-panel-2 px-2.5 py-1.5 ${eyebrowClassName}`;
 
 export function BuyOreDialog({
   open,

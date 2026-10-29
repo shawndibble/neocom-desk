@@ -1,3 +1,4 @@
+import { eyebrowClassName } from './eyebrowClassName';
 import { Select as SelectPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
@@ -128,10 +129,7 @@ export function SelectLabel({ className, ...props }: ComponentProps<typeof Selec
       // Indented to `pl-7` like an item's text, so a group's title and its
       // members share one left edge — the item indent exists to clear the
       // check mark, and a label sitting outside it reads as ragged.
-      className={cx(
-        'px-2 pt-2 pb-1 pl-7 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
-        className
-      )}
+      className={cx(eyebrowClassName, 'px-2 pt-2 pb-1 pl-7', className)}
       {...props}
     />
   );

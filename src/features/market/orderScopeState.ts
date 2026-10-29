@@ -4,6 +4,7 @@
  * sell-through estimate, my rank at my own station, and the scope table's CSV
  * rows. No JSX — `OrderDetailModal.tsx` renders them.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { useTranslation } from 'react-i18next';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
@@ -255,5 +256,4 @@ export function stationRank(
 export const CELL = 'border-t border-line px-2 py-1.5';
 
 /** A scope table column header. */
-export const COLUMN_HEADER =
-  'px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+export const COLUMN_HEADER = `px-2 pt-2 ${eyebrowClassName}`;
