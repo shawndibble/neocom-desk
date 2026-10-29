@@ -267,10 +267,6 @@ export interface WorkbenchHullRows {
   allOutOfDate: boolean;
   /** The Default Trade Hub the prices are from. */
   hub: TradeHub;
-  /** This hub's prices are on their way; false while there is nothing to price. */
-  pricing: boolean;
-  /** At least one row has a price. */
-  anyPriced: boolean;
   /** A Load is under way. */
   loading: boolean;
   /** Loads a row's fit from its stored EFT and hands it to `onOpen`; a failure marks the row. */
@@ -388,8 +384,6 @@ export function useWorkbenchHullRows(
     outOfDateCount: outOfDate.length,
     allOutOfDate: outOfDate.length > 0 && current.length === 0,
     hub,
-    pricing: priceKey !== null && prices === null,
-    anyPriced: priceById.size > 0,
     loading: loadingId !== null,
     load,
   };
