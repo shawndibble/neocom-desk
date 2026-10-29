@@ -864,7 +864,7 @@ function MovePlanTabBody({
               } else setUrlValues(NO_MOVE_PLAN);
               focusAfterCommit(deliverHeadingRef);
             }}
-            onShowRoute={showRoute}
+            onShowRoute={() => void showRoute()}
             routing={routing}
             routeFailed={routeFailed}
             onPackShip={packShip}
