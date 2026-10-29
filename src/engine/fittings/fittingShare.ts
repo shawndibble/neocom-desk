@@ -159,8 +159,7 @@ export type EncodeFittingShareResult =
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
 export type DecodeFittingShareResult =
-  | { ok: true; value: DecodedFittingShare }
-  | { ok: false; reason: ShareDecodeError };
+  { ok: true; value: DecodedFittingShare } | { ok: false; reason: ShareDecodeError };
 
 /** Real hulls never approach these — they only bound a forged payload cheaply. */
 export const MAX_SLOTS_PER_CATEGORY = 8;
