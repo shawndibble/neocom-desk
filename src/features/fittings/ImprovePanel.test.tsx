@@ -224,6 +224,40 @@ describe('ImprovePanel', () => {
     expect(onApply).toHaveBeenCalledWith([gain, trade]);
   });
 
+  it('shows a tank conversion as one row naming what it removes, adds and frees', () => {
+    const conversion = option(
+      31,
+      { ehp: 1500 },
+      {
+        candidate: {
+          fromTypeId: null,
+          toTypeId: 31,
+          at: [
+            { slot: 'medium', slotIndex: 0 },
+            { slot: 'medium', slotIndex: 1 },
+          ],
+          conversion: {
+            side: 'armor',
+            removes: [
+              {
+                typeId: 41,
+                at: [
+                  { slot: 'medium', slotIndex: 0 },
+                  { slot: 'medium', slotIndex: 1 },
+                  { slot: 'medium', slotIndex: 2 },
+                ],
+              },
+            ],
+            freed: { high: 0, medium: 1, low: 0 },
+          },
+        },
+      }
+    );
+    renderPanel(search(done({ noDownside: [conversion] })));
+    expect(screen.getByText('Convert to armor tank')).toBeInTheDocument();
+    expect(screen.getByText(/Removes 3 modules, adds 2\. Frees 1 mid slot\./)).toBeInTheDocument();
+  });
+
   it('lists replacements for unflyable modules under Make Flyable, with the swaps that pay for them', async () => {
     const fix = option(
       12,
