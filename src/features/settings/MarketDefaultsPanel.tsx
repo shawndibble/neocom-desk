@@ -21,7 +21,7 @@ import {
   ITEM_FLAG_MULTIPLE_OPTIONS,
   useItemFlagMultiple,
 } from '@/features/contractSearch/contractFlagThreshold';
-import { InlinePercent } from '@/features/refining/InlinePercent';
+import { RefiningSetupFields } from '@/features/refining/RefiningSetupFields';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { LpValueField } from '@/features/settings/LpValueSettingsForm';
 import {
@@ -70,25 +70,7 @@ export function MarketDefaultsPanel() {
             </Select>
           </Field>
 
-          <Field label={t('settings.refiningYieldLabel')} note={t('settings.refiningYieldHint')}>
-            <InlinePercent
-              fraction={refining.setup.stationRate}
-              name={t('settings.refiningYieldLabel')}
-              min={1}
-              max={100}
-              onCommit={(fraction) => void refining.setYieldRate(fraction)}
-            />
-          </Field>
-
-          <Field label={t('settings.refiningTaxLabel')} note={t('settings.refiningTaxHint')}>
-            <InlinePercent
-              fraction={refining.setup.taxRate}
-              name={t('settings.refiningTaxLabel')}
-              min={0}
-              max={100}
-              onCommit={(fraction) => void refining.setTaxRate(fraction)}
-            />
-          </Field>
+          <RefiningSetupFields refining={refining} />
 
           <ChipRow
             label={t('settings.courierCollateralLabel')}
