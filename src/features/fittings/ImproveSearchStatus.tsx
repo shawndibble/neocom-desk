@@ -8,7 +8,14 @@ import { formatIskCompact } from '@/lib/isk';
 import type { ImproveSearch } from './useImprove';
 
 /** The search's own state: progress, cancelled, below the budget's price, or failed. Nothing once done. */
-export function ImproveSearchStatus({ search }: { search: ImproveSearch }) {
+export function ImproveSearchStatus({
+  search,
+  round,
+}: {
+  search: ImproveSearch;
+  /** A multi-round search (Makeover): the round it is in and the most it will run. */
+  round?: { current: number; max: number };
+}) {
   const { t } = useTranslation();
   const { state } = search;
   return (
@@ -17,7 +24,14 @@ export function ImproveSearchStatus({ search }: { search: ImproveSearch }) {
         <div className="space-y-2">
           <p className="text-text-dim flex items-center gap-2 text-sm">
             <Spinner />
-            {t('fittings.improve.checking', { checked: state.checked, total: state.total })}
+            {round
+              ? t('fittings.improve.checkingRound', {
+                  round: round.current,
+                  max: round.max,
+                  checked: state.checked,
+                  total: state.total,
+                })
+              : t('fittings.improve.checking', { checked: state.checked, total: state.total })}
           </p>
           <ProgressBar
             label={t('fittings.improve.progressLabel')}

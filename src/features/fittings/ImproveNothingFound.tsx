@@ -24,6 +24,8 @@ interface Props {
   settings: ImproveSettings;
   labels: ImproveLabels;
   onSearchAgain: () => void;
+  /** Switches Reach to Rework and searches again; absent: no nudge. */
+  onSearchRework?: () => void;
 }
 
 export function ImproveNothingFound({
@@ -35,8 +37,10 @@ export function ImproveNothingFound({
   settings,
   labels,
   onSearchAgain,
+  onSearchRework,
 }: Props) {
   const { t } = useTranslation();
+  const nudge = settings.reach === 'upgrade' && !noModules && onSearchRework !== undefined;
   return (
     <div className="space-y-2">
       <p className="text-sm">
@@ -70,7 +74,16 @@ export function ImproveNothingFound({
           </ul>
         </MakeItFitSection>
       )}
-      {!noModules && (
+      {nudge && (
+        <div className="border-line space-y-2 rounded-xs border p-2">
+          <p className="text-sm">{t('fittings.improve.reworkNudge.text')}</p>
+          <Button variant="primary" size="sm" onClick={onSearchRework}>
+            {t('fittings.improve.reworkNudge.button')}
+          </Button>
+          <p className="text-text-dim text-xs">{t('fittings.improve.reworkNudge.time')}</p>
+        </div>
+      )}
+      {!noModules && !nudge && (
         <p className="text-text-dim text-xs">{t(`fittings.improve.widen.${settings.reach}`)}</p>
       )}
     </div>

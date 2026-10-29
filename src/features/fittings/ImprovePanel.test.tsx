@@ -602,9 +602,9 @@ describe('ImprovePanel', () => {
     const config = settings();
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config);
     await openSettings();
-    expect(screen.queryByRole('checkbox', { name: 'Rigs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /^Rigs/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Rigs and officer modules' }));
-    const rigs = screen.getByRole('checkbox', { name: 'Rigs' });
+    const rigs = screen.getByRole('checkbox', { name: /^Rigs/ });
     expect(rigs).not.toBeChecked();
     await userEvent.click(rigs);
     expect(config.onIncludeRigsChange).toHaveBeenCalledWith(true);
