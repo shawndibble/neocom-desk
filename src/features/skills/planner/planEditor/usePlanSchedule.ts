@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { SkillPlanRecord } from '@/db';
+import type { SkillPlanRecord, WhatIfImplantSelection } from '@/db';
 import type { AttributeBaseline } from '@/engine/attributeBaseline';
 import { projectQueueEnd } from '@/engine/skills/queueStatus';
 import type { Attributes, CloneState, Implants, TrainedSkill } from '@/engine/types';
@@ -7,11 +7,7 @@ import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { SkillCatalog } from '../../skillMap';
 import { schedulePlanWith, type PlanScheduleInputs, type SchedulablePlan } from '../planSchedule';
 import { pinnedInProgressEntry } from '../queueRows';
-import {
-  DEFAULT_WHAT_IF_SELECTION,
-  isHypotheticalLens,
-  normalizeWhatIfSelection,
-} from '../whatIfImplants';
+import { DEFAULT_WHAT_IF_SELECTION, isHypotheticalLens } from '../whatIfImplants';
 
 export type PlanScheduleResult = ReturnType<typeof schedulePlanWith>;
 
@@ -35,7 +31,7 @@ export function usePlanSchedule({
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
   cloneState: CloneState;
-  whatIf: ReturnType<typeof normalizeWhatIfSelection>;
+  whatIf: WhatIfImplantSelection;
 }) {
   // The queue's lead (the levels ahead of the first one this plan lists)
   // trains first, so the plan starts when it ends. One instant feeds the schedule,

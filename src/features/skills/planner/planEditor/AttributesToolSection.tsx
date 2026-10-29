@@ -19,7 +19,7 @@ export function AttributesToolSection({
   return (
     <div className="space-y-2 text-xs">
       {/* The clone's real sheet, never re-rendered through the what-if
-              lens below: "current" has to keep meaning current, or the one
+              Assumptions lens: "current" has to keep meaning current, or the one
               honest reading of the character on this page becomes another
               hypothetical. The lens's effect is visible where it belongs —
               in the plan's own numbers. */}
@@ -31,7 +31,7 @@ export function AttributesToolSection({
         short
       />
       {/* An impossible sheet is reported, never quietly approximated: the
-              scheduler below is running on the placeholder spread, and a
+              scheduler is running on the placeholder spread, and a
               number presented without that caveat is the bug this fixes. */}
       {attributeBaseline?.kind === 'impossible' && (
         <p className="text-warning">

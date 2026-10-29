@@ -39,7 +39,7 @@ export function useRemapMarkers({
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
   const normalizedMarkerAttributes = useMemo(() => alignedMarkerAttributes(editable), [editable]);
 
-  // `markersAtCurrentPositions` (from the schedule, above) already carries a
+  // `markersAtCurrentPositions` (from the schedule) already carries a
   // manual override's real attributes when one is set — exactly what the
   // savings badge and Accept must cost against (#1232). But RemapMarkerModal
   // needs the OTHER half for a marker that already has an override: what the

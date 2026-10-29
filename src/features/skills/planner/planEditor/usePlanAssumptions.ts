@@ -47,7 +47,7 @@ export function usePlanAssumptions({
   // held for the session: it is one of the two lenses every number on this
   // page is costed under, so a plan that reopened on a different lens reopened
   // quoting different training times than the ones the user left it showing.
-  // Device-local view preferences (Columns, Group-by above) are the opposite
+  // Device-local view preferences (Columns, Group-by: `usePlanViewPrefs`) are the opposite
   // case — they change what is *shown*, not what is *computed*.
   //
   // Normalized on read rather than trusted: the value can arrive from another
@@ -85,7 +85,7 @@ export function usePlanAssumptions({
   // A pure derivation, not seeded state — the prefill rule and its "neither
   // field stored is what 'unanswered' means" gate live in planBooster.ts,
   // where they are unit-tested; the moment the user touches any control the
-  // whole answer is written back through `onChange` below. Field-level
+  // whole answer is written back through `onChange` in `AssumptionControls`. Field-level
   // editing state (draft text, the blur-commit rule, quick picks) lives in
   // `BoosterList` itself, which owns rendering this control.
   const planBoosters = useMemo<PlanBooster[]>(

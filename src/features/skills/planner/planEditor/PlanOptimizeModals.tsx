@@ -91,7 +91,7 @@ export function PlanOptimizeModals({
         // reorder" — true only when a remap was actually weighed and lost,
         // never when there was none to spend. No segments on this branch:
         // a search that found nothing to remap has no plan-as-trained to
-        // show, unlike the markers Modal below, which already has one.
+        // show, unlike the markers Modal, which already has one.
         segments={optimizeVerdict?.kind === 'saves' && optimizeResult ? optimizeResult : null}
         message={
           optimizeVerdict?.kind === 'noRemapsAvailable'

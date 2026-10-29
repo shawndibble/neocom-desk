@@ -51,8 +51,8 @@ export function usePlanImport({
   );
   const [importError, setImportError] = useState<string | null>(null);
   // A queue import parsed on a non-empty plan (#1402): held until the user
-  // picks Append or Replace on the choice Modal below. Scoped to plan.id,
-  // same as undoImport below — this component doesn't remount on a plan
+  // picks Append or Replace on the choice Modal (`PlanImportDialogs`). Scoped to plan.id,
+  // same as undoImport below — PlanEditor doesn't remount on a plan
   // switch, so without that the Modal could stay open across one.
   const [pendingQueueImport, setPendingQueueImport] = useScopedState<PlanEntry[]>([planId]);
   // Whether a queue fetch is in flight — disables the Import button so a
@@ -93,7 +93,7 @@ export function usePlanImport({
         return;
       }
       // An empty plan has nothing to lose, so it goes in with no prompt —
-      // the choice Modal below exists only to protect entries already there.
+      // the choice Modal (`PlanImportDialogs`) exists only to protect entries already there.
       if (planEntryCount === 0) {
         onUpdate({ entries: parsed });
         return;

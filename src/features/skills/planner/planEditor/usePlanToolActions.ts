@@ -17,11 +17,9 @@ export function usePlanToolActions({
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   onUpdate: PlanEditorProps['onUpdate'];
 }) {
-  // Inline, beside-the-button confirmations (#222) — same pattern as
-  // copyConfirm/importConfirm above: small text next to the triggering
-  // button, cleared after a couple of seconds. Additive to the full
-  // Panel/Modal results those same actions already produce below.
-  // "Remove trained skills": the count it removed and the plan as it stood, for the Undo beside it. Scoped to the plan like undoImport.
+  // Inline, beside-the-button confirmations (#222): small text next to the triggering
+  // button, cleared after a couple of seconds.
+  // "Remove trained skills": the count it removed and the plan as it stood, for the Undo beside it. Scoped to the plan, like the import Undo.
   const [trainedRemoved, setTrainedRemoved] = useScopedState<TrainedRemoved>([planId]);
   const { show: showTrainedRemoved, cancel: cancelTrainedRemoved } =
     useAutoDismiss<TrainedRemoved | null>(setTrainedRemoved, null);
