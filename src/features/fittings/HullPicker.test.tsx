@@ -97,7 +97,7 @@ describe('HullPicker', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rifter' }));
     expect(await screen.findByText('4 losses')).toBeTruthy();
     expect(usePopularFitsMock.mock.lastCall?.[0]).toBe(587);
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('button', { name: '4 losses' }));
     expect(onOpenPopular).toHaveBeenCalledWith(
       expect.objectContaining({
         fitting: expect.objectContaining({ name: 'Rifter popular fit 1', shipTypeId: 587 }),
