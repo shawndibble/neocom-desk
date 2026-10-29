@@ -10,7 +10,7 @@
  *
  * Uses the default seeded character with no Dexie overrides.
  */
-import { test, expect, PHONE } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
 const LIMIT = 1300;
@@ -91,7 +91,7 @@ test('Travel folds Avoided systems and Also avoid at 390px; each opens on tap at
 });
 
 test('Travel shows both blocks open at 1280px, with no fold controls', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize(DESKTOP);
   await signInAndGoto(page, './settings/travel');
   await page.waitForURL(/\/settings\/travel$/);
 

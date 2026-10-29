@@ -3,7 +3,7 @@
  * of the cooldown / "You are in" / Respawn panels. From md up the panels keep
  * their place above it.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
@@ -32,7 +32,7 @@ async function tops(page: import('@playwright/test').Page) {
 for (const withClones of [true, false]) {
   const state = withClones ? 'a verdict from 2 jump clones' : 'a note verdict';
   test(`the verdict sits above the summary panels at 390px with ${state}`, async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     if (withClones) {
       await page.route(`**/characters/${CHARACTER_ID}/clones`, (route) =>
         route.fulfill({

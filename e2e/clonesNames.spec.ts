@@ -3,7 +3,7 @@
  * beside the place, and a long one wraps inside its card instead of widening
  * the list past its Panel, down to a phone. A blank one is headed by its place.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
@@ -21,11 +21,7 @@ function clone(id: number, name?: string) {
   };
 }
 
-for (const size of [
-  { width: 1440, height: 900 },
-  { width: 1024, height: 768 },
-  { width: 390, height: 844 },
-]) {
+for (const size of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, PHONE]) {
   test(`clone names show beside the location and long names stay in the panel without overflow at ${size.width}px`, async ({
     page,
   }) => {
@@ -68,10 +64,7 @@ for (const size of [
  * Layout invariants for the Clones summary strip and Settings > Data age
  * (no overlap between the strip's columns, no sideways page scroll).
  */
-for (const size of [
-  { width: 1024, height: 768 },
-  { width: 390, height: 844 },
-]) {
+for (const size of [{ width: 1024, height: 768 }, PHONE]) {
   test(`the clones summary strip does not overlap and the page does not scroll sideways at ${size.width}px`, async ({
     page,
   }) => {
@@ -100,7 +93,7 @@ for (const size of [
 }
 
 test('Settings > Data age stays inside a 390px page', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await signInAndGoto(page, './clones');
   await expect(page.getByRole('region', { name: 'You are in' })).toBeVisible();
   // Client-side navigation: the Data age list is session-only, built from this

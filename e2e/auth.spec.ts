@@ -1,8 +1,8 @@
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { CHARACTER_NAME } from './support/fixtureData';
 
 // A phone, per #1771: what a newbie's first login looks like.
-test.use({ viewport: { width: 390, height: 844 } });
+test.use({ viewport: PHONE });
 
 test('first login via mocked EVE SSO lands straight on the first-run Overview', async ({
   page,

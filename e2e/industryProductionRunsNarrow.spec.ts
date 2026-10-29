@@ -5,7 +5,7 @@
  * long figure. It now takes its own full-width row. Real layout only, so a
  * browser test.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
@@ -58,7 +58,7 @@ test('Production Runs summary reads in at most two lines and does not clip at 39
     },
     { characterId: CHARACTER_ID, planId: PLAN_ID }
   );
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await page.goto(`./industry/plans/${PLAN_ID}`);
 
   const summary = page.getByText(/logged · .* realized · .* open/);

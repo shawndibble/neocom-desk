@@ -234,10 +234,7 @@ test('a 40-character skill name wraps to at most two lines at 390px', async ({ p
   expect(box.height).toBeGreaterThanOrEqual(36);
 });
 
-for (const size of [
-  { width: 1280, height: 800 },
-  { width: 768, height: 800 },
-]) {
+for (const size of [DESKTOP, { width: 768, height: 800 }]) {
   test(`the training row keeps a one-line name with the chip beside it at ${size.width}px`, async ({
     page,
   }) => {

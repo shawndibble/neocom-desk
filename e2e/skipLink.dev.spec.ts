@@ -2,11 +2,11 @@
  * The "Skip to content" link (WCAG 2.4.1): first Tab stop at `md` and up,
  * absent below it, and Enter lands on the route outlet.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
 test('desktop: first Tab is the skip link, Enter moves focus past the rail', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize(DESKTOP);
   await signInAndGoto(page, './overview');
   await expect(page.locator('#route-outlet h1').first()).toBeVisible();
 
@@ -28,7 +28,7 @@ test('desktop: first Tab is the skip link, Enter moves focus past the rail', asy
 });
 
 test('phone: no skip link is rendered', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await signInAndGoto(page, './overview');
   await expect(page.locator('#route-outlet h1').first()).toBeVisible();
   await expect(page.getByRole('link', { name: /skip to content/i })).toHaveCount(0);
