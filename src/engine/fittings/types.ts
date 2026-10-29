@@ -162,8 +162,6 @@ export interface ProjectedEffects {
   effects: { typeId: number; effectId: number; attributes: Record<number, number> }[];
 }
 
-export const NO_PROJECTED_EFFECTS: ProjectedEffects = { buffs: [], effects: [] };
-
 export type CapacitorStatus =
   { stable: true; stablePercentage: number } | { stable: false; depletesInSeconds: number };
 
