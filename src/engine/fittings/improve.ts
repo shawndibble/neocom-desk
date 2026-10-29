@@ -12,7 +12,7 @@ import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
 import { addModule, removeModule, type ModuleAt } from './fittingEdit';
 import { peakAppliedDps } from './implantFinder';
-import { exploreFigures } from './explore';
+import type { ExploreStats } from './explore';
 import {
   EXPLORE_RIG_GROUPS,
   jobOf,
@@ -369,6 +369,42 @@ function meanGain(pairs: readonly (readonly [number, number])[]): number {
   );
 }
 
+/** Cycles a second of an analyzer; 0 with no cycle. */
+const cycleRate = (seconds: number): number => (seconds > 0 ? 1 / seconds : 0);
+
+/**
+ * Explore's hacking and scanning families the fit has, each one's gain.
+ * Hacking adds up, over the fit's analyzers (paired by position; one the swap
+ * drops loses all three of its figures), the gains in strength, coherence and
+ * cycles a second: a rig lifts one figure of one analyzer, and averaging that
+ * with the figures it leaves alone would bury it under a speed rig. Scanning
+ * is the mean of the scan figures present.
+ */
+function exploreFamilyGains(before: ExploreStats, after: ExploreStats): number[] {
+  const families: number[] = [];
+  if (before.analyzers.length > 0) {
+    const gains = before.analyzers.flatMap((was, i) => {
+      const now = after.analyzers[i] ?? { strength: 0, coherence: 0, cycleSeconds: 0 };
+      return [
+        [was.strength, now.strength],
+        [was.coherence, now.coherence],
+        [cycleRate(was.cycleSeconds), cycleRate(now.cycleSeconds)],
+      ].flatMap(([figure, next]) => (figure! > 0 ? [relative(figure!, next!)] : []));
+    });
+    families.push(gains.reduce((sum, gain) => sum + gain, 0));
+  }
+  const [was, now] = [before.scanning, after.scanning];
+  if (was.strength > 0 || was.duration > 0 || was.deviation > 0)
+    families.push(
+      meanGain([
+        [was.strength, now.strength],
+        [was.duration, now.duration],
+        [was.deviation, now.deviation],
+      ])
+    );
+  return families;
+}
+
 export function scoreOf(
   goal: ImproveGoal,
   before: FittingStats,
@@ -413,11 +449,9 @@ export function scoreOf(
       ]);
     }
     case 'explore': {
-      // The mean gain over the hacking and scanning figures the fit has, with speed and align: a figure the swap loses counts -1.
-      const was = exploreFigures(before.explore);
-      const now = exploreFigures(after.explore);
-      const gains = was.flatMap((figure, i) => (figure > 0 ? [relative(figure, now[i] ?? 0)] : []));
-      const all = [...gains, metrics.speed, metrics.align];
+      // The mean of the families the fit has (hacking, scanning, mobility), each gained on its own so one strength rig is not diluted by the rest.
+      const families = exploreFamilyGains(before.explore, after.explore);
+      const all = [...families, (metrics.speed + metrics.align) / 2];
       return all.reduce((sum, gain) => sum + gain, 0) / all.length;
     }
     case 'command':
