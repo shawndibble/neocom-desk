@@ -50,7 +50,7 @@ describe('writeOpenPricesToR2', () => {
       mergeDays,
       { get, put }
     );
-    expect(result).toEqual({ written: 2, failed: 0, firstError: null });
+    expect(result).toEqual({ written: 2, skipped: 0, failed: 0, firstError: null });
     const byKey = Object.fromEntries(puts.map((p) => [p.key, p]));
     expect(byKey['open-prices/34.json'].json).toEqual({
       typeId: 34,
@@ -62,6 +62,28 @@ describe('writeOpenPricesToR2', () => {
       stations: { 1: { buy: [null], sell: [5] } },
     });
     expect(byKey['open-prices/34.json'].headers['Cache-Control']).toBe('public, max-age=3600');
+  });
+
+  it('skips the put when the merge leaves the stored object unchanged', async () => {
+    const stored = {
+      typeId: 34,
+      dates: ['2026-10-16'],
+      stations: { 1: { buy: [1], sell: [2] } },
+    };
+    const { get, put, puts } = fakeR2({ [openPricesR2Key(34)]: stored });
+    const seen: number[] = [];
+    const result = await writeOpenPricesToR2(
+      [
+        { typeId: 34, days: [{ date: '2026-10-16', stations: { 1: { buy: 1, sell: 2 } } }] },
+        { typeId: 35, days: [{ date: '2026-10-16', stations: { 1: { buy: 1, sell: 2 } } }] },
+      ],
+      mergeDays,
+      { get, put },
+      (n) => seen.push(n)
+    );
+    expect(result).toEqual({ written: 1, skipped: 1, failed: 0, firstError: null });
+    expect(puts.map((p) => p.key)).toEqual(['open-prices/35.json']);
+    expect(seen.at(-1)).toBe(1);
   });
 
   it('counts a failing type instead of throwing, and keeps going', async () => {

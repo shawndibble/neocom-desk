@@ -97,7 +97,10 @@ export interface MergeFn {
 }
 
 export interface WriteOpenPricesResult {
+  /** Objects actually put. */
   written: number;
+  /** Objects left alone because the merge changed nothing (saves a Class A write). */
+  skipped: number;
   failed: number;
   /** First failure's message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
@@ -118,6 +121,7 @@ export async function writeOpenPricesToR2(
 ): Promise<WriteOpenPricesResult> {
   const iterator = items[Symbol.iterator]();
   let written = 0;
+  let skipped = 0;
   let failed = 0;
   let firstError: string | null = null;
   const worker = async () => {
@@ -127,9 +131,15 @@ export async function writeOpenPricesToR2(
       try {
         const existing = (await io.get(key)) as StoredTypeOpenPrices | null;
         const merged = merge(item, existing, item.days);
-        await io.put(key, gzipSync(JSON.stringify(merged)), OPEN_PRICES_HEADERS);
-        written += 1;
-        onProgress?.(written);
+        // Key order follows the stored order when nothing changed, so a plain stringify compare is safe;
+        // a reordered-but-equal object just costs one extra put.
+        if (existing !== null && JSON.stringify(existing) === JSON.stringify(merged)) {
+          skipped += 1;
+        } else {
+          await io.put(key, gzipSync(JSON.stringify(merged)), OPEN_PRICES_HEADERS);
+          written += 1;
+          onProgress?.(written);
+        }
       } catch (error) {
         failed += 1;
         firstError ??= String(error);
@@ -137,5 +147,5 @@ export async function writeOpenPricesToR2(
     }
   };
   await Promise.all(Array.from({ length: OPEN_PRICES_CONCURRENCY }, worker));
-  return { written, failed, firstError };
+  return { written, skipped, failed, firstError };
 }
