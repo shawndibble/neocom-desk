@@ -286,7 +286,7 @@ describe('Improve whole-tank conversion', () => {
   });
 
   describe('keeps the sustained tank', () => {
-    // Shield extenders carry 1000 sustained here; the converted fit keeps `kept` of it.
+    // The fit starts with `beforeSustained` sustained tank; a converted or swapped fit has `kept`.
     const run = async (beforeSustained: number, kept: number, conversion: boolean) => {
       const model = async (f: Fitting): Promise<FittingStats> => {
         const b = baseFittingStats();

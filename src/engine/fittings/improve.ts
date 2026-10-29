@@ -100,8 +100,8 @@ export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold 
  */
 export type Guardrail = 'budget' | 'capStable' | 'keepsTank' | 'keepsStats' | 'spend';
 
-/** The share of the sustained tank a conversion must keep: losing more than the rest is rejected. */
-export const CONVERSION_KEEPS_SUSTAINED = 0.5;
+/** A conversion must keep at least this share of the sustained tank. */
+const CONVERSION_KEEPS_SUSTAINED = 0.5;
 
 /** How far Improve may go from the fitted modules: Upgrade (default), Rebalance, Rework. */
 export const IMPROVE_REACHES = ['upgrade', 'rebalance', 'rework'] as const;
@@ -432,12 +432,12 @@ function brokenGuardrail(
   before: FittingStats,
   after: FittingStats,
   target: TargetProfile | undefined,
-  isConversion = false
+  conversion?: TankConversion
 ): Guardrail | null {
   if (fitsResourceBudget(before) && !fitsResourceBudget(after)) return 'budget';
   if (before.capacitor.stable && !after.capacitor.stable) return 'capStable';
   if (
-    isConversion &&
+    conversion &&
     before.tank.sustainedEffective > 0 &&
     after.tank.sustainedEffective < before.tank.sustainedEffective * CONVERSION_KEEPS_SUSTAINED
   )
@@ -1157,7 +1157,7 @@ export async function findImprovements({
     };
     const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
-    const broken = brokenGuardrail(goal, before, after, target, !!candidate.conversion);
+    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion);
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
     const capStillBinds =
       fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
