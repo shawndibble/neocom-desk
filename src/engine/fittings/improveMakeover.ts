@@ -199,6 +199,13 @@ export interface FindMakeoverParams {
   bestSingle?: number | null;
   /** Calculations allowed before the search stops with the best fit so far. */
   maxCalcs?: number;
+  /**
+   * Whole-fit calculations in flight at once (the worker pool's size). Moves
+   * are calculated ahead of the one being scored and scored in order, so the
+   * result equals a serial run's; calculations cut off by the lazy stop still
+   * count against `maxCalcs`. Default 1.
+   */
+  concurrency?: number;
   /** False: every round recalculates every move (the plain search, for comparison). */
   lazy?: boolean;
   /** False: no pair is tried when the rounds stop gaining. */
@@ -280,6 +287,7 @@ export async function findMakeover({
   fitTotal = null,
   bestSingle: givenSingle,
   maxCalcs = MAKEOVER_CALCS,
+  concurrency = 1,
   lazy = true,
   pairKick = true,
   onProgress,
@@ -296,20 +304,15 @@ export async function findMakeover({
     brokenGuardrail(goal, before, after, target) === null &&
     !overIskBudget(iskBudget, fitTotal, isk);
 
-  /** One whole-fit calculation, or null when it failed. The last of the cap is kept for the result. */
-  async function calc(fitting: Fitting): Promise<FittingStats | null> {
-    if (isCancelled?.()) throw new SearchHalt(true);
-    if (shouldStop?.() || calcs >= maxCalcs - 1) throw new SearchHalt(false);
+  /** Whether the next calculation may start; false once cancelled, stopped or at the cap (the last of it is kept for the result). */
+  const mayStart = () => !isCancelled?.() && !shouldStop?.() && calcs < maxCalcs - 1;
+
+  /** Starts one whole-fit calculation (counted now); a failure is kept as null, never a loose rejection. */
+  function begin(fitting: Fitting): Promise<FittingStats | null> {
     calcs++;
-    let after: FittingStats | null = null;
-    try {
-      after = await stats(fitting);
-    } catch {
-      // Left out: one move's calculation failing must not end the search.
-    }
-    if (isCancelled?.()) throw new SearchHalt(true);
-    onProgress?.(calcs, maxCalcs);
-    return after;
+    return Promise.resolve()
+      .then(() => stats(fitting))
+      .catch(() => null);
   }
 
   let fitting = original;
@@ -322,9 +325,12 @@ export async function findMakeover({
   let pending: Trial | null = null;
   const records = new Map<string, MoveRecord>();
 
-  async function tryMove(move: ImproveCandidate): Promise<Trial | null> {
-    const moved = applyImproveCandidate(fitting, move);
-    const after = await calc(moved);
+  /** Scores a calculated move against the current fit and notes what it did. */
+  function settle(
+    move: ImproveCandidate,
+    moved: Fitting,
+    after: FittingStats | null
+  ): Trial | null {
     const moveIsk = addIsk(isk, iskDeltaOf(move, priceOf));
     const moveScore = after ? scoreAt(after, moveIsk) : null;
     if (!move.pairedWith)
@@ -351,6 +357,42 @@ export async function findMakeover({
     };
   }
 
+  /**
+   * Calculates `list` in order, `concurrency` ahead of the move being scored,
+   * and hands each result to `take` in list order (so the outcome is a serial
+   * run's). `stopAt(move)` is asked before a move is scored; calculations
+   * already started for the moves after it are dropped but stay counted.
+   */
+  async function evaluate(
+    list: readonly ImproveCandidate[],
+    stopAt: (move: ImproveCandidate) => boolean,
+    take: (trial: Trial | null) => void
+  ) {
+    const ahead = Math.max(1, Math.floor(concurrency));
+    const started = new Map<number, { moved: Fitting; after: Promise<FittingStats | null> }>();
+    let next = 0;
+    const startUpTo = (last: number) => {
+      for (; next <= last && next < list.length && mayStart(); next++) {
+        const moved = applyImproveCandidate(fitting, list[next]);
+        started.set(next, { moved, after: begin(moved) });
+      }
+    };
+    for (const [index, move] of list.entries()) {
+      if (stopAt(move)) break;
+      startUpTo(index + ahead - 1);
+      const run = started.get(index);
+      // Not started: cancelled, stopped or at the cap.
+      if (!run || isCancelled?.() || shouldStop?.()) throw new SearchHalt(!!isCancelled?.());
+      started.delete(index);
+      const after = await run.after;
+      if (isCancelled?.()) throw new SearchHalt(true);
+      onProgress?.(Math.min(calcs, maxCalcs), maxCalcs);
+      take(settle(move, run.moved, after));
+    }
+    // Dropped calculations finish before the next round, so no more than `concurrency` are ever in flight.
+    await Promise.all([...started.values()].map((run) => run.after));
+  }
+
   const gainOf = (trial: Trial | null) => (trial?.score ?? -Infinity) - score;
 
   /** A round: the best passing move from the current fit, and the fresh moves that overran the budget. */
@@ -360,31 +402,35 @@ export async function findMakeover({
     if (lazy) list.sort((a, b) => bound(b) - bound(a));
     pending = null;
     const overran: Trial[] = [];
-    for (const move of list) {
-      const gainBound = bound(move);
+    await evaluate(
+      list,
       // Sorted by last gain: once the best fresh gain beats this move's last one, it beats the rest too.
-      if (
-        lazy &&
-        !first &&
-        pending &&
-        gainBound !== Infinity &&
-        gainOf(pending) >= gainBound + LAZY_MARGIN
-      )
-        break;
-      const trial = await tryMove(move);
-      if (!trial || trial.score === null) continue;
-      if (trial.ok) {
-        if (gainOf(trial) > gainOf(pending)) pending = trial;
-      } else if (
-        // A fit over its budget already is Make it fit's, not a pair's to fix.
-        gainOf(trial) > minGain &&
-        fitsResourceBudget(current) &&
-        RESOURCES.some((r) => overageOf(trial.after, r) > 0)
-      )
-        overran.push(trial);
-    }
-    if (first) firstRoundBest = pending?.score ?? null;
-    return { best: pending, overran };
+      (move) => {
+        const gainBound = bound(move);
+        return (
+          lazy &&
+          !first &&
+          pending !== null &&
+          gainBound !== Infinity &&
+          gainOf(pending) >= gainBound + LAZY_MARGIN
+        );
+      },
+      (trial) => {
+        if (!trial || trial.score === null) return;
+        if (trial.ok) {
+          if (gainOf(trial) > gainOf(pending)) pending = trial;
+        } else if (
+          // A fit over its budget already is Make it fit's, not a pair's to fix.
+          gainOf(trial) > minGain &&
+          fitsResourceBudget(current) &&
+          RESOURCES.some((r) => overageOf(trial.after, r) > 0)
+        )
+          overran.push(trial);
+      }
+    );
+    const best = pending as Trial | null;
+    if (first) firstRoundBest = best?.score ?? null;
+    return { best, overran };
   }
 
   /** The best passing pair of a budget-overrunning gain and a move that freed what it needs. */
@@ -406,10 +452,13 @@ export async function findMakeover({
     }
     pairs.sort((a, b) => b.estimate - a.estimate);
     pending = null;
-    for (const { candidate } of pairs.slice(0, PAIRS_TRIED)) {
-      const trial = await tryMove(candidate);
-      if (trial?.ok && gainOf(trial) > gainOf(pending)) pending = trial;
-    }
+    await evaluate(
+      pairs.slice(0, PAIRS_TRIED).map((pair) => pair.candidate),
+      () => false,
+      (trial) => {
+        if (trial?.ok && gainOf(trial) > gainOf(pending)) pending = trial;
+      }
+    );
     return pending;
   }
 
@@ -472,13 +521,8 @@ export async function findMakeover({
   if (rows.length < 2) return { makeover: null, calcs, stopped };
   // The figures shown are one recalculation of the rows, never the path's last step.
   const remade = rows.reduce(applyImproveCandidate, original);
-  calcs++;
-  let after: FittingStats;
-  try {
-    after = await stats(remade);
-  } catch {
-    return { makeover: null, calcs, stopped };
-  }
+  const after = await begin(remade);
+  if (!after) return { makeover: null, calcs, stopped };
   if (isCancelled?.()) return null;
   onProgress?.(calcs, maxCalcs);
   const iskDelta = rows.reduce<number | null>(
