@@ -108,9 +108,7 @@ export function ShareShell({
           </Link>
           <h1
             className={
-              hideTitle
-                ? 'sr-only'
-                : 'border-l border-line pl-4 text-xs font-semibold tracking-widest uppercase'
+              hideTitle ? 'sr-only' : 'border-l border-line pl-4 text-xs tracking-widest uppercase'
             }
           >
             {title}
