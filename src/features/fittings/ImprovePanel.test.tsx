@@ -501,6 +501,18 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('Goes over CPU, powergrid or calibration')).toBeInTheDocument();
   });
 
+  it('lists the conversion sustained-tank rule for the Tankier goal and its rejection', async () => {
+    const rejected = { ...option(11, { ehp: 1100 }), guardrail: 'keepsTank' as const };
+    renderPanel(search(done({ rejected: [rejected] })), vi.fn(), vi.fn(), settings(), {
+      goal: 'tank',
+    });
+    expect(screen.getByText('Loses more than half of the sustained tank')).toBeInTheDocument();
+    await openSettings();
+    expect(
+      screen.getByText(/A tank conversion keeps at least half of the sustained tank\./)
+    ).toBeInTheDocument();
+  });
+
   it('names the overage on a swap over the budget', () => {
     const rejected = {
       ...option(11, { ehp: 1100 }, { iskDelta: 12_300_000 }),

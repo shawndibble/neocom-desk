@@ -285,6 +285,72 @@ describe('Improve whole-tank conversion', () => {
     });
   });
 
+  describe('keeps the sustained tank', () => {
+    // The fit starts with `beforeSustained` sustained tank; a converted or swapped fit has `kept`.
+    const run = async (beforeSustained: number, kept: number, conversion: boolean) => {
+      const model = async (f: Fitting): Promise<FittingStats> => {
+        const b = baseFittingStats();
+        const converted = f.modules.some((m) => GROUP[m.typeId] === 329);
+        const swapped = f.modules.some((m) => m.typeId === 102);
+        const sustained = converted || swapped ? kept : beforeSustained;
+        return {
+          ...b,
+          cpuTotal: 100,
+          cpuUsed: 0,
+          ehp: b.ehp + (converted ? 1500 : swapped ? 100 : 0),
+          tank: { ...b.tank, sustainedEffective: sustained },
+        } as FittingStats;
+      };
+      const candidate: ImproveCandidate = conversion
+        ? conversions(candidates(shieldFit))[0]!
+        : {
+            fromTypeId: 101,
+            toTypeId: 102,
+            at: [
+              { slot: 'medium', slotIndex: 0 },
+              { slot: 'medium', slotIndex: 1 },
+            ],
+          };
+      const result = await findImprovements({
+        fitting: shieldFit,
+        before: await model(shieldFit),
+        goal: 'tank',
+        candidates: [candidate],
+        stats: model,
+        priceOf: () => 1,
+      });
+      if (!result) throw new Error('cancelled');
+      return {
+        kept: [...result.noDownside, ...result.tradeOffs],
+        rejected: result.rejected,
+      };
+    };
+
+    it('rejects a conversion that loses more than half of it', async () => {
+      const result = await run(1000, 400, true);
+      expect(result.kept).toEqual([]);
+      expect(result.rejected.map((o) => o.guardrail)).toEqual(['keepsTank']);
+    });
+
+    it('keeps a conversion that holds at least half of it', async () => {
+      const result = await run(1000, 500, true);
+      expect(result.kept.length).toBe(1);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it('never holds back a fit with no sustained tank', async () => {
+      const result = await run(0, 0, true);
+      expect(result.kept.length).toBe(1);
+      expect(result.rejected).toEqual([]);
+    });
+
+    it('does not hold back an ordinary swap', async () => {
+      const result = await run(1000, 100, false);
+      expect(result.rejected.filter((o) => o.guardrail === 'keepsTank')).toEqual([]);
+      expect(result.kept.length).toBe(1);
+    });
+  });
+
   it('offers more than one size per group', () => {
     const roots = conversions(candidates(shieldFit)).map((c) => c.toTypeId);
     expect(roots).toContain(201);

@@ -94,10 +94,14 @@ export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
  * powergrid or calibration; `capStable` a stable capacitor turned unstable;
+ * `keepsTank` a tank conversion lost more than half of the sustained tank;
  * `keepsStats` Cheaper lost more than 10% of damage, tank or speed; `spend`
  * it costs more than the total budget or extra-spend cap allows.
  */
-export type Guardrail = 'budget' | 'capStable' | 'keepsStats' | 'spend';
+export type Guardrail = 'budget' | 'capStable' | 'keepsTank' | 'keepsStats' | 'spend';
+
+/** A conversion must keep at least this share of the sustained tank. */
+const CONVERSION_KEEPS_SUSTAINED = 0.5;
 
 /** How far Improve may go from the fitted modules: Upgrade (default), Rebalance, Rework. */
 export const IMPROVE_REACHES = ['upgrade', 'rebalance', 'rework'] as const;
@@ -427,10 +431,17 @@ function brokenGuardrail(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
-  target: TargetProfile | undefined
+  target: TargetProfile | undefined,
+  conversion?: TankConversion
 ): Guardrail | null {
   if (fitsResourceBudget(before) && !fitsResourceBudget(after)) return 'budget';
   if (before.capacitor.stable && !after.capacitor.stable) return 'capStable';
+  if (
+    conversion &&
+    before.tank.sustainedEffective > 0 &&
+    after.tank.sustainedEffective < before.tank.sustainedEffective * CONVERSION_KEEPS_SUSTAINED
+  )
+    return 'keepsTank';
   if (goal === 'cheaper') {
     const kept: [number, number][] = [
       [damageOf(before, target), damageOf(after, target)],
@@ -1146,7 +1157,7 @@ export async function findImprovements({
     };
     const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
-    const broken = brokenGuardrail(goal, before, after, target);
+    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion);
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
     const capStillBinds =
       fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));

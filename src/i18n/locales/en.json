@@ -1396,6 +1396,7 @@
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
+        "tank": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration. A tank conversion keeps at least half of the sustained tank.",
         "cheaper": "Keeps damage, tank and speed each within 10%, the capacitor stable and the fit within CPU, powergrid and calibration."
       },
       "checking": "Checking {{checked}} of {{total}} swaps…",
@@ -1464,6 +1465,7 @@
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
         "keepsStats": "Loses more than 10% of damage, tank or speed",
+        "keepsTank": "Loses more than half of the sustained tank",
         "spend": "Costs more than your budget",
         "spendBudget": "Over your {{cap}} budget by {{over}}"
       },

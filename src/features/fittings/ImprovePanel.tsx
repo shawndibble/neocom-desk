@@ -1166,7 +1166,9 @@ export function ImprovePanel({
               {t(
                 goal === 'cheaper'
                   ? 'fittings.improve.guardrail.cheaper'
-                  : 'fittings.improve.guardrail.combat'
+                  : TANK_GOALS.has(goal)
+                    ? 'fittings.improve.guardrail.tank'
+                    : 'fittings.improve.guardrail.combat'
               )}
             </p>
             <SegmentedControl
