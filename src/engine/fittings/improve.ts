@@ -12,7 +12,7 @@ import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
 import { addModule, removeModule, type ModuleAt } from './fittingEdit';
 import { peakAppliedDps } from './implantFinder';
-import type { ExploreStats } from './explore';
+import { NO_EXPLORE, type ExploreStats } from './explore';
 import {
   EXPLORE_RIG_GROUPS,
   jobOf,
@@ -384,7 +384,7 @@ function exploreFamilyGains(before: ExploreStats, after: ExploreStats): number[]
   const families: number[] = [];
   if (before.analyzers.length > 0) {
     const gains = before.analyzers.flatMap((was, i) => {
-      const now = after.analyzers[i] ?? { strength: 0, coherence: 0, cycleSeconds: 0 };
+      const now = after.analyzers[i] ?? NO_EXPLORE.hacking;
       return [
         [was.strength, now.strength],
         [was.coherence, now.coherence],
