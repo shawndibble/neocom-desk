@@ -2385,7 +2385,6 @@ describe('Plan Milestones (GLOSSARY.md)', () => {
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
     await user.click(await screen.findByRole('menuitem', { name: /remove skill a i/i }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }));
 
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
