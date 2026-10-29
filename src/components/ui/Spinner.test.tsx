@@ -39,4 +39,18 @@ describe('Spinner', () => {
     unmount();
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it.each([
+    ['page', 'py-16'],
+    ['panel', 'py-8'],
+  ] as const)('block="%s" centres the spinner in a %s row', (block, padding) => {
+    const { container } = render(<Spinner block={block} label="Loading orders" />);
+    expect(container.firstElementChild).toHaveClass('flex', 'justify-center', padding);
+    expect(screen.getByRole('status', { name: 'Loading orders' })).toBeInTheDocument();
+  });
+
+  it('adds no wrapper without block', () => {
+    const { container } = render(<Spinner label="Loading orders" />);
+    expect(container.firstElementChild).toHaveAttribute('role', 'status');
+  });
 });
