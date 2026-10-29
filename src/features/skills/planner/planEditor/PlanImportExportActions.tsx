@@ -13,10 +13,11 @@ import { PlanConfirmation } from './PlanConfirmation';
 import type { usePlanExport } from './usePlanExport';
 import type { usePlanImport } from './usePlanImport';
 
-/* Import/Export: the route's page-level actions cluster, "far top
-          right corner" like every other route (Wallet.tsx, Assets.tsx) —
-          portaled in because the route owns that DOM slot but the handlers
-          and the data they act on (scheduled, catalog) live here. */
+/**
+ * Import/Export: the route's page-level actions cluster, "far top right corner" like every
+ * other route (Wallet.tsx, Assets.tsx) — portaled in because the route owns that DOM slot
+ * but the handlers and the data they act on (scheduled, catalog) live with the editor.
+ */
 export function PlanImportExportActions({
   container,
   imports,
@@ -106,6 +107,9 @@ export function PlanImportExportActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {/* Beside the buttons that produced them, not down in the entries
+          panel — a confirmation/error disconnected from its trigger
+          reads as belonging to something else. */}
       {copyConfirm && <PlanConfirmation message={t('plans.exportCopied')} />}
       {importConfirm && (
         <PlanConfirmation

@@ -4,26 +4,21 @@ import { useTranslation } from 'react-i18next';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import { FitGoalModal } from './FitGoalModal';
 import { useMilestones } from './useMilestones';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
-import { PlanHeader } from './PlanHeader';
 import { PlanEditorLayout } from './PlanEditorLayout';
-import { PlanToolsPane } from './PlanToolsPane';
-import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 import { LiveQueueLead } from './LiveQueueLead';
-import { remapSavingsShrank } from './planHeaderStats';
 import { addEntry } from './skillPlanEdit';
-import { RemapMarkerModal } from './RemapMarkerModal';
-import { MilestoneModal } from './MilestoneModal';
-import { whatIfVerdict } from './whatIfImplants';
 import { EntryListControls } from './planEditor/EntryListControls';
 import { OrphanedMilestoneNotices } from './planEditor/OrphanedMilestoneNotices';
+import { PlanEditorHeader } from './planEditor/PlanEditorHeader';
+import { PlanMilestoneDialogs } from './planEditor/PlanMilestoneDialogs';
 import { PlanConfirmation } from './planEditor/PlanConfirmation';
 import { PlanImportDialogs } from './planEditor/PlanImportDialogs';
 import { PlanImportExportActions } from './planEditor/PlanImportExportActions';
 import { PlanOptimizeModals } from './planEditor/PlanOptimizeModals';
+import { RemapMarkerEditor } from './planEditor/RemapMarkerEditor';
 import type { PlanEditorProps } from './planEditor/types';
 import { usePlanAssumptions } from './planEditor/usePlanAssumptions';
 import { usePlanExport } from './planEditor/usePlanExport';
@@ -36,7 +31,7 @@ import { usePlanRowActions } from './planEditor/usePlanRowActions';
 import { usePlanRows } from './planEditor/usePlanRows';
 import { usePlanSchedule } from './planEditor/usePlanSchedule';
 import { usePlanToolActions } from './planEditor/usePlanToolActions';
-import { usePlanToolSections } from './planEditor/usePlanToolSections';
+import { usePlanTools } from './planEditor/usePlanTools';
 import { usePlanViewPrefs } from './planEditor/usePlanViewPrefs';
 import { useRemapMarkers } from './planEditor/useRemapMarkers';
 import { useSplitLegacyEntries } from './planEditor/useSplitLegacyEntries';
@@ -118,34 +113,10 @@ export function PlanEditor({
     cloneState,
     whatIf,
   });
-  const {
-    scheduled,
-    error,
-    startDate,
-    boostedSteps,
-    alphaCappedSteps,
-    totalSeconds,
-    finish: planFinish,
-    skillCount: scheduledSkillCount,
-    stepByKey,
-  } = schedule;
+  const { scheduled, error, startDate, boostedSteps, alphaCappedSteps, stepByKey } = schedule;
 
   // Plan Milestone (GLOSSARY.md) statuses and the fit-goal picker, against the current schedule.
-  const {
-    milestoneModal,
-    setMilestoneModal,
-    fitGoalOpen,
-    setFitGoalOpen,
-    fitGoalPickerOptions,
-    milestoneStatusFor,
-    orphanedMilestones,
-    headerNextMilestone,
-    handleAddMilestone,
-    handleRenameMilestone,
-    handleRemoveMilestone,
-    pickFitGoal,
-    submitMilestoneModal,
-  } = useMilestones({
+  const milestones = useMilestones({
     characterId,
     milestones: plan.milestones,
     entries: plan.entries,
@@ -165,15 +136,7 @@ export function PlanEditor({
     onUpdate,
   });
 
-  const {
-    editingMarkerIndex,
-    setEditingMarkerIndex,
-    normalizedMarkerAttributes,
-    markersVerdict,
-    computedMarkerAttributesFor,
-    markerAttributesFor,
-    handleSaveMarkerAttributes,
-  } = useRemapMarkers({
+  const markers = useRemapMarkers({
     markers: plan.markers,
     schedule,
     engineSkills: catalog.engineSkills,
@@ -183,6 +146,7 @@ export function PlanEditor({
     editable,
     onUpdate,
   });
+  const { markersVerdict } = markers;
   const optimize = usePlanOptimize({
     plan,
     engineSkills: catalog.engineSkills,
@@ -203,7 +167,7 @@ export function PlanEditor({
     markersVerdict,
     onUpdate,
   });
-  const { headerProgress, headerBadge, realLensSavingsSeconds } = usePlanHeaderStats({
+  const headerStats = usePlanHeaderStats({
     plan,
     catalog,
     trainedSkills,
@@ -224,19 +188,7 @@ export function PlanEditor({
     catalog,
     groupingMode: viewPrefs.groupingMode,
   });
-  const {
-    dropError,
-    promoteConfirm,
-    removedToast,
-    setRemovedToast,
-    entriesHeadingRef,
-    focusAfterCommit,
-    handleDrop,
-    handlePromotePrereq,
-    requestRemoveEntry,
-    handleRemoveMarker,
-    handleSetPriority,
-  } = usePlanRowActions({
+  const rowActions = usePlanRowActions({
     planId: plan.id,
     planScope,
     editable,
@@ -247,6 +199,7 @@ export function PlanEditor({
     levelLabel,
     onUpdate,
   });
+  const { removedToast, setRemovedToast, entriesHeadingRef, focusAfterCommit } = rowActions;
   const toolActions = usePlanToolActions({
     planId: plan.id,
     editable,
@@ -269,20 +222,13 @@ export function PlanEditor({
     userSkillTypeIDs,
   });
 
-  const skillsToBuy = (collapsible: boolean) => (
-    <SkillsToBuyPanel
-      entries={plan.entries}
-      trainedSkills={trainedSkills}
-      trainedSkillsKnown={trainedSkillsKnown}
-      nameFor={nameFor}
-      collapsible={collapsible}
-    />
-  );
-  const toolSections = usePlanToolSections({
+  const { toolsPane, skillsToBuy } = usePlanTools({
     characterId,
     plan,
     catalog,
+    trainedSkills,
     trainedSkillsKnown,
+    nameFor,
     remapInfo,
     attributesResult,
     attributeBaseline,
@@ -295,16 +241,9 @@ export function PlanEditor({
     optimize,
     toolActions,
     markersVerdict,
-    skillsToBuy,
-    onAddFitGoal: () => setFitGoalOpen(true),
+    onAddFitGoal: () => milestones.setFitGoalOpen(true),
     onUpdate,
   });
-
-  // One instance, placed on one side or the other — never both. The two
-  // homes are genuinely different boxes in the layout (a sidebar column vs.
-  // the single scrolling column), which no CSS reordering can bridge without
-  // coupling the grid's row heights to each other.
-  const toolsPane = <PlanToolsPane sections={toolSections} asDisclosure={!isDesktop} />;
 
   return (
     <>
@@ -325,34 +264,17 @@ export function PlanEditor({
             ) : undefined
           }
         >
-          <PlanHeader
-            totalSeconds={totalSeconds}
-            skillCount={scheduledSkillCount}
-            projectedFinish={planFinish}
-            badge={headerBadge}
-            nextMilestone={headerNextMilestone}
-            progress={headerProgress}
-            whatIf={
-              currentLensTotalSeconds !== null && !error
-                ? {
-                    lens:
-                      whatIf.kind === 'custom'
-                        ? t('plans.whatIfCustom')
-                        : whatIf.preset === 'none'
-                          ? t('plans.whatIfNone')
-                          : whatIf.preset,
-                    verdict: whatIfVerdict(currentLensTotalSeconds, totalSeconds),
-                  }
-                : null
-            }
-            savingsShrankWithImplants={remapSavingsShrank(
-              headerBadge?.savingsSeconds ?? null,
-              realLensSavingsSeconds
-            )}
+          <PlanEditorHeader
+            plan={plan}
+            schedule={schedule}
+            currentLensTotalSeconds={currentLensTotalSeconds}
+            whatIf={whatIf}
+            headerStats={headerStats}
+            nextMilestone={milestones.headerNextMilestone}
             trainedKnown={trainedSkillsKnown}
-            name={plan.name}
-            onRename={isDesktop ? undefined : (name) => onUpdate({ name })}
+            isDesktop={isDesktop}
             focusName={focusName}
+            onUpdate={onUpdate}
           />
 
           {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
@@ -360,10 +282,10 @@ export function PlanEditor({
           {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
             instead of vanishing silently. */}
-          {orphanedMilestones.length > 0 && (
+          {milestones.orphanedMilestones.length > 0 && (
             <OrphanedMilestoneNotices
-              orphanedMilestones={orphanedMilestones}
-              onRemove={handleRemoveMilestone}
+              orphanedMilestones={milestones.orphanedMilestones}
+              onRemove={milestones.handleRemoveMilestone}
               focusAfterCommit={focusAfterCommit}
               entriesHeadingRef={entriesHeadingRef}
             />
@@ -393,8 +315,10 @@ export function PlanEditor({
                 // header, which Import/Export already fills.
                 controls={<EntryListControls viewPrefs={viewPrefs} />}
               />
-              {dropError && <InlineError>{dropError}</InlineError>}
-              {promoteConfirm && <PlanConfirmation message={promoteConfirm} />}
+              {rowActions.dropError && <InlineError>{rowActions.dropError}</InlineError>}
+              {rowActions.promoteConfirm && (
+                <PlanConfirmation message={rowActions.promoteConfirm} />
+              )}
               {error ? (
                 <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
               ) : (
@@ -407,21 +331,21 @@ export function PlanEditor({
                   boostedSteps={boostedSteps}
                   alphaCappedSteps={alphaCappedSteps}
                   startDate={startDate}
-                  onReorder={handleDrop}
-                  onPromotePrereq={handlePromotePrereq}
-                  onRemove={requestRemoveEntry}
+                  onReorder={rowActions.handleDrop}
+                  onPromotePrereq={rowActions.handlePromotePrereq}
+                  onRemove={rowActions.requestRemoveEntry}
                   onStageSkillDetail={handleStageSkillDetail}
                   removalBlockedReason={removalBlockedReason}
                   pinnedInProgress={pinnedInProgress}
-                  onRemoveMarker={handleRemoveMarker}
-                  markerAttributesFor={markerAttributesFor}
+                  onRemoveMarker={rowActions.handleRemoveMarker}
+                  markerAttributesFor={markers.markerAttributesFor}
                   markerImplants={effectiveImplants}
-                  onEditMarker={setEditingMarkerIndex}
-                  onSetPriority={handleSetPriority}
-                  milestoneStatusFor={milestoneStatusFor}
-                  onAddMilestone={handleAddMilestone}
-                  onRenameMilestone={handleRenameMilestone}
-                  onRemoveMilestone={handleRemoveMilestone}
+                  onEditMarker={markers.setEditingMarkerIndex}
+                  onSetPriority={rowActions.handleSetPriority}
+                  milestoneStatusFor={milestones.milestoneStatusFor}
+                  onAddMilestone={milestones.handleAddMilestone}
+                  onRenameMilestone={milestones.handleRenameMilestone}
+                  onRemoveMilestone={milestones.handleRemoveMilestone}
                 />
               )}
             </div>
@@ -449,35 +373,9 @@ export function PlanEditor({
         nameFor={nameFor}
       />
 
-      <RemapMarkerModal
-        open={editingMarkerIndex !== null}
-        onClose={() => setEditingMarkerIndex(null)}
-        override={
-          editingMarkerIndex === null
-            ? null
-            : (normalizedMarkerAttributes[editingMarkerIndex] ?? null)
-        }
-        computed={
-          editingMarkerIndex === null ? undefined : computedMarkerAttributesFor(editingMarkerIndex)
-        }
-        baseline={attributes}
-        onSave={(next) => {
-          if (editingMarkerIndex !== null) handleSaveMarkerAttributes(editingMarkerIndex, next);
-        }}
-      />
+      <RemapMarkerEditor markers={markers} baseline={attributes} />
 
-      <FitGoalModal
-        open={fitGoalOpen}
-        options={fitGoalPickerOptions}
-        onClose={() => setFitGoalOpen(false)}
-        onPick={pickFitGoal}
-      />
-      <MilestoneModal
-        open={milestoneModal !== null}
-        initialName={milestoneModal?.mode === 'rename' ? milestoneModal.currentName : undefined}
-        onClose={() => setMilestoneModal(null)}
-        onSave={submitMilestoneModal}
-      />
+      <PlanMilestoneDialogs milestones={milestones} />
 
       {removedToast && (
         <Toast

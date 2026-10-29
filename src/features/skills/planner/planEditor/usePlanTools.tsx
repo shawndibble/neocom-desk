@@ -1,17 +1,17 @@
 import { DataAgeBadge } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
-import type { ReactNode } from 'react';
 import type { SkillPlanRecord } from '@/db';
 import type { AttributeBaseline } from '@/engine/attributeBaseline';
-import type { Implants } from '@/engine/types';
+import type { Implants, TrainedSkill } from '@/engine/types';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import { useCharacters } from '@/features/character/useCharacters';
 import type { CachedResult } from '../../data';
 import type { SkillCatalog } from '../../skillMap';
 import { assumptionsSummary } from '../assumptionsSummary';
 import { InjectorFactsPanel } from '../InjectorFactsPanel';
+import { PlanToolsPane, type PlanToolSection } from '../PlanToolsPane';
+import { SkillsToBuyPanel } from '../SkillsToBuyPanel';
 import type { OptimizeVerdict } from '../optimizeVerdict';
-import type { PlanToolSection } from '../PlanToolsPane';
 import type { RemapAvailability } from '../remapAvailability';
 import { CLOSEST_AUTO_LOAD_MAX, WhoIsClosest } from '../WhoIsClosest';
 import { ActionsToolSection } from './ActionsToolSection';
@@ -24,14 +24,16 @@ import type { PlanScheduleResult } from './usePlanSchedule';
 import type { usePlanToolActions } from './usePlanToolActions';
 
 /**
- * The tools pane's sections, in display order. Rebuilt each render (never memoized): their
- * content is plain elements, and the pane takes them as a prop.
+ * The tools pane and the below-`lg` Skills to buy row. The sections are rebuilt each render
+ * (never memoized): their content is plain elements, and the pane takes them as a prop.
  */
-export function usePlanToolSections({
+export function usePlanTools({
   characterId,
   plan,
   catalog,
+  trainedSkills,
   trainedSkillsKnown,
+  nameFor,
   remapInfo,
   attributesResult,
   attributeBaseline,
@@ -44,14 +46,15 @@ export function usePlanToolSections({
   optimize,
   toolActions,
   markersVerdict,
-  skillsToBuy,
   onAddFitGoal,
   onUpdate,
 }: {
   characterId: number;
   plan: SkillPlanRecord;
   catalog: SkillCatalog;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
   trainedSkillsKnown: boolean;
+  nameFor: (skillTypeID: number) => string;
   remapInfo: RemapAvailability | null;
   attributesResult: CachedResult<CharacterAttributes> | null;
   attributeBaseline: AttributeBaseline | null;
@@ -64,15 +67,23 @@ export function usePlanToolSections({
   optimize: ReturnType<typeof usePlanOptimize>;
   toolActions: ReturnType<typeof usePlanToolActions>;
   markersVerdict: OptimizeVerdict | null;
-  skillsToBuy: (collapsible: boolean) => ReactNode;
   onAddFitGoal: () => void;
   onUpdate: PlanEditorProps['onUpdate'];
-}): PlanToolSection[] {
+}) {
   const { t } = useTranslation();
   const roster = useCharacters();
   const { scheduled, alphaCappedSteps } = schedule;
   const { cloneState, whatIf, matchedCloneId, activeBoosters } = assumptions;
-  return [
+  const skillsToBuy = (collapsible: boolean) => (
+    <SkillsToBuyPanel
+      entries={plan.entries}
+      trainedSkills={trainedSkills}
+      trainedSkillsKnown={trainedSkillsKnown}
+      nameFor={nameFor}
+      collapsible={collapsible}
+    />
+  );
+  const toolSections: PlanToolSection[] = [
     {
       id: 'actions',
       title: t('plans.toolsActions'),
@@ -206,4 +217,11 @@ export function usePlanToolSections({
         ]
       : []),
   ];
+
+  // One instance, placed on one side or the other — never both. The two
+  // homes are genuinely different boxes in the layout (a sidebar column vs.
+  // the single scrolling column), which no CSS reordering can bridge without
+  // coupling the grid's row heights to each other.
+  const toolsPane = <PlanToolsPane sections={toolSections} asDisclosure={!isDesktop} />;
+  return { toolsPane, skillsToBuy };
 }
