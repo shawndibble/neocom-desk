@@ -7,6 +7,7 @@ import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 import { db, type PlanBooster, type SkillPlanRecord } from '@/db';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 import type { CachedResult } from '@/features/skills/data';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -1610,13 +1611,7 @@ describe('PlanEditor Character details assumption note (issue #1526)', () => {
   const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
 
   async function seedGrant(scopes: readonly string[]): Promise<void> {
-    await db.tokens.put({
-      characterId: 1,
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      expiresAt: Date.now() + 60_000,
-      scopes: [...scopes],
-    });
+    await seedGrantFor(1, scopes);
   }
 
   beforeEach(() => {

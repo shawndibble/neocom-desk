@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { SkillCatalog } from '@/features/skills/skillMap';
@@ -154,13 +155,7 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
     const NOTE = 'Assumes no implants';
 
     async function seedGrant(scopes: readonly string[]): Promise<void> {
-      await db.tokens.put({
-        characterId: CHAR_ID,
-        accessToken: 'access',
-        refreshToken: 'refresh',
-        expiresAt: Date.now() + 60_000,
-        scopes: [...scopes],
-      });
+      await seedGrantFor(CHAR_ID, scopes);
     }
 
     function renderPane(height?: 'viewport' | 'sidebar') {

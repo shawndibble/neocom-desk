@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { seedCharacter as seedCharacterRow, seedGrant as seedGrantFor } from '@/test/seed';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { removeCharacter, removeCharacterAfterSync } from './removeCharacter';
@@ -31,19 +32,8 @@ vi.mock('@/features/notifications/projectionUpload', () => ({
 }));
 
 async function seedCharacter(characterId: number): Promise<void> {
-  await db.characters.put({
-    characterId,
-    name: `Pilot ${characterId}`,
-    ownerHash: `hash-${characterId}`,
-    addedAt: 1,
-  });
-  await db.tokens.put({
-    characterId,
-    accessToken: 'a',
-    refreshToken: 'r',
-    expiresAt: Date.now() + 100_000,
-    scopes: [],
-  });
+  await seedCharacterRow(characterId);
+  await seedGrantFor(characterId, []);
   await db.skillPlans.add({
     id: `plan-${characterId}`,
     characterId,

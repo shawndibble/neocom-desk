@@ -7,6 +7,7 @@ import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from '@/esi/cac
 import { loadWalletBalance } from './wallet';
 import { loadCharacterSkills, loadCharacterSkillQueue } from '@/features/skills/data';
 import { loadRosterSnapshot } from './roster';
+import { seedCharacter as seedCharacterRow } from '@/test/seed';
 
 vi.mock('./wallet', () => ({
   loadWalletBalance: vi.fn(),
@@ -32,7 +33,7 @@ const CHAR_B = 92;
 const CHAR_C = 93;
 
 function seedCharacter(characterId: number, name: string): Promise<unknown> {
-  return db.characters.put({ characterId, name, ownerHash: 'oh', addedAt: 0 });
+  return seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
 }
 
 function seedCache(

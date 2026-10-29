@@ -8,6 +8,7 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -427,13 +428,7 @@ describe('AppraisalPanel', () => {
       const STANDINGS_SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
 
       async function seedGrant(scopes: readonly string[]): Promise<void> {
-        await db.tokens.put({
-          characterId: 7,
-          accessToken: 'access',
-          refreshToken: 'refresh',
-          expiresAt: Date.now() + 60_000,
-          scopes: [...scopes],
-        });
+        await seedGrantFor(7, scopes);
       }
 
       beforeEach(() => {
@@ -833,13 +828,7 @@ describe('AppraisalPanel', () => {
       const NOTE = 'Assumes no implants';
 
       async function seedGrant(scopes: readonly string[]): Promise<void> {
-        await db.tokens.put({
-          characterId: 7,
-          accessToken: 'access',
-          refreshToken: 'refresh',
-          expiresAt: Date.now() + 60_000,
-          scopes: [...scopes],
-        });
+        await seedGrantFor(7, scopes);
       }
 
       beforeEach(() => {
