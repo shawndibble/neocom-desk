@@ -297,6 +297,18 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
   return { overall, ...metrics };
 }
 
+/**
+ * `overall` for Improve: the tank term is the change in sustained tank
+ * (passive regen included) rather than active repair, which would score the
+ * first repair module on a buffer fit as +100% (scope decision
+ * `20261029-145716-improve-overall-scores-sustained-tank-not-repair-from`).
+ */
+export function improveOverall(before: FittingStats, after: FittingStats): number {
+  const { overall, activeTank: repair } = gainMetrics(before, after);
+  const sustained = relative(before.tank.sustainedEffective, after.tank.sustainedEffective);
+  return overall + (sustained - repair) * overallWeight(before, after)('activeTank');
+}
+
 function rawMetrics(before: FittingStats, after: FittingStats): Record<GainMetric, number> {
   const roleGains = Object.fromEntries([
     ...ROLE_METRICS.map((key): [RoleMetric, number] => [key, 0]),
