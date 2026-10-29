@@ -94,7 +94,7 @@ afterEach(() => {
 
 async function seedCharacter(characterId: number, name: string) {
   await seedCharacterRow(characterId, name, { ownerHash: `oh-${characterId}` });
-  await seedGrantFor(characterId, []);
+  await seedGrantFor(characterId, [], { expiresAt: Date.now() + 3_600_000 });
 }
 
 beforeEach(async () => {

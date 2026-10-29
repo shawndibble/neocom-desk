@@ -29,7 +29,7 @@ vi.mock('@/features/communities/sharedFittings', () => sharedMock);
 
 async function seedCharacter(characterId: number): Promise<void> {
   await seedCharacterRow(characterId);
-  await seedGrantFor(characterId, []);
+  await seedGrantFor(characterId, [], { expiresAt: Date.now() + 100_000 });
   await db.skillPlans.add({
     id: `plan-${characterId}`,
     characterId,

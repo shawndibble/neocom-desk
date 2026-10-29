@@ -3,8 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
-import { stubNoViewportMatch, stubViewport } from '@/test/viewport';
-import { seedGrant as seedGrantFor } from '@/test/seed';
+import { stubViewport } from '@/test/viewport';
+import { seedGrant } from '@/test/seed';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { SkillCatalog } from '@/features/skills/skillMap';
@@ -26,35 +26,26 @@ beforeEach(async () => {
 
 describe('PlanListPane: viewport height ignoring the mobile tab bar (#1096)', () => {
   it('applies no inline max-height on mobile, leaving the page (which already reserves room for the fixed tab bar) to scroll instead', async () => {
-    const restore = stubNoViewportMatch();
-    try {
-      const { container } = render(
-        <MemoryRouter>
-          <PlanListPane activeCharacterId={CHAR_ID} remapInfo={null} />
-        </MemoryRouter>
-      );
-      await screen.findByRole('button', { name: 'New plan' });
+    const { container } = render(
+      <MemoryRouter>
+        <PlanListPane activeCharacterId={CHAR_ID} remapInfo={null} />
+      </MemoryRouter>
+    );
+    await screen.findByRole('button', { name: 'New plan' });
 
-      expect(scrollerDiv(container).style.maxHeight).toBe('');
-    } finally {
-      restore();
-    }
+    expect(scrollerDiv(container).style.maxHeight).toBe('');
   });
 
   it('still caps the list to the viewport on desktop, where it sits beside another column', async () => {
-    const restore = stubViewport(DESKTOP_QUERY);
-    try {
-      const { container } = render(
-        <MemoryRouter>
-          <PlanListPane activeCharacterId={CHAR_ID} remapInfo={null} />
-        </MemoryRouter>
-      );
-      await screen.findByRole('button', { name: 'New plan' });
+    stubViewport(DESKTOP_QUERY);
+    const { container } = render(
+      <MemoryRouter>
+        <PlanListPane activeCharacterId={CHAR_ID} remapInfo={null} />
+      </MemoryRouter>
+    );
+    await screen.findByRole('button', { name: 'New plan' });
 
-      expect(scrollerDiv(container).style.maxHeight).not.toBe('');
-    } finally {
-      restore();
-    }
+    expect(scrollerDiv(container).style.maxHeight).not.toBe('');
   });
 });
 
@@ -137,10 +128,6 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
   describe('Character details implant note (issue #1588)', () => {
     const NOTE = 'Assumes no implants';
 
-    async function seedGrant(scopes: readonly string[]): Promise<void> {
-      await seedGrantFor(CHAR_ID, scopes);
-    }
-
     function renderPane(height?: 'viewport' | 'sidebar') {
       render(
         <MemoryRouter>
@@ -160,7 +147,7 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
 
     it('notes that row training times assume no implants when the grant is missing', async () => {
       await seed();
-      await seedGrant([]);
+      await seedGrant(CHAR_ID, []);
       renderPane();
 
       expect(await screen.findByText(NOTE)).toBeInTheDocument();
@@ -168,7 +155,7 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
 
     it('hides the note once Character details is granted', async () => {
       await seed();
-      await seedGrant([ESI_REGISTRY.getCharacterImplants.scope]);
+      await seedGrant(CHAR_ID, [ESI_REGISTRY.getCharacterImplants.scope]);
       renderPane();
 
       await screen.findByText('Nothing to train');
@@ -185,7 +172,7 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
         updatedAt: Date.now(),
         whatIfImplants: { kind: 'preset', preset: 'none' },
       } as unknown as SkillPlanRecord);
-      await seedGrant([]);
+      await seedGrant(CHAR_ID, []);
       renderPane();
 
       await screen.findByText('Nothing to train');
@@ -194,7 +181,7 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
 
     it('leaves the note to the Plan Editor when shown as its sidebar', async () => {
       await seed();
-      await seedGrant([]);
+      await seedGrant(CHAR_ID, []);
       renderPane('sidebar');
 
       await screen.findByText('Nothing to train');

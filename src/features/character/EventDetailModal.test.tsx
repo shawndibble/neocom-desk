@@ -219,7 +219,7 @@ describe('EventDetailModal', () => {
     }
 
     async function seedGrant(scopes: readonly string[]) {
-      await seedGrantFor(CHAR_ID, scopes);
+      await seedGrantFor(CHAR_ID, scopes, { expiresAt: Date.now() + 3_600_000 });
       await useActiveCharacter.getState().hydrate();
     }
 

@@ -18,6 +18,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach } from 'vitest';
 import { settleEsiCacheLoads } from '@/esi/cache';
 import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
+import { fakeMediaQueryList } from '@/test/viewport';
 
 /**
  * A one-time hint is a Popover with `role="dialog"`; opened over a test that
@@ -221,15 +222,5 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
  * test see a mobile viewport and get the sheet at all.
  */
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
-  window.matchMedia = (media: string): MediaQueryList =>
-    ({
-      media,
-      matches: false,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
+  window.matchMedia = (media: string): MediaQueryList => fakeMediaQueryList(media, false);
 }
