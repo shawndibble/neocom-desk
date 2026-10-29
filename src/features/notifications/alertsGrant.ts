@@ -88,7 +88,6 @@ export interface AlertsExtraState {
   supported: boolean;
   characterIds: number[];
 }
-export type AlertsNearby = AlertsExtraState;
 
 export async function readAlertsExtra(extra: AlertsExtra): Promise<AlertsExtraState> {
   const value = (await db.settings.get(EXTRA_KEYS[extra]))?.value as

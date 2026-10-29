@@ -26,12 +26,6 @@ import { rankedSearch } from '@/lib/rankedSearch';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { LocatablePlace } from '@/features/industry/buildLocations';
 
-/** What `GET /characters/{id}/search` returns, by category. */
-export interface PlaceHits {
-  station?: readonly number[];
-  structure?: readonly number[];
-}
-
 export async function resolvePlaceHits(
   characterId: number,
   wanted: readonly number[],

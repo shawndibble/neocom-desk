@@ -155,9 +155,12 @@ export interface DecodedFittingShare {
 export type EncodeFittingShareResult =
   { ok: true; payload: string } | { ok: false; reason: 'too-large' };
 
+/** Why a Fitting Share Code failed to decode. */
+export type ShareDecodeError = 'invalid' | 'unsupported-version';
+
 export type DecodeFittingShareResult =
   | { ok: true; value: DecodedFittingShare }
-  | { ok: false; reason: 'invalid' | 'unsupported-version' };
+  | { ok: false; reason: ShareDecodeError };
 
 /** Real hulls never approach these — they only bound a forged payload cheaply. */
 export const MAX_SLOTS_PER_CATEGORY = 8;

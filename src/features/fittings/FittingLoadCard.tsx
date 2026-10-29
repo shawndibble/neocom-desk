@@ -6,7 +6,7 @@ import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
 import { resolveFittingXmlOpenAction, type FittingXmlListItem } from './fittingXmlList';
-import type { ShareDecodeError } from './useFittingWorkspace';
+import type { ShareDecodeError } from '@/engine/fittings/fittingShare';
 
 interface FittingLoadCardProps {
   onLoad: (text: string) => Promise<void>;

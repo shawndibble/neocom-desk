@@ -20,7 +20,7 @@
  * to that path and is rejected here outright.
  */
 import { db } from '@/db';
-import { createSettingStore, type SettingState, type SettingStore } from './settingStore';
+import { createSettingStore, type SettingStore } from './settingStore';
 
 /** The `sync.` namespace — including `sync.__` internals — is planSync's. */
 const SYNCED_PREFIX = 'sync.';
@@ -40,8 +40,6 @@ export interface LocalSettingOptions<T> {
   onApply?: (value: T) => void;
 }
 
-/** The store shape, shared with `createSyncedSetting`. */
-export type LocalSettingState<T> = SettingState<T>;
 export type LocalSettingStore<T> = SettingStore<T>;
 
 /**

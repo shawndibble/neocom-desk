@@ -26,6 +26,7 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 | Test data: characters, grants, deferred promises, ESI cache | `src/test/seed.ts`, `src/test/deferred.ts`, `src/esi/cacheFixtures.ts`                                                  | per-file `seedCharacter`/`seedGrant`              |
 | A test on a given viewport (a `matchMedia` stub)            | `stubViewport(query \| predicate)`, `fakeMediaQueryList` — `src/test/viewport.ts`; name every query the component reads | a hand-cast `as unknown as MediaQueryList`        |
 | An e2e spec's phone / desktop viewport                      | `PHONE`, `DESKTOP` — `e2e/support/testBase.ts`                                                                          | a per-spec `const PHONE`/`const DESKTOP`          |
+| Why a Fitting Share Code failed to decode                   | `ShareDecodeError` — `src/engine/fittings/fittingShare.ts`                                                              | a per-hook `type ShareDecodeError`                |
 
 ## Cloud Functions (`functions/src`)
 

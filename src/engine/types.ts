@@ -62,13 +62,6 @@ export interface TrainedSkill {
   sp: number;
 }
 
-export interface CharacterSheet {
-  /** Base + remap allocation (min 17, max 27 per attribute). */
-  attributes: Attributes;
-  implants: Implants;
-  trainedSkills: Map<number, TrainedSkill>;
-}
-
 /** Training-order urgency a user assigns to a Skill Plan entry. */
 export type PlanPriority = 'high' | 'normal' | 'low';
 
