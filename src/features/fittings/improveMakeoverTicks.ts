@@ -1,5 +1,5 @@
 import { iskDeltaOf, type ImproveOption } from '@/engine/fittings/improve';
-import { optionKey, toggleTick } from '@/engine/fittings/improveKeys';
+import { moveKey, optionKey, toggleTick } from '@/engine/fittings/improveKeys';
 import type { Makeover } from '@/engine/fittings/improveMakeover';
 
 /**
@@ -56,13 +56,17 @@ export function singleGainsOf(
   rows: readonly ImproveOption['candidate'][],
   singles: readonly ImproveOption[]
 ): Map<string, number> {
+  // One copy count per key: the first single swap with that key and size, as `find` took.
+  const scored = new Map<string, number>();
+  for (const single of singles) {
+    const key = `${optionKey(single)}#${single.candidate.at.length}`;
+    if (!scored.has(key)) scored.set(key, single.score);
+  }
   const gains = new Map<string, number>();
   for (const row of rows) {
-    const key = optionKey({ candidate: row } as ImproveOption);
-    const same = singles.find(
-      (single) => optionKey(single) === key && single.candidate.at.length === row.at.length
-    );
-    if (same) gains.set(key, same.score);
+    const key = moveKey(row);
+    const score = scored.get(`${key}#${row.at.length}`);
+    if (score !== undefined) gains.set(key, score);
   }
   return gains;
 }

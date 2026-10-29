@@ -21,11 +21,9 @@ import {
   onlySide,
   type ImproveCandidate,
   type ImproveGoal,
-  type ImproveOption,
   type ImproveHold,
   type ImproveReach,
   type ImproveResult,
-  type ModulePool,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import {
@@ -51,15 +49,8 @@ import {
   type ExploreSpace,
   type ImproveJob,
 } from '@/engine/fittings/improveJob';
-import {
-  findMakeover,
-  makeoverBar,
-  makeoverMoves,
-  MAKEOVER_CALCS,
-  type Makeover,
-  type MakeoverMoveOptions,
-} from '@/engine/fittings/improveMakeover';
-import { makeoverOptionsOf } from './improveMakeoverTicks';
+import { makeoverMovesFor, runMakeoverPhase, type MakeoverResult } from './improveMakeoverPhase';
+import { modulePool } from './improveModulePool';
 import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
@@ -296,7 +287,7 @@ export type ImproveState =
       fitTotal: number | null;
       elapsedMs: number;
       /** Rework's whole-fit rework, when it beat the best single swap; its rows as options, ready to tick. */
-      makeover?: { makeover: Makeover; options: ImproveOption[] };
+      makeover?: MakeoverResult;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
       /** With `sides`: the options on neither side (Damage Control, hull), shown as "Either". */
@@ -332,44 +323,6 @@ export interface ImproveSearch {
 export interface CompletionPool {
   swaps: FitSwap[];
   priceOf: (typeId: number) => number | null;
-}
-
-/** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
-function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluator): ModulePool {
-  const listed = new Set(catalogue.marketTypes.map((entry) => entry.typeId));
-  const flyable = new Map<string, boolean>();
-  const skilled = new Map<string, boolean>();
-  return {
-    groupOf: (typeId) => catalogue.types[String(typeId)]?.groupID,
-    typeIdsInGroup: (groupId) => catalogue.typeIdsByGroup.get(groupId) ?? [],
-    published: (typeId) => listed.has(typeId),
-    // A fitted module the pilot lacks skills for is replaced; its hull fit is not asked again.
-    pilotCanFly: (slot, typeId) => {
-      const key = `${slot}:${typeId}`;
-      let ok = skilled.get(key);
-      if (ok === undefined) {
-        const check = variants.engine
-          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
-          .get(typeId);
-        ok = check ? check.canFly : true;
-        skilled.set(key, ok);
-      }
-      return ok;
-    },
-    // A candidate the pilot lacks skills for goes under Train instead.
-    flyable: (slot, typeId) => {
-      const key = `${slot}:${typeId}`;
-      let ok = flyable.get(key);
-      if (ok === undefined) {
-        const check = variants.engine
-          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
-          .get(typeId);
-        ok = check ? check.fitsHull && check.canFly : true;
-        flyable.set(key, ok);
-      }
-      return ok;
-    },
-  };
 }
 
 /** The candidates for one side of the search, the hull takes and the pilot can fly. */
@@ -502,17 +455,6 @@ function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   };
   candidates.forEach(add);
   return [...ids];
-}
-
-/** The Makeover's one-slot moves on any fit the search reaches, for the catalogue, pilot and settings of this search. */
-function makeoverMovesFor(
-  variants: VariantEvaluator,
-  catalogue: FittingCatalogue,
-  options: Omit<MakeoverMoveOptions, 'pool'>
-): (fitting: Fitting) => ImproveCandidate[] {
-  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
-  const pool = modulePool(catalogue, variants);
-  return (fitting) => makeoverMoves(fitting.modules, index, catalogue.rackOf, { ...options, pool });
 }
 
 const NO_CHARGES: readonly ChargeLoadStep[] = [];
@@ -755,39 +697,30 @@ export function useImprove(
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
         // The Makeover: only after the single swaps ran to the end ("Show best so far" skips it), and only if it beats the best of them.
-        let makeover:
-          NonNullable<Extract<ImproveState, { status: 'done' }>['makeover']> | undefined;
+        let makeover: MakeoverResult | undefined;
         let makeoverStopped = false;
         if (movesFor && !stopRef.current && results.length > 0) {
-          setState((current) =>
-            current.status === 'searching'
-              ? { ...current, checked: 0, total: MAKEOVER_CALCS, makeover: true }
-              : current
-          );
-          const search = await findMakeover({
-            fitting: variants.fitting,
+          const search = await runMakeoverPhase({
+            variants,
+            catalogue,
+            moves: movesFor,
             before: scoredBefore,
             goal: searched,
-            moves: movesFor,
             stats,
             priceOf,
-            ...(target ? { target } : {}),
+            target,
             hold: effectiveHold(own.holds, hold),
             job,
             space,
             iskBudget,
             fitTotal,
-            // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.
-            bestSingle: makeoverBar(
-              listed,
-              buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups)
-            ),
+            listed,
             concurrency: workers.size,
-            onProgress: (calcs, max) => {
+            onProgress: (checked, total) => {
               if (!cancelled)
                 setState((current) =>
                   current.status === 'searching'
-                    ? { ...current, checked: calcs, total: max, makeover: true }
+                    ? { ...current, checked, total, makeover: true }
                     : current
                 );
             },
@@ -796,11 +729,7 @@ export function useImprove(
           });
           if (cancelled || search === null) return;
           makeoverStopped = search.stopped;
-          if (search.makeover)
-            makeover = {
-              makeover: search.makeover,
-              options: makeoverOptionsOf(search.makeover, priceOf),
-            };
+          makeover = search.makeover ?? undefined;
         }
         setRecalc(() => stats);
         let pool: Promise<CompletionPool> | null = null;
