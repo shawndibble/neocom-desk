@@ -70,7 +70,7 @@ describe('rememberedGoal', () => {
     expect(rememberedGoal(byRole, 'overall', 'mining')).toBe(DEFAULT_GOAL_OF_ROLE.mining);
     expect(DEFAULT_GOAL_OF_ROLE).toEqual({
       combat: 'overall',
-      explorer: 'overall',
+      explorer: 'explore',
       mining: 'mining',
       logistics: 'repair',
       command: 'command',

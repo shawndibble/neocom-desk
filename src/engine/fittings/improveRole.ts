@@ -79,7 +79,8 @@ export const roleUnlocks = (role: HullRole): readonly ImproveGoal[] => UNLOCKS[r
 /** The goal a role starts on when it has none remembered. */
 export const DEFAULT_GOAL_OF_ROLE: Record<HullRole, ImproveGoal> = {
   combat: 'overall',
-  explorer: 'overall',
+  // Explore better; a fit with no explorer module falls back to Best overall (`searchableGoal`).
+  explorer: 'explore',
   mining: 'mining',
   logistics: 'repair',
   command: 'command',
