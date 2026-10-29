@@ -3,8 +3,7 @@
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -29,10 +28,7 @@ import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 let identityCalls = 0;
@@ -121,21 +117,7 @@ const row = (quantity: number, cachedAt: string, overrides: Record<string, unkno
   ...overrides,
 });
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-/** The emulator's own wipe: BulkWriter-based recursiveDelete trips its rate limiter here. */
-async function clearEmulator(): Promise<void> {
-  const host = process.env.FIRESTORE_EMULATOR_HOST;
-  await fetch(
-    `http://${host}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
-suite('Corp Tax Book callables (emulator)', () => {
+emulatorSuite('Corp Tax Book callables (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(async () => {
     await clearEmulator();

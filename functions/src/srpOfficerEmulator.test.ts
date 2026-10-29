@@ -1,9 +1,8 @@
 // SRP officer actions against the Firestore emulator (issue #4853, ADR 0026). Runs only under the
 // emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { afterAll, beforeEach, expect, it } from 'vitest';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -26,10 +25,7 @@ import type { SrpDeps } from './srpStore.js';
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-23T12:00:00Z');
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 
@@ -100,19 +96,7 @@ async function seed(id: number, fields: Record<string, unknown> = {}) {
     });
 }
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
-suite('SRP officer actions (emulator)', () => {
+emulatorSuite('SRP officer actions (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(async () => {
     await clearEmulator();

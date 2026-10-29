@@ -1,8 +1,7 @@
 // The scheduled feeder pass against the Firestore emulator (issue #4509, spec #4504).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
-import { beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { beforeEach, expect, it } from 'vitest';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { SsoRefreshError } from './alertGrant.js';
 import { encryptRefreshToken } from './alertGrantCrypto.js';
 import {
@@ -19,10 +18,7 @@ const T0 = Date.parse('2026-10-18T12:00:00Z');
 const DAY = 24 * 3_600_000;
 const KEY = Buffer.alloc(32, 7);
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let now = T0;
 const dead = new Set<string>();
 /** SSO hands back the next token (`rt-H-n` → `rt-H-n+1`) instead of the same one. */
@@ -112,13 +108,6 @@ const grantDoc = async (corp: number) =>
 const observedRows = async () =>
   (await collectorBook().collection('observed').get()).docs.map((d) => d.data());
 
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
 async function addFeeder(
   corp: number,
   over: Partial<FeederRecord> = {},
@@ -158,14 +147,9 @@ async function addFeeder(
   return token;
 }
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
 const run = () => runScheduledCorpSyncs(syncDeps(), fakeEsi(), { sleep: async () => undefined });
 
-suite('scheduled feeder pass (emulator)', () => {
+emulatorSuite('scheduled feeder pass (emulator)', () => {
   beforeEach(async () => {
     await clearEmulator();
     now = T0;

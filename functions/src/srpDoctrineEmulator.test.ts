@@ -2,8 +2,7 @@
 // emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -27,10 +26,7 @@ const HULL = 587; // Rifter
 const HIGH = 405; // SDE slot map: a high-slot module
 const MED = 380; // a medium-slot module
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 const affiliations = new Map<number, number>();
@@ -152,19 +148,7 @@ const preview = (id: number, pilot = PILOT) =>
     parseFileClaimInput({ killmail: `https://zkillboard.com/kill/${id}/` }).ref
   );
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
-suite('SRP doctrine-fit (emulator)', () => {
+emulatorSuite('SRP doctrine-fit (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(async () => {
     await clearEmulator();

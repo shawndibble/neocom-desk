@@ -1,8 +1,7 @@
 // SRP retention sweep against the Firestore emulator (issue #4856, ADR 0026). Runs only
 // under the emulator (FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { afterAll, beforeEach, expect, it } from 'vitest';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { sweepSrpClaims } from './srpCleanup.js';
 import { SRP_RETENTION_MS } from './srpRetention.js';
 
@@ -12,21 +11,7 @@ const NOW = Date.parse('2026-10-23T12:00:00Z');
 const OLD = NOW - SRP_RETENTION_MS; // closed exactly a year ago
 const DAY = 24 * 60 * 60 * 1000;
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
+const db = emulatorDb;
 
 const claims = (corp: number) => db.collection('corps').doc(String(corp)).collection('srpClaims');
 const claimIds = async (corp: number) => (await claims(corp).get()).docs.map((d) => d.id).sort();
@@ -47,7 +32,7 @@ const put = (corp: number, id: number, state: string, closedAt?: number) =>
       ...(closedAt === undefined ? {} : { closedAt }),
     });
 
-suite('SRP retention sweep (emulator)', () => {
+emulatorSuite('SRP retention sweep (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(clearEmulator);
 

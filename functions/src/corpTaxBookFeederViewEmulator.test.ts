@@ -2,8 +2,8 @@
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -51,10 +51,7 @@ const FEEDER_NOBODY = 14;
 const FEEDER_JUNIOR = 15;
 const COLLECTOR_JUNIOR = 16;
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let ledger: 'ok' | 'forbidden' = 'ok';
 /** The accounting corporation's wallet journal, as ESI returns it. */
 let journalRows: unknown[] = [];
@@ -152,18 +149,6 @@ async function reason(promise: Promise<unknown>): Promise<string> {
   throw new Error('expected the call to fail');
 }
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
 const newInvite = async () =>
   (
     await createFeederInvite(bookDeps(), who(COLLECTOR_CEO), {
@@ -183,7 +168,7 @@ const viewRef = () => collectorBook().collection('feederViews').doc(String(FEEDE
 const summary = async () => (await viewRef().get()).data() as FeederViewSummary | undefined;
 const asDirector = { corporationId: FEEDER, accessToken: `roles-${FEEDER_DIRECTOR}` };
 
-suite('moon owner view', () => {
+emulatorSuite('moon owner view', () => {
   beforeEach(async () => {
     await clearEmulator();
     ledger = 'ok';
@@ -832,7 +817,7 @@ suite('moon owner view', () => {
 });
 
 // Paying a moon owner (#4514): what the wallet journal says, read by the server, matched once.
-suite('moon owner payouts (emulator)', () => {
+emulatorSuite('moon owner payouts (emulator)', () => {
   const officer = { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}` };
   const payoutDeps = () => ({ ...bookDeps(), esi: esi() });
   const payouts = async () =>

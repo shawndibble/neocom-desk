@@ -4,8 +4,8 @@
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { SsoRefreshError } from './alertGrant.js';
 import { decryptRefreshToken } from './alertGrantCrypto.js';
@@ -41,10 +41,7 @@ const ACCOUNTANT = 2; // also Station_Manager
 const JUNIOR = 3;
 const OTHER_ACCOUNTANT = 4;
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 /** Refresh tokens SSO has revoked or let die. */
@@ -167,22 +164,6 @@ async function reason(promise: Promise<unknown>): Promise<string> {
 const optIn = (id: number, refreshToken = `rt-${id}-0`, corporationId = CORP) =>
   saveCorpSyncGrant(syncDeps(), who(id), { corporationId, accessToken: `at-${id}`, refreshToken });
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-/** The emulator's own wipe: BulkWriter-based recursiveDelete trips its rate limiter here. */
-async function clearEmulator(): Promise<void> {
-  const host = process.env.FIRESTORE_EMULATOR_HOST;
-  await fetch(
-    `http://${host}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    {
-      method: 'DELETE',
-    }
-  );
-}
-
 const statement = {
   id: 's1',
   minerId: 'solo:50',
@@ -210,7 +191,7 @@ const statement = {
   characterIds: [50],
 };
 
-suite('Corp Tax Book scheduled sync (emulator)', () => {
+emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(async () => {
     await clearEmulator();

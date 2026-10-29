@@ -1,9 +1,8 @@
 // Moon owner onboarding against the Firestore emulator (issue #4511, spec #4504).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { beforeEach, expect, it } from 'vitest';
+import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -30,10 +29,7 @@ const ALT = 12; // the Accountant alt that logs in for the mining scope
 const FEEDER_DIRECTOR = 13;
 const FEEDER_NOBODY = 14;
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
+const db = emulatorDb;
 let ledger: 'ok' | 'forbidden' | 'unavailable' = 'ok';
 let now = T0;
 /** Runs during the first pull's observer read: a concurrent write landing mid-save. */
@@ -130,18 +126,6 @@ async function reason(promise: Promise<unknown>): Promise<string> {
   throw new Error('expected the call to fail');
 }
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
 const newInvite = async () =>
   (
     await createFeederInvite(bookDeps(), who(COLLECTOR_CEO), {
@@ -158,7 +142,7 @@ const save = (code: string, requestedRatePct?: number, alt = ALT) =>
   });
 const OTHER_ALT = 15;
 
-suite('moon owner onboarding', () => {
+emulatorSuite('moon owner onboarding', () => {
   beforeEach(async () => {
     await clearEmulator();
     ledger = 'ok';

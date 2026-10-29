@@ -1,8 +1,7 @@
 // The Corp Tax Book's version marker (issue #5047) against the Firestore emulator.
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { emulatorDb, emulatorSuite } from './testSupport/emulator.js';
 import { VERSIONED_COLLECTIONS } from './corpTaxBookVersionKeys.js';
 import {
   installBookWriteTracking,
@@ -10,11 +9,9 @@ import {
   withBookVersions,
 } from './corpTaxBookVersionTracking.js';
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
 const BOOK = '98500001';
 
-let db: Firestore;
+const db = emulatorDb;
 const book = () => db.collection('corps').doc(BOOK);
 const versions = async () => {
   const d = (await book().get()).data() ?? {};
@@ -26,10 +23,8 @@ const versions = async () => {
 const versioned = <T>(run: () => Promise<T>) =>
   withBookVersions((id, touched) => stampBook(db, id, touched), run, vi.fn());
 
-suite('Corp Tax Book version marker (emulator)', () => {
+emulatorSuite('Corp Tax Book version marker (emulator)', () => {
   beforeEach(async () => {
-    if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-    db = getFirestore();
     installBookWriteTracking();
     await db.recursiveDelete(book());
   });
