@@ -41,7 +41,7 @@ import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
-import { gainMetrics, roleChanges, type RoleChange } from './skillGains';
+import { gainMetrics, improveOverall, roleChanges, type RoleChange } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
 import { diffFittingStats, type StatChange } from './variationDelta';
@@ -368,7 +368,7 @@ function scoreOf(
   const metrics = gainMetrics(before, after);
   switch (goal) {
     case 'overall':
-      return metrics.overall;
+      return improveOverall(before, after);
     case 'damage':
       return relative(damageOf(before, target), damageOf(after, target));
     case 'tank':

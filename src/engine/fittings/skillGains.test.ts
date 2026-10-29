@@ -3,6 +3,7 @@ import type { AttributeWithSources, SourceLike } from './affectedBy';
 import {
   evaluateSkillGains,
   gainMetrics,
+  improveOverall,
   levelGain,
   levelOptions,
   pickedLevel,
@@ -655,5 +656,31 @@ describe('scheduledSkillTargets', () => {
       { skillTypeID: 9, targetLevel: 3 },
     ]);
     expect(scheduledSkillTargets([])).toEqual([]);
+  });
+});
+
+describe('improveOverall', () => {
+  const tank = (sustainedEffective: number) => ({ ...baseStats.tank, sustainedEffective });
+  const buffer = withStats({ repair: { shield: 0, armor: 0, hull: 0 }, tank: tank(400) });
+
+  it('does not score the first repair module on a buffer fit as a whole gain', () => {
+    const booster = withStats({
+      repair: { shield: 20, armor: 0, hull: 0 },
+      ehp: 19000,
+      tank: tank(410),
+    });
+    const hardener = withStats({
+      repair: { shield: 0, armor: 0, hull: 0 },
+      ehp: 21000,
+      tank: tank(440),
+    });
+    expect(gainMetrics(buffer, booster).overall).toBeGreaterThan(0.5);
+    expect(improveOverall(buffer, booster)).toBeLessThan(improveOverall(buffer, hardener));
+  });
+
+  it('still scores a better repair module on an active tank as a gain', () => {
+    const active = withStats({ repair: { shield: 20, armor: 0, hull: 0 }, tank: tank(400) });
+    const better = withStats({ repair: { shield: 40, armor: 0, hull: 0 }, tank: tank(600) });
+    expect(improveOverall(active, better)).toBeCloseTo(0.5);
   });
 });
