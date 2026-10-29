@@ -82,7 +82,7 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
 
 ## Editor (`src/routes/Fittings.tsx`)
 
-Layout (`THREE_COLUMN_QUERY` 100rem):
+Layout (`THREE_COLUMN_QUERY` 87.5rem, 1400px):
 
 - Wide: module browser (Add panel) | Ring or List | stats sections.
 - Narrower desktop: Add panel is a left `SlideOver`, opened by an empty slot or "Add module".
