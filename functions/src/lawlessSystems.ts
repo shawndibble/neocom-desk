@@ -6,6 +6,8 @@
  * system ids to R2 for the app to read. This module is the pure parse step.
  */
 
+import { isRecord } from './guards.js';
+
 export const INSURGENCY_URL = 'https://www.eveonline.com/api/warzone/insurgency';
 
 /** The collection of the backend's own state docs (the R2 publish markers); no client reads it. */
@@ -13,10 +15,6 @@ export const SYSTEM_CONDITIONS_COLLECTION = 'systemConditions';
 
 /** An insurgency's `corruptionState` once the system has gone lawless. */
 export const LAWLESS_CORRUPTION_STATE = 5;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 /**
  * System ids of every insurgency at corruption state 5, once each, ascending.

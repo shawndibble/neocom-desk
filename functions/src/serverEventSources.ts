@@ -4,6 +4,7 @@
 // User-Agent, which carries no email address.
 
 import { ESI_USER_AGENT } from './esiNotifications.js';
+import { isRecord } from './guards.js';
 
 const FUZZWORK_AGGREGATES = 'https://market.fuzzwork.co.uk/aggregates/';
 /** Fuzzwork batches poorly past this many types per request (the app's own cap). */
@@ -11,10 +12,6 @@ const FUZZWORK_MAX_TYPES = 200;
 const TIMEOUT_MS = 15_000;
 
 const HEADERS = { 'User-Agent': ESI_USER_AGENT, Accept: 'application/json' };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 /** The lowest sell order at the station, or null: no orders on that side is no price, never 0. */
 function sellMin(raw: unknown): number | null {

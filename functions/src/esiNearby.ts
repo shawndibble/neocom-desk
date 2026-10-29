@@ -11,6 +11,7 @@ import {
   retryAfterMs,
 } from './esiNotifications.js';
 import type { IncursionListing, RaidableSkyhook } from './nearbyAlerts.js';
+import { isRecord } from './guards.js';
 
 /** The compatibility-date routed base the app uses (`src/esi/client.ts`); the raidable list has no `/latest` route. */
 const ESI_ROOT = 'https://esi.evetech.net';
@@ -48,8 +49,6 @@ async function getJson(
   const body: unknown = await res.json().catch(() => undefined);
   return { kind: 'ok', body, budgetLow: isBudgetLow(res.headers) };
 }
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
 /** `GET /characters/{id}/location` (scope `esi-location.read_location.v1`). */
 export async function fetchCharacterLocation(

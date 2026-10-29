@@ -13,6 +13,7 @@
  * `index.ts` supplies `fetch` and publishes the result.
  */
 import { parseRetryAfterMs } from './workbenchFits.js';
+import { isPlainRecord } from './guards.js';
 
 const ESI_BASE_URL = 'https://esi.evetech.net';
 /** Courtesy gap between corporation requests (~170 requests a day). */
@@ -41,10 +42,6 @@ export function lpOffersUrl(corporationId: number): string {
   return `${ESI_BASE_URL}/loyalty/stores/${corporationId}/offers/`;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function num(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -54,7 +51,7 @@ export function parseLpOffers(body: unknown): LpSnapshotOffer[] {
   if (!Array.isArray(body)) return [];
   const offers: LpSnapshotOffer[] = [];
   for (const raw of body as unknown[]) {
-    if (!isRecord(raw)) continue;
+    if (!isPlainRecord(raw)) continue;
     const offerId = num(raw.offer_id);
     const typeId = num(raw.type_id);
     const quantity = num(raw.quantity);
@@ -72,7 +69,7 @@ export function parseLpOffers(body: unknown): LpSnapshotOffer[] {
     const required: Array<[number, number]> = [];
     if (Array.isArray(raw.required_items)) {
       for (const item of raw.required_items as unknown[]) {
-        if (!isRecord(item)) continue;
+        if (!isPlainRecord(item)) continue;
         const itemType = num(item.type_id);
         const itemQuantity = num(item.quantity);
         if (itemType !== null && itemQuantity !== null) required.push([itemType, itemQuantity]);

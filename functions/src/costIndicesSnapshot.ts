@@ -7,6 +7,7 @@
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { WriteOpenPricesResult } from './r2DailySnapshots.js';
+import { isPlainRecord } from './guards.js';
 
 export const COST_INDICES_R2_PREFIX = 'cost-indices/';
 /** Days kept per system; the oldest drop first. */
@@ -40,22 +41,18 @@ export function costIndicesR2Key(systemId: number): string {
   return `${COST_INDICES_R2_PREFIX}${systemId}.json`;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 /** ESI's system list -> `{ systemId: { activity: index } }`. Malformed entries are skipped, never thrown on. */
 export function parseCostIndices(body: unknown): DayCostIndices {
   const day: DayCostIndices = {};
   if (!Array.isArray(body)) return day;
   for (const raw of body as unknown[]) {
-    if (!isRecord(raw)) continue;
+    if (!isPlainRecord(raw)) continue;
     const id = raw.solar_system_id;
     if (typeof id !== 'number' || !Number.isFinite(id) || !Array.isArray(raw.cost_indices))
       continue;
     const activities: SystemCostIndices = {};
     for (const entry of raw.cost_indices as unknown[]) {
-      if (!isRecord(entry)) continue;
+      if (!isPlainRecord(entry)) continue;
       const { activity, cost_index: index } = entry;
       if (typeof activity === 'string' && typeof index === 'number' && Number.isFinite(index)) {
         activities[activity] = index;
@@ -67,7 +64,7 @@ export function parseCostIndices(body: unknown): DayCostIndices {
 }
 
 function isStored(value: unknown): value is StoredSystemCostIndices {
-  return isRecord(value) && Array.isArray(value.dates) && isRecord(value.activities);
+  return isPlainRecord(value) && Array.isArray(value.dates) && isPlainRecord(value.activities);
 }
 
 /**

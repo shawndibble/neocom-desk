@@ -28,6 +28,7 @@
  */
 
 import { ESI_USER_AGENT } from './esiNotifications.js';
+import { isPlainRecord } from './guards.js';
 
 const MUTAMARKET_API = 'https://mutamarket.com/api';
 const MUTAMARKET_SITE = 'https://mutamarket.com';
@@ -99,12 +100,9 @@ function positiveId(value: unknown, field: string): number {
   return value;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 export function parseEstimateInput(d: unknown): EstimateInput {
-  if (!isRecord(d)) throw new MutamarketInputError('expected { typeId, itemId, importIfMissing? }');
+  if (!isPlainRecord(d))
+    throw new MutamarketInputError('expected { typeId, itemId, importIfMissing? }');
   if (d.importIfMissing !== undefined && typeof d.importIfMissing !== 'boolean') {
     throw new MutamarketInputError('importIfMissing must be a boolean');
   }
@@ -121,10 +119,10 @@ export function parseEstimateInput(d: unknown): EstimateInput {
  * that isn't a positive finite number is no estimate — never a silent 0.
  */
 export function parseModuleEnvelope(body: unknown, typeId: number): MutamarketEstimate {
-  const data = isRecord(body) ? body.data : undefined;
-  if (!isRecord(data)) return { status: 'unknown' };
+  const data = isPlainRecord(body) ? body.data : undefined;
+  if (!isPlainRecord(data)) return { status: 'unknown' };
   const type = data.type;
-  if (!isRecord(type) || type.id !== typeId) return { status: 'unknown' };
+  if (!isPlainRecord(type) || type.id !== typeId) return { status: 'unknown' };
   const slug = typeof data.slug === 'string' && /^[a-z0-9-]+$/.test(data.slug) ? data.slug : null;
   const url = slug ? `${MUTAMARKET_SITE}/modules/${slug}` : null;
   const value = data.estimated_value;
@@ -145,7 +143,7 @@ function parseEstimatorStatistics(body: unknown): Map<number, boolean> {
   const out = new Map<number, boolean>();
   if (!Array.isArray(body)) return out;
   for (const row of body) {
-    if (!isRecord(row) || typeof row.type_id !== 'number') continue;
+    if (!isPlainRecord(row) || typeof row.type_id !== 'number') continue;
     out.set(row.type_id, typeof row.r2 === 'number');
   }
   return out;

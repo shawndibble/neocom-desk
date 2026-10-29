@@ -15,6 +15,7 @@ import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
 import { parseServerEvents, parseServerInputs, type ServerEventInputs } from './serverEvents.js';
 import type { NearbyRouteRules } from './nearbyAlerts.js';
+import { isRecord } from './guards.js';
 
 export type { ProjectionRowInput };
 
@@ -94,10 +95,6 @@ export interface RegisterDeviceResult {
   serverEventsByCharacter: Record<number, string[]>;
   /** Each verified character's server inputs; absent when the client sent none. */
   serverInputsByCharacter: Record<number, ServerEventInputs>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function parseProjectionRow(raw: unknown, path: string): ProjectionRowInput {
