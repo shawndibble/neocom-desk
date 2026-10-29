@@ -158,7 +158,7 @@ function ZkillboardFits({
  * A Workbench row's height before it is measured: name, date and price,
  * and one line of module icons, plus the gap below it.
  */
-const WORKBENCH_ROW_ESTIMATE = 100;
+const WORKBENCH_ROW_ESTIMATE = 104;
 
 const workbenchRowKey = (row: WorkbenchRow) => row.fit.id;
 

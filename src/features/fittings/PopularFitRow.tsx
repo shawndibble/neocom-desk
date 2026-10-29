@@ -3,6 +3,7 @@ import { disabledClassName, rowInteractiveClassName } from '@/components/ui/cont
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { isRowOwnEvent } from '@/components/ui/rowEvents';
 import { cx } from '@/lib/cx';
+import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { RackIconStrip } from './RackIconStrip';
 
 interface PopularFitRowProps {
@@ -22,8 +23,11 @@ interface PopularFitRowProps {
  * One Popular fit's card body, shared by the zKillboard and EVE Workbench tabs.
  * The whole card opens the fit; the blue title is its keyboard and screen-reader
  * control, and a tap on a module icon shows the module's name instead
- * (`isRowOwnEvent`). Renders into a parent `li` (`FIT_ROW_CLASS`), reaching
- * over its padding so the click area is the whole card.
+ * (`isRowOwnEvent`) — but only under a finger; with a mouse the hover has shown
+ * it, so a click on an icon opens the card too.
+ *
+ * Renders into a parent `li` (`FIT_ROW_CLASS`), reaching over its padding so
+ * the click area is the whole card.
  */
 export function PopularFitRow({
   title,
@@ -34,10 +38,18 @@ export function PopularFitRow({
   disabled = false,
   onOpen,
 }: PopularFitRowProps) {
+  const coarse = useMediaQuery(COARSE_POINTER_QUERY);
   return (
     <div
       onClick={(event) => {
-        if (!disabled && isRowOwnEvent(event)) onOpen();
+        if (disabled) return;
+        // A module icon is a tooltip trigger. With a mouse its name is already on
+        // hover, so a click is the card's; a finger has no hover, so its tap names it.
+        const onIcon =
+          !coarse &&
+          event.target instanceof Element &&
+          event.target.closest('[data-row-control][role="img"]');
+        if (onIcon || isRowOwnEvent(event)) onOpen();
       }}
       className={cx(
         '-mx-2 -my-1.5 min-w-0 flex-1 px-2 py-1.5',
@@ -45,7 +57,7 @@ export function PopularFitRow({
       )}
     >
       {/* -mx/px: room inside the truncating box for the title's focus ring. */}
-      <p className="-mx-1 truncate border-b border-line px-1 pb-1 text-sm">
+      <p className="-mx-1 truncate border-b border-line/50 px-1 pt-1 pb-2 text-sm">
         <button
           type="button"
           disabled={disabled}
