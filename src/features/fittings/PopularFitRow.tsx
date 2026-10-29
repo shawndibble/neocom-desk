@@ -24,8 +24,10 @@ interface PopularFitRowProps {
  * The whole card opens the fit; the blue title is its keyboard and screen-reader
  * control, and a tap on a module icon shows the module's name instead
  * (`isRowOwnEvent`) — but only under a finger; with a mouse the hover has shown
- * it, so a click on an icon opens the card too. Renders into a parent `li` (`FIT_ROW_CLASS`), reaching
- * over its padding so the click area is the whole card.
+ * it, so a click on an icon opens the card too.
+ *
+ * Renders into a parent `li` (`FIT_ROW_CLASS`), reaching over its padding so
+ * the click area is the whole card.
  */
 export function PopularFitRow({
   title,
@@ -44,7 +46,9 @@ export function PopularFitRow({
         // A module icon is a tooltip trigger. With a mouse its name is already on
         // hover, so a click is the card's; a finger has no hover, so its tap names it.
         const onIcon =
-          !coarse && event.target instanceof Element && event.target.closest('[role="img"]');
+          !coarse &&
+          event.target instanceof Element &&
+          event.target.closest('[data-row-control][role="img"]');
         if (onIcon || isRowOwnEvent(event)) onOpen();
       }}
       className={cx(
