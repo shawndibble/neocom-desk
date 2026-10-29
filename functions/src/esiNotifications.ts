@@ -5,6 +5,7 @@
 // run (the error budget is shared by every user of the client id).
 
 import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { isRecord } from './guards.js';
 import type { EsiNotification } from './eveNotificationSelection.js';
 
 export type NotificationsResult =
@@ -19,9 +20,8 @@ export type NotificationsResult =
   | { kind: 'backoff'; retryAfterMs: number | null }
   | { kind: 'error'; status: number };
 
-function isNotification(value: unknown): value is EsiNotification {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
+function isNotification(v: unknown): v is EsiNotification {
+  if (!isRecord(v)) return false;
   return (
     typeof v.notification_id === 'number' &&
     typeof v.type === 'string' &&

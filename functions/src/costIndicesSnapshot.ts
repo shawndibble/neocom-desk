@@ -35,7 +35,6 @@ export interface StoredSystemCostIndices {
   activities: Record<string, Array<number | null>>;
 }
 
-/** One object per system, so a popover reads a few KB, not every system. */
 /**
  * `isPlainRecord` from guards.ts, inlined: the docblock's "no relative runtime
  * imports" rule is what lets the backfill script load this file under Node type
@@ -45,6 +44,7 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** One object per system, so a popover reads a few KB, not every system. */
 export function costIndicesR2Key(systemId: number): string {
   return `${COST_INDICES_R2_PREFIX}${systemId}.json`;
 }

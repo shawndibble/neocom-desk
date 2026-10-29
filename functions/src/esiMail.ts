@@ -6,6 +6,7 @@
 // 420/429 stop the run, a low budget stops it after this call.
 
 import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { isRecord } from './guards.js';
 import type { MailHeader } from './mailPush.js';
 
 export type MailHeadersResult =
@@ -16,9 +17,8 @@ export type MailHeadersResult =
   | { kind: 'error'; status: number };
 
 /** An entry without a numeric `mail_id` is unusable; the other fields are optional here. */
-function toHeader(value: unknown): MailHeader[] {
-  if (typeof value !== 'object' || value === null) return [];
-  const v = value as Record<string, unknown>;
+function toHeader(v: unknown): MailHeader[] {
+  if (!isRecord(v)) return [];
   if (typeof v.mail_id !== 'number' || !Number.isSafeInteger(v.mail_id)) return [];
   const sentMs = typeof v.timestamp === 'string' ? Date.parse(v.timestamp) : NaN;
   return [
