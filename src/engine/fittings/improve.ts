@@ -18,7 +18,6 @@ import {
   jobOf,
   reworkGroups,
   RESOURCE_RIG_GROUPS,
-  scoredJobs,
   TANK_GOALS,
   TANK_GROUPS,
   UNIQUE_GROUPS,
@@ -26,6 +25,18 @@ import {
   type DefenseSide,
   type Job,
 } from './improveGroups';
+import {
+  dropLimitsOf,
+  firstLimitBreach,
+  HELD_EVERY_COPY,
+  holdsTankModules,
+  overallWeightsOf,
+  swapLimitsOf,
+  unguardedJobs,
+  type ExploreSpace,
+  type ImproveJob,
+  type LimitStat,
+} from './improveJob';
 import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
 import {
@@ -98,8 +109,9 @@ export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
  * powergrid or calibration; `capStable` a stable capacitor turned unstable;
- * `keepsTank` a tank conversion lost more than half of the sustained tank;
- * `keepsStats` Cheaper lost more than 10% of damage, tank or speed; `spend`
+ * `keepsTank` a tank conversion lost more than half of the sustained tank, or
+ * a job's tank limit broke (Explore Dangerous, every swap);
+ * `keepsStats` Cheaper, or a job's drop limit, lost too much of damage, tank or speed; `spend`
  * it costs more than the total budget or extra-spend cap allows.
  */
 export type Guardrail = 'budget' | 'capStable' | 'keepsTank' | 'keepsStats' | 'spend';
@@ -363,12 +375,13 @@ export function scoreOf(
   after: FittingStats,
   iskDelta: number | null,
   target: TargetProfile | undefined,
-  hold: ImproveHold
+  hold: ImproveHold,
+  job?: ImproveJob
 ): number | null {
   const metrics = gainMetrics(before, after);
   switch (goal) {
     case 'overall':
-      return improveOverall(before, after);
+      return improveOverall(before, after, job && overallWeightsOf(job));
     case 'damage':
       return relative(damageOf(before, target), damageOf(after, target));
     case 'tank':
@@ -443,13 +456,34 @@ const withTogglesOff = (fitting: Fitting): Fitting => ({
   ),
 });
 
+/** The figures an Improve Job's drop limits read. */
+function limitFigures(
+  s: FittingStats,
+  target: TargetProfile | undefined
+): Record<LimitStat, number> {
+  return {
+    damage: damageOf(s, target),
+    speed: s.navigation.maxVelocity,
+    ehp: s.ehp,
+    sustained: s.tank.sustainedEffective,
+  };
+}
+
+/** The Improve Job a check is made under; `makeover` holds the fit to every drop limit, not just a single swap's. */
+export interface JobGuard {
+  job?: ImproveJob;
+  space?: ExploreSpace;
+  makeover?: boolean;
+}
+
 /** The first Guardrail `after` breaks, or null. */
 export function brokenGuardrail(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
   target: TargetProfile | undefined,
-  conversion?: TankConversion
+  conversion?: TankConversion,
+  guard?: JobGuard
 ): Guardrail | null {
   if (fitsResourceBudget(before) && !fitsResourceBudget(after)) return 'budget';
   if (before.capacitor.stable && !after.capacitor.stable) return 'capStable';
@@ -459,6 +493,17 @@ export function brokenGuardrail(
     after.tank.sustainedEffective < before.tank.sustainedEffective * CONVERSION_KEEPS_SUSTAINED
   )
     return 'keepsTank';
+  if (guard?.job) {
+    const limits = guard.makeover
+      ? dropLimitsOf(guard.job, guard.space, goal)
+      : swapLimitsOf(guard.job, guard.space, goal);
+    const broke = firstLimitBreach(
+      limits,
+      limitFigures(before, target),
+      limitFigures(after, target)
+    );
+    if (broke) return broke === 'ehp' || broke === 'sustained' ? 'keepsTank' : 'keepsStats';
+  }
   if (goal === 'cheaper') {
     const kept: [number, number][] = [
       [damageOf(before, target), damageOf(after, target)],
@@ -496,6 +541,10 @@ export interface CandidateOptions {
   pool?: ModulePool;
   /** The most candidates returned; the caller that filters afterwards (by hull, skills) lifts it and slices itself. */
   limit?: number;
+  /** The Improve Job: its freed jobs may go. Absent: today's guard. */
+  job?: ImproveJob;
+  /** Explore's space: Dangerous keeps tank modules tank modules. */
+  space?: ExploreSpace;
 }
 
 const DEFAULT_OPTIONS: CandidateOptions = {
@@ -801,7 +850,9 @@ export function improveCandidates(
   const sides = defenseSides(modules, groupOf, o.defense);
   // A chosen side frees the other side's tank modules; nothing else swaps into tank modules.
   const freesTank = o.defense !== 'keep' && TANK_GOALS.has(o.goal);
-  const scored: readonly Job[] = scoredJobs(o.goal);
+  const scored: readonly Job[] = unguardedJobs(o.goal, o.job);
+  const heldWhole: readonly Job[] = o.job ? HELD_EVERY_COPY[o.job] : [];
+  const holdsTank = holdsTankModules(o.job, o.space);
 
   const jobsFitted = new Map<Job, number>();
   const groupsFitted = new Map<number, number>();
@@ -863,8 +914,10 @@ export function improveCandidates(
         !TANK_GROUPS.has(from ?? -1)
       )
         return false;
-      // Never the last module doing a job nobody scores.
-      return !(guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1);
+      if (holdsTank && TANK_GROUPS.has(from ?? -1) && !TANK_GROUPS.has(group ?? -1)) return false;
+      // Never the last module doing a job nobody scores (every copy, for a job the pilot's Job holds whole).
+      if (!guardsJob || jobOf(group) === job) return true;
+      return (jobsFitted.get(job) ?? 0) - at.length >= 1 && !heldWhole.includes(job);
     };
     const offer = (
       tier: number,
@@ -1074,6 +1127,9 @@ export interface FindImprovementsParams {
   target?: TargetProfile;
   /** Carry more: the hold scored (default the cargo hold). */
   hold?: ImproveHold;
+  /** The Improve Job (and for Explore, its space): Best overall's weights and the Explore Dangerous tank guard. Absent: today's. */
+  job?: ImproveJob;
+  space?: ExploreSpace;
   /** The total fit price may not pass it. Null: no limit. */
   iskBudget?: number | null;
   /** What the fit costs now, for the total budget. */
@@ -1173,6 +1229,8 @@ export async function findImprovements({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
+  job,
+  space,
   iskBudget = null,
   fitTotal = null,
   compensators,
@@ -1212,7 +1270,7 @@ export async function findImprovements({
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
     const iskDelta = iskDeltaOf(candidate, priceOf);
-    const score = scoreOf(goal, before, after, iskDelta, target, hold);
+    const score = scoreOf(goal, before, after, iskDelta, target, hold, job);
     const fix = candidate.fixesUnflyable === true;
     if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return false;
     const option: ImproveOption = {
@@ -1225,7 +1283,10 @@ export async function findImprovements({
     };
     const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
-    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion);
+    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion, {
+      job,
+      space,
+    });
     // A CPU or powergrid rig the fit needs is not a swap to offer, not even a greyed one.
     if (candidate.dropsResourceRig && broken === 'budget') return false;
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
