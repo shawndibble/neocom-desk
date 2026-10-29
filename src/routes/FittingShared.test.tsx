@@ -95,9 +95,7 @@ describe('FittingShared', () => {
     renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
 
     expect(
-      await screen.findByText(
-        'Shown at every skill level V, with no clone — log in to see this fit under your own pilot.'
-      )
+      await screen.findByText('Shown with skill level V - login to see with your skills.')
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
     await waitFor(() => expect(computeFittingStats).toHaveBeenCalled());
