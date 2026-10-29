@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
 import type { RejectedOption } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
 import { overageOf, RESOURCES } from '@/engine/fittings/makeItFit';
 import type { FittingStats } from '@/engine/fittings/types';
 import { changeLine } from './improveChangeLines';
@@ -30,7 +29,6 @@ export function ImproveBlockedRow({ option, own, fitTotal, searched, swapLabel, 
   );
   return (
     <li
-      key={optionKey(option)}
       className="border-line text-text-dim rounded-xs border p-2 text-sm"
       data-testid="improve-flyable-blocked"
     >
