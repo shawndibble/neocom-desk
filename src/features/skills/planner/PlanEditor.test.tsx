@@ -2041,35 +2041,19 @@ describe('splitting a plan into one row per level', () => {
   });
 });
 
-describe('removing an entry requires confirmation (#408)', () => {
-  it('does not remove the entry until the confirmation Modal is accepted', async () => {
+describe('removing an entry (undo toast, no confirmation)', () => {
+  it('removes the entry at once and Undo restores the previous entries', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
     await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
-    // Choosing Remove on the row only opens the Modal — the entry survives
-    // until the Modal's own Remove button is clicked.
-    expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.getByText(/remove "skill a i+v?" from this plan/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ entries: [{ skillTypeID: 20, targetLevel: 1, priority: 'high' }] })
     );
-  });
-
-  it('Cancel leaves the entry untouched and closes the Modal', async () => {
-    const user = userEvent.setup();
-    const { onUpdate } = renderEditor();
-
-    await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
-    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.queryByText(/remove "skill a i+v?" from this plan/i)).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+    expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ entries: PLAN.entries }));
   });
 
   it("removing entry 1 of 2 moves focus to the next row's reorder button (WCAG 2.4.3)", async () => {
@@ -2078,7 +2062,6 @@ describe('removing an entry requires confirmation (#408)', () => {
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
     await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
-    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /reorder skill b/i })).toHaveFocus()
@@ -2093,23 +2076,10 @@ describe('removing an entry requires confirmation (#408)', () => {
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a/i }));
     await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
-    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Your entries' })).toHaveFocus()
     );
-  });
-
-  it("Cancel gives focus back to the row's ⋮ (WCAG 2.4.3)", async () => {
-    const user = userEvent.setup();
-    renderEditor();
-
-    const more = screen.getByRole('button', { name: /more actions for skill a/i });
-    await user.click(more);
-    await user.click(await screen.findByRole('menuitem', { name: /remove skill a/i }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(more).toHaveFocus();
   });
 
   it("Saving a milestone gives focus back to the row's ⋮ (WCAG 2.4.3)", async () => {
@@ -2444,7 +2414,6 @@ describe('Plan Milestones (GLOSSARY.md)', () => {
 
     await user.click(screen.getByRole('button', { name: /more actions for skill a i/i }));
     await user.click(await screen.findByRole('menuitem', { name: /remove skill a i/i }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }));
 
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({

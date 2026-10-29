@@ -1,10 +1,10 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
-import { Panel, Spinner } from '@/components/ui';
+import { Panel, Spinner, ToastStack, useDeferredCommits } from '@/components/ui';
 import { markPlanDeleted, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -80,9 +80,17 @@ export function PlanListPane({
   );
   const isDesktop = useIsDesktop();
 
-  const plans = useLiveQuery(
+  const allPlans = useLiveQuery(
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
     [activeCharacterId]
+  );
+  // A deleted plan stays hidden until its Undo toast ends and the write lands,
+  // so a sync pull in that window can't bring it back.
+  const pendingDeletes = useDeferredCommits();
+  const { hiddenIds } = pendingDeletes;
+  const plans = useMemo(
+    () => (hiddenIds.size === 0 ? allPlans : allPlans?.filter((p) => !hiddenIds.has(p.id))),
+    [allPlans, hiddenIds]
   );
 
   const stats = usePlanStats(plans, scheduleInputs, activeCharacterId);
@@ -138,10 +146,17 @@ export function PlanListPane({
     if (isSyncConfigured()) scheduleSync(characterId, { collections: ['plans'] });
   }
 
-  async function handleDelete(id: string) {
-    // Always goes through markPlanDeleted (records a tombstone): a plain
-    // Dexie delete would let the remote copy resurrect it on next sync.
-    await markPlanDeleted(activeCharacterId, id);
+  // Delete hides the row and raises an Undo toast; the write lands when the
+  // toast ends (or the page or pane goes away), never lost.
+  function handleDelete(id: string) {
+    const characterId = activeCharacterId;
+    pendingDeletes.defer({
+      id,
+      message: t('plans.deleted', { name: allPlans?.find((p) => p.id === id)?.name ?? '' }),
+      // Always goes through markPlanDeleted (records a tombstone): a plain
+      // Dexie delete would let the remote copy resurrect it on next sync.
+      commit: () => markPlanDeleted(characterId, id),
+    });
   }
 
   async function handleRename(id: string, name: string) {
@@ -198,6 +213,12 @@ export function PlanListPane({
           />
         )}
       </div>
+      <ToastStack
+        items={pendingDeletes.items}
+        undoLabel={t('plans.undo')}
+        onUndo={pendingDeletes.undo}
+        onClose={pendingDeletes.commit}
+      />
     </>
   );
 
