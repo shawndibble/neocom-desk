@@ -1,0 +1,44 @@
+# Shared code: use it before writing your own
+
+Before writing a helper, grep for it (`grep -rn "function <name>" src`) and check
+this table. A private copy of something below is a defect; the 2026-10 DRY sweep
+removed over 50 of them (`isRecord`, `chunk`, `utcDay`, `DAY_MS`, `Translate`).
+Add a row here when you add a shared helper.
+
+UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
+
+| Need                                                        | Use                                                                                                     | Not                                               |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Narrow `unknown` to an object / finite number               | `isRecord`, `isPlainRecord` (rejects arrays), `isFiniteNumber` — `src/engine/guards.ts`                 | a local `isRecord`/`isObject`/`isNum`             |
+| Split an array into batches                                 | `chunk` — `src/lib/chunk.ts`                                                                            | a local `chunk`/`chunks`, `slice(i, i + n)` loops |
+| Time constants                                              | `MINUTE_MS`, `HOUR_MS`, `DAY_MS` — `src/lib/age.ts`                                                     | `86_400_000` literals, a local `DAY_MS`           |
+| UTC (EVE) `YYYY-MM-DD` of a timestamp, shift a UTC date     | `utcDay`, `shiftUtcDate` — `src/engine/localDay.ts`                                                     | `new Date(ms).toISOString().slice(0, 10)`         |
+| Local calendar day boundaries                               | `localMidnight`, `dayStart`, `nextDay`, `cellOf` — `src/engine/localDay.ts`                             | `ms % 86_400_000` (wrong for an hour around DST)  |
+| "How long ago" / durations                                  | `src/lib/age.ts`, `src/lib/duration.ts` (i18next plural keys)                                           | hand-built "3h ago" strings                       |
+| Clamp, sum, median                                          | `clamp`, `sum`, `median` — `src/engine/math.ts`; 0–100 percent in `src/lib/clampPct.ts`                 | inline `Math.max(0, Math.min(...))`               |
+| The `t` function passed into pure text builders             | `Translate` — `src/lib/translate.ts`                                                                    | a per-file `type Translate`                       |
+| Class-name joining                                          | `cx` — `src/lib/cx.ts`                                                                                  | template-string class concatenation               |
+| CSV / XLSX export                                           | `src/lib/csv.ts`, `src/lib/exportSheets.ts` (formula-injection guard included)                          | hand-joined CSV                                   |
+| A clock that re-renders on an interval                      | `useTicker(intervalMs)` (shared timer, pauses when hidden), `useNow` — `src/lib/ticker.ts`, `useNow.ts` | a component-local `setInterval`                   |
+| Debounce, media queries, URL state, synced settings         | `useDebouncedValue`, `useMediaQuery`, `useUrlState`, `useSyncedSetting` — `src/lib/`                    | re-implementing them                              |
+| Bounded-concurrency async work against ESI                  | `src/lib/concurrency.ts`, `src/lib/asyncPool.ts`, `src/esi/budget.ts`                                   | `Promise.all` over unbounded input; p-limit       |
+| Fuzzy item-name search                                      | `src/lib/fuzzySearch.ts`                                                                                | a new Levenshtein                                 |
+| Test data: characters, grants, deferred promises, ESI cache | `src/test/seed.ts`, `src/test/deferred.ts`, `src/esi/cacheFixtures.ts`                                  | per-file `seedCharacter`/`seedGrant`              |
+
+## Dates and times
+
+No date library, on purpose. EVE time is UTC with no DST, so UTC arithmetic via
+`utcDay`/`shiftUtcDate` is exact. Calendar-day logic for the user's own zone
+goes through `src/engine/localDay.ts`, which zeroes `Date` fields instead of
+dividing by `86_400_000`, so DST changes cannot skew it. Display formatting uses
+`Intl.DateTimeFormat` with `timeZone`, so the platform's tz database supplies the
+world's rules. Reach for a library (or `Temporal` once baseline) only for
+something `Intl` plus those helpers cannot express, such as recurring-event
+expansion across zones, and record the reason in `docs/context/decisions/`.
+
+## Packages
+
+Prefer what is installed (`radix-ui`, `@tanstack/react-virtual`, `@dnd-kit/*`,
+`@use-gesture/react`, `dexie`, `zustand`, `fflate`, `react-markdown`) over a new
+dependency. This is a PWA, so bundle size counts. Check an installed package
+before adding one, and record a new dependency's reason in the PR.
