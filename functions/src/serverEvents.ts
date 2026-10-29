@@ -7,8 +7,8 @@
 // 20261025-073433-server-pushed-events-community-triggers-polled-price-alerts):
 // per Character, the ids of the events it enabled for the browser channel
 // (`serverEvents`) and the inputs the server cannot read on its own
-// (`serverInputs`: the Quickbar's price targets and hub station, the ship-lost
-// minimum). The community events need no inputs: the backend writes them.
+// (`serverInputs`: the Quickbar's price targets and hub station, the nearby
+// alerts' jump limits). The community events need no inputs: the backend writes them.
 
 /** The events a Firestore trigger pushes the moment the backend writes them. */
 export const COMMUNITY_EVENT_IDS = [
@@ -17,8 +17,8 @@ export const COMMUNITY_EVENT_IDS = [
   'communityRequestPledged',
 ] as const;
 
-/** The events the 15-minute dispatch tick polls for (public market and zKillboard data). */
-export const POLLED_EVENT_IDS = ['priceAlertTriggered', 'shipLost'] as const;
+/** The events the 15-minute dispatch tick polls for (public market data). */
+export const POLLED_EVENT_IDS = ['priceAlertTriggered'] as const;
 export type PolledEventId = (typeof POLLED_EVENT_IDS)[number];
 
 /** Bounds a hostile or buggy upload; the real list is a handful. */
@@ -63,8 +63,6 @@ export interface ServerEventInputs {
   /** The hub station the Quickbar prices at. Required with `priceAlerts`. */
   priceStationId?: number;
   priceAlerts?: PriceAlertInput[];
-  /** 0 or absent: every loss. */
-  shipLostMinimumIsk?: number;
   /** The Character's N for `incursionNearby` (issue #5122): jumps from its location that count as near. */
   incursionNearbyJumps?: number;
   /** The Character's N for `skyhookRaidableNearby` (issue #5122). */
@@ -99,13 +97,7 @@ function parsePriceAlert(raw: unknown, path: string): PriceAlertInput {
 export function parseServerInputs(raw: unknown, path: string): ServerEventInputs | undefined {
   if (raw === undefined) return undefined;
   if (!isRecord(raw)) throw new Error(`${path}, if present, must be an object`);
-  const {
-    priceStationId,
-    priceAlerts,
-    shipLostMinimumIsk,
-    incursionNearbyJumps,
-    skyhookRaidableNearbyJumps,
-  } = raw;
+  const { priceStationId, priceAlerts, incursionNearbyJumps, skyhookRaidableNearbyJumps } = raw;
   const inputs: ServerEventInputs = {};
   // Lenient, unlike the rest of the registration: the alerts are the user's own
   // Quickbar data (no cap, free-text names), and one odd item must not fail
@@ -121,16 +113,6 @@ export function parseServerInputs(raw: unknown, path: string): ServerEventInputs
     });
     inputs.priceStationId = priceStationId;
     inputs.priceAlerts = alerts.slice(0, MAX_PRICE_ALERTS);
-  }
-  if (shipLostMinimumIsk !== undefined) {
-    if (
-      typeof shipLostMinimumIsk !== 'number' ||
-      !Number.isFinite(shipLostMinimumIsk) ||
-      shipLostMinimumIsk < 0
-    ) {
-      throw new Error(`${path}.shipLostMinimumIsk must be a non-negative number`);
-    }
-    inputs.shipLostMinimumIsk = shipLostMinimumIsk;
   }
   // Lenient like the price alerts: a bad N only loses that nearby alert.
   if (nearbyJumps(incursionNearbyJumps)) inputs.incursionNearbyJumps = incursionNearbyJumps;
@@ -156,8 +138,6 @@ export function polledEventsOf(
 export interface ServerEventBaseline {
   /** The price-alert snapshot `diffPriceAlerts` compares the next reading with. */
   priceAlerts?: PriceAlertSnapshotEntry[];
-  /** Loss killmail ids last read from zKillboard. */
-  shipLossIds?: number[];
 }
 
 /**
@@ -170,11 +150,6 @@ export function trimBaseline(raw: unknown, events: readonly string[]): ServerEve
   const baseline: ServerEventBaseline = {};
   if (events.includes('priceAlertTriggered') && Array.isArray(raw.priceAlerts)) {
     baseline.priceAlerts = raw.priceAlerts as PriceAlertSnapshotEntry[];
-  }
-  if (events.includes('shipLost') && Array.isArray(raw.shipLossIds)) {
-    baseline.shipLossIds = (raw.shipLossIds as unknown[]).filter(
-      (id): id is number => typeof id === 'number'
-    );
   }
   return baseline;
 }
@@ -216,22 +191,11 @@ export interface PriceAlertTriggeredFire {
   direction: 'above' | 'below';
 }
 
-export interface ShipLostFire {
-  eventId: 'shipLost';
-  characterId: number;
-  killmailId: number;
-  timeMs: number;
-  shipTypeId?: number;
-  systemId?: number;
-  value?: number;
-}
-
 export type ServerEventFire =
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
-  | PriceAlertTriggeredFire
-  | ShipLostFire;
+  | PriceAlertTriggeredFire;
 
 /* Price alerts: mirrors `diffPriceAlertTriggered` (src/engine/notificationDiffs/market.ts) */
 
@@ -281,37 +245,7 @@ export function diffPriceAlerts(
   return fires;
 }
 
-/* Ship lost: mirrors `diffShipLost` (src/engine/notificationDiffs/kills.ts) ----------- */
-
-export interface ShipLossEntry {
-  killmailId: number;
-  timeMs: number;
-  shipTypeId?: number;
-  systemId?: number;
-  value?: number;
-}
-
-/**
- * Fires per loss id the baseline lacks, oldest first. No baseline seeds
- * silently. With a minimum set, a loss under it, or with no stated value, is
- * dropped for good (the next baseline holds it).
- */
-export function diffShipLosses(
-  characterId: number,
-  seenIds: readonly number[] | undefined,
-  losses: readonly ShipLossEntry[],
-  minimumIsk: number
-): ShipLostFire[] {
-  if (!seenIds) return [];
-  const seen = new Set(seenIds);
-  return losses
-    .filter((entry) => !seen.has(entry.killmailId))
-    .filter((entry) => minimumIsk <= 0 || (entry.value ?? -1) >= minimumIsk)
-    .sort((a, b) => a.killmailId - b.killmailId)
-    .map((entry) => ({ eventId: 'shipLost' as const, characterId, ...entry }));
-}
-
-/* Occurrence Key and date: mirror src/engine/occurrenceKey.ts ------------------------- */
+/* Occurrence Key: mirrors src/engine/occurrenceKey.ts ------------------------------ */
 
 /** The Foreground Poller's Occurrence Key for the same fire; the parity test pins them. */
 export function serverEventOccurrenceKey(fire: ServerEventFire): string {
@@ -332,16 +266,7 @@ export function serverEventOccurrenceKey(fire: ServerEventFire): string {
       return [fire.characterId, fire.eventId, fire.typeId, fire.targetPrice, fire.direction].join(
         ':'
       );
-    case 'shipLost':
-      return [fire.characterId, fire.eventId, fire.killmailId].join(':');
   }
-}
-
-/** The feed row's date, as `occurrenceFiredAt` dates it: a loss by its killmail, the rest by now. */
-export function serverEventFiredAt(fire: ServerEventFire, nowMs: number): number {
-  return fire.eventId === 'shipLost' && Number.isFinite(fire.timeMs)
-    ? Math.min(fire.timeMs, nowMs)
-    : nowMs;
 }
 
 /* Push payload --------------------------------------------------------------------- */
@@ -378,8 +303,6 @@ function floorCopy(fire: ServerEventFire): { title: string; body: string } {
         title: 'Price alert',
         body: `${fire.name} reached ${iskFormat.format(fire.price)} ISK (target ${iskFormat.format(fire.targetPrice)} ISK).`,
       };
-    case 'shipLost':
-      return { title: 'Ship lost', body: 'Lost a ship' };
   }
 }
 
@@ -395,7 +318,7 @@ export function buildServerEventPush(fire: ServerEventFire, nowMs: number): Reco
     occurrenceKey: serverEventOccurrenceKey(fire),
     title: title.trim() === '' ? 'Neocom Desk' : title,
     body,
-    fireAt: String(serverEventFiredAt(fire, nowMs)),
+    fireAt: String(nowMs),
     fire: JSON.stringify(fire),
   };
 }

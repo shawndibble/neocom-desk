@@ -569,31 +569,6 @@ describe('server-pushed events (issue #5121)', () => {
     );
   });
 
-  it('names the ship and system of a loss through the public name lookup', async () => {
-    const fire = {
-      eventId: 'shipLost',
-      characterId: 7,
-      killmailId: 55,
-      timeMs: 900,
-      shipTypeId: 587,
-      systemId: 30000142,
-    } as const;
-    const resolveIds = vi.fn(
-      async () =>
-        new Map([
-          [587, 'Rifter'],
-          [30000142, 'Jita'],
-        ])
-    );
-    const e = env({ resolveIds });
-    await handlePush(e, serverPush(fire), 5000);
-    expect(resolveIds).toHaveBeenCalledWith([587, 30000142]);
-    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toBe('Lost your Rifter in Jita');
-    expect(e.recordFeedEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ id: '7:shipLost:55' })
-    );
-  });
-
   it('falls back to the sender’s copy and key for a fire that is not the push’s own', async () => {
     const e = env();
     await handlePush(e, serverPush({ ...priceFire, characterId: 8 }, { characterId: '7' }), 5000);

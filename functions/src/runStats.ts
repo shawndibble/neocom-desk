@@ -58,7 +58,6 @@ export const SERVER_POLL_STATS_KEYS = [
   'dormantBaselineClears',
   'firestoreReads',
   'firestoreWrites',
-  'zkillboardCalls',
   'fuzzworkCalls',
   'fcmSends',
   'durationMs',

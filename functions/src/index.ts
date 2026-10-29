@@ -56,7 +56,7 @@ import { isHourlyTick } from './dispatchProjections.js';
 import { pollServerEvents } from './serverEventPoll.js';
 import { createRegistrationReader } from './registrationReader.js';
 import { ALERTS_POLL_STATS_KEYS, SERVER_POLL_STATS_KEYS, createRunStats } from './runStats.js';
-import { fetchFuzzworkPrices, fetchZkillLosses } from './serverEventSources.js';
+import { fetchFuzzworkPrices } from './serverEventSources.js';
 import {
   deleteDeviceIfToken,
   listPolledDevices,
@@ -466,17 +466,17 @@ export const alertsCall = onCall<unknown>(
  * and pushes each row only to the device that uploaded it (issue #2240) —
  * see projectionStore.ts.
  *
- * The same tick polls the server-pushed price alerts and ship losses (issue
- * #5121, ADR 0027): public Fuzzwork and zKillboard reads, still no EVE token, rather than a scheduled job of its own.
+ * The same tick polls the server-pushed price alerts (issue #5121, ADR 0027): a
+ * public Fuzzwork read, still no EVE token, rather than a scheduled job of its own.
  *
  * The hourly tick (`isHourlyTick`) also ends every corp tax book removal whose 24 hours are up
  * (`finalizeDueRemovals`, issue #5072; it was `finalizeCorpTaxBookRemovals`, its own hourly job).
  * That is why this function holds the feeder-view secrets.
  */
 export const dispatchProjections = onSchedule(
-  // The server-pushed events' zKillboard reads are paced and stop after 5
-  // minutes (serverEventPoll.ts), so the tick can outlast the default minute;
-  // the projection dispatch runs alongside and is unaffected by them.
+  // The timeout was sized for the paced zKillboard loss reads this tick used to
+  // make (removed; the open app reads losses itself); lower it once run
+  // durations settle.
   {
     schedule: 'every 15 minutes',
     timeoutSeconds: 540,
@@ -490,11 +490,10 @@ export const dispatchProjections = onSchedule(
     // Independent halves: one failing must not stop the other.
     const [projected, polled] = await Promise.allSettled([
       dispatchDueProjections(db, messaging, Date.now(), logError),
-      // Price alerts and ship losses for a closed app (issue #5121): public data,
-      // no EVE token, pushed to the devices that enabled them.
+      // Price alerts for a closed app (issue #5121): public data, no EVE token,
+      // pushed to the devices that enabled them.
       pollServerEvents({
         listDevices: () => listPolledDevices(db, serverStats),
-        fetchLosses: (characterId) => fetchZkillLosses(characterId),
         fetchPrices: (stationId, typeIds) => fetchFuzzworkPrices(stationId, typeIds),
         send: async (token, data) => {
           serverStats.add('fcmSends');
