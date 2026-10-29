@@ -69,6 +69,25 @@ describe('ImproveMakeover', () => {
     expect(screen.queryByText(/^Costs/)).not.toBeInTheDocument();
   });
 
+  it('a rig put into an empty slot destroys nothing, so it gets no destroyed-rig note', () => {
+    const fill = {
+      fromTypeId: null,
+      toTypeId: 31796,
+      at: [{ slot: 'rig' as const, slotIndex: 2 }],
+    };
+    render(
+      <ImproveMakeover
+        makeover={{ ...MAKEOVER, rows: [fill] }}
+        before={BEFORE}
+        ticked={new Set()}
+        onToggle={() => {}}
+        typeName={typeNameOf}
+        rowCost={() => 1_000_000}
+      />
+    );
+    expect(screen.queryByText(/old rigs are destroyed/)).not.toBeInTheDocument();
+  });
+
   it("hides each row's own gain while the whole group is ticked", () => {
     render(<Harness />);
     expect(screen.queryByText(/On its own/)).toBeNull();

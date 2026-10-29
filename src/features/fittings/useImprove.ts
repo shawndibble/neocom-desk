@@ -19,7 +19,6 @@ import {
   type DefenseChoice,
   onlyNeutral,
   onlySide,
-  bestScore,
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveOption,
@@ -54,6 +53,7 @@ import {
 } from '@/engine/fittings/improveJob';
 import {
   findMakeover,
+  makeoverBar,
   makeoverMoves,
   MAKEOVER_CALCS,
   type Makeover,
@@ -777,7 +777,11 @@ export function useImprove(
             space,
             iskBudget,
             fitTotal,
-            bestSingle: bestScore(listed),
+            // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.
+            bestSingle: makeoverBar(
+              listed,
+              buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups)
+            ),
             concurrency: workers.size,
             onProgress: (calcs, max) => {
               if (!cancelled)

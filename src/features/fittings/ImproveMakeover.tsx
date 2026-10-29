@@ -247,7 +247,7 @@ export function ImproveMakeover({
                                   {t('fittings.improve.makeover.costs')} <IskAmount value={cost} />
                                 </>
                               )}
-                              {row.at[0]?.slot === 'rig' && (
+                              {row.fromTypeId !== null && row.at[0]?.slot === 'rig' && (
                                 <span className="text-text-dim">
                                   {' '}
                                   {t('fittings.improve.makeover.rigFullPrice')}
