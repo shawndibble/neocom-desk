@@ -70,6 +70,7 @@ import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/t
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -207,6 +208,26 @@ export const useImproveBudget = createLocalSetting<number | null>({
   defaultValue: null,
   parse: parseCap,
 });
+
+/**
+ * Reads every remembered Improve setting back from this device; true once all
+ * have settled. Nothing else hydrates them, so without it each starts at its
+ * default after a reload and the stored row is never read.
+ */
+export function useImproveSettingsHydrated(): boolean {
+  return useHydratedStore(
+    useImproveGoal,
+    useImproveGoalByRole,
+    useImproveReach,
+    useImproveJob,
+    useImproveSpace,
+    useImproveRigs,
+    useImproveSort,
+    useImproveOre,
+    useImproveHold,
+    useImproveBudget
+  );
+}
 
 /** Rows of the removed Refitting mode, dropped on the next start. */
 const RETIRED_KEYS = ['fittingsImproveMode', 'fittingsImproveRefitCap'];

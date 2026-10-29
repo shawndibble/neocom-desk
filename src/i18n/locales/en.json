@@ -1542,7 +1542,7 @@
         "rounds_other": "Found in {{count}} rounds.",
         "wholeFit": "The figures are the whole Makeover, recalculated as one fit.",
         "figure": {
-          "dps": "DPS",
+          "dps": "Total DPS",
           "ehp": "EHP",
           "speed": "Speed",
           "capacitor": "Capacitor",

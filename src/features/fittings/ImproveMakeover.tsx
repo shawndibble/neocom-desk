@@ -238,7 +238,15 @@ export function ImproveMakeover({
                           )}
                           {cost !== null && (
                             <span className="block text-xs">
-                              {t('fittings.improve.makeover.costs')} <IskAmount value={cost} />
+                              {cost < 0 ? (
+                                <>
+                                  {t('fittings.makeItFit.saves')} <IskAmount value={-cost} />
+                                </>
+                              ) : (
+                                <>
+                                  {t('fittings.improve.makeover.costs')} <IskAmount value={cost} />
+                                </>
+                              )}
                               {row.at[0]?.slot === 'rig' && (
                                 <span className="text-text-dim">
                                   {' '}

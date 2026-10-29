@@ -36,6 +36,7 @@ import {
   useImproveSpace,
   useImproveOre,
   useImproveReach,
+  useImproveSettingsHydrated,
   useImproveSort,
   useImproveBudget,
   migrateSpendCap,
@@ -107,6 +108,8 @@ export function useImproveDrawer({
   const role = hullRoleOf(hullOf(fitting, catalogue));
   const goal = rememberedGoal(goalsByRole, legacyGoal, role);
   const setGoal = (next: ImproveGoal) => setGoalsByRole({ ...goalsByRole, [role]: next });
+  // The remembered settings are read before the first search, so a reload never searches with the defaults.
+  const settingsReady = useImproveSettingsHydrated();
   const reach = useImproveReach((state) => state.value);
   const setReach = useImproveReach((state) => state.setValue);
   const sort = useImproveSort((state) => state.value);
@@ -187,7 +190,7 @@ export function useImproveDrawer({
     catalogue,
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
-    isOpen,
+    isOpen && settingsReady,
     {
       job,
       space,
