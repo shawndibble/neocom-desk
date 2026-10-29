@@ -2,9 +2,10 @@ import * as Icon from '@/components/ui/icons';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { formatIsk } from '@/lib/isk';
 import { formatCount } from '@/lib/formatCount';
+import type { Translate } from '@/lib/translate';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
-export type Translate = (key: string, opts?: Record<string, unknown>) => string;
+export type { Translate } from '@/lib/translate';
 
 /** The "build" glyph per method — a fourth method needs an entry here, never another ternary branch at a call site. */
 export const BUILD_GLYPH: Record<MakeMethod, typeof Icon.Build> = {

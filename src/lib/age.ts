@@ -1,3 +1,4 @@
+import type { Translate } from '@/lib/translate';
 /**
  * The relative-age ladder shared by every surface that shows "how long ago".
  * Extracted from `DataAgeBadge` so the Notification Feed's fired-at stamps
@@ -8,8 +9,6 @@
 export const MINUTE_MS = 60_000;
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 export function formatAge(ms: number, t: Translate): string {
   if (ms < MINUTE_MS) return t('common.age.justNow');

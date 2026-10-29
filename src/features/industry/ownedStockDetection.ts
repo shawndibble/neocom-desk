@@ -14,6 +14,7 @@ import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
 import { loadSystemName } from '@/features/character/systemSecurity';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import type { Translate } from '@/lib/translate';
 
 export interface OwnedStockSnapshot {
   /** Engine input: one entry per Character whose assets could be read. */
@@ -119,8 +120,6 @@ export async function resolveStockLocationNames(
 
   return names;
 }
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /**
  * One placement's location label. Falls back to the same id-based labels the

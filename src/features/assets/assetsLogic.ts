@@ -9,8 +9,9 @@ import {
 } from '@/engine/assetTree';
 import { type AssetSortField } from '@/features/assets/assetSortPreference';
 import { type AssetMatch } from '@/features/assets/assetBrowseModel';
+import type { Translate } from '@/lib/translate';
 
-export type Translate = (key: string, opts?: Record<string, unknown>) => string;
+export type { Translate } from '@/lib/translate';
 
 export function locationLabel(
   locationId: number,

@@ -1,4 +1,5 @@
 import type { WhatIfImplantSelection } from '@/db';
+import type { Translate } from '@/lib/translate';
 
 /** The planner's three standing assumptions, as the Assumptions row reads them. */
 export interface AssumptionsState {
@@ -10,8 +11,6 @@ export interface AssumptionsState {
   /** How many Boosters the plan carries. */
   boosterCount: number;
 }
-
-type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /**
  * One line saying what the plan is costed under: whichever of Alpha, an

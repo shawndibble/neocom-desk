@@ -20,6 +20,7 @@ import {
   type PledgeMailReservation,
 } from './pledgeMailStore';
 import { formatQuantity } from './requestFormat';
+import type { Translate } from '@/lib/translate';
 
 /**
  * `sent`: out and stamped. `unsure`: ESI gave no answer, so it may have been
@@ -81,8 +82,6 @@ export function pledgeMailDeps(
       ),
   };
 }
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /** One line of the mail: `350,000 x Reactive Metals`, with a copy's runs, ME and TE after it. */
 function lineText(t: Translate, line: RequestLine): string {

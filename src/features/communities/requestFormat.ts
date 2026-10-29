@@ -3,8 +3,8 @@ import type { BuybackLine, StandingRequest } from '@/engine/communities/buyback'
 import type { CommunityRequest, RequestStatus } from '@/engine/communities/requests';
 import { TRADE_HUBS } from '@/market/hubs';
 
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 import { createNumberFormat } from '@/lib/numberLocale';
+import type { Translate } from '@/lib/translate';
 
 const quantityFormat = createNumberFormat({});
 
