@@ -27,8 +27,9 @@ import {
 } from '@/lib/zkillboard';
 import { loadTypes } from '@/sde/loadSde';
 import { lookupNpcStation } from '@/sde/npcStations';
+import { MINUTE_MS } from '@/lib/age';
 
-export const RECENT_KILLS_TTL_MS = 5 * 60_000;
+export const RECENT_KILLS_TTL_MS = 5 * MINUTE_MS;
 
 /** Promises, so two callers asking at once share one request. */
 const killsCache = new Map<number, { at: number; result: Promise<SystemRecentKillsResult> }>();

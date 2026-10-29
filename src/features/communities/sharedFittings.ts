@@ -46,6 +46,7 @@ import {
   withMyCommunities,
   type CommunitySummary,
 } from './communityStore';
+import { MINUTE_MS } from '@/lib/age';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
 const MAX_CODE_LENGTH = 90_000;
@@ -96,7 +97,7 @@ async function toDoc(characterId: number, input: SharedFittingInput) {
  * How long `loadCommunityFittingsCached` reuses a Community's shared Fittings. This
  * device's own shares and unshares drop it at once; another Member's show within it.
  */
-export const SHARED_FITTINGS_TTL_MS = 10 * 60_000;
+export const SHARED_FITTINGS_TTL_MS = 10 * MINUTE_MS;
 
 const fittingsCache = createReadCache<SharedFitting[]>();
 const fittingsKey = (characterId: number, communityId: string) => `${characterId}:${communityId}:`;

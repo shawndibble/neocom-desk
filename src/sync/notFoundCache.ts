@@ -6,17 +6,18 @@
  * A local action that creates the document clears it (`clearNotFound`).
  */
 import { db as localDb } from '@/db';
+import { HOUR_MS } from '@/lib/age';
 
 const KEY_PREFIX = 'notFound:';
 
 /** How long each kind of miss is trusted before the document is read again. */
 export const NOT_FOUND_TTL_MS = {
   /** Written by the sync when a book starts billing the Character, so recheck often. */
-  billedByPointer: 3_600_000,
+  billedByPointer: HOUR_MS,
   /** A corp with no book: turning one on clears this on this device. */
-  corpBook: 6 * 3_600_000,
+  corpBook: 6 * HOUR_MS,
   /** A deleted Community never returns (new ones get new ids). */
-  community: 24 * 3_600_000,
+  community: 24 * HOUR_MS,
 } as const;
 
 /** True while a miss for `path` is remembered and unexpired. */

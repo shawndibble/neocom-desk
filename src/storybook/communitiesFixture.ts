@@ -30,8 +30,7 @@ import type {
 } from '@/features/communities/communityStore';
 import { uidForCharacter } from '@/sync/uid';
 import { SAMPLE_ACTIVE_CHARACTER, SAMPLE_CHARACTERS } from './sampleData';
-
-const DAY = 24 * 3_600_000;
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 
 export const SAMPLE_ADMIN_COMMUNITY_ID = 'sample-brass-meridian';
 export const SAMPLE_MEMBER_COMMUNITY_ID = 'sample-providence-co-op';
@@ -79,8 +78,8 @@ export function createCommunitiesFixture(
   ): CommunityMember => ({
     uid,
     characterName,
-    joinedAt: now - joinedDays * DAY,
-    libraryAsOf: libraryAgeDays === null ? null : now - libraryAgeDays * DAY,
+    joinedAt: now - joinedDays * DAY_MS,
+    libraryAsOf: libraryAgeDays === null ? null : now - libraryAgeDays * DAY_MS,
   });
 
   const members: Record<string, CommunityMember[]> = {
@@ -105,8 +104,8 @@ export function createCommunitiesFixture(
 
   const requests: Record<string, JoinRequest[]> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: [
-      { uid: 'char:2119000010', characterName: 'Anselm Voss', requestedAt: now - 2 * 3_600_000 },
-      { uid: 'char:2119000011', characterName: 'Marisol Teague', requestedAt: now - DAY },
+      { uid: 'char:2119000010', characterName: 'Anselm Voss', requestedAt: now - 2 * HOUR_MS },
+      { uid: 'char:2119000011', characterName: 'Marisol Teague', requestedAt: now - DAY_MS },
     ],
   };
 
@@ -162,7 +161,7 @@ export function createCommunitiesFixture(
     hull,
     // A sample, not a decodable Fitting Share Code: the list only links to it.
     code: `sample-${key}`,
-    updatedAt: now - DAY,
+    updatedAt: now - DAY_MS,
   });
   const fittings: Record<string, SharedFitting[]> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: [
@@ -198,8 +197,8 @@ export function createCommunitiesFixture(
       skillTypeID: 3300 + index,
       targetLevel: 4,
     })),
-    updatedAt: now - 2 * DAY,
-    sourceUpdatedAt: now - 2 * DAY,
+    updatedAt: now - 2 * DAY_MS,
+    sourceUpdatedAt: now - 2 * DAY_MS,
   });
   const plans: Record<string, SharedPlan[]> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: [
@@ -227,9 +226,9 @@ export function createCommunitiesFixture(
     location,
     terms,
     lines,
-    createdAt: now - ageHours * 3_600_000,
-    lastActivityAt: now - ageHours * 3_600_000,
-    expiresAt: now - ageHours * 3_600_000 + 30 * DAY,
+    createdAt: now - ageHours * HOUR_MS,
+    lastActivityAt: now - ageHours * HOUR_MS,
+    expiresAt: now - ageHours * HOUR_MS + 30 * DAY_MS,
     closed: false,
     notify: { app: true, mail: false },
   });
@@ -295,7 +294,7 @@ export function createCommunitiesFixture(
   const pledge = (uid: string, lines: RequestPledge['lines'], ageHours = 20): RequestPledge => ({
     uid,
     lines,
-    updatedAt: now - ageHours * 3_600_000,
+    updatedAt: now - ageHours * HOUR_MS,
   });
   const entry = (quantity: number, delivered = 0) => ({ quantity, delivered, contractIds: [] });
   const myReactivePledge: Record<number, PledgeEntry> = { 0: entry(150000) };
@@ -340,8 +339,8 @@ export function createCommunitiesFixture(
     memberUids,
     shareCount,
     paidCount,
-    createdAt: now - ageDays * DAY,
-    expiresAt: now - ageDays * DAY + 30 * DAY,
+    createdAt: now - ageDays * DAY_MS,
+    expiresAt: now - ageDays * DAY_MS + 30 * DAY_MS,
   });
   const fleetShare = (
     index: number,
@@ -357,7 +356,7 @@ export function createCommunitiesFixture(
     weight: 1,
     isk: 1_080_000_000,
     paid,
-    paidAt: paid ? now - DAY : 0,
+    paidAt: paid ? now - DAY_MS : 0,
   });
   const fleetPayouts: Record<string, FleetPayout[]> = {
     [SAMPLE_ADMIN_COMMUNITY_ID]: [
@@ -493,8 +492,8 @@ export function createCommunitiesFixture(
         case 'extendCommunityRequestCallable': {
           const { requestId } = data as { requestId: string };
           const found = itemRequests[communityId]?.find((entry) => entry.id === requestId);
-          if (found) found.expiresAt = now + 30 * DAY;
-          return { expiresAt: now + 30 * DAY };
+          if (found) found.expiresAt = now + 30 * DAY_MS;
+          return { expiresAt: now + 30 * DAY_MS };
         }
         case 'setCommunityRequestClosedCallable': {
           const { requestId, closed } = data as { requestId: string; closed: boolean };

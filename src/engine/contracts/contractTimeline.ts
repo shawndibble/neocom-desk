@@ -9,6 +9,7 @@
  */
 import type { Contract } from '@/esi/endpoints';
 import { parseInstant } from '@/engine/esiInstant';
+import { MINUTE_MS } from '@/lib/age';
 
 /** Statuses of a contract that ended without being completed. ESI dates none of them. */
 const OUTCOME_STATUSES = ['cancelled', 'deleted', 'rejected', 'failed', 'reversed'] as const;
@@ -25,8 +26,6 @@ export interface TimelineStep {
   /** Completed in the same minute as the step before it was accepted: shown as "Same minute", not a second stamp. */
   sameMinuteAsPrevious?: boolean;
 }
-
-const MINUTE_MS = 60_000;
 
 /**
  * `nowMs` decides whether an unaccepted contract has lapsed: ESI keeps it

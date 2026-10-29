@@ -12,6 +12,7 @@ import {
   type LoadedCorpBook,
 } from './corpBookStore';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
+import { MINUTE_MS } from '@/lib/age';
 
 interface Args {
   /** The ledger as loaded; undefined until it has. */
@@ -37,7 +38,7 @@ export function useCorpBookView({
   reloadKey,
 }: Args): { view: CorpBookView | null; reload: () => void } {
   const { t } = useTranslation();
-  const nowMs = useTicker(60_000);
+  const nowMs = useTicker(MINUTE_MS);
   const [version, setVersion] = useState(0);
   const [loaded, setLoaded] = useState<LoadedCorpBook[]>([]);
   const [pricesByCorp, setPricesByCorp] = useState<ReadonlyMap<number, DatedUnitPrices>>(new Map());

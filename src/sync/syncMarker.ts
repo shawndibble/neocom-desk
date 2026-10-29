@@ -10,6 +10,7 @@
 
 import { doc, getDoc, increment, setDoc, type Firestore } from 'firebase/firestore/lite';
 import type { SeenSyncMarker } from './localBookkeeping';
+import { HOUR_MS } from '@/lib/age';
 
 export const SYNC_MARKER_FIELD = 'syncVersion';
 
@@ -18,7 +19,7 @@ export const SYNC_MARKER_FIELD = 'syncVersion';
  * so a bump that never landed (a crash, a function write, a failed bump) cannot
  * hide data for longer.
  */
-export const SAFETY_RECONCILE_INTERVAL_MS = 3 * 3_600_000;
+export const SAFETY_RECONCILE_INTERVAL_MS = 3 * HOUR_MS;
 
 /** The remote marker, or `null` when the parent doc or field does not exist yet. */
 export async function readRemoteMarker(firestore: Firestore, uid: string): Promise<number | null> {

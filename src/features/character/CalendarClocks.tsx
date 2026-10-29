@@ -7,9 +7,9 @@
 import { useMemo } from 'react';
 import { eveTimeOfDay } from '@/lib/eveTime';
 import { useTicker } from '@/lib/ticker';
+import { MINUTE_MS } from '@/lib/age';
 
 const SECOND_MS = 1_000;
-const MINUTE_MS = 60_000;
 
 export function CalendarClocks() {
   const now = useTicker(SECOND_MS);

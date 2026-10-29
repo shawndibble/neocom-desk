@@ -1,3 +1,4 @@
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 /**
  * Tick positions for the Wallet Balance chart's time axis. Pure: the chart
  * scales its X axis by timestamp, so Recharts' own "nice" numbers would land
@@ -5,10 +6,8 @@
  * in the viewer's zone instead.
  */
 
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
 /** Below this span a date-only label would repeat, so ticks carry a time. */
-const TIME_TICK_SPAN_MS = 2 * DAY;
+const TIME_TICK_SPAN_MS = 2 * DAY_MS;
 
 export interface TimeAxisTicks {
   ticks: number[];
@@ -64,7 +63,7 @@ export function timeAxisTicks(
   if (!(max > min)) return { ticks: [min], showTime: true };
 
   if (max - min < TIME_TICK_SPAN_MS) {
-    const count = Math.min(limit, 2 + Math.floor((max - min) / HOUR));
+    const count = Math.min(limit, 2 + Math.floor((max - min) / HOUR_MS));
     const ticks = new Set<number>();
     for (let i = 0; i < count; i++) {
       ticks.add(Math.round(min + ((max - min) * i) / Math.max(1, count - 1)));

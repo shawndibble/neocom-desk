@@ -74,6 +74,7 @@ import {
 import { knownPackagedVolumeOf, type MarketTypeEntry } from '@/sde/marketTypes';
 import { loadMarketTypesById } from '@/sde/marketTypesById';
 import type { TypeMap } from '@/sde/types';
+import { utcDay } from '@/engine/localDay';
 
 /** Destination lowest sell must beat origin lowest sell by this factor to be looked at. */
 export const MIN_LISTED_GAP = 1.1;
@@ -319,7 +320,7 @@ async function loadDailyDemand(
 
 export async function runHaulingScan(request: HaulingScanRequest): Promise<HaulingScan> {
   const { from, to, typeIds, types, onProgress, signal } = request;
-  const today = request.today ?? new Date().toISOString().slice(0, 10);
+  const today = request.today ?? utcDay();
   const mode = request.mode ?? 'list';
   const maxUnitPrice = request.maxUnitPrice ?? null;
   const key = haulingScanCacheKey(request);

@@ -1,4 +1,5 @@
 import type { OpenOrderRow } from '../openOrdersModel';
+import { DAY_MS } from '@/lib/age';
 
 /** A healthy, uncomplicated sell order of Tritanium at Jita 4-4 — override only what a test is about. */
 export function openOrderRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRow {
@@ -17,7 +18,7 @@ export function openOrderRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRo
     stationName: 'Jita IV - Moon 4',
     issued: new Date().toISOString(),
     durationDays: 90,
-    expiry: { expiresAt: Date.now() + 60 * 86_400_000, daysLeft: 60, expired: false },
+    expiry: { expiresAt: Date.now() + 60 * DAY_MS, daysLeft: 60, expired: false },
     floor: null,
     costBasis: null,
     station: { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 },

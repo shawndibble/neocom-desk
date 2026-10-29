@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 /**
  * Jump clone cooldown: EVE limits how often a character can jump between
  * clones. Base 24 hours, reduced by 1 hour per level of Infomorph
@@ -28,7 +29,7 @@ export function cloneJumpCooldown(
   const last = new Date(lastCloneJumpDate);
   if (Number.isNaN(last.getTime())) return { onCooldown: false, readyAt: null };
   const readyAt = new Date(
-    last.getTime() + cloneJumpCooldownHours(infomorphSynchronizingLevel) * 3_600_000
+    last.getTime() + cloneJumpCooldownHours(infomorphSynchronizingLevel) * HOUR_MS
   );
   return { onCooldown: readyAt.getTime() > now.getTime(), readyAt };
 }

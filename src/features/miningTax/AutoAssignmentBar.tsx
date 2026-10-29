@@ -18,6 +18,7 @@ import { eveWhen } from '@/lib/eveTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { systemLabel } from './names';
 import { removeSurveyConnection, useSurveyConnections } from './surveyConnections';
+import { MINUTE_MS } from '@/lib/age';
 
 export function AutoAssignmentBar({
   characterIds,
@@ -36,7 +37,7 @@ export function AutoAssignmentBar({
   const { t } = useTranslation();
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setClock(Date.now()), 60_000);
+    const id = setInterval(() => setClock(Date.now()), MINUTE_MS);
     return () => clearInterval(id);
   }, []);
   const nowMs = nowOverride ?? clock;

@@ -24,12 +24,13 @@ import {
   type HubOrderCounts,
 } from './fuzzwork';
 import { TRADE_HUBS } from './hubs';
+import { MINUTE_MS, DAY_MS } from '@/lib/age';
 
 /** Past this many types the ESI step is skipped: one request each would eat the error-limit budget. */
 export const ESI_FALLBACK_MAX_TYPES = 50;
 
 /** After Fuzzwork throws, go straight to the fallback for this long rather than time out on every ask. */
-export const FUZZWORK_BACKOFF_MS = 60_000;
+export const FUZZWORK_BACKOFF_MS = MINUTE_MS;
 
 /** Fan-out for the ESI step; under `ESI_FANOUT_CONCURRENCY` so Sentry's N+1 detector stays quiet. */
 const ESI_STEP_CONCURRENCY = Math.min(4, ESI_FANOUT_CONCURRENCY);
@@ -133,7 +134,7 @@ async function r2Prices(
     const series = stored?.stations.get(stationId);
     let last = series ? series.dates.length - 1 : -1;
     const lastDay = series?.dates[last];
-    if (lastDay && nowMs - Date.parse(`${lastDay}T00:00:00Z`) > R2_MAX_AGE_DAYS * 86_400_000) {
+    if (lastDay && nowMs - Date.parse(`${lastDay}T00:00:00Z`) > R2_MAX_AGE_DAYS * DAY_MS) {
       last = -1;
     }
     const sellMin = last >= 0 ? (series?.sell[last] ?? null) : null;

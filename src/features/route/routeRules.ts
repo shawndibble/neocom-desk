@@ -22,6 +22,7 @@ import { EDENCOM_SYSTEMS, TRIGLAVIAN_MINOR_VICTORY_SYSTEMS } from '@/engine/rout
 import { loadPodKills } from '@/features/route/routeSafetyData';
 import { useAvoidedSystems } from './avoidedSystems';
 import { ROUTE_PREFERENCES } from './routePreferences';
+import { MINUTE_MS } from '@/lib/age';
 
 export const ROUTE_PREFERENCE_KEY = 'sync.routePreference';
 export const SECURITY_PENALTY_KEY = 'sync.routeSecurityPenalty';
@@ -132,7 +133,7 @@ export interface TravelSettingsState extends RouteRules {
 }
 
 /** The kill feed refreshes about hourly; asking this often is a cache read in between. */
-const POD_KILL_REFRESH_MS = 15 * 60_000;
+const POD_KILL_REFRESH_MS = 15 * MINUTE_MS;
 
 function useHydratedAll(): boolean {
   const flags = [

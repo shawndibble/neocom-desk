@@ -2,6 +2,7 @@ import type { CharacterAttributes, CharacterSkill, SkillQueueEntry } from '@/esi
 import type { Attributes, AttributeName } from '@/engine/types';
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { walletFixtureRoutes } from '@/storybook/esiFixtureRoutes';
+import { MINUTE_MS, DAY_MS } from '@/lib/age';
 
 /**
  * Sample skill data for the #4701 mockup (remap advice from the skill queue):
@@ -62,8 +63,6 @@ export const PERCEPTION_WILLPOWER: Attributes = {
   charisma: 17,
 };
 
-const DAY_MS = 86_400_000;
-
 function levelSp(rank: number, level: number): number {
   return level <= 0 ? 0 : Math.ceil(250 * rank * Math.pow(Math.sqrt(32), level - 1));
 }
@@ -82,7 +81,7 @@ export function queueEntries(
     const start = levelSp(skill.rank, skill.level - 1);
     const end = levelSp(skill.rank, skill.level);
     const perMinute = attrs[skill.primary] + attrs[skill.secondary] / 2;
-    const totalMs = ((end - start) / perMinute) * 60_000;
+    const totalMs = ((end - start) / perMinute) * MINUTE_MS;
     const doneFraction = index === 0 ? HEAD_DONE_FRACTION : 0;
     const startMs = index === 0 ? nowMs - totalMs * doneFraction : cursor;
     const finishMs = startMs + totalMs;

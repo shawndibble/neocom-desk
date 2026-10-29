@@ -10,6 +10,7 @@
  * attempts the network, so no offline banner appears at all.
  */
 import { STALE_AFTER } from './cache';
+import { MINUTE_MS } from '@/lib/age';
 
 /** A `fetchedAt` far enough back that the default freshness window has lapsed. */
-export const STALE_FETCHED_AT = Date.now() - STALE_AFTER.default - 60_000;
+export const STALE_FETCHED_AT = Date.now() - STALE_AFTER.default - MINUTE_MS;

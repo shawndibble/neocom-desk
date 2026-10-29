@@ -6,8 +6,7 @@
 
 import { moonOwnerMailRecipients } from './ownerRateMail';
 import type { Payee } from './payouts';
-
-const HOUR_MS = 3_600_000;
+import { HOUR_MS } from '@/lib/age';
 
 /** How long a removal waits once its mail is sent. */
 export const REMOVAL_WAIT_MS = 24 * HOUR_MS;

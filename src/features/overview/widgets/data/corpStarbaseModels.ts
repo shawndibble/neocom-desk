@@ -26,9 +26,9 @@ import {
 import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
 import type { NumberSecondary, RowDetailModel, TableRowModel } from './types';
 import type { Translate } from '@/lib/translate';
+import { HOUR_MS } from '@/lib/age';
 
 const W = 'overview.widgets.corpStarbases';
-const HOUR_MS = 3_600_000;
 const KNOWN_STATES = new Set(['offline', 'online', 'onlining', 'reinforced', 'unanchoring']);
 
 /** When the fuel runs out, from the moment this tower's bay was read; null when it cannot be told. */

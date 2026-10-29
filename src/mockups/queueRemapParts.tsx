@@ -9,8 +9,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { SCENARIOS, type ScenarioName } from './queueRemapFixtures';
 import { queueAdvice, savesTime } from './queueRemapAdvice';
-
-const DAY_MS = 86_400_000;
+import { DAY_MS } from '@/lib/age';
 
 /**
  * Puts the proposed button into the real Attributes card (the mockup can't

@@ -1,3 +1,4 @@
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 /**
  * The arithmetic behind the hand-built widget charts: scaling, polyline
  * points, donut dash arrays. Pure, so each is pinned by a plain test and the
@@ -118,9 +119,9 @@ export function stackedAreaBands(layers: readonly (readonly number[])[], height:
 }
 
 /** How far before now a Gantt axis reaches at most, and how far after. */
-export const GANTT_LOOK_BACK_MS = 86_400_000;
-export const GANTT_LOOK_AHEAD_MS = 14 * 86_400_000;
-const GANTT_MIN_AHEAD_MS = 3_600_000;
+export const GANTT_LOOK_BACK_MS = DAY_MS;
+export const GANTT_LOOK_AHEAD_MS = 14 * DAY_MS;
+const GANTT_MIN_AHEAD_MS = HOUR_MS;
 /** A Gantt bar is never thinner than this (percent of the axis), so a short job still reads as there. */
 const MIN_GANTT_BAR_PERCENT = 2;
 

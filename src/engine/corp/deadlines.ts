@@ -15,6 +15,7 @@ import { DEADLINE_SEVERITIES } from '../character/severity';
 import { dayStart, nextDay, type DayZone } from '../localDay';
 import type { CorpBoardItem } from './board';
 import type { CorpBoardSeverity } from './board';
+import { DAY_MS } from '@/lib/age';
 
 /** How far ahead the Deadline Strip looks on a full-width viewport. */
 export const DEADLINE_STRIP_DAYS = 14;
@@ -26,7 +27,7 @@ export const DEADLINE_STRIP_DAYS = 14;
  * there anything I have to do before I next log in", which is a question about
  * the calendar, not about the severity ladder.
  */
-export const DUE_SOON_WINDOW_MS = 86_400_000;
+export const DUE_SOON_WINDOW_MS = DAY_MS;
 
 /**
  * Severity worst-first, which is also `severityForRemaining`'s own order. Used

@@ -7,9 +7,10 @@
  */
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
+import { HOUR_MS } from '@/lib/age';
 
 /** The backend republishes once a day. */
-const STALE_AFTER_MS = 12 * 60 * 60_000;
+const STALE_AFTER_MS = 12 * HOUR_MS;
 
 /** Units per day by type id; a type that never traded in the window is absent. */
 export type LpStoreVolume = Readonly<Record<number, number>>;

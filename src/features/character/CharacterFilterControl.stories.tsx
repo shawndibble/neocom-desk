@@ -10,6 +10,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { db } from '@/db';
 import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
+import { MINUTE_MS } from '@/lib/age';
 
 /** Sample Character ids for the stack; a portrait the image server lacks shows its fallback. */
 const PILOT_IDS = [90000001, 2112625428, 91316135, 95465499, 96180548, 1338057886];
@@ -70,7 +71,7 @@ export const InPageHeader: Story = {
   render: (args) => (
     <PageHeader
       title="Market orders"
-      meta={<DataAgeBadge date={new Date(Date.now() - 12 * 60_000)} />}
+      meta={<DataAgeBadge date={new Date(Date.now() - 12 * MINUTE_MS)} />}
       scope={<CharacterFilterControl {...args} />}
       actions={actions}
     />

@@ -76,6 +76,7 @@ import {
 import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
 import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
 import type { NotificationCopy } from './notificationWording';
+import { HOUR_MS } from '@/lib/age';
 
 /** Matches the Roman-numeral formatting every skill-level display in the app uses. */
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
@@ -175,7 +176,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
 }
 
 /** How far ahead a Projection reaches (round 44: the Projection Horizon). */
-export const PROJECTION_HORIZON_MS = 72 * 3_600_000;
+export const PROJECTION_HORIZON_MS = 72 * HOUR_MS;
 
 export interface ProjectionRow {
   readonly characterId: number;

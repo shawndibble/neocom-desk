@@ -11,6 +11,7 @@ import { median } from '../math';
 import { turretDamageMultiplier, turretHitChance, type DamageSplit } from './appliedDps';
 import type { CapBoosterFigures } from './capBoosterChoice';
 import type { CrystalFigures } from './mining';
+import { MINUTE_MS } from '@/lib/age';
 
 export type ChargeTier = 'tech1' | 'faction' | 'tech2';
 
@@ -350,7 +351,7 @@ export function chargesUsedPerMinute({
   crystal: CrystalWear | null;
 }): number | null {
   if (rateOfFireMs <= 0) return null;
-  const shots = (60_000 / rateOfFireMs) * guns;
+  const shots = (MINUTE_MS / rateOfFireMs) * guns;
   if (crystal === null) return shots;
   if (!crystal.takesDamage || crystal.hitpoints <= 0) return null;
   return (shots * crystal.volatility * crystal.volatilityDamage) / crystal.hitpoints;

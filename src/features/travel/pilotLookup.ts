@@ -12,6 +12,7 @@ import {
   achievementFromPublicInfo,
   type CharacterAchievement,
 } from '@/features/character/achievement';
+import { DAY_MS } from '@/lib/age';
 
 export interface PilotSummary {
   characterId: number;
@@ -67,7 +68,7 @@ export function pilotAge(birthday: string, now: Date): { years: number; days: nu
     return date;
   };
   if (anniversary(years).getTime() > now.getTime()) years -= 1;
-  const days = Math.floor((now.getTime() - anniversary(years).getTime()) / 86_400_000);
+  const days = Math.floor((now.getTime() - anniversary(years).getTime()) / DAY_MS);
   return { years, days };
 }
 

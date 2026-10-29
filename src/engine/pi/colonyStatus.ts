@@ -11,6 +11,7 @@
  */
 import { hasYieldBaseline, pastEfficientWindow } from './extraction';
 import type { ColonyAttention, ColonyStatus, ExtractorProgram, ExtractorState } from './types';
+import { HOUR_MS } from '@/lib/age';
 
 /**
  * Default window before expiry inside which an extractor program is "expiring
@@ -27,7 +28,7 @@ import type { ColonyAttention, ColonyStatus, ExtractorProgram, ExtractorState } 
  * notification cadence is not a status colour, and the two stay free to
  * diverge.
  */
-export const EXPIRING_SOON_WINDOW_MS = 24 * 3_600_000;
+export const EXPIRING_SOON_WINDOW_MS = 24 * HOUR_MS;
 
 /**
  * A program is past its efficient window once its trailing day of output falls

@@ -5,6 +5,7 @@
  */
 import type { TaxPriceSource } from '../miningTax/priceBasis';
 import { DAY_MS } from '@/lib/age';
+import { utcDay } from '@/engine/localDay';
 
 /** What `readCorpTaxBookStatementCallable` returns (functions/src/corpTaxBookStore.ts). */
 export interface VerifyPayload {
@@ -104,7 +105,7 @@ export function verifyRows(lines: readonly VerifyPayloadLine[]): VerifyRow[] {
 
 /** The UTC date a Statement is due: `overdueDays` after it was issued (D19). */
 export function dueDate(issuedAt: string, overdueDays: number): string {
-  return new Date(Date.parse(issuedAt) + overdueDays * DAY_MS).toISOString().slice(0, 10);
+  return utcDay(Date.parse(issuedAt) + overdueDays * DAY_MS);
 }
 
 /** The distinct rates the lines billed, each with its effective-from date, in line order (D28). */

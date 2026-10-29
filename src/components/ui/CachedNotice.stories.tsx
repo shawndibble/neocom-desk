@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { CachedNotice } from './CachedNotice';
+import { MINUTE_MS } from '@/lib/age';
 
-const ago = (minutes: number) => Date.now() - minutes * 60_000;
+const ago = (minutes: number) => Date.now() - minutes * MINUTE_MS;
 
 /**
  * The line above a view's content while that content is a cached read. Cue

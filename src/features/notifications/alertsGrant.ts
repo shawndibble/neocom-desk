@@ -15,13 +15,14 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { db } from '@/db';
 import { reportFailure } from '@/observability/reportFailure';
 import type { AlertsWalkStep } from './alertsNeeds';
+import { MINUTE_MS } from '@/lib/age';
 
 const GRANTS_KEY = 'alertsGrants';
 const NEARBY_KEY = 'alertsNearby';
 const MAIL_KEY = 'alertsMail';
 const QUEUE_KEY = 'neocom.alerts.queue';
 /** Same bound as a Pending Login: a queue outlives no login that could still complete. */
-const QUEUE_TTL_MS = 15 * 60_000;
+const QUEUE_TTL_MS = 15 * MINUTE_MS;
 /** A hung delete must not hold removal, Log out or delete-data. */
 const DELETE_TIMEOUT_MS = 8_000;
 

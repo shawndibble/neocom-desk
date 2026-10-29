@@ -14,8 +14,9 @@
  */
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import { isRecord } from '@/engine/guards';
+import { MINUTE_MS } from '@/lib/age';
 
-const CACHE_TTL_MS = 10 * 60_000;
+const CACHE_TTL_MS = 10 * MINUTE_MS;
 const READ_TIMEOUT_MS = 20_000;
 
 /** One stored Workbench fit — mirrors `StoredWorkbenchFit` on the Functions side. */

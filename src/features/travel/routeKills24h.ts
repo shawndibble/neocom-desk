@@ -11,9 +11,10 @@
 import { fetchRegionRecentKills, type RegionRecentKillsResult } from '@/lib/zkillboard';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { MINUTE_MS } from '@/lib/age';
 
 export const ROUTE_KILLS_WINDOW_SECONDS = 24 * 3600;
-export const ROUTE_KILLS_TTL_MS = 10 * 60_000;
+export const ROUTE_KILLS_TTL_MS = 10 * MINUTE_MS;
 
 /** Low on purpose: zKillboard is a third party that rate-limits hard. */
 const CONCURRENCY = 3;

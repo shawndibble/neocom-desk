@@ -26,6 +26,8 @@ import {
   setCommunityBackendOverride,
   type CommunityBackendOverride,
 } from './backendOverride';
+import { utcDay } from '@/engine/localDay';
+import { MINUTE_MS } from '@/lib/age';
 
 export interface CommunitySummary {
   id: string;
@@ -93,7 +95,7 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
  * changes elsewhere (an admin letting this Character in, another Member joining)
  * shows within this window.
  */
-export const MY_COMMUNITIES_TTL_MS = 15 * 60_000;
+export const MY_COMMUNITIES_TTL_MS = 15 * MINUTE_MS;
 
 const mineCache = createReadCache<CommunitySummary[]>();
 
@@ -105,7 +107,7 @@ const mineCache = createReadCache<CommunitySummary[]>();
 /** Most documents one roster or join-request read takes. */
 export const COMMUNITY_LIST_CAP = 1000;
 
-export const ROSTER_TTL_MS = 20 * 60_000;
+export const ROSTER_TTL_MS = 20 * MINUTE_MS;
 
 const rosterCache = createReadCache<CommunityMember[]>();
 /** Stamped with the Member's `libraryAsOf`: the same stamp is the same library. */
@@ -556,7 +558,7 @@ export async function loadMailInviteStatus(
   if (communityBackendOverride()) return { remaining: MAX_MAIL_INVITES_PER_DAY, sent: [] };
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
-  const day = new Date(now).toISOString().slice(0, 10);
+  const day = utcDay(now);
   const [quota, invites] = await Promise.all([
     getDoc(doc(db, 'characters', uid, 'mailInviteQuota', day)),
     // The newest sent ones only: the list shows recent invites, and the daily cap is 20.

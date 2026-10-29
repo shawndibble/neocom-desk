@@ -7,13 +7,14 @@
  */
 import { isFinishedContractStatus } from '../contracts/contractStatus';
 import type { HeldQuote, QuoteContractStatus } from './buyback';
+import { MINUTE_MS } from '@/lib/age';
 
 export type { QuoteContractStatus };
 
 /** Contracts one quote links: the newest few. A seller who makes more than this has a bigger problem than a missing link. */
 export const MAX_LINKED_CONTRACTS = 5;
 /** ESI stamps a contract with its own clock and the quote with the client's: a fast client must not lose a real match. */
-export const LINK_CLOCK_SLACK_MS = 10 * 60_000;
+export const LINK_CLOCK_SLACK_MS = 10 * MINUTE_MS;
 
 /** The subset of an ESI item exchange contract this module reads, with its included items. */
 export interface BuybackContract {

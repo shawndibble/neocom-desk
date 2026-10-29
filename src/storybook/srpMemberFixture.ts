@@ -6,8 +6,8 @@
 import type { SrpMemberBackend } from '@/features/corp/srp/srpMemberBackend';
 import type { LostLoss, MemberClaim } from '@/features/corp/srp/srpMemberModel';
 import type { SrpStatus } from '@/features/corp/srpTypes';
+import { DAY_MS } from '@/lib/age';
 
-const DAY = 86_400_000;
 const HASH = 'c'.repeat(40);
 
 // Real SDE ids, so the page names them as it would in the app.
@@ -60,8 +60,8 @@ const claim = (
   hullTypeId,
   classId: 0,
   solarSystemId,
-  killedAt: now - daysAgo * DAY,
-  filedAt: now - (daysAgo - 0.5) * DAY,
+  killedAt: now - daysAgo * DAY_MS,
+  filedAt: now - (daysAgo - 0.5) * DAY_MS,
   state: 'pending',
   amount: null,
   rejectionReason: null,
@@ -132,7 +132,7 @@ export function createSrpMemberFixture(
     hullTypeId: hull,
     classId: CRUISER_GROUP,
     solarSystemId: system,
-    killedAt: now - daysAgo * DAY,
+    killedAt: now - daysAgo * DAY_MS,
   });
   const losses = noLosses
     ? []
@@ -190,7 +190,7 @@ export function createSrpMemberFixture(
     // A Hurricane fit: 519 (Gyrostabilizer-class sample) twice and 2048 on the high rack, a rig, a drone.
     killmail: async (killmailId) => ({
       killmail_id: killmailId,
-      killmail_time: new Date(now - DAY).toISOString(),
+      killmail_time: new Date(now - DAY_MS).toISOString(),
       solar_system_id: JITA,
       victim: {
         ship_type_id: HURRICANE,
