@@ -209,42 +209,45 @@ export function FittingShareView({
     <ShareShell
       title={t('fittingShare.title')}
       openInApp={openInApp}
+      wide
+      notice={t('fittingShare.banner')}
       actions={
-        state.status === 'ready' ? (
-          <>
-            {/* Absolutely positioned, so it adds no flex gap. */}
-            <LiveStatus announceKey={copyCount}>
-              {copied ? t('fittingShare.copied') : copyFailed ? t('fittingShare.copyFailed') : null}
-            </LiveStatus>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => void copyEft()}
-              disabled={typeName === null}
-            >
-              {copied
-                ? t('fittingShare.copied')
-                : copyFailed
-                  ? t('fittingShare.copyFailed')
-                  : t('fittingShare.copyEft')}
-            </Button>
-          </>
-        ) : undefined
+        <span className="flex items-center gap-3">
+          {expiresAt !== undefined && (
+            <StatChips>
+              <StatChip
+                label={t('fittingShare.expiresLabel')}
+                value={formatTimestamp(new Date(expiresAt), timeZone)}
+              />
+            </StatChips>
+          )}
+          {state.status === 'ready' && (
+            <>
+              {/* Absolutely positioned, so it adds no flex gap. */}
+              <LiveStatus announceKey={copyCount}>
+                {copied
+                  ? t('fittingShare.copied')
+                  : copyFailed
+                    ? t('fittingShare.copyFailed')
+                    : null}
+              </LiveStatus>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => void copyEft()}
+                disabled={typeName === null}
+              >
+                {copied
+                  ? t('fittingShare.copied')
+                  : copyFailed
+                    ? t('fittingShare.copyFailed')
+                    : t('fittingShare.copyEft')}
+              </Button>
+            </>
+          )}
+        </span>
       }
     >
-      <p className="rounded-xs border border-warning bg-panel-2 px-3 py-2 text-xs text-warning">
-        {t('fittingShare.banner')}
-      </p>
-
-      {expiresAt !== undefined && (
-        <StatChips>
-          <StatChip
-            label={t('fittingShare.expiresLabel')}
-            value={formatTimestamp(new Date(expiresAt), timeZone)}
-          />
-        </StatChips>
-      )}
-
       {/* Always mounted: Retry unmounts while the code resolves again, and focus waits here. */}
       <div ref={focusRef} tabIndex={-1} className="focus:outline-none">
         {state.status === 'loading' && (
@@ -295,32 +298,38 @@ export function FittingShareView({
                 )}
             </div>
           </div>
-          <FittingRing
-            fitting={state.fitting}
-            stats={stats}
-            moduleResults={stats?.modules ?? null}
-            hardpointsUsed={hardpoints.used}
-            hardpointKindOf={hardpoints.kindOf}
-          />
-          <FittingStatsSections
-            abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
-            statsWeatherTypeId={statsWeatherTypeId}
-            stats={stats}
-            statsProgress={statsProgress}
-            statsError={statsError}
-            onRetry={retry}
-            price={price}
-            typeName={typeName ?? ((typeId) => `#${typeId}`)}
-            damageProfiles={damageProfiles}
-            targetProfiles={targetProfiles}
-          />
-          {typeName !== null && (
-            <FittingModuleList
-              fitting={state.fitting}
-              typeName={typeName}
-              title={t('fittingShare.moduleListTitle')}
-            />
-          )}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <div className="flex min-w-0 flex-col gap-4 lg:w-[30rem] lg:shrink-0">
+              <FittingRing
+                fitting={state.fitting}
+                stats={stats}
+                moduleResults={stats?.modules ?? null}
+                hardpointsUsed={hardpoints.used}
+                hardpointKindOf={hardpoints.kindOf}
+              />
+              {typeName !== null && (
+                <FittingModuleList
+                  fitting={state.fitting}
+                  typeName={typeName}
+                  title={t('fittingShare.moduleListTitle')}
+                />
+              )}
+            </div>
+            <div className="min-w-0 lg:flex-1">
+              <FittingStatsSections
+                abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
+                statsWeatherTypeId={statsWeatherTypeId}
+                stats={stats}
+                statsProgress={statsProgress}
+                statsError={statsError}
+                onRetry={retry}
+                price={price}
+                typeName={typeName ?? ((typeId) => `#${typeId}`)}
+                damageProfiles={damageProfiles}
+                targetProfiles={targetProfiles}
+              />
+            </div>
+          </div>
         </>
       )}
     </ShareShell>

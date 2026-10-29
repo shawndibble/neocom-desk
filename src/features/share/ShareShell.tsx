@@ -23,6 +23,10 @@ interface ShareShellProps {
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
   openInApp?: OpenInApp;
+  /** Widens the frame for a page that lays out two columns; the other share pages stay a single narrow one. */
+  wide?: boolean;
+  /** A signed-out visitor's login sits beside this note, in one strip, instead of in the header. */
+  notice?: ReactNode;
   children: ReactNode;
 }
 
@@ -34,7 +38,15 @@ interface ShareShellProps {
  * on to the same page after, and a small "Choose permissions" link under it
  * that opens the Customize permissions dialog first (#3075).
  */
-export function ShareShell({ title, hideTitle, actions, openInApp, children }: ShareShellProps) {
+export function ShareShell({
+  title,
+  hideTitle,
+  actions,
+  openInApp,
+  wide,
+  notice,
+  children,
+}: ShareShellProps) {
   const { t } = useTranslation();
   const characterCount = useCharacterCountOrLoading();
   const signedOut = characterCount === 0;
@@ -58,30 +70,29 @@ export function ShareShell({ title, hideTitle, actions, openInApp, children }: S
     setCustomizing(true);
   }
 
+  const loginControls = (
+    <div className="flex flex-col items-end gap-1">
+      <EveSsoButton size="small" pending={loggingIn} onClick={logIn} label={t('share.logIn')} />
+      <button type="button" className={plainTextActionClassName()} onClick={choosePermissions}>
+        {t('share.choosePermissions')}
+      </button>
+      <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
+    </div>
+  );
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
+    <div
+      className={`mx-auto flex min-h-screen ${wide ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
+    >
       <header className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
           <LogoMark className="size-9" />
           {t('share.brand')}
         </Link>
         {signedOut ? (
-          <div className="flex flex-col items-end gap-1">
-            <EveSsoButton
-              size="small"
-              pending={loggingIn}
-              onClick={logIn}
-              label={t('share.logIn')}
-            />
-            <button
-              type="button"
-              className={plainTextActionClassName()}
-              onClick={choosePermissions}
-            >
-              {t('share.choosePermissions')}
-            </button>
-            <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
-          </div>
+          notice === undefined ? (
+            loginControls
+          ) : null
         ) : (
           <Link
             to={target.path}
@@ -101,6 +112,13 @@ export function ShareShell({ title, hideTitle, actions, openInApp, children }: S
           </h1>
           {actions && <span className="ml-auto">{actions}</span>}
         </div>
+
+        {signedOut && notice !== undefined && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xs border border-warning bg-panel-2 py-2 pr-2 pl-3">
+            <p className="min-w-48 flex-1 text-xs text-warning">{notice}</p>
+            {loginControls}
+          </div>
+        )}
 
         {children}
       </main>
