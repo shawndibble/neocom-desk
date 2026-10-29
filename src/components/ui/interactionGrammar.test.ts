@@ -186,6 +186,13 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
       'src/features/skills/planner/entryList/EntryRow.tsx',
       // Overview widget header: the settings menu (Show, View, Range, Rename, Remove …), the same list as the card's right-click menu.
       'src/features/overview/widgets/Widget.tsx',
+      // Alerts panel group row: Stop these alerts and Notification settings, plus
+      // Snooze on a price alert — none of them reachable from the row, whose click
+      // is View or expand. Dismiss is deliberately NOT in here: it is the visible ×
+      // beside it, spaced clear of the ⋮ under the mis-tap rule. A danger row gets
+      // no menu at all, because Acknowledge is visible and the one remaining item
+      // would be under the two-action minimum.
+      'src/features/notifications/AlertGroupRow.tsx',
     ];
     // Stale entries are harmless and left alone, so fix PRs never conflict on this list.
     const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1');
