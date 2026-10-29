@@ -134,11 +134,12 @@ export function useFittingEvaluation({
   // Back/Forward). An edit to the same hull keeps them until the
   // recalculation below lands, so the bars don't blank on every click.
   const hullTypeId = fitting?.shipTypeId ?? null;
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new hull, not a render-time derivation
+  const [statsHull, setStatsHull] = useState(hullTypeId);
+  if (statsHull !== hullTypeId) {
+    setStatsHull(hullTypeId);
     setStats(null);
     setStatsProgress(null);
-  }, [hullTypeId]);
+  }
 
   useEffect(() => {
     let cancelled = false;
