@@ -317,7 +317,7 @@ export function RequestsTab({
     </NeedsConnection>
   );
 
-  if (requests.length === 0) {
+  if (allRequests?.length === 0) {
     return (
       <>
         {failed && <Panel>{reloadFailed}</Panel>}
