@@ -2,9 +2,8 @@ import type { FittingView } from './fittingViewPreference';
 
 /**
  * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
- * browser, a Ring column wide enough for a ring of ~36rem (it grows to 48rem when
- * there's more), and
- * 22-26rem of stats, with gaps and page padding. 87.5rem is 1400px.
+ * browser, 22rem of stats, and a Ring track that shrinks (`minmax(0,52rem)`) to
+ * about 29rem at 87.5rem (1400px) rather than stacking.
  */
 export const THREE_COLUMN_QUERY = '(min-width: 87.5rem)';
 
