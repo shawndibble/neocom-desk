@@ -108,7 +108,7 @@ describe('PopularFitsPanel', () => {
     priceBeside(screen, '12.3M', '~');
     expect(screen.getByText('1 loss')).toBeTruthy();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '5 losses' }));
     expect(onOpen).toHaveBeenCalledTimes(1);
     const loaded = onOpen.mock.calls[0][0];
     expect(loaded.fitting).toMatchObject({
@@ -116,6 +116,15 @@ describe('PopularFitsPanel', () => {
       shipTypeId: 626,
       modules: [{ slot: 'high', typeId: 100, chargeTypeId: 900 }],
     });
+  });
+
+  it('opens from a click anywhere on the card, but not from one on a module icon', async () => {
+    const onOpen = renderPanel({ ok: true, fits: [fit('a', 5)] });
+    const row = (await screen.findByText('5 losses')).closest('li')!;
+    fireEvent.click(within(row).getAllByRole('img')[0]);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(row.querySelector('div')!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
   it('groups icons by rack and names each module', async () => {
@@ -244,7 +253,8 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     expect(screen.queryByText(/Saryna Dach/)).toBeNull();
     expect(screen.getByText('Unnamed fit')).toBeTruthy();
     expect(screen.queryByRole('link', { name: /^eveworkbench\.com/ })).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Unnamed fit' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
   });
 
   it('Loads the picked fit from its stored EFT', async () => {
@@ -361,8 +371,8 @@ describe('PopularFitsPanel EVE Workbench tab', () => {
     return row;
   }
 
-  /** A row's Open button: the name is plain text, Open is the one control. */
-  const openFor = (name: string) => within(rowOf(name)).getByRole('button', { name: 'Open' });
+  /** A row's title button: the blue name is the card's keyboard control. */
+  const openFor = (name: string) => within(rowOf(name)).getByRole('button', { name });
 
   const PRICED_FITS = [
     wbFit('a', { eft: '[Vexor, Fit a]\nHeavy Neutron Blaster II' }),

@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { isRowOwnEvent } from '@/components/ui/rowEvents';
+import { cx } from '@/lib/cx';
 import { RackIconStrip } from './RackIconStrip';
 
 interface PopularFitRowProps {
@@ -18,7 +19,10 @@ interface PopularFitRowProps {
 
 /**
  * One Popular fit's card body, shared by the zKillboard and EVE Workbench tabs.
- * Renders a fragment: the parent `li` is the card (`FIT_ROW_CLASS`, a flex row).
+ * The whole card opens the fit; the blue title is its keyboard and screen-reader
+ * control, and a tap on a module icon shows the module's name instead
+ * (`isRowOwnEvent`). Renders into a parent `li` (`FIT_ROW_CLASS`), reaching
+ * over its padding so the click area is the whole card.
  */
 export function PopularFitRow({
   title,
@@ -29,20 +33,29 @@ export function PopularFitRow({
   disabled = false,
   onOpen,
 }: PopularFitRowProps) {
-  const { t } = useTranslation();
   return (
-    <>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm">
+    <div
+      onClick={(event) => {
+        if (!disabled && isRowOwnEvent(event)) onOpen();
+      }}
+      className={cx(
+        '-mx-2 -my-1.5 min-w-0 flex-1 px-2 py-1.5',
+        disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-panel-2 active:bg-panel'
+      )}
+    >
+      <p className="truncate border-b border-line pb-1 text-sm">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onOpen}
+          className={entityLinkClassName('disabled:opacity-40')}
+        >
           {title}
-          <span className="text-text-dim">{meta}</span>
-        </p>
-        <RackIconStrip modules={modules} names={names} />
-        {children}
-      </div>
-      <Button size="sm" disabled={disabled} onClick={onOpen}>
-        {t('fittings.popular.open')}
-      </Button>
-    </>
+        </button>
+        <span className="text-text-dim">{meta}</span>
+      </p>
+      <RackIconStrip modules={modules} names={names} />
+      {children}
+    </div>
   );
 }
