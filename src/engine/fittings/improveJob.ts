@@ -1,6 +1,6 @@
 /**
  * The **Improve Job** (PvE, PvP, Explore; issue #5564, parent #5548, scope
- * decision `20261029-*-improve-job-weights-freed-jobs-and-drop-limits`): what
+ * decision `20261029-160515-improve-job-weights-freed-jobs-and-drop-limits`): what
  * the pilot flies the fit for. It frees module jobs the search may drop, sets
  * how Best overall weighs each stat, and caps how much a Makeover may give up.
  * Each job keeps its numbers in its own table entry, so tuning is a data
