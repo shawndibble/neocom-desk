@@ -259,7 +259,7 @@ function sectionFor(title: string): HTMLElement {
   return section as HTMLElement;
 }
 
-/** Runs `body` with `matchMedia` reporting a `lg`+ viewport. */
+/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, which lasts to the end of the test. */
 function withDesktopViewport(body: () => void) {
   stubViewport(() => true);
   body();

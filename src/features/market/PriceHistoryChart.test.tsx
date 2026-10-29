@@ -29,7 +29,7 @@ import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
 /**
  * Runs `body` with `matchMedia` answering yes, which is how `useIsPhone`'s
- * max-width query reads as a phone. Same override the Market route tests use.
+ * max-width query reads as a phone. Lasts to the end of the test.
  */
 function withPhoneViewport(body: () => void): void {
   stubViewport(() => true);

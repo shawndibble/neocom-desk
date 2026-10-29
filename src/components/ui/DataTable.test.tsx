@@ -976,11 +976,6 @@ describe('DataTable opt-in phone features', () => {
       label: 'Values',
     };
 
-    function withPhone(run: () => void) {
-      stubViewport(PHONE_QUERY);
-      run();
-    }
-
     it('hides the column below sm on its th and tds in table mode', () => {
       render(<DataTable {...props} responsive="table" />);
       expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
@@ -992,10 +987,10 @@ describe('DataTable opt-in phone features', () => {
 
     it('applies in table mode on a phone, and the column still sorts', async () => {
       const user = userEvent.setup();
-      withPhone(() => {
-        render(<DataTable {...props} stacked={false} />);
-        expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
-      });
+      const restore = stubViewport(PHONE_QUERY);
+      render(<DataTable {...props} stacked={false} />);
+      expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveClass('max-sm:hidden');
+      restore();
       await user.click(screen.getByRole('button', { name: /Value/ }));
       expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveAttribute(
         'aria-sort',
@@ -1004,11 +999,10 @@ describe('DataTable opt-in phone features', () => {
     });
 
     it('does nothing in the stacked card layout', () => {
-      withPhone(() => {
-        render(<DataTable {...props} />);
-        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
-        expect(document.querySelector('.max-sm\\:hidden')).toBeNull();
-      });
+      stubViewport(PHONE_QUERY);
+      render(<DataTable {...props} />);
+      expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+      expect(document.querySelector('.max-sm\\:hidden')).toBeNull();
     });
   });
 

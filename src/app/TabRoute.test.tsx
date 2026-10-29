@@ -170,8 +170,6 @@ describe('TabRoute with an index state', () => {
     );
   }
 
-  afterEach(() => vi.unstubAllGlobals());
-
   it('keeps the bare path below the breakpoint', () => {
     renderIndexed(false);
     expect(probe()).toBe('/idx|POP|false');
