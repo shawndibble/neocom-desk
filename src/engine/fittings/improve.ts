@@ -12,9 +12,12 @@ import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
 import { addModule, removeModule, type ModuleAt } from './fittingEdit';
 import { peakAppliedDps } from './implantFinder';
+import { exploreFigures } from './explore';
 import {
+  EXPLORE_RIG_GROUPS,
   jobOf,
   reworkGroups,
+  RESOURCE_RIG_GROUPS,
   scoredJobs,
   TANK_GOALS,
   TANK_GROUPS,
@@ -47,7 +50,7 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats }
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, then command and fleet. */
+/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, command and fleet, then Explore better. */
 export const IMPROVE_GOALS = [
   ...COMBAT_GOALS,
   'mining',
@@ -59,6 +62,7 @@ export const IMPROVE_GOALS = [
   'tackle',
   'ewar',
   'command',
+  'explore',
 ] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
@@ -141,6 +145,8 @@ export interface ImproveCandidate {
   fixesUnflyable?: boolean;
   /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
   covers?: 'budget' | 'capacitor';
+  /** Swaps a CPU or powergrid rig away (Explore better): offered only while the fit still fits without it. */
+  dropsResourceRig?: boolean;
   /** Strips the other side's tank first; the candidate and its `pairedWith` chain then fill the chosen side's rack. */
   conversion?: TankConversion;
 }
@@ -269,7 +275,8 @@ export type GoalAvailability =
         | 'noCapTransfer'
         | 'noTackle'
         | 'noEwar'
-        | 'noCommand';
+        | 'noCommand'
+        | 'noExplore';
     };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
@@ -314,6 +321,8 @@ export function goalAvailability(
   if (goal === 'ewar' && ewarOf(before).strength <= 0)
     return { available: false, reason: 'noEwar' };
   if (goal === 'command' && !hasCommand(before)) return { available: false, reason: 'noCommand' };
+  if (goal === 'explore' && before.explore.modules <= 0)
+    return { available: false, reason: 'noExplore' };
   return { available: true };
 }
 
@@ -389,6 +398,14 @@ function scoreOf(
         [was.web, now.web],
         [was.range, now.range],
       ]);
+    }
+    case 'explore': {
+      // The mean gain over the hacking and scanning figures the fit has, with speed and align: a figure the swap loses counts -1.
+      const was = exploreFigures(before.explore);
+      const now = exploreFigures(after.explore);
+      const gains = was.flatMap((figure, i) => (figure > 0 ? [relative(figure, now[i] ?? 0)] : []));
+      const all = [...gains, metrics.speed, metrics.align];
+      return all.reduce((sum, gain) => sum + gain, 0) / all.length;
     }
     case 'command':
       // From nothing there is no ratio: a bigger buff wins, a longer compression reach (km) breaks a tie.
@@ -827,7 +844,12 @@ export function improveCandidates(
     const seen = new Set<number>([fromTypeId]);
     // Each tier has its own budget, and only an offered target spends it.
     const taken = [0, 0, 0];
-    const offer = (tier: number, typeId: number, group: number | undefined) => {
+    const offer = (
+      tier: number,
+      typeId: number,
+      group: number | undefined,
+      dropsResourceRig = false
+    ) => {
       if (taken[tier] >= TARGETS_PER_MODULE || seen.has(typeId)) return;
       if (!allowed(typeId, slot, from, at.length)) return;
       if (
@@ -841,11 +863,13 @@ export function improveCandidates(
       if (guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1) return;
       seen.add(typeId);
       taken[tier]++;
-      tiers[tier].push(
-        unflyable
-          ? { fromTypeId, toTypeId: typeId, at, fixesUnflyable: true }
-          : { fromTypeId, toTypeId: typeId, at }
-      );
+      tiers[tier].push({
+        fromTypeId,
+        toTypeId: typeId,
+        at,
+        ...(unflyable ? { fixesUnflyable: true } : {}),
+        ...(dropsResourceRig ? { dropsResourceRig } : {}),
+      });
     };
     for (const member of getVariations(index, fromTypeId).members) {
       offer(0, member.typeId, groupOf(member.typeId));
@@ -859,6 +883,13 @@ export function improveCandidates(
     }
     if (o.pool && from !== undefined && o.reach !== 'upgrade') {
       for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
+    }
+    // A CPU or powergrid rig the fit does not need becomes a hacking, scanning, speed or align rig, whatever the Reach.
+    const resourceRig =
+      o.pool && o.goal === 'explore' && slot === 'rig' && RESOURCE_RIG_GROUPS.includes(from ?? -1);
+    if (o.pool && resourceRig) {
+      for (const group of EXPLORE_RIG_GROUPS)
+        for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group, true);
     }
     if (o.pool && o.reach === 'rework') {
       for (const group of reworkGroups(o.goal, sides))
@@ -1158,6 +1189,8 @@ export async function findImprovements({
     const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target, candidate.conversion);
+    // A CPU or powergrid rig the fit needs is not a swap to offer, not even a greyed one.
+    if (candidate.dropsResourceRig && broken === 'budget') return false;
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
     const capStillBinds =
       fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));

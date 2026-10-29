@@ -3,6 +3,7 @@
  * scores, before and after, and why a rejected swap was turned down.
  */
 import type { TFunction } from 'i18next';
+import { exploreFigures } from '@/engine/fittings/explore';
 import { commandOf } from '@/engine/fittings/improveCommand';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import {
@@ -113,6 +114,17 @@ export function moveLine(
       strengthAfter: m3sFormat(now.strength),
       rangeBefore: m3sFormat(was.range / 1000),
       rangeAfter: m3sFormat(now.range / 1000),
+    });
+  }
+  if (goal === 'explore') {
+    const [was, now] = [exploreFigures(own.explore), exploreFigures(option.after.explore)];
+    return t('fittings.improve.exploreLine', {
+      strengthBefore: m3sFormat(was[0] ?? 0),
+      strengthAfter: m3sFormat(now[0] ?? 0),
+      coherenceBefore: m3sFormat(was[1] ?? 0),
+      coherenceAfter: m3sFormat(now[1] ?? 0),
+      scanBefore: m3sFormat(was[3] ?? 0),
+      scanAfter: m3sFormat(now[3] ?? 0),
     });
   }
   if (goal === 'align') return align();
