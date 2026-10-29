@@ -98,6 +98,10 @@ describe('FittingShared', () => {
       await screen.findByText('Shown with skill level V - login to see with your skills.')
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
+    // The ring's slot tile is named by item, not `#id`.
+    expect(
+      await screen.findByRole('button', { name: /125mm Gatling AutoCannon I/ })
+    ).toBeInTheDocument();
     await waitFor(() => expect(computeFittingStats).toHaveBeenCalled());
     expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
