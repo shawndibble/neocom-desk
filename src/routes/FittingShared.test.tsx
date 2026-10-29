@@ -104,12 +104,10 @@ describe('FittingShared', () => {
     expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Choose permissions/ })).toBeInTheDocument();
-    // The login rides in the notice strip, not the header.
-    expect(
-      within(screen.getByRole('link', { name: /Neocom Desk/ }).closest('header')!).queryByRole(
-        'button'
-      )
-    ).not.toBeInTheDocument();
+    // The login sits in the header; Copy Fitting rides in the notice strip below it.
+    const header = screen.getByRole('link', { name: /Neocom Desk/ }).closest('header')!;
+    expect(within(header).getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(within(header).queryByRole('button', { name: 'Copy Fitting' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Open in Neocom Desk' })).not.toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));
