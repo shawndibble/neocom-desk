@@ -25,6 +25,19 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 | Fuzzy item-name search                                      | `src/lib/fuzzySearch.ts`                                                                                             | a new Levenshtein                                 |
 | Test data: characters, grants, deferred promises, ESI cache | `src/test/seed.ts`, `src/test/deferred.ts`, `src/esi/cacheFixtures.ts`                                               | per-file `seedCharacter`/`seedGrant`              |
 
+## Cloud Functions (`functions/src`)
+
+A separate package with its own tsconfig and no `@/` alias, so it cannot import
+`src/`. It has its own small set instead; the guards hand-mirror
+`src/engine/guards.ts` and `src/functionsParity.test.ts` asserts the two copies
+agree, so a change to one side that skips the other fails there.
+
+| Need                                | Use                                                                                      | Not                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Narrow `unknown` to an object       | `isRecord`, `isPlainRecord`, `isFiniteNumber` — `functions/src/guards.ts`                | a local `isRecord`; reaching into `src/engine`       |
+| An ESI request's headers            | `esiHeaders(accessToken?)`, `ESI_BASE`, `ESI_USER_AGENT` — `functions/src/esiClient.ts`  | spelling out `X-Compatibility-Date` / `X-User-Agent` |
+| A Firestore-emulator suite's set-up | `emulatorSuite`, `emulatorDb`, `clearEmulator` — `functions/src/testSupport/emulator.ts` | a per-file `runnable` probe and `clearEmulator`      |
+
 ## Dates and times
 
 No date library, on purpose. EVE time is UTC with no DST, so UTC arithmetic via
