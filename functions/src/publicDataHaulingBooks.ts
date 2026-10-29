@@ -8,7 +8,7 @@
  * Touches no Firestore.
  */
 import { gzipSync } from 'node:zlib';
-import { ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT } from './esiClient.js';
 import { HaulingBookFold } from './haulingBooks.js';
 import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
 import { foldOrderBooksUrl } from './marketOrdersArchive.js';

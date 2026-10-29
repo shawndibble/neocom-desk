@@ -10,6 +10,8 @@
 // (`serverInputs`: the Quickbar's price targets and hub station, the nearby
 // alerts' jump limits). The community events need no inputs: the backend writes them.
 
+import { isPlainRecord } from './guards.js';
+
 /** The events a Firestore trigger pushes the moment the backend writes them. */
 export const COMMUNITY_EVENT_IDS = [
   'communityJoinRequest',
@@ -27,10 +29,6 @@ const MAX_SERVER_EVENT_ID_LENGTH = 64;
 /** The Quickbar is short; this only bounds a bad upload. */
 export const MAX_PRICE_ALERTS = 100;
 const MAX_NAME_LENGTH = 200;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /**
  * A Character's `serverEvents`: sorted, de-duplicated ids. Ids this server
@@ -78,7 +76,7 @@ const positiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 
 function parsePriceAlert(raw: unknown, path: string): PriceAlertInput {
-  if (!isRecord(raw)) throw new Error(`${path} must be an object`);
+  if (!isPlainRecord(raw)) throw new Error(`${path} must be an object`);
   const { typeId, name, targetPrice, direction } = raw;
   if (!positiveInteger(typeId)) throw new Error(`${path}.typeId must be a positive integer`);
   if (typeof name !== 'string' || name.length > MAX_NAME_LENGTH) {
@@ -96,7 +94,7 @@ function parsePriceAlert(raw: unknown, path: string): PriceAlertInput {
 /** A Character's `serverInputs`. Unknown keys are ignored, so a newer client still registers. */
 export function parseServerInputs(raw: unknown, path: string): ServerEventInputs | undefined {
   if (raw === undefined) return undefined;
-  if (!isRecord(raw)) throw new Error(`${path}, if present, must be an object`);
+  if (!isPlainRecord(raw)) throw new Error(`${path}, if present, must be an object`);
   const { priceStationId, priceAlerts, incursionNearbyJumps, skyhookRaidableNearbyJumps } = raw;
   const inputs: ServerEventInputs = {};
   // Lenient, unlike the rest of the registration: the alerts are the user's own
@@ -146,7 +144,7 @@ export interface ServerEventBaseline {
  * happened while it was off.
  */
 export function trimBaseline(raw: unknown, events: readonly string[]): ServerEventBaseline {
-  if (!isRecord(raw)) return {};
+  if (!isPlainRecord(raw)) return {};
   const baseline: ServerEventBaseline = {};
   if (events.includes('priceAlertTriggered') && Array.isArray(raw.priceAlerts)) {
     baseline.priceAlerts = raw.priceAlerts as PriceAlertSnapshotEntry[];

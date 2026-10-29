@@ -31,6 +31,8 @@
  * deleted since.
  */
 
+import { isRecord } from './guards.js';
+
 /** One public R2 object per hull under this prefix: `workbench-fits/<shipTypeId>.json`. */
 export const WORKBENCH_FITS_R2_PREFIX = 'workbench-fits/';
 /** Sync bookkeeping: an R2 object outside the `workbench-fits/` prefix the client reads. */
@@ -125,10 +127,6 @@ export function parseWorkbenchDate(value: unknown): number | null {
     at -= sign * (oh * 60 + om) * 60_000;
   }
   return Number.isFinite(at) ? at : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 /**

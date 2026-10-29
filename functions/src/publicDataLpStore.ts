@@ -13,7 +13,7 @@ import {
   parseCostIndices,
   writeCostIndicesToR2,
 } from './costIndicesSnapshot.js';
-import { ESI_COMPATIBILITY_DATE, ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT, esiHeaders } from './esiClient.js';
 import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
 import { r2ConfigFromEnv } from './publicDataActiveWars.js';
 import {
@@ -30,12 +30,7 @@ import {
 } from './r2DailySnapshots.js';
 import { createR2Get, createR2Put, type R2Get, type R2Put } from './r2Client.js';
 
-const ESI_PUBLIC_HEADERS = {
-  'User-Agent': ESI_USER_AGENT,
-  'X-User-Agent': ESI_USER_AGENT,
-  'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-  Accept: 'application/json',
-};
+const ESI_PUBLIC_HEADERS = esiHeaders();
 
 /** A run that lost more than this share of the corporations (ESI down) publishes nothing. */
 const LP_STORE_MAX_FAILED_SHARE = 0.1;
