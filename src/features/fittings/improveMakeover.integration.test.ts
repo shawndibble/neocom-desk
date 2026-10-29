@@ -8,7 +8,7 @@ import {
   type MakeoverSearch,
 } from '@/engine/fittings/improveMakeover';
 import { damageOf, scoreOf, type ImproveGoal } from '@/engine/fittings/improve';
-import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
+import { jobSettingOf, type ExploreSpace, type ImproveJob } from '@/engine/fittings/improveJob';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import {
   buildVariationIndex,
@@ -95,14 +95,13 @@ async function loadWorld() {
       fitting,
       before,
       goal,
-      ...job,
+      ...(job ? { jobSetting: jobSettingOf(job.job, job.space) } : {}),
       moves: (current) =>
         makeoverMoves(current.modules, index, rackOf, {
           goal,
           defense: 'keep',
           includeRigs: true,
-          job: job?.job,
-          space: job?.space,
+          ...(job ? { jobSetting: jobSettingOf(job.job, job.space) } : {}),
           slotCounts: before.slotCounts,
           pool: {
             groupOf: (typeId) => types[String(typeId)]?.groupID,

@@ -16,9 +16,7 @@ import {
   applyImproveCandidate,
   brokenGuardrail,
   DEFAULT_IMPROVE_HOLD,
-  defenseSides,
   EPSILON,
-  FILL_RACKS,
   iskDeltaOf,
   lostStats,
   overIskBudget,
@@ -31,15 +29,10 @@ import {
   type LostStat,
   type ModulePool,
 } from './improve';
-import { jobOf, reworkGroups, TANK_GOALS, TANK_GROUPS, UNIQUE_GROUPS } from './improveGroups';
-import {
-  HELD_EVERY_COPY,
-  holdsTankModules,
-  unguardedJobs,
-  type ExploreSpace,
-  type ImproveJob,
-} from './improveJob';
-import { overageOf, RESOURCES, usedOf, type Resource } from './makeItFit';
+import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
+import type { JobSetting } from './improveJob';
+import { coveringFreed, freedBy, overrunBy } from './improvePairSeed';
+import type { Resource } from './makeItFit';
 import { newRuleBreaks } from './ruleBreaks';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
@@ -52,10 +45,8 @@ export interface MakeoverMoveOptions {
   goal: ImproveGoal;
   defense: DefenseChoice;
   includeRigs: boolean;
-  /** The Improve Job: its freed jobs may go. Absent: today's guard. */
-  job?: ImproveJob;
-  /** Explore's space: Dangerous keeps tank modules tank modules. */
-  space?: ExploreSpace;
+  /** The Improve Job and, for Explore, its space: its freed jobs may go, Dangerous keeps tank modules tank modules. Absent: today's guard. */
+  jobSetting?: JobSetting;
   /** Market-listed, hull and skill checks, and the groups' members. */
   pool: ModulePool;
   /** The hull's slots per rack, to find the empty ones; absent: no fills. */
@@ -82,26 +73,10 @@ export function makeoverMoves(
   modules: readonly FittingModule[],
   index: VariationIndex,
   rackOf: Readonly<Record<string, string>>,
-  { goal, defense, includeRigs, pool, slotCounts, job, space }: MakeoverMoveOptions
+  { goal, defense, includeRigs, pool, slotCounts, jobSetting }: MakeoverMoveOptions
 ): ImproveCandidate[] {
+  const filter = candidateFilter(modules, pool.groupOf, { goal, defense, includeRigs, jobSetting });
   const groupOf = pool.groupOf;
-  const goalGroups = reworkGroups(goal, defenseSides(modules, groupOf, defense));
-  const scored = unguardedJobs(goal, job);
-  const heldWhole = job ? HELD_EVERY_COPY[job] : [];
-  const holdsTank = holdsTankModules(job, space);
-  const freesTank = defense !== 'keep' && TANK_GOALS.has(goal);
-  const usesRack = (slot: FittingSlotKind) =>
-    slot !== 'subsystem' && (slot !== 'rig' || includeRigs);
-
-  const groupsFitted = new Map<number, number>();
-  const jobsFitted = new Map<string, number>();
-  for (const module of modules) {
-    const group = groupOf(module.typeId);
-    if (group === undefined) continue;
-    groupsFitted.set(group, (groupsFitted.get(group) ?? 0) + 1);
-    const job = jobOf(group);
-    if (job) jobsFitted.set(job, (jobsFitted.get(job) ?? 0) + 1);
-  }
 
   // A type outside the variation index has no variations: it is its group's Tech I.
   const metaOf = (typeId: number) => index.types[typeId]?.metaGroupId ?? TECH_I;
@@ -129,28 +104,19 @@ export function makeoverMoves(
   };
 
   /** Whether `group` may take a slot whose module (of `fromGroup`, or none) leaves. */
-  const allowed = (group: number, fromGroup: number | undefined) => {
-    if (freesTank && TANK_GROUPS.has(group) && !TANK_GROUPS.has(fromGroup ?? -1)) return false;
-    if (!UNIQUE_GROUPS.has(group)) return true;
-    return (groupsFitted.get(group) ?? 0) - (fromGroup === group ? 1 : 0) < 1;
-  };
+  const allowed = (group: number, fromGroup: number | undefined) =>
+    !filter.tankBlocks(group, fromGroup) && !filter.uniqueBlocks(group, fromGroup, 1);
 
   const moves: ImproveCandidate[] = [];
   const seen = new Set<string>();
   for (const module of [...modules].sort((a, b) => a.slotIndex - b.slotIndex)) {
     const { slot, slotIndex, typeId: fromTypeId } = module;
-    if (!usesRack(slot) || seen.has(`${slot}:${fromTypeId}`)) continue;
+    if (!filter.usesRack(slot) || seen.has(`${slot}:${fromTypeId}`)) continue;
     seen.add(`${slot}:${fromTypeId}`);
     const from = groupOf(fromTypeId);
-    const fromJob = jobOf(from);
-    const lastOfJob =
-      fromJob !== null &&
-      !scored.includes(fromJob) &&
-      ((jobsFitted.get(fromJob) ?? 0) <= 1 || heldWhole.includes(fromJob));
     const offered = new Set<number>([fromTypeId]);
-    for (const group of new Set([...(from === undefined ? [] : [from]), ...goalGroups])) {
-      if ((lastOfJob && jobOf(group) !== fromJob) || !allowed(group, from)) continue;
-      if (holdsTank && TANK_GROUPS.has(from ?? -1) && !TANK_GROUPS.has(group)) continue;
+    for (const group of new Set([...(from === undefined ? [] : [from]), ...filter.goalGroups])) {
+      if (filter.losesJob(group, from, 1) || !allowed(group, from)) continue;
       for (const toTypeId of representatives(group, slot)) {
         if (offered.has(toTypeId)) continue;
         offered.add(toTypeId);
@@ -161,13 +127,11 @@ export function makeoverMoves(
 
   if (slotCounts) {
     for (const slot of FILL_RACKS) {
-      if (!usesRack(slot)) continue;
-      const taken = new Set(modules.filter((m) => m.slot === slot).map((m) => m.slotIndex));
-      let free = 0;
-      while (free < slotCounts[slot] && taken.has(free)) free++;
-      if (free >= slotCounts[slot]) continue;
+      if (!filter.usesRack(slot)) continue;
+      const free = filter.firstFreeSlot(slot, slotCounts);
+      if (free === null) continue;
       const offered = new Set<number>();
-      for (const group of goalGroups) {
+      for (const group of filter.goalGroups) {
         if (!allowed(group, undefined)) continue;
         for (const toTypeId of representatives(group, slot)) {
           if (offered.has(toTypeId)) continue;
@@ -225,9 +189,8 @@ export interface FindMakeoverParams {
   priceOf: (typeId: number) => number | null;
   target?: TargetProfile;
   hold?: ImproveHold;
-  /** The Improve Job (and for Explore, its space): Best overall's weights, and its drop limits on every step and the final fit. */
-  job?: ImproveJob;
-  space?: ExploreSpace;
+  /** The Improve Job and, for Explore, its space: Best overall's weights, and its drop limits on every step and the final fit. */
+  jobSetting?: JobSetting;
   /** The total fit price may not pass it. Null: no limit. */
   iskBudget?: number | null;
   fitTotal?: number | null;
@@ -322,8 +285,7 @@ export async function findMakeover({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
-  job,
-  space,
+  jobSetting,
   iskBudget = null,
   fitTotal = null,
   bestSingle: givenSingle,
@@ -339,10 +301,10 @@ export async function findMakeover({
   let stopped = false;
   const minGain = goal === 'cheaper' ? 0 : EPSILON;
   const scoreAt = (after: FittingStats, isk: number | null) =>
-    scoreOf(goal, before, after, isk, target, hold, job);
+    scoreOf(goal, before, after, isk, target, hold, jobSetting?.job);
   const passes = (after: FittingStats, isk: number | null) =>
     newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length === 0 &&
-    brokenGuardrail(goal, before, after, target, undefined, { job, space, makeover: true }) ===
+    brokenGuardrail(goal, before, after, target, undefined, { jobSetting, makeover: true }) ===
       null &&
     !overIskBudget(iskBudget, fitTotal, isk);
 
@@ -363,8 +325,6 @@ export async function findMakeover({
   let score = 0;
   let steps = 0;
   let firstRoundBest: number | null = null;
-  /** A round's best passing move so far, taken if "Show best so far" or the cap ends the round. */
-  let pending: Trial | null = null;
   const records = new Map<string, MoveRecord>();
 
   /** Scores a calculated move against the current fit and notes what it did. */
@@ -383,9 +343,7 @@ export async function findMakeover({
         gain: moveScore === null ? -Infinity : moveScore - score,
         ...(after
           ? {
-              freed: Object.fromEntries(
-                RESOURCES.map((r) => [r, usedOf(current, r) - usedOf(after, r)])
-              ) as Record<Resource, number>,
+              freed: freedBy(current, after),
             }
           : {}),
       });
@@ -437,12 +395,26 @@ export async function findMakeover({
 
   const gainOf = (trial: Trial | null) => (trial?.score ?? -Infinity) - score;
 
+  /** A round's best passing move so far, taken if "Show best so far" or the cap ends the round. */
+  const pending = (() => {
+    let best: Trial | null = null;
+    return {
+      get: (): Trial | null => best,
+      clear: () => {
+        best = null;
+      },
+      offer: (trial: Trial) => {
+        if (gainOf(trial) > gainOf(best)) best = trial;
+      },
+    };
+  })();
+
   /** A round: the best passing move from the current fit, and the fresh moves that overran the budget. */
   async function round(first: boolean) {
     const list = [...moves(fitting)];
     const bound = (move: ImproveCandidate) => records.get(keyOf(move))?.gain ?? Infinity;
     if (lazy) list.sort((a, b) => bound(b) - bound(a));
-    pending = null;
+    pending.clear();
     const overran: Trial[] = [];
     await evaluate(
       list,
@@ -452,25 +424,24 @@ export async function findMakeover({
         return (
           lazy &&
           !first &&
-          pending !== null &&
+          pending.get() !== null &&
           gainBound !== Infinity &&
-          gainOf(pending) >= gainBound + LAZY_MARGIN
+          gainOf(pending.get()) >= gainBound + LAZY_MARGIN
         );
       },
       (trial) => {
         if (!trial || trial.score === null) return;
-        if (trial.ok) {
-          if (gainOf(trial) > gainOf(pending)) pending = trial;
-        } else if (
+        if (trial.ok) pending.offer(trial);
+        else if (
           // A fit over its budget already is Make it fit's, not a pair's to fix.
           gainOf(trial) > minGain &&
           fitsResourceBudget(current) &&
-          RESOURCES.some((r) => overageOf(trial.after, r) > 0)
+          overrunBy(trial.after).length > 0
         )
           overran.push(trial);
       }
     );
-    const best = pending as Trial | null;
+    const best = pending.get();
     if (first) firstRoundBest = best?.score ?? null;
     return { best, overran };
   }
@@ -480,12 +451,10 @@ export async function findMakeover({
     const seeds = overran.sort((a, b) => gainOf(b) - gainOf(a)).slice(0, PAIR_SEEDS);
     const pairs: { candidate: ImproveCandidate; estimate: number }[] = [];
     for (const seed of seeds) {
-      const over = RESOURCES.filter((r) => overageOf(seed.after, r) > 0);
       for (const freer of moves(fitting)) {
         if (sameSlot(freer, seed.move)) continue;
         const record = records.get(keyOf(freer));
-        const freed = record?.freed;
-        if (!freed || !over.every((r) => freed[r] >= overageOf(seed.after, r))) continue;
+        if (!record?.freed || coveringFreed(seed.after, record.freed) === null) continue;
         pairs.push({
           candidate: { ...seed.move, pairedWith: freer },
           estimate: gainOf(seed) + (record?.gain ?? 0),
@@ -493,15 +462,15 @@ export async function findMakeover({
       }
     }
     pairs.sort((a, b) => b.estimate - a.estimate);
-    pending = null;
+    pending.clear();
     await evaluate(
       pairs.slice(0, PAIRS_TRIED).map((pair) => pair.candidate),
       () => false,
       (trial) => {
-        if (trial?.ok && gainOf(trial) > gainOf(pending)) pending = trial;
+        if (trial?.ok) pending.offer(trial);
       }
     );
-    return pending;
+    return pending.get();
   }
 
   /**
@@ -554,7 +523,7 @@ export async function findMakeover({
     if (error.cancelled) return null;
     stopped = true;
     // The interrupted round's best so far still counts.
-    const interrupted: Trial | null = pending;
+    const interrupted = pending.get();
     if (interrupted && gainOf(interrupted) > minGain) applyStep(interrupted);
   }
 

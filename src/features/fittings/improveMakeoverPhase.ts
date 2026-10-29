@@ -4,7 +4,7 @@
  * the single swaps set, progress, and the result shaped as tickable options.
  */
 import type { ImproveCandidate, ImproveHold, ImproveOption } from '@/engine/fittings/improve';
-import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
+import type { JobSetting } from '@/engine/fittings/improveJob';
 import {
   findMakeover,
   makeoverBar,
@@ -49,8 +49,7 @@ export interface MakeoverPhaseParams {
   priceOf: (typeId: number) => number | null;
   target: TargetProfile | null | undefined;
   hold: ImproveHold;
-  job: ImproveJob;
-  space: ExploreSpace;
+  jobSetting: JobSetting;
   iskBudget: number | null;
   fitTotal: number | null;
   /** The single swaps' results: the Makeover must beat the best of them. */
@@ -80,8 +79,7 @@ export async function runMakeoverPhase(
     priceOf,
     ...(target ? { target } : {}),
     hold: params.hold,
-    job: params.job,
-    space: params.space,
+    jobSetting: params.jobSetting,
     iskBudget: params.iskBudget,
     fitTotal: params.fitTotal,
     // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.

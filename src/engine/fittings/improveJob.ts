@@ -98,11 +98,25 @@ export const HELD_EVERY_COPY: Record<ImproveJob, readonly Job[]> = {
   explore: ['cloak', 'analyzer', 'probeLauncher', 'propulsion'],
 };
 
-/** Whether tank modules stay tank modules: Explore in dangerous space, whatever the score says of a lost repairer. */
-export const holdsTankModules = (
-  job: ImproveJob | undefined,
+/**
+ * The job and its space as one value: they always travel together. Absent
+ * (`undefined`) is no job. Later per-job inputs (what the job needs of the
+ * fit) belong here too, so every consumer reads them from one place.
+ */
+export interface JobSetting {
+  job: ImproveJob;
+  /** Only Explore reads it. */
+  space: ExploreSpace;
+}
+
+export const jobSettingOf = (
+  job: ImproveJob,
   space: ExploreSpace = DEFAULT_EXPLORE_SPACE
-): boolean => job === 'explore' && space === 'dangerous';
+): JobSetting => ({ job, space });
+
+/** Whether tank modules stay tank modules: Explore in dangerous space, whatever the score says of a lost repairer. */
+export const holdsTankModules = (setting: JobSetting | undefined): boolean =>
+  setting?.job === 'explore' && setting.space === 'dangerous';
 
 /** The figures a drop limit reads. */
 export const LIMIT_STATS = ['damage', 'speed', 'ehp', 'sustained'] as const;
@@ -126,34 +140,29 @@ const GOAL_OWN_STAT: Partial<Record<ImproveGoal, LimitStat>> = {
   speed: 'speed',
 };
 
-/** The limits of `job` for `goal`; empty with no job. `space` only matters for Explore (default Dangerous). */
-export function dropLimitsOf(
-  job: ImproveJob | undefined,
-  space: ExploreSpace = DEFAULT_EXPLORE_SPACE,
-  goal: ImproveGoal
-): DropLimits {
-  if (!job) return {};
+/** The limits of the job for `goal`; empty with no job. `space` only matters for Explore. */
+export function dropLimitsOf(goal: ImproveGoal, setting: JobSetting | undefined): DropLimits {
+  if (!setting) return {};
   const limits: DropLimits = {
-    ...DROP_LIMITS[job],
-    ...(job === 'explore' && space === 'dangerous' ? DANGEROUS_EXPLORE_LIMITS : {}),
+    ...DROP_LIMITS[setting.job],
+    ...(holdsTankModules(setting) ? DANGEROUS_EXPLORE_LIMITS : {}),
   };
   const own = GOAL_OWN_STAT[goal];
   if (own) delete limits[own];
   return limits;
 }
 
-/** The limits a single swap is held to: Explore Dangerous guards tank on every swap, no other job guards one. */
-export function swapLimitsOf(
-  job: ImproveJob | undefined,
-  space: ExploreSpace = DEFAULT_EXPLORE_SPACE,
-  goal: ImproveGoal
-): DropLimits {
-  if (job !== 'explore' || space !== 'dangerous') return {};
-  const { ehp, sustained } = dropLimitsOf(job, space, goal);
-  return {
-    ...(ehp === undefined ? {} : { ehp }),
-    ...(sustained === undefined ? {} : { sustained }),
-  };
+/** The limit stats that guard the tank: a breach of one is a lost tank, any other a lost stat. */
+const TANK_STATS: readonly LimitStat[] = ['ehp', 'sustained'];
+export const isTankStat = (stat: LimitStat): boolean => TANK_STATS.includes(stat);
+
+/** The limits a single swap is held to: the tank limits of a job that holds tank modules (Explore Dangerous), no other. */
+export function swapLimitsOf(goal: ImproveGoal, setting: JobSetting | undefined): DropLimits {
+  if (!holdsTankModules(setting)) return {};
+  const limits = dropLimitsOf(goal, setting);
+  return Object.fromEntries(
+    Object.entries(limits).filter(([stat]) => isTankStat(stat as LimitStat))
+  ) as DropLimits;
 }
 
 /** The first limited figure that fell further than its limit; a figure the fit never had cannot fall. */

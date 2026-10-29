@@ -16,6 +16,7 @@ import {
   JOB_WEIGHTS,
   dropLimitsOf,
   firstLimitBreach,
+  jobSettingOf,
   overallWeightsOf,
   unguardedJobs,
 } from './improveJob';
@@ -90,33 +91,33 @@ describe('the Improve Job tables', () => {
 
 describe('dropLimitsOf', () => {
   it('PvE: damage 10%', () => {
-    expect(dropLimitsOf('pve', undefined, 'overall')).toEqual({ damage: 0.1 });
+    expect(dropLimitsOf('overall', jobSettingOf('pve'))).toEqual({ damage: 0.1 });
   });
   it('PvP: damage, speed and EHP 10%', () => {
-    expect(dropLimitsOf('pvp', undefined, 'overall')).toEqual({
+    expect(dropLimitsOf('overall', jobSettingOf('pvp'))).toEqual({
       damage: 0.1,
       speed: 0.1,
       ehp: 0.1,
     });
   });
   it('Explore Safe: speed only; Dangerous adds EHP and sustained tank', () => {
-    expect(dropLimitsOf('explore', 'safe', 'overall')).toEqual({ speed: 0.1 });
-    expect(dropLimitsOf('explore', 'dangerous', 'overall')).toEqual({
+    expect(dropLimitsOf('overall', jobSettingOf('explore', 'safe'))).toEqual({ speed: 0.1 });
+    expect(dropLimitsOf('overall', jobSettingOf('explore', 'dangerous'))).toEqual({
       speed: 0.1,
       ehp: 0.1,
       sustained: 0.1,
     });
-    expect(dropLimitsOf('explore', undefined, 'overall')).toEqual(
-      dropLimitsOf('explore', 'dangerous', 'overall')
+    expect(dropLimitsOf('overall', jobSettingOf('explore'))).toEqual(
+      dropLimitsOf('overall', jobSettingOf('explore', 'dangerous'))
     );
   });
   it('never binds on the goal own stat', () => {
-    expect(dropLimitsOf('pvp', undefined, 'damage')).toEqual({ speed: 0.1, ehp: 0.1 });
-    expect(dropLimitsOf('pvp', undefined, 'speed')).toEqual({ damage: 0.1, ehp: 0.1 });
-    expect(dropLimitsOf('pvp', undefined, 'tank')).toEqual({ damage: 0.1, speed: 0.1 });
+    expect(dropLimitsOf('damage', jobSettingOf('pvp'))).toEqual({ speed: 0.1, ehp: 0.1 });
+    expect(dropLimitsOf('speed', jobSettingOf('pvp'))).toEqual({ damage: 0.1, ehp: 0.1 });
+    expect(dropLimitsOf('tank', jobSettingOf('pvp'))).toEqual({ damage: 0.1, speed: 0.1 });
   });
   it('is empty with no job', () => {
-    expect(dropLimitsOf(undefined, undefined, 'overall')).toEqual({});
+    expect(dropLimitsOf('overall', undefined)).toEqual({});
   });
 });
 
@@ -175,43 +176,43 @@ describe('brokenGuardrail with a job', () => {
   it('single swaps: only Explore Dangerous guards tank', () => {
     expect(
       brokenGuardrail('overall', before, tankLoss, undefined, undefined, {
-        job: 'explore',
-        space: 'dangerous',
+        jobSetting: jobSettingOf('explore', 'dangerous'),
       })
     ).toBe('keepsTank');
     expect(
       brokenGuardrail('overall', before, tankLoss, undefined, undefined, {
-        job: 'explore',
-        space: 'safe',
+        jobSetting: jobSettingOf('explore', 'safe'),
       })
     ).toBeNull();
     expect(
-      brokenGuardrail('overall', before, tankLoss, undefined, undefined, { job: 'pvp' })
+      brokenGuardrail('overall', before, tankLoss, undefined, undefined, {
+        jobSetting: jobSettingOf('pvp'),
+      })
     ).toBeNull();
     expect(brokenGuardrail('overall', before, tankLoss, undefined, undefined)).toBeNull();
   });
   it('a whole makeover is held to every limit', () => {
     expect(
       brokenGuardrail('overall', before, tankLoss, undefined, undefined, {
-        job: 'pvp',
+        jobSetting: jobSettingOf('pvp'),
         makeover: true,
       })
     ).toBe('keepsTank');
     expect(
       brokenGuardrail('overall', before, statsWith({ dps: 80 }), undefined, undefined, {
-        job: 'pve',
+        jobSetting: jobSettingOf('pve'),
         makeover: true,
       })
     ).toBe('keepsStats');
     expect(
       brokenGuardrail('overall', before, statsWith({ dps: 95 }), undefined, undefined, {
-        job: 'pve',
+        jobSetting: jobSettingOf('pve'),
         makeover: true,
       })
     ).toBeNull();
   });
   it('a Safe Explore makeover may lose tank but not speed', () => {
-    const opts = { job: 'explore', space: 'safe', makeover: true } as const;
+    const opts = { jobSetting: jobSettingOf('explore', 'safe'), makeover: true };
     expect(brokenGuardrail('overall', before, tankLoss, undefined, undefined, opts)).toBeNull();
     expect(
       brokenGuardrail('overall', before, statsWith({ speed: 150 }), undefined, undefined, opts)
@@ -242,7 +243,12 @@ describe('improveCandidates with a job', () => {
   };
   const modules = [{ slot: 'medium', slotIndex: 0, typeId: 1, state: 'online' }] as FittingModule[];
   const run = (job?: 'pve' | 'pvp') =>
-    improveCandidates(modules, index, rackOf, { reach: 'rework', goal: 'overall', pool, job });
+    improveCandidates(modules, index, rackOf, {
+      reach: 'rework',
+      goal: 'overall',
+      pool,
+      jobSetting: job && jobSettingOf(job),
+    });
 
   it('guards the last scram under no job and PvP, frees it under PvE', () => {
     expect(run().some((c) => c.toTypeId === 3 || c.toTypeId === 4)).toBe(false);
@@ -284,7 +290,7 @@ describe('findMakeover with a job', () => {
       moves,
       stats,
       priceOf: () => null,
-      job,
+      jobSetting: job && jobSettingOf(job),
     });
 
   it('without a job both swaps are made', async () => {
@@ -327,8 +333,7 @@ describe('Explore holds the explorer kit and, in dangerous space, the tank modul
       reach: 'rework',
       goal: 'overall',
       pool,
-      job,
-      space,
+      jobSetting: job && jobSettingOf(job, space),
     });
   const from = (list: ImproveCandidate[], typeId: number) =>
     list.filter((c) => c.fromTypeId === typeId).map((c) => c.toTypeId);
