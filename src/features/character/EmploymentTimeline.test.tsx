@@ -1,11 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { render as rtlRender, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import type { ReactElement } from 'react';
+import { screen, within } from '@testing-library/react';
 import { deriveEmploymentHistoryRows } from './employmentHistory';
 import { EmploymentTimeline } from './EmploymentTimeline';
-
-const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
+import { renderInRouter } from '@/test/render';
 
 const NOW = new Date('2026-06-01T00:00:00Z').getTime();
 const rows = deriveEmploymentHistoryRows(
@@ -23,7 +20,7 @@ const names = new Map([
 
 describe('EmploymentTimeline', () => {
   it('tags a returned corp and a short stay in words, and the current stint when it matches', () => {
-    render(
+    renderInRouter(
       <EmploymentTimeline rows={rows} names={names} label="History" currentCorporationId={100} />
     );
 
@@ -46,7 +43,7 @@ describe('EmploymentTimeline', () => {
       ],
       NOW
     );
-    const { container } = render(
+    const { container } = renderInRouter(
       <EmploymentTimeline
         rows={npcRows}
         names={new Map([...names, [1_000_125, 'Perkone']])}
@@ -64,7 +61,7 @@ describe('EmploymentTimeline', () => {
   });
 
   it('keeps the ongoing row plain when the character record names another corp', () => {
-    render(
+    renderInRouter(
       <EmploymentTimeline rows={rows} names={names} label="History" currentCorporationId={999} />
     );
 
@@ -72,13 +69,13 @@ describe('EmploymentTimeline', () => {
   });
 
   it('keeps the ongoing row plain on the page when the character has no corporation id yet', () => {
-    render(<EmploymentTimeline rows={rows} names={names} label="History" />);
+    renderInRouter(<EmploymentTimeline rows={rows} names={names} label="History" />);
 
     expect(screen.queryByText('employmentHistory.current')).toBeNull();
   });
 
   it('modal variant draws no date gutter, so the range under the name is never hidden', () => {
-    const { container } = render(
+    const { container } = renderInRouter(
       <EmploymentTimeline variant="modal" rows={rows} names={names} label="History" />
     );
 

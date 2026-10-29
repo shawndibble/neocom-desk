@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useEffect } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 
 // The Character tab is Pilot Lookup's view; its zKillboard reads and type catalog are stubbed.
@@ -27,9 +27,8 @@ import { EntityInfoRoute } from '@/features/entities';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
@@ -41,8 +40,6 @@ beforeEach(async () => {
     http.get(`${ESI_BASE_URL}/alliances/:id/corporations`, () => HttpResponse.json([]))
   );
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 function mockCharacter(id: number, body: Record<string, unknown>) {
   server.use(http.get(`${ESI_BASE_URL}/characters/${id}`, () => HttpResponse.json(body)));

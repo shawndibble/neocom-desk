@@ -1,20 +1,17 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { db } from '@/db';
 import { ESI_BASE_URL } from '@/esi/client';
 import { loadConstellationNames } from './incursionsData';
 
-const server = setupServer();
+const server = mswServer();
 let namesRequests = 0;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   namesRequests = 0;
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('loadConstellationNames', () => {
   it('names constellations through the cached name lookup', async () => {

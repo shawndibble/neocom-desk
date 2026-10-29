@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -89,7 +89,7 @@ function clonesBody() {
   };
 }
 
-const server = setupServer(
+mswServer(
   http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json(clonesBody())),
   http.get(`${ESI}/characters/${CHAR_ID}/skills`, () =>
     HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
@@ -192,9 +192,6 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   scenario = {
     worn: [IMPLANT_PLAIN],

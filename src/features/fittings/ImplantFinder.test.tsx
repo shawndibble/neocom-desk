@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render as rtlRender, screen, within } from '@testing-library/react';
-import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { renderInRouter } from '@/test/render';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { LpOfferInput, SourceContext } from '@/engine/fittings/implantSources';
@@ -11,9 +10,6 @@ import type {
   FittingStats,
   PilotProfile,
 } from '@/engine/fittings/types';
-
-// Entity names are real links, so every render needs a Router.
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 // Two CPU implant families (slots 6 and 10), a speed implant, and a Crash booster for missiles.
 const EE = [601, 602, 603, 604, 605, 606];
@@ -177,7 +173,7 @@ const fitting = { name: 'Drake', shipTypeId: 24698, modules: [] } as unknown as 
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
 function renderFinder(onChange = vi.fn(), set: FittingImplantSet = { implants: [], boosters: [] }) {
-  render(
+  renderInRouter(
     <ImplantFinder
       open
       fitting={{ ...fitting, implantSet: set }}

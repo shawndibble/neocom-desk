@@ -1,6 +1,6 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { resetRevalidationState } from '@/esi/cache';
 import { db } from '@/db';
@@ -37,21 +37,18 @@ function esiImplant(typeId: number, attributeId: number, value: number) {
   };
 }
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
   resetRevalidationState();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
   mockedLoadTypeInfo.mockReset();
   mockedLoadTypeInfo.mockResolvedValue(null);
 });
-afterAll(() => server.close());
 
 describe('loadTypeDetail', () => {
   it('maps the baked record to the ESI shape, without asking ESI', async () => {

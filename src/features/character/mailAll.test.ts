@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { invalidateFreshness } from '@/esi/cache';
 import { db } from '@/db';
@@ -17,7 +17,7 @@ const characters = [
   { characterId: 93, name: 'NoGrant' },
 ];
 const headerFetches: number[] = [];
-const server = setupServer(
+mswServer(
   http.get(`${ESI_BASE_URL}/characters/:id/mail`, ({ params }) => {
     headerFetches.push(Number(params.id));
     return HttpResponse.json([{ mail_id: 1, timestamp: '2026-08-01T00:00:00Z', is_read: false }]);
@@ -28,7 +28,6 @@ const server = setupServer(
   http.get(`${ESI_BASE_URL}/characters/:id/mail/lists`, () => HttpResponse.json([]))
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -46,10 +45,8 @@ beforeEach(async () => {
   }
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 describe('loadMailForCharacters', () => {
   it('loads every granted Character and skips, by name, one without the mail grant', async () => {

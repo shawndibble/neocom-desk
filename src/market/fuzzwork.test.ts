@@ -1,13 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { fetchAggregates, fetchOrderCounts, FUZZWORK_AGGREGATES_URL } from './fuzzwork';
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+const server = mswServer();
 
 describe('fetchAggregates', () => {
   it('parses stringified sell/buy fields into numbers', async () => {

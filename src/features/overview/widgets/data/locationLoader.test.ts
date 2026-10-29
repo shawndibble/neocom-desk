@@ -1,15 +1,14 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { db } from '@/db';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { loadLocationWidget } from './kindLoaders';
 
 const CHARACTER_ID = 42;
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -22,10 +21,8 @@ beforeEach(async () => {
   });
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 describe('loadLocationWidget age', () => {
   it('reports the age of the cached reads, not the time of the call, when offline', async () => {

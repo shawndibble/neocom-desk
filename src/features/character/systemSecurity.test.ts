@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadSystemName, loadSystemNameAndSecurity, loadSystemSecurity } from './systemSecurity';
@@ -10,16 +10,13 @@ import { loadSystemName, loadSystemNameAndSecurity, loadSystemSecurity } from '.
 const lookupSolarSystem = vi.hoisted(() => vi.fn());
 vi.mock('@/sde/solarSystems', () => ({ lookupSolarSystem }));
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   lookupSolarSystem.mockReset();
   lookupSolarSystem.mockResolvedValue(undefined);
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('loadSystemSecurity', () => {
   it('fetches and caches the security status under the global sentinel', async () => {

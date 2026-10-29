@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import {
@@ -10,14 +10,11 @@ import {
   loadPublicEmploymentHistory,
 } from './publicInfoData';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('loadPublicCharacterInfo', () => {
   it('fetches and caches a character, keeping the id alongside the ESI fields', async () => {

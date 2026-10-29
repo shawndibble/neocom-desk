@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -117,10 +117,8 @@ function baseHandlers() {
   ];
 }
 
-const server = setupServer(...baseHandlers());
+const server = mswServer(...baseHandlers());
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
 /**
  * `vitest.setup.ts` stubs `matchMedia` to never match, and `useIsNarrow` is
  * phrased as a max-width so that reads as "wide" — so every test here renders
@@ -170,7 +168,6 @@ function dayLabelsWithLoad(): string[] {
 /** The Day Ticker's fixed span — `TICKER_DAYS` in the route, a fortnight. */
 const TICKER_DAYS = 14;
 
-afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();

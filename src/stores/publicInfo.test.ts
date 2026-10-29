@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { db } from '@/db';
 import { usePublicInfo } from './publicInfo';
 
@@ -9,7 +9,7 @@ let characterRequests = 0;
 let affiliationRequests = 0;
 let namesRequests = 0;
 
-const server = setupServer(
+const server = mswServer(
   http.get('https://esi.evetech.net/characters/:id', ({ params }) => {
     characterRequests += 1;
     if (params.id === String(CHAR_ID)) {
@@ -79,9 +79,6 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.esiCache.clear();
   characterRequests = 0;
