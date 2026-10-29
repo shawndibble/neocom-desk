@@ -34,6 +34,14 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
   ticket loop calls it automatically. `/code-review` sub-agents are
   read-only diff review and must never run tests, lint, typecheck, or build.
+- **`npm run typecheck` is `tsc -b` over two projects**: `tsconfig.src.json` (shipped code, emits
+  declarations to `.cache/tsc`) and `tsconfig.tests.json` (tests, stories, e2e, tool configs;
+  checks `src` through the reference). A single `tsc --noEmit` over everything peaked at 4.3 GB and
+  OOM-aborted CI at Node's default heap; this peaks at ~2.7 GB and reruns in under a second when
+  nothing changed. A new test-only file pattern goes in the `exclude` of `tsconfig.src.json` _and_
+  the `include` of `tsconfig.tests.json`; a file outside `src` that `src` imports is added to
+  `tsconfig.src.json`'s `include` (TS6307 says so). Ambient globals don't cross the reference, so
+  `src/vite-env.d.ts` is listed in both.
 - **Parallel agents stay light.** Every commit already runs a full
   `typecheck` through the pre-commit hook, so a dozen agents at once push the
   machine's load past 70 and make tests time out (they flake under load, they
