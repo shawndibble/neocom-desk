@@ -47,6 +47,9 @@ import {
   effectiveHold,
   remoteRepairOf,
   COMBAT_GOALS,
+  conversionKey,
+  conversionSummary,
+  TANK_RACKS,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
   IMPROVE_MODES,
@@ -132,7 +135,7 @@ const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navig
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
 const moveKey = (candidate: ImproveOption['candidate']): string =>
-  `${candidate.conversion ? `convert-${candidate.conversion.side}-${candidate.conversion.removes.map((r) => `${r.typeId}:${r.at.map((at) => `${at.slot}${at.slotIndex}`).join('.')}`).join('_')}-` : ''}${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
+  `${candidate.conversion ? `${conversionKey(candidate.conversion)}-` : ''}${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
   (candidate.pairedWith ? `+${moveKey(candidate.pairedWith)}` : '');
 
 const optionKey = (option: ImproveOption) => moveKey(option.candidate);
@@ -339,17 +342,12 @@ export function ImprovePanel({
 
   /** A conversion's size at a glance: what it removes and adds, and the slots it leaves empty. */
   function conversionLine(candidate: ImproveOption['candidate']): string | null {
-    const conversion = candidate.conversion;
-    if (!conversion) return null;
-    let added = 0;
-    for (let link: ImproveOption['candidate'] | undefined = candidate; link; link = link.pairedWith)
-      added += link.at.length;
-    const removed = conversion.removes.reduce((sum, r) => sum + r.at.length, 0);
-    const freed = (['high', 'medium', 'low'] as const)
-      .filter((rack) => conversion.freed[rack] > 0)
-      .map((rack) =>
-        t(`fittings.improve.convert.freedRack.${rack}`, { count: conversion.freed[rack] })
-      );
+    if (!candidate.conversion) return null;
+    const summary = conversionSummary(candidate);
+    const { removed, added } = summary;
+    const freed = TANK_RACKS.filter((rack) => summary.freed[rack] > 0).map((rack) =>
+      t(`fittings.improve.convert.freedRack.${rack}`, { count: summary.freed[rack] })
+    );
     return [
       t('fittings.improve.convert.counts', { count: removed, removed, added }),
       freed.length > 0 ? t('fittings.improve.convert.freed', { slots: freed.join(', ') }) : null,

@@ -111,11 +111,10 @@ export type ImproveMode = (typeof IMPROVE_MODES)[number];
 export const DEFENSE_CHOICES = ['keep', 'shield', 'armor'] as const;
 export type DefenseChoice = (typeof DEFENSE_CHOICES)[number];
 
-/**
- * Every fitted copy of `fromTypeId` turned into `toTypeId`: one suggestion,
- * not one per copy. A `fromTypeId` of null fills the empty slot in `at`.
- * `pairedWith` is the downgrade that pays for an add no single add fits.
- */
+/** The racks a tank module sits in (rigs are never part of a conversion). */
+export const TANK_RACKS = ['high', 'medium', 'low'] as const;
+export type TankRack = (typeof TANK_RACKS)[number];
+
 /**
  * A whole-tank conversion, carried by the first link of its chain: the other
  * side's tank modules (and any displaced from a full rack) are removed before
@@ -125,9 +124,14 @@ export type DefenseChoice = (typeof DEFENSE_CHOICES)[number];
 export interface TankConversion {
   side: DefenseSide;
   removes: { typeId: number; at: ModuleAt[] }[];
-  freed: Record<'high' | 'medium' | 'low', number>;
+  freed: Record<TankRack, number>;
 }
 
+/**
+ * Every fitted copy of `fromTypeId` turned into `toTypeId`: one suggestion,
+ * not one per copy. A `fromTypeId` of null fills the empty slot in `at`.
+ * `pairedWith` is the downgrade that pays for an add no single add fits.
+ */
 export interface ImproveCandidate {
   fromTypeId: number | null;
   toTypeId: number;
@@ -488,6 +492,9 @@ export const FILLS_PER_RACK = 40;
 /** The most candidates one search checks; fits that need more show "Show best so far". */
 export const MAX_CANDIDATES = 400;
 
+/** Candidate tiers: Upgrade, Rebalance, Rework, then the empty-slot fills. */
+const FILL_TIER = 3;
+
 const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
 
 /** The side of the tank the fit already has; null when it has none (or an even split). */
@@ -507,10 +514,13 @@ function fittedSide(
 }
 
 /** Conversions offered per search: each is a whole-fit calculation. */
-export const CONVERSIONS_PER_SEARCH = 30;
+const CONVERSIONS_PER_SEARCH = 40;
 /** Most modules a conversion displaces from a full chosen-side rack. */
 const MAX_DISPLACED = 3;
-const CONVERSION_RACKS = ['high', 'medium', 'low'] as const;
+/** Sizes tried per tank group (Tech II first), so the hull's right plate or extender is among them. */
+const SIZES_PER_GROUP = 3;
+/** Rig groups: a rig is never stripped or refilled by a conversion. */
+const RIG_TANK_GROUPS: ReadonlySet<number> = new Set([773, 774]);
 
 /** Tech II first, then Tech I, then the rest; a tie goes to the newer type id. */
 const metaRank = (index: VariationIndex, typeId: number) => {
@@ -518,12 +528,140 @@ const metaRank = (index: VariationIndex, typeId: number) => {
   return meta === 2 ? 0 : meta === 1 ? 1 : 2;
 };
 
+type Allowed = (
+  typeId: number,
+  slot: FittingSlotKind,
+  removedGroup: number | undefined,
+  removed: number
+) => boolean;
+
+const isTankRack = (slot: FittingSlotKind): slot is TankRack =>
+  (TANK_RACKS as readonly string[]).includes(slot);
+
+/** The other side's tank modules a conversion to `side` removes: never a rig, a job module or a unique group (so a Damage Control stays). */
+function strippedForConversion(
+  modules: readonly FittingModule[],
+  side: DefenseSide,
+  groupOf: (typeId: number) => number | undefined
+): FittingModule[] {
+  return modules.filter((module) => {
+    const group = groupOf(module.typeId);
+    if (group === undefined || !isTankRack(module.slot)) return false;
+    if (UNIQUE_GROUPS.has(group) || jobOf(group) !== null) return false;
+    const own = sideOf(group);
+    return own !== null && own !== side;
+  });
+}
+
+/** The rack a conversion refills (the first the side's primary group fits) and its groups there, primary first. */
+function refillRack(
+  goal: ImproveGoal,
+  side: DefenseSide,
+  fits: (group: number, slot: TankRack) => boolean
+): { rack: TankRack; groups: number[] } | null {
+  const sideGroups = reworkGroups(goal, [side]).filter(
+    (group) => sideOf(group) === side && !RIG_TANK_GROUPS.has(group)
+  );
+  const primary = sideGroups[0];
+  const rack = primary === undefined ? undefined : TANK_RACKS.find((slot) => fits(primary, slot));
+  return rack === undefined
+    ? null
+    : { rack, groups: sideGroups.filter((group) => fits(group, rack)) };
+}
+
+/** The modules in the refilled rack a full rack may give up: no job, not tank; those least tied to the goal first, then the last slot. */
+function displaceableIn(
+  inRack: readonly FittingModule[],
+  goal: ImproveGoal,
+  groupOf: (typeId: number) => number | undefined
+): FittingModule[] {
+  const goalGroups = new Set(reworkGroups(goal, []));
+  const tied = (module: FittingModule) => Number(goalGroups.has(groupOf(module.typeId) ?? -1));
+  return inRack
+    .filter((module) => {
+      const group = groupOf(module.typeId);
+      return group !== undefined && jobOf(group) === null && !TANK_GROUPS.has(group);
+    })
+    .sort((a, b) => tied(a) - tied(b) || b.slotIndex - a.slotIndex);
+}
+
+/** `removed` grouped by type, as a conversion lists them. */
+function removesOf(removed: readonly FittingModule[]): TankConversion['removes'] {
+  const removes: TankConversion['removes'] = [];
+  for (const module of removed) {
+    const at = { slot: module.slot, slotIndex: module.slotIndex };
+    const entry = removes.find((r) => r.typeId === module.typeId);
+    if (entry) entry.at.push(at);
+    else removes.push({ typeId: module.typeId, at: [at] });
+  }
+  return removes;
+}
+
+/** The emptied slots per rack that `refilled` (in `rack`) does not fill again. */
+function freedOf(
+  removed: readonly FittingModule[],
+  rack: TankRack,
+  refilled: readonly number[]
+): TankConversion['freed'] {
+  const freed = { high: 0, medium: 0, low: 0 };
+  for (const module of removed)
+    if (isTankRack(module.slot) && !(module.slot === rack && refilled.includes(module.slotIndex)))
+      freed[module.slot]++;
+  return freed;
+}
+
+/**
+ * The type lists to fill `slots` with: one group in every slot, or the primary
+ * group first and another for the rest, each at every size tried. Duplicates
+ * (a group with fewer sizes) are dropped.
+ */
+function fillPlans(
+  groups: readonly number[],
+  slots: readonly number[],
+  typesOf: (group: number) => readonly number[]
+): number[][] {
+  const [primary, ...others] = groups;
+  if (primary === undefined) return [];
+  const pairs: [number, number][] = [
+    ...groups.map((group): [number, number] => [group, group]),
+    ...(slots.length > 1 ? others.map((group): [number, number] => [primary, group]) : []),
+  ];
+  const plans = new Map<string, number[]>();
+  for (let size = 0; size < SIZES_PER_GROUP; size++)
+    for (const [first, rest] of pairs) {
+      const pick = (group: number) => {
+        const types = typesOf(group);
+        return types[Math.min(size, types.length - 1)];
+      };
+      const [head, tail] = [pick(first), pick(rest)];
+      if (head === undefined || tail === undefined) continue;
+      const plan = slots.map((_, i) => (i === 0 ? head : tail));
+      plans.set(plan.join(','), plan);
+    }
+  return [...plans.values()];
+}
+
+/** The fills as a chain of adds, one link per type; null for none. */
+function addChain(slotTypes: readonly [number, number][], rack: TankRack): ImproveCandidate | null {
+  const byType = new Map<number, ModuleAt[]>();
+  for (const [slotIndex, typeId] of slotTypes)
+    byType.set(typeId, [...(byType.get(typeId) ?? []), { slot: rack, slotIndex }]);
+  return [...byType].reduceRight<ImproveCandidate | null>(
+    (next, [toTypeId, at]) => ({
+      fromTypeId: null,
+      toTypeId,
+      at,
+      ...(next ? { pairedWith: next } : {}),
+    }),
+    null
+  );
+}
+
 /**
  * Whole-tank conversions to `side`: every non-rig module of the other side's
- * tank removed (never one doing a job, never a unique group), the chosen
- * side's rack refilled with the best allowed module of one or two tank groups,
- * the other rack's freed slots left empty. A full rack displaces its weakest
- * unprotected modules (those least tied to the goal, last slot first), a few
+ * tank removed (`strippedForConversion`), the chosen side's rack refilled
+ * with a few sizes of one or two tank groups, the other rack's freed slots
+ * left empty. A full rack displaces its weakest unprotected modules, a few
  * counts, as separate candidates; scoring whole decides which beat the fit.
  */
 function tankConversions(
@@ -533,108 +671,82 @@ function tankConversions(
   pool: ModulePool,
   slotCounts: Readonly<Record<FittingSlotKind, number>>,
   index: VariationIndex,
-  allowed: (
-    typeId: number,
-    slot: FittingSlotKind,
-    removedGroup: number | undefined,
-    removed: number
-  ) => boolean
+  allowed: Allowed
 ): ImproveCandidate[] {
-  const isStripped = (module: FittingModule) => {
-    const group = pool.groupOf(module.typeId);
-    const own = group === undefined ? null : sideOf(group);
-    return (
-      module.slot !== 'rig' &&
-      module.slot !== 'subsystem' &&
-      own !== null &&
-      own !== side &&
-      jobOf(group) === null
-    );
-  };
-  const stripped = modules.filter(isStripped);
+  const stripped = strippedForConversion(modules, side, pool.groupOf);
   if (stripped.length === 0) return [];
 
-  // The chosen side's groups, primary first, and the rack each can be fitted to.
-  const bestOf = (group: number, slot: FittingSlotKind): number | null => {
-    const types = pool
+  const typesFor = (group: number, slot: FittingSlotKind): number[] =>
+    pool
       .typeIdsInGroup(group)
-      .filter((typeId) => allowed(typeId, slot, undefined, 0));
-    return types.length === 0
-      ? null
-      : (types.sort((a, b) => metaRank(index, a) - metaRank(index, b) || b - a)[0] ?? null);
-  };
-  const sideGroups = reworkGroups(goal, [side]).filter(
-    (group) => sideOf(group) === side && group !== 773 && group !== 774
-  );
-  const rack = CONVERSION_RACKS.find((slot) => bestOf(sideGroups[0] ?? -1, slot) !== null);
-  if (rack === undefined) return [];
-  const groups = sideGroups.filter((group) => bestOf(group, rack) !== null);
+      .filter((typeId) => allowed(typeId, slot, undefined, 0))
+      .sort((a, b) => metaRank(index, a) - metaRank(index, b) || b - a)
+      .slice(0, SIZES_PER_GROUP);
+  const target = refillRack(goal, side, (group, slot) => typesFor(group, slot).length > 0);
+  if (!target) return [];
+  const { rack, groups } = target;
 
-  const goalGroups = new Set(reworkGroups(goal, []));
-  const remaining = modules.filter((module) => !stripped.includes(module));
-  const inRack = remaining.filter((module) => module.slot === rack);
+  const inRack = modules.filter((module) => module.slot === rack && !stripped.includes(module));
   const taken = new Set(inRack.map((module) => module.slotIndex));
-  const free: number[] = [];
-  for (let i = 0; i < slotCounts[rack]; i++) if (!taken.has(i)) free.push(i);
-
-  const displaceable = inRack
-    .filter((module) => {
-      const group = pool.groupOf(module.typeId);
-      return group !== undefined && jobOf(group) === null && !TANK_GROUPS.has(group);
-    })
-    .sort(
-      (a, b) =>
-        Number(goalGroups.has(pool.groupOf(a.typeId) ?? -1)) -
-          Number(goalGroups.has(pool.groupOf(b.typeId) ?? -1)) || b.slotIndex - a.slotIndex
-    );
+  const free = Array.from({ length: slotCounts[rack] }, (_, i) => i).filter((i) => !taken.has(i));
+  const displaceable = displaceableIn(inRack, goal, pool.groupOf);
+  // A full rack gives up one to MAX_DISPLACED modules, each count with its own share of the budget.
   const counts =
     free.length > 0
       ? [0]
-      : [1, 2, 3].filter((n) => n <= Math.min(MAX_DISPLACED, displaceable.length));
+      : Array.from({ length: Math.min(MAX_DISPLACED, displaceable.length) }, (_, i) => i + 1);
+  const share = Math.ceil(CONVERSIONS_PER_SEARCH / Math.max(1, counts.length));
 
   const out: ImproveCandidate[] = [];
   for (const count of counts) {
     const displaced = displaceable.slice(0, count);
     const slots = [...free, ...displaced.map((module) => module.slotIndex)].sort((a, b) => a - b);
-    if (slots.length === 0) continue;
-    // One group for every slot, or the primary group first and another for the rest.
-    const plans: (readonly number[])[] = groups.map((group) => slots.map(() => group));
-    if (slots.length > 1 && groups.length > 1)
-      for (const group of groups.slice(1))
-        plans.push(slots.map((_, i) => (i === 0 ? groups[0]! : group)));
-    for (const plan of plans) {
-      const byType = new Map<number, ModuleAt[]>();
-      plan.forEach((group, i) => {
-        const typeId = bestOf(group, rack)!;
-        byType.set(typeId, [...(byType.get(typeId) ?? []), { slot: rack, slotIndex: slots[i]! }]);
-      });
-      const links = [...byType].map(([toTypeId, at]): ImproveCandidate => ({
-        fromTypeId: null,
-        toTypeId,
-        at,
-      }));
-      const removed = [...stripped, ...displaced];
-      const removes: TankConversion['removes'] = [];
-      for (const module of removed) {
-        const entry = removes.find((r) => r.typeId === module.typeId);
-        const at = { slot: module.slot, slotIndex: module.slotIndex };
-        if (entry) entry.at.push(at);
-        else removes.push({ typeId: module.typeId, at: [at] });
-      }
-      const freed = { high: 0, medium: 0, low: 0 };
-      for (const module of removed) {
-        const refilled = module.slot === rack && slots.includes(module.slotIndex);
-        if (!refilled && module.slot !== 'rig' && module.slot !== 'subsystem') freed[module.slot]++;
-      }
-      const chain = links.reduceRight<ImproveCandidate | undefined>(
-        (next, link) => (next ? { ...link, pairedWith: next } : link),
-        undefined
-      )!;
-      out.push({ ...chain, conversion: { side, removes, freed } });
-      if (out.length >= CONVERSIONS_PER_SEARCH) return out;
+    const removed = [...stripped, ...displaced];
+    const conversion: TankConversion = {
+      side,
+      removes: removesOf(removed),
+      freed: freedOf(removed, rack, slots),
+    };
+    for (const plan of fillPlans(groups, slots, (group) => typesFor(group, rack)).slice(0, share)) {
+      const chain = addChain(
+        slots.map((slotIndex, i): [number, number] => [slotIndex, plan[i] ?? plan[0] ?? -1]),
+        rack
+      );
+      if (chain) out.push({ ...chain, conversion });
     }
   }
   return out;
+}
+
+/** A conversion's identity for ticking: its side and what it removes, so each variant has its own tick key. */
+export const conversionKey = (conversion: TankConversion): string =>
+  `convert-${conversion.side}-${conversion.removes
+    .map((r) => `${r.typeId}:${r.at.map((at) => `${at.slot}${at.slotIndex}`).join('.')}`)
+    .join('_')}`;
+
+/**
+ * What a conversion does at a glance, walking its chain once: modules
+ * `removed`, modules `added`, other-slot downgrades chained behind it
+ * (`swapped`, not counted as added), and the slots `freed` per rack.
+ */
+export function conversionSummary(candidate: ImproveCandidate): {
+  removed: number;
+  added: number;
+  swapped: number;
+  freed: TankConversion['freed'];
+} {
+  let added = 0;
+  let swapped = 0;
+  for (let link: ImproveCandidate | undefined = candidate; link; link = link.pairedWith) {
+    if (link.fromTypeId === null) added += link.at.length;
+    else swapped += link.at.length;
+  }
+  return {
+    removed: candidate.conversion?.removes.reduce((sum, r) => sum + r.at.length, 0) ?? 0,
+    added,
+    swapped,
+    freed: candidate.conversion?.freed ?? { high: 0, medium: 0, low: 0 },
+  };
 }
 
 /**
@@ -700,7 +812,7 @@ export function improveCandidates(
     return true;
   };
 
-  const tiers: ImproveCandidate[][] = [[], [], [], [], []];
+  const tiers: ImproveCandidate[][] = Array.from({ length: FILL_TIER + 1 }, () => []);
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
@@ -760,19 +872,10 @@ export function improveCandidates(
   }
 
   // A fit tanking the other side may convert whole, which no single swap scores well.
-  if (o.pool && o.slotCounts && freesTank && o.reach !== 'upgrade') {
-    tiers[3].push(
-      ...tankConversions(
-        modules,
-        o.defense as DefenseSide,
-        o.goal,
-        o.pool,
-        o.slotCounts,
-        index,
-        allowed
-      )
-    );
-  }
+  const conversions =
+    o.pool && o.slotCounts && freesTank && o.reach !== 'upgrade' && o.defense !== 'keep'
+      ? tankConversions(modules, o.defense, o.goal, o.pool, o.slotCounts, index, allowed)
+      : [];
 
   // Empty slots are always free to fill: the first one in each rack, from the goal's groups.
   if (o.pool && o.slotCounts) {
@@ -791,15 +894,19 @@ export function improveCandidates(
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
           added++;
-          tiers[4].push({ fromTypeId: null, toTypeId: typeId, at: [{ slot, slotIndex: free }] });
+          tiers[FILL_TIER].push({
+            fromTypeId: null,
+            toTypeId: typeId,
+            at: [{ slot, slotIndex: free }],
+          });
         }
       }
     }
   }
-  // Replacing an unflyable module is never cut by the cap.
+  // Replacing an unflyable module is never cut by the cap, and a conversion (no single swap finds it) comes next.
   const all = tiers.flat();
   const fixes = all.filter((candidate) => candidate.fixesUnflyable);
-  return [...fixes, ...all.filter((candidate) => !candidate.fixesUnflyable)].slice(
+  return [...fixes, ...conversions, ...all.filter((candidate) => !candidate.fixesUnflyable)].slice(
     0,
     o.limit ?? MAX_CANDIDATES
   );
@@ -1100,7 +1207,12 @@ export async function findImprovements({
   // Estimated from the singles' freed CPU and powergrid, then the best few calculated whole,
   // as Make it fit does (`PAIR_LIMIT`).
   const seeds = rejected
-    .filter((option) => option.guardrail === 'budget' && option.candidate.fromTypeId === null)
+    .filter(
+      (option) =>
+        option.guardrail === 'budget' &&
+        option.candidate.fromTypeId === null &&
+        !option.candidate.conversion
+    )
     .sort((a, b) => b.score - a.score)
     .slice(0, PAIR_SEEDS);
   const pairs: { candidate: ImproveCandidate; estimate: number }[] = [];

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyImproveCandidate,
+  conversionKey,
+  conversionSummary,
   findImprovements,
   improveCandidates,
   iskDeltaOf,
@@ -203,7 +205,8 @@ describe('Improve whole-tank conversion', () => {
     expect(conversions(candidates(armorFit, { defense: 'armor' }))).toEqual([]);
   });
 
-  it('leaves rigs alone', () => {
+  // v1 never strips a rig, even with Include rigs ticked.
+  it('never strips a rig, even when rigs are included', () => {
     const withRig = fit([
       ...shieldFit.modules.map((m): [FittingSlotKind, number, number] => [
         m.slot,
@@ -281,5 +284,96 @@ describe('Improve whole-tank conversion', () => {
       expect(shown(result)).toEqual([]);
       expect(result.rejected.filter((o) => o.candidate.conversion)).toEqual([]);
     });
+  });
+
+  it('offers more than one size per group', () => {
+    const roots = conversions(candidates(shieldFit)).map((c) => c.toTypeId);
+    expect(roots).toContain(201);
+    expect(roots).toContain(202);
+  });
+
+  it('lists conversions ahead of everything else, so the cap never cuts them', () => {
+    const many = 450;
+    const manyPlates = (group: number) =>
+      group === 329
+        ? [201, 202, ...Array.from({ length: many }, (_, i) => 1000 + i)]
+        : (base.pool!.typeIdsInGroup(group) as number[]);
+    const crowdedRack = {
+      ...rackOf,
+      ...Object.fromEntries(Array.from({ length: many }, (_, i) => [1000 + i, 'low'])),
+    };
+    const list = improveCandidates(shieldFit.modules, index, crowdedRack, {
+      ...base,
+      reach: 'rework',
+      limit: 5,
+      pool: {
+        ...base.pool!,
+        typeIdsInGroup: manyPlates,
+        groupOf: (id) => (id >= 1000 ? 329 : GROUP[id]),
+      },
+    });
+    expect(list).toHaveLength(5);
+    expect(list.every((c) => c.conversion)).toBe(true);
+  });
+
+  it('names a conversion and counts what it removes, adds and frees', () => {
+    const [first] = conversions(candidates(shieldFit));
+    expect(conversionKey(first!.conversion!)).toContain('armor');
+    expect(conversionSummary(first!)).toEqual({
+      removed: 2,
+      added: 1,
+      swapped: 0,
+      freed: { high: 0, medium: 2, low: 0 },
+    });
+    const downgrade: ImproveCandidate = {
+      fromTypeId: 301,
+      toTypeId: 301,
+      at: [{ slot: 'medium', slotIndex: 2 }],
+    };
+    const chained = { ...first!, pairedWith: { ...first!.pairedWith, ...downgrade } };
+    expect(conversionSummary(chained).swapped).toBe(1);
+    expect(conversionSummary(chained).added).toBe(1);
+  });
+
+  it('an over-budget conversion is never paired with a downgrade', async () => {
+    let calls = 0;
+    const model = async (f: Fitting): Promise<FittingStats> => {
+      calls++;
+      const b = baseFittingStats();
+      const cpu = (id: number) => (id === 101 ? 10 : id === 102 ? 0 : GROUP[id] === 329 ? 105 : 0);
+      return {
+        ...b,
+        cpuTotal: 100,
+        cpuUsed: f.modules.reduce((n, m) => n + cpu(m.typeId), 0),
+        ehp: b.ehp + f.modules.reduce((n, m) => n + (GROUP[m.typeId] === 329 ? 1500 : 0), 0),
+      } as FittingStats;
+    };
+    const [conversion] = conversions(candidates(shieldFit));
+    const before = await model(shieldFit);
+    calls = 0;
+    const result = await findImprovements({
+      fitting: shieldFit,
+      before,
+      goal: 'tank',
+      candidates: [
+        conversion!,
+        {
+          fromTypeId: 101,
+          toTypeId: 102,
+          at: [
+            { slot: 'medium', slotIndex: 0 },
+            { slot: 'medium', slotIndex: 1 },
+          ],
+        },
+      ],
+      stats: model,
+      priceOf: () => 1,
+    });
+    // The conversion and the swap are the only two calculations: no pair move was built.
+    expect(calls).toBe(2);
+    const all = [...result!.noDownside, ...result!.tradeOffs, ...result!.rejected];
+    expect(all.filter((o) => o.candidate.conversion).every((o) => o.candidate === conversion)).toBe(
+      true
+    );
   });
 });
