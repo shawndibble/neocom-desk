@@ -46,6 +46,7 @@ import {
   DEFAULT_IMPROVE_JOB,
   EXPLORE_SPACES,
   IMPROVE_JOBS,
+  jobSettingOf,
   type ExploreSpace,
   type ImproveJob,
 } from '@/engine/fittings/improveJob';
@@ -340,8 +341,7 @@ function searchCandidates(
     defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
-    job: config.job,
-    space: config.space,
+    jobSetting: jobSettingOf(config.job, config.space),
     slotCounts,
     pool: modulePool(catalogue, variants),
   });
@@ -482,6 +482,7 @@ export function useImprove(
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
   const { job, space, reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } =
     config;
+  const jobSetting = useMemo(() => jobSettingOf(job, space), [job, space]);
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -576,8 +577,7 @@ export function useImprove(
               goal: searched,
               defense: sets[0].side,
               includeRigs,
-              job,
-              space,
+              jobSetting,
               slotCounts: own.slotCounts,
             })
           : null;
@@ -648,8 +648,7 @@ export function useImprove(
             candidates: set.candidates,
             stats,
             concurrency: workers.size,
-            job,
-            space,
+            jobSetting,
             priceOf,
             ...(target ? { target } : {}),
             iskBudget,
@@ -710,8 +709,7 @@ export function useImprove(
             priceOf,
             target,
             hold: effectiveHold(own.holds, hold),
-            job,
-            space,
+            jobSetting,
             iskBudget,
             fitTotal,
             listed,
@@ -802,6 +800,7 @@ export function useImprove(
     hold,
     job,
     space,
+    jobSetting,
     chargePlanKey,
   ]);
 
