@@ -17,11 +17,10 @@
  * row is checked against the fixed tab bar's own bounding box.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
-const PHONE = { width: 390, height: 844 };
 const PLAN_COUNT = 40;
 const LAST_PLAN_NAME = `Plan ${PLAN_COUNT}`;
 

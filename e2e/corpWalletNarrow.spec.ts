@@ -9,14 +9,11 @@
  * overridden to `['Director']`, and the JWT carries the `corp` scope group
  * on top of the base fixture grant.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, CORPORATION_NAME, SCOPES } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 import { scopesForGroup } from '../src/esi/scopes';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 const JOURNAL = [
   {

@@ -5,11 +5,10 @@
  * overviewNarrow.spec.ts.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, SCOPES } from './support/fixtureData';
 
-const PHONE = { width: 390, height: 844 };
 // The first load on a cold dev server is slow; later assertions use the default budget.
 const FIRST_LOAD = { timeout: 20_000 };
 

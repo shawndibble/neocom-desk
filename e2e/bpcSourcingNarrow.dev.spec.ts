@@ -21,18 +21,16 @@
  * and the acceptance criteria for this ticket are phrased in exactly these
  * terms.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
 
-const PHONE = { width: 390, height: 844 };
 /**
  * The first assertion after `goto`: a cold dev server on a CI runner was seen
  * taking ~6s just to serve the Industry route's module graph, past
  * Playwright's default 5s, with the page still on its route spinner.
  */
 const COLD_LOAD = { timeout: 15_000 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /** Rifter Blueprint — a real blueprint typeId out of `public/data/blueprints.json`. */
 const BLUEPRINT_TYPE_ID = 691;

@@ -14,13 +14,11 @@
  * `/universe/names` with the long names (a later `page.route` wins).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { ALLIANCE_ID, ALLIANCE_NAME, CHARACTER_ID, CORPORATION_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 const TABLET = { width: 820, height: 1100 };
 /** A cold dev server can take longer than Playwright's default 5s to serve the route. */
 const COLD_LOAD = { timeout: 15_000 };

@@ -7,13 +7,10 @@
  *
  * Also the journal as a plain phone table (was #2521's "Sort by" picker), below.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 test('Journal "Transactions" link meets the 36px touch floor at 390px, without overflow', async ({
   page,

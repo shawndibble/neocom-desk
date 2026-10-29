@@ -17,6 +17,7 @@ import { configureClipboard } from '@/lib/clipboard';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { App } from '@/app/App';
+import { stubViewport } from '@/test/viewport';
 import * as routeChunks from '@/app/routeChunks';
 import { exportRows } from '@/lib/downloadCsv';
 import type { TypeMap } from '@/sde/types';
@@ -295,23 +296,11 @@ describe('Assets', () => {
   });
 
   it('shows Tools as its icon-only ⋮ below md', async () => {
-    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === NARROW_QUERY,
-          onchange: null,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          addListener: () => {},
-          removeListener: () => {},
-          dispatchEvent: () => false,
-        }) as unknown as MediaQueryList
-    );
+    const restoreViewport = stubViewport(NARROW_QUERY);
     render(<App />);
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tools' })).not.toHaveTextContent('Tools');
-    matchMedia.mockRestore();
+    restoreViewport();
   });
 
   it('has Items, Ships and Move tabs, opening on Items', async () => {
@@ -1998,20 +1987,8 @@ describe('jumps-away distance (issue #87)', () => {
   });
 
   describe('station header on a phone (#2989)', () => {
-    function phoneViewport() {
-      return vi.spyOn(window, 'matchMedia').mockImplementation(
-        (media: string) =>
-          ({
-            media,
-            matches: media === PHONE_QUERY,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-          }) as unknown as MediaQueryList
-      );
-    }
-
     it('puts security · ISK · jumps on a second line, jumps opening the route', async () => {
-      const matchMedia = phoneViewport();
+      const restoreViewport = stubViewport(PHONE_QUERY);
       try {
         window.history.pushState({}, '', '/assets/items/60003760');
         render(<App />);
@@ -2030,7 +2007,7 @@ describe('jumps-away distance (issue #87)', () => {
         expect(facts.textContent).toMatch(/^[^·].*·0 jumps$/);
         expect(jumps.className).toContain('min-h-9');
       } finally {
-        matchMedia.mockRestore();
+        restoreViewport();
       }
     });
 

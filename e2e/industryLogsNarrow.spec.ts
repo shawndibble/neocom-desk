@@ -13,12 +13,9 @@
  * app's own Dexie schema has already opened the stores.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 const RUN_ID = 'e2e-run-1';
 const PLAN_ID = 'e2e-plan-1';

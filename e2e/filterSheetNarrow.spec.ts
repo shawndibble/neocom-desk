@@ -18,12 +18,9 @@
  * `FilterBar` carries the search box and the "Ref type" select, fed by seeded
  * sign-in and a mocked journal answer.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 const JOURNAL = Array.from({ length: 4 }, (_, index) => ({
   id: index + 1,

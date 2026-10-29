@@ -35,13 +35,10 @@
  * resolves locally off the bundled stargate graph — no `/route/` call.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 import type { RegionOrder } from '../src/esi/endpoints';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 const REGION = 10000002; // The Forge
 const TRITANIUM = 34;

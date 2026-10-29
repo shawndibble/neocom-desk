@@ -14,10 +14,9 @@
  * assert there.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const PHONE = { width: 390, height: 844 };
 const REASON = 'Select a character to use the Quickbar';
 
 /**

@@ -24,13 +24,12 @@
  * thing that can make the expiring order need the pilot is its own expiry.
  */
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 import type { MarketOrder } from '../src/esi/endpoints';
 
-const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 768, height: 900 };
 
 const REGION = 10000002;

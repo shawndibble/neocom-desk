@@ -8,6 +8,8 @@ import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { db } from '@/db';
+import { stubNoViewportMatch, stubViewport } from '@/test/viewport';
+import { seedGrant } from '@/test/seed';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -144,27 +146,10 @@ function renderPanel(
  * phone — where a result folds the paste card away (#3135). Every test here
  * but the phone block below is about the desktop two-column layout.
  */
-const realMatchMedia = window.matchMedia;
-function setViewport(desktop: boolean) {
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: desktop && media === DESKTOP_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-}
-beforeEach(() => setViewport(true));
-afterEach(() => {
-  window.matchMedia = realMatchMedia;
-});
+beforeEach(() => stubViewport(DESKTOP_QUERY));
 
 describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => {
-  beforeEach(() => setViewport(false));
+  beforeEach(() => stubNoViewportMatch());
 
   it('folds to a summary once a result exists, and opens on the textarea', async () => {
     const user = userEvent.setup();
@@ -226,7 +211,7 @@ describe('AppraisalPanel — folded paste card on a phone (issue #3135)', () => 
   });
 
   it('never folds at desktop width', () => {
-    setViewport(true);
+    stubViewport(DESKTOP_QUERY);
     renderPanel({ controller: controller({ text: 'Tritanium 5', result: outcome() }) });
     expect(screen.getByLabelText(/Items from inventory/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit list/ })).not.toBeInTheDocument();
@@ -426,16 +411,6 @@ describe('AppraisalPanel', () => {
     describe('Character details assumption note (issue #1526)', () => {
       const STANDINGS_SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
 
-      async function seedGrant(scopes: readonly string[]): Promise<void> {
-        await db.tokens.put({
-          characterId: 7,
-          accessToken: 'access',
-          refreshToken: 'refresh',
-          expiresAt: Date.now() + 60_000,
-          scopes: [...scopes],
-        });
-      }
-
       beforeEach(() => {
         useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
       });
@@ -445,14 +420,14 @@ describe('AppraisalPanel', () => {
       });
 
       it('shows the note when the broker fee is quoted without the Character details scope', async () => {
-        await seedGrant([]);
+        await seedGrant(7, []);
         renderPanel({ controller: controller({ result: netOutcome() }) });
 
         expect(await screen.findByText('Assumes base standings')).toBeInTheDocument();
       });
 
       it('hides the note once Character details is granted', async () => {
-        await seedGrant([STANDINGS_SCOPE]);
+        await seedGrant(7, [STANDINGS_SCOPE]);
         renderPanel({ controller: controller({ result: netOutcome() }) });
 
         await waitFor(() => {
@@ -461,7 +436,7 @@ describe('AppraisalPanel', () => {
       });
 
       it('hides the note while there is no net figure to annotate', async () => {
-        await seedGrant([]);
+        await seedGrant(7, []);
         renderPanel({
           controller: controller({
             result: netOutcome({ accountingLevel: null, brokerRelationsLevel: null }),
@@ -831,16 +806,6 @@ describe('AppraisalPanel', () => {
       const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
       const NOTE = 'Assumes no implants';
 
-      async function seedGrant(scopes: readonly string[]): Promise<void> {
-        await db.tokens.put({
-          characterId: 7,
-          accessToken: 'access',
-          refreshToken: 'refresh',
-          expiresAt: Date.now() + 60_000,
-          scopes: [...scopes],
-        });
-      }
-
       beforeEach(() => {
         useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
       });
@@ -850,7 +815,7 @@ describe('AppraisalPanel', () => {
       });
 
       it('shows the note when ore is refined without the Character details scope', async () => {
-        await seedGrant([]);
+        await seedGrant(7, []);
         renderPanel({
           controller: controller({ result: refineOutcome({ refinesOreOrIce: true }) }),
         });
@@ -859,7 +824,7 @@ describe('AppraisalPanel', () => {
       });
 
       it('hides the note once Character details is granted', async () => {
-        await seedGrant([IMPLANTS_SCOPE]);
+        await seedGrant(7, [IMPLANTS_SCOPE]);
         renderPanel({
           controller: controller({ result: refineOutcome({ refinesOreOrIce: true }) }),
         });
@@ -868,7 +833,7 @@ describe('AppraisalPanel', () => {
       });
 
       it('hides the note on a scrap-only refine — no refining implant touches it', async () => {
-        await seedGrant([]);
+        await seedGrant(7, []);
         renderPanel({ controller: controller({ result: refineOutcome() }) });
 
         await waitFor(() => expect(screen.queryByText(NOTE)).not.toBeInTheDocument());
@@ -1531,13 +1496,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
   });
 
   async function seedAssetsGrant() {
-    await db.tokens.put({
-      characterId: 1,
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      expiresAt: Date.now() + 60_000,
-      scopes: [ESI_REGISTRY.getCharacterAssets.scope],
-    });
+    await seedGrant(1, [ESI_REGISTRY.getCharacterAssets.scope]);
   }
 
   beforeEach(() => {
@@ -1611,13 +1570,7 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
   });
 
   it('disables Minus owned with a grant note without the assets permission', async () => {
-    await db.tokens.put({
-      characterId: 1,
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      expiresAt: Date.now() + 60_000,
-      scopes: [],
-    });
+    await seedGrant(1, []);
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
     expect(await screen.findByText('Grant Assets permission')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toBeDisabled();
