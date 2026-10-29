@@ -10,7 +10,7 @@
 import { useCallback, useMemo } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { isPlainRecord } from '../../engine/guards';
+import { isPlainRecord } from '@/engine/guards';
 
 export const CORP_STOCK_TARGETS_KEY = 'sync.corpStockTargets';
 

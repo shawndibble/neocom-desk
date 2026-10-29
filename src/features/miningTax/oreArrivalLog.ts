@@ -13,7 +13,7 @@ import {
   type OreArrivalLog,
 } from '@/engine/miningTax/oreArrival';
 import type { CharacterMiningLedger } from './ledger';
-import { isPlainRecord } from '../../engine/guards';
+import { isPlainRecord } from '@/engine/guards';
 
 export const useOreArrivalLog = createLocalSetting<OreArrivalLog>({
   key: 'miningTaxOreArrivals',

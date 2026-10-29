@@ -66,8 +66,8 @@ import {
   communityRequestPledgedText,
   newMailText,
   priceAlertText,
-  type Translate,
 } from './serverEventCopy';
+import type { Translate } from '@/lib/translate';
 import {
   incursionNearbyWording,
   skyhookRaidableNearbyWording,

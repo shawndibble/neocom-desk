@@ -20,14 +20,8 @@ import {
 import { blank, count, detailToneOf, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar } from './cellKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
-import type {
-  DetailTone,
-  NumberModel,
-  RowDetailModel,
-  TableCell,
-  TableModel,
-  Translate,
-} from './types';
+import type { DetailTone, NumberModel, RowDetailModel, TableCell, TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.chart';
 const SERVICE_STATE = {

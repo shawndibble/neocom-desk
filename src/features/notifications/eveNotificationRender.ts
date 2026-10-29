@@ -25,6 +25,7 @@
  * name that has not resolved renders as an id or a neutral phrase instead of
  * delaying or dropping the notification.
  */
+import type { Translate } from '@/lib/translate';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 import {
   parseEveNotificationPayload,
@@ -41,7 +42,7 @@ import { eveTypeLabel } from './eveTypeLabel';
  * locale plus React (see `pushHandler.ts`). `eveNotificationText.ts` binds the
  * app's.
  */
-export type EveNotificationTranslate = (key: string, options?: Record<string, unknown>) => string;
+export type EveNotificationTranslate = Translate;
 
 /** Deliberately not `CharacterRef` — importing it back from `foregroundPoller.ts` would be a cycle. */
 export interface EveNotificationTextCharacter {

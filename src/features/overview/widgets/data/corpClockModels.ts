@@ -32,8 +32,8 @@ import type {
   TableCell,
   TableModel,
   TableRowModel,
-  Translate,
 } from './types';
+import type { Translate } from '@/lib/translate';
 
 // --- Due soon ---------------------------------------------------------------------
 

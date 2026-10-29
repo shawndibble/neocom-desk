@@ -31,7 +31,7 @@ import {
 import { migrateRetiredKind } from './migrate';
 import { SIZES } from './sizes';
 import { isRowsPerPage } from './tableSortPage';
-import { isPlainRecord } from '../../../engine/guards';
+import { isPlainRecord } from '@/engine/guards';
 
 export const OVERVIEW_LAYOUT_KEY = 'sync.overviewLayout';
 

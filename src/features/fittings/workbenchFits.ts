@@ -13,7 +13,7 @@
  * hull for ten minutes, like the zKillboard tab's.
  */
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
-import { isRecord } from '../../engine/guards';
+import { isRecord } from '@/engine/guards';
 
 const CACHE_TTL_MS = 10 * 60_000;
 const READ_TIMEOUT_MS = 20_000;

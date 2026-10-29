@@ -1,13 +1,10 @@
 import { DAY_MS } from '@/lib/age';
+import { shiftUtcDate } from '@/engine/localDay';
 /**
  * Time-series arithmetic for the widget charts: the daily balance a journal
  * implies, and bucketing by week or hour. Pure and independent of the clock
  * (every function is handed `now`), so each is pinned by a plain test.
  */
-
-function shiftDay(day: string, days: number): string {
-  return new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
-}
 
 /**
  * One value per UTC day over the last `days` days ending at `today`, oldest
@@ -20,7 +17,7 @@ export function dailyBalanceSeries(
   today: string,
   days: number
 ): { days: string[]; values: number[] } {
-  const windowStart = shiftDay(today, -(days - 1));
+  const windowStart = shiftUtcDate(today, -(days - 1));
   let current: number | null = null;
   // The newest balance held before the window opens is where the window starts.
   const earlier = [...byDay.keys()].filter((day) => day < windowStart).sort();
@@ -29,7 +26,7 @@ export function dailyBalanceSeries(
   const outDays: string[] = [];
   const values: number[] = [];
   for (let i = 0; i < days; i++) {
-    const day = shiftDay(windowStart, i);
+    const day = shiftUtcDate(windowStart, i);
     const balance = byDay.get(day);
     if (balance !== undefined) current = balance;
     if (current !== null) {

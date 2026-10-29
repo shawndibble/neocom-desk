@@ -20,7 +20,8 @@ import type { BoardMail } from '../../data/boardData';
 import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
-import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
+import type { SpExtras, TableCell, TableModel, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 import { highlightHref } from '@/lib/highlightParam';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 

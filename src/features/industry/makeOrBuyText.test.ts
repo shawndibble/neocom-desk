@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
-import { makeOrBuyLabel, makeOrBuyReason, makeOrBuyVerdict, type Translate } from './makeOrBuyText';
+import { makeOrBuyLabel, makeOrBuyReason, makeOrBuyVerdict } from './makeOrBuyText';
+import type { Translate } from '@/lib/translate';
 
 /** Echoes the key, so the assertions read as "which strings were asked for". */
 const t: Translate = (key, opts) => (opts?.verdict ? `${key}:${String(opts.verdict)}` : key);

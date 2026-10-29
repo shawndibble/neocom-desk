@@ -5,7 +5,7 @@ import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
 import type { EsiEndpointId } from '../registry';
-import { chunk } from '../../lib/chunk';
+import { chunk } from '@/lib/chunk';
 
 // --- GET /universe/types/{type_id} (public) ---
 

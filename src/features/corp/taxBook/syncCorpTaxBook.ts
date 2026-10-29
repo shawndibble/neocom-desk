@@ -47,7 +47,7 @@ import {
   type ObserverFeed,
 } from './esiFeed';
 import { reconcileFeederPayouts } from './feederClient';
-import { chunk } from '../../../lib/chunk';
+import { chunk } from '@/lib/chunk';
 
 /** The server accepts at most this many observer rows in one sync call. */
 export const OBSERVED_PER_CALL = 2000;

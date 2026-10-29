@@ -18,7 +18,7 @@ import type {
 } from '../charts/types';
 import { sharesOfMax } from '../charts/geometry';
 import { dayTitle } from './chartTips';
-import type { Translate } from './types';
+import type { Translate } from '@/lib/translate';
 
 const K = 'overview.widgets.chart';
 

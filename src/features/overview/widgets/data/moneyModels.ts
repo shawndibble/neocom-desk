@@ -25,7 +25,8 @@ import { rollingTitles, signTone } from './chartTips';
 import type { NetWorthCharacter } from './kindLoaders';
 import { STOCK_PATH, UNKNOWN } from './builderKit';
 import { fractionBar, shareCell, signedCell } from './cellKit';
-import type { NumberSecondary, TableCell, TableModel, Translate } from './types';
+import type { NumberSecondary, TableCell, TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const W = 'overview.widgets';
 

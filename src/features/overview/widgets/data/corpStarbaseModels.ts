@@ -24,7 +24,8 @@ import {
   type Builder,
 } from './builderKit';
 import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
-import type { NumberSecondary, RowDetailModel, TableRowModel, Translate } from './types';
+import type { NumberSecondary, RowDetailModel, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const W = 'overview.widgets.corpStarbases';
 const HOUR_MS = 3_600_000;

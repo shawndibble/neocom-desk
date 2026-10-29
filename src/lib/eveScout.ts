@@ -16,7 +16,7 @@ import {
   type WormholeShipSize,
 } from '@/engine/route/theraConnections';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
-import { isRecord } from '../engine/guards';
+import { isRecord } from '@/engine/guards';
 
 export const EVE_SCOUT_SIGNATURES_URL = 'https://api.eve-scout.com/v2/public/signatures';
 

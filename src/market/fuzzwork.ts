@@ -7,7 +7,7 @@
  * price is reported as null, never coerced to 0.
  */
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
-import { chunk } from '../lib/chunk';
+import { chunk } from '@/lib/chunk';
 
 export const FUZZWORK_AGGREGATES_URL = 'https://market.fuzzwork.co.uk/aggregates/';
 

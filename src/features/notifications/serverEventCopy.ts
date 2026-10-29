@@ -21,8 +21,6 @@ import type {
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
 
-export type { Translate } from '@/lib/translate';
-
 /**
  * The fire a server push of `newMail` carries (issue #5143): the poller's own
  * fire plus what the push may name. Only the closed-app pop-up is worded from

@@ -13,7 +13,7 @@ import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import { createTtlCache } from '@/lib/ttlCache';
 import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
 import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
-import { isRecord } from '../engine/guards';
+import { isRecord } from '@/engine/guards';
 
 /**
  * Why a zKillboard request failed: no answer (`offline`, a thrown fetch or a

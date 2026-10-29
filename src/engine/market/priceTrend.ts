@@ -4,11 +4,11 @@
  * scale that lets a 5 ISK mineral and a 5M ISK PLEX share a chart. Pure.
  */
 import { sortPriceHistory, type MarketHistoryPoint } from './priceHistory';
-import { DAY_MS } from '@/lib/age';
+import { shiftUtcDate } from '@/engine/localDay';
 
 /** `YYYY-MM-DD` shifted by whole days (UTC, so no DST drift). */
 export function shiftDay(date: string, days: number): string {
-  return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+  return shiftUtcDate(date, days);
 }
 
 /** A day whose average is a real price: a row of 0 (or garbage) is a day nothing priced, not a crash. */

@@ -24,14 +24,8 @@ import { ganttAxis } from '../charts/geometry';
 import type { ChartModel } from '../charts/types';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows } from './chartBuilders';
-import type {
-  NumberSecondary,
-  TableCell,
-  TableColumn,
-  TableModel,
-  TableRowModel,
-  Translate,
-} from './types';
+import type { NumberSecondary, TableCell, TableColumn, TableModel, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.chart';
 

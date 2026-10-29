@@ -21,7 +21,8 @@ import { formatIskCompact } from '@/lib/isk';
 import type { ChartModel } from '../charts/types';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { dayTitle } from './chartTips';
-import type { KindView, TableRowModel, Translate } from './types';
+import type { KindView, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 import { utcDay } from '@/engine/localDay';
 
 const D = 'overview.widgets.data.omega';

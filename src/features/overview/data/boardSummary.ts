@@ -51,7 +51,6 @@ import type { Translate } from '@/lib/translate';
  * The narrow slice of i18next's `t` these need: a key, and interpolations that
  * are counts or already-formatted strings.
  */
-export type { Translate } from '@/lib/translate';
 
 const CHECKING = 'overview.board.checking';
 const REAUTH = 'overview.board.reauth';

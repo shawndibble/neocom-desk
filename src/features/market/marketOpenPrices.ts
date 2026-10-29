@@ -18,7 +18,7 @@
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
 import { TRADE_HUBS } from '@/market/hubs';
-import { isRecord } from '../../engine/guards';
+import { isRecord } from '@/engine/guards';
 
 /** Mirrors `openPricesR2Key` on the Functions side (`functions/src/r2DailySnapshots.ts`). */
 export function openPricesUrl(typeId: number): string {

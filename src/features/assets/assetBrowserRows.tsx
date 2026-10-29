@@ -36,8 +36,6 @@ import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import type { BlueprintKind } from '@/engine/blueprintKind';
 import type { Translate } from '@/lib/translate';
 
-export type { Translate } from '@/lib/translate';
-
 /* ------------------------------------------------------------------ badges */
 
 /** A navigating row's trailing caret (§6c): faint at rest, accent while the row's link is hovered or focused. */

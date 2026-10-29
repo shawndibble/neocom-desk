@@ -19,8 +19,8 @@ import {
   LocationRow,
   SearchResultRow,
   SectionHeading,
-  type Translate,
 } from '@/features/assets/assetBrowserRows';
+import type { Translate } from '@/lib/translate';
 import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
