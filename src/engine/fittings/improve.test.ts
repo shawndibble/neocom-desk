@@ -25,6 +25,8 @@ interface Row {
   cpu?: number;
   /** Turns the capacitor unstable. */
   capUnstable?: boolean;
+  /** Offsets every module that turns the capacitor unstable. */
+  capCover?: boolean;
   /** A module the pilot switches on; it turns the capacitor unstable only while running. */
   toggled?: boolean;
   /** Signature radius added, in m. */
@@ -48,9 +50,11 @@ function stats(rows: Row[], states: string[] = []): FittingStats {
     cpuUsed: sum('cpu'),
     capacitorRechargeTime: base.capacitorRechargeTime + sum('recharge'),
     ehp: base.ehp + sum('ehp'),
-    capacitor: rows.some((row, i) => row.capUnstable || (row.toggled && states[i] === 'active'))
-      ? { stable: false, depletesInSeconds: 120 }
-      : base.capacitor,
+    capacitor:
+      rows.some((row, i) => row.capUnstable || (row.toggled && states[i] === 'active')) &&
+      !rows.some((row) => row.capCover)
+        ? { stable: false, depletesInSeconds: 120 }
+        : base.capacitor,
     navigation: { ...base.navigation, maxVelocity: base.navigation.maxVelocity + sum('speed') },
     targeting: { ...base.targeting, signatureRadius: base.targeting.signatureRadius + sum('sig') },
     offense: {
@@ -316,6 +320,62 @@ describe('findImprovements replacing an unflyable module and the capacitor', () 
     const table = { 1: {}, 2: { capUnstable: true } };
     const result = await search('damage', table, [fix], {}, running([1]));
     expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
+  });
+});
+
+describe('findImprovements Make Flyable capacitor cover', () => {
+  // Module 2 flies but turns the capacitor unstable; module 6 in place of 5 steadies it.
+  const base = fit([1, 5]);
+  const fix: ImproveCandidate = { ...candidate(1, 2), fixesUnflyable: true };
+  const swapFor = (toTypeId: number, fromTypeId = 5) => ({
+    slot: 'low' as const,
+    slotIndex: 1,
+    fromTypeId,
+    toTypeId,
+  });
+  const table = {
+    1: {},
+    2: { capUnstable: true },
+    5: {},
+    6: { capCover: true },
+    7: { capCover: true },
+  };
+
+  it('adds the swap that keeps the capacitor stable, so the option can be applied', async () => {
+    const prices = { 1: 10, 2: 10, 5: 50, 6: 200 };
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6)],
+    });
+    expect(result.flyableBlocked).toEqual([]);
+    const [option] = result.makeFlyable;
+    expect(option.candidate.toTypeId).toBe(2);
+    expect(option.candidate.pairedWith?.toTypeId).toBe(6);
+    expect(option.after.capacitor.stable).toBe(true);
+    expect(option.candidate.covers).toBe('capacitor');
+    expect(option.iskDelta).toBe(150);
+  });
+
+  it('offers the cheaper of two covers first', async () => {
+    const prices = { 1: 10, 2: 10, 5: 50, 6: 400, 7: 100 };
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6), swapFor(7)],
+    });
+    expect(result.makeFlyable.map((o) => o.candidate.pairedWith?.toTypeId)).toEqual([7, 6]);
+  });
+
+  it('leaves the greyed row when no swap steadies the capacitor', async () => {
+    const result = await search('damage', table, [fix], {}, base, {
+      compensators: () => [swapFor(5, 5)],
+    });
+    expect(result.makeFlyable).toEqual([]);
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
+  });
+
+  it('keeps a capacitor fix out of the implant list, which only helps CPU and powergrid', async () => {
+    const result = await search('damage', table, [fix], {}, base, {
+      compensators: () => [swapFor(5, 5)],
+    });
+    expect(result.flyableOverrun).toEqual([]);
   });
 });
 

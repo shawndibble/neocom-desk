@@ -123,6 +123,8 @@ export interface ImproveCandidate {
   pairedWith?: ImproveCandidate;
   /** Replaces a fitted module the pilot cannot fly yet: accepted even when it scores worse on the goal. */
   fixesUnflyable?: boolean;
+  /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
+  covers?: 'budget' | 'capacitor';
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
@@ -391,6 +393,9 @@ const CHEAPER_TOLERANCE = 0.1;
 /** Whether the fit has a module the pilot switches on (an MWD, a booster, a weapon). */
 const hasToggledModule = (stats: FittingStats): boolean =>
   stats.modules.some((module) => module.maxState === 'active' || module.maxState === 'overload');
+
+/** A cover for a fix that breaks the capacitor: the swapped fit holds a stable one. */
+const capacitorHolds = (stats: FittingStats): boolean => stats.capacitor.stable;
 
 /** The fit with every toggled module switched off. */
 const withTogglesOff = (fitting: Fitting): Fitting => ({
@@ -787,9 +792,13 @@ const changeCount = (candidate: ImproveCandidate): number =>
   1 + (candidate.pairedWith ? changeCount(candidate.pairedWith) : 0);
 
 /** `fix` with each swap chained behind it as a paired change, so one Apply makes them all. */
-function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCandidate {
+function bundleOf(
+  fix: ImproveCandidate,
+  swaps: readonly FitSwap[],
+  covers: NonNullable<ImproveCandidate['covers']>
+): ImproveCandidate {
   const chain = chainOf(swaps);
-  return chain ? { ...fix, pairedWith: chain } : fix;
+  return chain ? { ...fix, pairedWith: chain, covers } : fix;
 }
 
 /** The swaps as one candidate with the rest chained behind it; undefined for none. */
@@ -953,12 +962,14 @@ export async function findImprovements({
     }
   }
 
-  // A fix over budget: the module and rig swaps that bring the fit back under, so Apply is never locked.
+  // A fix over budget or breaking a stable capacitor: the module and rig swaps that put the fit right, so Apply is never locked.
   if (compensators) {
-    const seeds = flyableBlocked
-      .filter((option) => option.guardrail === 'budget')
-      .slice(0, FLYABLE_SEEDS);
-    overrun.push(...seeds);
+    const seedsFor = (guardrail: Guardrail) =>
+      flyableBlocked.filter((option) => option.guardrail === guardrail).slice(0, FLYABLE_SEEDS);
+    const overBudget = seedsFor('budget');
+    // Implants shift CPU and powergrid, not the capacitor: only an over-budget fix is offered them.
+    overrun.push(...overBudget);
+    const seeds = [...overBudget, ...seedsFor('capStable')];
     for (const seed of seeds) {
       if (isCancelled?.()) return null;
       if (shouldStop?.()) {
@@ -976,6 +987,7 @@ export async function findImprovements({
           stats,
           priceOf,
           isCancelled,
+          ...(seed.guardrail === 'capStable' ? { accepts: capacitorHolds } : {}),
         });
       } catch {
         // A failed search leaves the fix greyed with its reason; it must not end the whole search.
@@ -987,7 +999,15 @@ export async function findImprovements({
       const taken: boolean[] = [];
       for (const option of found.options.slice(0, FLYABLE_PER_FIX))
         taken.push(
-          await take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
+          await take(
+            bundleOf(
+              seed.candidate,
+              option.swaps,
+              seed.guardrail === 'capStable' ? 'capacitor' : 'budget'
+            ),
+            option.fitting,
+            option.after
+          )
         );
       if (taken.some(Boolean)) flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
     }

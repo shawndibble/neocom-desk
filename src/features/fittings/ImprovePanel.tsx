@@ -683,9 +683,12 @@ export function ImprovePanel({
             )}
             {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
               <span className="block text-xs">
-                {t('fittings.improve.flyableWith', {
-                  swaps: flyableSwaps(option.candidate).join('; '),
-                })}
+                {t(
+                  option.candidate.covers === 'capacitor'
+                    ? 'fittings.improve.flyableWithCapacitor'
+                    : 'fittings.improve.flyableWith',
+                  { swaps: flyableSwaps(option.candidate).join('; ') }
+                )}
               </span>
             )}
             {lead && <span className="block text-xs">{lead.node}</span>}
