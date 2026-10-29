@@ -31,7 +31,10 @@ import {
   HULL_ROLES,
   hullRoleOf,
   type GoalsByRole,
+  type HullRole,
   type HullRef,
+  type JobsByRole,
+  type SpacesByRole,
 } from '@/engine/fittings/improveRole';
 import {
   bestCrystalKey,
@@ -141,6 +144,36 @@ export const useImproveJob = createLocalSetting<ImproveJob>({
       : DEFAULT_IMPROVE_JOB,
 });
 
+/** The last Improve Job per hull role, remembered on this device; the single `fittingsImproveJob` row only seeds a role (`rememberedJob`). */
+export const useImproveJobByRole = createLocalSetting<JobsByRole>({
+  key: 'fittingsImproveJobByRole',
+  defaultValue: {},
+  parse: (raw) => keepByRole(raw, IMPROVE_JOBS),
+});
+
+/** The last Explore space per hull role, remembered on this device; the single `fittingsImproveSpace` row only seeds a role. */
+export const useImproveSpaceByRole = createLocalSetting<SpacesByRole>({
+  key: 'fittingsImproveSpaceByRole',
+  defaultValue: {},
+  parse: (raw) => keepByRole(raw, EXPLORE_SPACES),
+});
+
+/** The entries of a stored role map whose role and value are both known; null for anything not a map. */
+function keepByRole<V extends string>(
+  raw: unknown,
+  allowed: readonly V[]
+): Partial<Record<HullRole, V>> | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const values = raw as Record<string, unknown>;
+  const kept: Partial<Record<HullRole, V>> = {};
+  for (const role of HULL_ROLES) {
+    const value = values[role];
+    if (typeof value === 'string' && (allowed as readonly string[]).includes(value))
+      kept[role] = value as V;
+  }
+  return kept;
+}
+
 /** Where an Explore fit flies (Safe or Dangerous), remembered on this device. */
 export const useImproveSpace = createLocalSetting<ExploreSpace>({
   key: 'fittingsImproveSpace',
@@ -212,7 +245,9 @@ export function useImproveSettingsHydrated(): boolean {
     useImproveGoalByRole,
     useImproveReach,
     useImproveJob,
+    useImproveJobByRole,
     useImproveSpace,
+    useImproveSpaceByRole,
     useImproveRigs,
     useImproveSort,
     useImproveOre,

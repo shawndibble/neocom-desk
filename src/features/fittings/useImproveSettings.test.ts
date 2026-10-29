@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import { useImproveJob, useImproveRigs, useImproveSpace } from './useImprove';
+import {
+  useImproveJob,
+  useImproveJobByRole,
+  useImproveRigs,
+  useImproveSpace,
+  useImproveSpaceByRole,
+} from './useImprove';
 
 const fresh = async () => {
   await db.settings.clear();
@@ -62,5 +68,32 @@ describe('Improve rigs', () => {
     await db.settings.put({ key: 'fittingsImproveRigs', value: 'off' });
     await useImproveRigs.getState().hydrate();
     expect(useImproveRigs.getState().value).toBe(true);
+  });
+});
+
+describe('Improve Job and space per hull role', () => {
+  it('are kept per role, in their own rows, and come back after a reload', async () => {
+    await useImproveJobByRole.getState().setValue({ combat: 'pvp', explorer: 'pve' });
+    await useImproveSpaceByRole.getState().setValue({ explorer: 'safe' });
+    expect((await db.settings.get('fittingsImproveJobByRole'))?.value).toEqual({
+      combat: 'pvp',
+      explorer: 'pve',
+    });
+    useImproveJobByRole.setState({ value: {}, hydrated: false });
+    useImproveSpaceByRole.setState({ value: {}, hydrated: false });
+    await useImproveJobByRole.getState().hydrate();
+    await useImproveSpaceByRole.getState().hydrate();
+    expect(useImproveJobByRole.getState().value).toEqual({ combat: 'pvp', explorer: 'pve' });
+    expect(useImproveSpaceByRole.getState().value).toEqual({ explorer: 'safe' });
+  });
+
+  it('drop unknown roles and values from a stored row', async () => {
+    await db.settings.put({
+      key: 'fittingsImproveJobByRole',
+      value: { combat: 'tackle', explorer: 'explore', pirate: 'pvp' },
+    });
+    useImproveJobByRole.setState({ value: {}, hydrated: false });
+    await useImproveJobByRole.getState().hydrate();
+    expect(useImproveJobByRole.getState().value).toEqual({ explorer: 'explore' });
   });
 });
