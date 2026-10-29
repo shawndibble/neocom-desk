@@ -426,7 +426,7 @@ export function ImprovePanel({
     });
   }
 
-  /** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR, Stronger fleet support: the figure the goal scores, before and after. */
+  /** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR, Stronger fleet support, Explore better: the figure the goal scores, before and after. */
   function moveLine(option: ImproveOption | RejectedOption, own: FittingStats): string | null {
     const align = () =>
       t('fittings.improve.alignLine', {
@@ -479,6 +479,7 @@ export function ImprovePanel({
       const [was, now] = [own.explore, option.after.explore];
       const parts = [
         ['coherence', was.hacking.coherence, now.hacking.coherence],
+        ['strength', was.hacking.strength, now.hacking.strength],
         ['access', was.hacking.access, now.hacking.access],
         ['probe', was.probeStrength, now.probeStrength],
       ] as const;
@@ -486,8 +487,8 @@ export function ImprovePanel({
         .filter(([, before, after]) => before > 0 && before !== after)
         .map(([key, before, after]) =>
           t(`fittings.improve.explore.${key}`, {
-            before: m3sFormat(before),
-            after: m3sFormat(after),
+            before: twoDecimals(before),
+            after: twoDecimals(after),
           })
         );
       return changed.length > 0 ? changed.join(' · ') : null;

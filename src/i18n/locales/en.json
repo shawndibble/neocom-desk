@@ -1575,6 +1575,7 @@
       "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
       "explore": {
         "coherence": "Virus coherence {{before}} → {{after}}",
+        "strength": "Virus strength {{before}} → {{after}}",
         "access": "Access difficulty bonus {{before}} → {{after}}",
         "probe": "Probe strength {{before}} → {{after}}"
       },

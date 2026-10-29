@@ -1,14 +1,9 @@
 /**
- * Hacking and scanning figures — this app's own read of the engine's final
- * per-item attributes (ADR 0016), for the Explore better Improve Goal.
- * Attribute ids are plain SDE, named by ESI `dogma/attributes` on 2026-10-29
- * and read back off a live run on a Heron: a Data Analyzer II reads a higher
- * `virusCoherence` and `accessDifficultyBonus` with a Memetic Algorithm Bank
- * rig and none with an Emission Scope Sharpener (the Relic rig); a loaded
- * Core Scanner Probe I reads a higher `baseSensorStrength` with a Scan
- * Rangefinding Array or a Gravity Capacitor Upgrade rig. The engine does not
- * move a launcher's scan time for a Signal Focusing Kit, so scan time is not
- * scored. Pure.
+ * Hacking and scanning figures for the Explore better Improve Goal, read off
+ * the engine's final per-item attributes (ADR 0016). Ids are plain SDE:
+ * `virusCoherence`, `virusStrength`, `accessDifficultyBonus`, and a loaded
+ * probe's `baseSensorStrength`. Scan time is not scored: the engine moves no
+ * launcher duration for a Signal Focusing Kit. Pure.
  */
 
 export const EXPLORE_ATTRIBUTE = {
@@ -90,3 +85,7 @@ export function exploreFigures(
   ];
   return pairs.filter(([was]) => was > 0);
 }
+
+/** Whether the fit has a running analyzer or a loaded probe to score. */
+export const hasExplore = (stats: ExploreStats): boolean =>
+  stats.hacking.coherence > 0 || stats.probeStrength > 0;

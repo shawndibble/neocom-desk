@@ -921,6 +921,28 @@ describe('ImprovePanel', () => {
       screen.getAllByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
     ).toHaveLength(2);
   });
+  it('disables Explore better with its reason on a fit with no analyzer or probe', async () => {
+    renderPanel(search({ status: 'idle' }));
+    await openMoreGoals();
+    expect(screen.getByRole('button', { name: /Explore better/ })).toBeDisabled();
+    expect(
+      screen.getByText('No running analyzer or loaded scan probe on this fit')
+    ).toBeInTheDocument();
+  });
+
+  it('shows only the hacking and scanning figures that changed on an Explore better row', () => {
+    const withExplore = (coherence: number, strength: number, probeStrength: number) => ({
+      ...before,
+      explore: { hacking: { coherence, strength, access: 14 }, probeStrength },
+    });
+    const own = withExplore(110, 35, 70);
+    const gain = option(10, { explore: withExplore(130, 35, 70).explore });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'explore',
+    });
+    expect(screen.getAllByText('Virus coherence 110 → 130')).toHaveLength(2);
+  });
+
   it('disables Stronger fleet support with its reason on a fit with no fleet modules', async () => {
     renderPanel(search({ status: 'idle' }));
     await openMoreGoals();

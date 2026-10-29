@@ -97,4 +97,18 @@ describe('the Explore better goal', () => {
     const result = await run([6]);
     expect([...result!.noDownside, ...result!.tradeOffs]).toEqual([]);
   });
+
+  it('never lets a big speed gain pay for a lost analyzer', async () => {
+    figures[7] = { coherence: 0, probe: 70, cpuUsed: 100, velocity: 3000 };
+    const result = await run([7]);
+    expect([...result!.noDownside, ...result!.tradeOffs]).toEqual([]);
+  });
+
+  it('keeps a hacking gain that costs a little speed', async () => {
+    figures[8] = { coherence: 130, probe: 70, cpuUsed: 100, velocity: 290 };
+    const result = await run([8]);
+    expect([...result!.noDownside, ...result!.tradeOffs].map((o) => o.candidate.toTypeId)).toEqual([
+      8,
+    ]);
+  });
 });

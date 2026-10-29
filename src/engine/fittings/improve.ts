@@ -36,7 +36,7 @@ import {
 } from './makeItFit';
 import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
-import { exploreFigures } from './explore';
+import { exploreFigures, hasExplore } from './explore';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
 import { gainMetrics, roleChanges, type RoleChange } from './skillGains';
@@ -317,7 +317,7 @@ export function goalAvailability(
   if (goal === 'ewar' && ewarOf(before).strength <= 0)
     return { available: false, reason: 'noEwar' };
   if (goal === 'command' && !hasCommand(before)) return { available: false, reason: 'noCommand' };
-  if (goal === 'explore' && exploreFigures(before.explore, before.explore).length === 0)
+  if (goal === 'explore' && !hasExplore(before.explore))
     return { available: false, reason: 'noExplore' };
   return { available: true };
 }
@@ -343,6 +343,9 @@ function relative(before: number, after: number): number {
 function gainOrAbsolute(before: number, after: number): number {
   return before === 0 ? after - before : relative(before, after);
 }
+
+/** The most speed and align can add to or take from an Explore better score. */
+const EXPLORE_MOVE_CAP = 0.1;
 
 /** The mean relative gain over the figures the fit already has; a figure it lost counts -1. */
 function meanGain(pairs: readonly (readonly [number, number])[]): number {
@@ -409,10 +412,10 @@ function scoreOf(
       return meanGain([...kinds, [was.range, now.range]]);
     }
     case 'explore':
-      // Hacking and scanning first; speed and align count half, as an explorer wants to be gone sooner.
+      // Hacking and scanning lead; speed and align only nudge, capped so a faster hull never outweighs a lost analyzer.
       return (
         meanGain(exploreFigures(before.explore, after.explore)) +
-        (metrics.speed + metrics.align) / 2
+        Math.max(-EXPLORE_MOVE_CAP, Math.min(EXPLORE_MOVE_CAP, (metrics.speed + metrics.align) / 2))
       );
   }
 }
