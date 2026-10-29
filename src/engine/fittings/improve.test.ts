@@ -4,7 +4,7 @@ import {
   findImprovements,
   goalAvailability,
   improveCandidates,
-  overSpendCap,
+  overIskBudget,
   rankImproveOptions,
   type FlyableCompensators,
   type ImproveCandidate,
@@ -93,8 +93,7 @@ async function search(
   base = fit([1]),
   extra: {
     compensators?: FlyableCompensators;
-    spendCap?: number | null;
-    mode?: 'buy' | 'refit';
+    iskBudget?: number | null;
   } = {}
 ) {
   const stat = calc(table);
@@ -434,8 +433,7 @@ describe('findImprovements Make Flyable bundles', () => {
   it('greys a bundle that costs more than the spend cap', async () => {
     const result = await search('damage', table, [fix], prices, base, {
       compensators: () => [swapFor(6)],
-      spendCap: 150,
-      mode: 'refit',
+      iskBudget: 150,
     });
     expect(result.makeFlyable).toEqual([]);
     expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['spend']);
@@ -720,22 +718,19 @@ describe('damageOf', () => {
   });
 });
 
-describe('overSpendCap', () => {
+describe('overIskBudget', () => {
   it('counts an implant set against the same budget as the swaps', () => {
-    // Planning: the fit costs 900 and the fix 50; 100 of implants makes 1050.
-    expect(overSpendCap('buy', 1000, 900, 50, 0)).toBe(false);
-    expect(overSpendCap('buy', 1000, 900, 50, 100)).toBe(true);
-    // Refitting: only the extra spend counts.
-    expect(overSpendCap('refit', 200, 900, 50, 100)).toBe(false);
-    expect(overSpendCap('refit', 120, 900, 50, 100)).toBe(true);
+    // The fit costs 900 and the fix 50; 100 of implants makes 1050.
+    expect(overIskBudget(1000, 900, 50, 0)).toBe(false);
+    expect(overIskBudget(1000, 900, 50, 100)).toBe(true);
   });
 
   it('never blocks without a cap or a price', () => {
-    expect(overSpendCap('buy', null, 900, 50, 1e9)).toBe(false);
-    expect(overSpendCap('buy', 10, 900, null, 0)).toBe(false);
+    expect(overIskBudget(null, 900, 50, 1e9)).toBe(false);
+    expect(overIskBudget(10, 900, null, 0)).toBe(false);
   });
 
   it('still charges the implants of an unpriced change', () => {
-    expect(overSpendCap('refit', 100, 900, null, 150)).toBe(true);
+    expect(overIskBudget(1000, 900, null, 150)).toBe(true);
   });
 });

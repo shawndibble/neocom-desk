@@ -9,7 +9,6 @@ import {
   type CandidateOptions,
   type ImproveCandidate,
   type ImproveGoal,
-  type ImproveMode,
 } from './improve';
 import { buildVariationIndex } from '../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from './types';
@@ -382,7 +381,7 @@ async function run(
   fitting: Fitting,
   candidates: ImproveCandidate[],
   prices: Record<number, number>,
-  extra: { mode?: ImproveMode; spendCap?: number | null; fitTotal?: number | null } = {}
+  extra: { iskBudget?: number | null; fitTotal?: number | null } = {}
 ) {
   const result = await findImprovements({
     fitting,
@@ -456,7 +455,7 @@ describe('fills and pair moves', () => {
   });
 });
 
-describe('buy and refit accounting', () => {
+describe('buy accounting', () => {
   const f = fit([
     ['low', 0, 4],
     ['rig', 0, 20],
@@ -465,34 +464,17 @@ describe('buy and refit accounting', () => {
   it('Planning to buy: the swap costs new minus old; a total budget drops options over it', async () => {
     const prices = { 4: 100, 5: 300, 20: 50, 21: 500 };
     const result = await run('tank', f, [swap(4, 5, 0)], prices, {
-      mode: 'buy',
       fitTotal: 150,
-      spendCap: 400,
+      iskBudget: 400,
     });
     // The fit costs 150 now; the swap makes it 350, under the 400 budget.
     expect(result.noDownside[0].iskDelta).toBe(200);
     const over = await run('tank', f, [swap(4, 5, 0)], prices, {
-      mode: 'buy',
       fitTotal: 150,
-      spendCap: 300,
+      iskBudget: 300,
     });
     expect(over.noDownside).toEqual([]);
     expect(over.rejected[0].guardrail).toBe('spend');
-  });
-
-  it('Refitting: the cap is on the extra spend, and a rig change costs the full new rig and is flagged', async () => {
-    const prices = { 4: 100, 5: 300, 20: 50, 21: 500 };
-    const rigSwap = swap(20, 21, 0, 'rig');
-    const result = await run('tank', f, [rigSwap, swap(4, 5, 0)], prices, {
-      mode: 'refit',
-      spendCap: 1000,
-    });
-    const rig = result.noDownside.find((o) => o.candidate.at[0].slot === 'rig');
-    expect(rig?.iskDelta).toBe(500);
-    expect(rig?.destroysRigs).toBe(true);
-    const module = result.noDownside.find((o) => o.candidate.at[0].slot === 'low');
-    expect(module?.iskDelta).toBe(200);
-    expect(module?.destroysRigs).toBe(false);
   });
 
   it('an unpriced option sorts last and is never dropped for the budget', async () => {
@@ -502,8 +484,8 @@ describe('buy and refit accounting', () => {
       [swap(4, 5, 0), fill(9, 1)],
       { 4: 100, 5: 200 },
       {
-        mode: 'refit',
-        spendCap: 50,
+        fitTotal: 0,
+        iskBudget: 50,
       }
     );
     // 5 costs 100 extra: over the 50 cap. Fill 9 has no price, and gains no EHP either.

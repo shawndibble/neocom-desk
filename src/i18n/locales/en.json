@@ -1464,9 +1464,8 @@
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
         "keepsStats": "Loses more than 10% of damage, tank or speed",
-        "spend": "Costs more than your budget or spend cap",
-        "spendBudget": "Over your {{cap}} budget by {{over}}",
-        "spendCap": "{{over}} over your {{cap}} cap"
+        "spend": "Costs more than your budget",
+        "spendBudget": "Over your {{cap}} budget by {{over}}"
       },
       "widen": {
         "upgrade": "Only variations of the modules already fitted are tried. Rebalance or Rework tries more.",
@@ -1480,12 +1479,7 @@
         "rebalance": "Also tries a different module doing the same job.",
         "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
       },
-      "modeLabel": "Improve mode",
-      "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
-      "cap": {
-        "buy": "Total budget (ISK)",
-        "refit": "Extra spend cap (ISK)"
-      },
+      "cap": "Total budget (ISK)",
       "defenseLabel": "Defense Choice",
       "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor", "either": "Either" },
       "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
@@ -1503,13 +1497,9 @@
       "findImplants": "Find implants",
       "settingsLabel": "Search settings",
       "summaryNoCap": "no budget",
-      "summaryCap": {
-        "buy": "budget {{cap}}",
-        "refit": "cap {{cap}}"
-      },
+      "summaryCap": "budget {{cap}}",
       "includeRigs": "Rigs",
       "includeOfficer": "Officer and Deadspace modules",
-      "destroysRig": "Removing the old rig destroys it; the new one is paid in full.",
       "fill_one": "Add {{to}}",
       "fill_other": "Add {{count}}× {{to}}",
       "pair": "{{add}}, paid for by {{downgrade}}",
@@ -1555,7 +1545,7 @@
         "problem": {
           "over": "Together these over-run the {{resource}}.",
           "capStable": "Together these leave the capacitor unstable.",
-          "spend": "Together these pass your spend cap."
+          "spend": "Together these pass your budget."
         }
       },
       "unloaded": {

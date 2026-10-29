@@ -5,7 +5,7 @@
  * "-0", which reads as a loss that isn't real.
  */
 import { formatCompactNumber } from './compactNumber';
-import { createNumberFormat, getDecimalMark } from './numberLocale';
+import { createNumberFormat, getDecimalMark, getGroupMark } from './numberLocale';
 import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 
 const formatters = new Map<number, (value: number) => string>();
@@ -107,10 +107,11 @@ const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
   b: 1_000_000_000,
   m: 1_000_000,
   t: 1_000,
+  k: 1_000,
 };
 
-/** `10.5m`, `10,500,000`, `10.500.000` and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, t = thousand. */
-const ISK_AMOUNT_PATTERN = /^([\d.,'\s\u00a0\u2009\u202f]*\d)\s*([bmt])?$/i;
+/** `10.5m`, `10,500,000`, `10.500.000` and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, k or t = thousand. */
+const ISK_AMOUNT_PATTERN = /^([\d.,'\s\u00a0\u2009\u202f]*\d)\s*([bmtk])?$/i;
 
 /**
  * Parses a threshold-style ISK amount from free text (issue #wallet-balance-threshold):
@@ -130,6 +131,28 @@ export function parseIskAmount(input: string): number | null {
   const suffix = match[2]?.toLowerCase();
   const multiplier = suffix ? ISK_SHORTHAND_MULTIPLIERS[suffix] : 1;
   return numeric * multiplier;
+}
+
+/**
+ * Live mask for an ISK field being typed: the integer digits grouped with the
+ * display format's separator, a decimal mark kept, and a
+ * `b`/`m`/`k`/`t` suffix left as typed. Text that is not an amount comes back
+ * untouched so the field's error can name it.
+ */
+export function maskIskTyping(text: string): string {
+  const match = /^([\d.,'\s\u00a0\u2009\u202f]*)\s*([bmtk])?$/i.exec(text.trim());
+  if (!match) return text;
+  const decimal = getDecimalMark();
+  const body = match[1];
+  const at = body.indexOf(decimal);
+  // A second decimal mark is a figure in another format (a pasted 1.234.567): left for the field's error, not mangled.
+  if (at >= 0 && body.indexOf(decimal, at + 1) >= 0) return text;
+  const group = getGroupMark();
+  const whole = (at < 0 ? body : body.slice(0, at)).replace(/\D/g, '');
+  // No cap on fraction digits: a suffix may still follow (1.255m), and the figure is parsed whole.
+  const fraction = at < 0 ? null : body.slice(at + 1).replace(/\D/g, '');
+  const grouped = whole.replace(/\B(?=(\d{3})+$)/g, group);
+  return `${grouped}${fraction === null ? '' : decimal + fraction}${match[2] ?? ''}`;
 }
 
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */

@@ -219,16 +219,15 @@ describe('Improve whole-tank conversion', () => {
       expect(c.conversion!.removes.map((r) => r.typeId)).not.toContain(401);
   });
 
-  it('costs the new modules less the removed ones, in both modes', () => {
+  it('costs the new modules less the removed ones', () => {
     const [first] = conversions(candidates(shieldFit));
     const price = (id: number) => (id === 101 ? 10 : 100);
     const adds = typesOf(applyImproveCandidate(shieldFit, first!)).filter(
       (t) => GROUP[t] === 329 || GROUP[t] === 62 || GROUP[t] === 328
     ).length;
     const expected = adds * 100 - 2 * 10;
-    expect(iskDeltaOf(first!, price, 'buy').isk).toBe(expected);
-    expect(iskDeltaOf(first!, price, 'refit').isk).toBe(expected);
-    expect(iskDeltaOf(first!, (id) => (id === 101 ? null : 100), 'buy').isk).toBeNull();
+    expect(iskDeltaOf(first!, price)).toBe(expected);
+    expect(iskDeltaOf(first!, (id) => (id === 101 ? null : 100))).toBeNull();
   });
 
   it('stays within the candidate cap', () => {

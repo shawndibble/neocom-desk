@@ -37,7 +37,6 @@ function option(
     after: { ...before, ...patch },
     score: 0.1,
     iskDelta: 1000,
-    destroysRigs: false,
     lost: [],
     ...extra,
   } as ImproveOption;
@@ -86,10 +85,8 @@ const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   onReachChange: vi.fn(),
   sort: 'gain',
   onSortChange: vi.fn(),
-  mode: 'buy',
-  onModeChange: vi.fn(),
-  spendCap: null,
-  onSpendCapChange: vi.fn(),
+  iskBudget: null,
+  onIskBudgetChange: vi.fn(),
   defense: 'keep',
   onDefenseChange: vi.fn(),
   includeRigs: false,
@@ -504,22 +501,14 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('Goes over CPU, powergrid or calibration')).toBeInTheDocument();
   });
 
-  it('names the overage on a swap over the budget or the cap', () => {
+  it('names the overage on a swap over the budget', () => {
     const rejected = {
       ...option(11, { ehp: 1100 }, { iskDelta: 12_300_000 }),
       guardrail: 'spend' as const,
     };
     const state = { ...done({ rejected: [rejected] }), fitTotal: 40_000_000 } as ImproveState;
-    const { unmount } = renderPanel(
-      search(state),
-      vi.fn(),
-      vi.fn(),
-      settings({ mode: 'buy', spendCap: 50_000_000 })
-    );
+    renderPanel(search(state), vi.fn(), vi.fn(), settings({ iskBudget: 50_000_000 }));
     expect(screen.getByText('Over your 50M budget by 2.3M')).toBeInTheDocument();
-    unmount();
-    renderPanel(search(state), vi.fn(), vi.fn(), settings({ mode: 'refit', spendCap: 5_000_000 }));
-    expect(screen.getByText('7.3M over your 5M cap')).toBeInTheDocument();
   });
 
   it('shows a notice and no results when the budget is below the fit price', () => {
@@ -569,7 +558,7 @@ describe('ImprovePanel', () => {
     expect(screen.getByText('Nothing on this fit deals damage')).toBeInTheDocument();
   });
 
-  it('shows Reach, mode, Defense Choice and the spend cap, and reports a pick', async () => {
+  it('shows Reach, Defense Choice and the budget, and reports a pick', async () => {
     const config = settings({ reach: 'rebalance' });
     renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), config, { goal: 'tank' });
     await openSettings();
@@ -577,8 +566,8 @@ describe('ImprovePanel', () => {
     expect(screen.getByRole('group', { name: 'Defense Choice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Rework' }));
     expect(config.onReachChange).toHaveBeenCalledWith('rework');
-    await userEvent.click(screen.getByRole('button', { name: 'Refitting a ship I own' }));
-    expect(config.onModeChange).toHaveBeenCalledWith('refit');
+    expect(screen.queryByRole('group', { name: 'Improve mode' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Total budget (ISK)')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Armor' }));
     expect(config.onDefenseChange).toHaveBeenCalledWith('armor');
   });
@@ -609,20 +598,12 @@ describe('ImprovePanel', () => {
     expect(config.onIncludeRigsChange).toHaveBeenCalledWith(true);
   });
 
-  it('flags a rig change in a refit and labels an add and a pair', () => {
+  it('labels an add and a pair', () => {
     const add = option(
       30,
       {},
       {
         candidate: { fromTypeId: null, toTypeId: 30, at: [{ slot: 'low', slotIndex: 2 }] },
-      }
-    );
-    const rig = option(
-      31,
-      {},
-      {
-        destroysRigs: true,
-        candidate: { fromTypeId: 5, toTypeId: 31, at: [{ slot: 'rig', slotIndex: 0 }] },
       }
     );
     const pair = option(
@@ -637,9 +618,8 @@ describe('ImprovePanel', () => {
         },
       }
     );
-    renderPanel(search(done({ noDownside: [add, rig, pair] })));
+    renderPanel(search(done({ noDownside: [add, pair] })));
     expect(screen.getByText('Add #30')).toBeInTheDocument();
-    expect(screen.getByText(/Removing the old rig destroys it/)).toBeInTheDocument();
     expect(screen.getByText('Add #32, paid for by #3 → #4')).toBeInTheDocument();
   });
 
