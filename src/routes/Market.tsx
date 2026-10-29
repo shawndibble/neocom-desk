@@ -78,6 +78,8 @@ import { buttonClassName } from '@/components/ui/buttonClassName';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { AppraisalSettingsForm } from '@/features/market/AppraisalSettingsForm';
 import { usePageHeaderSlots } from '@/features/market/pageHeaderSlots';
 import { useAppraisalListUrl } from '@/features/market/useAppraisalListUrl';
 import { useAppraisal } from '@/features/market/useAppraisal';
@@ -940,6 +942,11 @@ export function Market() {
                     aria-label={t('market.region')}
                     className="w-32 sm:w-44"
                   />
+                )}
+                {tab === 'appraisal' && (
+                  <PageSettingsButton pageName={t('market.sections.appraisal')} section="market">
+                    <AppraisalSettingsForm characterId={activeCharacterId} />
+                  </PageSettingsButton>
                 )}
                 <IconButton
                   icon={<Icon.Refresh />}

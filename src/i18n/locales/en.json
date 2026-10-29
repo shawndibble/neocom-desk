@@ -12096,7 +12096,9 @@
         "multibuy": "Multibuy"
       },
       "openInJanice": "Open in Janice",
-      "pickHaulingShip": "Pick hauling ship",
+      "settingsShipTitle": "Hauling ship",
+      "settingsShipNone": "No ship set. Pick one to see how the list fits its hold.",
+      "settingsShipCurrent": "{{ship}}, {{capacity}}",
       "janiceFetching": "Fetching your Janice URL…",
       "janiceFailed": {
         "failed": "Janice didn't answer, so no tab was opened. Try again in a moment.",

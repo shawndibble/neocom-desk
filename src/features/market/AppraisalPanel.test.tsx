@@ -726,17 +726,17 @@ describe('AppraisalPanel', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent(/no price at this hub/);
     });
 
-    it('hides the refine chips with the Refine column, and brings them back with it', async () => {
+    it('hides the Refine total chip with the Refine column, and brings it back with it', async () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
-      expect(screen.getByText('Facility yield')).toBeInTheDocument();
-      expect(screen.getByText('Reprocessing tax')).toBeInTheDocument();
+      expect(screen.getByText('Refine total')).toBeInTheDocument();
+      // Yield and tax are edited in the page settings now, not beside the total.
+      expect(screen.queryByText('Facility yield')).not.toBeInTheDocument();
+      expect(screen.queryByText('Reprocessing tax')).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
       await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Refine total' }));
       await userEvent.keyboard('{Escape}');
       expect(screen.queryByRole('columnheader', { name: 'Refine total' })).not.toBeInTheDocument();
-      expect(screen.queryByText('Facility yield')).not.toBeInTheDocument();
-      expect(screen.queryByText('Reprocessing tax')).not.toBeInTheDocument();
       expect(screen.queryAllByText('Refine total')).toHaveLength(0);
       expect(screen.getByText('Volume')).toBeInTheDocument();
       expect(screen.getByText('Items')).toBeInTheDocument();
@@ -744,8 +744,7 @@ describe('AppraisalPanel', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
       await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Refine total' }));
       await userEvent.keyboard('{Escape}');
-      expect(screen.getByText('Facility yield')).toBeInTheDocument();
-      expect(screen.getByText('Reprocessing tax')).toBeInTheDocument();
+      expect(screen.getByText('Refine total')).toBeInTheDocument();
     });
 
     it('omits the refine column entirely with no active Character', () => {
@@ -1758,23 +1757,11 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
     expect(screen.getByText('Does not fit in one trip.')).toBeInTheDocument();
   });
 
-  it('picks a hauling ship from the actions menu, and the item goes once one is set', async () => {
+  it('offers no hauling-ship item in the actions menu: the page settings hold the picker', async () => {
     const user = userEvent.setup();
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.queryByTestId('hold-bar')).not.toBeInTheDocument();
-    const menuButton = screen.getByRole('button', { name: /Appraisal actions/ });
-    await user.click(menuButton);
-    await user.click(await screen.findByRole('menuitem', { name: 'Pick hauling ship' }));
-    expect(await screen.findByRole('dialog', { name: 'Pick hauling ship' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Enter m³' }));
-    await user.type(screen.getByRole('textbox', { name: 'Cargo space (m³)' }), '5000');
-    await user.click(screen.getByRole('button', { name: 'Use' }));
-
-    await waitFor(() => expect(screen.getByTestId('hold-bar')).toBeInTheDocument());
-    expect(screen.queryByRole('dialog', { name: 'Pick hauling ship' })).not.toBeInTheDocument();
-    await waitFor(() => expect(menuButton).toHaveFocus());
-    await user.click(menuButton);
+    await user.click(screen.getByRole('button', { name: /Appraisal actions/ }));
     expect(await screen.findByRole('menuitem', { name: /Open in Janice/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Pick hauling ship' })).not.toBeInTheDocument();
   });
