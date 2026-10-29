@@ -7,7 +7,7 @@ import {
   makeoverMoves,
   type MakeoverSearch,
 } from '@/engine/fittings/improveMakeover';
-import { damageOf, type ImproveGoal } from '@/engine/fittings/improve';
+import { damageOf, scoreOf, type ImproveGoal } from '@/engine/fittings/improve';
 import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import {
@@ -32,6 +32,8 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 const SHIELD_HARDENER = 77;
+/** Hacking and scanning rigs: the Memetic, Emission, Gravity and Signal rigs. */
+const SCANNING_RIGS = 1233;
 
 /**
  * The PvE Drake from issue #5548. A hand review turned it into: Damage Control
@@ -119,7 +121,7 @@ async function loadWorld() {
     });
     return { before, result };
   };
-  return { types, id, search };
+  return { types, id, search, stats };
 }
 
 const fitModule = (
@@ -286,10 +288,53 @@ describe('Improve makeover on an Explore Astero (real WASM + real pinned SDE)', 
     }
   );
 
+  it('Dangerous fits a hacking or scanning rig that the calibration allows', () => {
+    const fit = dangerous?.makeover?.fitting ?? astero;
+    const rigs = fit.modules.filter((m) => m.slot === 'rig').map((m) => types[String(m.typeId)]);
+    expect(rigs.some((rig) => rig.groupID === SCANNING_RIGS)).toBe(true);
+  });
+
   it('Safe does not guard the tank modules (any drop shows as lost)', () => {
     const lost = safe?.makeover?.lost ?? [];
     const dropped = TANK.some((name) => !namesOf(safe).includes(name));
     // A dropped tank module must be reported; keeping it is also allowed.
     expect(!dropped || lost.length > 0).toBe(true);
+  });
+});
+
+describe('Explore score on the Astero rigs (real WASM + real pinned SDE)', () => {
+  let scoreWith: (first: string, second: string) => number;
+
+  beforeAll(async () => {
+    const world = await loadWorld();
+    const fitWith = (rigs: string[]): Fitting =>
+      ({
+        name: 'Anomaly Astero',
+        shipTypeId: world.id('Astero'),
+        modules: Object.entries({ ...ASTERO, rig: rigs }).flatMap(([slot, names]) =>
+          names.map((name, i) => fitModule(world.id, slot as FittingSlotKind, i, name))
+        ),
+        drones: [],
+        cargo: [],
+      }) as unknown as Fitting;
+    const before = await world.stats(fitWith(ASTERO.rig));
+    const scores = new Map<string, number>();
+    for (const rigs of [
+      ['Small Memetic Algorithm Bank I', 'Small Low Friction Nozzle Joints II'],
+      ['Small Polycarbon Engine Housing II', 'Small Low Friction Nozzle Joints II'],
+    ]) {
+      const a = await world.stats(fitWith(rigs));
+      scores.set(rigs.join('+'), scoreOf('explore', before, a, null, undefined, 'cargo')!);
+    }
+    scoreWith = (first, second) => scores.get(`${first}+${second}`)!;
+  }, 90_000);
+
+  it('a Memetic Algorithm Bank I outscores a Polycarbon Engine Housing II', () => {
+    const low = 'Small Low Friction Nozzle Joints II';
+    const [memetic, polycarbon] = [
+      scoreWith('Small Memetic Algorithm Bank I', low),
+      scoreWith('Small Polycarbon Engine Housing II', low),
+    ];
+    expect(memetic).toBeGreaterThan(polycarbon);
   });
 });

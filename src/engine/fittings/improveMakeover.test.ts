@@ -144,6 +144,11 @@ describe('makeoverMoves', () => {
     expect(list).not.toContain('1>5@m0');
   });
 
+  it("offers a rig group's Tech I beside its Tech II: calibration often leaves room only for a Tech I rig", () => {
+    const list = moves({ includeRigs: true })(fit([['rig', 0, 30]])).map(label);
+    expect(list).toContain('30>31@r0');
+  });
+
   it('falls back to Tech I when a group has no Tech II', () => {
     const types = { ...TYPES, 2: { ...TYPES[2], meta: 1 }, 4: { ...TYPES[4], meta: 1 } };
     const list = catalogue(types)

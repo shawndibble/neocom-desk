@@ -27,11 +27,20 @@ const EXPLORE_ATTRIBUTE = {
 /** The charge group a Scan Probe Launcher loads. */
 const SCAN_PROBE_CHARGE_GROUP = 479;
 
+/** One fitted, online analyzer's figures. */
+export interface AnalyzerStats {
+  strength: number;
+  coherence: number;
+  cycleSeconds: number;
+}
+
 export interface ExploreStats {
   /** Hacking, scanning, probe and survey modules fitted. */
   modules: number;
   /** The best analyzer's figures; 0 with none. */
-  hacking: { strength: number; coherence: number; cycleSeconds: number };
+  hacking: AnalyzerStats;
+  /** Every fitted, online analyzer, in module order (a Data and a Relic Analyzer both count). */
+  analyzers: AnalyzerStats[];
   /** Array bonuses added up, percent; a duration or deviation cut is positive. */
   scanning: { strength: number; duration: number; deviation: number };
 }
@@ -39,6 +48,7 @@ export interface ExploreStats {
 export const NO_EXPLORE: ExploreStats = {
   modules: 0,
   hacking: { strength: 0, coherence: 0, cycleSeconds: 0 },
+  analyzers: [],
   scanning: { strength: 0, duration: 0, deviation: 0 },
 };
 
@@ -62,6 +72,7 @@ export function extractExplore(
   const explore: ExploreStats = {
     modules: 0,
     hacking: { ...NO_EXPLORE.hacking },
+    analyzers: [],
     scanning: { ...NO_EXPLORE.scanning },
   };
   items.forEach((item, index) => {
@@ -82,6 +93,11 @@ export function extractExplore(
     if (strength > 0) {
       const cycle = read(EXPLORE_ATTRIBUTE.duration) / 1000;
       const { hacking } = explore;
+      explore.analyzers.push({
+        strength,
+        coherence: read(EXPLORE_ATTRIBUTE.virusCoherence),
+        cycleSeconds: cycle,
+      });
       hacking.strength = Math.max(hacking.strength, strength);
       hacking.coherence = Math.max(hacking.coherence, read(EXPLORE_ATTRIBUTE.virusCoherence));
       if (cycle > 0)
@@ -93,17 +109,4 @@ export function extractExplore(
     explore.scanning.deviation += scan.deviation;
   });
   return explore;
-}
-
-/** The figures Explore better scores, bigger better: strength, coherence, cycles a second, then scan strength, duration cut and deviation cut. */
-export function exploreFigures(explore: ExploreStats): number[] {
-  const { hacking, scanning } = explore;
-  return [
-    hacking.strength,
-    hacking.coherence,
-    hacking.cycleSeconds > 0 ? 1 / hacking.cycleSeconds : 0,
-    scanning.strength,
-    scanning.duration,
-    scanning.deviation,
-  ];
 }

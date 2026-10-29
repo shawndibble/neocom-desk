@@ -59,6 +59,12 @@ const analyzerFit = (analyzer: number, rig: number): Fitting =>
     ],
   }) as unknown as Fitting;
 
+const ANALYZER = (analyzer: number, rig: number) => ({
+  strength: (analyzer === 2 ? 70 : 60) + (rig === 11 ? 10 : 0),
+  coherence: 40,
+  cycleSeconds: 10,
+});
+
 /** Strength 60 on analyzer 1, 70 on 2; the hacking rig 11 adds 10; `cpu` is what each rig leaves used. */
 function figures(fit: Fitting, cpu: Record<number, number> = {}): FittingStats {
   const [analyzer, rig] = [fit.modules[0]!.typeId, fit.modules[1]!.typeId];
@@ -69,11 +75,8 @@ function figures(fit: Fitting, cpu: Record<number, number> = {}): FittingStats {
     explore: {
       ...NO_EXPLORE,
       modules: 1,
-      hacking: {
-        strength: (analyzer === 2 ? 70 : 60) + (rig === 11 ? 10 : 0),
-        coherence: 40,
-        cycleSeconds: 10,
-      },
+      hacking: ANALYZER(analyzer, rig),
+      analyzers: [ANALYZER(analyzer, rig)],
     },
   };
 }

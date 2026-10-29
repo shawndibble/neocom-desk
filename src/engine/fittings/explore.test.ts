@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractExplore, exploreFigures, NO_EXPLORE } from './explore';
+import { extractExplore, NO_EXPLORE } from './explore';
 
 const item = (typeId = 1, slot = 'high') => ({ type_id: typeId, slot: { type: slot } });
 const result = (attrs: Record<number, number>, state = 'active') => ({
@@ -19,6 +19,10 @@ describe('extractExplore', () => {
     );
     expect(explore.modules).toBe(2);
     expect(explore.hacking).toEqual({ strength: 70, coherence: 40, cycleSeconds: 8 });
+    expect(explore.analyzers).toEqual([
+      { strength: 60, coherence: 40, cycleSeconds: 10 },
+      { strength: 70, coherence: 30, cycleSeconds: 8 },
+    ]);
   });
 
   it('sums scan array bonuses, duration and deviation as cuts', () => {
@@ -33,23 +37,11 @@ describe('extractExplore', () => {
   it('counts a probe launcher (takes scan probes) as an explorer module with no figure', () => {
     const explore = extractExplore([item()], [result({ 604: 479 })]);
     expect(explore.modules).toBe(1);
-    expect(exploreFigures(explore)).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(explore.analyzers).toEqual([]);
   });
 
   it('ignores drones and offline modules', () => {
     expect(extractExplore([item(1, 'drone_bay')], [result({ 1909: 60 })]).modules).toBe(0);
     expect(extractExplore([item()], [result({ 1909: 60 }, 'offline')]).modules).toBe(0);
-  });
-});
-
-describe('exploreFigures', () => {
-  it('lists strength, coherence, cycle rate, then the three scan figures', () => {
-    expect(
-      exploreFigures({
-        modules: 2,
-        hacking: { strength: 60, coherence: 40, cycleSeconds: 10 },
-        scanning: { strength: 10, duration: 20, deviation: 5 },
-      })
-    ).toEqual([60, 40, 0.1, 10, 20, 5]);
   });
 });
