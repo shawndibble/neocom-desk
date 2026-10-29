@@ -791,3 +791,75 @@ describe('overIskBudget', () => {
     expect(overIskBudget(1000, 900, null, 150)).toBe(true);
   });
 });
+
+describe('findImprovements concurrency', () => {
+  const table = { 2: { dps: 10 }, 3: { dps: 30 }, 4: { dps: 20 }, 5: { dps: 5 }, 6: { dps: 15 } };
+  const candidates = [2, 3, 4, 5, 6].map((to) => candidate(1, to));
+
+  /** Answers later swaps first: the calculation of the swap to type 2 finishes last. */
+  const outOfOrder = (inFlight: { now: number; max: number }) => async (f: Fitting) => {
+    const typeId = f.modules[0].typeId;
+    inFlight.now++;
+    inFlight.max = Math.max(inFlight.max, inFlight.now);
+    await new Promise((resolve) => setTimeout(resolve, (7 - typeId) * 3));
+    inFlight.now--;
+    return calc(table)(f);
+  };
+
+  const run = async (
+    stat: (f: Fitting) => Promise<FittingStats>,
+    extra: { concurrency?: number; isCancelled?: () => boolean; onProgress?: () => void } = {}
+  ) => {
+    const base = fit([1]);
+    return findImprovements({
+      fitting: base,
+      before: await calc(table)(base),
+      goal: 'damage',
+      candidates,
+      stats: stat,
+      priceOf: () => null,
+      ...extra,
+    });
+  };
+
+  it('returns the serial result when calculations finish out of order', async () => {
+    const serial = await run(calc(table));
+    const inFlight = { now: 0, max: 0 };
+    const parallel = await run(outOfOrder(inFlight), { concurrency: 4 });
+    expect(inFlight.max).toBe(4);
+    expect(parallel).toEqual(serial);
+  });
+
+  it('never has more calculations running than the concurrency', async () => {
+    const inFlight = { now: 0, max: 0 };
+    await run(outOfOrder(inFlight), { concurrency: 2 });
+    expect(inFlight.max).toBe(2);
+  });
+
+  it('reports progress in order and returns null when cancelled', async () => {
+    let cancelled = false;
+    const progress: number[] = [];
+    const result = await run(outOfOrder({ now: 0, max: 0 }), {
+      concurrency: 4,
+      isCancelled: () => cancelled,
+      onProgress: () => {
+        progress.push(progress.length + 1);
+        cancelled = true;
+      },
+    });
+    expect(result).toBeNull();
+    expect(progress).toEqual([1]);
+  });
+
+  it('leaves out a failed calculation without a loose rejection', async () => {
+    const result = await run(
+      async (f) => {
+        if (f.modules[0].typeId === 3) throw new Error('boom');
+        return calc(table)(f);
+      },
+      { concurrency: 4 }
+    );
+    expect(result?.checked).toBe(5);
+    expect(toIds(result?.noDownside ?? [])).not.toContain(3);
+  });
+});

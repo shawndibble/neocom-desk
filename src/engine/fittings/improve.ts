@@ -1074,6 +1074,12 @@ export interface FindImprovementsParams {
   isCancelled?: () => boolean;
   /** "Show best so far": stop and rank what is done. */
   shouldStop?: () => boolean;
+  /**
+   * How many single swaps `stats` may work on at once (default 1). Their
+   * results are still scored in candidate order, so the result is the one a
+   * serial run gives, however the calculations finish.
+   */
+  concurrency?: number;
 }
 
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
@@ -1161,6 +1167,7 @@ export async function findImprovements({
   onProgress,
   isCancelled,
   shouldStop,
+  concurrency = 1,
 }: FindImprovementsParams): Promise<ImproveResult | null> {
   const kept: ImproveOption[] = [];
   const rejected: RejectedOption[] = [];
@@ -1221,26 +1228,39 @@ export async function findImprovements({
     return true;
   }
 
-  for (const candidate of candidates) {
+  // Not `runPool`: results are scored in candidate order, so calculations run ahead of the one being scored, `concurrency` at once; a failure is kept as null, never a loose rejection.
+  const started = new Map<number, { swapped: Fitting; after: Promise<FittingStats | null> }>();
+  const window = Math.max(1, concurrency);
+  let nextToStart = 0;
+  const startUpTo = (last: number) => {
+    for (; nextToStart <= last && nextToStart < candidates.length; nextToStart++) {
+      const swapped = applyImproveCandidate(fitting, candidates[nextToStart]);
+      started.set(nextToStart, {
+        swapped,
+        after: Promise.resolve()
+          .then(() => stats(swapped))
+          .catch(() => null),
+      });
+    }
+  };
+  for (const [index, candidate] of candidates.entries()) {
     if (isCancelled?.()) return null;
     if (shouldStop?.()) {
       stopped = true;
       break;
     }
-    const swapped = applyImproveCandidate(fitting, candidate);
-    let after: FittingStats | null = null;
-    try {
-      after = await stats(swapped);
-    } catch {
-      // Left out: one variation's calculation failing must not end the search.
-      failed++;
-    }
+    startUpTo(index + window - 1);
+    const { swapped, after } = started.get(index)!;
+    started.delete(index);
+    const result = await after;
+    // Left out: one variation's calculation failing must not end the search.
+    if (result === null) failed++;
     if (isCancelled?.()) return null;
     checked++;
     onProgress?.(checked, candidates.length);
-    if (after === null) continue;
-    if (candidate.fromTypeId !== null) swaps.push({ candidate, after });
-    await take(candidate, swapped, after);
+    if (result === null) continue;
+    if (candidate.fromTypeId !== null) swaps.push({ candidate, after: result });
+    await take(candidate, swapped, result);
   }
   // Every calculation failed: the engine is broken, not the fit beyond improving.
   if (checked > 0 && failed === checked) throw new Error('Every Improve calculation failed');
