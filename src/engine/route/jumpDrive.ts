@@ -45,11 +45,6 @@ export interface JumpSystem extends SystemPosition {
   regionId: number;
 }
 
-export interface JumpTarget {
-  id: number;
-  distanceLy: number;
-}
-
 export const FATIGUE_CAP_MINUTES = 5 * 60;
 export const COOLDOWN_CAP_MINUTES = 30;
 

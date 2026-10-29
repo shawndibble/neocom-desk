@@ -28,6 +28,7 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 | A test file that mocks HTTP with MSW                        | `mswServer(...handlers)` — `src/test/msw.ts` (listens, resets after each test, closes; unmocked requests fail)          | a hand-built `setupServer` + `beforeAll`/`afterEach`/`afterAll`              |
 | A component test that needs a Router but no `<Routes>`      | `renderInRouter(ui)` — `src/test/render.tsx` (a `MemoryRouter` wrapper, so `rerender` keeps it)                         | a per-file `const render = (ui) => rtlRender(ui, { wrapper: MemoryRouter })` |
 | An e2e spec's phone / desktop viewport                      | `PHONE`, `DESKTOP` — `e2e/support/testBase.ts`                                                                          | a per-spec `const PHONE`/`const DESKTOP`                                     |
+| Why a Fitting Share Code failed to decode                   | `ShareDecodeError` — `src/engine/fittings/fittingShare.ts`                                                              | a per-hook `type ShareDecodeError`                                           |
 
 ## Cloud Functions (`functions/src`)
 
