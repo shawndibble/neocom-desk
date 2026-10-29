@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applyImproveCandidate, type CandidateOptions, type ImproveCandidate } from './improve';
-import { findMakeover, makeoverMoves } from './improveMakeover';
+import { applyImproveCandidate, type ImproveCandidate } from './improve';
+import {
+  findMakeover,
+  makeoverMoves,
+  rowsBetween,
+  type MakeoverMoveOptions,
+} from './improveMakeover';
 import { buildVariationIndex } from '../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from './types';
 import { baseFittingStats } from './__fixtures__/fittingStats';
@@ -26,7 +31,7 @@ const TYPES: Record<number, Type> = {
   12: { group: 1156, rack: 'low', meta: 2, ehp: 90, cpu: 5 },
   13: { group: 99999, rack: 'low', meta: 1, ehp: 0, cpu: 0 },
   15: { group: 770, rack: 'low', meta: 2, ehp: 60, cpu: 40 },
-  16: { group: 1156, rack: 'low', meta: 1, ehp: 500, cpu: 5, capUnstable: true },
+  16: { group: 1156, rack: 'low', meta: 2, ehp: 500, cpu: 5, capUnstable: true },
   20: { group: 46, rack: 'medium', meta: 2, ehp: 0, cpu: 5 },
   30: { group: 774, rack: 'rig', meta: 2, ehp: 70 },
   31: { group: 774, rack: 'rig', meta: 1, ehp: 10 },
@@ -39,11 +44,10 @@ function catalogue(types: Record<number, Type>) {
     { 1: 'Tech I', 2: 'Tech II', 5: 'Officer' }
   );
   const rackOf = Object.fromEntries(ids.map((id) => [String(id), types[id].rack]));
-  const options = (extra: Partial<CandidateOptions> = {}): Partial<CandidateOptions> => ({
+  const options = (extra: Partial<MakeoverMoveOptions> = {}): MakeoverMoveOptions => ({
     goal: 'tank',
     defense: 'keep',
     includeRigs: false,
-    includeOfficer: false,
     slotCounts: { high: 0, medium: 2, low: 2, rig: 0, subsystem: 0 },
     pool: {
       groupOf: (id) => types[id]?.group,
@@ -53,7 +57,7 @@ function catalogue(types: Record<number, Type>) {
     ...extra,
   });
   const moves =
-    (extra: Partial<CandidateOptions> = {}) =>
+    (extra: Partial<MakeoverMoveOptions> = {}) =>
     (f: Fitting) =>
       makeoverMoves(f.modules, index, rackOf, options(extra));
   return { index, rackOf, options, moves };
@@ -94,7 +98,7 @@ async function search(
   fitting: Fitting,
   extra: Partial<Parameters<typeof findMakeover>[0]> = {},
   types: Record<number, Type> = TYPES,
-  moveOptions: Partial<CandidateOptions> = {}
+  moveOptions: Partial<MakeoverMoveOptions> = {}
 ) {
   let calls = 0;
   const result = await findMakeover({
@@ -174,6 +178,12 @@ describe('makeoverMoves', () => {
     expect(list).toContain('->4@m0');
   });
 
+  it('with a chosen side on a tank goal, a non-tank module never turns into a tank module', () => {
+    const f = fit([['low', 0, 13]]);
+    expect(moves()(f).map(label)).toContain('13>10@l0');
+    expect(moves({ defense: 'shield' })(f).some((c) => c.fromTypeId === 13)).toBe(false);
+  });
+
   it('leaves rigs out unless they are included', () => {
     const f = fit([['rig', 0, 31]]);
     expect(moves()(f).some((c) => c.at[0].slot === 'rig')).toBe(false);
@@ -243,40 +253,48 @@ describe('findMakeover', () => {
   });
 
   it('never applies a step that breaks a Guardrail', async () => {
-    const { result } = await search(
-      fit([
-        ['low', 0, 11],
-        ['low', 1, 11],
-      ])
-    );
+    const f = fit([
+      ['low', 0, 11],
+      ['low', 1, 11],
+    ]);
+    // The cap-unstable module is offered and is the biggest single gain.
+    expect(catalogue(TYPES).moves()(f).map(label)).toContain('11>16@l0');
+    const { result } = await search(f);
     expect(result?.makeover?.fitting.modules.some((m) => m.typeId === 16)).toBe(false);
     expect(result?.makeover?.after.capacitor.stable).toBe(true);
   });
 
-  it('stops at the calculation cap and keeps the best fit so far', async () => {
-    const f = fit([
-      ['medium', 0, 1],
-      ['medium', 1, 5],
-      ['low', 0, 11],
-      ['low', 1, 11],
-    ]);
-    const { result, calls } = await search(f, { maxCalcs: 12 });
+  const FOUR = fit([
+    ['medium', 0, 1],
+    ['medium', 1, 5],
+    ['low', 0, 11],
+    ['low', 1, 11],
+  ]);
+
+  it('stops at the calculation cap, the confirming recalculation included', async () => {
+    const { result, calls } = await search(FOUR, { maxCalcs: 12 });
     expect(result?.stopped).toBe(true);
-    expect(calls).toBeLessThanOrEqual(13);
+    expect(calls).toBeLessThanOrEqual(12);
   });
 
-  it('Show best so far ends the search', async () => {
-    let asked = 0;
-    const { result } = await search(
-      fit([
-        ['low', 0, 11],
-        ['low', 1, 11],
-      ]),
-      {
-        shouldStop: () => ++asked > 1,
-      }
-    );
+  it('Show best so far keeps the best fit so far, the interrupted round included', async () => {
+    const firstRound = catalogue(TYPES).moves()(FOUR).length;
+    let calls = 0;
+    const result = await findMakeover({
+      fitting: FOUR,
+      before: statsOf(FOUR),
+      goal: 'tank',
+      moves: catalogue(TYPES).moves(),
+      stats: async (g) => {
+        calls++;
+        return statsOf(g);
+      },
+      priceOf: () => 1,
+      // Round 1, then three moves of round 2 (the first, cap-unstable, is rejected).
+      shouldStop: () => calls >= firstRound + 3,
+    });
     expect(result?.stopped).toBe(true);
+    expect(result?.makeover?.rows).toHaveLength(2);
   });
 
   it('Cancel returns null', async () => {
@@ -284,11 +302,56 @@ describe('findMakeover', () => {
     expect(result).toBeNull();
   });
 
-  it('shows no makeover when it does not beat the best single move', async () => {
+  it('shows no makeover of fewer than two changes', async () => {
     const { result } = await search(fit([['low', 0, 11]]), {}, TYPES, {
       slotCounts: { high: 0, medium: 0, low: 1, rig: 0, subsystem: 0 },
     });
     expect(result).not.toBeNull();
     expect(result?.makeover).toBeNull();
+  });
+
+  it('shows no makeover when it beats the best single change by too little', async () => {
+    // A Damage Control gains 1000 EHP; the second change adds only 10 more.
+    const types: Record<number, Type> = {
+      13: { group: 99999, rack: 'low', meta: 1, ehp: 0 },
+      14: { group: 99998, rack: 'low', meta: 1, ehp: 0 },
+      10: { group: 60, rack: 'low', meta: 2, ehp: 1000 },
+      12: { group: 1156, rack: 'low', meta: 2, ehp: 10 },
+    };
+    const f = fit([
+      ['low', 0, 13],
+      ['low', 1, 14],
+    ]);
+    const { result } = await search(f, {}, types);
+    expect(result?.makeover).toBeNull();
+    const counted = await search(f, { bestSingle: 0 }, types);
+    expect(counted.result?.makeover?.rows).toHaveLength(2);
+  });
+
+  it('must beat the single swap score Improve already found', async () => {
+    const { result } = await search(
+      fit([
+        ['low', 0, 11],
+        ['low', 1, 11],
+      ]),
+      { bestSingle: 100 }
+    );
+    expect(result?.makeover).toBeNull();
+  });
+});
+
+describe('rowsBetween', () => {
+  it('shows a slot changed twice once, first module to last', () => {
+    const f = fit([
+      ['low', 0, 11],
+      ['low', 1, 11],
+    ]);
+    const low0 = (from: number, to: number) => ({
+      fromTypeId: from,
+      toTypeId: to,
+      at: [{ slot: 'low' as const, slotIndex: 0 }],
+    });
+    const twice = applyImproveCandidate(applyImproveCandidate(f, low0(11, 10)), low0(10, 12));
+    expect(rowsBetween(f, twice).map(label)).toEqual(['11>12@l0']);
   });
 });

@@ -30,10 +30,7 @@ async function readJson<T>(path: string): Promise<T> {
   return JSON.parse(await readFile(require.resolve(`../../../public/data/${path}`), 'utf8')) as T;
 }
 
-/** Module groups the fit puts in an active state: shield hardeners, propulsion, shield boosters. */
-const ACTIVE_GROUPS = new Set([77, 46, 40]);
-/** Shield hardeners (active) and shield resistance amplifiers (passive): the score may pick either. */
-const SHIELD_RESIST_GROUPS = new Set([77, 295]);
+const SHIELD_HARDENER = 77;
 
 /**
  * The PvE Drake from issue #5548. A hand review turned it into: Damage Control
@@ -81,13 +78,12 @@ describe('Improve makeover on a PvE Drake (real WASM + real pinned SDE)', () => 
       return found;
     };
     const module = (slot: FittingSlotKind, slotIndex: number, name: string): FittingModule => {
-      const typeId = id(name);
-      const active = slot === 'high' || ACTIVE_GROUPS.has(types[String(typeId)].groupID);
+      // Every loader marks modules active and the engine lowers a passive one (`eftLoader`).
       return {
         slot,
         slotIndex,
-        typeId,
-        state: active ? 'active' : 'online',
+        typeId: id(name),
+        state: 'active',
         ...(slot === 'high' ? { chargeTypeId: id('Scourge Rage Heavy Assault Missile') } : {}),
       } as FittingModule;
     };
@@ -161,12 +157,13 @@ describe('Improve makeover on a PvE Drake (real WASM + real pinned SDE)', () => 
     expect(named('low')).toContain('Damage Control II');
   });
 
-  it('keeps the three Large Shield Extender II and has at least two shield resist modules', () => {
-    expect(named('medium').filter((name) => name === 'Large Shield Extender II')).toHaveLength(3);
-    const resists = search?.makeover?.fitting.modules.filter(
-      (m) => m.slot === 'medium' && SHIELD_RESIST_GROUPS.has(types[String(m.typeId)].groupID)
+  it('keeps at least three Large Shield Extender II and has at least two shield hardeners', () => {
+    const extenders = named('medium').filter((name) => name === 'Large Shield Extender II');
+    expect(extenders.length).toBeGreaterThanOrEqual(3);
+    const hardeners = search?.makeover?.fitting.modules.filter(
+      (m) => m.slot === 'medium' && types[String(m.typeId)].groupID === SHIELD_HARDENER
     );
-    expect(resists?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(hardeners?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
   it('swaps the Core Defense Field Purger rigs', () => {

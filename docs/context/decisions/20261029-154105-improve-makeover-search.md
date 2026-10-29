@@ -1,0 +1,13 @@
+# Scope decisions — Improve makeover search (issue #5560)
+
+_Recorded 2026-10-29 · issue #5560 · parent #5548._
+
+- **A Makeover is a lazy greedy search over one-slot moves, not a beam search.** A probe on the #5548 PvE Drake with the real engine showed every hand-review change gains on its own, so applying the best move and searching again reaches a good fit; what was missing was candidates (#5554) and an honest score (#5555), not search breadth. Each later round recalculates moves in order of their last gain and stops once the best fresh gain beats the rest by 0.01; a module a step places starts from an estimate (F → Y's gain less F → X's) instead of unknown. On the Drake this is 230 calculations against about 1,300 for full rounds.
+- **Every step is scored against the original fit.** Scoring each round against the previous fit lets relative gains compound and the objective drift; a fixed baseline keeps the total equal to what one whole-fit recalculation of the rows says.
+- **One copy at a time, merged afterwards.** A move changes one slot; identical copies are tried once. That makes splits (two Shield Power Relays into a Damage Control and a Ballistic Control) free, and identical moves merge into one row at the end.
+- **Shape, not price tier: Tech II, else Tech I, per group.** Without prices a whole-fit search chases faction and deadspace modules (the probe picked Domination and Thukker modules). Officer, deadspace and faction steps stay in Improve's Upgrade rows; Reach does not apply to a Makeover.
+- **A pair is tried only when the rounds stall.** The top 8 moves that gained but overran CPU, powergrid or calibration are paired with moves that freed enough when last calculated, and the best 10 pairs are calculated whole. This covers a removal that only pays off once its slot or fitting room is reused.
+- **Guardrails apply to every step and to the final fit**, against the original: budget, capacitor stability, no new rule breaks, the spend cap.
+- **300 calculations, one of them kept to confirm the result.** About 9–16 s in today's browser worker (#5561 works on that). "Show best so far" and the cap keep the interrupted round's best passing move.
+- **Shown only when it beats the best single change by 5%,** and only with two or more rows. The caller passes Improve's own best single-swap score; absent, the search's first-round best stands in.
+- **Not carried over from the single-swap search:** replacing modules the pilot cannot fly (Make Flyable rows do it) and the Explore resource-rig rule. Best overall on the Drake gives up 14% of damage for 2.8× EHP; how much a job may give up is #5548's job limits, not this search's.

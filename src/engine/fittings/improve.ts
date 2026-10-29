@@ -515,10 +515,22 @@ export const MAX_CANDIDATES = 400;
 /** Candidate tiers: Upgrade, Rebalance, Rework, then the empty-slot fills. */
 const FILL_TIER = 3;
 
-const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
+/** The racks an empty slot is filled in. */
+export const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
+
+/** The tank sides a search uses: the chosen one, else the fit's own, else both. */
+export function defenseSides(
+  modules: readonly FittingModule[],
+  groupOf: (typeId: number) => number | undefined,
+  defense: DefenseChoice
+): DefenseSide[] {
+  if (defense !== 'keep') return [defense];
+  const side = fittedSide(modules, groupOf);
+  return side ? [side] : ['shield', 'armor'];
+}
 
 /** The side of the tank the fit already has; null when it has none (or an even split). */
-export function fittedSide(
+function fittedSide(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined
 ): DefenseSide | null {
@@ -786,9 +798,7 @@ export function improveCandidates(
 ): ImproveCandidate[] {
   const o: CandidateOptions = { ...DEFAULT_OPTIONS, ...options };
   const groupOf = o.pool?.groupOf ?? (() => undefined);
-  const side = fittedSide(modules, groupOf);
-  const sides: DefenseSide[] =
-    o.defense === 'keep' ? (side ? [side] : ['shield', 'armor']) : [o.defense];
+  const sides = defenseSides(modules, groupOf, o.defense);
   // A chosen side frees the other side's tank modules; nothing else swaps into tank modules.
   const freesTank = o.defense !== 'keep' && TANK_GOALS.has(o.goal);
   const scored: readonly Job[] = scoredJobs(o.goal);

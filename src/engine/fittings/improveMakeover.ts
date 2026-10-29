@@ -1,10 +1,11 @@
 /**
- * Improve's makeover: a whole-fit rework found by chaining swaps (issue #5560,
- * parent #5548). `findImprovements` scores one module type at a time against
- * the unchanged fit; this search applies the best one-slot move, looks again
- * from the result, and repeats, so linked changes, a split of two copies into
- * two different modules, and a pair where one half only pays off because the
- * other frees CPU or powergrid all show up. Every figure is still a whole-fit
+ * Improve's **Makeover**: a whole-fit rework found by chaining swaps (issue
+ * #5560, parent #5548, scope decision `20261029-154105-improve-makeover-search`).
+ * `findImprovements` scores one module type at a time against the unchanged
+ * fit; this search applies the best one-slot move, looks again from the
+ * result, and repeats, so linked changes, a split of two copies into two
+ * different modules, and a pair where one half only pays off because the other
+ * frees CPU or powergrid all show up. Every figure is still a whole-fit
  * recalculation through the injected `stats`, and every step is scored against
  * the original fit, so the objective never drifts round to round.
  *
@@ -15,59 +16,75 @@ import {
   applyImproveCandidate,
   brokenGuardrail,
   DEFAULT_IMPROVE_HOLD,
+  defenseSides,
   EPSILON,
-  fittedSide,
+  FILL_RACKS,
   iskDeltaOf,
   lostStats,
   overIskBudget,
   scoreOf,
-  type CandidateOptions,
+  type DefenseChoice,
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveHold,
   type LostStat,
+  type ModulePool,
 } from './improve';
-import { jobOf, reworkGroups, scoredJobs, UNIQUE_GROUPS, type DefenseSide } from './improveGroups';
+import {
+  jobOf,
+  scoredJobs,
+  reworkGroups,
+  TANK_GOALS,
+  TANK_GROUPS,
+  UNIQUE_GROUPS,
+} from './improveGroups';
 import { overageOf, RESOURCES, usedOf, type Resource } from './makeItFit';
 import { newRuleBreaks } from './ruleBreaks';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
 import type { Fitting, FittingModule, FittingSlotKind, FittingStats } from './types';
 
-/** Racks an empty slot is filled in: the same ones as Improve's fills. */
-const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
 const TECH_I = 1;
 const TECH_II = 2;
 
+export interface MakeoverMoveOptions {
+  goal: ImproveGoal;
+  defense: DefenseChoice;
+  includeRigs: boolean;
+  /** Market-listed, hull and skill checks, and the groups' members. */
+  pool: ModulePool;
+  /** The hull's slots per rack, to find the empty ones; absent: no fills. */
+  slotCounts?: Readonly<Record<FittingSlotKind, number>>;
+}
+
 /**
- * The one-slot moves the makeover tries on `modules`. One copy stands for
+ * The one-slot moves the Makeover tries on `modules`. One copy stands for
  * identical copies (the first in the rack), so a split costs no more than a
  * whole-type swap. Targets are the module's own group and the goal's Rework
  * groups (`reworkGroups`), one tier per group: Tech II, else Tech I. Faction,
- * deadspace and officer steps stay in Improve's Upgrade rows, so the makeover
- * changes the fit's shape and not its price tier. The first empty slot of each
- * rack takes the same groups. The filters match `improveCandidates`: rack,
- * market-listed, `flyable`, a second unique module, the last module doing a
- * job the goal does not score, rigs only when included.
+ * deadspace and officer steps stay in Improve's Upgrade rows, so the Makeover
+ * changes the fit's shape and not its price tier; Reach does not apply (it is
+ * always Rework-wide). The first empty slot of each rack takes the same groups.
+ *
+ * Filters shared with `improveCandidates`: rack, market-listed, `flyable`, a
+ * second unique module, the last module doing a job the goal does not score,
+ * rigs only when included, and with a chosen Defense side on a tank goal no
+ * non-tank module turns into a tank module. Not carried over: replacing a
+ * module the pilot cannot fly (Improve's own Make Flyable rows do that) and
+ * the Explore resource-rig rule.
  */
 export function makeoverMoves(
   modules: readonly FittingModule[],
   index: VariationIndex,
   rackOf: Readonly<Record<string, string>>,
-  options: Partial<CandidateOptions>
+  { goal, defense, includeRigs, pool, slotCounts }: MakeoverMoveOptions
 ): ImproveCandidate[] {
-  const goal = options.goal ?? 'overall';
-  const defense = options.defense ?? 'keep';
-  const pool = options.pool;
-  if (!pool) return [];
   const groupOf = pool.groupOf;
-  const side = fittedSide(modules, groupOf);
-  const sides: DefenseSide[] =
-    defense === 'keep' ? (side ? [side] : ['shield', 'armor']) : [defense];
-  const goalGroups = reworkGroups(goal, sides);
+  const goalGroups = reworkGroups(goal, defenseSides(modules, groupOf, defense));
   const scored = scoredJobs(goal);
+  const freesTank = defense !== 'keep' && TANK_GOALS.has(goal);
   const usesRack = (slot: FittingSlotKind) =>
-    slot !== 'subsystem' && (slot !== 'rig' || options.includeRigs === true);
+    slot !== 'subsystem' && (slot !== 'rig' || includeRigs);
 
   const groupsFitted = new Map<number, number>();
   const jobsFitted = new Map<string, number>();
@@ -79,6 +96,7 @@ export function makeoverMoves(
     if (job) jobsFitted.set(job, (jobsFitted.get(job) ?? 0) + 1);
   }
 
+  // A type outside the variation index has no variations: it is its group's Tech I.
   const metaOf = (typeId: number) => index.types[typeId]?.metaGroupId ?? TECH_I;
   const tiers = new Map<string, readonly number[]>();
   /** The group's Tech II members for the rack the hull takes and the pilot flies, else its Tech I. */
@@ -101,10 +119,10 @@ export function makeoverMoves(
     return found;
   };
 
-  /** Whether `typeId` may go in a slot whose module (of `fromGroup`, or none) leaves. */
-  const allowed = (typeId: number, fromGroup: number | undefined) => {
-    const group = groupOf(typeId);
-    if (group === undefined || !UNIQUE_GROUPS.has(group)) return true;
+  /** Whether `group` may take a slot whose module (of `fromGroup`, or none) leaves. */
+  const allowed = (group: number, fromGroup: number | undefined) => {
+    if (freesTank && TANK_GROUPS.has(group) && !TANK_GROUPS.has(fromGroup ?? -1)) return false;
+    if (!UNIQUE_GROUPS.has(group)) return true;
     return (groupsFitted.get(group) ?? 0) - (fromGroup === group ? 1 : 0) < 1;
   };
 
@@ -119,43 +137,45 @@ export function makeoverMoves(
     const lastOfJob = job !== null && !scored.includes(job) && (jobsFitted.get(job) ?? 0) <= 1;
     const offered = new Set<number>([fromTypeId]);
     for (const group of new Set([...(from === undefined ? [] : [from]), ...goalGroups])) {
-      if (lastOfJob && jobOf(group) !== job) continue;
+      if ((lastOfJob && jobOf(group) !== job) || !allowed(group, from)) continue;
       for (const toTypeId of representatives(group, slot)) {
-        if (offered.has(toTypeId) || !allowed(toTypeId, from)) continue;
+        if (offered.has(toTypeId)) continue;
         offered.add(toTypeId);
         moves.push({ fromTypeId, toTypeId, at: [{ slot, slotIndex }] });
       }
     }
   }
 
-  if (options.slotCounts) {
+  if (slotCounts) {
     for (const slot of FILL_RACKS) {
       if (!usesRack(slot)) continue;
       const taken = new Set(modules.filter((m) => m.slot === slot).map((m) => m.slotIndex));
       let free = 0;
-      while (free < options.slotCounts[slot] && taken.has(free)) free++;
-      if (free >= options.slotCounts[slot]) continue;
+      while (free < slotCounts[slot] && taken.has(free)) free++;
+      if (free >= slotCounts[slot]) continue;
       const offered = new Set<number>();
-      for (const group of goalGroups)
+      for (const group of goalGroups) {
+        if (!allowed(group, undefined)) continue;
         for (const toTypeId of representatives(group, slot)) {
-          if (offered.has(toTypeId) || !allowed(toTypeId, undefined)) continue;
+          if (offered.has(toTypeId)) continue;
           offered.add(toTypeId);
           moves.push({ fromTypeId: null, toTypeId, at: [{ slot, slotIndex: free }] });
         }
+      }
     }
   }
   return moves;
 }
 
-/** The most whole-fit calculations one makeover search makes: about 9–16 s in the browser worker. */
+/** The most whole-fit calculations one Makeover search makes (the last confirms the result): about 9–16 s in the browser worker. */
 export const MAKEOVER_CALCS = 300;
 /** A lazy round stops once its best fresh gain beats every remaining move's last gain by this much. */
 const LAZY_MARGIN = 0.01;
 /** Moves that gained but overran the fit's budget, tried with a move that frees what they need. */
-const KICK_SEEDS = 8;
-/** Pairs calculated whole per kick, best estimate first. */
-const KICK_PAIRS = 10;
-/** A makeover is shown only when it beats the best single move by this share of that move's gain. */
+const PAIR_SEEDS = 8;
+/** Pairs calculated whole when the rounds stall, best estimate first. */
+const PAIRS_TRIED = 10;
+/** A Makeover is shown only when it beats the best single change by this share of that change's gain. */
 const BEATS_SINGLE = 0.05;
 
 export interface FindMakeoverParams {
@@ -172,6 +192,11 @@ export interface FindMakeoverParams {
   /** The total fit price may not pass it. Null: no limit. */
   iskBudget?: number | null;
   fitTotal?: number | null;
+  /**
+   * The best score Improve's own single swaps reached (`bestScore`), which the
+   * Makeover must beat; absent: the best one-slot move of the first round.
+   */
+  bestSingle?: number | null;
   /** Calculations allowed before the search stops with the best fit so far. */
   maxCalcs?: number;
   /** False: every round recalculates every move (the plain search, for comparison). */
@@ -184,7 +209,7 @@ export interface FindMakeoverParams {
 }
 
 export interface Makeover {
-  /** The changes from the open fit to the makeover, identical ones merged into one row. */
+  /** The changes from the open fit to the Makeover, identical ones merged into one row. */
   rows: ImproveCandidate[];
   fitting: Fitting;
   after: FittingStats;
@@ -195,7 +220,7 @@ export interface Makeover {
 }
 
 export interface MakeoverSearch {
-  /** Null when no makeover of two or more changes beats the best single move. */
+  /** Null when no Makeover of two or more changes beats the best single change. */
   makeover: Makeover | null;
   calcs: number;
   /** "Show best so far" or the calculation cap ended it early. */
@@ -203,29 +228,44 @@ export interface MakeoverSearch {
 }
 
 /** One calculated move from the current fit. */
-interface Tried {
+interface Trial {
   move: ImproveCandidate;
   fitting: Fitting;
   after: FittingStats;
   /** The goal's score of the moved fit against the original, before any Guardrail; null when unscored. */
   score: number | null;
+  /** Passes every Guardrail. */
   ok: boolean;
 }
 
-const moveKey = (move: ImproveCandidate) =>
-  `${move.fromTypeId ?? '-'}>${move.toTypeId}>${move.at[0]?.slot}`;
+/** What one move did when last calculated (or was estimated to do), for the lazy order and the pairs. */
+interface MoveRecord {
+  fromTypeId: number | null;
+  toTypeId: number;
+  rack: FittingSlotKind;
+  /** Gain over the fit it was measured on; -Infinity for a failed or unscored calculation. */
+  gain: number;
+  /** CPU, powergrid and calibration it freed; absent for an estimate. */
+  freed?: Readonly<Record<Resource, number>>;
+}
+
+/** Moves of one type into another in one rack are the same move, whichever copy stands for them. */
+const moveKey = (fromTypeId: number | null, toTypeId: number, rack: FittingSlotKind) =>
+  `${fromTypeId ?? '-'}>${toTypeId}>${rack}`;
+const keyOf = (move: ImproveCandidate) => moveKey(move.fromTypeId, move.toTypeId, move.at[0].slot);
 const sameSlot = (a: ImproveCandidate, b: ImproveCandidate) =>
   a.at.some((x) => b.at.some((y) => x.slot === y.slot && x.slotIndex === y.slotIndex));
 const addIsk = (a: number | null, b: number | null) => (a === null || b === null ? null : a + b);
 
-class Stop {
+/** Ends the search: Cancel (nothing comes back), or "Show best so far" and the cap. */
+class SearchHalt {
   constructor(readonly cancelled: boolean) {}
 }
 
 /**
- * Lazy greedy over one-slot moves, then a pair kick when it stalls. Null when
- * cancelled. See the module comment for the shape; the figures of the
- * result are one recalculation of its rows on the open fit.
+ * Lazy greedy over one-slot moves, then a pair when it stalls. Null when
+ * cancelled. The figures of the result are one recalculation of its rows on
+ * the open fit.
  */
 export async function findMakeover({
   fitting: original,
@@ -238,6 +278,7 @@ export async function findMakeover({
   hold = DEFAULT_IMPROVE_HOLD,
   iskBudget = null,
   fitTotal = null,
+  bestSingle: givenSingle,
   maxCalcs = MAKEOVER_CALCS,
   lazy = true,
   pairKick = true,
@@ -255,10 +296,10 @@ export async function findMakeover({
     brokenGuardrail(goal, before, after, target) === null &&
     !overIskBudget(iskBudget, fitTotal, isk);
 
-  /** One whole-fit calculation, or null when it failed. */
+  /** One whole-fit calculation, or null when it failed. The last of the cap is kept for the result. */
   async function calc(fitting: Fitting): Promise<FittingStats | null> {
-    if (isCancelled?.()) throw new Stop(true);
-    if (shouldStop?.() || calcs >= maxCalcs) throw new Stop(false);
+    if (isCancelled?.()) throw new SearchHalt(true);
+    if (shouldStop?.() || calcs >= maxCalcs - 1) throw new SearchHalt(false);
     calcs++;
     let after: FittingStats | null = null;
     try {
@@ -266,7 +307,7 @@ export async function findMakeover({
     } catch {
       // Left out: one move's calculation failing must not end the search.
     }
-    if (isCancelled?.()) throw new Stop(true);
+    if (isCancelled?.()) throw new SearchHalt(true);
     onProgress?.(calcs, maxCalcs);
     return after;
   }
@@ -276,25 +317,31 @@ export async function findMakeover({
   let isk: number | null = 0;
   let score = 0;
   let steps = 0;
-  let bestSingle: number | null = null;
-  /** Each move's last raw gain, for the lazy order. */
-  const lastGain = new Map<string, number>();
-  /** Each move's last freed CPU, powergrid and calibration, for the pair estimate. */
-  const freedBy = new Map<string, Partial<Record<Resource, number>>>();
+  let firstRoundBest: number | null = null;
+  /** A round's best passing move so far, taken if "Show best so far" or the cap ends the round. */
+  let pending: Trial | null = null;
+  const records = new Map<string, MoveRecord>();
 
-  async function tryMove(move: ImproveCandidate): Promise<Tried | null> {
+  async function tryMove(move: ImproveCandidate): Promise<Trial | null> {
     const moved = applyImproveCandidate(fitting, move);
     const after = await calc(moved);
-    if (!after) return null;
     const moveIsk = addIsk(isk, iskDeltaOf(move, priceOf));
-    const moveScore = scoreAt(after, moveIsk);
-    if (!move.pairedWith) {
-      lastGain.set(moveKey(move), moveScore === null ? -Infinity : moveScore - score);
-      freedBy.set(
-        moveKey(move),
-        Object.fromEntries(RESOURCES.map((r) => [r, usedOf(current, r) - usedOf(after, r)]))
-      );
-    }
+    const moveScore = after ? scoreAt(after, moveIsk) : null;
+    if (!move.pairedWith)
+      records.set(keyOf(move), {
+        fromTypeId: move.fromTypeId,
+        toTypeId: move.toTypeId,
+        rack: move.at[0].slot,
+        gain: moveScore === null ? -Infinity : moveScore - score,
+        ...(after
+          ? {
+              freed: Object.fromEntries(
+                RESOURCES.map((r) => [r, usedOf(current, r) - usedOf(after, r)])
+              ) as Record<Resource, number>,
+            }
+          : {}),
+      });
+    if (!after) return null;
     return {
       move,
       fitting: moved,
@@ -304,113 +351,120 @@ export async function findMakeover({
     };
   }
 
+  const gainOf = (trial: Trial | null) => (trial?.score ?? -Infinity) - score;
+
   /** A round: the best passing move from the current fit, and the fresh moves that overran the budget. */
   async function round(first: boolean) {
     const list = [...moves(fitting)];
-    const bound = (move: ImproveCandidate) => lastGain.get(moveKey(move)) ?? Infinity;
+    const bound = (move: ImproveCandidate) => records.get(keyOf(move))?.gain ?? Infinity;
     if (lazy) list.sort((a, b) => bound(b) - bound(a));
-    let best: Tried | null = null;
-    const overran: Tried[] = [];
+    pending = null;
+    const overran: Trial[] = [];
     for (const move of list) {
       const gainBound = bound(move);
+      // Sorted by last gain: once the best fresh gain beats this move's last one, it beats the rest too.
       if (
         lazy &&
         !first &&
-        best !== null &&
-        best.score !== null &&
-        Number.isFinite(gainBound) &&
-        best.score - score >= gainBound + LAZY_MARGIN
+        pending &&
+        gainBound !== Infinity &&
+        gainOf(pending) >= gainBound + LAZY_MARGIN
       )
         break;
-      const tried = await tryMove(move);
-      if (!tried || tried.score === null) continue;
-      if (tried.ok) {
-        if (!best || tried.score > (best.score ?? -Infinity)) best = tried;
+      const trial = await tryMove(move);
+      if (!trial || trial.score === null) continue;
+      if (trial.ok) {
+        if (gainOf(trial) > gainOf(pending)) pending = trial;
       } else if (
         // A fit over its budget already is Make it fit's, not a pair's to fix.
-        tried.score - score > minGain &&
+        gainOf(trial) > minGain &&
         fitsResourceBudget(current) &&
-        RESOURCES.some((r) => overageOf(tried.after, r) > 0)
+        RESOURCES.some((r) => overageOf(trial.after, r) > 0)
       )
-        overran.push(tried);
+        overran.push(trial);
     }
-    if (first) bestSingle = best?.score ?? null;
-    return { best, overran };
+    if (first) firstRoundBest = pending?.score ?? null;
+    return { best: pending, overran };
   }
 
-  /** The best passing pair of a budget-overrunning gain and a move that frees what it needs. */
-  async function kick(overran: Tried[]): Promise<Tried | null> {
-    const seeds = overran.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, KICK_SEEDS);
+  /** The best passing pair of a budget-overrunning gain and a move that freed what it needs. */
+  async function tryPairs(overran: Trial[]): Promise<Trial | null> {
+    const seeds = overran.sort((a, b) => gainOf(b) - gainOf(a)).slice(0, PAIR_SEEDS);
     const pairs: { candidate: ImproveCandidate; estimate: number }[] = [];
     for (const seed of seeds) {
       const over = RESOURCES.filter((r) => overageOf(seed.after, r) > 0);
       for (const freer of moves(fitting)) {
         if (sameSlot(freer, seed.move)) continue;
-        const freed = freedBy.get(moveKey(freer));
-        if (!freed || !over.every((r) => (freed[r] ?? 0) >= overageOf(seed.after, r))) continue;
+        const record = records.get(keyOf(freer));
+        const freed = record?.freed;
+        if (!freed || !over.every((r) => freed[r] >= overageOf(seed.after, r))) continue;
         pairs.push({
           candidate: { ...seed.move, pairedWith: freer },
-          estimate: (seed.score ?? 0) - score + (lastGain.get(moveKey(freer)) ?? 0),
+          estimate: gainOf(seed) + (record?.gain ?? 0),
         });
       }
     }
     pairs.sort((a, b) => b.estimate - a.estimate);
-    let best: Tried | null = null;
-    for (const { candidate } of pairs.slice(0, KICK_PAIRS)) {
-      const tried = await tryMove(candidate);
-      if (tried?.ok && (!best || (tried.score ?? 0) > (best.score ?? 0))) best = tried;
+    pending = null;
+    for (const { candidate } of pairs.slice(0, PAIRS_TRIED)) {
+      const trial = await tryMove(candidate);
+      if (trial?.ok && gainOf(trial) > gainOf(pending)) pending = trial;
     }
-    return best;
+    return pending;
   }
 
   /**
    * A placed module's own moves start from an estimate, not unknown: moving X
    * (which replaced F) on to Y is about F → Y's gain less F → X's. Without it
-   * every module a step places is recalculated against all its targets.
+   * every module a step places is recalculated against all its targets. Only
+   * the lazy order reads it, and a move that looks close is calculated.
    */
-  const estimateFrom = (move: ImproveCandidate, gain: number) => {
+  function estimateFrom(move: ImproveCandidate, gain: number) {
     if (move.fromTypeId === null) return;
-    const rack = move.at[0]?.slot;
-    const prefix = `${move.fromTypeId}>`;
-    for (const [key, last] of [...lastGain]) {
-      if (!key.startsWith(prefix) || !key.endsWith(`>${rack}`)) continue;
-      const to = key.slice(prefix.length, key.length - rack.length - 1);
-      const estimate = `${move.toTypeId}>${to}>${rack}`;
-      if (!lastGain.has(estimate)) lastGain.set(estimate, last - gain);
-    }
-    const back = `${move.toTypeId}>${move.fromTypeId}>${rack}`;
-    if (!lastGain.has(back)) lastGain.set(back, -gain);
-  };
+    const rack = move.at[0].slot;
+    const estimate = (toTypeId: number, estimated: number) => {
+      const key = moveKey(move.toTypeId, toTypeId, rack);
+      if (!records.has(key))
+        records.set(key, { fromTypeId: move.toTypeId, toTypeId, rack, gain: estimated });
+    };
+    for (const record of [...records.values()])
+      if (record.fromTypeId === move.fromTypeId && record.rack === rack)
+        estimate(record.toTypeId, record.gain - gain);
+    estimate(move.fromTypeId, -gain);
+  }
 
-  const take = (tried: Tried) => {
-    const gain = (tried.score ?? score) - score;
-    for (let link: ImproveCandidate | undefined = tried.move; link; link = link.pairedWith)
+  function applyStep(trial: Trial) {
+    const gain = gainOf(trial);
+    for (let link: ImproveCandidate | undefined = trial.move; link; link = link.pairedWith)
       estimateFrom(link, gain);
-    fitting = tried.fitting;
-    current = tried.after;
-    isk = addIsk(isk, iskDeltaOf(tried.move, priceOf));
-    score = tried.score ?? score;
+    fitting = trial.fitting;
+    current = trial.after;
+    isk = addIsk(isk, iskDeltaOf(trial.move, priceOf));
+    score = trial.score ?? score;
     steps++;
-  };
+  }
 
   try {
     for (let first = true; ; first = false) {
       const { best, overran } = await round(first);
-      if (best && (best.score ?? 0) - score > minGain) {
-        take(best);
+      if (best && gainOf(best) > minGain) {
+        applyStep(best);
         continue;
       }
-      const pair = pairKick ? await kick(overran) : null;
-      if (pair && (pair.score ?? 0) - score > minGain) {
-        take(pair);
+      const pair = pairKick ? await tryPairs(overran) : null;
+      if (pair && gainOf(pair) > minGain) {
+        applyStep(pair);
         continue;
       }
       break;
     }
   } catch (error) {
-    if (!(error instanceof Stop)) throw error;
+    if (!(error instanceof SearchHalt)) throw error;
     if (error.cancelled) return null;
     stopped = true;
+    // The interrupted round's best so far still counts.
+    const interrupted: Trial | null = pending;
+    if (interrupted && gainOf(interrupted) > minGain) applyStep(interrupted);
   }
 
   if (steps === 0) return { makeover: null, calcs, stopped };
@@ -418,20 +472,21 @@ export async function findMakeover({
   if (rows.length < 2) return { makeover: null, calcs, stopped };
   // The figures shown are one recalculation of the rows, never the path's last step.
   const remade = rows.reduce(applyImproveCandidate, original);
+  calcs++;
   let after: FittingStats;
   try {
     after = await stats(remade);
   } catch {
     return { makeover: null, calcs, stopped };
   }
-  calcs++;
   if (isCancelled?.()) return null;
+  onProgress?.(calcs, maxCalcs);
   const iskDelta = rows.reduce<number | null>(
     (sum, row) => addIsk(sum, iskDeltaOf(row, priceOf)),
     0
   );
   const total = scoreAt(after, iskDelta);
-  const single = bestSingle ?? 0;
+  const single = givenSingle ?? firstRoundBest ?? 0;
   const beats =
     total !== null &&
     passes(after, iskDelta) &&
@@ -447,7 +502,9 @@ export async function findMakeover({
 
 /**
  * The changes from `from` to `to`, slot by slot: a slot changed twice shows
- * once, first module to last, and the same change in several slots is one row.
+ * once, first module to last, and the same change in several slots is one
+ * row. Swaps and fills only: a slot `to` leaves empty gives no row (the
+ * Makeover never empties one).
  */
 export function rowsBetween(from: Fitting, to: Fitting): ImproveCandidate[] {
   const at = (fitting: Fitting, slot: FittingSlotKind, slotIndex: number) =>
