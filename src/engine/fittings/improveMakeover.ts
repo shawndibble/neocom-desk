@@ -27,6 +27,7 @@ import {
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveHold,
+  type ImproveOption,
   type LostStat,
   type ModulePool,
 } from './improve';
@@ -175,6 +176,29 @@ export function makeoverMoves(
     }
   }
   return moves;
+}
+
+/**
+ * The score a Makeover must beat (`bestSingle`): the best single swap whose
+ * modules are all Tech I or Tech II. A faction, deadspace or officer upgrade
+ * is a price step the Makeover never makes, and stays a single row the pilot
+ * can tick beside it; it must not hide a Makeover. Null when none qualifies.
+ */
+export function makeoverBar(
+  result: { noDownside: readonly ImproveOption[]; tradeOffs: readonly ImproveOption[] },
+  index: VariationIndex
+): number | null {
+  const shapeOnly = (candidate: ImproveCandidate | undefined): boolean => {
+    for (let link = candidate; link; link = link.pairedWith) {
+      const meta = index.types[link.toTypeId]?.metaGroupId ?? TECH_I;
+      if (meta !== TECH_I && meta !== TECH_II) return false;
+    }
+    return true;
+  };
+  const scores = [...result.noDownside, ...result.tradeOffs]
+    .filter((option) => shapeOnly(option.candidate))
+    .map((option) => option.score);
+  return scores.length > 0 ? Math.max(...scores) : null;
 }
 
 /** The most whole-fit calculations one Makeover search makes (the last confirms the result): about 9–16 s in the browser worker. */

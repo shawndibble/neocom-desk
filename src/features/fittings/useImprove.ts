@@ -21,6 +21,7 @@ import {
   onlySide,
   type ImproveCandidate,
   type ImproveGoal,
+  type ImproveOption,
   type ImproveHold,
   type ImproveReach,
   type ImproveResult,
@@ -42,6 +43,23 @@ import {
   minerWithoutCrystal,
   unloadedMiners,
 } from '@/engine/fittings/improveMining';
+import {
+  DEFAULT_EXPLORE_SPACE,
+  DEFAULT_IMPROVE_JOB,
+  EXPLORE_SPACES,
+  IMPROVE_JOBS,
+  type ExploreSpace,
+  type ImproveJob,
+} from '@/engine/fittings/improveJob';
+import {
+  findMakeover,
+  makeoverBar,
+  makeoverMoves,
+  MAKEOVER_CALCS,
+  type Makeover,
+  type MakeoverMoveOptions,
+} from '@/engine/fittings/improveMakeover';
+import { makeoverOptionsOf } from './improveMakeoverTicks';
 import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
@@ -52,6 +70,7 @@ import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/t
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -120,6 +139,37 @@ export const useImproveReach = createLocalSetting<ImproveReach>({
       : 'upgrade',
 });
 
+/** The Improve Job (PvE, PvP, Explore), remembered on this device like Reach; never part of the Fitting. */
+export const useImproveJob = createLocalSetting<ImproveJob>({
+  key: 'fittingsImproveJob',
+  defaultValue: DEFAULT_IMPROVE_JOB,
+  parse: (raw) =>
+    typeof raw === 'string' && (IMPROVE_JOBS as readonly string[]).includes(raw)
+      ? (raw as ImproveJob)
+      : DEFAULT_IMPROVE_JOB,
+});
+
+/** Where an Explore fit flies (Safe or Dangerous), remembered on this device. */
+export const useImproveSpace = createLocalSetting<ExploreSpace>({
+  key: 'fittingsImproveSpace',
+  defaultValue: DEFAULT_EXPLORE_SPACE,
+  parse: (raw) =>
+    typeof raw === 'string' && (EXPLORE_SPACES as readonly string[]).includes(raw)
+      ? (raw as ExploreSpace)
+      : DEFAULT_EXPLORE_SPACE,
+});
+
+/**
+ * Whether rigs are searched: on until the pilot unticks it. The old drawer kept
+ * the tick for the session only and defaulted it off, so no stored row says "off"
+ * by default; this key is new and holds a value only once the pilot has chosen it.
+ */
+export const useImproveRigs = createLocalSetting<boolean>({
+  key: 'fittingsImproveRigs',
+  defaultValue: true,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
+});
+
 /** How Improve orders each section's rows, remembered on this device. */
 export const useImproveSort = createLocalSetting<ImproveSort>({
   key: 'fittingsImproveSort',
@@ -159,6 +209,26 @@ export const useImproveBudget = createLocalSetting<number | null>({
   parse: parseCap,
 });
 
+/**
+ * Reads every remembered Improve setting back from this device; true once all
+ * have settled. Nothing else hydrates them, so without it each starts at its
+ * default after a reload and the stored row is never read.
+ */
+export function useImproveSettingsHydrated(): boolean {
+  return useHydratedStore(
+    useImproveGoal,
+    useImproveGoalByRole,
+    useImproveReach,
+    useImproveJob,
+    useImproveSpace,
+    useImproveRigs,
+    useImproveSort,
+    useImproveOre,
+    useImproveHold,
+    useImproveBudget
+  );
+}
+
 /** Rows of the removed Refitting mode, dropped on the next start. */
 const RETIRED_KEYS = ['fittingsImproveMode', 'fittingsImproveRefitCap'];
 
@@ -185,6 +255,9 @@ export async function migrateSpendCap(): Promise<void> {
 
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
+  job: ImproveJob;
+  /** Explore only. */
+  space: ExploreSpace;
   reach: ImproveReach;
   iskBudget: number | null;
   defense: DefenseChoice;
@@ -201,7 +274,14 @@ export const BEST_SO_FAR_AFTER_MS = 10_000;
 
 export type ImproveState =
   | { status: 'idle' }
-  | { status: 'searching'; checked: number; total: number; slow: boolean }
+  | {
+      status: 'searching';
+      checked: number;
+      total: number;
+      slow: boolean;
+      /** The Makeover search is running (after the single swaps): `checked` and `total` count its calculations. */
+      makeover?: boolean;
+    }
   | { status: 'cancelled' }
   /** The fit is over a budget: Improve hands over to Make it fit and searches nothing. */
   | { status: 'overBudget'; resources: Resource[] }
@@ -215,6 +295,8 @@ export type ImproveState =
       /** What the fit costs now at the hub, for the selection summary; null when not loaded. */
       fitTotal: number | null;
       elapsedMs: number;
+      /** Rework's whole-fit rework, when it beat the best single swap; its rows as options, ready to tick. */
+      makeover?: { makeover: Makeover; options: ImproveOption[] };
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
       /** With `sides`: the options on neither side (Damage Control, hull), shown as "Either". */
@@ -305,6 +387,8 @@ function searchCandidates(
     defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
+    job: config.job,
+    space: config.space,
     slotCounts,
     pool: modulePool(catalogue, variants),
   });
@@ -420,6 +504,17 @@ function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   return [...ids];
 }
 
+/** The Makeover's one-slot moves on any fit the search reaches, for the catalogue, pilot and settings of this search. */
+function makeoverMovesFor(
+  variants: VariantEvaluator,
+  catalogue: FittingCatalogue,
+  options: Omit<MakeoverMoveOptions, 'pool'>
+): (fitting: Fitting) => ImproveCandidate[] {
+  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
+  const pool = modulePool(catalogue, variants);
+  return (fitting) => makeoverMoves(fitting.modules, index, catalogue.rackOf, { ...options, pool });
+}
+
 const NO_CHARGES: readonly ChargeLoadStep[] = [];
 
 export function useImprove(
@@ -443,7 +538,8 @@ export function useImprove(
   const poolRef = useRef<WorkerPool | null>(null);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  const { reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
+  const { job, space, reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } =
+    config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -512,6 +608,8 @@ export function useImprove(
             catalogue,
             searched,
             {
+              job,
+              space,
               reach,
               iskBudget,
               defense: side,
@@ -529,6 +627,19 @@ export function useImprove(
         );
         const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
         const candidates = sets.flatMap((set) => set.candidates);
+        // The Makeover is Rework's: it follows the single swaps, and the Cheaper goal has none. One search, for the chosen Defense side.
+        const wantMakeover = reach === 'rework' && searched !== 'cheaper';
+        const movesFor = wantMakeover
+          ? makeoverMovesFor(variants, catalogue, {
+              goal: searched,
+              defense: sets[0].side,
+              includeRigs,
+              job,
+              space,
+              slotCounts: own.slotCounts,
+            })
+          : null;
+        const makeoverStart = movesFor ? movesFor(variants.fitting) : [];
         const compensation = compensationSwaps(
           variants,
           catalogue,
@@ -537,6 +648,7 @@ export function useImprove(
         const typeIds = [
           ...new Set([
             ...candidateTypeIds(candidates),
+            ...candidateTypeIds(makeoverStart),
             ...compensation.flatMap((swap) => [swap.fromTypeId, swap.toTypeId]),
           ]),
         ];
@@ -582,6 +694,7 @@ export function useImprove(
             throw new Error('A miner takes no crystal of this ore');
           return after;
         };
+        const priceOf = (typeId: number) => priceMap?.get(typeId)?.sellMin ?? null;
         const results: ImproveResult[] = [];
         let done = 0;
         for (const set of sets) {
@@ -593,7 +706,9 @@ export function useImprove(
             candidates: set.candidates,
             stats,
             concurrency: workers.size,
-            priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
+            job,
+            space,
+            priceOf,
             ...(target ? { target } : {}),
             iskBudget,
             fitTotal,
@@ -639,6 +754,54 @@ export function useImprove(
                 [sets[1].side]: sided[1],
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
+        // The Makeover: only after the single swaps ran to the end ("Show best so far" skips it), and only if it beats the best of them.
+        let makeover:
+          NonNullable<Extract<ImproveState, { status: 'done' }>['makeover']> | undefined;
+        let makeoverStopped = false;
+        if (movesFor && !stopRef.current && results.length > 0) {
+          setState((current) =>
+            current.status === 'searching'
+              ? { ...current, checked: 0, total: MAKEOVER_CALCS, makeover: true }
+              : current
+          );
+          const search = await findMakeover({
+            fitting: variants.fitting,
+            before: scoredBefore,
+            goal: searched,
+            moves: movesFor,
+            stats,
+            priceOf,
+            ...(target ? { target } : {}),
+            hold: effectiveHold(own.holds, hold),
+            job,
+            space,
+            iskBudget,
+            fitTotal,
+            // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.
+            bestSingle: makeoverBar(
+              listed,
+              buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups)
+            ),
+            concurrency: workers.size,
+            onProgress: (calcs, max) => {
+              if (!cancelled)
+                setState((current) =>
+                  current.status === 'searching'
+                    ? { ...current, checked: calcs, total: max, makeover: true }
+                    : current
+                );
+            },
+            isCancelled: () => cancelled,
+            shouldStop: () => stopRef.current,
+          });
+          if (cancelled || search === null) return;
+          makeoverStopped = search.stopped;
+          if (search.makeover)
+            makeover = {
+              makeover: search.makeover,
+              options: makeoverOptionsOf(search.makeover, priceOf),
+            };
+        }
         setRecalc(() => stats);
         let pool: Promise<CompletionPool> | null = null;
         setCompletion(
@@ -660,7 +823,12 @@ export function useImprove(
         );
         setState({
           status: 'done',
-          result: { ...listed, checked },
+          result: {
+            ...listed,
+            checked,
+            stopped: listed.stopped || makeoverStopped,
+          },
+          ...(makeover ? { makeover } : {}),
           before: scoredBefore,
           ...(plan
             ? {
@@ -703,6 +871,8 @@ export function useImprove(
     includeOfficer,
     oreFamily,
     hold,
+    job,
+    space,
     chargePlanKey,
   ]);
 

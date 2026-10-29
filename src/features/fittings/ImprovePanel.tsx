@@ -88,7 +88,8 @@ export function ImprovePanel({
   const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
   const labels = useImproveLabels(catalogue);
-  const selection = useImproveSelection(result, labels.swapLabel);
+  const makeoverRows = state.status === 'done' ? state.makeover?.options : undefined;
+  const selection = useImproveSelection(result, labels.swapLabel, makeoverRows);
   const { chosen, ticked, hovered, setTicked } = selection;
   const check = useSelectionCheck({
     search,
@@ -106,6 +107,7 @@ export function ImprovePanel({
               ...state.result.makeFlyable,
               ...state.result.noDownside,
               ...state.result.tradeOffs,
+              ...(state.makeover?.options ?? []),
             ].map(optionKey)
           )
         : new Set<string>(),
@@ -191,7 +193,8 @@ export function ImprovePanel({
         (state.result.makeFlyable.length === 0 &&
         state.result.flyableBlocked.length === 0 &&
         state.result.noDownside.length === 0 &&
-        state.result.tradeOffs.length === 0 ? (
+        state.result.tradeOffs.length === 0 &&
+        state.makeover === undefined ? (
           <ImproveNothingFound
             goal={goal}
             result={state.result}
@@ -201,6 +204,7 @@ export function ImprovePanel({
             settings={settings}
             labels={labels}
             onSearchAgain={search.restart}
+            onSearchRework={() => settings.onReachChange('rework')}
           />
         ) : (
           <ImproveResults

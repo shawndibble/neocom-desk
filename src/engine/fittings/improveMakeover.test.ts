@@ -7,6 +7,7 @@ import {
 } from './improve';
 import {
   findMakeover,
+  makeoverBar,
   makeoverMoves,
   rowsBetween,
   type MakeoverMoveOptions,
@@ -445,5 +446,45 @@ describe('rowsBetween', () => {
     });
     const twice = applyImproveCandidate(applyImproveCandidate(f, low0(11, 10)), low0(10, 12));
     expect(rowsBetween(f, twice).map(label)).toEqual(['11>12@l0']);
+  });
+});
+
+describe('makeoverBar', () => {
+  const { index } = catalogue(TYPES);
+  const option = (toTypeId: number, score: number, pairedTo?: number) =>
+    ({
+      candidate: {
+        fromTypeId: 1,
+        toTypeId,
+        at: [{ slot: 'medium', slotIndex: 0 }],
+        ...(pairedTo === undefined
+          ? {}
+          : {
+              pairedWith: {
+                fromTypeId: 11,
+                toTypeId: pairedTo,
+                at: [{ slot: 'low', slotIndex: 0 }],
+              },
+            }),
+      },
+      score,
+    }) as unknown as Parameters<typeof makeoverBar>[0]['noDownside'][number];
+
+  it('is the best single swap to a Tech I or Tech II module, never a faction or officer step', () => {
+    // 3 is officer: a big gain the Makeover never offers does not hide it.
+    const bar = makeoverBar(
+      { noDownside: [option(3, 0.5), option(2, 0.1)], tradeOffs: [option(4, 0.2)] },
+      index
+    );
+    expect(bar).toBe(0.2);
+  });
+
+  it('counts a paired swap only when every module it adds is Tech I or II', () => {
+    expect(makeoverBar({ noDownside: [option(2, 0.3, 3)], tradeOffs: [] }, index)).toBeNull();
+    expect(makeoverBar({ noDownside: [option(2, 0.3, 12)], tradeOffs: [] }, index)).toBe(0.3);
+  });
+
+  it('is null when no single swap qualifies', () => {
+    expect(makeoverBar({ noDownside: [option(3, 0.5)], tradeOffs: [] }, index)).toBeNull();
   });
 });

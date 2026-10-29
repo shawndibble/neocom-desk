@@ -18,20 +18,25 @@ export function ImproveSearchStatus({
 }) {
   const { t } = useTranslation();
   const { state } = search;
+  const counts = {
+    checked: state.status === 'searching' ? state.checked : 0,
+    total: state.status === 'searching' ? state.total : 0,
+  };
+  const progress =
+    state.status !== 'searching'
+      ? null
+      : state.makeover
+        ? t('fittings.improve.checkingMakeover', counts)
+        : round
+          ? t('fittings.improve.checkingRound', { round: round.current, max: round.max, ...counts })
+          : t('fittings.improve.checking', counts);
   return (
     <>
       {state.status === 'searching' && (
         <div className="space-y-2">
           <p className="text-text-dim flex items-center gap-2 text-sm">
             <Spinner />
-            {round
-              ? t('fittings.improve.checkingRound', {
-                  round: round.current,
-                  max: round.max,
-                  checked: state.checked,
-                  total: state.total,
-                })
-              : t('fittings.improve.checking', { checked: state.checked, total: state.total })}
+            {progress}
           </p>
           <ProgressBar
             label={t('fittings.improve.progressLabel')}

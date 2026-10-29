@@ -3,7 +3,7 @@
  * Trade-offs, never ranked against each other) under the best swap found,
  * and the footer where the ticked set is checked and applied.
  */
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SegmentedControl } from '@/components/ui';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
@@ -13,9 +13,11 @@ import { IMPROVE_SORTS } from '@/engine/fittings/improveRows';
 import { ImproveBlockedRow } from './ImproveBlockedRow';
 import { ImproveCoverOffer } from './ImproveCoverOffer';
 import { ImproveFooter } from './ImproveFooter';
+import { ImproveMakeover } from './ImproveMakeover';
 import { ImproveOptionList } from './ImproveOptionList';
 import { ImproveSelectionSummary } from './ImproveSelectionSummary';
 import { crystalBasisOf } from './improveCrystalBasis';
+import { singleGainsOf } from './improveMakeoverTicks';
 import { bestFoundLine } from './improveLeadLine';
 import type { ImproveSettings } from './improveSettings';
 import { MakeItFitSection } from './MakeItFitSection';
@@ -61,6 +63,14 @@ export function ImproveResults({
   const { chosen, setTicked } = selection;
   const lead = { goal, hold: settings.hold, target };
   const bestFound = bestFoundLine(t, lead, result, state.fitAsIs ?? state.before);
+  const makeover = state.makeover;
+  const singleGains = useMemo(
+    () =>
+      makeover
+        ? singleGainsOf(makeover.makeover.rows, [...result.noDownside, ...result.tradeOffs])
+        : undefined,
+    [makeover, result]
+  );
   const basisDiffers = crystalBasisOf(state).differs;
   const list = (options: ImproveOption[], section: string) => (
     <ImproveOptionList
@@ -76,6 +86,24 @@ export function ImproveResults({
 
   return (
     <div className="space-y-4">
+      {makeover && (
+        <ImproveMakeover
+          makeover={makeover.makeover}
+          before={state.before}
+          ticked={new Set(selection.ticked.keys())}
+          onToggle={(keys, checked) =>
+            selection.toggleMakeover(
+              makeover.options.filter((option) => keys.includes(optionKey(option))),
+              checked
+            )
+          }
+          singleGains={singleGains}
+          typeName={labels.typeName}
+          rowCost={(row) =>
+            makeover.options.find((option) => option.candidate === row)?.iskDelta ?? null
+          }
+        />
+      )}
       {bestFound && (
         <p className="text-sm" data-testid="improve-best-found">
           <span className="text-text-dim">{t('fittings.improve.bestFound')} </span>

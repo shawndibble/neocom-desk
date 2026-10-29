@@ -9,18 +9,18 @@ import { Radio, SegmentedControl } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
+  EXPLORE_SPACES,
   IMPROVE_JOBS,
-  IMPROVE_SPACES,
+  type ExploreSpace,
   type ImproveJob,
-  type ImproveSpace,
-} from './improveSettings';
+} from '@/engine/fittings/improveJob';
 
 interface Props {
   job: ImproveJob;
   onJobChange: (job: ImproveJob) => void;
   /** Only read under Explore. */
-  space?: ImproveSpace;
-  onSpaceChange: (space: ImproveSpace) => void;
+  space?: ExploreSpace;
+  onSpaceChange: (space: ExploreSpace) => void;
 }
 
 export function ImproveJobChoice({ job, onJobChange, space = 'dangerous', onSpaceChange }: Props) {
@@ -41,7 +41,7 @@ export function ImproveJobChoice({ job, onJobChange, space = 'dangerous', onSpac
       {job === 'explore' && (
         <fieldset className="space-y-1">
           <legend className="text-text-dim text-xs">{t('fittings.improve.job.spaceLabel')}</legend>
-          {IMPROVE_SPACES.map((value) => (
+          {EXPLORE_SPACES.map((value) => (
             <label
               key={value}
               className={cx('flex cursor-pointer items-start gap-2 text-sm', tappableRowClassName)}

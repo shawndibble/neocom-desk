@@ -5,14 +5,18 @@
  */
 import { useMemo, useState } from 'react';
 import type { ImproveOption, ImproveResult } from '@/engine/fittings/improve';
-import { toggleTick } from '@/engine/fittings/improveKeys';
+import { optionKey, toggleTick } from '@/engine/fittings/improveKeys';
+import { tickMakeoverRows } from './improveMakeoverTicks';
 
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
 const NO_OPEN: ReadonlySet<string> = new Set();
+const NO_ROWS: readonly ImproveOption[] = [];
 
 export function useImproveSelection(
   result: ImproveResult | null,
-  swapLabel: (option: ImproveOption) => string
+  swapLabel: (option: ImproveOption) => string,
+  /** The Makeover's rows: every one is ticked until the pilot changes the ticks. */
+  makeoverRows: readonly ImproveOption[] = NO_ROWS
 ) {
   // Modules whose other options, and rows whose other stats, are showing; like ticks, they belong to one result.
   const [open, setOpen] = useState<{ result: ImproveResult | null; keys: ReadonlySet<string> }>({
@@ -42,7 +46,15 @@ export function useImproveSelection(
         expanded.has(key) ? [...expanded].filter((k) => k !== key) : [...expanded, key]
       ),
     });
-  const ticked = ticks.result === result ? ticks.byModule : NO_TICKS;
+  // Before the pilot's first tick on this result, the Makeover's rows are all ticked.
+  const startTicks = useMemo<ReadonlyMap<string, ImproveOption>>(
+    () =>
+      makeoverRows.length === 0
+        ? NO_TICKS
+        : new Map(makeoverRows.map((row) => [optionKey(row), row] as const)),
+    [makeoverRows]
+  );
+  const ticked = ticks.result === result ? ticks.byModule : startTicks;
   const replaced = ticks.result === result ? ticks.replaced : new Map<string, string>();
   const hovered = hovering.result === result ? hovering.option : null;
   const setHover = (option: ImproveOption | null) => setHovering({ result, option });
@@ -57,7 +69,24 @@ export function useImproveSelection(
     setTicked(next.byModule, next.replaced);
   }
 
-  return { expanded, flip, ticked, replaced, hovered, setHover, setTicked, chosen, toggle };
+  /** Ticks or unticks Makeover rows; ticking one displaces a single swap on its slot (and the reverse is `toggle`'s). */
+  function toggleMakeover(rows: readonly ImproveOption[], checked: boolean) {
+    const next = tickMakeoverRows(ticked, replaced, rows, checked, swapLabel);
+    setTicked(next.byModule, next.replaced);
+  }
+
+  return {
+    expanded,
+    flip,
+    ticked,
+    replaced,
+    hovered,
+    setHover,
+    setTicked,
+    chosen,
+    toggle,
+    toggleMakeover,
+  };
 }
 
 /** The shape the row list reads: everything the pilot has ticked, opened or hovered. */

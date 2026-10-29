@@ -31,8 +31,12 @@ import {
   useImproveGoalByRole,
   hullOf,
   useImproveHold,
+  useImproveJob,
+  useImproveRigs,
+  useImproveSpace,
   useImproveOre,
   useImproveReach,
+  useImproveSettingsHydrated,
   useImproveSort,
   useImproveBudget,
   migrateSpendCap,
@@ -104,6 +108,8 @@ export function useImproveDrawer({
   const role = hullRoleOf(hullOf(fitting, catalogue));
   const goal = rememberedGoal(goalsByRole, legacyGoal, role);
   const setGoal = (next: ImproveGoal) => setGoalsByRole({ ...goalsByRole, [role]: next });
+  // The remembered settings are read before the first search, so a reload never searches with the defaults.
+  const settingsReady = useImproveSettingsHydrated();
   const reach = useImproveReach((state) => state.value);
   const setReach = useImproveReach((state) => state.setValue);
   const sort = useImproveSort((state) => state.value);
@@ -117,9 +123,15 @@ export function useImproveDrawer({
   useEffect(() => {
     void migrateSpendCap();
   }, []);
-  // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
+  const job = useImproveJob((state) => state.value);
+  const setJob = useImproveJob((state) => state.setValue);
+  const space = useImproveSpace((state) => state.value);
+  const setSpace = useImproveSpace((state) => state.setValue);
+  // Rigs are on until the pilot unticks them, and that choice is remembered on this device.
+  const includeRigs = useImproveRigs((state) => state.value);
+  const setIncludeRigs = useImproveRigs((state) => state.setValue);
+  // Not remembered: a Defense Choice, and the Officer tick, are about this fit.
   const [defense, setDefense] = useState<DefenseChoice>('keep');
-  const [includeRigs, setIncludeRigs] = useState(false);
   const [includeOfficer, setIncludeOfficer] = useState(false);
   // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
   const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
@@ -178,8 +190,10 @@ export function useImproveDrawer({
     catalogue,
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
-    isOpen,
+    isOpen && settingsReady,
     {
+      job,
+      space,
       reach,
       iskBudget,
       defense,
@@ -320,6 +334,10 @@ export function useImproveDrawer({
         )
       }
       settings={{
+        job,
+        onJobChange: (next) => void setJob(next),
+        space,
+        onSpaceChange: (next) => void setSpace(next),
         reach,
         onReachChange: (next) => void setReach(next),
         sort,
@@ -329,7 +347,7 @@ export function useImproveDrawer({
         defense,
         onDefenseChange: setDefense,
         includeRigs,
-        onIncludeRigsChange: setIncludeRigs,
+        onIncludeRigsChange: (next) => void setIncludeRigs(next),
         includeOfficer,
         onIncludeOfficerChange: setIncludeOfficer,
         oreFamily,
@@ -342,12 +360,14 @@ export function useImproveDrawer({
 
   // Only once a search found something: the bar (ImproveFooter) is
   // drawn for results alone, and an empty footer is a stray line.
+  const doneState = search.state.status === 'done' ? search.state : null;
   const found =
-    search.state.status === 'done' &&
-    search.state.result.makeFlyable.length +
-      search.state.result.noDownside.length +
-      search.state.result.tradeOffs.length >
-      0;
+    doneState !== null &&
+    (doneState.result.makeFlyable.length +
+      doneState.result.noDownside.length +
+      doneState.result.tradeOffs.length >
+      0 ||
+      doneState.makeover !== undefined);
   const footer = found && <div ref={setFooterTarget} />;
 
   // Desktop: a column in the page, left of the editor (FittingEditorLayout's
