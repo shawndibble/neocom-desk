@@ -379,7 +379,7 @@ owns the "don't price until hydrated" gate, `isPricingReady`) and loads
 corp blueprints, per-Trade-Hub standings and BPC Sourcing rows;
 `pricingSourcesForHub` narrows them to one plan's hub. A new pricing input
 goes there and in `resolveBuildPlan`, nowhere else. Every view that prices a
-plan — `BuildPlanDetail` for the open plan, `useComparedBuildResults` for
+plan — `BuildPlanDetail` for the open plan (a thin composition of the `Plan*` panels and `usePlan*` hooks beside it), `useComparedBuildResults` for
 Build Plan Compare / the index / every Group Rollup — takes those inputs,
 fetches its market snapshot (plus a second, reaction-activity one for a
 configured Reaction Location) and calls `features/industry/resolveBuildPlan`
