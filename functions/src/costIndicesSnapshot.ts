@@ -103,7 +103,8 @@ export function mergeSystemCostIndices(
   return { systemId, lastSyncedAt, dates, activities };
 }
 
-export type WriteCostIndicesResult = WriteOpenPricesResult;
+/** `lastSyncedAt` changes every run, so no system is ever skipped. */
+export type WriteCostIndicesResult = Omit<WriteOpenPricesResult, 'skipped'>;
 
 /**
  * Merges `days` into every system's R2 object (read, merge, write). A system
