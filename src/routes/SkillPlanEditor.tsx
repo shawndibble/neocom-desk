@@ -133,7 +133,7 @@ export function SkillPlanEditor() {
   const plan = planQuery.plan;
   // Deleted elsewhere or a stale URL — the list is the only page left to send
   // the user back to. A plan owned by another Character stays open: switching
-  // Characters on a plan re-costs it against the new pilot's skills.
+  // Characters on a plan re-costs it against the new Character's skills.
   if (!plan) {
     return <Navigate to="/skills/plans" replace />;
   }
