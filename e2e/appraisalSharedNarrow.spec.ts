@@ -197,7 +197,7 @@ test.describe('Shared appraisal — phone table', () => {
     // Rendered cells only: `phoneHidden` columns are `display: none` here, so
     // they have no box. Asserted as the whole row at once.
     const shown = cells.filter((cell) => cell.width > 0).map((cell) => cell.label);
-    expect(shown).toEqual(['Qty', 'Item', 'Buy total', 'Sell total']);
+    expect(shown).toEqual(['Item', 'Qty', 'Buy total', 'Sell total']);
 
     // The item cell is pinned while the table scrolls sideways inside its
     // wrapper, never the page.
@@ -253,7 +253,7 @@ test.describe('Shared appraisal — phone table', () => {
     // Above `sm` nothing is shed: all six values plus the name on one line.
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
-      ['Qty', 'Item', 'Buy each', 'Sell each', 'Split each', 'Buy total', 'Sell total'],
+      ['Item', 'Qty', 'Buy each', 'Sell each', 'Split each', 'Buy total', 'Sell total'],
     ]);
     // Not just "one line group": a single dense row of text, so a cell that
     // started wrapping onto a second line would fail here rather than pass by

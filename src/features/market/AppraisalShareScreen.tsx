@@ -76,19 +76,19 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
 
   const columns: DataTableColumn<AppraisalRow>[] = [
     {
+      id: 'item',
+      header: t('market.appraisal.columnItem'),
+      stickyStart: true,
+      render: (row) => row.name,
+      sortValue: (row) => row.name,
+    },
+    {
       id: 'quantity',
       header: t('market.appraisal.columnQuantity'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => formatVolume(row.quantity),
       sortValue: (row) => row.quantity,
-    },
-    {
-      id: 'item',
-      header: t('market.appraisal.columnItem'),
-      stickyStart: true,
-      render: (row) => row.name,
-      sortValue: (row) => row.name,
     },
     {
       id: 'buyEach',
@@ -137,7 +137,7 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   ];
 
   return (
-    <ShareShell title={t('appraisalShare.title')} layout="compact" openInApp={openInApp}>
+    <ShareShell title={t('appraisalShare.title')} openInApp={openInApp}>
       {state.status === 'invalid' && (
         <EmptyState
           title={t('appraisalShare.invalidTitle')}

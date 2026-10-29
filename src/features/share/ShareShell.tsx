@@ -17,32 +17,27 @@ export interface OpenInApp {
 
 interface ShareShellProps {
   title: string;
-  /** The page's own primary controls, e.g. a table's export menu. On a `compact` or `wide` page they sit at the right of the row under the header. */
+  /** The page's own primary controls, e.g. a table's export menu. They sit at the right of the row under the header. */
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
   openInApp?: OpenInApp;
-  /**
-   * `classic` (default): the original header, a title row, a 768px frame. `compact`: the brand and
-   * login in one header row over a divider, the title kept for screen readers only, the same
-   * 768px frame. `wide`: `compact` in a 896px frame, for a two-column page.
-   */
-  layout?: 'classic' | 'compact' | 'wide';
-  /** A note for a signed-out visitor. On a `compact` or `wide` page it fills the strip beside the page's `actions`. */
+  /** A 896px frame instead of 768px, for a page that lays out two columns. */
+  wide?: boolean;
+  /** A note for a signed-out visitor. It fills a strip beside the page's `actions`. */
   notice?: ReactNode;
-  /** The last thing on a `compact` or `wide` page, a short chip rather than a sentence (a link's expiry). */
+  /** The last thing on the page, a short chip rather than a sentence (a link's expiry). */
   footer?: ReactNode;
-  /** Beside the notice strip, on `compact` and `wide` pages (the shared Fitting's ship and name). */
+  /** Beside the notice strip (the shared Fitting's ship and name). */
   lead?: ReactNode;
   children: ReactNode;
 }
 
-/** The frame's max width per layout: `compact` keeps the 768px a share page has always had. */
-const FRAME_WIDTH = { classic: 'max-w-3xl', compact: 'max-w-3xl', wide: 'max-w-4xl' } as const;
-
 /**
  * The frame every Share Link page renders in: no navigation chrome (it sits
- * outside `RequireCharacter` and `ScopeGate`), the brand and one way
- * into the live app in a header, then the page's title. A visitor with no Character gets "Log in" instead,
+ * outside `RequireCharacter` and `ScopeGate`), the brand and one way into
+ * the live app in one header row over a divider. The page's title is for
+ * screen readers only; the page says what it is below. A visitor with no
+ * Character gets "Log in" instead of the link,
  * which starts the EVE login right here with `setLoginReturnTo` carrying them
  * on to the same page after, and a small "Choose permissions" link under it
  * that opens the Customize permissions dialog first (#3075).
@@ -51,7 +46,7 @@ export function ShareShell({
   title,
   actions,
   openInApp,
-  layout = 'classic',
+  wide,
   notice,
   lead,
   footer,
@@ -101,66 +96,43 @@ export function ShareShell({
     </Link>
   );
 
-  if (layout !== 'classic') {
-    // The login stays in the header; the page's own action rides in the notice strip.
-    return (
-      <div
-        className={`mx-auto flex min-h-screen ${FRAME_WIDTH[layout]} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
-      >
-        <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
-          <Link
-            to="/"
-            className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-wide sm:text-lg"
-          >
-            <LogoMark className="size-6 shrink-0 sm:size-7" />
-            {/* The icon alone on the narrowest phones, so the login keeps its row. */}
-            <span className="max-[369px]:sr-only">{t('share.brand')}</span>
-          </Link>
-          {/* The page says what it is below; the title is for screen readers. */}
-          <h1 className="sr-only">{title}</h1>
-          <span className="ml-auto shrink-0">{signedOut ? loginControls : openInAppLink}</span>
-        </header>
-
-        <main className="flex flex-1 flex-col gap-4">
-          {(lead !== undefined || actions !== undefined || (signedOut && notice !== undefined)) && (
-            <div className="flex flex-wrap items-center gap-4">
-              {lead !== undefined && <div className="min-w-0 flex-1 basis-72">{lead}</div>}
-              {signedOut && notice !== undefined ? (
-                <div className="flex flex-1 basis-96 flex-wrap items-center justify-between gap-3 rounded-xs border border-warning bg-panel-2 py-2 pr-2 pl-3">
-                  <p className="min-w-48 flex-1 text-xs text-warning">{notice}</p>
-                  {actions && <span className="flex items-center gap-3">{actions}</span>}
-                </div>
-              ) : (
-                actions && <span className="ml-auto flex items-center gap-3">{actions}</span>
-              )}
-            </div>
-          )}
-
-          {children}
-
-          {footer !== undefined && <footer className="mt-auto pt-2">{footer}</footer>}
-        </main>
-      </div>
-    );
-  }
-
+  // The login stays in the header; the page's own action rides in the notice strip.
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-wide">
-          <LogoMark className="size-9" />
-          {t('share.brand')}
+    <div
+      className={`mx-auto flex min-h-screen ${wide ? 'max-w-4xl' : 'max-w-3xl'} flex-col gap-4 bg-bg p-2 text-text sm:p-6`}
+    >
+      <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-wide sm:text-lg"
+        >
+          <LogoMark className="size-6 shrink-0 sm:size-7" />
+          {/* The icon alone on the narrowest phones, so the login keeps its row. */}
+          <span className="max-[369px]:sr-only">{t('share.brand')}</span>
         </Link>
-        {signedOut ? loginControls : openInAppLink}
+        {/* The page says what it is below; the title is for screen readers. */}
+        <h1 className="sr-only">{title}</h1>
+        <span className="ml-auto shrink-0">{signedOut ? loginControls : openInAppLink}</span>
       </header>
 
       <main className="flex flex-1 flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold tracking-widest uppercase">{title}</h1>
-          {actions && <span className="ml-auto">{actions}</span>}
-        </div>
+        {(lead !== undefined || actions !== undefined || (signedOut && notice !== undefined)) && (
+          <div className="flex flex-wrap items-center gap-4">
+            {lead !== undefined && <div className="min-w-0 flex-1 basis-72">{lead}</div>}
+            {signedOut && notice !== undefined ? (
+              <div className="flex flex-1 basis-96 flex-wrap items-center justify-between gap-3 rounded-xs border border-warning bg-panel-2 py-2 pr-2 pl-3">
+                <p className="min-w-48 flex-1 text-xs text-warning">{notice}</p>
+                {actions && <span className="flex items-center gap-3">{actions}</span>}
+              </div>
+            ) : (
+              actions && <span className="ml-auto flex items-center gap-3">{actions}</span>
+            )}
+          </div>
+        )}
 
         {children}
+
+        {footer !== undefined && <footer className="mt-auto pt-2">{footer}</footer>}
       </main>
     </div>
   );
