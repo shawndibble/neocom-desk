@@ -663,7 +663,7 @@ export function PlanEditor({
     if (patch) onUpdate(patch);
   }, [editable, catalog.engineSkills, trainedSkills, trainedSkillsKnown, onUpdate]);
 
-  // Whether the plan holds any row the character already trained: the button is off when there is nothing to remove.
+  // Whether the plan holds any row the character already trained: the button is absent when there is nothing to remove.
   const hasTrainedEntries = useMemo(
     () => removeTrainedEntries(editable, trainedSkills) !== null,
     [editable, trainedSkills]
@@ -1409,12 +1409,14 @@ export function PlanEditor({
               label: t('plans.fitGoal.add'),
               onClick: () => setFitGoalOpen(true),
             })}
-            {toolAction({
-              icon: <Icon.Done size={Icon.ICON_SIZE.sm} />,
-              label: t('plans.removeTrained'),
-              onClick: handleRemoveTrained,
-              disabled: !trainedSkillsKnown || !hasTrainedEntries,
-            })}
+            {/* Absent, not greyed, when there is nothing to remove (or trained skills are unknown). */}
+            {trainedSkillsKnown &&
+              hasTrainedEntries &&
+              toolAction({
+                icon: <Icon.Done size={Icon.ICON_SIZE.sm} />,
+                label: t('plans.removeTrained'),
+                onClick: handleRemoveTrained,
+              })}
             {trainedRemoved &&
               confirmation(
                 t('plans.trainedRemoved', { count: trainedRemoved.count }),

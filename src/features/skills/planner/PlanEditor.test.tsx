@@ -1103,13 +1103,13 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
 describe('Remove trained skills', () => {
   const trained: ReadonlyMap<number, TrainedSkill> = new Map([[10, { level: 1, sp: 0 }]]);
 
-  it('is off when the character has trained nothing in the plan', async () => {
+  it('is absent when the character has trained nothing in the plan', async () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
     expect(
-      within(sectionFor('Actions')).getByRole('button', { name: 'Remove trained skills' })
-    ).toBeDisabled();
+      within(sectionFor('Actions')).queryByRole('button', { name: 'Remove trained skills' })
+    ).toBeNull();
   });
 
   it('drops the trained rows, says how many, and Undo puts them back', async () => {
