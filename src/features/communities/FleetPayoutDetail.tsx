@@ -10,7 +10,6 @@ import {
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   fleetPayoutProgress,
   holdBackIsk,
@@ -75,7 +74,7 @@ export function FleetPayoutDetail({
   communityId,
   onClose,
   onChanged,
-  onRemoved,
+  onRemove,
 }: {
   payout: FleetPayout;
   /** The viewer is the boss. */
@@ -86,14 +85,14 @@ export function FleetPayoutDetail({
   onClose: () => void;
   /** A Share's paid flag changed: refetch the list's counts. */
   onChanged: () => void;
-  onRemoved: () => void;
+  /** The boss removed this payout: the list hides it and writes after its Undo toast. */
+  onRemove: (removal: { message: string; commit: () => Promise<void> }) => void;
 }) {
   const { t } = useTranslation();
   const [shares, setShares] = useState<FleetShare[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState(false);
 
   const readShares = useCallback(
     () =>
@@ -232,7 +231,16 @@ export function FleetPayoutDetail({
             )}
             <div className="flex justify-end">
               <NeedsConnection>
-                <Button size="sm" variant="danger" onClick={() => setRemoving(true)}>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() =>
+                    onRemove({
+                      message: t('communities.payouts.detail.removed', { name: payout.name }),
+                      commit: () => removeFleetPayout(characterId, communityId, payout.id),
+                    })
+                  }
+                >
                   {t('communities.payouts.detail.remove')}
                 </Button>
               </NeedsConnection>
@@ -240,17 +248,6 @@ export function FleetPayoutDetail({
           </>
         )}
       </div>
-      <ConfirmDialog
-        open={removing}
-        title={t('communities.payouts.detail.removeTitle')}
-        body={t('communities.payouts.detail.removeBody', { name: payout.name })}
-        actionLabel={t('communities.payouts.detail.removeAction')}
-        onClose={() => setRemoving(false)}
-        onConfirm={async () => {
-          await removeFleetPayout(characterId, communityId, payout.id);
-          onRemoved();
-        }}
-      />
     </SlideOver>
   );
 }

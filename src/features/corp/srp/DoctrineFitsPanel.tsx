@@ -15,9 +15,10 @@ import {
   Panel,
   Spinner,
   Toast,
+  ToastStack,
+  useDeferredCommits,
   type DataTableColumn,
 } from '@/components/ui';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { textActionClassName } from '@/components/ui';
 import type { DoctrineFit, SaveDoctrineInput } from '../srpTypes';
 import { AddDoctrineDialog, type DoctrineSource } from './AddDoctrineDialog';
@@ -44,10 +45,13 @@ export function DoctrineFitsPanel({
 }: Props) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState<DoctrineSource | null>(null);
-  const [deleting, setDeleting] = useState<DoctrineFit | null>(null);
+  // A deleted fit stays hidden until its Undo toast ends and the write lands.
+  const pendingDeletes = useDeferredCommits();
   const [toast, setToast] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
-  const fits = state.status === 'ready' ? state.fits : [];
+  const allFits = state.status === 'ready' ? state.fits : [];
+  const { hiddenIds } = pendingDeletes;
+  const fits = hiddenIds.size === 0 ? allFits : allFits.filter((f) => !hiddenIds.has(f.id));
   const hullName = useDoctrineTypeNames(fits.map((f) => f.snapshot.hullTypeId));
 
   const open = (source: DoctrineSource, el: HTMLElement) => {
@@ -85,10 +89,13 @@ export function DoctrineFitsPanel({
           type="button"
           className={textActionClassName()}
           aria-label={t('srp.settings.doctrines.deleteLabel', { name: f.name })}
-          onClick={(e) => {
-            triggerRef.current = e.currentTarget;
-            setDeleting(f);
-          }}
+          onClick={() =>
+            pendingDeletes.defer({
+              id: f.id,
+              message: t('srp.settings.doctrines.deleted', { name: f.name }),
+              commit: () => onRemove(f.id),
+            })
+          }
         >
           {t('srp.settings.doctrines.delete')}
         </button>
@@ -141,20 +148,11 @@ export function DoctrineFitsPanel({
           onClose={() => setAdding(null)}
         />
       )}
-      <ConfirmDialog
-        open={deleting !== null}
-        title={t('srp.settings.doctrines.deleteTitle', { name: deleting?.name ?? '' })}
-        body={t('srp.settings.doctrines.deleteBody')}
-        actionLabel={t('srp.settings.doctrines.deleteAction')}
-        cancelLabel={t('srp.settings.doctrines.dialog.cancel')}
-        failedLabel={t('srp.settings.doctrines.deleteFailed')}
-        returnFocusFallback={() => triggerRef.current}
-        onConfirm={async () => {
-          if (!deleting) return;
-          await onRemove(deleting.id);
-          setToast(t('srp.settings.doctrines.deleted', { name: deleting.name }));
-        }}
-        onClose={() => setDeleting(null)}
+      <ToastStack
+        items={pendingDeletes.items}
+        undoLabel={t('srp.settings.doctrines.undo')}
+        onUndo={pendingDeletes.undo}
+        onClose={pendingDeletes.commit}
       />
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </Panel>

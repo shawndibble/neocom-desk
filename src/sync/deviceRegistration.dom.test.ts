@@ -367,11 +367,11 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
   });
 
   it('re-registers when the server events or their inputs change, and sends them (issue #5121)', async () => {
-    const withServer = (minimum: number) =>
+    const withServer = (jumps: number) =>
       registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]), {
         skipIfUnchanged: true,
         serverEventsByCharacter: new Map([
-          [1, { serverEvents: ['shipLost'], serverInputs: { shipLostMinimumIsk: minimum } }],
+          [1, { serverEvents: ['incursionNearby'], serverInputs: { incursionNearbyJumps: jumps } }],
         ]),
       });
     await withServer(0);
@@ -381,8 +381,8 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
     await withServer(5);
     expect(call).toHaveBeenCalledTimes(1);
     expect(call.mock.calls[0][0].data.characters[0]).toMatchObject({
-      serverEvents: ['shipLost'],
-      serverInputs: { shipLostMinimumIsk: 5 },
+      serverEvents: ['incursionNearby'],
+      serverInputs: { incursionNearbyJumps: 5 },
     });
   });
 

@@ -112,10 +112,13 @@ export function PaymentLinksCard({
                 )}
               </span>
               {onUnlinkTransaction && (
-                <Button size="sm" onClick={() => onUnlinkTransaction(tx)} disabled={busy}>
-                  {links.length > 1
-                    ? t('miningTax.payment.unlinkNamed', { id: tx.refId })
-                    : t('miningTax.unlinkTransactionAction')}
+                <Button
+                  size="sm"
+                  aria-label={t('miningTax.payment.unlinkNamed', { id: tx.refId })}
+                  onClick={() => onUnlinkTransaction(tx)}
+                  disabled={busy}
+                >
+                  {t('miningTax.unlinkTransactionAction')}
                 </Button>
               )}
             </li>

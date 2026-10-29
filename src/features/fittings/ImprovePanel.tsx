@@ -39,7 +39,7 @@ import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
-  overSpendCap,
+  overIskBudget,
   bestScore,
   damageOf,
   DEFENSE_CHOICES,
@@ -47,14 +47,15 @@ import {
   effectiveHold,
   remoteRepairOf,
   COMBAT_GOALS,
+  conversionKey,
+  conversionSummary,
+  TANK_RACKS,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
-  IMPROVE_MODES,
   IMPROVE_REACHES,
   type DefenseChoice,
   type ImproveGoal,
   type ImproveHold,
-  type ImproveMode,
   type ImproveReach,
   type ImproveOption,
   type ImproveResult,
@@ -132,14 +133,16 @@ const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navig
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
 const moveKey = (candidate: ImproveOption['candidate']): string =>
-  `${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
+  `${candidate.conversion ? `${conversionKey(candidate.conversion)}-` : ''}${candidate.fromTypeId ?? 'empty'}-${candidate.toTypeId}-${candidate.at[0].slot}${candidate.at[0].slotIndex}` +
   (candidate.pairedWith ? `+${moveKey(candidate.pairedWith)}` : '');
 
 const optionKey = (option: ImproveOption) => moveKey(option.candidate);
 
 /** Every slot a suggestion changes, its paired downgrade's included: two ticked rows never share one. */
 function slotsOf(candidate: ImproveOption['candidate']): string[] {
-  const own = candidate.at.map((at) => `${at.slot}${at.slotIndex}`);
+  const own = [...(candidate.conversion?.removes.flatMap((r) => r.at) ?? []), ...candidate.at].map(
+    (at) => `${at.slot}${at.slotIndex}`
+  );
   return candidate.pairedWith ? [...own, ...slotsOf(candidate.pairedWith)] : own;
 }
 
@@ -150,11 +153,9 @@ export interface ImproveSettings {
   /** How each section's rows are ordered. */
   sort: ImproveSort;
   onSortChange: (sort: ImproveSort) => void;
-  mode: ImproveMode;
-  onModeChange: (mode: ImproveMode) => void;
-  /** Total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
-  spendCap: number | null;
-  onSpendCapChange: (cap: number | null) => void;
+  /** Total budget in ISK; null is no limit. */
+  iskBudget: number | null;
+  onIskBudgetChange: (cap: number | null) => void;
   defense: DefenseChoice;
   onDefenseChange: (defense: DefenseChoice) => void;
   includeRigs: boolean;
@@ -205,16 +206,15 @@ interface Props {
 function brokeText(
   t: TFunction,
   option: RejectedOption,
-  { mode, spendCap }: Pick<ImproveSettings, 'mode' | 'spendCap'>,
+  { iskBudget }: Pick<ImproveSettings, 'iskBudget'>,
   fitTotal: number | null
 ): string {
-  if (option.guardrail !== 'spend' || spendCap === null || option.iskDelta === null)
+  if (option.guardrail !== 'spend' || iskBudget === null || option.iskDelta === null)
     return t(`fittings.improve.broke.${option.guardrail}`);
-  const planning = mode === 'buy';
-  const over = (planning ? (fitTotal ?? 0) + option.iskDelta : option.iskDelta) - spendCap;
-  return t(planning ? 'fittings.improve.broke.spendBudget' : 'fittings.improve.broke.spendCap', {
+  const over = (fitTotal ?? 0) + option.iskDelta - iskBudget;
+  return t('fittings.improve.broke.spendBudget', {
     over: formatIskCompact(over),
-    cap: formatIskCompact(spendCap),
+    cap: formatIskCompact(iskBudget),
   });
 }
 
@@ -324,14 +324,32 @@ export function ImprovePanel({
       : [];
 
   const swapLabel = (option: ImproveOption) =>
-    option.candidate.fixesUnflyable
-      ? moveLabel({ ...option.candidate, pairedWith: undefined })
-      : option.candidate.pairedWith
-        ? t('fittings.improve.pair', {
-            add: moveLabel({ ...option.candidate, pairedWith: undefined }),
-            downgrade: moveLabel(option.candidate.pairedWith),
-          })
-        : moveLabel(option.candidate);
+    option.candidate.conversion
+      ? t(`fittings.improve.convert.${option.candidate.conversion.side}`)
+      : option.candidate.fixesUnflyable
+        ? moveLabel({ ...option.candidate, pairedWith: undefined })
+        : option.candidate.pairedWith
+          ? t('fittings.improve.pair', {
+              add: moveLabel({ ...option.candidate, pairedWith: undefined }),
+              downgrade: moveLabel(option.candidate.pairedWith),
+            })
+          : moveLabel(option.candidate);
+
+  /** A conversion's size at a glance: what it removes and adds, and the slots it leaves empty. */
+  function conversionLine(candidate: ImproveOption['candidate']): string | null {
+    if (!candidate.conversion) return null;
+    const summary = conversionSummary(candidate);
+    const { removed, added } = summary;
+    const freed = TANK_RACKS.filter((rack) => summary.freed[rack] > 0).map((rack) =>
+      t(`fittings.improve.convert.freedRack.${rack}`, { count: summary.freed[rack] })
+    );
+    return [
+      t('fittings.improve.convert.counts', { count: removed, removed, added }),
+      freed.length > 0 ? t('fittings.improve.convert.freed', { slots: freed.join(', ') }) : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
 
   /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
   function changeLine(
@@ -683,9 +701,17 @@ export function ImprovePanel({
             )}
             {option.candidate.fixesUnflyable && option.candidate.pairedWith && (
               <span className="block text-xs">
-                {t('fittings.improve.flyableWith', {
-                  swaps: flyableSwaps(option.candidate).join('; '),
-                })}
+                {t(
+                  option.candidate.covers === 'capacitor'
+                    ? 'fittings.improve.flyableWithCapacitor'
+                    : 'fittings.improve.flyableWith',
+                  { swaps: flyableSwaps(option.candidate).join('; ') }
+                )}
+              </span>
+            )}
+            {option.candidate.conversion && (
+              <span className="text-text-dim block text-xs">
+                {conversionLine(option.candidate)}
               </span>
             )}
             {lead && <span className="block text-xs">{lead.node}</span>}
@@ -702,11 +728,6 @@ export function ImprovePanel({
             {replaced.has(optionKey(option)) && ticked.has(optionKey(option)) && (
               <span className="text-text-dim block text-xs">
                 {t('fittings.improve.replacesPick', { swap: replaced.get(optionKey(option)) })}
-              </span>
-            )}
-            {option.destroysRigs && (
-              <span className="text-warning block text-xs">
-                {t('fittings.improve.destroysRig')}
               </span>
             )}
           </span>
@@ -834,8 +855,7 @@ export function ImprovePanel({
           options: chosen,
           before: state.before,
           after: checked,
-          mode: settings.mode,
-          spendCap: settings.spendCap,
+          iskBudget: settings.iskBudget,
           fitTotal: state.fitTotal,
           target,
         })
@@ -860,7 +880,6 @@ export function ImprovePanel({
           swaps: pool.swaps.filter((swap) => !taken.has(`${swap.slot}${swap.slotIndex}`)),
           stats: recalc,
           priceOf: pool.priceOf,
-          mode: settings.mode,
           isCancelled: () => stale,
         });
         if (!stale) setCovers({ key: chosenKey, options });
@@ -870,8 +889,7 @@ export function ImprovePanel({
       stale = true;
       clearTimeout(timer);
     };
-    // `settings.mode` is part of the price a cover shows.
-  }, [fitting, recalc, completion, checked, overruns, chosen, chosenKey, settings.mode]);
+  }, [fitting, recalc, completion, checked, overruns, chosen, chosenKey]);
   // Ticked rows that no list shows are covers added from the footer: they get a tick of their own there.
   const listedKeys = useMemo(
     () =>
@@ -891,9 +909,8 @@ export function ImprovePanel({
     covers?.key === chosenKey && summary
       ? covers.options.filter(
           (option) =>
-            !overSpendCap(
-              settings.mode,
-              settings.spendCap,
+            !overIskBudget(
+              settings.iskBudget,
               state.status === 'done' ? state.fitTotal : null,
               summary.isk + (option.iskDelta ?? 0)
             )
@@ -909,7 +926,6 @@ export function ImprovePanel({
       after: checked,
       score: 0,
       iskDelta: summary.isk,
-      destroysRigs: false,
       lost: [],
       guardrail: 'budget',
     };
@@ -961,10 +977,10 @@ export function ImprovePanel({
     () => (previewBefore && previewAfter ? diffFittingStats(previewBefore, previewAfter) : null),
     [previewBefore, previewAfter]
   );
-  // The Price figure follows the same rows. Only buy mode moves the fit's price by exactly the rows' iskDelta.
+  // The Price figure follows the same rows. The rows' iskDelta moves the fit's price exactly.
   const previewRows = hoverAfter && hoverSet ? hoverSet : chosen;
   const previewIsk =
-    settings.mode === 'buy' && previewDelta && previewRows.some((row) => row.iskDelta !== null)
+    previewDelta && previewRows.some((row) => row.iskDelta !== null)
       ? previewRows.reduce((sum, row) => sum + (row.iskDelta ?? 0), 0)
       : null;
   useEffect(() => {
@@ -1018,11 +1034,10 @@ export function ImprovePanel({
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
   const settingsSummary = [
     t(`fittings.improve.reach.${settings.reach}`),
-    t(`fittings.improve.mode.${settings.mode}`),
-    settings.spendCap === null
+    settings.iskBudget === null
       ? t('fittings.improve.summaryNoCap')
-      : t(`fittings.improve.summaryCap.${settings.mode}`, {
-          cap: formatIskCompact(settings.spendCap),
+      : t('fittings.improve.summaryCap', {
+          cap: formatIskCompact(settings.iskBudget),
         }),
   ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
@@ -1151,7 +1166,9 @@ export function ImprovePanel({
               {t(
                 goal === 'cheaper'
                   ? 'fittings.improve.guardrail.cheaper'
-                  : 'fittings.improve.guardrail.combat'
+                  : TANK_GOALS.has(goal)
+                    ? 'fittings.improve.guardrail.tank'
+                    : 'fittings.improve.guardrail.combat'
               )}
             </p>
             <SegmentedControl
@@ -1167,21 +1184,14 @@ export function ImprovePanel({
             <p className="text-text-dim text-xs">
               {t(`fittings.improve.reachHint.${settings.reach}`)}
             </p>
-            <SegmentedControl
-              label={t('fittings.improve.modeLabel')}
-              options={IMPROVE_MODES.map((value) => ({
-                value,
-                label: t(`fittings.improve.mode.${value}`),
-              }))}
-              value={settings.mode}
-              onChange={settings.onModeChange}
-              fill
-            />
             <label className="block space-y-1 text-sm">
-              <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
+              <span>{t('fittings.improve.cap')}</span>
               <IskInput
-                value={settings.spendCap === null ? '' : String(settings.spendCap)}
-                onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
+                mask
+                value={settings.iskBudget === null ? '' : String(settings.iskBudget)}
+                onChange={(value) =>
+                  settings.onIskBudgetChange(value === '' ? null : Number(value))
+                }
               />
             </label>
             {TANK_GOALS.has(goal) && (
@@ -1514,11 +1524,7 @@ export function ImprovePanel({
                           </p>
                         ))}
                       </div>
-                      <SelectionCost
-                        summary={summary}
-                        buy={settings.mode === 'buy'}
-                        spendCap={settings.spendCap}
-                      />
+                      <SelectionCost summary={summary} iskBudget={settings.iskBudget} />
                     </>
                   ) : (
                     <p className="text-text-dim text-xs" role="status">
@@ -1576,11 +1582,6 @@ export function ImprovePanel({
                             )}
                           </span>
                           <span className="block">{isk(option)}</span>
-                          {option.destroysRigs && (
-                            <span className="text-warning block">
-                              {t('fittings.improve.destroysRig')}
-                            </span>
-                          )}
                         </button>
                       ))}
                     </>
@@ -1619,17 +1620,15 @@ export function ImprovePanel({
 }
 
 /**
- * The ticked set's price: the fit's total cost after (buy mode) with what the
+ * The ticked set's price: the fit's total cost after with what the
  * ticks add to it, or just that change when there is no total to compare.
  */
 function SelectionCost({
   summary,
-  buy,
-  spendCap,
+  iskBudget,
 }: {
   summary: SelectionSummary;
-  buy: boolean;
-  spendCap: number | null;
+  iskBudget: number | null;
 }) {
   const { t } = useTranslation();
   const tone =
@@ -1643,7 +1642,7 @@ function SelectionCost({
         <IskAmount value={Math.abs(summary.isk)} />
       </>
     );
-  const total = buy ? summary.total : null;
+  const total = summary.total;
   return (
     <div className="shrink-0 text-right" data-testid="improve-cost">
       <p className="text-text-dim text-xs">
@@ -1663,12 +1662,12 @@ function SelectionCost({
           <span className={tone}>{delta}</span>
         )}
       </p>
-      {(summary.unpriced > 0 || (total !== null && spendCap !== null)) && (
+      {(summary.unpriced > 0 || (total !== null && iskBudget !== null)) && (
         <p className="text-text-dim text-xs">
           {total !== null &&
-            spendCap !== null &&
-            t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(spendCap) })}
-          {total !== null && spendCap !== null && summary.unpriced > 0 && ' · '}
+            iskBudget !== null &&
+            t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(iskBudget) })}
+          {total !== null && iskBudget !== null && summary.unpriced > 0 && ' · '}
           {summary.unpriced > 0 &&
             `+ ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
         </p>

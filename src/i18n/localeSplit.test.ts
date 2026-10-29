@@ -282,9 +282,20 @@ describe('the real en.json against the real sources', () => {
 
   // Overview widget copy can never leave the shell (the Overview is a startup root), so each
   // new Overview kind spends this budget.
+  //
+  // Raised 0.305 -> 0.306 for the bell panel's row actions (Stop these alerts,
+  // the Undo toasts, the topic eyebrow). The panel hangs off the header bell,
+  // so its copy is a startup root too and cannot be lazy. It went over by about
+  // 80 bytes, and there was nothing dead left to reclaim: the same change
+  // already deleted `dismiss`, `dismissAll` and `snoozeLabel`.
+  //
+  // The structural fix, when this budget next bites, is to put `alerts` on
+  // LAZY_SECTIONS: most of that section is the `/alerts` page, which is not a
+  // startup root, so the splitter would keep only the panel's keys in the shell
+  // and move the rest. That is its own change, not a line in a UI PR.
   it('moves most of the locale out of the shell', () => {
     const shellBytes = JSON.stringify(plan.shell).length;
-    expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.305);
+    expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.306);
   });
 
   it('keeps the Corp Board widget builders, and so their copy, out of the startup graph', () => {

@@ -751,23 +751,18 @@ test.describe('Mining Tax ledger — zero values read as muted dashes (#3104)', 
   test.describe('phone', () => {
     test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
-    test('a zero-value row prints no "value" affix and a priced row still does', async ({
-      page,
-    }) => {
+    test('a phone card carries no value entry, priced or not', async ({ page }) => {
       await signInAndGoto(page);
       await seedPayeeBalance(page, { withZeroValue: true });
       await page.goto('./mining/tax');
-      const valueCell = page.locator('tbody td[data-label="Est. value"]').first();
-      await expect(valueCell).toBeHidden();
+      const valueCell = page.locator('tbody td[data-label="Est. value"]');
+      await expect(valueCell).toHaveCount(0);
       await noOverflow(page);
 
       await seedPayeeBalance(page);
       await page.goto('./mining/tax');
-      const priced = page.locator('tbody td[data-label="Est. value"]').first();
-      await expect(priced).toBeVisible();
-      expect(await priced.evaluate((td) => getComputedStyle(td, '::after').content)).toContain(
-        'value'
-      );
+      await expect(page.locator('tbody td[data-label="Tax owed"]').first()).toBeVisible();
+      await expect(valueCell).toHaveCount(0);
     });
   });
 

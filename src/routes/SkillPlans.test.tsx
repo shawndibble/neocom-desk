@@ -422,6 +422,15 @@ describe('SkillPlans CRUD', () => {
     );
   });
 
+  it('keeps a plan open when it belongs to another Character, as after a Character switch', async () => {
+    await db.skillPlans.add(seedPlan({ characterId: CHAR_ID + 1, name: 'Alt plan' }));
+    goToPlanEditor();
+    render(<App />);
+
+    expect(await screen.findByDisplayValue('Alt plan')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/plans/plan-1');
+  });
+
   it('renames a plan from the list, scheduling a sync', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
@@ -463,7 +472,7 @@ describe('SkillPlans CRUD', () => {
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
-  it('deletes a plan via the confirmation Modal, not window.confirm', async () => {
+  it('hides a deleted plan behind an Undo toast and deletes it once the toast ends', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     render(<App />);
@@ -473,32 +482,33 @@ describe('SkillPlans CRUD', () => {
       await within(plans).findByRole('button', { name: 'More actions for Test plan' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-
-    await waitFor(async () =>
-      expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0)
-    );
-    // Deletes MUST go through markPlanDeleted (records a tombstone) — a plain
-    // Dexie delete would let the remote copy resurrect it on next sync.
-    expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1');
-  });
-
-  it('cancels a delete from the confirmation Modal without deleting', async () => {
-    const user = userEvent.setup();
-    await db.skillPlans.add(seedPlan());
-    render(<App />);
-
-    const plans = await openAllPlans(user);
-    await user.click(
-      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('dialog', { name: 'Delete' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    // Pending: the write waits for the toast.
     expect(markPlanDeletedMock).not.toHaveBeenCalled();
+
+    // Closing the toast commits it. Deletes MUST go through markPlanDeleted
+    // (records a tombstone) — a plain Dexie delete would let the remote copy
+    // resurrect it on next sync.
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1'));
+  });
+
+  it('Undo cancels the delete', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const plans = await openAllPlans(user);
+    await user.click(
+      await within(plans).findByRole('button', { name: 'More actions for Test plan' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await user.click(await screen.findByRole('button', { name: 'Undo' }));
+
+    expect(markPlanDeletedMock).not.toHaveBeenCalled();
+    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
   });
 
   it('returns to the list via the back link, and via the browser’s own Back after opening a plan', async () => {
@@ -1258,7 +1268,6 @@ describe('SkillPlans editor: optimize remaps', () => {
       within(entriesPanel).getByRole('button', { name: 'More actions for Gunnery III' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Remove Gunnery III' }));
-    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(screen.queryByText(/^Remapping saves/)).not.toBeInTheDocument());
     // The rest of the app must still be usable — no crash boundary tripped.

@@ -97,7 +97,7 @@ function recordedPayment(): Record<string, unknown> | undefined {
   return settle.mock.calls[0][1] as Record<string, unknown> | undefined;
 }
 
-const RECORD = 'I sent it · record payment';
+const RECORD = 'Record payment';
 
 describe('SettleUpDialog', () => {
   it('offers Open in EVE above To: by id for a verified Payee, by name lookup otherwise', () => {
@@ -172,10 +172,10 @@ describe('SettleUpDialog', () => {
     expect(recordedPayment()).toMatchObject({ method: 'donation', amount: 600_000 });
   });
 
-  it('"Just mark paid" records no payment', async () => {
+  it('"Mark paid only" records no payment', async () => {
     renderDialog(THREE_ROWS);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Just mark paid' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mark paid only' }));
 
     await waitFor(() => expect(settle).toHaveBeenCalled());
     expect(recordedPayment()).toBeUndefined();

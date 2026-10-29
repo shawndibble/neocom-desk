@@ -22,7 +22,7 @@ vi.mock('./foregroundPoller', () => ({ liveDependencies: vi.fn(() => ({})) }));
 vi.mock('./nearbyRouteRules', () => ({ routeRulesForServer: vi.fn(async () => null) }));
 vi.mock('./serverEvents', () => ({
   serverRegistrationsByCharacter: vi.fn(
-    async () => new Map([[1, { serverEvents: ['shipLost'], serverInputs: {} }]])
+    async () => new Map([[1, { serverEvents: ['priceAlertTriggered'], serverInputs: {} }]])
   ),
 }));
 
@@ -64,7 +64,9 @@ describe('enableWebPush', () => {
       {
         eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]),
         // Not empty: an empty map would wipe this device's server events (#5121).
-        serverEventsByCharacter: new Map([[1, { serverEvents: ['shipLost'], serverInputs: {} }]]),
+        serverEventsByCharacter: new Map([
+          [1, { serverEvents: ['priceAlertTriggered'], serverInputs: {} }],
+        ]),
         quietHours: null,
         routeRules: null,
       }

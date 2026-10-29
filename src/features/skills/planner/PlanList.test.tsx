@@ -21,23 +21,8 @@ const noop = () => {};
 const planHref = (id: string) => `/skills/plans/${id}`;
 const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
-describe('PlanList delete confirmation (#408: names the plan)', () => {
-  it('names the plan being deleted in the confirmation modal', async () => {
-    render(
-      <PlanList
-        plans={[plan('1', 'Titan pilot')]}
-        planHref={planHref}
-        onDuplicate={noop}
-        onDelete={noop}
-        onRename={noop}
-      />
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for Titan pilot' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    expect(screen.getByText(/delete "titan pilot"/i)).toBeInTheDocument();
-  });
-
-  it('deletes the plan whose row triggered the confirmation, even with multiple plans', async () => {
+describe('PlanList delete (no confirmation)', () => {
+  it('deletes the plan whose row was chosen, even with multiple plans', async () => {
     const onDelete = vi.fn();
     render(
       <PlanList
@@ -50,9 +35,8 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Beta' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    expect(screen.getByText(/delete "beta"/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith('2');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 
@@ -236,7 +220,6 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Alpha'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Beta/ })).toHaveFocus());
   });
 
@@ -245,7 +228,6 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Beta'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Alpha/ })).toHaveFocus());
   });
 
@@ -262,17 +244,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     );
     await user.click(moreOf('Alpha'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Plans' })).toHaveFocus());
-  });
-
-  it('returns focus to the row ⋮ when the delete dialog is cancelled', async () => {
-    const user = userEvent.setup();
-    render(<Harness initial={[plan('1', 'Alpha')]} />);
-    await user.click(moreOf('Alpha'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
   });
 
   it('returns focus to the row ⋮ after copying to a character', async () => {

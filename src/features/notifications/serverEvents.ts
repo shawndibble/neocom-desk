@@ -3,8 +3,9 @@
  * `20261025-073433-server-pushed-events-community-triggers-polled-price-alerts`):
  * the events a closed app is told about by the backend, with no EVE token
  * there. Community events are pushed when the backend writes them (a Firestore
- * trigger); price alerts and ship losses are read from public data on the
- * 15-minute dispatch tick.
+ * trigger); price alerts are read from public data on the 15-minute dispatch
+ * tick. Ship losses are not server-pushed: the open app reads zKillboard itself
+ * (decision `20261029-000802-ship-losses-are-no-longer-server-pushed`).
  *
  * The device says which of them it wants, per Character, at registration —
  * the same per-device browser-channel model as the EVE notification types
@@ -27,7 +28,6 @@ export const SERVER_PUSHED_EVENT_IDS = [
   'communityMemberJoined',
   'communityRequestPledged',
   'priceAlertTriggered',
-  'shipLost',
   // Needs an Alerts Grant that carries the mail scope (issue #5143, ADR 0029).
   'newMail',
   // Need an Alerts Grant that carries the location (issue #5122, ADR 0028).
@@ -68,7 +68,6 @@ export interface ServerEventInputs {
     targetPrice: number;
     direction: 'above' | 'below';
   }[];
-  shipLostMinimumIsk?: number;
   /** This Character's N for `incursionNearby`; sent with it. */
   incursionNearbyJumps?: number;
   /** This Character's N for `skyhookRaidableNearby`; sent with it. */

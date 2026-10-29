@@ -45,12 +45,15 @@ export function EveNotificationRow({
   context,
   extraTypesByCharacter,
   showTypes = true,
+  typeFilter = null,
 }: {
   context: EventRowContext;
   /** Seen ESI types outside the allow-list, per Character. */
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
   /** Leave the type list out: a search stacks every match, and this list is the longest on the page. */
   showTypes?: boolean;
+  /** A search's matched types: only these get a row. The family tick-boxes still act on the whole family. */
+  typeFilter?: ReadonlySet<string> | null;
 }) {
   const { t } = useTranslation();
   const eventId = 'eveNotification' as const;
@@ -69,7 +72,11 @@ export function EveNotificationRow({
   const families = [
     ...NOTIFICATION_FAMILIES.map((family) => ({ key: family, types: eveTypesByFamily(family) })),
     { key: 'other', types: otherTypes },
-  ].filter((family) => family.types.length > 0);
+  ].filter(
+    (family) =>
+      family.types.length > 0 &&
+      (typeFilter === null || family.types.some((type) => typeFilter.has(type)))
+  );
 
   return (
     <>
@@ -139,49 +146,51 @@ export function EveNotificationRow({
                     ))}
                   </div>
                   <ul className="divide-y divide-line/60">
-                    {types.map((type) => {
-                      const typeLabel = eveTypeLabel(t, type);
-                      return (
-                        <AggregateRow
-                          key={type}
-                          tone="type"
-                          label={typeLabel}
-                          labelAccessory={
-                            // Only the missing-grant mark, and only where Device is ticked: a hundred rows of marks would drown the page.
-                            grantMissing === true &&
-                            applicableIds.some((id) =>
+                    {types
+                      .filter((type) => typeFilter === null || typeFilter.has(type))
+                      .map((type) => {
+                        const typeLabel = eveTypeLabel(t, type);
+                        return (
+                          <AggregateRow
+                            key={type}
+                            tone="type"
+                            label={typeLabel}
+                            labelAccessory={
+                              // Only the missing-grant mark, and only where Device is ticked: a hundred rows of marks would drown the page.
+                              grantMissing === true &&
+                              applicableIds.some((id) =>
+                                isEveTypeEnabledFor(
+                                  characterEveTypePrefs(prefsValue, id),
+                                  type,
+                                  'browser'
+                                )
+                              ) ? (
+                                <EveGrantMissingBadge />
+                              ) : undefined
+                            }
+                            characters={context.characters}
+                            availability={availability}
+                            readValue={(id, channel) =>
                               isEveTypeEnabledFor(
                                 characterEveTypePrefs(prefsValue, id),
                                 type,
-                                'browser'
+                                channel
                               )
-                            ) ? (
-                              <EveGrantMissingBadge />
-                            ) : undefined
-                          }
-                          characters={context.characters}
-                          availability={availability}
-                          readValue={(id, channel) =>
-                            isEveTypeEnabledFor(
-                              characterEveTypePrefs(prefsValue, id),
-                              type,
-                              channel
-                            )
-                          }
-                          onToggleAll={(ids, channel) =>
-                            void broadcastEveTypeChannelPref(ids, currentValue(), type, channel)
-                          }
-                          onToggleOne={(id, channel) =>
-                            toggleEveTypeChannelPref(id, currentValue(), type, channel)
-                          }
-                          channelOff={context.channelOff}
-                          visibleCharacterIds={context.visibleCharacterIds}
-                          forceExpanded={false}
-                          // Always inline, even on a phone: a sheet over the Topic page loses the Back button.
-                          isDesktop
-                        />
-                      );
-                    })}
+                            }
+                            onToggleAll={(ids, channel) =>
+                              void broadcastEveTypeChannelPref(ids, currentValue(), type, channel)
+                            }
+                            onToggleOne={(id, channel) =>
+                              toggleEveTypeChannelPref(id, currentValue(), type, channel)
+                            }
+                            channelOff={context.channelOff}
+                            visibleCharacterIds={context.visibleCharacterIds}
+                            forceExpanded={false}
+                            // Always inline, even on a phone: a sheet over the Topic page loses the Back button.
+                            isDesktop
+                          />
+                        );
+                      })}
                   </ul>
                 </section>
               );

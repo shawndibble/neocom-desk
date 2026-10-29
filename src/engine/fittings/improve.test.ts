@@ -4,7 +4,7 @@ import {
   findImprovements,
   goalAvailability,
   improveCandidates,
-  overSpendCap,
+  overIskBudget,
   rankImproveOptions,
   type FlyableCompensators,
   type ImproveCandidate,
@@ -25,6 +25,10 @@ interface Row {
   cpu?: number;
   /** Turns the capacitor unstable. */
   capUnstable?: boolean;
+  /** Offsets every module that turns the capacitor unstable. */
+  capCover?: boolean;
+  /** A module the pilot switches on; it turns the capacitor unstable only while running. */
+  toggled?: boolean;
   /** Signature radius added, in m. */
   sig?: number;
   /** Capacitor recharge time added, in ms. */
@@ -33,19 +37,24 @@ interface Row {
   breaks?: RuleBreak[];
 }
 
-function stats(rows: Row[]): FittingStats {
+function stats(rows: Row[], states: string[] = []): FittingStats {
   const sum = (key: 'dps' | 'ehp' | 'speed' | 'cpu' | 'sig' | 'recharge') =>
     rows.reduce((total, row) => total + (row[key] ?? 0), 0);
   const base = baseFittingStats();
   return {
     ...base,
     ruleBreaks: rows.flatMap((row) => row.breaks ?? []),
+    modules: rows.flatMap((row, i) =>
+      row.toggled ? [{ state: states[i] ?? 'online', maxState: 'active' }] : []
+    ),
     cpuUsed: sum('cpu'),
     capacitorRechargeTime: base.capacitorRechargeTime + sum('recharge'),
     ehp: base.ehp + sum('ehp'),
-    capacitor: rows.some((row) => row.capUnstable)
-      ? { stable: false, depletesInSeconds: 120 }
-      : base.capacitor,
+    capacitor:
+      rows.some((row, i) => row.capUnstable || (row.toggled && states[i] === 'active')) &&
+      !rows.some((row) => row.capCover)
+        ? { stable: false, depletesInSeconds: 120 }
+        : base.capacitor,
     navigation: { ...base.navigation, maxVelocity: base.navigation.maxVelocity + sum('speed') },
     targeting: { ...base.targeting, signatureRadius: base.targeting.signatureRadius + sum('sig') },
     offense: {
@@ -65,7 +74,10 @@ function fit(typeIds: number[]): Fitting {
 }
 
 const calc = (table: Record<number, Row>) => async (f: Fitting) =>
-  stats(f.modules.map((m) => table[m.typeId] ?? {}));
+  stats(
+    f.modules.map((m) => table[m.typeId] ?? {}),
+    f.modules.map((m) => m.state)
+  );
 
 const candidate = (fromTypeId: number, toTypeId: number, slotIndex = 0): ImproveCandidate => ({
   fromTypeId,
@@ -81,8 +93,7 @@ async function search(
   base = fit([1]),
   extra: {
     compensators?: FlyableCompensators;
-    spendCap?: number | null;
-    mode?: 'buy' | 'refit';
+    iskBudget?: number | null;
   } = {}
 ) {
   const stat = calc(table);
@@ -247,14 +258,123 @@ describe('findImprovements replacing an unflyable module', () => {
     expect(result.tradeOffs).toEqual([]);
   });
 
-  it('ignores the capacitor and Cheaper stat guardrails, but not the fit’s CPU', async () => {
-    const table = { 1: {}, 2: { capUnstable: true, dps: -50 }, 3: { cpu: 999 } };
-    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3)], { 1: 100, 2: 500 });
+  it('ignores the Cheaper stat guardrails, but not the fit’s CPU or a stable capacitor', async () => {
+    const table = { 1: {}, 2: { dps: -50 }, 3: { cpu: 999 }, 4: { capUnstable: true } };
+    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3), fix(1, 4)], {
+      1: 100,
+      2: 500,
+    });
     expect(toIds(result.makeFlyable)).toEqual([2]);
     expect(result.rejected).toEqual([]);
     expect(result.flyableBlocked.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
       [3, 'budget'],
+      [4, 'capStable'],
     ]);
+  });
+});
+
+describe('findImprovements replacing an unflyable module and the capacitor', () => {
+  const fix: ImproveCandidate = { ...candidate(1, 2), fixesUnflyable: true };
+  const running = (typeIds: number[]) =>
+    ({
+      ...fit(typeIds),
+      modules: typeIds.map((typeId, slotIndex) => ({
+        slot: 'low',
+        slotIndex,
+        typeId,
+        state: 'active',
+      })),
+    }) as unknown as Fitting;
+
+  it('allows a toggled replacement that is stable with the toggled modules off', async () => {
+    const table = { 1: {}, 2: { toggled: true } };
+    const result = await search('damage', table, [fix], {}, running([1]));
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+  });
+
+  it('blocks one that is still unstable with the toggled modules off', async () => {
+    const table = { 1: {}, 2: { capUnstable: true }, 5: { toggled: true } };
+    const result = await search('damage', table, [fix], {}, fit([1, 5]));
+    expect(result.makeFlyable).toEqual([]);
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
+  });
+
+  it('still offers another replacement that keeps the capacitor stable', async () => {
+    const table = { 1: {}, 2: { capUnstable: true }, 3: {} };
+    const result = await search('damage', table, [
+      fix,
+      { ...candidate(1, 3), fixesUnflyable: true },
+    ]);
+    expect(toIds(result.makeFlyable)).toEqual([3]);
+    expect(result.flyableBlocked.map((r) => r.candidate.toTypeId)).toEqual([2]);
+  });
+
+  it('leaves a ship whose capacitor was already unstable alone', async () => {
+    const table = { 1: { capUnstable: true }, 2: { capUnstable: true } };
+    const result = await search('damage', table, [fix]);
+    expect(toIds(result.makeFlyable)).toEqual([2]);
+  });
+
+  it('blocks an unstable replacement on a ship with nothing to toggle', async () => {
+    const table = { 1: {}, 2: { capUnstable: true } };
+    const result = await search('damage', table, [fix], {}, running([1]));
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
+  });
+});
+
+describe('findImprovements Make Flyable capacitor cover', () => {
+  // Module 2 flies but turns the capacitor unstable; module 6 in place of 5 steadies it.
+  const base = fit([1, 5]);
+  const fix: ImproveCandidate = { ...candidate(1, 2), fixesUnflyable: true };
+  const swapFor = (toTypeId: number, fromTypeId = 5) => ({
+    slot: 'low' as const,
+    slotIndex: 1,
+    fromTypeId,
+    toTypeId,
+  });
+  const table = {
+    1: {},
+    2: { capUnstable: true },
+    5: {},
+    6: { capCover: true },
+    7: { capCover: true },
+  };
+
+  it('adds the swap that keeps the capacitor stable, so the option can be applied', async () => {
+    const prices = { 1: 10, 2: 10, 5: 50, 6: 200 };
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6)],
+    });
+    expect(result.flyableBlocked).toEqual([]);
+    const [option] = result.makeFlyable;
+    expect(option.candidate.toTypeId).toBe(2);
+    expect(option.candidate.pairedWith?.toTypeId).toBe(6);
+    expect(option.after.capacitor.stable).toBe(true);
+    expect(option.candidate.covers).toBe('capacitor');
+    expect(option.iskDelta).toBe(150);
+  });
+
+  it('offers the cheaper of two covers first', async () => {
+    const prices = { 1: 10, 2: 10, 5: 50, 6: 400, 7: 100 };
+    const result = await search('damage', table, [fix], prices, base, {
+      compensators: () => [swapFor(6), swapFor(7)],
+    });
+    expect(result.makeFlyable.map((o) => o.candidate.pairedWith?.toTypeId)).toEqual([7, 6]);
+  });
+
+  it('leaves the greyed row when no swap steadies the capacitor', async () => {
+    const result = await search('damage', table, [fix], {}, base, {
+      compensators: () => [swapFor(5, 5)],
+    });
+    expect(result.makeFlyable).toEqual([]);
+    expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['capStable']);
+  });
+
+  it('keeps a capacitor fix out of the implant list, which only helps CPU and powergrid', async () => {
+    const result = await search('damage', table, [fix], {}, base, {
+      compensators: () => [swapFor(5, 5)],
+    });
+    expect(result.flyableOverrun).toEqual([]);
   });
 });
 
@@ -313,8 +433,7 @@ describe('findImprovements Make Flyable bundles', () => {
   it('greys a bundle that costs more than the spend cap', async () => {
     const result = await search('damage', table, [fix], prices, base, {
       compensators: () => [swapFor(6)],
-      spendCap: 150,
-      mode: 'refit',
+      iskBudget: 150,
     });
     expect(result.makeFlyable).toEqual([]);
     expect(result.flyableBlocked.map((r) => r.guardrail)).toEqual(['spend']);
@@ -599,22 +718,19 @@ describe('damageOf', () => {
   });
 });
 
-describe('overSpendCap', () => {
+describe('overIskBudget', () => {
   it('counts an implant set against the same budget as the swaps', () => {
-    // Planning: the fit costs 900 and the fix 50; 100 of implants makes 1050.
-    expect(overSpendCap('buy', 1000, 900, 50, 0)).toBe(false);
-    expect(overSpendCap('buy', 1000, 900, 50, 100)).toBe(true);
-    // Refitting: only the extra spend counts.
-    expect(overSpendCap('refit', 200, 900, 50, 100)).toBe(false);
-    expect(overSpendCap('refit', 120, 900, 50, 100)).toBe(true);
+    // The fit costs 900 and the fix 50; 100 of implants makes 1050.
+    expect(overIskBudget(1000, 900, 50, 0)).toBe(false);
+    expect(overIskBudget(1000, 900, 50, 100)).toBe(true);
   });
 
   it('never blocks without a cap or a price', () => {
-    expect(overSpendCap('buy', null, 900, 50, 1e9)).toBe(false);
-    expect(overSpendCap('buy', 10, 900, null, 0)).toBe(false);
+    expect(overIskBudget(null, 900, 50, 1e9)).toBe(false);
+    expect(overIskBudget(10, 900, null, 0)).toBe(false);
   });
 
   it('still charges the implants of an unpriced change', () => {
-    expect(overSpendCap('refit', 100, 900, null, 150)).toBe(true);
+    expect(overIskBudget(1000, 900, null, 150)).toBe(true);
   });
 });

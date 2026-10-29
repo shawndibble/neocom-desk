@@ -31,12 +31,10 @@ import {
   useImproveGoalByRole,
   hullOf,
   useImproveHold,
-  useImproveMode,
   useImproveOre,
   useImproveReach,
   useImproveSort,
   useImproveBudget,
-  useImproveRefitCap,
   migrateSpendCap,
 } from './useImprove';
 import type { FittingWorkspace } from './useFittingWorkspace';
@@ -110,19 +108,12 @@ export function useImproveDrawer({
   const setReach = useImproveReach((state) => state.setValue);
   const sort = useImproveSort((state) => state.value);
   const setSort = useImproveSort((state) => state.setValue);
-  const mode = useImproveMode((state) => state.value);
-  const setMode = useImproveMode((state) => state.setValue);
   const oreFamily = useImproveOre((state) => state.value);
   const setOreFamily = useImproveOre((state) => state.setValue);
   const hold = useImproveHold((state) => state.value);
   const setHold = useImproveHold((state) => state.setValue);
-  // Planning's budget and Refitting's cap are separate settings; the field shows the mode's own.
-  const budget = useImproveBudget((state) => state.value);
-  const setBudget = useImproveBudget((state) => state.setValue);
-  const refitCap = useImproveRefitCap((state) => state.value);
-  const setRefitCap = useImproveRefitCap((state) => state.setValue);
-  const spendCap = mode === 'buy' ? budget : refitCap;
-  const setSpendCap = mode === 'buy' ? setBudget : setRefitCap;
+  const iskBudget = useImproveBudget((state) => state.value);
+  const setIskBudget = useImproveBudget((state) => state.setValue);
   useEffect(() => {
     void migrateSpendCap();
   }, []);
@@ -190,8 +181,7 @@ export function useImproveDrawer({
     isOpen,
     {
       reach,
-      mode,
-      spendCap,
+      iskBudget,
       defense,
       includeRigs,
       includeOfficer,
@@ -282,8 +272,7 @@ export function useImproveDrawer({
                   basis: workspace.implantBasis,
                   onChange: workspace.setImplantSet,
                 }}
-                mode={mode}
-                spendCap={spendCap}
+                iskBudget={iskBudget}
                 fitTotal={search.state.status === 'done' ? search.state.fitTotal : null}
                 onApply={applyWithImplants}
               />
@@ -335,10 +324,8 @@ export function useImproveDrawer({
         onReachChange: (next) => void setReach(next),
         sort,
         onSortChange: (next) => void setSort(next),
-        mode,
-        onModeChange: (next) => void setMode(next),
-        spendCap,
-        onSpendCapChange: (next) => void setSpendCap(next),
+        iskBudget,
+        onIskBudgetChange: (next) => void setIskBudget(next),
         defense,
         onDefenseChange: setDefense,
         includeRigs,

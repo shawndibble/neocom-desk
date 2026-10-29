@@ -1360,6 +1360,8 @@
     "improve": {
       "menuItem": "Improve Fit",
       "button": "Improve",
+      "fixMenuItem": "Fix Fit",
+      "fixButton": "Fix Fit",
       "title": "Improve Fit",
       "goalLabel": "Improve Goal",
       "goal": {
@@ -1394,6 +1396,7 @@
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
+        "tank": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration. A tank conversion keeps at least half of the sustained tank.",
         "cheaper": "Keeps damage, tank and speed each within 10%, the capacitor stable and the fit within CPU, powergrid and calibration."
       },
       "checking": "Checking {{checked}} of {{total}} swaps…",
@@ -1408,6 +1411,7 @@
       "givesUp": "Gives up:",
       "unflyable": "You can't fly the current module yet; this one you can.",
       "flyableWith": "Also swaps {{swaps}} to keep the fit within CPU, powergrid and calibration.",
+      "flyableWithCapacitor": "Also swaps {{swaps}} to keep the capacitor stable.",
       "flyableImplants": "Or fly {{fix}} with implants instead:",
       "appliedWithImplants": "Made the module flyable and set the implants.",
       "cover": {
@@ -1461,9 +1465,9 @@
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
         "keepsStats": "Loses more than 10% of damage, tank or speed",
-        "spend": "Costs more than your budget or spend cap",
-        "spendBudget": "Over your {{cap}} budget by {{over}}",
-        "spendCap": "{{over}} over your {{cap}} cap"
+        "keepsTank": "Loses more than half of the sustained tank",
+        "spend": "Costs more than your budget",
+        "spendBudget": "Over your {{cap}} budget by {{over}}"
       },
       "widen": {
         "upgrade": "Only variations of the modules already fitted are tried. Rebalance or Rework tries more.",
@@ -1477,12 +1481,7 @@
         "rebalance": "Also tries a different module doing the same job.",
         "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
       },
-      "modeLabel": "Improve mode",
-      "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
-      "cap": {
-        "buy": "Total budget (ISK)",
-        "refit": "Extra spend cap (ISK)"
-      },
+      "cap": "Total budget (ISK)",
       "defenseLabel": "Defense Choice",
       "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor", "either": "Either" },
       "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
@@ -1500,16 +1499,27 @@
       "findImplants": "Find implants",
       "settingsLabel": "Search settings",
       "summaryNoCap": "no budget",
-      "summaryCap": {
-        "buy": "budget {{cap}}",
-        "refit": "cap {{cap}}"
-      },
+      "summaryCap": "budget {{cap}}",
       "includeRigs": "Rigs",
       "includeOfficer": "Officer and Deadspace modules",
-      "destroysRig": "Removing the old rig destroys it; the new one is paid in full.",
       "fill_one": "Add {{to}}",
       "fill_other": "Add {{count}}× {{to}}",
       "pair": "{{add}}, paid for by {{downgrade}}",
+      "convert": {
+        "shield": "Convert to shield tank",
+        "armor": "Convert to armor tank",
+        "counts_one": "Removes {{removed}} module, adds {{added}}.",
+        "counts_other": "Removes {{removed}} modules, adds {{added}}.",
+        "freed": "Frees {{slots}}.",
+        "freedRack": {
+          "high_one": "{{count}} high slot",
+          "high_other": "{{count}} high slots",
+          "medium_one": "{{count}} mid slot",
+          "medium_other": "{{count}} mid slots",
+          "low_one": "{{count}} low slot",
+          "low_other": "{{count}} low slots"
+        }
+      },
       "partial": "Best of the first {{checked}} swaps checked.",
       "checked_one": "Checked {{count}} swap in {{seconds}} s",
       "checked_other": "Checked {{count}} swaps in {{seconds}} s",
@@ -1537,7 +1547,7 @@
         "problem": {
           "over": "Together these over-run the {{resource}}.",
           "capStable": "Together these leave the capacitor unstable.",
-          "spend": "Together these pass your spend cap."
+          "spend": "Together these pass your budget."
         }
       },
       "unloaded": {
@@ -2503,7 +2513,8 @@
     "deleteMenu": "Delete",
     "copyToCharacterHint": "Copy \"{{name}}\" to another character on this account.",
     "delete": "Delete",
-    "deleteConfirm": "Delete \"{{name}}\"? This can't be undone.",
+    "deleted": "Deleted \"{{name}}\"",
+    "undo": "Undo",
     "cancel": "Cancel",
     "rename": "Rename",
     "emptyTitle": "No skill plans yet",
@@ -2703,9 +2714,7 @@
     "dragInstructions": "To pick up an entry or remap marker, press the space bar. While dragging, use the arrow keys to move it. Press space again to drop it in its new position, or press escape to cancel.",
     "removeEntry": "Remove {{name}}",
     "removeBlockedByDependent": "Required by {{blocker}}",
-    "removeEntryConfirmTitle": "Remove skill",
-    "removeEntryConfirm": "Remove \"{{name}}\" from this plan?",
-    "removeEntryAction": "Remove",
+    "entryRemoved": "Removed \"{{name}}\" from this plan",
     "dragPrereq": "Drag {{name}} into the plan — press Space then arrow keys to move it",
     "promotePrereq": "Add {{name}} to the plan",
     "prereqPromoted": "{{name}} is now a plan entry",
@@ -2719,6 +2728,9 @@
     "importQueueReplace": "Replace plan",
     "importQueueReplaced": "Plan replaced with skill queue",
     "importQueueUndo": "Undo",
+    "removeTrained": "Remove trained skills",
+    "trainedRemoved_one": "Removed {{count}} trained skill",
+    "trainedRemoved_other": "Removed {{count}} trained skills",
     "addMarker": "Add remap marker",
     "markerAdded": "Marker added",
     "optimizeAtMarkers": "Optimize at my markers",
@@ -6450,16 +6462,21 @@
       },
       "groupCount_one": "{{count}} alert",
       "groupCount_other": "{{count}} alerts",
+      "expandLabel": "{{title}}, {{count}} alerts",
+      "topicOther": "Alerts",
       "eveTime": "EVE time {{time}}",
       "view": "View",
       "viewLabel": "View {{title}}",
       "snooze": "Snooze 1h",
-      "snoozeLabel": "Snooze {{title}} for 1 hour",
-      "dismiss": "Dismiss",
       "dismissLabel": "Dismiss {{title}}",
       "dismissAllLabel": "Dismiss all {{count}} {{title}} alerts",
-      "dismissAll": "Dismiss all {{count}}",
       "dismissFire": "Dismiss: {{body}}",
+      "stopThese": "Stop these alerts",
+      "undo": "Undo",
+      "undoDismissed": "{{title}} dismissed",
+      "undoDismissedMany": "{{title}} dismissed · {{count}} alerts",
+      "undoStopped": "{{title}} alerts off for all characters",
+      "undoStoppedOne": "{{title}} alerts off",
       "showMore_one": "Show {{count}} more",
       "showMore_other": "Show {{count}} more",
       "acknowledge": "Acknowledge",
@@ -7362,7 +7379,7 @@
     "settleUpSeveralPayees": "{{count}} payees",
     "settleUpIncludeLabel": "Include {{date}}",
     "settleUpUntickHint": "Untick an entry to hold it back.",
-    "settleUpJustMarkPaid": "Just mark paid",
+    "settleUpJustMarkPaid": "Mark paid only",
     "settleUpReasonPrefix": "Moon tax",
     "settleUpCopy": "Copy",
     "settleUpCopied": "Copied",
@@ -7407,8 +7424,8 @@
     "paidAtLabel": "Paid on",
     "paymentCardTitle": "Payment",
     "noLinkedTransactions": "No wallet transaction linked yet.",
-    "linkTransactionAction": "Link a transaction",
-    "unlinkTransactionAction": "Unlink this transaction",
+    "linkTransactionAction": "Link transaction",
+    "unlinkTransactionAction": "Unlink",
     "linkTransactionTitle": "Link a wallet transaction",
     "linkTransactionHint": "Pick the transaction that paid this — it's shown here so you can jump straight to it later, even if you marked this paid before ESI posted it.",
     "linkTransactionSearchPlaceholder": "Search by amount, date, or description…",
@@ -7605,7 +7622,7 @@
       "shortBy": "{{amount}} ISK short of the ticked entries",
       "notEnough": "Not enough for the oldest entry",
       "hint": "Record it now — the transfer links itself once it shows up in your wallet journal.",
-      "recordAction": "I sent it · record payment",
+      "recordAction": "Record payment",
       "pickFromWallet": "Already in my wallet? Pick it",
       "fromLabel": "Paying from",
       "fromOption": "{{name}} · {{amount}} ISK",
@@ -7842,9 +7859,7 @@
       "haulerSizingUnavailable": "Hauler sizing needs data that isn't downloaded yet, or your skills couldn't be read. Connect once, then plan again.",
       "showRoute": "Show my route",
       "routeFailed": "Could not work out the route. Try again.",
-      "replaceHaulTitle": "Replace the haul in progress?",
-      "replaceHaulBody": "You have a haul saved already. Showing this route replaces it, and its legs are lost.",
-      "replaceHaul": "Replace haul",
+      "haulReplaced": "Replaced the haul in progress",
       "resumeHaul": "Haul in progress — resume",
       "haul": {
         "title": "Haul in progress",
@@ -7918,8 +7933,7 @@
         "replanFailed": "Could not replan the route. Try again later.",
         "resetProgress": "Reset progress",
         "clear": "Clear haul",
-        "clearTitle": "Clear the haul in progress?",
-        "clearBody": "The saved route and its legs are removed. The Move plan is not affected."
+        "cleared": "Cleared the haul in progress"
       },
       "volumeUnknown": "volume unknown",
       "flyIt": "Fly it",
@@ -10467,9 +10481,8 @@
       "unavailable": "A Fitting no longer on this device",
       "inGame": "In-game",
       "cannot": "That Fitting can't be shared: it is unreadable or too large.",
-      "offTitle": "Stop sharing all your Fittings?",
-      "offBody": "This removes every Fitting you share with this Community, including ones you picked one by one. You can share them again at any time.",
-      "offAction": "Stop sharing all",
+      "stoppedAll": "Stopped sharing all your Fittings",
+      "undo": "Undo",
       "loadFailed": "Couldn't load your Fittings.",
       "failed": "Couldn't update the Fittings. Try again."
     },
@@ -10562,9 +10575,8 @@
         "yourPilot": "Pilot: {{name}}",
         "noShare": "You aren't on this payout's list.",
         "remove": "Remove payout",
-        "removeTitle": "Remove this payout?",
-        "removeBody": "{{name}} and all its shares are deleted for everyone. Pilots you haven't marked paid lose the record of what they're owed.",
-        "removeAction": "Remove payout"
+        "removed": "Removed payout {{name}}",
+        "undo": "Undo"
       },
       "compose": {
         "title": "New payout",
@@ -10686,9 +10698,8 @@
       "stop": "Stop sharing",
       "noneShared": "No blueprints shared yet",
       "limited": "Showing the first {{count}}. Search to narrow the list.",
-      "offTitle": "Stop sharing all your blueprints?",
-      "offBody": "This removes every blueprint you share with this Community, including ones you picked one by one and every station or structure you share. You can share them again at any time.",
-      "offAction": "Stop sharing all",
+      "stoppedAll": "Stopped sharing all your blueprints",
+      "undo": "Undo",
       "skipped_one": "{{count}} blueprint is not shared: Neocom Desk cannot tell which station or structure it is in (inside a container it cannot trace, or in a structure you cannot read). It is added once its place can be worked out.",
       "skipped_other": "{{count}} blueprints are not shared: Neocom Desk cannot tell which station or structure they are in (inside a container it cannot trace, or in a structure you cannot read). They are added once their place can be worked out.",
       "unpublished": "Saved on this device, but it did not reach the Community yet. Neocom Desk retries on its own; blueprints it cannot place at a station are left out."
@@ -10809,17 +10820,14 @@
       },
       "admin": {
         "removeRequest": "Remove request",
-        "removeRequestTitle": "Remove this request?",
-        "removeRequestBody": "{{name}}'s request for {{items}} and every Pledge on it are deleted for the whole Community right away.",
-        "removeRequestAction": "Remove request",
+        "requestRemoved": "Removed {{name}}'s request",
+        "undo": "Undo",
         "pledgesLabel": "Pledges on this request",
         "pledgeSummary_one": "{{count}} line",
         "pledgeSummary_other": "{{count}} lines",
         "removePledge": "Remove",
         "removePledgeFor": "Remove {{name}}'s Pledge",
-        "removePledgeTitle": "Remove {{name}}'s Pledge?",
-        "removePledgeBody": "Their Pledge on this request is deleted. The request and the other Pledges stay.",
-        "removePledgeAction": "Remove Pledge",
+        "pledgeRemoved": "Removed {{name}}'s Pledge",
         "unknownPledger": "Former Member",
         "quoteSummary": "Quote {{price}} ISK"
       },
@@ -18086,10 +18094,7 @@
         "contentsValue": "{{modules}} modules, {{rigs}} rigs",
         "delete": "Delete",
         "deleteLabel": "Delete {{name}}",
-        "deleteTitle": "Delete {{name}}?",
-        "deleteBody": "Hulls stop being checked against it. Claims already filed keep the result they were checked with.",
-        "deleteAction": "Delete Doctrine Fit",
-        "deleteFailed": "Couldn't delete the Doctrine Fit. Try again.",
+        "undo": "Undo",
         "dialog": {
           "fittingTitle": "Add from my Fittings",
           "fittingLabel": "Fitting",

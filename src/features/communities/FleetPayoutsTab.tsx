@@ -7,6 +7,8 @@ import {
   NeedsConnection,
   Panel,
   Spinner,
+  ToastStack,
+  useDeferredCommits,
   type DataTableColumn,
 } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
@@ -82,11 +84,16 @@ export function FleetPayoutsTab({
   const { t } = useTranslation();
   const [openId, setOpenId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  // A removed payout stays hidden until its Undo toast ends and the write lands.
+  const pendingRemovals = useDeferredCommits();
+  const { hiddenIds } = pendingRemovals;
 
   const rows = useMemo(() => {
     const listed = new Set(mySharesOf(payouts ?? [], myUid).map((p) => p.id));
-    return (payouts ?? []).filter((p) => p.ownerUid === myUid || listed.has(p.id));
-  }, [payouts, myUid]);
+    return (payouts ?? []).filter(
+      (p) => !hiddenIds.has(p.id) && (p.ownerUid === myUid || listed.has(p.id))
+    );
+  }, [payouts, myUid, hiddenIds]);
 
   const columns: DataTableColumn<FleetPayout>[] = [
     {
@@ -153,7 +160,7 @@ export function FleetPayoutsTab({
       </Button>
     </NeedsConnection>
   );
-  const open = payouts.find((p) => p.id === openId) ?? null;
+  const open = payouts.find((p) => p.id === openId && !hiddenIds.has(p.id)) ?? null;
 
   return (
     <div className="space-y-3">
@@ -187,12 +194,25 @@ export function FleetPayoutsTab({
           communityId={communityId}
           onClose={() => setOpenId(null)}
           onChanged={onReload}
-          onRemoved={() => {
+          onRemove={({ message, commit }) => {
+            pendingRemovals.defer({
+              id: open.id,
+              message,
+              commit: async () => {
+                await commit();
+                onReload();
+              },
+            });
             setOpenId(null);
-            onReload();
           }}
         />
       )}
+      <ToastStack
+        items={pendingRemovals.items}
+        undoLabel={t('communities.payouts.detail.undo')}
+        onUndo={pendingRemovals.undo}
+        onClose={pendingRemovals.commit}
+      />
       {composing && (
         <ComposeFleetPayoutDialog
           characterId={characterId}

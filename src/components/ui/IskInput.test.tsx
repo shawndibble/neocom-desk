@@ -9,10 +9,12 @@ function Harness({
   initial = '',
   onCommit,
   echo,
+  mask,
 }: {
   initial?: string;
   onCommit: (value: string) => void;
   echo?: boolean;
+  mask?: boolean;
 }) {
   const [value, setValue] = useState(initial);
   return (
@@ -21,6 +23,7 @@ function Harness({
         aria-label="Max price"
         value={value}
         echo={echo}
+        mask={mask}
         onChange={(next) => {
           setValue(next);
           onCommit(next);
@@ -168,5 +171,56 @@ describe('IskInput invalid text', () => {
     await user.type(screen.getByRole('textbox', { name: 'Max price' }), '1x');
     await user.tab();
     expect(screen.getByRole('alert')).toHaveTextContent('Not an ISK amount');
+  });
+
+  describe('mask', () => {
+    it('groups digits with the display separator as they are typed, committing the plain figure', async () => {
+      const user = userEvent.setup();
+      const onCommit = vi.fn();
+      render(<Harness onCommit={onCommit} mask />);
+      const input = screen.getByRole('textbox', { name: 'Max price' });
+      await user.type(input, '1234567');
+      expect(input).toHaveValue('1,234,567');
+      expect(onCommit).toHaveBeenLastCalledWith('1234567');
+      expect(screen.queryByText(/ISK$/)).not.toBeInTheDocument();
+    });
+
+    it('keeps shorthand as typed and groups a figure set from outside', async () => {
+      const user = userEvent.setup();
+      const onCommit = vi.fn();
+      render(<Harness onCommit={onCommit} mask initial="50000000" />);
+      const input = screen.getByRole('textbox', { name: 'Max price' });
+      expect(input).toHaveValue('50,000,000');
+      await user.clear(input);
+      await user.type(input, '100m');
+      expect(input).toHaveValue('100m');
+      expect(onCommit).toHaveBeenLastCalledWith('100000000');
+      await user.clear(input);
+      await user.type(input, '100k');
+      expect(input).toHaveValue('100k');
+      expect(onCommit).toHaveBeenLastCalledWith('100000');
+    });
+
+    it('keeps every fraction digit before a suffix and leaves a foreign-format paste alone', async () => {
+      const user = userEvent.setup();
+      render(<Harness onCommit={vi.fn()} mask />);
+      const input = screen.getByRole('textbox', { name: 'Max price' });
+      await user.type(input, '1.255m');
+      expect(input).toHaveValue('1.255m');
+      await user.clear(input);
+      await user.click(input);
+      await user.paste('1.234.567');
+      expect(input).toHaveValue('1.234.567');
+    });
+
+    it('keeps the caret after the digit being edited when the groups shift', async () => {
+      const user = userEvent.setup();
+      render(<Harness onCommit={vi.fn()} mask initial="1234" />);
+      const input = screen.getByRole('textbox', { name: 'Max price' });
+      await user.click(input);
+      await user.keyboard('{Home}{ArrowRight}9');
+      expect(input).toHaveValue('19,234');
+      expect(input).toHaveProperty('selectionStart', 2);
+    });
   });
 });

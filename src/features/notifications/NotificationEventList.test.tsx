@@ -54,6 +54,7 @@ function Harness(props: {
   over?: Partial<EventRowContext>;
   ids?: typeof NOTIFICATION_EVENT_IDS;
   searching?: boolean;
+  eveTypes?: ReadonlySet<string>;
   path?: string;
 }) {
   // Re-read the store each render so a click's write is visible, like the panel does.
@@ -62,6 +63,7 @@ function Harness(props: {
     <MemoryRouter initialEntries={[props.path ?? '/settings/notifications']}>
       <NotificationEventList
         searching={props.searching}
+        eveTypes={props.eveTypes}
         eventIds={props.ids ?? NOTIFICATION_EVENT_IDS}
         context={context({ prefsValue: value, ...props.over })}
         extraTypesByCharacter={new Map()}
@@ -231,6 +233,40 @@ describe('NotificationEventList on desktop', () => {
     expect(
       screen.queryByRole('button', { name: 'Structure Under Attack' })
     ).not.toBeInTheDocument();
+  });
+
+  it('lists just the EVE types a search matched under the EVE row, with the rest left out', () => {
+    render(
+      <Harness
+        ids={['eveNotification']}
+        searching
+        eveTypes={new Set(['StructureFuelAlert', 'StructureUnderAttack'])}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'EVE notifications' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Structure Low on Fuel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Structure Under Attack' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Structure Destroyed' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'War Declared' })).not.toBeInTheDocument();
+    // A family with no matching type leaves its heading out too.
+    expect(screen.queryByRole('region', { name: 'War' })).not.toBeInTheDocument();
+  });
+
+  it('still toggles a matched EVE type for every character', async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness ids={['eveNotification']} searching eveTypes={new Set(['StructureFuelAlert'])} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Structure Low on Fuel' }));
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Structure Low on Fuel, Alpha Pilot, device notifications',
+      })
+    );
+    await waitFor(() => {
+      const byType = useNotificationPreferences.getState().value.eveNotificationTypesByCharacter;
+      expect(byType?.[1]).toBeDefined();
+    });
   });
 
   it('lets the user close a row a search opened', async () => {

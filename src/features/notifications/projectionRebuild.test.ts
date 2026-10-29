@@ -229,21 +229,21 @@ describe('eve type upload (issue #3755)', () => {
 describe('server-pushed events upload (issue #5121)', () => {
   it('uploads each Character’s browser-enabled server events, sorted, with their inputs', async () => {
     const serverInputsFor = vi.fn(async (_characterId: number, events: readonly string[]) =>
-      events.includes('shipLost') ? { shipLostMinimumIsk: 5 } : {}
+      events.includes('priceAlertTriggered') ? { priceStationId: 60003760 } : {}
     );
     const { deps: d, uploadProjection } = deps({
       // communityMemberJoined and communityRequestPledged default browser-off.
-      eventPrefsFor: async () => ({ priceAlertTriggered: { browser: false, feed: true } }),
+      eventPrefsFor: async () => ({}),
       serverInputsFor,
     });
     await rebuildProjection(d);
     expect(uploadProjection.mock.calls[0][2]?.get(CHAR.characterId)).toEqual({
-      serverEvents: ['communityJoinRequest', 'shipLost'],
-      serverInputs: { shipLostMinimumIsk: 5 },
+      serverEvents: ['communityJoinRequest', 'priceAlertTriggered'],
+      serverInputs: { priceStationId: 60003760 },
     });
     expect(serverInputsFor).toHaveBeenCalledWith(CHAR.characterId, [
       'communityJoinRequest',
-      'shipLost',
+      'priceAlertTriggered',
     ]);
   });
 

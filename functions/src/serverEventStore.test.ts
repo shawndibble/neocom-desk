@@ -173,10 +173,10 @@ describe('listPolledDevices', () => {
     db.docs.set('deviceRegistrations/A', {
       fcmToken: 'a',
       characterIds: [7, 8],
-      polledServerEvents: ['shipLost'],
-      serverEventsByCharacter: { '7': ['shipLost'], '8': ['communityJoinRequest'] },
-      serverInputsByCharacter: { '7': { shipLostMinimumIsk: 5 } },
-      serverEventBaselines: { '7': { shipLossIds: [1] } },
+      polledServerEvents: ['priceAlertTriggered'],
+      serverEventsByCharacter: { '7': ['priceAlertTriggered'], '8': ['communityJoinRequest'] },
+      serverInputsByCharacter: { '7': { priceStationId: 60003760 } },
+      serverEventBaselines: { '7': { priceAlerts: [] } },
     });
     db.docs.set('deviceRegistrations/B', {
       fcmToken: 'b',
@@ -190,9 +190,9 @@ describe('listPolledDevices', () => {
         characters: [
           {
             characterId: 7,
-            events: ['shipLost'],
-            inputs: { shipLostMinimumIsk: 5 },
-            baseline: { shipLossIds: [1] },
+            events: ['priceAlertTriggered'],
+            inputs: { priceStationId: 60003760 },
+            baseline: { priceAlerts: [] },
           },
         ],
       },

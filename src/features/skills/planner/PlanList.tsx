@@ -200,7 +200,7 @@ function PlanRow({
   );
 }
 
-/** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (confirm), rename inline. */
+/** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (with Undo), rename inline. */
 export function PlanList({
   plans,
   planHref,
@@ -223,24 +223,19 @@ export function PlanList({
     else linkRefs.current.delete(id);
   }
 
-  // The row goes only after the dialog has closed (an awaited delete), so
-  // focus is requested once the delete resolves: the next plan's link, else
-  // the previous one's, else the panel title.
-  async function confirmDelete() {
-    const target = deletingPlan;
-    setDeletingPlan(null);
-    if (!target) return;
+  // The row goes once the delete resolves, so focus is requested then: the
+  // next plan's link, else the previous one's, else the panel title.
+  async function deletePlan(target: SkillPlanRecord) {
     const index = plans.findIndex((plan) => plan.id === target.id);
     const near = [plans[index + 1], plans[index - 1]].map(
       (plan) => () => (plan ? linkRefs.current.get(plan.id) : null)
     );
     await onDelete(target.id);
-    // One macrotask on: the dialog's own focus restore (to the row being
+    // One macrotask on: the menu's own focus restore (to the row being
     // deleted) runs in a passive effect and must not land after this request.
     await new Promise((resolve) => setTimeout(resolve, 0));
     focusAfterCommit(...near, headingRef);
   }
-  const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
   const [copyingPlan, setCopyingPlan] = useState<SkillPlanRecord | null>(null);
   const canCopy = otherCharacters.length > 0 && onCopyToCharacter !== undefined;
 
@@ -257,7 +252,7 @@ export function PlanList({
               planHref={planHref}
               onDuplicate={onDuplicate}
               onRequestCopy={canCopy ? setCopyingPlan : null}
-              onRequestDelete={setDeletingPlan}
+              onRequestDelete={(plan) => void deletePlan(plan)}
               onRename={onRename}
               stats={stats?.get(plan.id)}
               active={plan.id === activePlanId}
@@ -295,23 +290,6 @@ export function PlanList({
         <div className="mt-3 flex justify-end">
           <Button size="sm" onClick={() => setCopyingPlan(null)}>
             {t('plans.cancel')}
-          </Button>
-        </div>
-      </Modal>
-      <Modal
-        open={deletingPlan !== null}
-        onClose={() => setDeletingPlan(null)}
-        title={t('plans.delete')}
-      >
-        <p className="text-xs text-text-dim">
-          {t('plans.deleteConfirm', { name: deletingPlan?.name ?? '' })}
-        </p>
-        <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setDeletingPlan(null)}>
-            {t('plans.cancel')}
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => void confirmDelete()}>
-            {t('plans.delete')}
           </Button>
         </div>
       </Modal>

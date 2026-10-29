@@ -620,7 +620,7 @@ function RowDetail({ open }: { open: boolean }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem>Link a wallet payment</DropdownMenuItem>
-                <DropdownMenuItem>Link a transaction</DropdownMenuItem>
+                <DropdownMenuItem>Link transaction</DropdownMenuItem>
                 <DropdownMenuItem>Mark as paid</DropdownMenuItem>
                 <DropdownMenuItem>Combine with another day</DropdownMenuItem>
                 <DropdownMenuItem>Split between Payees</DropdownMenuItem>

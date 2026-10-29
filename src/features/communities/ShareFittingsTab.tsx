@@ -1,12 +1,19 @@
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, EmptyState, SearchInput, Spinner } from '@/components/ui';
+import {
+  Button,
+  Checkbox,
+  EmptyState,
+  SearchInput,
+  Spinner,
+  ToastStack,
+  useDeferredCommits,
+} from '@/components/ui';
 import { fittingChoiceKey } from '@/engine/communities/sharedFittings';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { AddSharedItemsDialog } from './AddSharedItemsDialog';
 import { Pill } from '@/components/ui/Pill';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { collectFittingsToShare } from './shareAllFittings';
 import { namedLike, needleOf, ROW_LIMIT } from './shareLists';
 import { loadFittingsAll, saveFittingsAll } from './shareSelection';
@@ -34,6 +41,9 @@ interface Loaded {
   shared: Set<string>;
 }
 
+/** The deferred-commit id of "stop sharing all"; only one is ever pending. */
+const STOP_ALL_ID = 'stop-all';
+
 /**
  * The Fittings tab's My sharing (issue #3605): what this Character shares, one
  * row per Fitting with Stop sharing, and Add Fittings for the rest. "Share all
@@ -51,7 +61,9 @@ export function ShareFittingsTab({
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const [confirmingOff, setConfirmingOff] = useState(false);
+  // Stopping everything shows at once but writes after its Undo toast, so Undo is just not writing.
+  const pendingOff = useDeferredCommits();
+  const stoppingAll = pendingOff.hiddenIds.has(STOP_ALL_ID);
   const [adding, setAdding] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const stopButtons = useRef(new Map<string, HTMLButtonElement>());
@@ -65,11 +77,21 @@ export function ShareFittingsTab({
     ]);
     return { fittings, allExcluded, shared };
   }, [characterId, communityId]);
-  const { loaded, loadFailed, notice, setNotice, run } = useSerialShareState(
-    fetchAll,
-    'communities.fittings.failed'
-  );
+  const {
+    loaded: savedLoaded,
+    loadFailed,
+    notice,
+    setNotice,
+    run,
+  } = useSerialShareState(fetchAll, 'communities.fittings.failed');
 
+  const loaded = useMemo(
+    () =>
+      savedLoaded && stoppingAll
+        ? { ...savedLoaded, allExcluded: null, shared: new Set<string>() }
+        : savedLoaded,
+    [savedLoaded, stoppingAll]
+  );
   const fittings = useMemo(() => loaded?.fittings ?? [], [loaded]);
   const needle = needleOf(query);
   const unavailable = t('communities.fittings.unavailable');
@@ -104,7 +126,7 @@ export function ShareFittingsTab({
     );
   }
   if (loaded === null) return <Spinner size="sm" label={t('communities.fittings.loading')} />;
-  if (fittings.length === 0 && loaded.shared.size === 0) {
+  if (fittings.length === 0 && (savedLoaded?.shared.size ?? 0) === 0) {
     return <EmptyState title={t('communities.fittings.noFittings')} />;
   }
 
@@ -188,8 +210,14 @@ export function ShareFittingsTab({
           <Checkbox
             checked={all}
             onChange={(event) => {
-              if (event.target.checked) void run(turnOn);
-              else setConfirmingOff(true);
+              if (!event.target.checked) {
+                pendingOff.defer({
+                  id: STOP_ALL_ID,
+                  message: t('communities.fittings.stoppedAll'),
+                  commit: () => run(turnOff),
+                });
+              } else if (pendingOff.items.length > 0) pendingOff.undo(STOP_ALL_ID);
+              else void run(turnOn);
             }}
           />
           {t('communities.fittings.shareAll')}
@@ -254,13 +282,11 @@ export function ShareFittingsTab({
           {notice}
         </p>
       )}
-      <ConfirmDialog
-        open={confirmingOff}
-        title={t('communities.fittings.offTitle')}
-        body={t('communities.fittings.offBody')}
-        actionLabel={t('communities.fittings.offAction')}
-        onClose={() => setConfirmingOff(false)}
-        onConfirm={() => run(turnOff)}
+      <ToastStack
+        items={pendingOff.items}
+        undoLabel={t('communities.fittings.undo')}
+        onUndo={pendingOff.undo}
+        onClose={pendingOff.commit}
       />
       <AddSharedItemsDialog
         open={adding}
@@ -281,7 +307,9 @@ export function ShareFittingsTab({
         }))}
         onShare={(key) => {
           const input = addable.find((candidate) => fittingChoiceKey(candidate) === key);
-          if (input) void run((current) => add(current, input));
+          if (!input) return;
+          pendingOff.commit(STOP_ALL_ID);
+          void run((current) => add(current, input));
         }}
       />
     </div>

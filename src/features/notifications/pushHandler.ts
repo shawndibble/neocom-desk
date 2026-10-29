@@ -66,7 +66,6 @@ import {
   communityRequestPledgedText,
   newMailText,
   priceAlertText,
-  shipLostText,
   type Translate,
 } from './serverEventCopy';
 import {
@@ -237,7 +236,7 @@ interface Presented {
 
 const t: Translate = (key, vars) => i18n.t(key, vars);
 
-/** A server-pushed fire in the app's own words; a loss names its hull and system when the lookup answers. */
+/** A server-pushed fire in the app's own words. */
 async function presentServerFire(
   env: PushEnv,
   fire: ServerEventFire,
@@ -253,17 +252,6 @@ async function presentServerFire(
       return { ...communityRequestPledgedText(t, fire), feedKey };
     case 'priceAlertTriggered':
       return { ...priceAlertText(t, fire), feedKey, subjectId: fire.typeId };
-    case 'shipLost': {
-      const ids = [fire.shipTypeId, fire.systemId].filter((id): id is number => id !== undefined);
-      const names = await publicNames(env, ids);
-      return {
-        ...shipLostText(t, fire, {
-          ship: fire.shipTypeId === undefined ? undefined : names.get(fire.shipTypeId),
-          system: fire.systemId === undefined ? undefined : names.get(fire.systemId),
-        }),
-        feedKey,
-      };
-    }
     // New mail (issue #5143): the pop-up names the sender and subject; the feed row never does.
     case 'newMail': {
       const character =

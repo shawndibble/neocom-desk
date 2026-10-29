@@ -10,7 +10,7 @@
  */
 import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
-import { addModule, type ModuleAt } from './fittingEdit';
+import { addModule, removeModule, type ModuleAt } from './fittingEdit';
 import { peakAppliedDps } from './implantFinder';
 import {
   jobOf,
@@ -94,22 +94,38 @@ export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
  * powergrid or calibration; `capStable` a stable capacitor turned unstable;
+ * `keepsTank` a tank conversion lost more than half of the sustained tank;
  * `keepsStats` Cheaper lost more than 10% of damage, tank or speed; `spend`
  * it costs more than the total budget or extra-spend cap allows.
  */
-export type Guardrail = 'budget' | 'capStable' | 'keepsStats' | 'spend';
+export type Guardrail = 'budget' | 'capStable' | 'keepsTank' | 'keepsStats' | 'spend';
+
+/** A conversion must keep at least this share of the sustained tank. */
+const CONVERSION_KEEPS_SUSTAINED = 0.5;
 
 /** How far Improve may go from the fitted modules: Upgrade (default), Rebalance, Rework. */
 export const IMPROVE_REACHES = ['upgrade', 'rebalance', 'rework'] as const;
 export type ImproveReach = (typeof IMPROVE_REACHES)[number];
 
-/** Planning to buy (default: the fit is a shopping list) or Refitting a ship the pilot owns. */
-export const IMPROVE_MODES = ['buy', 'refit'] as const;
-export type ImproveMode = (typeof IMPROVE_MODES)[number];
-
 /** Defense Choice: Keep as is, or free the tank modules for Shield or Armor. */
 export const DEFENSE_CHOICES = ['keep', 'shield', 'armor'] as const;
 export type DefenseChoice = (typeof DEFENSE_CHOICES)[number];
+
+/** The racks a tank module sits in (rigs are never part of a conversion). */
+export const TANK_RACKS = ['high', 'medium', 'low'] as const;
+export type TankRack = (typeof TANK_RACKS)[number];
+
+/**
+ * A whole-tank conversion, carried by the first link of its chain: the other
+ * side's tank modules (and any displaced from a full rack) are removed before
+ * the chain's adds are made. `freed` counts, per rack, the emptied slots the
+ * adds did not refill.
+ */
+export interface TankConversion {
+  side: DefenseSide;
+  removes: { typeId: number; at: ModuleAt[] }[];
+  freed: Record<TankRack, number>;
+}
 
 /**
  * Every fitted copy of `fromTypeId` turned into `toTypeId`: one suggestion,
@@ -123,17 +139,26 @@ export interface ImproveCandidate {
   pairedWith?: ImproveCandidate;
   /** Replaces a fitted module the pilot cannot fly yet: accepted even when it scores worse on the goal. */
   fixesUnflyable?: boolean;
+  /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
+  covers?: 'budget' | 'capacitor';
+  /** Strips the other side's tank first; the candidate and its `pairedWith` chain then fill the chosen side's rack. */
+  conversion?: TankConversion;
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
 export function applyImproveCandidate(fitting: Fitting, candidate: ImproveCandidate): Fitting {
+  const start = candidate.conversion
+    ? candidate.conversion.removes
+        .flatMap(({ at }) => at)
+        .reduce((fit, { slot, slotIndex }) => removeModule(fit, slot, slotIndex), fitting)
+    : fitting;
   const changed =
     candidate.fromTypeId === null
       ? candidate.at.reduce(
           (fit, { slot, slotIndex }) => addModule(fit, slot, slotIndex, candidate.toTypeId),
-          fitting
+          start
         )
-      : applyModuleUpgrade(fitting, { ...candidate, fromTypeId: candidate.fromTypeId });
+      : applyModuleUpgrade(start, { ...candidate, fromTypeId: candidate.fromTypeId });
   return candidate.pairedWith ? applyImproveCandidate(changed, candidate.pairedWith) : changed;
 }
 
@@ -144,13 +169,9 @@ export interface ImproveOption {
   /** How much the goal gains: a fraction of the fit's own figure, or ISK saved for Cheaper. */
   score: number;
   /**
-   * What the change costs: new minus old when planning to buy; new minus what
-   * the removed part sells for when refitting, a changed rig costing the full
-   * new one. Null when a price is unknown.
+   * What the change costs: new minus old. Null when a price is unknown.
    */
   iskDelta: number | null;
-  /** Refitting changes a rig: the old one is destroyed when removed. */
-  destroysRigs: boolean;
   /** Every stat it makes worse, before and after, so "Gives up" names the size; empty is No downside. */
   lost: LostStat[];
 }
@@ -388,15 +409,39 @@ function scoreOf(
 /** Cheaper may give up this much damage, tank or speed: a bit worse for a lot less ISK is the point. Deliberately looser than Make it fit's `STAT_TOLERANCE`. */
 const CHEAPER_TOLERANCE = 0.1;
 
+/** Whether the fit has a module the pilot switches on (an MWD, a booster, a weapon). */
+const hasToggledModule = (stats: FittingStats): boolean =>
+  stats.modules.some((module) => module.maxState === 'active' || module.maxState === 'overload');
+
+/** A cover for a fix that breaks the capacitor: the swapped fit holds a stable one. */
+const capacitorHolds = (stats: FittingStats): boolean => stats.capacitor.stable;
+
+/** The fit with every toggled module switched off. */
+const withTogglesOff = (fitting: Fitting): Fitting => ({
+  ...fitting,
+  modules: fitting.modules.map((module) =>
+    module.state === 'active' || module.state === 'overload'
+      ? { ...module, state: 'online' }
+      : module
+  ),
+});
+
 /** The first Guardrail `after` breaks, or null. */
 function brokenGuardrail(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
-  target: TargetProfile | undefined
+  target: TargetProfile | undefined,
+  conversion?: TankConversion
 ): Guardrail | null {
   if (fitsResourceBudget(before) && !fitsResourceBudget(after)) return 'budget';
   if (before.capacitor.stable && !after.capacitor.stable) return 'capStable';
+  if (
+    conversion &&
+    before.tank.sustainedEffective > 0 &&
+    after.tank.sustainedEffective < before.tank.sustainedEffective * CONVERSION_KEEPS_SUSTAINED
+  )
+    return 'keepsTank';
   if (goal === 'cheaper') {
     const kept: [number, number][] = [
       [damageOf(before, target), damageOf(after, target)],
@@ -450,6 +495,9 @@ export const FILLS_PER_RACK = 40;
 /** The most candidates one search checks; fits that need more show "Show best so far". */
 export const MAX_CANDIDATES = 400;
 
+/** Candidate tiers: Upgrade, Rebalance, Rework, then the empty-slot fills. */
+const FILL_TIER = 3;
+
 const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
 
 /** The side of the tank the fit already has; null when it has none (or an even split). */
@@ -466,6 +514,242 @@ function fittedSide(
   }
   if (shield === armor) return null;
   return shield > armor ? 'shield' : 'armor';
+}
+
+/** Conversions offered per search: each is a whole-fit calculation. */
+const CONVERSIONS_PER_SEARCH = 40;
+/** Most modules a conversion displaces from a full chosen-side rack. */
+const MAX_DISPLACED = 3;
+/** Sizes tried per tank group (Tech II first), so the hull's right plate or extender is among them. */
+const SIZES_PER_GROUP = 3;
+/** Rig groups: a rig is never stripped or refilled by a conversion. */
+const RIG_TANK_GROUPS: ReadonlySet<number> = new Set([773, 774]);
+
+/** Tech II first, then Tech I, then the rest; a tie goes to the newer type id. */
+const metaRank = (index: VariationIndex, typeId: number) => {
+  const meta = index.types[typeId]?.metaGroupId ?? 0;
+  return meta === 2 ? 0 : meta === 1 ? 1 : 2;
+};
+
+type Allowed = (
+  typeId: number,
+  slot: FittingSlotKind,
+  removedGroup: number | undefined,
+  removed: number
+) => boolean;
+
+const isTankRack = (slot: FittingSlotKind): slot is TankRack =>
+  (TANK_RACKS as readonly string[]).includes(slot);
+
+/** The other side's tank modules a conversion to `side` removes: never a rig, a job module or a unique group (so a Damage Control stays). */
+function strippedForConversion(
+  modules: readonly FittingModule[],
+  side: DefenseSide,
+  groupOf: (typeId: number) => number | undefined
+): FittingModule[] {
+  return modules.filter((module) => {
+    const group = groupOf(module.typeId);
+    if (group === undefined || !isTankRack(module.slot)) return false;
+    if (UNIQUE_GROUPS.has(group) || jobOf(group) !== null) return false;
+    const own = sideOf(group);
+    return own !== null && own !== side;
+  });
+}
+
+/** The rack a conversion refills (the first the side's primary group fits) and its groups there, primary first. */
+function refillRack(
+  goal: ImproveGoal,
+  side: DefenseSide,
+  fits: (group: number, slot: TankRack) => boolean
+): { rack: TankRack; groups: number[] } | null {
+  const sideGroups = reworkGroups(goal, [side]).filter(
+    (group) => sideOf(group) === side && !RIG_TANK_GROUPS.has(group)
+  );
+  const primary = sideGroups[0];
+  const rack = primary === undefined ? undefined : TANK_RACKS.find((slot) => fits(primary, slot));
+  return rack === undefined
+    ? null
+    : { rack, groups: sideGroups.filter((group) => fits(group, rack)) };
+}
+
+/** The modules in the refilled rack a full rack may give up: no job, not tank; those least tied to the goal first, then the last slot. */
+function displaceableIn(
+  inRack: readonly FittingModule[],
+  goal: ImproveGoal,
+  groupOf: (typeId: number) => number | undefined
+): FittingModule[] {
+  const goalGroups = new Set(reworkGroups(goal, []));
+  const tied = (module: FittingModule) => Number(goalGroups.has(groupOf(module.typeId) ?? -1));
+  return inRack
+    .filter((module) => {
+      const group = groupOf(module.typeId);
+      return group !== undefined && jobOf(group) === null && !TANK_GROUPS.has(group);
+    })
+    .sort((a, b) => tied(a) - tied(b) || b.slotIndex - a.slotIndex);
+}
+
+/** `removed` grouped by type, as a conversion lists them. */
+function removesOf(removed: readonly FittingModule[]): TankConversion['removes'] {
+  const removes: TankConversion['removes'] = [];
+  for (const module of removed) {
+    const at = { slot: module.slot, slotIndex: module.slotIndex };
+    const entry = removes.find((r) => r.typeId === module.typeId);
+    if (entry) entry.at.push(at);
+    else removes.push({ typeId: module.typeId, at: [at] });
+  }
+  return removes;
+}
+
+/** The emptied slots per rack that `refilled` (in `rack`) does not fill again. */
+function freedOf(
+  removed: readonly FittingModule[],
+  rack: TankRack,
+  refilled: readonly number[]
+): TankConversion['freed'] {
+  const freed = { high: 0, medium: 0, low: 0 };
+  for (const module of removed)
+    if (isTankRack(module.slot) && !(module.slot === rack && refilled.includes(module.slotIndex)))
+      freed[module.slot]++;
+  return freed;
+}
+
+/**
+ * The type lists to fill `slots` with: one group in every slot, or the primary
+ * group first and another for the rest, each at every size tried. Duplicates
+ * (a group with fewer sizes) are dropped.
+ */
+function fillPlans(
+  groups: readonly number[],
+  slots: readonly number[],
+  typesOf: (group: number) => readonly number[]
+): number[][] {
+  const [primary, ...others] = groups;
+  if (primary === undefined) return [];
+  const pairs: [number, number][] = [
+    ...groups.map((group): [number, number] => [group, group]),
+    ...(slots.length > 1 ? others.map((group): [number, number] => [primary, group]) : []),
+  ];
+  const plans = new Map<string, number[]>();
+  for (let size = 0; size < SIZES_PER_GROUP; size++)
+    for (const [first, rest] of pairs) {
+      const pick = (group: number) => {
+        const types = typesOf(group);
+        return types[Math.min(size, types.length - 1)];
+      };
+      const [head, tail] = [pick(first), pick(rest)];
+      if (head === undefined || tail === undefined) continue;
+      const plan = slots.map((_, i) => (i === 0 ? head : tail));
+      plans.set(plan.join(','), plan);
+    }
+  return [...plans.values()];
+}
+
+/** The fills as a chain of adds, one link per type; null for none. */
+function addChain(slotTypes: readonly [number, number][], rack: TankRack): ImproveCandidate | null {
+  const byType = new Map<number, ModuleAt[]>();
+  for (const [slotIndex, typeId] of slotTypes)
+    byType.set(typeId, [...(byType.get(typeId) ?? []), { slot: rack, slotIndex }]);
+  return [...byType].reduceRight<ImproveCandidate | null>(
+    (next, [toTypeId, at]) => ({
+      fromTypeId: null,
+      toTypeId,
+      at,
+      ...(next ? { pairedWith: next } : {}),
+    }),
+    null
+  );
+}
+
+/**
+ * Whole-tank conversions to `side`: every non-rig module of the other side's
+ * tank removed (`strippedForConversion`), the chosen side's rack refilled
+ * with a few sizes of one or two tank groups, the other rack's freed slots
+ * left empty. A full rack displaces its weakest unprotected modules, a few
+ * counts, as separate candidates; scoring whole decides which beat the fit.
+ */
+function tankConversions(
+  modules: readonly FittingModule[],
+  side: DefenseSide,
+  goal: ImproveGoal,
+  pool: ModulePool,
+  slotCounts: Readonly<Record<FittingSlotKind, number>>,
+  index: VariationIndex,
+  allowed: Allowed
+): ImproveCandidate[] {
+  const stripped = strippedForConversion(modules, side, pool.groupOf);
+  if (stripped.length === 0) return [];
+
+  const typesFor = (group: number, slot: FittingSlotKind): number[] =>
+    pool
+      .typeIdsInGroup(group)
+      .filter((typeId) => allowed(typeId, slot, undefined, 0))
+      .sort((a, b) => metaRank(index, a) - metaRank(index, b) || b - a)
+      .slice(0, SIZES_PER_GROUP);
+  const target = refillRack(goal, side, (group, slot) => typesFor(group, slot).length > 0);
+  if (!target) return [];
+  const { rack, groups } = target;
+
+  const inRack = modules.filter((module) => module.slot === rack && !stripped.includes(module));
+  const taken = new Set(inRack.map((module) => module.slotIndex));
+  const free = Array.from({ length: slotCounts[rack] }, (_, i) => i).filter((i) => !taken.has(i));
+  const displaceable = displaceableIn(inRack, goal, pool.groupOf);
+  // A full rack gives up one to MAX_DISPLACED modules, each count with its own share of the budget.
+  const counts =
+    free.length > 0
+      ? [0]
+      : Array.from({ length: Math.min(MAX_DISPLACED, displaceable.length) }, (_, i) => i + 1);
+  const share = Math.ceil(CONVERSIONS_PER_SEARCH / Math.max(1, counts.length));
+
+  const out: ImproveCandidate[] = [];
+  for (const count of counts) {
+    const displaced = displaceable.slice(0, count);
+    const slots = [...free, ...displaced.map((module) => module.slotIndex)].sort((a, b) => a - b);
+    const removed = [...stripped, ...displaced];
+    const conversion: TankConversion = {
+      side,
+      removes: removesOf(removed),
+      freed: freedOf(removed, rack, slots),
+    };
+    for (const plan of fillPlans(groups, slots, (group) => typesFor(group, rack)).slice(0, share)) {
+      const chain = addChain(
+        slots.map((slotIndex, i): [number, number] => [slotIndex, plan[i] ?? plan[0] ?? -1]),
+        rack
+      );
+      if (chain) out.push({ ...chain, conversion });
+    }
+  }
+  return out;
+}
+
+/** A conversion's identity for ticking: its side and what it removes, so each variant has its own tick key. */
+export const conversionKey = (conversion: TankConversion): string =>
+  `convert-${conversion.side}-${conversion.removes
+    .map((r) => `${r.typeId}:${r.at.map((at) => `${at.slot}${at.slotIndex}`).join('.')}`)
+    .join('_')}`;
+
+/**
+ * What a conversion does at a glance, walking its chain once: modules
+ * `removed`, modules `added`, other-slot downgrades chained behind it
+ * (`swapped`, not counted as added), and the slots `freed` per rack.
+ */
+export function conversionSummary(candidate: ImproveCandidate): {
+  removed: number;
+  added: number;
+  swapped: number;
+  freed: TankConversion['freed'];
+} {
+  let added = 0;
+  let swapped = 0;
+  for (let link: ImproveCandidate | undefined = candidate; link; link = link.pairedWith) {
+    if (link.fromTypeId === null) added += link.at.length;
+    else swapped += link.at.length;
+  }
+  return {
+    removed: candidate.conversion?.removes.reduce((sum, r) => sum + r.at.length, 0) ?? 0,
+    added,
+    swapped,
+    freed: candidate.conversion?.freed ?? { high: 0, medium: 0, low: 0 },
+  };
 }
 
 /**
@@ -531,7 +815,7 @@ export function improveCandidates(
     return true;
   };
 
-  const tiers: ImproveCandidate[][] = [[], [], [], []];
+  const tiers: ImproveCandidate[][] = Array.from({ length: FILL_TIER + 1 }, () => []);
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
@@ -590,6 +874,12 @@ export function improveCandidates(
     }
   }
 
+  // A fit tanking the other side may convert whole, which no single swap scores well.
+  const conversions =
+    o.pool && o.slotCounts && freesTank && o.reach !== 'upgrade' && o.defense !== 'keep'
+      ? tankConversions(modules, o.defense, o.goal, o.pool, o.slotCounts, index, allowed)
+      : [];
+
   // Empty slots are always free to fill: the first one in each rack, from the goal's groups.
   if (o.pool && o.slotCounts) {
     const pool = o.pool;
@@ -607,15 +897,19 @@ export function improveCandidates(
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
           added++;
-          tiers[3].push({ fromTypeId: null, toTypeId: typeId, at: [{ slot, slotIndex: free }] });
+          tiers[FILL_TIER].push({
+            fromTypeId: null,
+            toTypeId: typeId,
+            at: [{ slot, slotIndex: free }],
+          });
         }
       }
     }
   }
-  // Replacing an unflyable module is never cut by the cap.
+  // Replacing an unflyable module is never cut by the cap, and a conversion (no single swap finds it) comes next.
   const all = tiers.flat();
   const fixes = all.filter((candidate) => candidate.fixesUnflyable);
-  return [...fixes, ...all.filter((candidate) => !candidate.fixesUnflyable)].slice(
+  return [...fixes, ...conversions, ...all.filter((candidate) => !candidate.fixesUnflyable)].slice(
     0,
     o.limit ?? MAX_CANDIDATES
   );
@@ -634,26 +928,24 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
   });
 }
 
-/** Hub sell price of every part, per the mode (`ImproveOption.iskDelta`). */
+/** Hub sell price of every part (`ImproveOption.iskDelta`). */
 export function iskDeltaOf(
   candidate: ImproveCandidate,
-  priceOf: (typeId: number) => number | null,
-  mode: ImproveMode
-): { isk: number | null; destroysRigs: boolean } {
+  priceOf: (typeId: number) => number | null
+): number | null {
   const to = priceOf(candidate.toTypeId);
   const from = candidate.fromTypeId === null ? 0 : priceOf(candidate.fromTypeId);
-  const isRig = candidate.at[0].slot === 'rig';
-  // A removed rig is destroyed, so a refit pays the full new rig and gets nothing back.
-  const destroys = mode === 'refit' && isRig && candidate.fromTypeId !== null;
-  let isk: number | null =
-    to === null || from === null ? null : (to - (destroys ? 0 : from)) * candidate.at.length;
-  let destroysRigs = destroys;
-  if (candidate.pairedWith) {
-    const paired = iskDeltaOf(candidate.pairedWith, priceOf, mode);
-    isk = isk === null || paired.isk === null ? null : isk + paired.isk;
-    destroysRigs = destroysRigs || paired.destroysRigs;
+  let isk: number | null = to === null || from === null ? null : (to - from) * candidate.at.length;
+  // A conversion's removed modules (never rigs) are sold or dropped from the shopping list.
+  for (const { typeId, at } of candidate.conversion?.removes ?? []) {
+    const price = priceOf(typeId);
+    isk = isk === null || price === null ? null : isk - price * at.length;
   }
-  return { isk, destroysRigs };
+  if (candidate.pairedWith) {
+    const paired = iskDeltaOf(candidate.pairedWith, priceOf);
+    isk = isk === null || paired === null ? null : isk + paired;
+  }
+  return isk;
 }
 
 /** The best gain among the options, or null when nothing helps: the Defense Choice compares sides by it. */
@@ -721,11 +1013,9 @@ export interface FindImprovementsParams {
   target?: TargetProfile;
   /** Carry more: the hold scored (default the cargo hold). */
   hold?: ImproveHold;
-  /** Planning to buy (default) or Refitting a ship the pilot owns. */
-  mode?: ImproveMode;
-  /** Planning: the total fit price may not pass it. Refitting: the extra spend may not. Null: no limit. */
-  spendCap?: number | null;
-  /** What the fit costs now, for Planning's total budget. */
+  /** The total fit price may not pass it. Null: no limit. */
+  iskBudget?: number | null;
+  /** What the fit costs now, for the total budget. */
   fitTotal?: number | null;
   /** Module and rig swaps that pay for an unflyable-module fix that overruns the fit. */
   compensators?: FlyableCompensators;
@@ -742,20 +1032,19 @@ const PAIR_SEEDS = 5;
 
 /**
  * Whether a change costing `iskDelta` (plus `extra`, an implant set bought with
- * it) passes the pilot's budget: Planning's total fit price, or Refitting's
- * extra spend. No cap, or an unpriced change, never blocks.
+ * it) passes the pilot's budget: the total fit price. No cap, or an unpriced
+ * change, never blocks.
  */
-export function overSpendCap(
-  mode: ImproveMode,
-  spendCap: number | null,
+export function overIskBudget(
+  iskBudget: number | null,
   fitTotal: number | null,
   iskDelta: number | null,
   extra = 0
 ): boolean {
-  if (spendCap === null || (iskDelta === null && extra === 0)) return false;
+  if (iskBudget === null || (iskDelta === null && extra === 0)) return false;
   // An unpriced change adds nothing it can be charged, but the implants bought with it still count.
   const spent = (iskDelta ?? 0) + extra;
-  return (mode === 'buy' ? (fitTotal ?? 0) + spent : spent) > spendCap;
+  return (fitTotal ?? 0) + spent > iskBudget;
 }
 
 /** Fixes over budget that get a compensation search, and the bundles kept for each. */
@@ -773,9 +1062,13 @@ const changeCount = (candidate: ImproveCandidate): number =>
   1 + (candidate.pairedWith ? changeCount(candidate.pairedWith) : 0);
 
 /** `fix` with each swap chained behind it as a paired change, so one Apply makes them all. */
-function bundleOf(fix: ImproveCandidate, swaps: readonly FitSwap[]): ImproveCandidate {
+function bundleOf(
+  fix: ImproveCandidate,
+  swaps: readonly FitSwap[],
+  covers: NonNullable<ImproveCandidate['covers']>
+): ImproveCandidate {
   const chain = chainOf(swaps);
-  return chain ? { ...fix, pairedWith: chain } : fix;
+  return chain ? { ...fix, pairedWith: chain, covers } : fix;
 }
 
 /** The swaps as one candidate with the rest chained behind it; undefined for none. */
@@ -813,8 +1106,7 @@ export async function findImprovements({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
-  mode = 'buy',
-  spendCap = null,
+  iskBudget = null,
   fitTotal = null,
   compensators,
   onProgress,
@@ -832,11 +1124,26 @@ export async function findImprovements({
   let failed = 0;
   let stopped = false;
 
+  /** Whether a ship with toggled modules is stable once they are off; false for one with none. */
+  async function stableWhenToggledOff(swapped: Fitting, after: FittingStats): Promise<boolean> {
+    if (!hasToggledModule(after)) return false;
+    try {
+      return (await stats(withTogglesOff(swapped))).capacitor.stable;
+    } catch {
+      // Blocked, the cautious side: a failed calculation must not let a fix break the capacitor.
+      return false;
+    }
+  }
+
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
-  function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats): boolean {
+  async function take(
+    candidate: ImproveCandidate,
+    swapped: Fitting,
+    after: FittingStats
+  ): Promise<boolean> {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
-    const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
+    const iskDelta = iskDeltaOf(candidate, priceOf);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     const fix = candidate.fixesUnflyable === true;
     if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return false;
@@ -846,13 +1153,17 @@ export async function findImprovements({
       after,
       score: score ?? 0,
       iskDelta,
-      destroysRigs,
       lost: lostStats(before, after),
     };
-    const overSpend = overSpendCap(mode, spendCap, fitTotal, iskDelta);
-    // Flying it beats keeping the stats: only the fit's resources and the spend still bind.
-    const broken = brokenGuardrail(goal, before, after, target);
-    const guardrail = (fix && broken !== 'budget' ? null : broken) ?? (overSpend ? 'spend' : null);
+    const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
+    // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
+    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion);
+    // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
+    const capStillBinds =
+      fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
+    const guardrail =
+      (fix && broken !== 'budget' && !capStillBinds ? null : broken) ??
+      (overSpend ? 'spend' : null);
     // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
     if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
     else (fix ? flyable : kept).push(option);
@@ -878,7 +1189,7 @@ export async function findImprovements({
     onProgress?.(checked, candidates.length);
     if (after === null) continue;
     if (candidate.fromTypeId !== null) swaps.push({ candidate, after });
-    take(candidate, swapped, after);
+    await take(candidate, swapped, after);
   }
   // Every calculation failed: the engine is broken, not the fit beyond improving.
   if (checked > 0 && failed === checked) throw new Error('Every Improve calculation failed');
@@ -887,7 +1198,12 @@ export async function findImprovements({
   // Estimated from the singles' freed CPU and powergrid, then the best few calculated whole,
   // as Make it fit does (`PAIR_LIMIT`).
   const seeds = rejected
-    .filter((option) => option.guardrail === 'budget' && option.candidate.fromTypeId === null)
+    .filter(
+      (option) =>
+        option.guardrail === 'budget' &&
+        option.candidate.fromTypeId === null &&
+        !option.candidate.conversion
+    )
     .sort((a, b) => b.score - a.score)
     .slice(0, PAIR_SEEDS);
   const pairs: { candidate: ImproveCandidate; estimate: number }[] = [];
@@ -913,18 +1229,20 @@ export async function findImprovements({
     try {
       const after = await stats(swapped);
       if (isCancelled?.()) return null;
-      if (fitsResourceBudget(after)) take(candidate, swapped, after);
+      if (fitsResourceBudget(after)) await take(candidate, swapped, after);
     } catch {
       // Left out, as a single's failure is.
     }
   }
 
-  // A fix over budget: the module and rig swaps that bring the fit back under, so Apply is never locked.
+  // A fix over budget or breaking a stable capacitor: the module and rig swaps that put the fit right, so Apply is never locked.
   if (compensators) {
-    const seeds = flyableBlocked
-      .filter((option) => option.guardrail === 'budget')
-      .slice(0, FLYABLE_SEEDS);
-    overrun.push(...seeds);
+    const seedsFor = (guardrail: Guardrail) =>
+      flyableBlocked.filter((option) => option.guardrail === guardrail).slice(0, FLYABLE_SEEDS);
+    const overBudget = seedsFor('budget');
+    // Implants shift CPU and powergrid, not the capacitor: only an over-budget fix is offered them.
+    overrun.push(...overBudget);
+    const seeds = [...overBudget, ...seedsFor('capStable')];
     for (const seed of seeds) {
       if (isCancelled?.()) return null;
       if (shouldStop?.()) {
@@ -933,6 +1251,7 @@ export async function findImprovements({
       }
       const swaps = compensators(seed.candidate);
       if (swaps.length === 0) continue;
+      const forCapacitor = seed.guardrail === 'capStable';
       let found: Awaited<ReturnType<typeof findFitSwaps>>;
       try {
         found = await findFitSwaps({
@@ -942,6 +1261,7 @@ export async function findImprovements({
           stats,
           priceOf,
           isCancelled,
+          ...(forCapacitor ? { accepts: capacitorHolds } : {}),
         });
       } catch {
         // A failed search leaves the fix greyed with its reason; it must not end the whole search.
@@ -950,10 +1270,14 @@ export async function findImprovements({
       if (isCancelled?.()) return null;
       if (found.options.length === 0) continue;
       // The fix leaves its greyed row only once a bundle took its place (a rule break can drop them all).
-      const taken = found.options
-        .slice(0, FLYABLE_PER_FIX)
-        .map((option) =>
-          take(bundleOf(seed.candidate, option.swaps), option.fitting, option.after)
+      const taken: boolean[] = [];
+      for (const option of found.options.slice(0, FLYABLE_PER_FIX))
+        taken.push(
+          await take(
+            bundleOf(seed.candidate, option.swaps, forCapacitor ? 'capacitor' : 'budget'),
+            option.fitting,
+            option.after
+          )
         );
       if (taken.some(Boolean)) flyableBlocked.splice(flyableBlocked.indexOf(seed), 1);
     }

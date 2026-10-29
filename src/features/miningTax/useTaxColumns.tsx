@@ -4,7 +4,6 @@ import {
   Caret,
   Checkbox,
   DataTableDenseCell,
-  IskAmount,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -179,8 +178,6 @@ export function useTaxColumns({
       align: 'right',
       className: 'whitespace-nowrap',
       stackAffix: { after: ` ${t('miningTax.valueAffix')}` },
-      // Compact on a phone card, where it shares one meta line with the
-      // system, the Payee and the status.
       render: (dr) =>
         withDayLines(
           dr,
@@ -191,8 +188,6 @@ export function useTaxColumns({
               <span aria-hidden="true">—</span>
               <span className="sr-only">{t('miningTax.noPriceLabel')}</span>
             </span>
-          ) : isPhone ? (
-            <IskAmount value={estimatedValueOf(dr)} />
           ) : (
             `${formatIsk(estimatedValueOf(dr))} ISK`
           ),
@@ -293,7 +288,8 @@ export function useTaxColumns({
         sortValue: (dr) => payeeDisplayName(dr),
       },
       ...(showOreColumn ? [oreColumn] : []),
-      ...(showValueColumn ? [valueColumn] : []),
+      // A phone card's meta line is already full; the value lives in the detail.
+      ...(showValueColumn && !isPhone ? [valueColumn] : []),
       {
         id: 'taxOwed',
         headerCellClassName: 'sm:w-28',

@@ -210,7 +210,7 @@ Events (`NOTIFICATION_EVENTS`, `events.ts`), with scope endpoint:
 - Calendar: `newCalendarEvent`, `calendarEventStarting`
 - `eveNotification`: CCP's in-game notifications, with a per-type breakdown grouped by Notification Family (per-family select-all per channel). Per-type defaults: Overview only, except attack/loss alerts which also pop up
 - Corp group (own header with select-all, one shared Needs-permission line, best-effort disclosure): `structureFuelLow` (structures), `skyhookRaidable` (Station Manager; lead time and silo minimum), `corpIndustryJobReady`, `corpMemberJoined`, `corpMemberLeft`, `corpWalletThreshold`
-- No scope: `priceAlertTriggered`, `shipLost` (public zKillboard)
+- No scope: `priceAlertTriggered`, `shipLost` (public zKillboard; `shipLost` is raised by the open app only)
 
 Inline thresholds (shown when row enabled; stored per Character; change rebuilds the push Projection immediately): structure fuel low 7/3/1 days (default 7); extractor expiring 24/12/6/1 h (default 6); skill queue ending 48/24/12/6 h; courier delivery due 24/12/6/1 h (default 6); corp wallet balance floor ISK (default 50,000,000); corp wallet single-transaction ceiling ISK (default 100,000,000); wallet balance change threshold ISK (default 1,000,000); ship lost minimum loss value ISK (default 0 = every loss). ISK fields (`ThresholdAmountInput`, commit on blur) accept `1b`/`500m`/`10t` shorthand via `parseIskAmount`; negative or unparsable input reverts to the stored value; value rounded to whole ISK. Defs: `eventThresholdFields.ts`.
 

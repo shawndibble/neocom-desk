@@ -7,7 +7,8 @@
  * Desktop: tabs across the top, each with its event count, one table per
  * Topic. Phone: a list of Topics, each with a one-line state, drilling into
  * the Topic (the `topic` URL param, so Back returns to the list). A search
- * shows the matches of every Topic in one stack instead.
+ * shows the matches of every Topic in one stack instead, listing under the EVE
+ * notifications row only the EVE types it matched.
  */
 import { Tabs, TabPanel, useTabsId } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
@@ -36,12 +37,15 @@ export function NotificationEventList({
   context,
   extraTypesByCharacter,
   searching = false,
+  eveTypes,
 }: {
   eventIds: readonly NotificationEventId[];
   context: EventRowContext;
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
   /** A search is active: show every matching Topic in one stack, not one at a time. */
   searching?: boolean;
+  /** While searching, the EVE types the query matched (`visibleEveTypes`); none means the row shows no types. */
+  eveTypes?: ReadonlySet<string>;
 }) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
@@ -54,7 +58,7 @@ export function NotificationEventList({
       topic={topic}
       context={context}
       extraTypesByCharacter={extraTypesByCharacter}
-      showEveTypes={!searching}
+      eveTypeFilter={searching ? (eveTypes ?? new Set()) : null}
     />
   );
 
@@ -184,12 +188,13 @@ function TopicTable({
   topic,
   context,
   extraTypesByCharacter,
-  showEveTypes,
+  eveTypeFilter,
 }: {
   topic: Topic;
   context: EventRowContext;
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
-  showEveTypes: boolean;
+  /** A search's matched EVE types, or null for the whole list. */
+  eveTypeFilter: ReadonlySet<string> | null;
 }) {
   const { t } = useTranslation();
   // Every corp event rides the one opt-in Corporation Permission, so the Topic says it once.
@@ -216,7 +221,8 @@ function TopicTable({
           <EveNotificationRow
             context={context}
             extraTypesByCharacter={extraTypesByCharacter}
-            showTypes={showEveTypes}
+            showTypes={eveTypeFilter === null || eveTypeFilter.size > 0}
+            typeFilter={eveTypeFilter}
           />
         ) : (
           topic.eventIds.map((eventId) => (

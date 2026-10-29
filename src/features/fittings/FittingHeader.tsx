@@ -49,6 +49,8 @@ interface FittingHeaderProps {
   onCompare: () => void;
   /** Opens Improve in the ⋮ menu; absent where the Fitting cannot be edited. */
   onImprove?: () => void;
+  /** The pilot can't fly a fitted module: Improve opens on fixing it first, so the entry says Fix Fit. */
+  unflyable?: boolean;
   /** Renames the open Fitting, independent of Save. */
   onRename: (name: string) => void;
   /** The Fitting's Jita price, for Export; null while it loads. */
@@ -198,6 +200,7 @@ export function FittingHeader({
   onLibrary,
   onCompare,
   onImprove,
+  unflyable = false,
   onRename,
   price,
   cloneImplants,
@@ -267,7 +270,7 @@ export function FittingHeader({
   const improveMenu = useOpenAfterMenu();
   const improveItem = onImprove && (
     <DropdownMenuItem onSelect={() => improveMenu.run(onImprove)}>
-      {t('fittings.improve.menuItem')}
+      {t(unflyable ? 'fittings.improve.fixMenuItem' : 'fittings.improve.menuItem')}
     </DropdownMenuItem>
   );
   const context = badges && (
@@ -332,7 +335,11 @@ export function FittingHeader({
               {libraryItems}
             </DropdownMenuContent>
           </DropdownMenu>
-          {onImprove && <Button onClick={onImprove}>{t('fittings.improve.button')}</Button>}
+          {onImprove && (
+            <Button onClick={onImprove}>
+              {t(unflyable ? 'fittings.improve.fixButton' : 'fittings.improve.button')}
+            </Button>
+          )}
           <FittingExportMenu
             fitting={fitting}
             price={price}

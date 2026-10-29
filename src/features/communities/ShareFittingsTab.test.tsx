@@ -145,16 +145,29 @@ describe('ShareFittingsTab', () => {
     expect(screen.queryByText('Beta Fit')).not.toBeInTheDocument();
   });
 
-  it('asks before turning share-all off, then removes every shared Fitting', async () => {
+  it('turns share-all off with an Undo toast, then removes every shared Fitting', async () => {
     store.shared = new Set(['saved-a']);
     await saveFittingsAll(1, 'c1', new Set());
     const user = userEvent.setup();
     render(<ShareFittingsTab characterId={1} communityId="c1" />);
     await user.click(await screen.findByRole('checkbox', { name: f.shareAll }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: f.offAction }));
+    expect((await screen.findAllByText(f.stoppedAll)).length).toBeGreaterThan(0);
+    expect(store.unshareAllFittings).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(store.unshareAllFittings).toHaveBeenCalledWith(1, 'c1'));
     await waitFor(async () => expect(await loadFittingsAll(1, 'c1')).toBeNull());
+  });
+
+  it('Undo on the share-all toast writes nothing and keeps everything shared', async () => {
+    store.shared = new Set(['saved-a']);
+    await saveFittingsAll(1, 'c1', new Set());
+    const user = userEvent.setup();
+    render(<ShareFittingsTab characterId={1} communityId="c1" />);
+    await user.click(await screen.findByRole('checkbox', { name: f.shareAll }));
+    await user.click(await screen.findByRole('button', { name: f.undo }));
+    expect(screen.getByRole('checkbox', { name: f.shareAll })).toBeChecked();
+    expect(store.unshareAllFittings).not.toHaveBeenCalled();
+    expect(await loadFittingsAll(1, 'c1')).not.toBeNull();
   });
 
   it('lists a shared Fitting this device no longer has, so it can still be stopped', async () => {

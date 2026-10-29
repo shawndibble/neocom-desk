@@ -1,4 +1,4 @@
-import { damageOf, type ImproveMode, type ImproveOption } from './improve';
+import { damageOf, type ImproveOption } from './improve';
 import { overageOf, RESOURCES, type Resource } from './makeItFit';
 import type { TargetProfile } from './targetProfile';
 import type { FittingStats } from './types';
@@ -8,11 +8,11 @@ export type SelectionProblem =
 
 export interface SelectionSummary {
   count: number;
-  /** Sum of the priced rows' cost: new minus old, or net extra spend when refitting. */
+  /** Sum of the priced rows' cost: new minus old. */
   isk: number;
   /** Rows with no hub price, which `isk` leaves out. */
   unpriced: number;
-  /** The whole fit's price with the set made; planning only, null when the fit's price is unknown. */
+  /** The whole fit's price with the set made; null when the fit's price is unknown. */
   total: number | null;
   dps: { before: number; after: number };
   ehp: { before: number; after: number };
@@ -26,9 +26,8 @@ interface Params {
   before: FittingStats;
   /** One whole-fit recalculation of every ticked row made together. */
   after: FittingStats;
-  mode: ImproveMode;
-  spendCap: number | null;
-  /** What the fit costs now (planning). */
+  iskBudget: number | null;
+  /** What the fit costs now (for the budget). */
   fitTotal: number | null;
   target?: TargetProfile;
 }
@@ -38,22 +37,19 @@ export function summariseSelection({
   options,
   before,
   after,
-  mode,
-  spendCap,
+  iskBudget,
   fitTotal,
   target,
 }: Params): SelectionSummary {
   const priced = options.filter((option) => option.iskDelta !== null);
   const isk = options.reduce((sum, option) => sum + (option.iskDelta ?? 0), 0);
-  const total = mode === 'buy' && fitTotal !== null ? fitTotal + isk : null;
+  const total = fitTotal !== null ? fitTotal + isk : null;
   const problems: SelectionProblem[] = [
     ...RESOURCES.filter((resource) => overageOf(after, resource) > 0).map(
       (resource): SelectionProblem => ({ kind: 'over', resource })
     ),
     ...(before.capacitor.stable && !after.capacitor.stable ? [{ kind: 'capStable' } as const] : []),
-    ...(spendCap !== null &&
-    (mode === 'buy' ? total : isk) !== null &&
-    (mode === 'buy' ? total! : isk) > spendCap
+    ...(iskBudget !== null && total !== null && total > iskBudget
       ? [{ kind: 'spend' } as const]
       : []),
   ];

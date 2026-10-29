@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Caret, Checkbox, Toast, buttonClassName } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   focusRingInsetClassName,
   inlineLinkClassName,
@@ -42,7 +41,7 @@ import { useHaulLegRows, type LegRows } from './useHaulLegRows';
 interface ActiveHaulViewProps {
   haul: ActiveHaul;
   onBack: () => void;
-  onClear: () => Promise<void>;
+  onClear: () => void;
   /** Saves the ticked Leg ids on the snapshot. */
   onProgress: (done: number[]) => void | Promise<void>;
   /** Re-optimises what is left from where the pilot is; the caller saves a new snapshot. */
@@ -75,7 +74,6 @@ export function ActiveHaulView({
   const legRows = useHaulLegRows(allLegs);
   // Each section's current Leg shows its cargo and the rest fold; a toggle flips that.
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
-  const [clearing, setClearing] = useState(false);
   const [marked, setMarked] = useState<{ n: number; before: number[] } | null>(null);
   const [replanNote, setReplanNote] = useState<string | null>(null);
   const [replanning, setReplanning] = useState(false);
@@ -227,25 +225,13 @@ export function ActiveHaulView({
             {t('assets.movePlan.haul.resetProgress')}
           </Button>
         )}
-        <Button variant="danger" onClick={() => setClearing(true)}>
+        <Button variant="danger" onClick={() => onClear()}>
           {t('assets.movePlan.haul.clear')}
         </Button>
         <Button variant="ghost" onClick={onBack}>
           {t('assets.movePlan.back')}
         </Button>
       </div>
-      <ConfirmDialog
-        open={clearing}
-        title={t('assets.movePlan.haul.clearTitle')}
-        body={t('assets.movePlan.haul.clearBody')}
-        actionLabel={t('assets.movePlan.haul.clear')}
-        cancelLabel={t('assets.movePlan.cancel')}
-        onConfirm={async () => {
-          await onClear();
-          setClearing(false);
-        }}
-        onClose={() => setClearing(false)}
-      />
     </div>
   );
 }

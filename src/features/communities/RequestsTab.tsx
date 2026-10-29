@@ -14,6 +14,8 @@ import {
   Spinner,
   type DataTableColumn,
   NeedsConnection,
+  ToastStack,
+  useDeferredCommits,
 } from '@/components/ui';
 import { db } from '@/db';
 import { permissionsForEndpoints } from '@/esi/registry';
@@ -88,7 +90,7 @@ export function RequestsTab({
   myUid,
   isAdmin,
   memberNames,
-  requests,
+  requests: allRequests,
   pledges,
   pledgesFailed,
   failed,
@@ -123,6 +125,16 @@ export function RequestsTab({
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(initialRequestId ?? null);
+  // A removed Request stays hidden until its Undo toast ends and the write lands.
+  const pendingRemovals = useDeferredCommits();
+  const { hiddenIds: hiddenRequestIds } = pendingRemovals;
+  const requests = useMemo(
+    () =>
+      hiddenRequestIds.size === 0 || allRequests === null
+        ? allRequests
+        : allRequests.filter((r) => !hiddenRequestIds.has(r.id)),
+    [allRequests, hiddenRequestIds]
+  );
   // A link to a Request (`?request=`) opens its panel, also when the board is already showing.
   const [seenRequestId, setSeenRequestId] = useState(initialRequestId);
   if (initialRequestId !== seenRequestId) {
@@ -305,7 +317,7 @@ export function RequestsTab({
     </NeedsConnection>
   );
 
-  if (requests.length === 0) {
+  if (allRequests?.length === 0) {
     return (
       <>
         {failed && <Panel>{reloadFailed}</Panel>}
@@ -501,9 +513,16 @@ export function RequestsTab({
           onClose={() => setOpenId(null)}
           onChanged={onReload}
           onEdit={() => setEditingId(panelRequest.id)}
-          onRemoved={() => {
+          onRemove={({ message, commit }) => {
+            pendingRemovals.defer({
+              id: panelRequest.id,
+              message,
+              commit: async () => {
+                await commit();
+                onReload();
+              },
+            });
             setOpenId(null);
-            onReload();
           }}
           refreshPledges={refreshPledges}
         />
@@ -517,6 +536,12 @@ export function RequestsTab({
           setPledgesOpen(false);
           setOpenId(id);
         }}
+      />
+      <ToastStack
+        items={pendingRemovals.items}
+        undoLabel={t('communities.board.admin.undo')}
+        onUndo={pendingRemovals.undo}
+        onClose={pendingRemovals.commit}
       />
       {compose}
       {edit}

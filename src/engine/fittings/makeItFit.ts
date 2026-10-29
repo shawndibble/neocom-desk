@@ -120,6 +120,11 @@ export interface FindFitSwapsParams {
   /** Hands the main thread back between calculations. */
   yieldFn?: () => Promise<void>;
   isCancelled?: () => boolean;
+  /**
+   * What a swapped fit must satisfy, on top of the budget: the search is then for
+   * single swaps that bring `before` there, not for ones that free CPU or powergrid.
+   */
+  accepts?: (after: FittingStats) => boolean;
 }
 
 export async function findFitSwaps({
@@ -130,8 +135,10 @@ export async function findFitSwaps({
   priceOf,
   yieldFn,
   isCancelled,
+  accepts,
 }: FindFitSwapsParams): Promise<FitSwapsResult> {
   const over = RESOURCES.filter((resource) => overageOf(before, resource) > 0);
+  if (accepts) return findAcceptedSwaps();
   if (over.length === 0) return { options: [], nothingFits: false };
 
   async function evaluate(swaps: FitSwap[]): Promise<FitOption | null> {
@@ -144,6 +151,25 @@ export async function findFitSwaps({
     } catch {
       return null;
     }
+  }
+
+  /** Single swaps only: the cover for a need other than CPU or powergrid has no freed-resource estimate to pair on. */
+  async function findAcceptedSwaps(): Promise<FitSwapsResult> {
+    if (over.length === 0 && accepts!(before)) return { options: [], nothingFits: false };
+    const accepted: FitOption[] = [];
+    for (const candidate of candidates) {
+      const option = await evaluate([candidate]);
+      if (isCancelled?.()) return { options: [], nothingFits: false };
+      if (option && fitsResourceBudget(option.after) && accepts!(option.after)) {
+        accepted.push(option);
+      }
+    }
+    // Cheapest first, an unpriced swap last: the caller keeps only the first few.
+    accepted.sort((a, b) => {
+      if ((a.iskDelta === null) !== (b.iskDelta === null)) return a.iskDelta === null ? 1 : -1;
+      return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
+    });
+    return { options: accepted, nothingFits: accepted.length === 0 };
   }
 
   const singles: FitOption[] = [];

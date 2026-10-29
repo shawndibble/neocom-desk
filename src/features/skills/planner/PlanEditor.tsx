@@ -30,13 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  Toast,
   Tooltip,
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
-import { useFocusAfterCommit, type FocusCandidate } from '@/lib/useFocusAfterCommit';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { neighbourFocusCandidates, planRowHandle } from './focusNeighbour';
 import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
@@ -69,7 +70,6 @@ import {
 } from './optimizeHelpers';
 import { OptimizeMenu, type OptimizeMenuItem } from './OptimizeMenu';
 import { OptimizeForMeModal, RemapPreviewModal } from './RemapPreviewModal';
-import { RemoveEntryModal } from './RemoveEntryModal';
 import { MilestoneModal } from './MilestoneModal';
 import type {
   PlanBooster,
@@ -123,6 +123,7 @@ import {
   promotePrereqRow,
   alignedMarkerAttributes,
   removeEntry,
+  removeTrainedEntries,
   removeRemapMarker,
   replaceWithImport,
   setPriority,
@@ -178,6 +179,12 @@ export type PlanPatch = Partial<
     | 'milestones'
   >
 >;
+
+/** What "Remove trained skills" just did: how many rows went, and the plan as it stood for Undo. */
+interface TrainedRemoved {
+  count: number;
+  undo: Required<SkillPlanEditable>;
+}
 
 interface PlanEditorProps {
   characterId: number;
@@ -324,6 +331,10 @@ export function PlanEditor({
   // copyConfirm/importConfirm above: small text next to the triggering
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
+  // "Remove trained skills": the count it removed and the plan as it stood, for the Undo beside it. Scoped to the plan like undoImport.
+  const [trainedRemoved, setTrainedRemoved] = useScopedState<TrainedRemoved>([plan.id]);
+  const { show: showTrainedRemoved, cancel: cancelTrainedRemoved } =
+    useAutoDismiss<TrainedRemoved | null>(setTrainedRemoved, null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const { show: showMarkerConfirm } = useAutoDismiss<boolean>(setMarkerConfirm, false);
   // A promoted prereq row is a quieter change than it looks (a dimmed row
@@ -334,23 +345,18 @@ export function PlanEditor({
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
-  // The entry pending a remove confirmation (#408) — an in-app Modal rather
-  // than removing on click, matching the pattern PlanList already uses for
-  // deleting a whole plan (GLOSSARY.md's "an in-app Modal replacing
-  // window.confirm on delete").
-  // The row awaiting the remove-confirm Modal. Skill *and* level: a plan
-  // holds one entry per level, so "which row" needs both.
-  const [removingEntry, setRemovingEntry] = useState<{
-    skillTypeID: number;
-    targetLevel: number;
-  } | null>(null);
+  // A removed entry goes at once, with an Undo toast rather than a confirm
+  // dialog. Scoped to plan.id so a plan switch can't offer an undo for another plan.
+  const [removedToast, setRemovedToast] = useScopedState<{
+    message: string;
+    onUndo: () => void;
+  }>([plan.id]);
   // Focus after a remove goes to a neighbour row, else this heading (WCAG 2.4.3).
   const entriesHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  // Worked out when the confirm opens, while the row's neighbours are known.
-  const removeFocusRef = useRef<readonly FocusCandidate[]>([]);
   // A ref keeps `requestRemoveEntry` stable, so memoized rows don't re-render on every recompute.
   const mergedRowsRef = useRef<readonly MergedRow[]>([]);
+  const editableRef = useRef<SkillPlanEditable>({ entries: [] });
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -652,6 +658,12 @@ export function PlanEditor({
     if (patch) onUpdate(patch);
   }, [editable, catalog.engineSkills, trainedSkills, trainedSkillsKnown, onUpdate]);
 
+  // Whether the plan holds any row the character already trained: the button is absent when there is nothing to remove.
+  const hasTrainedEntries = useMemo(
+    () => removeTrainedEntries(editable, trainedSkills) !== null,
+    [editable, trainedSkills]
+  );
+
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
     [plan.entries]
@@ -759,6 +771,7 @@ export function PlanEditor({
   );
   useEffect(() => {
     mergedRowsRef.current = mergedRows;
+    editableRef.current = editable;
   });
   const bandsAt = useMemo<ReadonlyMap<string, BandInfo>>(() => {
     if (groupingMode === 'attributePair') {
@@ -1185,27 +1198,34 @@ export function PlanEditor({
     [editable, mergedRows, onUpdate, confirmPromotion, setDropError, focusAfterCommit]
   );
 
-  /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
-  const requestRemoveEntry = useCallback((skillTypeID: number, targetLevel: number) => {
-    removeFocusRef.current = neighbourFocusCandidates(
-      mergedRowsRef.current,
-      `${skillTypeID}-${targetLevel}`,
-      entriesHeadingRef
-    );
-    setRemovingEntry({ skillTypeID, targetLevel });
-  }, []);
-
-  /** The confirm Modal's Remove button: the removal `onRemove` used to do inline before #408. */
-  const confirmRemoveEntry = useCallback(() => {
-    if (removingEntry === null) return;
-    const { skillTypeID, targetLevel } = removingEntry;
-    const landing = removeFocusRef.current;
-    const saved = onUpdate(removeEntry(editable, skillTypeID, targetLevel));
-    setRemovingEntry(null);
-    // The save is async, so the row can outlive the dialog: once it has
-    // landed, move focus again (the dialog hands it back to the gone ⋮).
-    void Promise.resolve(saved).then(() => focusAfterCommit(...landing));
-  }, [removingEntry, editable, onUpdate, focusAfterCommit]);
+  /** EntryList's `onRemove`: removes at once and offers Undo, which restores the plan as it was. */
+  const requestRemoveEntry = useCallback(
+    (skillTypeID: number, targetLevel: number) => {
+      const before = editableRef.current;
+      const landing = neighbourFocusCandidates(
+        mergedRowsRef.current,
+        `${skillTypeID}-${targetLevel}`,
+        entriesHeadingRef
+      );
+      const snapshot: Required<SkillPlanEditable> = {
+        entries: before.entries,
+        markers: before.markers ?? [],
+        markerAttributes: before.markerAttributes ?? [],
+      };
+      const saved = onUpdate(removeEntry(before, skillTypeID, targetLevel));
+      setRemovedToast({
+        message: t('plans.entryRemoved', { name: levelLabel(skillTypeID, targetLevel) }),
+        onUndo: () => {
+          setRemovedToast(null);
+          void onUpdate(snapshot);
+        },
+      });
+      // The save is async, so the row can outlive the click: once it has
+      // landed, move focus off the gone ⋮.
+      void Promise.resolve(saved).then(() => focusAfterCommit(...landing));
+    },
+    [onUpdate, focusAfterCommit, setRemovedToast, levelLabel, t]
+  );
 
   const handleRemoveMarker = useCallback(
     (markerIndex: number) => {
@@ -1223,6 +1243,21 @@ export function PlanEditor({
       onUpdate(setPriority(editable, skillTypeID, priority)),
     [editable, onUpdate]
   );
+
+  function handleRemoveTrained() {
+    const removal = removeTrainedEntries(editable, trainedSkills);
+    if (!removal) return;
+    onUpdate(removal.patch);
+    // Long enough to use the Undo it carries, like Replace's.
+    showTrainedRemoved({ count: removal.removed, undo: removal.undo }, 10000);
+  }
+
+  function undoRemoveTrained() {
+    if (!trainedRemoved) return;
+    cancelTrainedRemoved();
+    onUpdate(trainedRemoved.undo);
+    setTrainedRemoved(null);
+  }
 
   function handleAddMarker() {
     onUpdate(addRemapMarker(editable));
@@ -1377,6 +1412,21 @@ export function PlanEditor({
               label: t('plans.fitGoal.add'),
               onClick: () => setFitGoalOpen(true),
             })}
+            {/* Absent, not greyed, when there is nothing to remove (or trained skills are unknown). */}
+            {trainedSkillsKnown &&
+              hasTrainedEntries &&
+              toolAction({
+                icon: <Icon.Done size={Icon.ICON_SIZE.sm} />,
+                label: t('plans.removeTrained'),
+                onClick: handleRemoveTrained,
+              })}
+            {trainedRemoved &&
+              confirmation(
+                t('plans.trainedRemoved', { count: trainedRemoved.count }),
+                <Button size="md" variant="ghost" onClick={undoRemoveTrained}>
+                  {t('plans.importQueueUndo')}
+                </Button>
+              )}
             {markerConfirm && confirmation(t('plans.markerAdded'))}
             {/* Standing, not a post-click toast: the moment the plan carries
                 a Remap Marker, what it saves is a fact about the plan, and
@@ -1772,7 +1822,7 @@ export function PlanEditor({
                         onValueChange={(value) => void setGroupingMode(value as GroupingMode)}
                       >
                         <SelectTrigger
-                          size="sm"
+                          size="md"
                           aria-label={t('plans.groupBy')}
                           className="w-36 lg:scroll-mt-40"
                         >
@@ -1871,7 +1921,7 @@ export function PlanEditor({
           <>
             <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" disabled={queueImporting}>
+                <Button size="md" disabled={queueImporting}>
                   <Icon.ImportClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
                   {t('plans.import')}
                   <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
@@ -1904,7 +1954,7 @@ export function PlanEditor({
             </DropdownMenu>
             <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button size="sm">
+                <Button size="md">
                   <Icon.Export aria-hidden="true" size={Icon.ICON_SIZE.sm} />
                   {t('plans.export')}
                   <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
@@ -2110,13 +2160,14 @@ export function PlanEditor({
         onSave={submitMilestoneModal}
       />
 
-      <RemoveEntryModal
-        removing={removingEntry}
-        nameFor={nameFor}
-        focusRef={removeFocusRef}
-        onClose={() => setRemovingEntry(null)}
-        onConfirm={confirmRemoveEntry}
-      />
+      {removedToast && (
+        <Toast
+          message={removedToast.message}
+          instance={removedToast}
+          undo={{ label: t('plans.undo'), onUndo: removedToast.onUndo }}
+          onClose={() => setRemovedToast(null)}
+        />
+      )}
     </>
   );
 }

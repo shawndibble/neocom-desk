@@ -566,6 +566,7 @@ function FittingsPage() {
               onLibrary={openLibrary}
               onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
               onImprove={improve.open}
+              unflyable={(gaps?.unusableModuleKeys.size ?? 0) > 0}
             />
             {workspace.tooLargeToShare && (
               <p role="alert" className="text-xs text-warning">

@@ -36,6 +36,26 @@ describe('groupByModule', () => {
     expect(ids(groups)).toEqual([[11, 10]]);
   });
 
+  it('groups the conversion variants of one side into one row', () => {
+    const conversion = (toTypeId: number, score: number, removedTypeId: number): ImproveOption =>
+      ({
+        candidate: {
+          fromTypeId: null,
+          toTypeId,
+          at: [{ slot: 'low', slotIndex: 0 }],
+          conversion: {
+            side: 'armor',
+            removes: [{ typeId: removedTypeId, at: [{ slot: 'medium', slotIndex: 0 }] }],
+            freed: { high: 0, medium: 1, low: 0 },
+          },
+        },
+        score,
+        iskDelta: 1,
+      }) as ImproveOption;
+    const groups = groupByModule([conversion(10, 0.1, 5), conversion(11, 0.3, 6)], 'gain');
+    expect(ids(groups)).toEqual([[11, 10]]);
+  });
+
   it('sorts by value: gain per ISK, free before priced, unpriced last', () => {
     const groups = groupByModule(
       [
