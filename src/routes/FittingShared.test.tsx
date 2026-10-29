@@ -11,7 +11,7 @@ import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingShared, FittingShareView } from './FittingShared';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly } from '@/lib/timestamp';
 
 const sde = vi.hoisted(() => ({
   loadSkills: vi.fn(async () => [{ typeID: 3300, name: 'Gunnery' }]),
@@ -130,9 +130,7 @@ describe('FittingShared', () => {
         <FittingShareView code={encoded.payload} expiresAt={expiresAt} />
       </MemoryRouter>
     );
-    expect(
-      await screen.findByText(formatTimestamp(new Date(expiresAt), 'UTC'))
-    ).toBeInTheDocument();
+    expect(await screen.findByText(formatDateOnly(new Date(expiresAt), 'UTC'))).toBeInTheDocument();
   });
 
   it('announces a failed copy', async () => {

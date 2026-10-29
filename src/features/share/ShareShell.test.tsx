@@ -11,13 +11,13 @@ beforeEach(async () => {
 });
 
 describe('ShareShell wide', () => {
-  it('puts the title, expiry and login in the header, and the ship and action beside the notice below', async () => {
+  it('keeps brand and login in the header, the ship and action beside the notice, and the footer last', async () => {
     render(
       <MemoryRouter>
         <ShareShell
           title="Shared fitting"
           wide
-          meta={<span>Expires soon</span>}
+          footer={<span>Expires soon</span>}
           lead={<span>Heron</span>}
           notice="Shown at every skill level V."
           actions={<button type="button">Copy it</button>}
@@ -29,11 +29,11 @@ describe('ShareShell wide', () => {
 
     const header = screen.getByRole('heading', { name: 'Shared fitting' }).closest('header')!;
     expect(await within(header).findByRole('button', { name: 'Log in' })).toBeInTheDocument();
-    expect(within(header).getByRole('heading', { name: 'Shared fitting' })).toBeInTheDocument();
-    expect(within(header).getByText('Expires soon')).toBeInTheDocument();
+    expect(within(header).queryByText('Expires soon')).not.toBeInTheDocument();
     expect(within(header).queryByRole('button', { name: 'Copy it' })).not.toBeInTheDocument();
     expect(screen.getByText('Heron')).toBeInTheDocument();
     expect(screen.getByText('Shown at every skill level V.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy it' })).toBeInTheDocument();
+    expect(screen.getByRole('contentinfo')).toHaveTextContent('Expires soon');
   });
 });

@@ -23,12 +23,12 @@ interface ShareShellProps {
   actions?: ReactNode;
   /** Omitted while nothing is loaded yet, or the link is dead — the plain app root then. */
   openInApp?: OpenInApp;
-  /** Widens the frame for a page that lays out two columns, and puts the title in the header row beside the brand; the other share pages stay a single narrow one. */
+  /** Widens the frame for a page that lays out two columns, and shrinks the header to the brand and the login, the title kept for screen readers only; the other share pages stay a single narrow one. */
   wide?: boolean;
   /** A note for a signed-out visitor. On a `wide` page it fills the strip beside the page's `actions`. */
   notice?: ReactNode;
-  /** Quiet header facts beside the login, on `wide` pages (a link's expiry). */
-  meta?: ReactNode;
+  /** The last thing on a `wide` page, a short chip rather than a sentence (a link's expiry). */
+  footer?: ReactNode;
   /** Beside the notice strip, on `wide` pages (the shared Fitting's ship and name). */
   lead?: ReactNode;
   children: ReactNode;
@@ -50,7 +50,7 @@ export function ShareShell({
   wide,
   notice,
   lead,
-  meta,
+  footer,
   children,
 }: ShareShellProps) {
   const { t } = useTranslation();
@@ -101,22 +101,18 @@ export function ShareShell({
     // The login stays in the header; the page's own action rides in the notice strip.
     return (
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
-        <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line pb-3">
-          <Link to="/" className="flex items-center gap-2 text-lg font-semibold tracking-wide">
-            <LogoMark className="size-7" />
-            {t('share.brand')}
-          </Link>
-          <h1
-            className={
-              hideTitle ? 'sr-only' : 'border-l border-line pl-4 text-xs tracking-widest uppercase'
-            }
+        <header className="flex items-center gap-3 border-b border-line pb-3 sm:gap-4">
+          <Link
+            to="/"
+            className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-wide sm:text-lg"
           >
-            {title}
-          </h1>
-          <span className="ml-auto flex items-center gap-3">
-            {meta}
-            {signedOut ? loginControls : openInAppLink}
-          </span>
+            <LogoMark className="size-6 shrink-0 sm:size-7" />
+            {/* The icon alone on the narrowest phones, so the login keeps its row. */}
+            <span className="max-[369px]:sr-only">{t('share.brand')}</span>
+          </Link>
+          {/* The page says what it is below; the title is for screen readers. */}
+          <h1 className="sr-only">{title}</h1>
+          <span className="ml-auto shrink-0">{signedOut ? loginControls : openInAppLink}</span>
         </header>
 
         <main className="flex flex-1 flex-col gap-4">
@@ -135,6 +131,8 @@ export function ShareShell({
           )}
 
           {children}
+
+          {footer !== undefined && <footer className="mt-auto pt-2">{footer}</footer>}
         </main>
       </div>
     );
