@@ -23,6 +23,7 @@ import {
   sideOf,
   type DefenseSide,
 } from './improveGroups';
+import { breakTies, type JobCommonality } from './hullCommonality';
 import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
 import {
   dropLimitsOf,
@@ -566,6 +567,12 @@ export interface CandidateOptions {
   limit?: number;
   /** The Improve Job and, for Explore, its space: its freed jobs may go, Dangerous keeps tank modules tank modules. Absent: today's guard. */
   jobSetting?: JobSetting;
+  /**
+   * What the hull's community fits say for the job (#5581): the groups on enough
+   * of them join Rework's. They are tried after every candidate the table's groups
+   * make and never take their place. Absent: today's.
+   */
+  commonality?: JobCommonality | null;
 }
 
 const DEFAULT_OPTIONS: CandidateOptions = {
@@ -584,6 +591,8 @@ export const MAX_CANDIDATES = 400;
 
 /** Candidate tiers: Upgrade, Rebalance, Rework, then the empty-slot fills. */
 const FILL_TIER = 3;
+/** The groups the hull's community fits add: after every other candidate, so the cap never drops one for them. */
+const COMMON_TIER = 4;
 
 /** Conversions offered per search: each is a whole-fit calculation. */
 const CONVERSIONS_PER_SEARCH = 40;
@@ -841,6 +850,8 @@ export function improveCandidates(
   const filter = candidateFilter(modules, groupOf, o);
   // A chosen side frees the other side's tank modules; nothing else swaps into tank modules.
   const { freesTank, goalGroups } = filter;
+  // The table's own groups; the community's extras (`filter.commonGroups`) are tried after them.
+  const tableGroups = goalGroups.filter((group) => !filter.commonGroups.includes(group));
 
   const copies = new Map<number, ModuleAt[]>();
   for (const module of modules) {
@@ -866,7 +877,7 @@ export function improveCandidates(
     return !filter.uniqueBlocks(groupOf(typeId), removedGroup, removed);
   };
 
-  const tiers: ImproveCandidate[][] = Array.from({ length: FILL_TIER + 1 }, () => []);
+  const tiers: ImproveCandidate[][] = Array.from({ length: COMMON_TIER + 1 }, () => []);
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
@@ -875,7 +886,7 @@ export function improveCandidates(
     const from = groupOf(fromTypeId);
     const seen = new Set<number>([fromTypeId]);
     // Each tier has its own budget, and only an offered target spends it.
-    const taken = [0, 0, 0];
+    const taken = [0, 0, 0, 0, 0];
     const canOffer = (typeId: number, group: number | undefined) => {
       if (seen.has(typeId) || !allowed(typeId, slot, from, at.length)) return false;
       if (filter.tankBlocks(group, from)) return false;
@@ -902,8 +913,8 @@ export function improveCandidates(
     // Rework: one target per group in turn, so the groups listed first cannot use the whole budget.
     // Within a group, the members nearest the fitted module's meta group come first.
     const fromMeta = index.types[fromTypeId]?.metaGroupId ?? 0;
-    const offerRework = () => {
-      const lists = goalGroups
+    const offerRework = (groups: readonly number[], tier: number) => {
+      const lists = groups
         .map((group) => ({
           group,
           typeIds: (o.pool?.typeIdsInGroup(group) ?? [])
@@ -916,7 +927,8 @@ export function improveCandidates(
         }))
         .filter((list) => list.typeIds.length > 0);
       for (let i = 0; lists.some((list) => i < list.typeIds.length); i++)
-        for (const { group, typeIds } of lists) if (i < typeIds.length) offer(2, typeIds[i], group);
+        for (const { group, typeIds } of lists)
+          if (i < typeIds.length) offer(tier, typeIds[i], group);
     };
     for (const member of getVariations(index, fromTypeId).members) {
       offer(0, member.typeId, groupOf(member.typeId));
@@ -924,7 +936,7 @@ export function improveCandidates(
     // The other side's tank modules are freed: they take the chosen side's modules whatever the Reach.
     const otherSide = from === undefined ? null : sideOf(from);
     if (o.pool && freesTank && otherSide !== null && otherSide !== o.defense) {
-      for (const group of goalGroups)
+      for (const group of tableGroups)
         if (TANK_GROUPS.has(group))
           for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
     }
@@ -939,13 +951,14 @@ export function improveCandidates(
         for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group, true);
     }
     if (o.pool && o.reach === 'rework') {
-      offerRework();
+      offerRework(tableGroups, 2);
+      offerRework(filter.commonGroups, COMMON_TIER);
     }
     // Whatever the Reach found, an unflyable module is replaced: the same group when no variant was found, then the goal's groups.
     if (o.pool && unflyable) {
       if (taken[0] + taken[1] + taken[2] === 0 && from !== undefined)
         for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
-      if (taken[0] + taken[1] + taken[2] === 0) offerRework();
+      if (taken[0] + taken[1] + taken[2] === 0) offerRework(tableGroups, 2);
     }
   }
 
@@ -963,13 +976,16 @@ export function improveCandidates(
       const free = filter.firstFreeSlot(slot, o.slotCounts);
       if (free === null) continue;
       // Each group gets an equal share, so the first groups listed cannot use the whole rack's budget.
-      const share = Math.ceil(FILLS_PER_RACK / Math.max(1, goalGroups.length));
+      const share = Math.ceil(
+        FILLS_PER_RACK / Math.max(1, goalGroups.length - filter.commonGroups.length)
+      );
       for (const group of goalGroups) {
+        const tier = filter.commonGroups.includes(group) ? COMMON_TIER : FILL_TIER;
         let added = 0;
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
           added++;
-          tiers[FILL_TIER].push({
+          tiers[tier].push({
             fromTypeId: null,
             toTypeId: typeId,
             at: [{ slot, slotIndex: free }],
@@ -987,9 +1003,16 @@ export function improveCandidates(
   );
 }
 
-/** Best score first; a tie goes to the cheaper swap; an unpriced swap sorts after every priced one. */
-export function rankImproveOptions<T extends ImproveOption>(options: readonly T[]): T[] {
-  return [...options].sort((a, b) => {
+/**
+ * Best score first; a tie goes to the cheaper swap; an unpriced swap sorts after every priced one.
+ * With `targetShare` (#5581), scores within 1% of each other order by how common the target's
+ * GROUP is on the hull for the job, most common first; a variant within a group is never ordered by it.
+ */
+export function rankImproveOptions<T extends ImproveOption>(
+  options: readonly T[],
+  targetShare?: (candidate: ImproveCandidate) => number
+): T[] {
+  const ranked = [...options].sort((a, b) => {
     const ap = a.iskDelta === null;
     const bp = b.iskDelta === null;
     const af = a.candidate.fixesUnflyable === true;
@@ -998,6 +1021,14 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
     if (Math.abs(a.score - b.score) > 1e-9) return b.score - a.score;
     return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
   });
+  return breakTies(
+    ranked,
+    (option) => option.score,
+    targetShare && ((option) => targetShare(option.candidate)),
+    (a, b) =>
+      (a.candidate.fixesUnflyable === true) === (b.candidate.fixesUnflyable === true) &&
+      (a.iskDelta === null) === (b.iskDelta === null)
+  );
 }
 
 /** Hub sell price of every part (`ImproveOption.iskDelta`). */
@@ -1108,6 +1139,8 @@ export interface FindImprovementsParams {
    * serial run gives, however the calculations finish.
    */
   concurrency?: number;
+  /** How common a swap's target group is on the hull for the job, 0..1: orders near-ties (#5581). Absent: today's order. */
+  targetShare?: (candidate: ImproveCandidate) => number;
 }
 
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
@@ -1197,6 +1230,7 @@ export async function findImprovements({
   isCancelled,
   shouldStop,
   concurrency = 1,
+  targetShare,
 }: FindImprovementsParams): Promise<ImproveResult | null> {
   const kept: ImproveOption[] = [];
   const rejected: RejectedOption[] = [];
@@ -1381,7 +1415,7 @@ export async function findImprovements({
     }
   }
 
-  const ranked = rankImproveOptions(kept);
+  const ranked = rankImproveOptions(kept, targetShare);
   return {
     makeFlyable: rankFlyable(flyable),
     flyableOverrun: overrun,

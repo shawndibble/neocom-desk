@@ -30,9 +30,20 @@ interface Props {
   labels: ImproveLabels;
   selection: ImproveSelection;
   lead: LeadContext;
+  /** A quiet line for a row whose target group most community fits carry (#5581); null: none. */
+  hintOf?: (candidate: ImproveOption['candidate']) => string | null;
 }
 
-export function ImproveOptionList({ options, own, section, sort, labels, selection, lead }: Props) {
+export function ImproveOptionList({
+  options,
+  own,
+  section,
+  sort,
+  labels,
+  selection,
+  lead,
+  hintOf,
+}: Props) {
   const { t } = useTranslation();
   const idPrefix = useId();
   const { ticked, expanded, flip } = selection;
@@ -57,6 +68,7 @@ export function ImproveOptionList({ options, own, section, sort, labels, selecti
               labels={labels}
               selection={selection}
               lead={lead}
+              hintOf={hintOf}
             />
             {rest.length > 0 && (
               <li className="pl-2">
@@ -81,6 +93,7 @@ export function ImproveOptionList({ options, own, section, sort, labels, selecti
                         labels={labels}
                         selection={selection}
                         lead={lead}
+                        hintOf={hintOf}
                       />
                     ))}
                   </ul>
@@ -101,6 +114,7 @@ interface RowProps {
   labels: ImproveLabels;
   selection: ImproveSelection;
   lead: LeadContext;
+  hintOf?: Props['hintOf'];
 }
 
 function ImproveOptionRow({
@@ -110,6 +124,7 @@ function ImproveOptionRow({
   labels,
   selection,
   lead: leadContext,
+  hintOf,
 }: RowProps) {
   const { t } = useTranslation();
   const { ticked, replaced, expanded, flip, toggle, setHover } = selection;
@@ -117,6 +132,10 @@ function ImproveOptionRow({
   const id = `improve-${section}-${key}`;
   const statsKey = `stats:${id}`;
   const lead = leadLine(t, leadContext, option, own);
+  const hint =
+    option.candidate.fixesUnflyable || option.candidate.conversion
+      ? null
+      : (hintOf?.(option.candidate) ?? null);
   return (
     <li
       className="border-line rounded-xs border p-2 text-sm"
@@ -172,6 +191,7 @@ function ImproveOptionRow({
             </span>
           )}
           {lead && <span className="block text-xs">{lead.node}</span>}
+          {hint && <span className="text-text-dim block text-xs">{hint}</span>}
           <span className="text-text-dim block text-xs">
             {changeLine(t, option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
           </span>

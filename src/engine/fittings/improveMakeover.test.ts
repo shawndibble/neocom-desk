@@ -12,6 +12,7 @@ import {
   rowsBetween,
   type MakeoverMoveOptions,
 } from './improveMakeover';
+import type { JobCommonality } from './hullCommonality';
 import { buildVariationIndex } from '../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from './types';
 import { baseFittingStats } from './__fixtures__/fittingStats';
@@ -491,5 +492,93 @@ describe('makeoverBar', () => {
 
   it('is null when no single swap qualifies', () => {
     expect(makeoverBar({ noDownside: [option(3, 0.5)], tradeOffs: [] }, index)).toBeNull();
+  });
+});
+
+describe('hull commonality (#5581)', () => {
+  const common = (shares: Record<number, number>): JobCommonality => ({
+    fits: 20,
+    groupShare: new Map(Object.entries(shares).map(([g, s]) => [Number(g), s])),
+    propulsion: { afterburner: 0, mwd: 0, mjd: 0 },
+  });
+  const f = fit([
+    ['low', 0, 11],
+    ['medium', 0, 1],
+  ]);
+
+  it('adds a group at or above the threshold to the moves, after every move without it', () => {
+    const base = catalogue(TYPES).moves()(f);
+    const withData = catalogue(TYPES).moves({ commonality: common({ 99999: 0.3 }) })(f);
+    expect(withData.slice(0, base.length).map(label)).toEqual(base.map(label));
+    const added = withData.slice(base.length).map(label);
+    expect(added).toContain('11>13@l0');
+    expect(base.map(label)).not.toContain('11>13@l0');
+  });
+
+  it('never removes a move, and a group under the threshold adds none', () => {
+    const base = catalogue(TYPES).moves()(f).map(label);
+    expect(
+      catalogue(TYPES)
+        .moves({ commonality: common({ 99999: 0.24 }) })(f)
+        .map(label)
+    ).toEqual(base);
+    expect(catalogue(TYPES).moves({ commonality: null })(f).map(label)).toEqual(base);
+  });
+
+  it('still obeys the filters: no second Damage Control, no tank module in a freed tank', () => {
+    const list = catalogue(TYPES)
+      .moves({ commonality: common({ 60: 0.9 }), defense: 'shield' })(
+        fit([
+          ['low', 0, 10],
+          ['low', 1, 11],
+        ])
+      )
+      .map(label);
+    expect(list.some((l) => l.startsWith('11>10'))).toBe(false);
+  });
+
+  describe('the tie-break', () => {
+    const types: Record<number, Type> = {
+      40: { group: 57, rack: 'low', meta: 2, ehp: 0 },
+      41: { group: 1156, rack: 'low', meta: 2, ehp: 1000 },
+      42: { group: 770, rack: 'low', meta: 2, ehp: 1005 },
+      43: { group: 770, rack: 'low', meta: 2, ehp: 1100 },
+      50: { group: 38, rack: 'medium', meta: 2, ehp: 0 },
+      51: { group: 77, rack: 'medium', meta: 2, ehp: 500 },
+    };
+    const start = fit([
+      ['low', 0, 40],
+      ['medium', 0, 50],
+    ]);
+    // Moves from whatever the fit holds now, as the real move list is.
+    const moveList =
+      (to: number) =>
+      (current: Fitting): ImproveCandidate[] => {
+        const low = current.modules.find((m) => m.slot === 'low')?.typeId ?? 40;
+        return [
+          ...[to, 41]
+            .filter((target) => target !== low)
+            .map((target) => ({
+              fromTypeId: low,
+              toTypeId: target,
+              at: [{ slot: 'low' as const, slotIndex: 0 }],
+            })),
+          { fromTypeId: 50, toTypeId: 51, at: [{ slot: 'medium' as const, slotIndex: 0 }] },
+        ];
+      };
+    const run = (to: number, targetShare?: (m: ImproveCandidate) => number) =>
+      search(start, { moves: moveList(to), ...(targetShare ? { targetShare } : {}) }, types).then(
+        ({ result }) => result?.makeover?.rows.map(label) ?? []
+      );
+    const prefers41 = (m: ImproveCandidate) => (m.toTypeId === 41 ? 0.9 : 0.1);
+
+    it('picks the more common target group when the gains are within 1%', async () => {
+      expect(await run(42)).toContain('40>42@l0');
+      expect(await run(42, prefers41)).toContain('40>41@l0');
+    });
+
+    it('keeps the larger gain when it is more than 1% ahead', async () => {
+      expect(await run(43, prefers41)).toContain('40>43@l0');
+    });
   });
 });

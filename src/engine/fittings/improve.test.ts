@@ -633,6 +633,32 @@ describe('rankImproveOptions', () => {
   });
 });
 
+describe('rankImproveOptions with hull commonality (#5581)', () => {
+  const option = (score: number, iskDelta: number | null, toTypeId: number) =>
+    ({ score, iskDelta, candidate: candidate(1, toTypeId) }) as unknown as ImproveOption;
+  // Targets 2 and 3 are in a group on most fits; 4 is in a rare one.
+  const share = (c: ImproveCandidate) => (c.toTypeId === 4 ? 0.1 : 0.9);
+
+  it('puts the more common target group first within 1%, and a clear leader stays first', () => {
+    const near = rankImproveOptions([option(0.1005, 100, 4), option(0.1, 100, 2)], share);
+    expect(toIds(near)).toEqual([2, 4]);
+    const clear = rankImproveOptions([option(0.12, 100, 4), option(0.1, 100, 2)], share);
+    expect(toIds(clear)).toEqual([4, 2]);
+  });
+
+  it('never orders variants of one group by popularity, and without data is today’s order', () => {
+    const same = rankImproveOptions([option(0.1005, 100, 2), option(0.1, 100, 3)], share);
+    expect(toIds(same)).toEqual([2, 3]);
+    const list = [option(0.1005, 100, 4), option(0.1, 100, 2)];
+    expect(toIds(rankImproveOptions(list))).toEqual([4, 2]);
+  });
+
+  it('keeps an unpriced swap after every priced one', () => {
+    const ranked = rankImproveOptions([option(0.1, null, 2), option(0.1, 100, 4)], share);
+    expect(toIds(ranked)).toEqual([4, 2]);
+  });
+});
+
 describe('goalAvailability', () => {
   it('disables damage and reach on a fit that fires nothing, with a reason', () => {
     const unarmed = { ...stats([]), offense: { ...stats([]).offense, dps: 0, sustainedDps: 0 } };
@@ -709,6 +735,30 @@ describe('improveCandidates Rework budget', () => {
     const modules = at('medium', [groups[213][0]]);
     const targets = improveCandidates(modules, index, rackOf, opts).map((c) => c.toTypeId);
     expect(targets.some((id) => groups[77].includes(id))).toBe(true);
+  });
+
+  describe('with hull commonality (#5581)', () => {
+    // Group 999 is in no goal's table groups; the community fits add it.
+    it('adds the community groups after every candidate it makes without them', () => {
+      groups[999] = [3000, 3001, 3002];
+      for (const id of groups[999]) {
+        groupOf.set(id, 999);
+        rackOf[id] = 'medium';
+      }
+      const modules = at('medium', [groups[213][0]]);
+      const base = improveCandidates(modules, index, rackOf, opts);
+      const common = {
+        fits: 20,
+        groupShare: new Map([[999, 0.4]]),
+        propulsion: { afterburner: 0, mwd: 0, mjd: 0 },
+      };
+      const withData = improveCandidates(modules, index, rackOf, { ...opts, commonality: common });
+      expect(withData.slice(0, base.length)).toEqual(base);
+      expect(withData.slice(base.length).map((c) => c.toTypeId)).toEqual([3000, 3001, 3002]);
+      const noData = improveCandidates(modules, index, rackOf, { ...opts, commonality: null });
+      expect(noData).toEqual(base);
+      delete groups[999];
+    });
   });
 
   it('offers a Damage Control to a low-slot non-tank module', () => {
