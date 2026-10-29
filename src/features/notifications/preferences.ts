@@ -27,6 +27,7 @@ import {
   type EventEnabledMap,
   type EveTypeEnabledMap,
   type NotificationChannel,
+  NOTIFICATION_CHANNELS,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
 import {
@@ -338,39 +339,56 @@ export async function toggleEveTypeChannelPref(
 }
 
 /**
- * Silence (or restore) one notification type in the **feed**, for several
- * Characters at once — what the Alerts page's per-type row does.
+ * Silence (or restore) one notification type for several Characters at once,
+ * on the given delivery channels.
  *
- * A `set`, not a toggle, and that is the whole reason it exists. A type on
- * that page is one row spanning every Character it fired for, and those
- * Characters can disagree about it: one muted from a context menu months ago,
- * the rest not. Looping the existing `toggle*ChannelPref` over them would flip
- * each independently and leave the row in the *inverted* mixed state it
- * started in. Passing the intended end state instead makes the row's own
- * reading of itself ("muted" = muted for all of them) the thing that changes.
+ * A `set`, not a toggle, and that is the whole reason it exists. A type is one
+ * row spanning every Character it fired for, and those Characters can disagree
+ * about it: one muted from a context menu months ago, the rest not. Looping the
+ * existing `toggle*ChannelPref` over them would flip each independently and leave
+ * the row in the *inverted* mixed state it started in. Passing the intended end
+ * state instead makes the row's own reading of itself ("muted" = muted for all of
+ * them) the thing that changes. The same holds per channel: a type already off
+ * for `browser` stays off, rather than being flipped back on.
  *
  * Sequential, re-reading the store between writes: `updateNotificationPrefs`
  * takes a whole next value, so a parallel fan-out would have every write build
- * on the same pre-loop snapshot and only the last would survive.
+ * on the same pre-loop snapshot and only the last would survive. A `browser`
+ * write stays on the device (`updateNotificationPrefs`), a `feed` write syncs.
+ *
+ * `characterIds[0]` drives the sync scheduling, so put a signed-in Character
+ * (the active one) first.
  */
-export async function setFeedMutedForCharacters(
+export async function setMutedForCharacters(
+  characterIds: readonly number[],
+  target: EntryChannelTarget,
+  muted: boolean,
+  channels: readonly NotificationChannel[] = NOTIFICATION_CHANNELS
+): Promise<void> {
+  for (const characterId of characterIds) {
+    for (const channel of channels) {
+      const value = useNotificationPreferences.getState().value;
+      const isMuted =
+        target.kind === 'eveType'
+          ? !isEveTypeEnabledFor(characterEveTypePrefs(value, characterId), target.type, channel)
+          : !isEventEnabledFor(characterEventPrefs(value, characterId), target.eventId, channel);
+      if (isMuted === muted) continue;
+      if (target.kind === 'eveType') {
+        await toggleEveTypeChannelPref(characterId, value, target.type, channel);
+      } else {
+        await toggleEventChannelPref(characterId, value, target.eventId, channel);
+      }
+    }
+  }
+}
+
+/** The same, for the **feed** channel alone — what the Alerts page's per-type row does. */
+export function setFeedMutedForCharacters(
   characterIds: readonly number[],
   target: EntryChannelTarget,
   muted: boolean
 ): Promise<void> {
-  for (const characterId of characterIds) {
-    const value = useNotificationPreferences.getState().value;
-    const isMuted =
-      target.kind === 'eveType'
-        ? !isEveTypeEnabledFor(characterEveTypePrefs(value, characterId), target.type, 'feed')
-        : !isEventEnabledFor(characterEventPrefs(value, characterId), target.eventId, 'feed');
-    if (isMuted === muted) continue;
-    if (target.kind === 'eveType') {
-      await toggleEveTypeChannelPref(characterId, value, target.type, 'feed');
-    } else {
-      await toggleEventChannelPref(characterId, value, target.eventId, 'feed');
-    }
-  }
+  return setMutedForCharacters(characterIds, target, muted, ['feed']);
 }
 
 /** Whether this Character would actually raise `characterNotTraining` in the Feed — its one per-pilot opt-out (issue #1731), read by the Overview board and Characters page so neither can disagree with the alert itself. */

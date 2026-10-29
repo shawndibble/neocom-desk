@@ -4,7 +4,10 @@ Research for a rework of the bell popover (`src/features/notifications/AlertsPan
 surface in `src/components/ui/AlertsBell.tsx`). Sources: Mobbin (web + iOS
 notification inboxes), `docs/DESIGN.md` §6c, and the panel's own code.
 
-Mockups: `docs/design/mockups/alerts-panel/` (stories in `src/mockups/AlertsPanel.stories.tsx`).
+Built and shipped in the same change as this document, so it describes what
+the panel does rather than what it might do. The mockup story that preceded it
+(`src/mockups/AlertsPanel.stories.tsx`) was deleted once the real panel landed,
+as `docs/design/mockups/README.md` step 9 requires; git history keeps it.
 
 ## 1. What is wrong today
 
@@ -62,8 +65,15 @@ for the cases one tap cannot cover (per-character, per-channel, thresholds).
 
 **Verdict:** Dismiss stays on the surface as a small `×` (§3e, WHOOP's
 pattern), and one `⋮` per row holds Snooze, "Stop these alerts" and
-"Notification settings…". §6c's "a row gets a ⋮ only for two or more real
-actions" is satisfied — three, none of them reachable in one tap elsewhere.
+"Notification settings…".
+
+On §6c's "a row gets a ⋮ only for two or more real actions": Snooze is price
+alerts only (`isSnoozable`), so most rows hold **two**, not three. Two still
+clears the bar, but only if the pre-filtered "Notification settings…" counts
+as distinct from the footer's "Notify me about…", which opens the same page
+unfiltered. It does — landing on the row's own type with the list already
+narrowed is the four-step detour this change is removing — but the ticket
+should state it rather than leave a reviewer to work it out.
 
 ### 2c. Rows are told apart by an eyebrow and a glyph, not by colour
 
@@ -103,6 +113,23 @@ the sample asked "are you sure?".
   nearer the content, and the `⋮` stays pinned at the very edge where §6c
   already puts it on a phone card. Both are plain `IconButton`s, not `Button`s
   — which is the original complaint answered directly: dismiss is a small icon.
+- **Space them apart.** §6c is explicit: "A destructive `×` beside a `⋮` is a
+  mis-tap hazard: fold Delete into the menu as a danger item, or separate it
+  from the `⋮`" (DESIGN.md:1359). Folding is not open to us — a menu item is
+  the buried Dismiss this whole change exists to undo — so take the other
+  branch and put real space between the two, not the hairline gap a normal
+  icon pair gets. Their hit areas must not touch (WCAG 2.5.8), at touch sizing
+  especially. Dismiss here is gentler than the Delete that rule has in mind —
+  it is undoable for the life of the toast (§4a) and the row comes straight
+  back — but "less destructive" is not "not destructive", and a mis-tap that
+  fires the wrong one of two adjacent 36px targets is exactly what the rule
+  is about.
+- **The caret and count are not a third control.** §6c also says "A › caret
+  beside a ⋮ is redundant: drop the caret". That rule is about a caret *in the
+  trailing cluster*, standing in for a row action. `▸ 12` sits mid-content
+  beside the title, is not focusable, and reports expand state that the row
+  click owns — so the cluster stays two controls, and the rule is not in play.
+  Worth saying out loud so a reviewer does not reject it on sight.
 
 ### 3b. The `⋮` menu
 
@@ -110,7 +137,7 @@ the sample asked "are you sure?".
 |---|---|
 | **Snooze 1h** | Unchanged, price alerts only (`isSnoozable`) |
 | **Stop these alerts** | Turns off `feed` + `browser` for this type, for every character (§4c) — the thing the pilot goes to Settings for today |
-| **Notification settings…** | Deep link, pre-filtered (see §4b) |
+| **Notification settings** | Deep link, pre-filtered (see §4b). No trailing "…": `placeholderEllipsis.test.ts` reserves that for a label that opens a dialog, and this navigates |
 
 **The same menu opens from the row itself** — right-click with a pointer,
 touch and hold on touch. §6c's gesture table already assigns touch-and-hold to
@@ -142,12 +169,22 @@ kind-of-clock is the one *nominal* palette. So topic gets **no colour**:
 
 - **Leading glyph** reusing the nav icons the app already owns —
   `NavMarket`, `NavIndustry`, `NavMail`, `NavCorp` (structures), `NavSkills`,
-  `NavAlerts` (everything else). These are the same six buckets as the
-  existing filter chips (`typeChipOfGroupKey`), so the chip bar and the glyphs
-  name the same thing.
+  and `NavAlerts` as the fallback. The first five are exactly the chips
+  `typeChipOfGroupKey` can return, so the chip bar and the glyphs name the
+  same thing. **The fallback is not decoration.** That function returns `null`
+  for every `eveType:` key that is not a structure prefix, and for any
+  `event:` id missing from `EVENT_CHIP` — a corp bill notification, say — so
+  those groups have no chip today and would have no glyph either. They get
+  `NavAlerts` and the eyebrow word "Alerts", because a row with no topic cue
+  is the complaint this section exists to fix. The ticket should look at what
+  actually lands in that bucket and, where a group deserves a real chip, add
+  it to `EVENT_CHIP` rather than leaving it in the fallback.
 - **Dim eyebrow** with the topic word and the age, Shopify-style.
 - **Severity keeps exactly today's treatment**: `critical` gets the left
-  border and tint it has now, and nothing else changes. No `warning` border.
+  border and tint it has now, and nothing else changes. No `warning` border,
+  and **the topic glyph is never tinted by severity** — it names the topic, and
+  colouring it `danger` on a critical row would make one mark carry two facts.
+  The left border, the tint and the worded Acknowledge already carry severity.
 
   Two reasons not to add one. `severityTone.ts` warns against a "third
   telling" of a fact the list already carries — the panel is sorted worst-first
@@ -170,8 +207,13 @@ and it earns it by (a) fading in on hover *or focus* with a pointer, (b) being
 **always shown** on `touch:` / `hover:none`, and (c) sitting on a surface where
 the whole thing is the click target.
 
-The `⋮` meets all three. So the recommendation is the magnifier treatment, not
-true hover-only:
+The `⋮` meets (a) and (b) but **not (c)**: the Magnifier badge is an
+`aria-hidden` cue for the surface's *own* click, and this menu is not the row
+click. So this is a near neighbour of that exception rather than a case of it,
+and it stands on its own footing — the menu has two other doors, a right-click
+and a touch-and-hold (§3b), so dimming the icon hides a shortcut and not the
+action. The §6c row the ticket writes should say that plainly instead of
+leaning on the Magnifier. The treatment itself:
 
 - pointer: `⋮` at reduced opacity at rest, full on `group-hover` / `focus-within`
 - touch and `hover:none`: always at full opacity
@@ -212,9 +254,12 @@ every input, and only the `⋮` dims at rest.
 
 **The slide-away.** On dismiss the row translates out in the same direction as
 the phone swipe (§3f), then its height collapses so the rows below glide up
-instead of jumping — reuse `Collapse`'s 220ms rather than inventing a duration.
-Under `prefers-reduced-motion: reduce` there is neither slide nor collapse: the
-row is simply gone, which is what every other motion in §7 does.
+instead of jumping. `Collapse` itself is a disclosure component and does not
+fit a list row, so the build does this with a grid-rows transition on the `<li>`
+— a 150ms slide, then a 200ms height collapse, with the panel holding the row
+for `LEAVE_MS = 400` before it goes. Under `prefers-reduced-motion: reduce`
+there is neither slide nor collapse: the row is simply gone, which is what
+every other motion in §7 does.
 
 **Focus after a dismiss**, or the keyboard drops to `<body>`: move it to the
 next row's `×`, to the previous row's if the dismissed row was last, and to the
@@ -235,9 +280,15 @@ A third meaning would break §6c's one meaning per cue.
 - This panel's own `FireRow` already dismisses a fire with it
   (`AlertsPanel.tsx:404`), so a group row and the fires inside it end up using
   one glyph for one action instead of disagreeing.
-- The panel's header closes with the **word** "Close"
-  (`AlertsPanel.tsx:158`), not an `×`, so there is no competing `×` on this
-  surface to confuse a row's with.
+- On a pointer the panel's header closes with the **word** "Close"
+  (`AlertsPanel.tsx:158`), not an `×`. On a phone it does not: that button is
+  behind `{!sheet && …}`, and the `sheet-full` `Modal` supplies its own header
+  close, which *is* an `Icon.Close` `IconButton` (`Modal.tsx:238`). So on a
+  phone two `×` glyphs are on screen at once. They are told apart the way they
+  are everywhere else in the app — one sits in the overlay's header and closes
+  the overlay, one sits in a row's trailing cluster and acts on that row — and
+  each carries its own label. Worth saying in the §6c row rather than
+  pretending the collision is not there.
 - `×` on a notification is about as widely read as a glyph gets — it is what
   the promo card on WHOOP's own screen uses, beside the `✓` that clears a
   health card.
@@ -331,7 +382,7 @@ passes `showEveTypes={!searching}` — so an active search *hides* the EVE
 notification types entirely. A deep link works for an `event:` group and lands
 an `eveType:` group on an empty page.
 
-Two ways out, for the ticket to pick:
+Two ways out. **Option 1 is what was built:**
 
 1. Make the search match EVE type labels too (`eveTypeLabel`) and stop hiding
    the EVE types while searching. Fixes the deep link and the pilot's manual
@@ -339,8 +390,13 @@ Two ways out, for the ticket to pick:
 2. Link `eveType:` groups to the EVE-notifications section by its `topic`
    param instead, and keep `?search=` for events only.
 
-Option 1 is the better buy — the pilot's current four-step workaround fails on
-EVE types for the same reason.
+Option 1 was the better buy — the pilot's four-step workaround failed on EVE
+types for the same reason — and it is what shipped: `filterNotificationEvents`
+takes the EVE type labels and returns `visibleEveTypes`, and
+`NotificationEventList` filters the types to that set instead of hiding them
+all. Always-on would have dumped every allow-listed type under any search. The
+panel must therefore link with `eveTypeLabel(t, type)`, not the raw type id —
+`StructureFuelAlert` reads "Structure Low on Fuel".
 
 ### 4c. Mute is per character; a group is not
 
@@ -353,7 +409,9 @@ turns the type off for every character on the account, not only the group's.
 That is what the words say, and it is what the pilot asked for. Build it as a
 loop over the account's characters through `withEventChannelToggled` (or
 `withEveNotificationTypeToggled` for an `eveType:` group) on both channels. The
-toast names the scope — "Structure fuel alerts off for all characters · Undo" —
+toast names the scope — "Structure fuel alerts off for all characters · Undo",
+or, on a device with a single character, the same line without the "for all
+characters" clause, which would be noise —
 so the broad action is visible and reversible.
 
 ### 4c-bis. Open questions the ticket must answer
@@ -365,10 +423,10 @@ so the broad action is visible and reversible.
   cannot nest inside one link. Use the cover-button pattern §6c names for the
   Character switcher (the controls sit *above* the row's cover button, never
   inside it).
-- **The `⋮` at rest opacity must still pass WCAG 1.4.11** (3:1 non-text
-  contrast) against `bg-panel`. If 45% does not clear it, raise it until it
-  does — a control that fails contrast at rest is hidden at rest, which is the
-  thing §6c forbids.
+- **Settled: the `⋮` rests at 60%, not 45%.** Measured against `bg-panel`, 45%
+  of `text-dim` is 2.4:1 and fails WCAG 1.4.11's 3:1 for a control; 60% is
+  3.3:1 and passes. A control that fails contrast at rest is hidden at rest,
+  which is the thing §6c forbids.
 
 ### 4d. Channels are `browser` and `feed` only
 
@@ -394,5 +452,5 @@ leave the item off critical rows, or offer only "Notification settings…" there
 | No easy way to stop a type | "Stop these alerts" in the `⋮`, one tap, account-wide (§4c), with Undo |
 | Manage-notifications is a four-step detour | "Notification settings…" deep-links pre-filtered via `?search=` — which needs §4b's fix before it works for EVE types |
 | Dismiss on hover? | No: dismiss is visible at rest (§3e). Only the `⋮` dims at rest with a pointer — the one exception §6c allows (§3d) |
-| A quick dismiss that slides the card away | `×` slides the row toward the inline start (left, in English), then `Collapse` takes its height; reduced motion simply removes it (§3e) |
+| A quick dismiss that slides the card away | `×` slides the row toward the inline start (left, in English), then its height collapses; reduced motion simply removes it (§3e) |
 | Swipe it away on a phone, in the same direction | Swipe the same way, the `×` being the non-gesture path WCAG wants (§3f). Nothing in the app swipes a row today |

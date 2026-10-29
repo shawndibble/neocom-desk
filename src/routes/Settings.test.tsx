@@ -1022,6 +1022,23 @@ describe('Settings — Notifications (issue #170)', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('finds an EVE notification type from the URL search, listing it with no unrelated rows', async () => {
+    window.history.pushState({}, '', '/settings/notifications?search=Structure%20Low%20on%20Fuel');
+    render(<App />);
+    await notificationsPanel();
+
+    expect(
+      await screen.findByRole('button', { name: 'Structure Low on Fuel' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Structure Destroyed' })).not.toBeInTheDocument();
+    expect(screen.queryByText('No matching events or characters')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', {
+        name: 'Skill level complete for every character, device notifications',
+      })
+    ).not.toBeInTheDocument();
+  });
+
   it('writes typed search text to the URL once typing pauses, and leaves the default out', async () => {
     const user = userEvent.setup();
     render(<App />);

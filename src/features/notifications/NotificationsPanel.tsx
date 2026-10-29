@@ -34,7 +34,8 @@ import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
 import { useNotificationPreferences, hydrateNotificationPreferences } from './preferences';
-import { extraEveTypes } from './eventSelection';
+import { EVE_ALLOWED_TYPES, extraEveTypes } from './eventSelection';
+import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationEvents } from './notificationSearch';
 import { useSeenEveTypesStore } from './seenEveTypes';
 import { refreshAppBadge } from './appBadge';
@@ -152,6 +153,15 @@ export function NotificationsPanel() {
     [t]
   );
 
+  // Every EVE type the page can list, named as its row names it, so a search finds "Structure Fuel Alert".
+  const eveTypeLabels = useMemo(() => {
+    const seen = [...extraTypesByCharacter.values()].flat();
+    return [...new Set([...EVE_ALLOWED_TYPES, ...seen])].map((type) => ({
+      type,
+      label: eveTypeLabel(t, type),
+    }));
+  }, [extraTypesByCharacter, t]);
+
   // useLiveQuery resolves asynchronously: render the panel and master switch
   // immediately, and treat "still loading" the same as "no characters yet".
   // "Still loading" covers `tokens` too: the two live queries resolve on
@@ -185,9 +195,10 @@ export function NotificationsPanel() {
       filterNotificationEvents(
         orderedCharacters.map((c) => ({ characterId: c.characterId, characterName: c.name })),
         eventLabels,
-        search
+        search,
+        eveTypeLabels
       ),
-    [orderedCharacters, eventLabels, search]
+    [orderedCharacters, eventLabels, search, eveTypeLabels]
   );
   const visibleEventIds = useMemo(
     () =>
@@ -255,6 +266,7 @@ export function NotificationsPanel() {
                 context={rowContext}
                 extraTypesByCharacter={extraTypesByCharacter}
                 searching={filterResult !== null}
+                eveTypes={filterResult?.visibleEveTypes}
               />
             )}
           </>
