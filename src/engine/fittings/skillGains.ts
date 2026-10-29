@@ -340,11 +340,10 @@ export type JobOverallWeights = Partial<Record<GainMetric, number>>;
 /** The weight `overall` gives each metric for this swap; see `gainMetrics`. */
 function overallWeight(before: FittingStats, after: FittingStats, jobWeights?: JobOverallWeights) {
   const flipped = before.capacitor.stable !== after.capacitor.stable;
-  const weighted = isArmed(before);
   return (metric: GainMetric) => {
     if (metric === 'capacitor' && flipped) return 1;
     if (jobWeights) return jobWeights[metric] ?? 1;
-    return !weighted ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
+    return !isArmed(before) ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
   };
 }
 

@@ -139,14 +139,14 @@ export function makeoverMoves(
     if (!usesRack(slot) || seen.has(`${slot}:${fromTypeId}`)) continue;
     seen.add(`${slot}:${fromTypeId}`);
     const from = groupOf(fromTypeId);
-    const job = jobOf(from);
+    const fromJob = jobOf(from);
     const lastOfJob =
-      job !== null &&
-      !scored.includes(job) &&
-      ((jobsFitted.get(job) ?? 0) <= 1 || heldWhole.includes(job));
+      fromJob !== null &&
+      !scored.includes(fromJob) &&
+      ((jobsFitted.get(fromJob) ?? 0) <= 1 || heldWhole.includes(fromJob));
     const offered = new Set<number>([fromTypeId]);
     for (const group of new Set([...(from === undefined ? [] : [from]), ...goalGroups])) {
-      if ((lastOfJob && jobOf(group) !== job) || !allowed(group, from)) continue;
+      if ((lastOfJob && jobOf(group) !== fromJob) || !allowed(group, from)) continue;
       if (holdsTank && TANK_GROUPS.has(from ?? -1) && !TANK_GROUPS.has(group)) continue;
       for (const toTypeId of representatives(group, slot)) {
         if (offered.has(toTypeId)) continue;
