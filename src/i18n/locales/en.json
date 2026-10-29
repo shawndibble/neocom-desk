@@ -1500,6 +1500,67 @@
       "summaryNoCap": "no budget",
       "summaryCap": "budget {{cap}}",
       "includeRigs": "Rigs",
+      "summaryRigsOn": "rigs on",
+      "rigsHint": "A rig is destroyed when removed, so a rig swap costs the new rig's full price.",
+      "checkingRound": "Round {{round}} of up to {{max}} · checking {{checked}} of {{total}} swaps…",
+      "reworkNudge": {
+        "text": "Rework tries any module that can move this goal, over several rounds, and can return a Makeover.",
+        "button": "Search with Rework",
+        "time": "Rework usually takes 10 to 15 seconds."
+      },
+      "job": {
+        "label": "Job",
+        "pve": "PvE",
+        "pvp": "PvP",
+        "explore": "Explore",
+        "hint": {
+          "pve": "Missions, anomalies, Abyss. Tackle may go; sustained tank and applied damage count most.",
+          "pvp": "Keeps propulsion, scram, web and EWAR. Burst tank, speed and lock range count most.",
+          "explore": "Keeps cloak, probe launcher, analyzers and propulsion."
+        },
+        "spaceLabel": "Where it flies",
+        "space": {
+          "dangerous": "Dangerous (wormholes, busy null)",
+          "safe": "Safe space (highsec, quiet low and null)"
+        },
+        "spaceHint": {
+          "dangerous": "Tank stays.",
+          "safe": "Tank may go; each drop says what it gives up."
+        },
+        "spaceShort": { "dangerous": "dangerous", "safe": "safe" },
+        "summaryExplore": "Explore, {{space}}"
+      },
+      "makeover": {
+        "heading": "Makeover",
+        "groupTick": "Whole Makeover",
+        "whole_one": "Makeover · {{count}} change",
+        "whole_other": "Whole Makeover · {{count}} changes",
+        "partTicked_one": "Makeover, {{ticked}} of {{count}} change ticked",
+        "partTicked_other": "Makeover, {{ticked}} of {{count}} changes ticked",
+        "rounds_one": "Found in {{count}} round.",
+        "rounds_other": "Found in {{count}} rounds.",
+        "wholeFit": "The figures are the whole Makeover, recalculated as one fit.",
+        "figure": {
+          "dps": "DPS",
+          "ehp": "EHP",
+          "speed": "Speed",
+          "capacitor": "Capacitor",
+          "cpu": "CPU",
+          "powergrid": "Powergrid"
+        },
+        "capStable": "Stable",
+        "capUnstable": "Runs dry",
+        "become_one": "{{name}} becomes",
+        "become_other": "{{count}}× {{name}} become",
+        "splitInto_one": "{{name}} becomes",
+        "splitInto_other": "{{count}}× {{name}} split into",
+        "fills": "Empty slots filled with",
+        "rowName_one": "{{name}}",
+        "rowName_other": "{{count}}× {{name}}",
+        "onItsOwn": "On its own {{gain}}",
+        "costs": "Costs",
+        "rigFullPrice": "(full price: the old rigs are destroyed)"
+      },
       "includeOfficer": "Officer and Deadspace modules",
       "fill_one": "Add {{to}}",
       "fill_other": "Add {{count}}× {{to}}",

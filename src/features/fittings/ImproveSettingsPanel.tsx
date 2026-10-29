@@ -14,6 +14,7 @@ import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { formatIskCompact } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import type { ImproveSettings } from './improveSettings';
+import { ImproveJobChoice } from './ImproveJobChoice';
 
 interface Props {
   goal: ImproveGoal;
@@ -49,12 +50,22 @@ export function ImproveSettingsPanel({
 }: Props) {
   const { t } = useTranslation();
   const settingsSummary = [
+    ...(settings.job
+      ? [
+          settings.job === 'explore'
+            ? t('fittings.improve.job.summaryExplore', {
+                space: t(`fittings.improve.job.spaceShort.${settings.space ?? 'dangerous'}`),
+              })
+            : t(`fittings.improve.job.${settings.job}`),
+        ]
+      : []),
     t(`fittings.improve.reach.${settings.reach}`),
     settings.iskBudget === null
       ? t('fittings.improve.summaryNoCap')
       : t('fittings.improve.summaryCap', {
           cap: formatIskCompact(settings.iskBudget),
         }),
+    ...(settings.job && settings.includeRigs ? [t('fittings.improve.summaryRigsOn')] : []),
   ].join(' · ');
 
   return (
@@ -77,6 +88,14 @@ export function ImproveSettingsPanel({
       </div>
       <Collapse open={settingsOpen} id={settingsId} className="pt-2">
         <div className="space-y-3">
+          {settings.job && settings.onJobChange && (
+            <ImproveJobChoice
+              job={settings.job}
+              onJobChange={settings.onJobChange}
+              space={settings.space}
+              onSpaceChange={(space) => settings.onSpaceChange?.(space)}
+            />
+          )}
           <p className="text-text-dim text-xs">
             {t(
               goal === 'cheaper'
@@ -141,12 +160,18 @@ export function ImproveSettingsPanel({
             </button>
             <Collapse open={moreOpen} id={moreId} className="pt-2">
               <div className="space-y-1">
-                <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                <label className={cx('flex items-start gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
+                    className="mt-0.5"
                     checked={settings.includeRigs}
                     onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
                   />
-                  {t('fittings.improve.includeRigs')}
+                  <span>
+                    {t('fittings.improve.includeRigs')}
+                    <span className="text-text-dim block text-xs">
+                      {t('fittings.improve.rigsHint')}
+                    </span>
+                  </span>
                 </label>
                 <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
