@@ -23,7 +23,6 @@ import { useContinuations } from '@/features/miningTax/useContinuations';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -43,6 +42,7 @@ import { useTaxBalances } from './useTaxBalances';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
 import { useTaxLedgerActions } from './useTaxLedgerActions';
 import { useTaxPayeeNames } from './useTaxPayeeNames';
+import { useTaxPayeeManager } from './useTaxPayeeManager';
 import { useTaxPayees } from './useTaxPayees';
 import { useTaxPricing } from './useTaxPricing';
 import { useTaxRowInteractions } from './useTaxRowInteractions';
@@ -68,7 +68,6 @@ interface TaxTabProps {
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const payeesFit = !useIsNarrow();
   // The Ore column only where the table has room for it beside a full Payee
   // name: the Payee is what a row is read by, the ore is one click away in
   // the entry itself (and at 1024px it pushed Status off-screen, #2147).
@@ -85,7 +84,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   useRefreshOnOreFormChange(refresh);
 
   const { characterFilter, payeeFilter, setCharacterFilter, setPayeeFilter } = useTaxUrlFilters();
-  const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   // Unconditional, deliberately. Hiding this behind "the pilot has at least
   // one tag" reads tidier and reintroduces the shape of the bug it exists to
   // fix: the check can only re-run when `data`'s identity changes, and a
@@ -138,6 +136,15 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   usePaymentRefDeepLink(Boolean(data), allDisplayRows, loading, actions.openDetail);
 
   const { allPayees, payeeById, ledgerPayees } = useTaxPayees(data, corpView);
+  const {
+    payeeManagerCharacterId,
+    openPayeeManager,
+    closePayeeManager,
+    needsFirstPayee,
+    onAddPayee,
+    canManagePayees,
+    payeesInline,
+  } = useTaxPayeeManager(Boolean(data), characters, activeCharacterId, allPayees, corpView);
   const datedPrices = data?.datedPrices ?? EMPTY_DATED_PRICES;
   const { pricesFor, priceSourcesFor, estimatedValueOf, systemName, systemSecurityOf } =
     useTaxPricing(datedPrices, systemNames, systemSecurity);
@@ -241,19 +248,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       corpStateLabel,
     });
 
-  const payeeManagerDefaultCharacterId =
-    characters.find((c) => c.characterId === activeCharacterId)?.characterId ??
-    characters[0]?.characterId ??
-    null;
-
-  // A corp's book is something to owe on its own: a member with no Payee of their own yet still
-  // sees what the book billed.
-  const needsFirstPayee =
-    data != null &&
-    allPayees.length === 0 &&
-    !(corpView && corpView.overlay.rows.length > 0) &&
-    payeeManagerDefaultCharacterId !== null;
-
   /** What a book's rows owe the member right now (its Billed days). */
   const corpOwedNow = useCallback(
     (corporationId: number) =>
@@ -262,20 +256,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         .reduce((sum, dr) => sum + (dr.status === 'outstanding' ? taxOwedOf(dr) : 0), 0),
     [characterFiltered]
   );
-
-  const onAddPayee = useMemo(
-    () =>
-      payeeManagerDefaultCharacterId !== null
-        ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
-        : undefined,
-    [payeeManagerDefaultCharacterId]
-  );
-
-  // The header row never wraps (it has a picker): below `md` Payees moves
-  // into the ⋮, except as the accent first-run call to action, which is the
-  // one control an empty tab is waiting on and so stays in sight.
-  const canManagePayees = payeeManagerDefaultCharacterId !== null;
-  const payeesInline = canManagePayees && (payeesFit || needsFirstPayee);
 
   return (
     <div className="space-y-4">
@@ -288,7 +268,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         characterIds={characterIds}
         canManagePayees={canManagePayees}
         payeesInline={payeesInline}
-        onManagePayees={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}
+        onManagePayees={openPayeeManager}
         onRefresh={refresh}
         loading={loading}
         onOpenOreTags={() => setOreTagsOpen(true)}
@@ -448,7 +428,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           onCloseSettings={() => setSettingsOpen(false)}
           onAutoContinueChange={setAutoContinueFromCard}
           payeeManagerCharacterId={payeeManagerCharacterId}
-          onClosePayeeManager={() => setPayeeManagerCharacterId(null)}
+          onClosePayeeManager={closePayeeManager}
           characters={characters}
           payeesByCharacter={data?.payeesByCharacter}
           owedByPayee={owedByPayee}
