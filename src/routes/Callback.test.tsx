@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -41,7 +41,7 @@ function makeAccessJwt(): string {
 
 let tokenRequests = 0;
 
-const server = setupServer(
+const server = mswServer(
   http.post('https://login.eveonline.com/v2/oauth/token', () => {
     tokenRequests += 1;
     return HttpResponse.json({
@@ -53,9 +53,6 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   tokenRequests = 0;
   vi.mocked(assignLocation).mockClear();

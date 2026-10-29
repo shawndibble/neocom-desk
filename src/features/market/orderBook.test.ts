@@ -1,20 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { getOrderBook, clearOrderBookCache, ORDER_BOOK_TTL_MS } from './orderBook';
 
 const REGION_ID = 10000002; // The Forge
 const TYPE_ID = 34; // Tritanium
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
-  server.resetHandlers();
   clearOrderBookCache();
 });
-afterAll(() => server.close());
 
 function ordersHandler(hits: { count: number }) {
   return http.get(`${ESI_BASE_URL}/markets/${REGION_ID}/orders`, ({ request }) => {

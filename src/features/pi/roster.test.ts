@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { setupServer } from 'msw/node';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mswServer } from '@/test/msw';
 import { db } from '@/db';
 import { configureEsi } from '@/esi/client';
 import { writeCached } from '@/esi/cache';
@@ -21,12 +21,9 @@ const ACTIVE_ID = 90;
  * whole contract is that it costs zero live calls on page open, and a test
  * that merely handled a 403 gracefully would pass while the fan-out lived on.
  */
-const server = setupServer();
+mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
 beforeEach(async () => {

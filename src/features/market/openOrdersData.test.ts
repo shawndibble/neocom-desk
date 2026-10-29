@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { MarketOrder } from '@/esi/endpoints';
@@ -8,9 +8,8 @@ import { loadAllCharactersOpenOrders } from './openOrdersData';
 
 const ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -18,10 +17,8 @@ beforeEach(async () => {
   await db.tokens.clear();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 function tokenWith(characterId: number, scopes: string[]) {
   return {

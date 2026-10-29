@@ -1,19 +1,9 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-  onTestFinished,
-  vi,
-} from 'vitest';
+import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { writeCached } from '@/esi/cache';
@@ -66,7 +56,7 @@ vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/character/removeCharacter')>()),
 }));
 
-const server = setupServer(
+mswServer(
   http.post('https://esi.evetech.net/characters/affiliation', async ({ request }) => {
     const ids = (await request.json()) as number[];
     // Character 92 never resolves — same as ESI silently omitting an id it
@@ -91,9 +81,6 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();

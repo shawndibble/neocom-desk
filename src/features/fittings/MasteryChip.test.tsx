@@ -1,7 +1,5 @@
-import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
@@ -9,9 +7,7 @@ import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { loadMasteries } from '@/sde/loadSde';
 import type { MasteryMap } from '@/sde/types';
 import { MasteryChip } from './MasteryChip';
-
-/** Skill names are links, so every render sits in a router. */
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+import { renderInRouter } from '@/test/render';
 
 const GUNNERY: EngineSkill = {
   typeID: 3300,
@@ -70,7 +66,7 @@ vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
 }));
 
 async function openChip(user: ReturnType<typeof userEvent.setup>, hullTypeId = 626) {
-  render(<MasteryChip hullTypeId={hullTypeId} hullName="Vexor" characterId={1} />);
+  renderInRouter(<MasteryChip hullTypeId={hullTypeId} hullName="Vexor" characterId={1} />);
   await user.click(await screen.findByRole('button', { name: 'Mastery' }));
 }
 
@@ -134,7 +130,7 @@ describe('MasteryChip', () => {
   });
 
   it('renders nothing for a hull with no Mastery data', async () => {
-    const { container } = render(
+    const { container } = renderInRouter(
       <MasteryChip hullTypeId={999} hullName="Nothing" characterId={1} />
     );
     await waitFor(() => expect(container).toBeEmptyDOMElement());
@@ -146,7 +142,9 @@ describe('MasteryChip', () => {
     vi.mocked(loadMasteries).mockImplementationOnce(
       () => new Promise<MasteryMap>((resolve) => (release = resolve))
     );
-    const { container } = render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    const { container } = renderInRouter(
+      <MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />
+    );
     expect(screen.queryByRole('button')).toBeNull();
     const slot = container.firstElementChild!;
     expect(slot).toHaveAttribute('aria-hidden', 'true');
@@ -160,7 +158,7 @@ describe('MasteryChip', () => {
 
   it('offers a badge that says the Mastery data is unavailable, with Retry, when it fails to load', async () => {
     vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
-    render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    renderInRouter(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Mastery' }));
     expect(screen.getByText(/Mastery data isn't available offline yet/)).toBeVisible();
 
@@ -171,7 +169,7 @@ describe('MasteryChip', () => {
 
   it('keeps the unavailable panel, with Retry busy and focused, while a retry runs', async () => {
     vi.mocked(loadMasteries).mockImplementationOnce(() => Promise.reject(new Error('offline')));
-    render(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
+    renderInRouter(<MasteryChip hullTypeId={626} hullName="Vexor" characterId={1} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Mastery' }));
 
     let release: (value: MasteryMap) => void = () => {};

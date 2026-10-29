@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
-import { createRef, useState, type ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
+import { createRef, useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { PlanList } from './PlanList';
 import type { SkillPlanRecord } from '@/db';
+import { renderInRouter } from '@/test/render';
 
 function plan(id: string, name: string): SkillPlanRecord {
   return {
@@ -19,12 +19,11 @@ function plan(id: string, name: string): SkillPlanRecord {
 
 const noop = () => {};
 const planHref = (id: string) => `/skills/plans/${id}`;
-const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe('PlanList delete (no confirmation)', () => {
   it('deletes the plan whose row was chosen, even with multiple plans', async () => {
     const onDelete = vi.fn();
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
         planHref={planHref}
@@ -49,7 +48,7 @@ describe('PlanList row stats (#1416)', () => {
   };
 
   it('shows duration and finish under the name, and "Nothing to train" for an empty plan', () => {
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
         {...props}
@@ -66,7 +65,7 @@ describe('PlanList row stats (#1416)', () => {
   });
 
   it('renders the name only without stats', () => {
-    render(<PlanList plans={[plan('1', 'Alpha')]} {...props} />);
+    renderInRouter(<PlanList plans={[plan('1', 'Alpha')]} {...props} />);
     expect(screen.queryByText(/finishes|Nothing to train/)).not.toBeInTheDocument();
   });
 });
@@ -76,7 +75,7 @@ describe('PlanList copy to character (#1729)', () => {
 
   it('hides the action when the account has no other character', async () => {
     const user = userEvent.setup();
-    render(<PlanList {...props} plans={[plan('1', 'Alpha')]} onCopyToCharacter={noop} />);
+    renderInRouter(<PlanList {...props} plans={[plan('1', 'Alpha')]} onCopyToCharacter={noop} />);
     await user.click(screen.getByRole('button', { name: 'More actions for Alpha' }));
     expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /copy to character/i })).toBeNull();
@@ -85,7 +84,7 @@ describe('PlanList copy to character (#1729)', () => {
   it('copies the plan to the chosen character', async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn();
-    render(
+    renderInRouter(
       <PlanList
         {...props}
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
@@ -102,7 +101,7 @@ describe('PlanList copy to character (#1729)', () => {
 
 describe('PlanList active plan (#1709)', () => {
   it('marks only the open plan with aria-current', () => {
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
         activePlanId="2"
@@ -121,7 +120,7 @@ describe('PlanList long name (#2105)', () => {
   it('shows the full name in a tooltip on focus so a truncated name is still readable', async () => {
     const user = userEvent.setup();
     const longName = 'A very long plan name that will surely truncate in the sidebar list';
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('1', longName)]}
         planHref={planHref}
@@ -139,7 +138,7 @@ describe('PlanList row menu', () => {
   it('renames from the menu', async () => {
     const user = userEvent.setup();
     const onRename = vi.fn();
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('1', 'Alpha')]}
         planHref={planHref}
@@ -159,7 +158,7 @@ describe('PlanList row menu', () => {
 
   it('opens a just-created plan straight into rename', () => {
     const started = vi.fn();
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('1', 'Alpha')]}
         autoRenamePlanId="1"
@@ -177,7 +176,7 @@ describe('PlanList row menu', () => {
 
 describe('PlanList row link (DESIGN.md §6c)', () => {
   it('a plan row is a real link to the plan, not a button', () => {
-    render(
+    renderInRouter(
       <PlanList
         plans={[plan('p1', 'Titan pilot')]}
         planHref={planHref}
@@ -217,7 +216,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
 
   it('moves focus to the next plan link after a delete', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
+    renderInRouter(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Alpha'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Beta/ })).toHaveFocus());
@@ -225,7 +224,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
 
   it('falls back to the previous plan link when the last row is deleted', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
+    renderInRouter(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Beta'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Alpha/ })).toHaveFocus());
@@ -234,7 +233,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
   it('falls back to the panel title when the only plan is deleted', async () => {
     const user = userEvent.setup();
     const headingRef = createRef<HTMLHeadingElement>();
-    render(
+    renderInRouter(
       <>
         <h2 ref={headingRef} tabIndex={-1}>
           Plans
@@ -249,7 +248,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
 
   it('returns focus to the row ⋮ after copying to a character', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={[plan('1', 'Alpha')]} />);
+    renderInRouter(<Harness initial={[plan('1', 'Alpha')]} />);
     await user.click(moreOf('Alpha'));
     await user.click(await screen.findByRole('menuitem', { name: 'Copy to character' }));
     await user.click(screen.getByRole('button', { name: 'Other Pilot' }));
@@ -260,7 +259,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     'returns focus to the row ⋮ after rename ends with %s',
     async (key) => {
       const user = userEvent.setup();
-      render(<Harness initial={[plan('1', 'Alpha')]} />);
+      renderInRouter(<Harness initial={[plan('1', 'Alpha')]} />);
       await user.click(moreOf('Alpha'));
       await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
       await user.type(screen.getByRole('textbox', { name: 'Rename' }), `Z${key}`);

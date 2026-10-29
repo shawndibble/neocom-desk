@@ -1,23 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadOrders, loadOrderHistory } from './orders';
 
 const CHAR_ID = 91;
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 const ORDER = {
   order_id: 1,

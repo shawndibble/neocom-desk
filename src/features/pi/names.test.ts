@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadPi } from '@/sde/loadSde';
@@ -8,19 +8,16 @@ import { loadPlanetName, loadSchematicName, readCachedSchematicNames } from './n
 
 vi.mock('@/sde/loadSde', () => ({ loadPi: vi.fn() }));
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   vi.mocked(loadPi).mockRejectedValue(new Error('no local data'));
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 describe('loadPlanetName', () => {
   it('resolves a planet name from the public endpoint', async () => {

@@ -1,13 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render as rtlRender, screen } from '@testing-library/react';
-import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { FittingImplantSet } from '@/engine/fittings/types';
-
-// Entity names are real links, so every render needs a Router.
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+import { renderInRouter } from '@/test/render';
 
 vi.mock('@/features/skills/typeCatalog', () => ({ loadItemNameMap: async () => new Map() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: async () => new Map() }));
@@ -16,7 +12,7 @@ const { ImplantSetControl } = await import('./ImplantSetControl');
 
 function setup(implantSet: FittingImplantSet | undefined, canUseClone = true) {
   const onImplantSetChange = vi.fn();
-  render(
+  renderInRouter(
     <ImplantSetControl
       basis={implantSet === undefined && canUseClone ? 'clone' : 'fitting'}
       canUseCloneBasis={canUseClone}

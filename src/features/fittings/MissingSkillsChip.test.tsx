@@ -1,15 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { MissingSkillsChip } from './MissingSkillsChip';
-
-// Entity names are real links, so every render needs a Router.
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+import { renderInRouter } from '@/test/render';
 
 const GUNNERY: EngineSkill = {
   typeID: 3300,
@@ -57,7 +53,7 @@ vi.mock('@/features/skills/useTargetPlan', async (importOriginal) => ({
 }));
 
 async function openChip(user: ReturnType<typeof userEvent.setup>) {
-  render(<MissingSkillsChip entries={ENTRIES} characterId={1} fittingName="Vexor" />);
+  renderInRouter(<MissingSkillsChip entries={ENTRIES} characterId={1} fittingName="Vexor" />);
   await user.click(await screen.findByRole('button', { name: /missing 2 skills/i }));
 }
 

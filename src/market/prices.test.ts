@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { db } from '@/db';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
@@ -22,20 +22,17 @@ import {
   ADJUSTED_PRICE_TTL_MS,
 } from './prices';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   // The fallback sources are down unless a test brings one up, so "Fuzzwork
   // failed" still means "no price" for the tests that predate the fallback.
   server.use(...fallbackSourcesDown);
 });
 afterEach(() => {
-  server.resetHandlers();
   clearMarketPriceCache();
   resetMarketOpenPricesCache();
 });
-afterAll(() => server.close());
 
 function fuzzworkHandler(hits: { count: number }) {
   return http.get(FUZZWORK_AGGREGATES_URL, () => {

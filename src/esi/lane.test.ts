@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import type { PriorityTicket } from '@/lib/concurrency';
 
 /** The lane each request asked the gate for, in arrival order. */
@@ -25,16 +25,13 @@ const { fetchAllPagesStatus } = await import('./paginated');
 const { currentEsiLane, inBackgroundLane, withEsiLane, laneForLoad, configureActiveCharacter } =
   await import('./lane');
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
   configureActiveCharacter(null);
   gate.lanes = [];
 });
-afterAll(() => server.close());
 
 function serveWallet(): void {
   server.use(http.get(`${ESI_BASE_URL}/characters/1/wallet`, () => HttpResponse.json(1)));

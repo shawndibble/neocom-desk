@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -132,7 +132,7 @@ function renderModal(props: ContractDetailModalProps) {
 /** A solar system the System row can name; any other id declines, which hides the row. */
 const SYSTEM_NAMES: Record<string, string> = { '30000142': 'Jita', '30002187': 'Amarr' };
 
-const server = setupServer(
+const server = mswServer(
   http.get(`${ESI_BASE_URL}/universe/systems/:id`, ({ params }) => {
     const name = SYSTEM_NAMES[String(params.id)];
     return name
@@ -140,7 +140,6 @@ const server = setupServer(
       : new HttpResponse(null, { status: 404 });
   })
 );
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -151,10 +150,8 @@ beforeEach(async () => {
     .mockResolvedValue({ saved: new Map(), historical: new Map() });
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 /**
  * Issue #3525: the own-contract modal is the only place an own contract's

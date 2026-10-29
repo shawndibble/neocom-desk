@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { db, type TokenRecord } from '@/db';
 import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
@@ -53,7 +53,7 @@ function b64url(s: string): string {
  * fixture, and what makes them mirror EVE's real behaviour: the token carries
  * what was requested and approved, never a scope the request omitted.
  */
-const server = setupServer(
+mswServer(
   http.post('https://login.eveonline.com/v2/oauth/token', () => {
     const payload = {
       sub: `CHARACTER:EVE:${CHAR_ID}`,
@@ -70,10 +70,6 @@ const server = setupServer(
     });
   })
 );
-
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
 
 beforeEach(async () => {
   sessionStorage.clear();
