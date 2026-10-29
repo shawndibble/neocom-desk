@@ -7,6 +7,7 @@
 import type { TFunction } from 'i18next';
 import {
   HINT_SHARE,
+  PROPULSION_GROUP,
   removedCommonGroups,
   type JobCommonality,
 } from '@/engine/fittings/hullCommonality';
@@ -25,13 +26,12 @@ export interface CommunityHints {
   removed: readonly number[];
 }
 
-/** Groups whose market groups mix kinds a pilot tells apart: no honest single name. */
-const UNNAMED_GROUPS: ReadonlySet<number> = new Set([46]);
 const SIZE_WORD = /^(small|medium|large|x-large|capital)\b/i;
 
 /** A group's name for a hint: the market group of one of its listed types, one level up when that is a size tier. */
 function groupLabel(catalogue: FittingCatalogue, group: number): string | null {
-  if (UNNAMED_GROUPS.has(group)) return null;
+  // Afterburners and MWDs share a group: no honest single name.
+  if (group === PROPULSION_GROUP) return null;
   const members = new Set(catalogue.typeIdsByGroup.get(group) ?? []);
   const entry = catalogue.marketTypes.find((type) => members.has(type.typeId));
   let node = entry ? catalogue.groupsById.get(entry.marketGroupId) : undefined;
