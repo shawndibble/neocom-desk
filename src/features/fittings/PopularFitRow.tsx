@@ -16,7 +16,10 @@ interface PopularFitRowProps {
   onOpen: () => void;
 }
 
-/** One Popular fit's card body, shared by the zKillboard and EVE Workbench tabs. */
+/**
+ * One Popular fit's card body, shared by the zKillboard and EVE Workbench tabs.
+ * Renders a fragment: the parent `li` is the card (`FIT_ROW_CLASS`, a flex row).
+ */
 export function PopularFitRow({
   title,
   meta,
