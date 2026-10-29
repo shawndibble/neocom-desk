@@ -20,6 +20,11 @@ export const Neutral: Story = {
   args: { children: 'Corp' },
 };
 
+/** @summary A state from the user's own choices, such as "In plan". */
+export const Accent: Story = {
+  args: { tone: 'accent', children: 'In plan' },
+};
+
 /** @summary A finished or healthy state. */
 export const Success: Story = {
   args: { tone: 'success', children: 'Done' },

@@ -1,15 +1,10 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { AUTHORIZED_APPS_URL } from '@/lib/links';
-import {
-  focusRingInsetClassName,
-  inlineLinkClassName,
-  rowInteractiveClassName,
-} from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
-import { Caret } from '@/components/ui/Disclosure';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { QuestionRow } from '@/components/ui/QuestionRow';
 import { tabPath } from '@/lib/pageTabs';
 import { HELP_TABS, SETTINGS_TABS } from '@/app/pageTabs';
 import {
@@ -71,50 +66,6 @@ function RetentionList({ group }: { group: RetentionGroup }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/**
- * One question, a body-size row that opens its answer below. Not `Disclosure`,
- * whose label is a micro-heading: a question is read as a sentence.
- */
-function FaqItem({
-  id,
-  question,
-  expanded,
-  onToggle,
-  children,
-}: {
-  /** The question's anchor: `/help/faq#<id>` opens it. */
-  id: string;
-  question: string;
-  expanded: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  const answerId = useId();
-  return (
-    <li id={id} className="scroll-mt-4 rounded-xs border border-line bg-panel/85">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={expanded ? answerId : undefined}
-        onClick={onToggle}
-        className={cx(
-          'flex min-h-9 w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-text',
-          rowInteractiveClassName,
-          focusRingInsetClassName
-        )}
-      >
-        <Caret expanded={expanded} />
-        {question}
-      </button>
-      {expanded && (
-        <div id={answerId} className="space-y-2 border-t border-line px-3 py-3 text-sm">
-          {children}
-        </div>
-      )}
-    </li>
   );
 }
 
@@ -358,15 +309,16 @@ export function FaqPanel() {
           )}
           <ul className="space-y-2" aria-labelledby={`faq-group-${section.id}`}>
             {section.entries.map((entry) => (
-              <FaqItem
+              <QuestionRow
                 key={entry.id}
                 id={entry.id}
                 question={t(entry.questionKey)}
                 expanded={open.has(entry.id)}
                 onToggle={() => toggle(entry.id)}
+                className="scroll-mt-4 rounded-xs border border-line bg-panel/85"
               >
                 {entry.answer}
-              </FaqItem>
+              </QuestionRow>
             ))}
           </ul>
         </section>

@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 
-export type PillTone = 'neutral' | 'success' | 'warning' | 'danger';
+export type PillTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 
 const PILL_TONE_CLASS: Record<PillTone, string> = {
   neutral: 'bg-panel-2 text-text-dim',
+  accent: 'bg-accent/15 text-accent',
   success: 'bg-success/15 text-success',
   warning: 'bg-warning/15 text-warning',
   danger: 'bg-danger/15 text-danger',

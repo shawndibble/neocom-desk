@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import type { PlanEntry } from '@/engine/types';
 import { Button, SkillBar } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import type { SkillTrainingStatus } from './skillStatus';
 import { SkillLink } from '@/features/entities';
 import { SkillStatusIcon } from './SkillStatusIcon';
@@ -68,11 +69,7 @@ export function SkillRow({
           word-breaks mid-word (issue: mobile Market required skills). */}
       <div className="ml-auto flex shrink-0 items-center gap-3">
         {tags !== undefined && <span className="flex gap-1">{tags}</span>}
-        {inPlan && (
-          <span className="inline-flex items-center rounded-xs bg-accent/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-            {inPlanLabel}
-          </span>
-        )}
+        {inPlan && <Pill tone="accent">{inPlanLabel}</Pill>}
         <SkillBar level={currentLevel} plannedLevel={plannedLevel} />
         {timeLabel !== undefined && (
           <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>

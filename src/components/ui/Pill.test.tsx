@@ -11,6 +11,7 @@ describe('Pill', () => {
   });
 
   it.each([
+    ['accent', 'bg-accent/15 text-accent'],
     ['success', 'bg-success/15 text-success'],
     ['warning', 'bg-warning/15 text-warning'],
     ['danger', 'bg-danger/15 text-danger'],

@@ -77,8 +77,7 @@ import { bpcActiveFilterChips, type BpcFilterChip, type BpcFilterState } from '.
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 
 /** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
-const SOURCING_GROUP_HEADER =
-  'pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const SOURCING_GROUP_HEADER = `pb-2 ${eyebrowClassName}`;
 
 /**
  * One card width for region and BPO cards alike from `sm`, so the groups

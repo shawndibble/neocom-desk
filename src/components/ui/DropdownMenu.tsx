@@ -1,3 +1,4 @@
+import { eyebrowClassName } from './eyebrowClassName';
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
@@ -108,10 +109,7 @@ export function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       role="presentation"
-      className={cx(
-        'px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
-        className
-      )}
+      className={cx(eyebrowClassName, 'px-2 py-1.5', className)}
       {...props}
     />
   );
