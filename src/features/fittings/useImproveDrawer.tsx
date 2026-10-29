@@ -11,7 +11,13 @@ import {
   type RejectedOption,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
-import { hullRoleOf, rememberedGoal } from '@/engine/fittings/improveRole';
+import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
+import {
+  hullRoleOf,
+  rememberedGoal,
+  rememberedJob,
+  rememberedSpace,
+} from '@/engine/fittings/improveRole';
 import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { Fitting, FittingImplantSet, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
@@ -32,8 +38,10 @@ import {
   hullOf,
   useImproveHold,
   useImproveJob,
+  useImproveJobByRole,
   useImproveRigs,
   useImproveSpace,
+  useImproveSpaceByRole,
   useImproveOre,
   useImproveReach,
   useImproveSettingsHydrated,
@@ -124,10 +132,17 @@ export function useImproveDrawer({
   useEffect(() => {
     void migrateSpendCap();
   }, []);
-  const job = useImproveJob((state) => state.value);
-  const setJob = useImproveJob((state) => state.setValue);
-  const space = useImproveSpace((state) => state.value);
-  const setSpace = useImproveSpace((state) => state.setValue);
+  // Job and Explore space are remembered per hull role too: PvP on a Thrasher leaves the Astero on Explore.
+  const legacyJob = useImproveJob((state) => state.value);
+  const jobsByRole = useImproveJobByRole((state) => state.value);
+  const setJobsByRole = useImproveJobByRole((state) => state.setValue);
+  const job = rememberedJob(jobsByRole, legacyJob, role);
+  const setJob = (next: ImproveJob) => setJobsByRole({ ...jobsByRole, [role]: next });
+  const legacySpace = useImproveSpace((state) => state.value);
+  const spacesByRole = useImproveSpaceByRole((state) => state.value);
+  const setSpacesByRole = useImproveSpaceByRole((state) => state.setValue);
+  const space = rememberedSpace(spacesByRole, legacySpace, role);
+  const setSpace = (next: ExploreSpace) => setSpacesByRole({ ...spacesByRole, [role]: next });
   // Rigs are on until the pilot unticks them, and that choice is remembered on this device.
   const includeRigs = useImproveRigs((state) => state.value);
   const setIncludeRigs = useImproveRigs((state) => state.setValue);

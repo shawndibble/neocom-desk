@@ -4,6 +4,8 @@ import {
   DEFAULT_GOAL_OF_ROLE,
   hullRoleOf,
   rememberedGoal,
+  rememberedJob,
+  rememberedSpace,
   roleUnlocks,
   type HullRef,
 } from './improveRole';
@@ -68,6 +70,7 @@ describe('rememberedGoal', () => {
     expect(rememberedGoal(byRole, 'overall', 'mining')).toBe(DEFAULT_GOAL_OF_ROLE.mining);
     expect(DEFAULT_GOAL_OF_ROLE).toEqual({
       combat: 'overall',
+      explorer: 'overall',
       mining: 'mining',
       logistics: 'repair',
       command: 'command',
@@ -149,5 +152,39 @@ describe('a Nestor with empty highs', () => {
       [20, 0],
       [21, 0],
     ]);
+  });
+});
+
+describe('explorer hulls and the Job per role', () => {
+  const ASTERO: HullRef = { typeId: 33_468, groupId: 25 };
+
+  it('names the explorer hulls by type id', () => {
+    for (const typeId of [605, 607, 29_248, 586, 33_468, 11_192, 11_182, 11_172, 11_188, 33_470])
+      expect(hullRoleOf({ typeId, groupId: 25 })).toBe('explorer');
+  });
+
+  it('opens an Astero on Explore and a Drake on PvE', () => {
+    expect(rememberedJob({}, 'pve', hullRoleOf(ASTERO))).toBe('explore');
+    expect(rememberedJob({}, 'pve', hullRoleOf(DRAKE))).toBe('pve');
+  });
+
+  it('remembers PvP for combat hulls while explorers keep their own', () => {
+    const byRole = { combat: 'pvp' } as const;
+    expect(rememberedJob(byRole, 'pve', 'combat')).toBe('pvp');
+    expect(rememberedJob(byRole, 'pve', 'explorer')).toBe('explore');
+    expect(rememberedJob({ ...byRole, explorer: 'pve' }, 'pve', 'explorer')).toBe('pve');
+  });
+
+  it('uses the old device-wide Job once, only while no role has one and it was moved', () => {
+    expect(rememberedJob({}, 'pvp', 'combat')).toBe('pvp');
+    expect(rememberedJob({}, 'pvp', 'explorer')).toBe('pvp');
+    expect(rememberedJob({ combat: 'pve' }, 'pvp', 'explorer')).toBe('explore');
+  });
+
+  it('remembers the Explore space per role the same way', () => {
+    expect(rememberedSpace({}, 'dangerous', 'explorer')).toBe('dangerous');
+    expect(rememberedSpace({}, 'safe', 'explorer')).toBe('safe');
+    expect(rememberedSpace({ explorer: 'dangerous' }, 'safe', 'explorer')).toBe('dangerous');
+    expect(rememberedSpace({ combat: 'safe' }, 'safe', 'explorer')).toBe('dangerous');
   });
 });
