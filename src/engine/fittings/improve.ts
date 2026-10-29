@@ -258,7 +258,7 @@ export const REJECTED_LIMIT = 5;
 const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
 
 /** A change smaller than this (a fraction) is rounding, not a gain or a loss. */
-const EPSILON = 1e-4;
+export const EPSILON = 1e-4;
 
 export type GoalAvailability =
   | { available: true }
@@ -357,7 +357,7 @@ function meanGain(pairs: readonly (readonly [number, number])[]): number {
   );
 }
 
-function scoreOf(
+export function scoreOf(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
@@ -444,7 +444,7 @@ const withTogglesOff = (fitting: Fitting): Fitting => ({
 });
 
 /** The first Guardrail `after` breaks, or null. */
-function brokenGuardrail(
+export function brokenGuardrail(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
@@ -518,7 +518,7 @@ const FILL_TIER = 3;
 const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
 
 /** The side of the tank the fit already has; null when it has none (or an even split). */
-function fittedSide(
+export function fittedSide(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined
 ): DefenseSide | null {
