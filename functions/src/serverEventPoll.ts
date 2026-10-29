@@ -1,15 +1,15 @@
-// The polled half of server-pushed events (issue #5121): price alerts and ship
-// losses, read from public data on the 15-minute dispatch tick. Every
-// dependency is injected (devices, zKillboard, Fuzzwork, FCM), so it tests
-// without Firestore or the network; serverEventStore.ts and index.ts wire the
-// real ones. The diffs and keys are serverEvents.ts's, which mirror the
-// Foreground Poller's.
+// The polled half of server-pushed events (issue #5121): price alerts, read from
+// public data on the 15-minute dispatch tick. Every dependency is injected
+// (devices, Fuzzwork, FCM), so it tests without Firestore or the network;
+// serverEventStore.ts and index.ts wire the real ones. The diffs and keys are
+// serverEvents.ts's, which mirror the Foreground Poller's. Ship losses are not
+// polled here: the open app reads zKillboard itself (decision
+// 20261029-000802-ship-losses-are-no-longer-server-pushed).
 //
 // Readings are per device and Character (the registration doc's
 // `serverEventBaselines`), like the device's own choices: each device is told
-// once per crossing or loss, against its own targets and minimum. Sources are
-// read once per run however many devices share them: one zKillboard list per
-// Character, one Fuzzwork call per hub station.
+// once per crossing, against its own targets. Sources are read once per run
+// however many devices share them: one Fuzzwork call per hub station.
 
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import { deviceCadence } from './pollerEfficiency.js';
@@ -18,25 +18,12 @@ import { SERVER_POLL_STATS_KEYS, createRunStats, type RunStats } from './runStat
 import {
   buildServerEventPush,
   diffPriceAlerts,
-  diffShipLosses,
   trimBaseline,
   type PriceAlertSnapshotEntry,
   type ServerEventBaseline,
   type ServerEventFire,
   type ServerEventInputs,
-  type ShipLossEntry,
 } from './serverEvents.js';
-
-/**
- * zKillboard reads per run, spaced by `LOSS_READ_SPACING_MS` and bounded by
- * `LOSS_READ_BUDGET_MS` of wall time: the tick has a 9-minute timeout, pushes
- * and readings are written only after the reads, so a run must stop reading
- * well before it, and zKillboard asks API users to go gently. A Character past
- * either bound waits for a later run (the order rotates, below).
- */
-export const MAX_LOSS_READS_PER_RUN = 300;
-export const LOSS_READ_SPACING_MS = 1_000;
-export const LOSS_READ_BUDGET_MS = 300_000;
 
 export interface PolledCharacter {
   characterId: number;
@@ -55,16 +42,9 @@ export interface PolledDevice {
   characters: PolledCharacter[];
 }
 
-export type LossRead =
-  | { kind: 'ok'; losses: ShipLossEntry[] }
-  /** Rate limited: no more reads this run. */
-  | { kind: 'backoff' }
-  | { kind: 'error' };
-
 export interface ServerPollDeps {
   /** Devices with at least one polled event enabled. */
   listDevices(): Promise<PolledDevice[]>;
-  fetchLosses(characterId: number): Promise<LossRead>;
   /** Lowest sell per type at the station (null: no sell order), or null when the read failed. */
   fetchPrices(
     stationId: number,
@@ -83,61 +63,13 @@ export interface ServerPollDeps {
   now(): number;
   /** The run's counters (issue #5144); the store wrappers share it. Absent: counted privately. */
   stats?: RunStats;
-  /** Spacing between zKillboard reads; injectable so tests don't wait. */
-  pause?(ms: number): Promise<void>;
 }
 
 export interface ServerPollSummary {
   /** Devices polled this run (those whose turn it is; see pollerEfficiency.ts). */
   devices: number;
-  lossReads: number;
   priceReads: number;
   pushesSent: number;
-  /** True when zKillboard asked to back off, or the per-run cap was reached. */
-  lossReadsStopped: boolean;
-}
-
-const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-/**
- * Character ids in a run-dependent rotation: when more Characters want reading
- * than the cap allows, a different slice goes first each run, so nobody is
- * starved by sitting at the end of a sorted list.
- */
-function rotated(ids: readonly number[], nowMs: number): number[] {
-  const sorted = [...ids].sort((a, b) => a - b);
-  if (sorted.length === 0) return sorted;
-  const offset = Math.floor(nowMs / (15 * 60_000)) % sorted.length;
-  return [...sorted.slice(offset), ...sorted.slice(0, offset)];
-}
-
-async function readLosses(
-  deps: ServerPollDeps,
-  characterIds: readonly number[],
-  summary: ServerPollSummary
-): Promise<Map<number, ShipLossEntry[]>> {
-  const losses = new Map<number, ShipLossEntry[]>();
-  const pause = deps.pause ?? wait;
-  const startedAt = deps.now();
-  for (const characterId of rotated(characterIds, startedAt)) {
-    if (
-      summary.lossReads >= MAX_LOSS_READS_PER_RUN ||
-      deps.now() - startedAt >= LOSS_READ_BUDGET_MS
-    ) {
-      summary.lossReadsStopped = true;
-      break;
-    }
-    if (summary.lossReads > 0) await pause(LOSS_READ_SPACING_MS);
-    summary.lossReads++;
-    const read = await deps.fetchLosses(characterId).catch((): LossRead => ({ kind: 'error' }));
-    if (read.kind === 'ok') losses.set(characterId, read.losses);
-    else if (read.kind === 'backoff') {
-      summary.lossReadsStopped = true;
-      deps.log('zKillboard asked to back off; stopping loss reads this run');
-      break;
-    }
-  }
-  return losses;
 }
 
 async function readPrices(
@@ -182,10 +114,8 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
   const stats = deps.stats ?? createRunStats(SERVER_POLL_STATS_KEYS);
   const summary: ServerPollSummary = {
     devices: 0,
-    lossReads: 0,
     priceReads: 0,
     pushesSent: 0,
-    lossReadsStopped: false,
   };
   const listed = await deps.listDevices();
   stats.set('devicesListed', listed.length);
@@ -208,11 +138,9 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
   summary.devices = devices.length;
   stats.set('devicesPolled', devices.length);
 
-  const lossCharacters = new Set<number>();
   const typesByStation = new Map<number, Set<number>>();
   for (const device of devices) {
     for (const character of device.characters) {
-      if (character.events.includes('shipLost')) lossCharacters.add(character.characterId);
       const { priceStationId, priceAlerts } = character.inputs;
       if (
         character.events.includes('priceAlertTriggered') &&
@@ -226,10 +154,7 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
     }
   }
 
-  const [losses, prices] = await Promise.all([
-    readLosses(deps, [...lossCharacters], summary),
-    readPrices(deps, typesByStation, summary),
-  ]);
+  const prices = await readPrices(deps, typesByStation, summary);
 
   const nowMs = deps.now();
   for (const device of devices) {
@@ -254,21 +179,6 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
           }));
           fires.push(...diffPriceAlerts(characterId, previous.priceAlerts, reading));
           next.priceAlerts = reading;
-        }
-      }
-
-      if (events.includes('shipLost')) {
-        const list = losses.get(characterId);
-        if (list) {
-          fires.push(
-            ...diffShipLosses(
-              characterId,
-              previous.shipLossIds,
-              list,
-              inputs.shipLostMinimumIsk ?? 0
-            )
-          );
-          next.shipLossIds = list.map((entry) => entry.killmailId);
         }
       }
 
@@ -299,7 +209,6 @@ export async function pollServerEvents(deps: ServerPollDeps): Promise<ServerPoll
     );
     if (!unchanged) await deps.saveBaselines(device.deviceId, baselines);
   }
-  stats.set('zkillboardCalls', summary.lossReads);
   stats.set('fuzzworkCalls', summary.priceReads);
   stats.set('durationMs', deps.now() - startedAt);
   return summary;

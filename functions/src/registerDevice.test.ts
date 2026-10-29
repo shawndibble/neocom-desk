@@ -123,12 +123,12 @@ describe('parseRegisterDeviceInput', () => {
           {
             ...character,
             serverEvents: ['shipLost', 'priceAlertTriggered', 'shipLost'],
-            serverInputs: { shipLostMinimumIsk: 5 },
+            serverInputs: { incursionNearbyJumps: 5 },
           },
         ],
       });
       expect(input.characters[0].serverEvents).toEqual(['priceAlertTriggered', 'shipLost']);
-      expect(input.characters[0].serverInputs).toEqual({ shipLostMinimumIsk: 5 });
+      expect(input.characters[0].serverInputs).toEqual({ incursionNearbyJumps: 5 });
     });
 
     it('leaves both absent for an older client', () => {
@@ -393,7 +393,7 @@ describe('buildDeviceRegistration', () => {
           {
             ...input.characters[0],
             serverEvents: ['shipLost'],
-            serverInputs: { shipLostMinimumIsk: 1 },
+            serverInputs: { incursionNearbyJumps: 1 },
           },
           { ...input.characters[1], serverEvents: ['shipLost'] },
           { characterId: 3, accessToken: 'token-3', projectionRows: [] },
@@ -403,7 +403,7 @@ describe('buildDeviceRegistration', () => {
     );
 
     expect(result.serverEventsByCharacter).toEqual({ 1: ['shipLost'] });
-    expect(result.serverInputsByCharacter).toEqual({ 1: { shipLostMinimumIsk: 1 } });
+    expect(result.serverInputsByCharacter).toEqual({ 1: { incursionNearbyJumps: 1 } });
   });
 
   it('drops a character whose access token fails verification, keeping the rest', async () => {

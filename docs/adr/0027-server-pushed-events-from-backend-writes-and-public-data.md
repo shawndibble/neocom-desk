@@ -42,3 +42,10 @@ The backend pushes these events itself, to the devices that chose them.
   the web client works against an older function (unknown fields are ignored).
 - Price and loss pushes are up to about 15 minutes late; community pushes are
   immediate.
+
+## Amendment (2026-10-29)
+
+Ship losses are no longer server-pushed; the open app's Foreground Poller still
+raises them. Everything above about zKillboard reads, loss readings and the
+ship-lost minimum is retired. See
+`docs/context/decisions/20261029-000802-ship-losses-are-no-longer-server-pushed.md`.

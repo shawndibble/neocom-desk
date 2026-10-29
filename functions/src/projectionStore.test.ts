@@ -335,16 +335,21 @@ describe('writeDeviceRegistration', () => {
       characterIds: [CHAR, other],
       projections: [],
       eveTypesByCharacter: {},
-      serverEventsByCharacter: { [CHAR]: ['communityJoinRequest', 'shipLost'], [other]: [] },
-      serverInputsByCharacter: { [CHAR]: { shipLostMinimumIsk: 5 } },
+      serverEventsByCharacter: {
+        [CHAR]: ['communityJoinRequest', 'priceAlertTriggered'],
+        [other]: [],
+      },
+      serverInputsByCharacter: { [CHAR]: { priceStationId: 60003760 } },
     });
     const first = db.get('deviceRegistrations', 'A');
     expect(first?.serverEventsByCharacter).toEqual({
-      [String(CHAR)]: ['communityJoinRequest', 'shipLost'],
+      [String(CHAR)]: ['communityJoinRequest', 'priceAlertTriggered'],
       [String(other)]: [],
     });
-    expect(first?.serverInputsByCharacter).toEqual({ [String(CHAR)]: { shipLostMinimumIsk: 5 } });
-    expect(first?.polledServerEvents).toEqual(['shipLost']);
+    expect(first?.serverInputsByCharacter).toEqual({
+      [String(CHAR)]: { priceStationId: 60003760 },
+    });
+    expect(first?.polledServerEvents).toEqual(['priceAlertTriggered']);
 
     // The tick's baselines survive a re-registration for Characters still held.
     db.seed('deviceRegistrations', 'A', {
@@ -358,11 +363,14 @@ describe('writeDeviceRegistration', () => {
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
     const second = db.get('deviceRegistrations', 'A');
     expect(second?.serverEventsByCharacter).toEqual({
-      [String(CHAR)]: ['communityJoinRequest', 'shipLost'],
+      [String(CHAR)]: ['communityJoinRequest', 'priceAlertTriggered'],
     });
-    expect(second?.serverInputsByCharacter).toEqual({ [String(CHAR)]: { shipLostMinimumIsk: 5 } });
-    expect(second?.serverEventBaselines).toEqual({ [String(CHAR)]: { shipLossIds: [1] } });
-    expect(second?.polledServerEvents).toEqual(['shipLost']);
+    expect(second?.serverInputsByCharacter).toEqual({
+      [String(CHAR)]: { priceStationId: 60003760 },
+    });
+    // The reading of a retired event (a loss list) is dropped with the rest of the stale baseline.
+    expect(second?.serverEventBaselines).toEqual({ [String(CHAR)]: { priceAlerts: [] } });
+    expect(second?.polledServerEvents).toEqual(['priceAlertTriggered']);
   });
 
   it("keeps routeRules when an upload omits them, and never touches the poller's nearbyState (issue #5122)", async () => {

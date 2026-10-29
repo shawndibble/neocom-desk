@@ -45,8 +45,6 @@ import {
   COMMUNITY_EVENT_IDS,
   POLLED_EVENT_IDS,
   diffPriceAlerts,
-  diffShipLosses,
-  serverEventFiredAt,
   serverEventOccurrenceKey,
   type ServerEventFire as FunctionsServerEventFire,
   type ServerEventInputs as FunctionsServerEventInputs,
@@ -66,7 +64,6 @@ import { occurrenceFiredAt, occurrenceKey } from '@/engine/occurrenceKey';
 import {
   diffNewMail,
   diffPriceAlertTriggered,
-  diffShipLost,
   type PriceAlertEntrySnapshot,
 } from '@/engine/notificationDiffs';
 import {
@@ -217,16 +214,13 @@ describe('server-pushed events (issue #5121)', () => {
       targetPrice: 5.25,
       direction: 'below',
     },
-    { eventId: 'shipLost', characterId: 7, killmailId: 55, timeMs: 9_000, value: 1.5e6 },
-    { eventId: 'shipLost', characterId: 7, killmailId: 56, timeMs: 99_000 },
   ];
 
   it.each(fires.map((fire) => [fire.eventId, fire] as const))(
-    '%s: the push is keyed and dated like the Foreground Poller’s row',
+    '%s: the push is keyed like the Foreground Poller’s row',
     (_, fire) => {
       const now = 50_000;
       expect(serverEventOccurrenceKey(fire)).toBe(occurrenceKey(fire, now));
-      expect(serverEventFiredAt(fire, now)).toBe(occurrenceFiredAt(fire, now));
     }
   );
 
@@ -250,29 +244,6 @@ describe('server-pushed events (issue #5121)', () => {
       expect(diffPriceAlerts(7, prev, next)).toEqual(
         diffPriceAlertTriggered(7, prev && { entries: prev, nowMs: 0 }, { entries: next, nowMs: 0 })
       );
-    }
-  });
-
-  it('ship losses fire for the same killmails, against the same minimum', () => {
-    const losses = [
-      { killmailId: 3, timeMs: 3, value: 50 },
-      { killmailId: 2, timeMs: 2 },
-      { killmailId: 1, timeMs: 1, value: 5, shipTypeId: 587, systemId: 30000142 },
-    ];
-    for (const minimum of [0, 10]) {
-      for (const seen of [undefined, [], [1], [1, 2, 3]]) {
-        const snapshot = (entries: typeof losses) => ({
-          entries: entries.map((entry) => ({ ...entry, thresholdIsk: minimum })),
-          nowMs: 0,
-        });
-        expect(diffShipLosses(7, seen, losses, minimum)).toEqual(
-          diffShipLost(
-            7,
-            seen && snapshot(losses.filter((l) => seen.includes(l.killmailId))),
-            snapshot(losses)
-          )
-        );
-      }
     }
   });
 });

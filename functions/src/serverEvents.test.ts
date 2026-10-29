@@ -4,16 +4,13 @@ import {
   MAX_SERVER_EVENTS,
   buildServerEventPush,
   diffPriceAlerts,
-  diffShipLosses,
   parseServerEvents,
   parseServerInputs,
   polledEventsOf,
-  serverEventFiredAt,
   serverEventOccurrenceKey,
   trimBaseline,
   type PriceAlertSnapshotEntry,
   type ServerEventFire,
-  type ShipLossEntry,
 } from './serverEvents.js';
 
 describe('parseServerEvents', () => {
@@ -50,7 +47,7 @@ describe('parseServerInputs', () => {
     expect(parseServerInputs(undefined, 'x')).toBeUndefined();
   });
 
-  it('parses price alerts and the ship-lost minimum, ignoring unknown keys', () => {
+  it('parses price alerts, ignoring unknown keys and the retired ship-lost minimum', () => {
     expect(
       parseServerInputs(
         {
@@ -64,7 +61,6 @@ describe('parseServerInputs', () => {
     ).toEqual({
       priceStationId: 60003760,
       priceAlerts: [{ typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'above' }],
-      shipLostMinimumIsk: 1_000_000,
     });
   });
 
@@ -86,7 +82,8 @@ describe('parseServerInputs', () => {
         'x'
       )?.priceAlerts
     ).toHaveLength(MAX_PRICE_ALERTS);
-    expect(() => parseServerInputs({ shipLostMinimumIsk: -1 }, 'x')).toThrow(/shipLostMinimumIsk/);
+    // A client from before the retirement may still send it, bad or not.
+    expect(parseServerInputs({ shipLostMinimumIsk: -1 }, 'x')).toEqual({});
   });
 });
 
@@ -97,7 +94,7 @@ describe('polledEventsOf', () => {
         '1': ['communityJoinRequest', 'shipLost'],
         '2': ['priceAlertTriggered', 'shipLost'],
       })
-    ).toEqual(['priceAlertTriggered', 'shipLost']);
+    ).toEqual(['priceAlertTriggered']);
     expect(polledEventsOf({ '1': ['communityJoinRequest'] })).toEqual([]);
   });
 });
@@ -135,29 +132,6 @@ describe('diffPriceAlerts (mirrors diffPriceAlertTriggered)', () => {
 
   it('reads "below" as at or under the target', () => {
     expect(diffPriceAlerts(7, [entry(11, 10, 'below')], [entry(10, 10, 'below')])).toHaveLength(1);
-  });
-});
-
-const loss = (killmailId: number, value?: number): ShipLossEntry => ({
-  killmailId,
-  timeMs: killmailId * 1000,
-  shipTypeId: 587,
-  systemId: 30000142,
-  ...(value === undefined ? {} : { value }),
-});
-
-describe('diffShipLosses (mirrors diffShipLost)', () => {
-  it('seeds silently, then fires each unseen loss oldest first', () => {
-    expect(diffShipLosses(7, undefined, [loss(2)], 0)).toEqual([]);
-    expect(diffShipLosses(7, [1], [loss(3), loss(2), loss(1)], 0).map((f) => f.killmailId)).toEqual(
-      [2, 3]
-    );
-  });
-
-  it('drops a loss under the minimum, and one with no value while a minimum is set', () => {
-    expect(diffShipLosses(7, [], [loss(2, 5), loss(3), loss(4, 50)], 10)).toEqual([
-      expect.objectContaining({ killmailId: 4 }),
-    ]);
   });
 });
 
@@ -203,34 +177,8 @@ describe('serverEventOccurrenceKey', () => {
         },
         '7:priceAlertTriggered:34:10:above',
       ],
-      [{ eventId: 'shipLost', characterId: 7, killmailId: 55, timeMs: 1 }, '7:shipLost:55'],
     ];
     for (const [fire, key] of fires) expect(serverEventOccurrenceKey(fire)).toBe(key);
-  });
-});
-
-describe('serverEventFiredAt', () => {
-  it('dates a loss by its killmail, never in the future, and the rest by now', () => {
-    expect(
-      serverEventFiredAt({ eventId: 'shipLost', characterId: 7, killmailId: 1, timeMs: 5 }, 9)
-    ).toBe(5);
-    expect(
-      serverEventFiredAt({ eventId: 'shipLost', characterId: 7, killmailId: 1, timeMs: 50 }, 9)
-    ).toBe(9);
-    expect(
-      serverEventFiredAt(
-        {
-          eventId: 'priceAlertTriggered',
-          characterId: 7,
-          typeId: 34,
-          name: 'T',
-          price: 1,
-          targetPrice: 1,
-          direction: 'below',
-        },
-        9
-      )
-    ).toBe(9);
   });
 });
 
@@ -258,21 +206,31 @@ describe('buildServerEventPush', () => {
     for (const value of Object.values(data)) expect(typeof value).toBe('string');
   });
 
-  it('never leaves a title empty', () => {
+  it('words a price alert for the floor, dated now', () => {
     const data = buildServerEventPush(
-      { eventId: 'shipLost', characterId: 7, killmailId: 55, timeMs: 1 },
+      {
+        eventId: 'priceAlertTriggered',
+        characterId: 7,
+        typeId: 34,
+        name: 'Tritanium',
+        price: 11,
+        targetPrice: 10,
+        direction: 'above',
+      },
       2
     );
-    expect(data.title).toBe('Ship lost');
-    expect(data.body).toBe('Lost a ship');
+    expect(data.title).toBe('Price alert');
+    expect(data.body).toBe('Tritanium reached 11.00 ISK (target 10.00 ISK).');
+    expect(data.fireAt).toBe('2');
   });
 });
 
 describe('trimBaseline', () => {
   it('keeps only the readings of events still enabled', () => {
+    // A stored loss reading from before ship losses left the server is dropped.
     const stored = { priceAlerts: [entry(1)], shipLossIds: [1, 'x'] };
-    expect(trimBaseline(stored, ['shipLost'])).toEqual({ shipLossIds: [1] });
+    expect(trimBaseline(stored, ['shipLost'])).toEqual({});
     expect(trimBaseline(stored, ['priceAlertTriggered'])).toEqual({ priceAlerts: [entry(1)] });
-    expect(trimBaseline('junk', ['shipLost'])).toEqual({});
+    expect(trimBaseline('junk', ['priceAlertTriggered'])).toEqual({});
   });
 });

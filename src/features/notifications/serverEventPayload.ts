@@ -14,7 +14,7 @@ import type {
   CommunityMemberJoinedFire,
   CommunityRequestPledgedFire,
 } from '@/engine/communities/communityAlert';
-import type { PriceAlertTriggeredFire, ShipLostFire } from '@/engine/notificationDiffs';
+import type { PriceAlertTriggeredFire } from '@/engine/notificationDiffs';
 import type { NewMailPushFire } from './serverEventCopy';
 import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
 import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
@@ -27,7 +27,6 @@ export type ServerEventFire =
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
   | PriceAlertTriggeredFire
-  | ShipLostFire
   | NewMailPushFire
   | IncursionNearbyFire
   | SkyhookRaidableNearbyFire;
@@ -65,15 +64,6 @@ const GUARDS: Record<ServerPushedEventId, (raw: unknown) => boolean> = {
     price: is.number,
     targetPrice: is.number,
     direction: is.oneOf(['above', 'below'] as const),
-  }),
-  shipLost: shapeGuard<ShipLostFire>({
-    eventId: is.oneOf(['shipLost'] as const),
-    characterId: is.number,
-    killmailId: is.number,
-    timeMs: is.number,
-    shipTypeId: is.optional(is.number),
-    systemId: is.optional(is.number),
-    value: is.optional(is.number),
   }),
   // Lenient on the optional parts: a push without a sender or subject still reads as a new mail.
   newMail: shapeGuard<NewMailPushFire>({
