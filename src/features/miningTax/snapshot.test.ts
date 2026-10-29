@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { loadMoonMiningTaxSnapshot } from './snapshot';
 import { computePayeeBalances } from './balances';
 import { flatten } from './groupRows';
-import { seedCharacter as seedCharacterRow } from '@/test/seed';
+import { seedCharacter } from '@/test/seed';
 
 const MOON_ORE = 45490;
 
@@ -27,10 +27,6 @@ beforeEach(async () => {
   await db.payees.clear();
   await db.miningTaxAssignments.clear();
 });
-
-async function seedCharacter(characterId: number, name: string): Promise<void> {
-  await seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
-}
 
 describe('loadMoonMiningTaxSnapshot', () => {
   it('reports an entry as unassigned with the whole entry as its residual, when nothing covers it', async () => {

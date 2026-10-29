@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
+import { seedCharacter, seedGrant } from '@/test/seed';
 import { clearLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { loadShareSelection } from '@/features/communities/shareSelection';
 import { CommunityJoin } from './CommunityJoin';
@@ -47,20 +48,9 @@ function renderPage() {
 async function seedCharacters(withBlueprints: number[], all: number[] = withBlueprints) {
   await db.characters.clear();
   await db.tokens.clear();
-  for (const [index, id] of all.entries()) {
-    await db.characters.put({
-      characterId: id,
-      name: `Pilot ${id}`,
-      ownerHash: 'h',
-      addedAt: index,
-    });
-    await db.tokens.put({
-      characterId: id,
-      accessToken: 'a',
-      refreshToken: 'r',
-      expiresAt: 0,
-      scopes: withBlueprints.includes(id) ? [BLUEPRINT_SCOPE] : [],
-    });
+  for (const id of all) {
+    await seedCharacter(id);
+    await seedGrant(id, withBlueprints.includes(id) ? [BLUEPRINT_SCOPE] : []);
   }
 }
 

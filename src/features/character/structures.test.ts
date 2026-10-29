@@ -11,15 +11,11 @@ import {
   loadStructureNameNoRoster,
   readCachedStructureNames,
 } from './structures';
-import { seedCharacter as seedCharacterRow } from '@/test/seed';
+import { seedCharacter } from '@/test/seed';
 
 const CHARACTER_ID = 42;
 const OTHER_CHARACTER_ID = 43;
 const THIRD_CHARACTER_ID = 44;
-
-function seedCharacter(characterId: number, name = `char-${characterId}`): Promise<unknown> {
-  return seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
-}
 
 const server = mswServer();
 
