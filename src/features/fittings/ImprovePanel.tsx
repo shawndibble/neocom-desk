@@ -25,6 +25,7 @@ import { ImproveSettingsPanel } from './ImproveSettingsPanel';
 import { ImproveSidesLine } from './ImproveSidesLine';
 import type { ImproveSettings } from './improveSettings';
 import type { ImproveSearch } from './useImprove';
+import { hasImproveResults } from './improveHasResults';
 import { useImproveLabels } from './useImproveLabels';
 import { useImprovePanels } from './useImprovePanels';
 import { useImproveSelection } from './useImproveSelection';
@@ -190,11 +191,7 @@ export function ImprovePanel({
       )}
 
       {state.status === 'done' &&
-        (state.result.makeFlyable.length === 0 &&
-        state.result.flyableBlocked.length === 0 &&
-        state.result.noDownside.length === 0 &&
-        state.result.tradeOffs.length === 0 &&
-        state.makeover === undefined ? (
+        (!hasImproveResults(state, { blocked: true }) ? (
           <ImproveNothingFound
             goal={goal}
             result={state.result}

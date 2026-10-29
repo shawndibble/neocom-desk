@@ -41,6 +41,7 @@ import {
   useImproveBudget,
   migrateSpendCap,
 } from './useImprove';
+import { hasImproveResults } from './improveHasResults';
 import type { FittingWorkspace } from './useFittingWorkspace';
 
 const moduleKey = (f: Fitting) =>
@@ -361,13 +362,7 @@ export function useImproveDrawer({
   // Only once a search found something: the bar (ImproveFooter) is
   // drawn for results alone, and an empty footer is a stray line.
   const doneState = search.state.status === 'done' ? search.state : null;
-  const found =
-    doneState !== null &&
-    (doneState.result.makeFlyable.length +
-      doneState.result.noDownside.length +
-      doneState.result.tradeOffs.length >
-      0 ||
-      doneState.makeover !== undefined);
+  const found = doneState !== null && hasImproveResults(doneState, { blocked: false });
   const footer = found && <div ref={setFooterTarget} />;
 
   // Desktop: a column in the page, left of the editor (FittingEditorLayout's
