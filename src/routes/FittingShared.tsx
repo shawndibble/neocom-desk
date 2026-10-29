@@ -228,7 +228,7 @@ export function FittingShareView({
           </div>
         ) : undefined
       }
-      meta={
+      footer={
         expiresAt === undefined ? undefined : (
           <StatChips>
             <StatChip
