@@ -1,16 +1,11 @@
 // `GET /characters/{id}/notifications/` for the Alerts poller (issue #3756,
-// ADR 0020). Sends ESI's required identification headers (no email address),
-// the stored ETag, and classifies the response so the poller never has to read
-// a status code: 304 costs nothing, 403 is a dead grant, 420/429 stop the whole
+// ADR 0020). Sends `esiHeaders` (esiClient.ts) and the stored ETag, then
+// classifies the response so the poller never has to read a status code:
+// 304 costs nothing, 403 is a dead grant, 420/429 stop the whole
 // run (the error budget is shared by every user of the client id).
 
-import { ESI_BASE, esiHeaders } from './esiClient.js';
+import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
 import type { EsiNotification } from './eveNotificationSelection.js';
-
-/** Stop polling for this run when fewer than this many errors remain in ESI's window. */
-const ERROR_LIMIT_FLOOR = 20;
-/** Stop polling for this run when the rate-limit group has this few tokens left. */
-const RATELIMIT_REMAINING_FLOOR = 2;
 
 export type NotificationsResult =
   | {
@@ -23,26 +18,6 @@ export type NotificationsResult =
   | { kind: 'forbidden' }
   | { kind: 'backoff'; retryAfterMs: number | null }
   | { kind: 'error'; status: number };
-
-function numberHeader(headers: Headers, name: string): number | null {
-  const raw = headers.get(name);
-  if (raw === null || raw.trim() === '') return null;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
-}
-
-/** True when ESI's own headers say the next call risks the shared budget. */
-export function isBudgetLow(headers: Headers): boolean {
-  const remaining = numberHeader(headers, 'X-Ratelimit-Remaining');
-  if (remaining !== null && remaining <= RATELIMIT_REMAINING_FLOOR) return true;
-  const errorsLeft = numberHeader(headers, 'X-ESI-Error-Limit-Remain');
-  return errorsLeft !== null && errorsLeft < ERROR_LIMIT_FLOOR;
-}
-
-export function retryAfterMs(headers: Headers): number | null {
-  const seconds = numberHeader(headers, 'Retry-After');
-  return seconds === null ? null : Math.max(0, seconds) * 1000;
-}
 
 function isNotification(value: unknown): value is EsiNotification {
   if (typeof value !== 'object' || value === null) return false;

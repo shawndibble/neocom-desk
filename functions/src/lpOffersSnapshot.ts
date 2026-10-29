@@ -12,10 +12,9 @@
  * are arguments, so parsing, joining, retry and the drop rules are unit-tested.
  * `index.ts` supplies `fetch` and publishes the result.
  */
+import { ESI_ROOT } from './esiClient.js';
+import { isFiniteNumber, isPlainRecord } from './guards.js';
 import { parseRetryAfterMs } from './workbenchFits.js';
-import { isPlainRecord } from './guards.js';
-
-const ESI_BASE_URL = 'https://esi.evetech.net';
 /** Courtesy gap between corporation requests (~170 requests a day). */
 export const LP_STORE_REQUEST_GAP_MS = 200;
 const RATE_LIMIT_RETRIES = 3;
@@ -39,11 +38,11 @@ export interface FetchJsonResult {
 }
 
 export function lpOffersUrl(corporationId: number): string {
-  return `${ESI_BASE_URL}/loyalty/stores/${corporationId}/offers/`;
+  return `${ESI_ROOT}/loyalty/stores/${corporationId}/offers/`;
 }
 
 function num(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  return isFiniteNumber(value) ? value : null;
 }
 
 /** ESI's offer list -> compact tuples. Anything malformed is skipped, never thrown on. */

@@ -1,7 +1,7 @@
 // The scheduled feeder pass against the Firestore emulator (issue #4509, spec #4504).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { beforeEach, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { SsoRefreshError } from './alertGrant.js';
 import { encryptRefreshToken } from './alertGrantCrypto.js';
 import {
@@ -18,7 +18,6 @@ const T0 = Date.parse('2026-10-18T12:00:00Z');
 const DAY = 24 * 3_600_000;
 const KEY = Buffer.alloc(32, 7);
 
-const db = emulatorDb;
 let now = T0;
 const dead = new Set<string>();
 /** SSO hands back the next token (`rt-H-n` → `rt-H-n+1`) instead of the same one. */

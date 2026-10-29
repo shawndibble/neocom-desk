@@ -101,8 +101,9 @@ function positiveId(value: unknown, field: string): number {
 }
 
 export function parseEstimateInput(d: unknown): EstimateInput {
-  if (!isPlainRecord(d))
+  if (!isPlainRecord(d)) {
     throw new MutamarketInputError('expected { typeId, itemId, importIfMissing? }');
+  }
   if (d.importIfMissing !== undefined && typeof d.importIfMissing !== 'boolean') {
     throw new MutamarketInputError('importIfMissing must be a boolean');
   }

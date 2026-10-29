@@ -2,7 +2,7 @@
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
@@ -51,7 +51,6 @@ const FEEDER_NOBODY = 14;
 const FEEDER_JUNIOR = 15;
 const COLLECTOR_JUNIOR = 16;
 
-const db = emulatorDb;
 let ledger: 'ok' | 'forbidden' = 'ok';
 /** The accounting corporation's wallet journal, as ESI returns it. */
 let journalRows: unknown[] = [];

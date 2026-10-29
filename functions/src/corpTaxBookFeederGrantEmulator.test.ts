@@ -2,7 +2,7 @@
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -29,7 +29,6 @@ const ALT = 12; // the Accountant alt that logs in for the mining scope
 const FEEDER_DIRECTOR = 13;
 const FEEDER_NOBODY = 14;
 
-const db = emulatorDb;
 let ledger: 'ok' | 'forbidden' | 'unavailable' = 'ok';
 let now = T0;
 /** Runs during the first pull's observer read: a concurrent write landing mid-save. */

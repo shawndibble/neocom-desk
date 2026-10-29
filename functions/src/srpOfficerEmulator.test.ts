@@ -2,7 +2,7 @@
 // emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -25,7 +25,6 @@ import type { SrpDeps } from './srpStore.js';
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-23T12:00:00Z');
 
-const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 

@@ -27,16 +27,24 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 
 ## Cloud Functions (`functions/src`)
 
-A separate package with its own tsconfig and no `@/` alias, so it cannot import
-`src/`. It has its own small set instead; the guards hand-mirror
-`src/engine/guards.ts` and `src/functionsParity.test.ts` asserts the two copies
-agree, so a change to one side that skips the other fails there.
+`firebase.json` deploys `functions/` alone, so a `../src` import cannot resolve
+at runtime — hence a mirrored copy, not an import. `src/functionsParity.test.ts`
+asserts the copies agree, so a change to one side that skips the other fails
+there. Mirrored so far: the guards below, and `esiClient.ts`'s compatibility
+date and User-Agent against `src/esi/`.
 
-| Need                                | Use                                                                                      | Not                                                  |
-| ----------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Narrow `unknown` to an object       | `isRecord`, `isPlainRecord`, `isFiniteNumber` — `functions/src/guards.ts`                | a local `isRecord`; reaching into `src/engine`       |
-| An ESI request's headers            | `esiHeaders(accessToken?)`, `ESI_BASE`, `ESI_USER_AGENT` — `functions/src/esiClient.ts`  | spelling out `X-Compatibility-Date` / `X-User-Agent` |
-| A Firestore-emulator suite's set-up | `emulatorSuite`, `emulatorDb`, `clearEmulator` — `functions/src/testSupport/emulator.ts` | a per-file `runnable` probe and `clearEmulator`      |
+| Need                                  | Use                                                                                                             | Not                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Narrow `unknown` to an object         | `functions/src/guards.ts` — the same three names as `src/engine/guards.ts`                                      | a local `isRecord`; importing `src/engine`           |
+| Anything an ESI call puts on the wire | `esiHeaders(accessToken?)`, `ESI_ROOT`/`ESI_BASE`, `isBudgetLow`, `retryAfterMs` — `functions/src/esiClient.ts` | spelling out `X-Compatibility-Date` / `X-User-Agent` |
+| A Firestore-emulator suite's set-up   | `emulatorSuite`, `emulatorDb`, `clearEmulator` — `functions/src/testSupport/emulator.ts`                        | a per-file `runnable` probe and `clearEmulator`      |
+
+Two carve-outs, both marked in their own docblocks: `costIndicesSnapshot.ts` and
+`r2Client.ts` take no relative _runtime_ imports, because
+`functions/scripts/backfill-cost-indices.mjs` loads them under Node type
+stripping, where `./guards.js` resolves to nothing. They inline what they need.
+`Retry-After` has two readers on purpose: `esiClient.retryAfterMs` for ESI, and
+`workbenchFits.parseRetryAfterMs` (HTTP-date form, capped) for the other syncs.
 
 ## Dates and times
 

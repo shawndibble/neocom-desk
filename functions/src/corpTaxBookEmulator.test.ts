@@ -3,7 +3,7 @@
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -28,7 +28,6 @@ import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
 
-const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 let identityCalls = 0;

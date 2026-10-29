@@ -4,8 +4,8 @@
  * repo root, which starts the emulator and sets `FIRESTORE_EMULATOR_HOST`; a
  * plain `npm test` skips them.
  *
- * Test-only: `tsconfig.build.json` excludes this folder, so it never reaches a
- * deploy.
+ * Test-only: `tsconfig.build.json` keeps it out of `lib/` and `firebase.json`'s
+ * `ignore` keeps it out of the upload, so it never reaches a deploy.
  */
 import { describe } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -14,7 +14,7 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 /** The project `npm run test:rules` starts the emulator with. */
 const PROJECT_ID = 'demo-neocom-rules';
 
-export const emulatorRunnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+const emulatorRunnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 /** `describe`, or `describe.skip` when there is no emulator to talk to. */
 export const emulatorSuite = emulatorRunnable ? describe : describe.skip;

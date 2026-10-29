@@ -15,7 +15,7 @@ import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
 import { parseServerEvents, parseServerInputs, type ServerEventInputs } from './serverEvents.js';
 import type { NearbyRouteRules } from './nearbyAlerts.js';
-import { isRecord } from './guards.js';
+import { isPlainRecord, isRecord } from './guards.js';
 
 export type { ProjectionRowInput };
 
@@ -151,7 +151,7 @@ const ROUTE_PREFERENCES = ['shortest', 'prefer-highsec', 'avoid-highsec'] as con
  * refusing the whole upload with its Projection and types.
  */
 function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
-  if (!isRecord(raw) || Array.isArray(raw)) return undefined;
+  if (!isPlainRecord(raw)) return undefined;
   const { preference, securityPenalty, avoid } = raw;
   if (!(ROUTE_PREFERENCES as readonly unknown[]).includes(preference)) return undefined;
   if (

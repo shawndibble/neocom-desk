@@ -7,7 +7,6 @@
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
 import type { WriteOpenPricesResult } from './r2DailySnapshots.js';
-import { isPlainRecord } from './guards.js';
 
 export const COST_INDICES_R2_PREFIX = 'cost-indices/';
 /** Days kept per system; the oldest drop first. */
@@ -37,6 +36,15 @@ export interface StoredSystemCostIndices {
 }
 
 /** One object per system, so a popover reads a few KB, not every system. */
+/**
+ * `isPlainRecord` from guards.ts, inlined: the docblock's "no relative runtime
+ * imports" rule is what lets the backfill script load this file under Node type
+ * stripping, and a value import of `./guards.js` resolves to nothing on disk.
+ */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export function costIndicesR2Key(systemId: number): string {
   return `${COST_INDICES_R2_PREFIX}${systemId}.json`;
 }

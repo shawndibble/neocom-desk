@@ -2,7 +2,7 @@
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -39,7 +39,6 @@ const COLLECTOR_JUNIOR = 3;
 const FEEDER_DIRECTOR = 11;
 const FEEDER_JUNIOR = 12;
 
-const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 

@@ -1,8 +1,9 @@
 /**
  * Shared type guards for parsing untrusted (ESI / stored / callable-input)
- * values. Hand-mirrors `src/engine/guards.ts` — this is a separate package
- * with its own tsconfig and no `@/` alias, so it cannot import it.
- * `src/functionsParity.test.ts` asserts the two copies agree.
+ * values. Hand-mirrors `src/engine/guards.ts`: `firebase.json` deploys
+ * `functions/` alone, so a `../src` import would not resolve at runtime (and
+ * this package has no `@/` alias either). `src/functionsParity.test.ts` asserts
+ * the two copies agree.
  */
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

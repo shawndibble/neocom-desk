@@ -6,6 +6,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { ESI_BASE, ESI_USER_AGENT, esiHeaders } from './esiClient.js';
+import { isFiniteNumber } from './guards.js';
 import type { EsiKillmail, KillmailItem, SrpKillmailSource, ZkillRecord } from './srpKillmail.js';
 
 const ZKILL_API = 'https://zkillboard.com/api/killID';
@@ -33,8 +34,7 @@ async function esiGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
   return res.json().catch(() => null);
 }
 
-const asNumber = (v: unknown): number | null =>
-  typeof v === 'number' && Number.isFinite(v) ? v : null;
+const asNumber = (v: unknown): number | null => (isFiniteNumber(v) ? v : null);
 
 function cleanItems(raw: unknown): KillmailItem[] {
   if (!Array.isArray(raw)) return [];

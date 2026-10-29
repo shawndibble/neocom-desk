@@ -1,7 +1,7 @@
 // The Corp Tax Book's version marker (issue #5047) against the Firestore emulator.
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { beforeEach, expect, it, vi } from 'vitest';
-import { emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { VERSIONED_COLLECTIONS } from './corpTaxBookVersionKeys.js';
 import {
   installBookWriteTracking,
@@ -11,7 +11,6 @@ import {
 
 const BOOK = '98500001';
 
-const db = emulatorDb;
 const book = () => db.collection('corps').doc(BOOK);
 const versions = async () => {
   const d = (await book().get()).data() ?? {};

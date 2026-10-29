@@ -4,7 +4,7 @@
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb, emulatorSuite } from './testSupport/emulator.js';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { SsoRefreshError } from './alertGrant.js';
@@ -41,7 +41,6 @@ const ACCOUNTANT = 2; // also Station_Manager
 const JUNIOR = 3;
 const OTHER_ACCOUNTANT = 4;
 
-const db = emulatorDb;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 /** Refresh tokens SSO has revoked or let die. */

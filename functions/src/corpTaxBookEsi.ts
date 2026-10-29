@@ -2,7 +2,7 @@
 // corporation and in-game roles, and the corporation's CEO (ADR 0023). The
 // caller's short-lived access token is used for these calls and dropped; it is
 // never stored or logged (ADR 0001, ADR 0010). Same identification headers as
-// every other ESI call (esiNotifications.ts).
+// every other ESI call (esiClient.ts).
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { ESI_BASE, esiHeaders } from './esiClient.js';
