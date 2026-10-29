@@ -95,27 +95,6 @@ export function useAppraisalColumns({
 
   const columns: DataTableColumn<OwnedRow>[] = [
     {
-      id: 'quantity',
-      header: owned ? t('market.appraisal.columnNeed') : t('market.appraisal.columnQuantity'),
-      // On a phone the count sits under the item name instead (below).
-      phoneHidden: true,
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums',
-      // A count, not ISK — an ISK formatter would run `clampIskZero` over it.
-      render: (row) =>
-        row.need !== undefined ? (
-          <span>
-            {formatVolume(row.need)}
-            <span className="block text-[0.625rem] text-text-dim">
-              {t('market.appraisal.ownedBeneath', { qty: formatVolume(row.owned ?? 0) })}
-            </span>
-          </span>
-        ) : (
-          formatVolume(row.quantity)
-        ),
-      sortValue: (row) => row.need ?? row.quantity,
-    },
-    {
       id: 'item',
       stickyStart: true,
       stickyStartOnPanel: true,
@@ -135,6 +114,27 @@ export function useAppraisalColumns({
         </>
       ),
       sortValue: (row) => row.name,
+    },
+    {
+      id: 'quantity',
+      header: owned ? t('market.appraisal.columnNeed') : t('market.appraisal.columnQuantity'),
+      // On a phone the count sits under the item name instead (below).
+      phoneHidden: true,
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      // A count, not ISK — an ISK formatter would run `clampIskZero` over it.
+      render: (row) =>
+        row.need !== undefined ? (
+          <span>
+            {formatVolume(row.need)}
+            <span className="block text-[0.625rem] text-text-dim">
+              {t('market.appraisal.ownedBeneath', { qty: formatVolume(row.owned ?? 0) })}
+            </span>
+          </span>
+        ) : (
+          formatVolume(row.quantity)
+        ),
+      sortValue: (row) => row.need ?? row.quantity,
     },
   ];
 

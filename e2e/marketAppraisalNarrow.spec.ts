@@ -197,8 +197,8 @@ test.describe('Market Appraisal — stacked result card', () => {
     expect(display).toBe('table-row');
     expect(labelLines(cells)).toEqual([
       [
-        'Qty',
         'Item',
+        'Qty',
         'Buy each',
         'Sell each',
         'Buy total',

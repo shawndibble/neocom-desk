@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,8 +18,6 @@ import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import { formatIskAuto } from '@/lib/isk';
 import { appraisalCsvColumns } from './appraisalCsv';
 import type { AppraisalShareView } from './appraisalShareData';
-import { appraisalVolumeColumn } from './appraisalVolume';
-import { AppraisalVolumeChip } from './AppraisalVolumeChip';
 import { formatVolume } from './format';
 import { FullIskTotal } from './FullIskTotal';
 
@@ -61,6 +60,7 @@ interface AppraisalShareScreenProps {
 export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalShareScreenProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const isPhone = useIsPhone();
   const shareRows = state.status === 'ready' ? state.view.appraisal.rows : NO_ROWS;
   const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
   const tableExport = useTableExport({
@@ -69,7 +69,19 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
     columns: csvColumns,
   });
 
+  /** The full figure a pilot pastes into a contract, but shorthand with the exact value in a tooltip on a phone, where it would not fit. */
+  function totalFigure(value: number): ReactNode {
+    return isPhone ? <IskAmount value={value} decimals={0} /> : <FullIskTotal value={value} />;
+  }
+
   const columns: DataTableColumn<AppraisalRow>[] = [
+    {
+      id: 'item',
+      header: t('market.appraisal.columnItem'),
+      stickyStart: true,
+      render: (row) => row.name,
+      sortValue: (row) => row.name,
+    },
     {
       id: 'quantity',
       header: t('market.appraisal.columnQuantity'),
@@ -77,13 +89,6 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => formatVolume(row.quantity),
       sortValue: (row) => row.quantity,
-    },
-    {
-      id: 'item',
-      header: t('market.appraisal.columnItem'),
-      stickyStart: true,
-      render: (row) => row.name,
-      sortValue: (row) => row.name,
     },
     {
       id: 'buyEach',
@@ -129,19 +134,10 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
       render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
-    { ...appraisalVolumeColumn(t), phoneHidden: true },
   ];
 
   return (
-    <ShareShell
-      title={t('appraisalShare.title')}
-      openInApp={openInApp}
-      actions={
-        shareRows.length > 0 ? (
-          <TableActionsMenu name={t('appraisalShare.title')} tableExport={tableExport} />
-        ) : undefined
-      }
-    >
+    <ShareShell title={t('appraisalShare.title')} openInApp={openInApp}>
       {state.status === 'invalid' && (
         <EmptyState
           title={t('appraisalShare.invalidTitle')}
@@ -152,30 +148,26 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
 
       {state.status === 'ready' && (
         <>
-          <StatChips className="border-b border-line px-1 py-2">
-            <StatChip
-              label={state.view.hub.systemName}
-              value={t('market.appraisal.atPercent', { pricePercent: state.view.pricePercent })}
-            />
-            <StatChip
-              label={t('market.appraisal.sellTotal')}
-              value={<FullIskTotal value={state.view.appraisal.totals.sell} />}
-              tone="accent"
-            />
-            <StatChip
-              label={t('market.appraisal.buyTotal')}
-              value={<FullIskTotal value={state.view.appraisal.totals.buy} />}
-            />
-            <AppraisalVolumeChip totals={state.view.appraisal.totals} />
-            <StatChip
-              label={t('appraisalShare.generatedLabel')}
-              value={formatTimestamp(new Date(state.view.generatedAt * 1000), timeZone)}
-            />
-            <StatChip
-              label={t('appraisalShare.expiresLabel')}
-              value={formatTimestamp(new Date(expiresAt), timeZone)}
-            />
-          </StatChips>
+          <div className="flex items-start justify-between gap-3 border-b border-line px-1 py-2">
+            <StatChips className="min-w-0 flex-1">
+              <StatChip
+                label={state.view.hub.systemName}
+                value={t('market.appraisal.atPercent', { pricePercent: state.view.pricePercent })}
+              />
+              <StatChip
+                label={t('market.appraisal.sellTotal')}
+                value={totalFigure(state.view.appraisal.totals.sell)}
+                tone="accent"
+              />
+              <StatChip
+                label={t('market.appraisal.buyTotal')}
+                value={totalFigure(state.view.appraisal.totals.buy)}
+              />
+            </StatChips>
+            {shareRows.length > 0 && (
+              <TableActionsMenu name={t('appraisalShare.title')} tableExport={tableExport} />
+            )}
+          </div>
 
           {state.view.appraisal.rows.length === 0 ? (
             <EmptyState
@@ -198,6 +190,17 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
               />
             </div>
           )}
+
+          <StatChips className="border-t border-line px-1 py-2">
+            <StatChip
+              label={t('appraisalShare.generatedLabel')}
+              value={formatTimestamp(new Date(state.view.generatedAt * 1000), timeZone)}
+            />
+            <StatChip
+              label={t('appraisalShare.expiresLabel')}
+              value={formatTimestamp(new Date(expiresAt), timeZone)}
+            />
+          </StatChips>
         </>
       )}
     </ShareShell>
