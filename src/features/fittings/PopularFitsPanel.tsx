@@ -1,8 +1,6 @@
-import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { IskAmount, Spinner, TabPanel, Tabs, useTabsId } from '@/components/ui';
 import type { FitSellPrice } from '@/engine/fittings/fitSellPrice';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { popularFitLoad } from '@/engine/fittings/popularFits';
@@ -12,7 +10,7 @@ import { useNow } from '@/lib/useNow';
 import { zkillFailureKey } from '@/lib/zkillFailureKey';
 import { typeName } from '@/sde/loadSde';
 import { usePopularFits } from './popularFits';
-import { RackIconStrip } from './RackIconStrip';
+import { PopularFitRow } from './PopularFitRow';
 import { useModuleNames } from './useModuleNames';
 import { FIT_ROW_CLASS, VirtualFitList } from './VirtualFitList';
 import {
@@ -116,10 +114,10 @@ function ZkillboardFits({
         <ul className={cx('space-y-1', capped && 'max-h-72 overflow-y-auto')}>
           {result.fits.map((fit, index) => (
             <li key={fit.key} className={FIT_ROW_CLASS}>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm">
-                  {t('fittings.popular.losses', { count: fit.count })}
-                  <span className="text-text-dim">
+              <PopularFitRow
+                title={t('fittings.popular.losses', { count: fit.count })}
+                meta={
+                  <>
                     {fit.lastSeen !== null &&
                       ` · ${t('fittings.popular.lastSeen', {
                         age: formatAge(Math.max(0, now - Date.parse(fit.lastSeen)), t),
@@ -133,14 +131,12 @@ function ZkillboardFits({
                         />
                       </>
                     )}
-                  </span>
-                </p>
-                <RackIconStrip modules={fit.parts.modules} names={names} />
-              </div>
-              <Button
-                size="sm"
+                  </>
+                }
+                modules={fit.parts.modules}
+                names={names}
                 disabled={busy}
-                onClick={() =>
+                onOpen={() =>
                   onOpen(
                     popularFitLoad(
                       fit,
@@ -148,9 +144,7 @@ function ZkillboardFits({
                     )
                   )
                 }
-              >
-                {t('fittings.popular.open')}
-              </Button>
+              />
             </li>
           ))}
         </ul>
@@ -160,10 +154,10 @@ function ZkillboardFits({
 }
 
 /**
- * A Workbench row's height before it is measured: name and price, date
- * created, and one line of module icons, plus the gap below it.
+ * A Workbench row's height before it is measured: name, date and price,
+ * and one line of module icons, plus the gap below it.
  */
-const WORKBENCH_ROW_ESTIMATE = 80;
+const WORKBENCH_ROW_ESTIMATE = 96;
 
 const workbenchRowKey = (row: WorkbenchRow) => row.fit.id;
 
@@ -187,24 +181,6 @@ function WorkbenchFits({
 
   return (
     <>
-      {/* One line for the whole tab, not one per row: a hull can list hundreds. */}
-      <p className="text-xs text-text-dim">
-        {t('fittings.popular.workbench.source')}{' '}
-        <ExternalLink href="https://eveworkbench.com">eveworkbench.com</ExternalLink>
-        {listed && tab.pricing ? (
-          <>
-            {' · '}
-            <span role="status">
-              {t('fittings.popular.workbench.pricing', { hub: tab.hub.systemName })}
-            </span>
-          </>
-        ) : listed && tab.anyPriced ? (
-          <>
-            {' · '}
-            <span>{t('fittings.popular.workbench.priceNote', { hub: tab.hub.systemName })}</span>
-          </>
-        ) : null}
-      </p>
       {tab.status === 'loading' ? (
         <Spinner size="sm" delayMs={200} label={t('fittings.popular.workbench.loading')} />
       ) : tab.status === 'failed' ? (
@@ -221,38 +197,36 @@ function WorkbenchFits({
           label={t('fittings.popular.tabWorkbench')}
           capped={capped}
           renderItem={({ fit, modules, price, sighting, loadFailed }) => (
-            <>
-              <div className="min-w-0 flex-1">
-                <p className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <button
-                    type="button"
-                    disabled={busy || tab.loading}
-                    onClick={() => void tab.load(fit, onOpen)}
-                    className={entityLinkClassName('truncate text-left disabled:opacity-40')}
-                  >
-                    {fit.name || t('fittings.popular.workbench.unnamed')}
-                  </button>
-                  <WorkbenchFitPrice price={price} />
-                </p>
-                <p className="text-xs text-text-dim">
-                  {t('fittings.popular.workbench.created', {
+            <PopularFitRow
+              title={fit.name || t('fittings.popular.workbench.unnamed')}
+              meta={
+                <>
+                  {` · ${t('fittings.popular.workbench.created', {
                     age: formatAge(Math.max(0, now - fit.dateAdded), t),
+                  })}`}
+                  <WorkbenchFitPrice price={price} />
+                </>
+              }
+              modules={modules}
+              names={names}
+              disabled={busy || tab.loading}
+              onOpen={() => void tab.load(fit, onOpen)}
+            >
+              {price?.partial && (
+                <p className="text-xs text-text-dim">
+                  {t('fittings.popular.workbench.unpriced', {
+                    count: price.unpricedTypes,
+                    hub: tab.hub.systemName,
                   })}
-                  {price?.partial &&
-                    ` · ${t('fittings.popular.workbench.unpriced', {
-                      count: price.unpricedTypes,
-                      hub: tab.hub.systemName,
-                    })}`}
                 </p>
-                <RackIconStrip modules={modules} names={names} />
-                <WorkbenchSightingBadge sighting={sighting} />
-                {loadFailed && (
-                  <p role="alert" className="text-xs text-danger">
-                    {t('fittings.popular.workbench.loadFailed')}
-                  </p>
-                )}
-              </div>
-            </>
+              )}
+              <WorkbenchSightingBadge sighting={sighting} />
+              {loadFailed && (
+                <p role="alert" className="text-xs text-danger">
+                  {t('fittings.popular.workbench.loadFailed')}
+                </p>
+              )}
+            </PopularFitRow>
           )}
         />
       )}
@@ -262,27 +236,23 @@ function WorkbenchFits({
 }
 
 /**
- * A Workbench row's price at the Default Trade Hub, after its name; nothing
- * while loading or with nothing priced. A partial total's missing items are
- * on the line below.
+ * A Workbench row's price at the Default Trade Hub, after its date, in the
+ * zKillboard row's "~87.5M ISK" style; nothing while loading or with nothing
+ * priced. A partial total's missing items are on the line below.
  */
 function WorkbenchFitPrice({ price }: { price: FitSellPrice | undefined }) {
   if (price === undefined) return null;
   return (
     <>
-      <span aria-hidden className="shrink-0 text-text-dim">
-        ·
-      </span>
-      <span className="shrink-0 tabular-nums">
-        <Trans
-          i18nKey={
-            price.partial
-              ? 'fittings.popular.workbench.pricePartial'
-              : 'fittings.popular.workbench.price'
-          }
-          components={{ isk: <IskAmount value={price.sell} /> }}
-        />
-      </span>
+      {' · '}
+      <Trans
+        i18nKey={
+          price.partial
+            ? 'fittings.popular.workbench.pricePartial'
+            : 'fittings.popular.workbench.price'
+        }
+        components={{ isk: <IskAmount value={price.sell} /> }}
+      />
     </>
   );
 }
