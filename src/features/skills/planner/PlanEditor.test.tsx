@@ -1100,6 +1100,35 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
   });
 });
 
+describe('Remove trained skills', () => {
+  const trained: ReadonlyMap<number, TrainedSkill> = new Map([[10, { level: 1, sp: 0 }]]);
+
+  it('is off when the character has trained nothing in the plan', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+    expect(
+      within(sectionFor('Actions')).getByRole('button', { name: 'Remove trained skills' })
+    ).toBeDisabled();
+  });
+
+  it('drops the trained rows, says how many, and Undo puts them back', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    renderEditor(onUpdate, { trainedSkills: trained });
+    await openTools(user);
+    const actions = sectionFor('Actions');
+    await user.click(within(actions).getByRole('button', { name: 'Remove trained skills' }));
+    expect(onUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ entries: [{ skillTypeID: 20, targetLevel: 1, priority: 'high' }] })
+    );
+    expect(within(actions).getByText('Removed 1 trained skill')).toBeInTheDocument();
+    await user.click(within(actions).getByRole('button', { name: 'Undo' }));
+    expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ entries: PLAN.entries }));
+    expect(within(actions).queryByText('Removed 1 trained skill')).toBeNull();
+  });
+});
+
 describe('PlanEditor tools pane placement', () => {
   it('folds the tools into one collapsed disclosure below `lg`, so the plan leads the page', () => {
     renderEditor();
