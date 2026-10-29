@@ -195,6 +195,22 @@ describe('IskInput invalid text', () => {
       await user.type(input, '100m');
       expect(input).toHaveValue('100m');
       expect(onCommit).toHaveBeenLastCalledWith('100000000');
+      await user.clear(input);
+      await user.type(input, '100k');
+      expect(input).toHaveValue('100k');
+      expect(onCommit).toHaveBeenLastCalledWith('100000');
+    });
+
+    it('keeps every fraction digit before a suffix and leaves a foreign-format paste alone', async () => {
+      const user = userEvent.setup();
+      render(<Harness onCommit={vi.fn()} mask />);
+      const input = screen.getByRole('textbox', { name: 'Max price' });
+      await user.type(input, '1.255m');
+      expect(input).toHaveValue('1.255m');
+      await user.clear(input);
+      await user.click(input);
+      await user.paste('1.234.567');
+      expect(input).toHaveValue('1.234.567');
     });
 
     it('keeps the caret after the digit being edited when the groups shift', async () => {

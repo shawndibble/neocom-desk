@@ -14,6 +14,9 @@ import { FieldError } from './FieldError';
 import { FieldNoteContext, mergeDescribedBy } from './fieldNote';
 import { TextInput } from './TextInput';
 
+/** A digit or the decimal mark: what the caret position is counted in, since grouping marks come and go. */
+const isAmountChar = (ch: string) => /\d/.test(ch) || ch === getDecimalMark();
+
 /** How long typing pauses before invalid text shows its error. */
 const ERROR_PAUSE_MS = 600;
 
@@ -73,31 +76,32 @@ export function IskInput({
   const echoId = useId();
   const errorId = useId();
   const noteId = useContext(FieldNoteContext);
-  const shown = (amount: string) => (mask ? maskIskTyping(amount) : amount);
-  const [text, setText] = useState(shown(value));
+  // A committed value is a plain `1500000.5`, whatever the display mark: it is formatted, not re-read as typed text.
+  const toDisplay = (amount: string) =>
+    mask && amount !== '' && Number.isFinite(Number(amount)) ? maskIsk(Number(amount)) : amount;
+  const [text, setText] = useState(toDisplay(value));
   // The last value this field itself committed: a `value` that differs came
   // from outside (Clear, a URL change) and replaces what was typed.
   const committed = useRef(value);
   useEffect(() => {
     if (value !== committed.current) {
       committed.current = value;
-      setText(shown(value));
+      setText(toDisplay(value));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
   // Typing re-groups the text, which moves the caret: it is put back after the same count of digits.
-  const input = useRef<HTMLInputElement | null>(null);
+  const field = useRef<HTMLInputElement | null>(null);
   const caretDigits = useRef<number | null>(null);
   useLayoutEffect(() => {
-    const el = input.current;
+    const el = field.current;
     const digits = caretDigits.current;
     caretDigits.current = null;
     if (!el || digits === null || document.activeElement !== el) return;
-    const decimal = getDecimalMark();
     let seen = 0;
     let at = 0;
     while (at < text.length && seen < digits) {
-      if (/\d/.test(text[at]) || text[at] === decimal) seen += 1;
+      if (isAmountChar(text[at])) seen += 1;
       at += 1;
     }
     el.setSelectionRange(at, at);
@@ -119,7 +123,7 @@ export function IskInput({
     <div className={`flex flex-col gap-1 ${className}`}>
       <TextInput
         {...rest}
-        ref={input}
+        ref={field}
         type="text"
         inputMode="decimal"
         placeholder={
@@ -144,9 +148,7 @@ export function IskInput({
             const masked = maskIskTyping(next);
             if (masked !== next) {
               const caret = event.target.selectionStart ?? next.length;
-              caretDigits.current = [...next.slice(0, caret)].filter(
-                (ch) => /\d/.test(ch) || ch === getDecimalMark()
-              ).length;
+              caretDigits.current = [...next.slice(0, caret)].filter(isAmountChar).length;
               next = masked;
             }
           }

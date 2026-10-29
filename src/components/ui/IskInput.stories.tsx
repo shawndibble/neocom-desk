@@ -34,5 +34,8 @@ export const Unparseable: Story = { args: { value: 'lots' } };
 /** @summary `echo` off, for a field whose neighbouring figure already shows the result. */
 export const NoEcho: Story = { args: { value: '250m', echo: false } };
 
+/** @summary `mask`: digits group with the display separator as they are typed, so there is no echo; shorthand (`100k`) stays as typed. */
+export const Masked: Story = { args: { value: '50000000', mask: true } };
+
 /** @summary Disabled (§6c States): `opacity-40` and `cursor-not-allowed`. */
 export const Disabled: Story = { args: { value: '250m', disabled: true } };
