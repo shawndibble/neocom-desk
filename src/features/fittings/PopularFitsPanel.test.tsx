@@ -118,13 +118,29 @@ describe('PopularFitsPanel', () => {
     });
   });
 
-  it('opens from a click anywhere on the card, but not from one on a module icon', async () => {
+  it('opens from a click anywhere on the card, a module icon included, with a mouse', async () => {
     const onOpen = renderPanel({ ok: true, fits: [fit('a', 5)] });
     const row = (await screen.findByText('5 losses')).closest('li')!;
     fireEvent.click(within(row).getAllByRole('img')[0]);
-    expect(onOpen).not.toHaveBeenCalled();
-    fireEvent.click(row.firstElementChild!);
     expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(row.firstElementChild!);
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
+  it('under a finger, a tap on a module icon names it instead of opening the card', async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = (query: string) =>
+      ({ ...matchMedia(query), matches: query === '(pointer: coarse)' }) as MediaQueryList;
+    try {
+      const onOpen = renderPanel({ ok: true, fits: [fit('a', 5)] });
+      const row = (await screen.findByText('5 losses')).closest('li')!;
+      fireEvent.click(within(row).getAllByRole('img')[0]);
+      expect(onOpen).not.toHaveBeenCalled();
+      fireEvent.click(row.firstElementChild!);
+      expect(onOpen).toHaveBeenCalledTimes(1);
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 
   it('groups icons by rack and names each module', async () => {
