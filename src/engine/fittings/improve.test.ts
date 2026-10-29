@@ -247,13 +247,17 @@ describe('findImprovements replacing an unflyable module', () => {
     expect(result.tradeOffs).toEqual([]);
   });
 
-  it('ignores the capacitor and Cheaper stat guardrails, but not the fit’s CPU', async () => {
-    const table = { 1: {}, 2: { capUnstable: true, dps: -50 }, 3: { cpu: 999 } };
-    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3)], { 1: 100, 2: 500 });
+  it('ignores the Cheaper stat guardrails, but not the fit’s CPU or a stable capacitor', async () => {
+    const table = { 1: {}, 2: { dps: -50 }, 3: { cpu: 999 }, 4: { capUnstable: true } };
+    const result = await search('cheaper', table, [fix(1, 2), fix(1, 3), fix(1, 4)], {
+      1: 100,
+      2: 500,
+    });
     expect(toIds(result.makeFlyable)).toEqual([2]);
     expect(result.rejected).toEqual([]);
     expect(result.flyableBlocked.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
       [3, 'budget'],
+      [4, 'capStable'],
     ]);
   });
 });

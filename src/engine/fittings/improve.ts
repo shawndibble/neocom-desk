@@ -850,9 +850,11 @@ export async function findImprovements({
       lost: lostStats(before, after),
     };
     const overSpend = overSpendCap(mode, spendCap, fitTotal, iskDelta);
-    // Flying it beats keeping the stats: only the fit's resources and the spend still bind.
+    // Flying it beats keeping the stats: only the fit's resources, a stable capacitor and the spend still bind.
     const broken = brokenGuardrail(goal, before, after, target);
-    const guardrail = (fix && broken !== 'budget' ? null : broken) ?? (overSpend ? 'spend' : null);
+    const guardrail =
+      (fix && broken !== 'budget' && broken !== 'capStable' ? null : broken) ??
+      (overSpend ? 'spend' : null);
     // A fix is its own list: a gain's rejection is "closest swap", a fix's is a greyed row.
     if (guardrail) (fix ? flyableBlocked : rejected).push({ ...option, guardrail });
     else (fix ? flyable : kept).push(option);
