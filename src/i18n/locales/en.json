@@ -710,7 +710,6 @@
       "losses_other": "{{count}} losses",
       "lastSeen": "last seen {{age}}",
       "value": "~<isk/> ISK",
-      "open": "Open",
       "fitName": "{{hullName}} popular fit {{rank}}",
       "sourceLabel": "Popular fits source",
       "tabZkillboard": "zKillboard",
