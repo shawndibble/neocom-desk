@@ -24,6 +24,8 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 | Bounded-concurrency async work against ESI                  | `src/lib/concurrency.ts`, `src/lib/asyncPool.ts`, `src/esi/budget.ts`                                                | `Promise.all` over unbounded input; p-limit       |
 | Fuzzy item-name search                                      | `src/lib/fuzzySearch.ts`                                                                                             | a new Levenshtein                                 |
 | Test data: characters, grants, deferred promises, ESI cache | `src/test/seed.ts`, `src/test/deferred.ts`, `src/esi/cacheFixtures.ts`                                               | per-file `seedCharacter`/`seedGrant`              |
+| A test on a given viewport (a `matchMedia` stub)            | `stubViewport(query)`, `stubNoViewportMatch()` — `src/test/viewport.ts`                                              | a hand-cast `as unknown as MediaQueryList`        |
+| An e2e spec's phone / desktop viewport                      | `PHONE`, `DESKTOP` — `e2e/support/testBase.ts`                                                                       | a per-spec `const PHONE`/`const DESKTOP`          |
 
 ## Dates and times
 
@@ -51,3 +53,6 @@ Not yet migrated; move them to the shared helper when you touch the file.
 - Raw `86_400_000` literals and a local `DAY` in `corp/deadlines.ts`, `market/orderBook.ts`, `netWorth/snapshot.ts`, `ExtractionTimeline.tsx` and others.
 - `src/features/miningTax/paymentLinks.ts` exports a different `utcDay(date: string): number`; do not mistake it for the shared one.
 - Hand-built spinner and inline-error wrappers (96 and 83 sites) where a `Spinner` size option and an `InlineError` primitive do not exist yet.
+- Hand-cast `matchMedia` stubs in 35 test files that `stubViewport` would replace: `src/components/ui/*.test.tsx` (7), the market panels, and the route tests (`Calendar`, `Contacts`, `ContactsStandings`, `Contracts`, `Mail`, `Market`, `Overview`, `Wallet`, `SkillPlans`, `LoyaltyStore`, `IndustryPlanPage`). `Layout.test.tsx` matches every query in one place and `prefers-reduced-motion` in another, and `InstallPrompt.test.tsx` matches every query; the predicate form of `stubViewport` covers all three.
+- `const PHONE = { width: 390, height: 844 }` is still local to four PI specs (`piColonies`, `piPhoneLayout`, `planetaryIndustryFindBest`, `planetaryIndustryNarrow`), left alone while those pages are overhauled.
+- `src/app/loginFlow.dom.test.ts` writes a token row with no `scopes` field at all, which `seedGrant` cannot express; its raw `db.tokens.put` is deliberate.
