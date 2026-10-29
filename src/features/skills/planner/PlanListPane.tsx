@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { Panel, Spinner } from '@/components/ui';
-import { markPlanDeleted, scheduleSync } from '@/sync';
+import { markPlanDeleted, restorePlan, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
   useViewportBoundedHeight,
@@ -194,6 +194,7 @@ export function PlanListPane({
             otherCharacters={otherCharacters}
             onCopyToCharacter={(id, characterId) => void handleCopyToCharacter(id, characterId)}
             onDelete={handleDelete}
+            onRestore={restorePlan}
             onRename={(id, name) => void handleRename(id, name)}
           />
         )}

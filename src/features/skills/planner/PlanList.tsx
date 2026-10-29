@@ -12,6 +12,7 @@ import {
   EmptyState,
   IconButton,
   Modal,
+  Toast,
   TextInput,
   Tooltip,
   useOpenAfterMenu,
@@ -35,6 +36,8 @@ interface PlanListProps {
   planHref: (id: string) => string;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void | Promise<void>;
+  /** Undo of `onDelete`: puts the plan back. */
+  onRestore: (plan: SkillPlanRecord) => void | Promise<void>;
   onRename: (id: string, name: string) => void;
   /** The account's other characters; "Copy to character" shows only when there are any. */
   otherCharacters?: readonly Pick<CharacterRecord, 'characterId' | 'name'>[];
@@ -200,12 +203,13 @@ function PlanRow({
   );
 }
 
-/** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (confirm), rename inline. */
+/** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (with Undo), rename inline. */
 export function PlanList({
   plans,
   planHref,
   onDuplicate,
   onDelete,
+  onRestore,
   onRename,
   otherCharacters = [],
   onCopyToCharacter,
@@ -226,21 +230,25 @@ export function PlanList({
   // The row goes only after the dialog has closed (an awaited delete), so
   // focus is requested once the delete resolves: the next plan's link, else
   // the previous one's, else the panel title.
-  async function confirmDelete() {
-    const target = deletingPlan;
-    setDeletingPlan(null);
-    if (!target) return;
+  async function deletePlan(target: SkillPlanRecord) {
     const index = plans.findIndex((plan) => plan.id === target.id);
     const near = [plans[index + 1], plans[index - 1]].map(
       (plan) => () => (plan ? linkRefs.current.get(plan.id) : null)
     );
     await onDelete(target.id);
+    setUndoToast({
+      message: t('plans.deleted', { name: target.name }),
+      onUndo: () => {
+        setUndoToast(null);
+        void onRestore(target);
+      },
+    });
     // One macrotask on: the dialog's own focus restore (to the row being
     // deleted) runs in a passive effect and must not land after this request.
     await new Promise((resolve) => setTimeout(resolve, 0));
     focusAfterCommit(...near, headingRef);
   }
-  const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
+  const [undoToast, setUndoToast] = useState<{ message: string; onUndo: () => void } | null>(null);
   const [copyingPlan, setCopyingPlan] = useState<SkillPlanRecord | null>(null);
   const canCopy = otherCharacters.length > 0 && onCopyToCharacter !== undefined;
 
@@ -257,7 +265,7 @@ export function PlanList({
               planHref={planHref}
               onDuplicate={onDuplicate}
               onRequestCopy={canCopy ? setCopyingPlan : null}
-              onRequestDelete={setDeletingPlan}
+              onRequestDelete={(plan) => void deletePlan(plan)}
               onRename={onRename}
               stats={stats?.get(plan.id)}
               active={plan.id === activePlanId}
@@ -298,23 +306,14 @@ export function PlanList({
           </Button>
         </div>
       </Modal>
-      <Modal
-        open={deletingPlan !== null}
-        onClose={() => setDeletingPlan(null)}
-        title={t('plans.delete')}
-      >
-        <p className="text-xs text-text-dim">
-          {t('plans.deleteConfirm', { name: deletingPlan?.name ?? '' })}
-        </p>
-        <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setDeletingPlan(null)}>
-            {t('plans.cancel')}
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => void confirmDelete()}>
-            {t('plans.delete')}
-          </Button>
-        </div>
-      </Modal>
+      {undoToast && (
+        <Toast
+          message={undoToast.message}
+          instance={undoToast}
+          undo={{ label: t('plans.undo'), onUndo: undoToast.onUndo }}
+          onClose={() => setUndoToast(null)}
+        />
+      )}
     </div>
   );
 }

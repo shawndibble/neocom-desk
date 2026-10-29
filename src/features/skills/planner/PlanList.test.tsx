@@ -21,38 +21,27 @@ const noop = () => {};
 const planHref = (id: string) => `/skills/plans/${id}`;
 const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
-describe('PlanList delete confirmation (#408: names the plan)', () => {
-  it('names the plan being deleted in the confirmation modal', async () => {
-    render(
-      <PlanList
-        plans={[plan('1', 'Titan pilot')]}
-        planHref={planHref}
-        onDuplicate={noop}
-        onDelete={noop}
-        onRename={noop}
-      />
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for Titan pilot' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    expect(screen.getByText(/delete "titan pilot"/i)).toBeInTheDocument();
-  });
-
-  it('deletes the plan whose row triggered the confirmation, even with multiple plans', async () => {
+describe('PlanList delete (undo toast, no confirmation)', () => {
+  it('deletes the plan whose row was chosen, even with multiple plans, and offers Undo', async () => {
     const onDelete = vi.fn();
+    const onRestore = vi.fn();
+    const beta = plan('2', 'Beta');
     render(
       <PlanList
-        plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
+        plans={[plan('1', 'Alpha'), beta]}
         planHref={planHref}
         onDuplicate={noop}
         onDelete={onDelete}
+        onRestore={onRestore}
         onRename={noop}
       />
     );
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Beta' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    expect(screen.getByText(/delete "beta"/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(onDelete).toHaveBeenCalledWith('2');
+    expect(await screen.findByRole('status')).toHaveTextContent('Deleted "Beta"');
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(onRestore).toHaveBeenCalledWith(beta);
   });
 });
 
@@ -61,6 +50,7 @@ describe('PlanList row stats (#1416)', () => {
     planHref,
     onDuplicate: noop,
     onDelete: noop,
+    onRestore: noop,
     onRename: noop,
   };
 
@@ -88,7 +78,7 @@ describe('PlanList row stats (#1416)', () => {
 });
 
 describe('PlanList copy to character (#1729)', () => {
-  const props = { planHref, onDuplicate: noop, onDelete: noop, onRename: noop };
+  const props = { planHref, onDuplicate: noop, onDelete: noop, onRestore: noop, onRename: noop };
 
   it('hides the action when the account has no other character', async () => {
     const user = userEvent.setup();
@@ -125,6 +115,7 @@ describe('PlanList active plan (#1709)', () => {
         planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
+        onRestore={noop}
         onRename={noop}
       />
     );
@@ -143,6 +134,7 @@ describe('PlanList long name (#2105)', () => {
         planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
+        onRestore={noop}
         onRename={noop}
       />
     );
@@ -161,6 +153,7 @@ describe('PlanList row menu', () => {
         planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
+        onRestore={noop}
         onRename={onRename}
       />
     );
@@ -183,6 +176,7 @@ describe('PlanList row menu', () => {
         planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
+        onRestore={noop}
         onRename={noop}
       />
     );
@@ -199,6 +193,7 @@ describe('PlanList row link (DESIGN.md §6c)', () => {
         planHref={planHref}
         onDuplicate={noop}
         onDelete={noop}
+        onRestore={noop}
         onRename={noop}
       />
     );
@@ -223,6 +218,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
           await Promise.resolve();
           setPlans((current) => current.filter((p) => p.id !== id));
         }}
+        onRestore={noop}
         onRename={noop}
         otherCharacters={[{ characterId: 9, name: 'Other Pilot' }]}
         onCopyToCharacter={noop}
@@ -236,7 +232,6 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Alpha'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Beta/ })).toHaveFocus());
   });
 
@@ -245,7 +240,6 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     render(<Harness initial={[plan('1', 'Alpha'), plan('2', 'Beta')]} />);
     await user.click(moreOf('Beta'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('link', { name: /Alpha/ })).toHaveFocus());
   });
 
@@ -262,17 +256,7 @@ describe('PlanList keyboard focus (WCAG 2.4.3)', () => {
     );
     await user.click(moreOf('Alpha'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Plans' })).toHaveFocus());
-  });
-
-  it('returns focus to the row ⋮ when the delete dialog is cancelled', async () => {
-    const user = userEvent.setup();
-    render(<Harness initial={[plan('1', 'Alpha')]} />);
-    await user.click(moreOf('Alpha'));
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(moreOf('Alpha')).toHaveFocus());
   });
 
   it('returns focus to the row ⋮ after copying to a character', async () => {

@@ -30,13 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  Toast,
   Tooltip,
   Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
-import { useFocusAfterCommit, type FocusCandidate } from '@/lib/useFocusAfterCommit';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { neighbourFocusCandidates, planRowHandle } from './focusNeighbour';
 import { MarketGroupLink } from './MarketGroupLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
@@ -69,7 +70,6 @@ import {
 } from './optimizeHelpers';
 import { OptimizeMenu, type OptimizeMenuItem } from './OptimizeMenu';
 import { OptimizeForMeModal, RemapPreviewModal } from './RemapPreviewModal';
-import { RemoveEntryModal } from './RemoveEntryModal';
 import { MilestoneModal } from './MilestoneModal';
 import type {
   PlanBooster,
@@ -334,23 +334,18 @@ export function PlanEditor({
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
-  // The entry pending a remove confirmation (#408) — an in-app Modal rather
-  // than removing on click, matching the pattern PlanList already uses for
-  // deleting a whole plan (GLOSSARY.md's "an in-app Modal replacing
-  // window.confirm on delete").
-  // The row awaiting the remove-confirm Modal. Skill *and* level: a plan
-  // holds one entry per level, so "which row" needs both.
-  const [removingEntry, setRemovingEntry] = useState<{
-    skillTypeID: number;
-    targetLevel: number;
-  } | null>(null);
+  // A removed entry goes at once, with an Undo toast rather than a confirm
+  // dialog. Scoped to plan.id so a plan switch can't offer an undo for another plan.
+  const [removedToast, setRemovedToast] = useScopedState<{
+    message: string;
+    onUndo: () => void;
+  }>([plan.id]);
   // Focus after a remove goes to a neighbour row, else this heading (WCAG 2.4.3).
   const entriesHeadingRef = useRef<HTMLHeadingElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  // Worked out when the confirm opens, while the row's neighbours are known.
-  const removeFocusRef = useRef<readonly FocusCandidate[]>([]);
   // A ref keeps `requestRemoveEntry` stable, so memoized rows don't re-render on every recompute.
   const mergedRowsRef = useRef<readonly MergedRow[]>([]);
+  const editableRef = useRef<SkillPlanEditable>({ entries: [] });
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -759,6 +754,7 @@ export function PlanEditor({
   );
   useEffect(() => {
     mergedRowsRef.current = mergedRows;
+    editableRef.current = editable;
   });
   const bandsAt = useMemo<ReadonlyMap<string, BandInfo>>(() => {
     if (groupingMode === 'attributePair') {
@@ -1185,27 +1181,34 @@ export function PlanEditor({
     [editable, mergedRows, onUpdate, confirmPromotion, setDropError, focusAfterCommit]
   );
 
-  /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
-  const requestRemoveEntry = useCallback((skillTypeID: number, targetLevel: number) => {
-    removeFocusRef.current = neighbourFocusCandidates(
-      mergedRowsRef.current,
-      `${skillTypeID}-${targetLevel}`,
-      entriesHeadingRef
-    );
-    setRemovingEntry({ skillTypeID, targetLevel });
-  }, []);
-
-  /** The confirm Modal's Remove button: the removal `onRemove` used to do inline before #408. */
-  const confirmRemoveEntry = useCallback(() => {
-    if (removingEntry === null) return;
-    const { skillTypeID, targetLevel } = removingEntry;
-    const landing = removeFocusRef.current;
-    const saved = onUpdate(removeEntry(editable, skillTypeID, targetLevel));
-    setRemovingEntry(null);
-    // The save is async, so the row can outlive the dialog: once it has
-    // landed, move focus again (the dialog hands it back to the gone ⋮).
-    void Promise.resolve(saved).then(() => focusAfterCommit(...landing));
-  }, [removingEntry, editable, onUpdate, focusAfterCommit]);
+  /** EntryList's `onRemove`: removes at once and offers Undo, which restores the plan as it was. */
+  const requestRemoveEntry = useCallback(
+    (skillTypeID: number, targetLevel: number) => {
+      const before = editableRef.current;
+      const landing = neighbourFocusCandidates(
+        mergedRowsRef.current,
+        `${skillTypeID}-${targetLevel}`,
+        entriesHeadingRef
+      );
+      const snapshot: Required<SkillPlanEditable> = {
+        entries: before.entries,
+        markers: before.markers ?? [],
+        markerAttributes: before.markerAttributes ?? [],
+      };
+      const saved = onUpdate(removeEntry(before, skillTypeID, targetLevel));
+      setRemovedToast({
+        message: t('plans.entryRemoved', { name: levelLabel(skillTypeID, targetLevel) }),
+        onUndo: () => {
+          setRemovedToast(null);
+          void onUpdate(snapshot);
+        },
+      });
+      // The save is async, so the row can outlive the click: once it has
+      // landed, move focus off the gone ⋮.
+      void Promise.resolve(saved).then(() => focusAfterCommit(...landing));
+    },
+    [onUpdate, focusAfterCommit, setRemovedToast, levelLabel, t]
+  );
 
   const handleRemoveMarker = useCallback(
     (markerIndex: number) => {
@@ -2110,13 +2113,14 @@ export function PlanEditor({
         onSave={submitMilestoneModal}
       />
 
-      <RemoveEntryModal
-        removing={removingEntry}
-        nameFor={nameFor}
-        focusRef={removeFocusRef}
-        onClose={() => setRemovingEntry(null)}
-        onConfirm={confirmRemoveEntry}
-      />
+      {removedToast && (
+        <Toast
+          message={removedToast.message}
+          instance={removedToast}
+          undo={{ label: t('plans.undo'), onUndo: removedToast.onUndo }}
+          onClose={() => setRemovedToast(null)}
+        />
+      )}
     </>
   );
 }
