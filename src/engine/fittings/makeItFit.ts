@@ -164,7 +164,12 @@ export async function findFitSwaps({
         accepted.push(option);
       }
     }
-    return { options: rankFitOptions(before, accepted), nothingFits: accepted.length === 0 };
+    // Cheapest first, an unpriced swap last: the caller keeps only the first few.
+    accepted.sort((a, b) => {
+      if ((a.iskDelta === null) !== (b.iskDelta === null)) return a.iskDelta === null ? 1 : -1;
+      return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
+    });
+    return { options: accepted, nothingFits: accepted.length === 0 };
   }
 
   const singles: FitOption[] = [];

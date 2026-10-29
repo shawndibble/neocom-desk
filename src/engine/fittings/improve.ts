@@ -978,6 +978,7 @@ export async function findImprovements({
       }
       const swaps = compensators(seed.candidate);
       if (swaps.length === 0) continue;
+      const forCapacitor = seed.guardrail === 'capStable';
       let found: Awaited<ReturnType<typeof findFitSwaps>>;
       try {
         found = await findFitSwaps({
@@ -987,7 +988,7 @@ export async function findImprovements({
           stats,
           priceOf,
           isCancelled,
-          ...(seed.guardrail === 'capStable' ? { accepts: capacitorHolds } : {}),
+          ...(forCapacitor ? { accepts: capacitorHolds } : {}),
         });
       } catch {
         // A failed search leaves the fix greyed with its reason; it must not end the whole search.
@@ -1000,11 +1001,7 @@ export async function findImprovements({
       for (const option of found.options.slice(0, FLYABLE_PER_FIX))
         taken.push(
           await take(
-            bundleOf(
-              seed.candidate,
-              option.swaps,
-              seed.guardrail === 'capStable' ? 'capacitor' : 'budget'
-            ),
+            bundleOf(seed.candidate, option.swaps, forCapacitor ? 'capacitor' : 'budget'),
             option.fitting,
             option.after
           )
