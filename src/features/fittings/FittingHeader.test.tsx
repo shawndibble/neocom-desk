@@ -87,6 +87,14 @@ describe('FittingHeader on desktop', () => {
     expect(onImprove).toHaveBeenCalledOnce();
   });
 
+  it('calls the Improve button Fix Fit while the pilot cannot fly a fitted module', async () => {
+    const onImprove = vi.fn();
+    renderHeader({ onImprove, unflyable: true });
+    expect(screen.queryByRole('button', { name: 'Improve' })).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Fix Fit' }));
+    expect(onImprove).toHaveBeenCalledOnce();
+  });
+
   it('copies the headline stats from the ⋮ menu and says so', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {

@@ -1360,6 +1360,8 @@
     "improve": {
       "menuItem": "Improve Fit",
       "button": "Improve",
+      "fixMenuItem": "Fix Fit",
+      "fixButton": "Fix Fit",
       "title": "Improve Fit",
       "goalLabel": "Improve Goal",
       "goal": {
