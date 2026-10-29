@@ -115,6 +115,23 @@ export function moveLine(
       rangeAfter: m3sFormat(now.range / 1000),
     });
   }
+  if (goal === 'explore') {
+    const [was, now] = [own.explore, option.after.explore];
+    return t('fittings.improve.exploreLine', {
+      strengthBefore: m3sFormat(was.hacking.strength),
+      strengthAfter: m3sFormat(now.hacking.strength),
+      coherenceBefore: m3sFormat(was.hacking.coherence),
+      coherenceAfter: m3sFormat(now.hacking.coherence),
+      cycleBefore: m3sFormat(was.hacking.cycleSeconds),
+      cycleAfter: m3sFormat(now.hacking.cycleSeconds),
+      scanBefore: m3sFormat(was.scanning.strength),
+      scanAfter: m3sFormat(now.scanning.strength),
+      durationBefore: m3sFormat(was.scanning.duration),
+      durationAfter: m3sFormat(now.scanning.duration),
+      deviationBefore: m3sFormat(was.scanning.deviation),
+      deviationAfter: m3sFormat(now.scanning.deviation),
+    });
+  }
   if (goal === 'align') return align();
   if (goal === 'warp')
     return t('fittings.improve.warpLine', {

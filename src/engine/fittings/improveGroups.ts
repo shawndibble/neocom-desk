@@ -36,6 +36,15 @@ const REACH_GROUPS: readonly number[] = [211, 213, 212, 775, 776, 777];
 /** Afterburner and Microwarpdrive, Inertial Stabilizers, Nanofiber, Overdrive Injector, Hyperspatial rigs. */
 const SPEED_GROUPS: readonly number[] = [46, 762, 763, 764, 782];
 
+/** Data and Relic Analyzer 538, Scan Rangefinding and Pinpointing Array 1223, Scan Acquisition Array 1238, Survey Scanner 49, scanning rigs 1233 (the Memetic, Emission, Gravity and Signal rigs), then the speed groups. */
+const EXPLORE_GROUPS: readonly number[] = [538, 1223, 1238, 49, 1233, ...SPEED_GROUPS];
+
+/** The rigs Explore better swaps a surplus CPU or powergrid rig for: scanning and hacking rigs, and the navigation rigs that speed or align. */
+export const EXPLORE_RIG_GROUPS: readonly number[] = [1233, 782];
+
+/** Engineering rigs (Processor Overclocking Unit, Ancillary Current Router, capacitor rigs): the CPU, powergrid and capacitor rigs a fit may not need. A needed capacitor rig is held by the capacitor Guardrail. */
+export const RESOURCE_RIG_GROUPS: readonly number[] = [781];
+
 /** Cap Recharger, Capacitor Power Relay, Capacitor Flux Coil, capacitor rigs. */
 const CAP_GROUPS: readonly number[] = [43, 767, 768, 781];
 
@@ -80,6 +89,7 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   tackle: TACKLE_GROUPS,
   ewar: EWAR_GROUPS,
   command: COMMAND_GROUPS,
+  explore: EXPLORE_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -180,6 +190,7 @@ export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'tackle') return ['scram', 'web'];
   if (goal === 'ewar') return ['ewar'];
   if (goal === 'command') return ['fleet'];
+  // Explore better scores no job: the score cannot see a lost probe launcher, so every explorer module stays guarded.
   return [];
 }
 
