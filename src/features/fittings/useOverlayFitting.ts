@@ -35,10 +35,11 @@ export function useOverlayFitting({
   const conditions = useStatsConditions();
 
   // A Fitting belongs to one Character.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
+  const [selectedFor, setSelectedFor] = useState(characterId);
+  if (selectedFor !== characterId) {
+    setSelectedFor(characterId);
     setSelectedId(null);
-  }, [characterId]);
+  }
 
   const choiceId = choices.all.find((c) => c.id === selectedId)?.id ?? null;
   const { resolve } = choices;
