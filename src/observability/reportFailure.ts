@@ -162,11 +162,12 @@ export function isClosedDatabaseEvent(event: {
 }
 
 // A bare `AbortError`, or WebKit's wording for a transaction killed under a reader.
-const STRAY_IDB_REJECTION =
+const STRAY_REJECTION_VALUE =
   /^(Error: )?(AbortError\b|UnknownError: Attempt to get a record from database without an in-progress transaction)/;
 
 /**
- * `beforeSend`'s filter for a bare `AbortError` that reaches the global
+ * `beforeSend`'s filter for a bare `AbortError` (or WebKit's "without an
+ * in-progress transaction" IndexedDB rejection) that reaches the global
  * unhandled-rejection handler: a fetch or Firestore stream cancelled by a
  * navigation, a tab going to the background or Safari dropping the connection.
  * It has no stack and names nothing, and `isNetworkFailure` already treats the
@@ -180,7 +181,7 @@ export function isStrayAbortEvent(event: {
     event.exception?.values?.some(
       (v) =>
         v.mechanism?.type === 'auto.browser.global_handlers.onunhandledrejection' &&
-        STRAY_IDB_REJECTION.test(v.value ?? '')
+        STRAY_REJECTION_VALUE.test(v.value ?? '')
     ) ?? false
   );
 }
