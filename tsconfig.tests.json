@@ -1,0 +1,31 @@
+{
+  // Everything that is not shipped code: unit tests, stories, e2e, rules tests
+  // and the tool configs. It reads `src` through the reference, not the source.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.cache/tsc/tests.tsbuildinfo"
+  },
+  "references": [{ "path": "./tsconfig.src.json" }],
+  "include": [
+    // Ambient globals (`__APP_RELEASE__` ...) do not cross a project reference.
+    "src/vite-env.d.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**/*",
+    "src/**/test-helpers.ts",
+    "src/**/*.stories.tsx",
+    ".storybook",
+    "e2e",
+    "vite.config.ts",
+    "vitest.setup.ts",
+    // Carries the `@testing-library/jest-dom/vitest` import, and with it the
+    // matcher type augmentations every `.test.tsx` relies on. Dropping it
+    // from the program makes `toBeInTheDocument` an error everywhere.
+    "vitest.setup.dom.ts",
+    "playwright.config.ts",
+    "vitest.rules.config.ts",
+    "rules-tests"
+  ]
+}
