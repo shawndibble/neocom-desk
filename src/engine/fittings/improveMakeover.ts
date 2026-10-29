@@ -30,14 +30,14 @@ import {
   type LostStat,
   type ModulePool,
 } from './improve';
+import { jobOf, reworkGroups, TANK_GOALS, TANK_GROUPS, UNIQUE_GROUPS } from './improveGroups';
 import {
-  jobOf,
-  scoredJobs,
-  reworkGroups,
-  TANK_GOALS,
-  TANK_GROUPS,
-  UNIQUE_GROUPS,
-} from './improveGroups';
+  HELD_EVERY_COPY,
+  holdsTankModules,
+  unguardedJobs,
+  type ExploreSpace,
+  type ImproveJob,
+} from './improveJob';
 import { overageOf, RESOURCES, usedOf, type Resource } from './makeItFit';
 import { newRuleBreaks } from './ruleBreaks';
 import { fitsResourceBudget } from './skillGaps';
@@ -51,6 +51,10 @@ export interface MakeoverMoveOptions {
   goal: ImproveGoal;
   defense: DefenseChoice;
   includeRigs: boolean;
+  /** The Improve Job: its freed jobs may go. Absent: today's guard. */
+  job?: ImproveJob;
+  /** Explore's space: Dangerous keeps tank modules tank modules. */
+  space?: ExploreSpace;
   /** Market-listed, hull and skill checks, and the groups' members. */
   pool: ModulePool;
   /** The hull's slots per rack, to find the empty ones; absent: no fills. */
@@ -77,11 +81,13 @@ export function makeoverMoves(
   modules: readonly FittingModule[],
   index: VariationIndex,
   rackOf: Readonly<Record<string, string>>,
-  { goal, defense, includeRigs, pool, slotCounts }: MakeoverMoveOptions
+  { goal, defense, includeRigs, pool, slotCounts, job, space }: MakeoverMoveOptions
 ): ImproveCandidate[] {
   const groupOf = pool.groupOf;
   const goalGroups = reworkGroups(goal, defenseSides(modules, groupOf, defense));
-  const scored = scoredJobs(goal);
+  const scored = unguardedJobs(goal, job);
+  const heldWhole = job ? HELD_EVERY_COPY[job] : [];
+  const holdsTank = holdsTankModules(job, space);
   const freesTank = defense !== 'keep' && TANK_GOALS.has(goal);
   const usesRack = (slot: FittingSlotKind) =>
     slot !== 'subsystem' && (slot !== 'rig' || includeRigs);
@@ -134,10 +140,14 @@ export function makeoverMoves(
     seen.add(`${slot}:${fromTypeId}`);
     const from = groupOf(fromTypeId);
     const job = jobOf(from);
-    const lastOfJob = job !== null && !scored.includes(job) && (jobsFitted.get(job) ?? 0) <= 1;
+    const lastOfJob =
+      job !== null &&
+      !scored.includes(job) &&
+      ((jobsFitted.get(job) ?? 0) <= 1 || heldWhole.includes(job));
     const offered = new Set<number>([fromTypeId]);
     for (const group of new Set([...(from === undefined ? [] : [from]), ...goalGroups])) {
       if ((lastOfJob && jobOf(group) !== job) || !allowed(group, from)) continue;
+      if (holdsTank && TANK_GROUPS.has(from ?? -1) && !TANK_GROUPS.has(group)) continue;
       for (const toTypeId of representatives(group, slot)) {
         if (offered.has(toTypeId)) continue;
         offered.add(toTypeId);
@@ -189,6 +199,9 @@ export interface FindMakeoverParams {
   priceOf: (typeId: number) => number | null;
   target?: TargetProfile;
   hold?: ImproveHold;
+  /** The Improve Job (and for Explore, its space): Best overall's weights, and its drop limits on every step and the final fit. */
+  job?: ImproveJob;
+  space?: ExploreSpace;
   /** The total fit price may not pass it. Null: no limit. */
   iskBudget?: number | null;
   fitTotal?: number | null;
@@ -283,6 +296,8 @@ export async function findMakeover({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
+  job,
+  space,
   iskBudget = null,
   fitTotal = null,
   bestSingle: givenSingle,
@@ -298,10 +313,11 @@ export async function findMakeover({
   let stopped = false;
   const minGain = goal === 'cheaper' ? 0 : EPSILON;
   const scoreAt = (after: FittingStats, isk: number | null) =>
-    scoreOf(goal, before, after, isk, target, hold);
+    scoreOf(goal, before, after, isk, target, hold, job);
   const passes = (after: FittingStats, isk: number | null) =>
     newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length === 0 &&
-    brokenGuardrail(goal, before, after, target) === null &&
+    brokenGuardrail(goal, before, after, target, undefined, { job, space, makeover: true }) ===
+      null &&
     !overIskBudget(iskBudget, fitTotal, isk);
 
   /** Whether the next calculation may start; false once cancelled, stopped or at the cap (the last of it is kept for the result). */

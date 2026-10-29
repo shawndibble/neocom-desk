@@ -290,9 +290,13 @@ export function roleChanges(before: FittingStats, after: FittingStats): RoleChan
  * miner or other unarmed fit, align time and the like are what keep it
  * alive, so every metric counts whole.
  */
-export function gainMetrics(before: FittingStats, after: FittingStats): GainMetrics {
+export function gainMetrics(
+  before: FittingStats,
+  after: FittingStats,
+  weights?: JobOverallWeights
+): GainMetrics {
   const metrics = rawMetrics(before, after);
-  const weight = overallWeight(before, after);
+  const weight = overallWeight(before, after, weights);
   const overall = GAIN_METRICS.reduce((sum, metric) => sum + metrics[metric] * weight(metric), 0);
   return { overall, ...metrics };
 }
@@ -303,10 +307,14 @@ export function gainMetrics(before: FittingStats, after: FittingStats): GainMetr
  * first repair module on a buffer fit as +100% (scope decision
  * `20261029-145716-improve-overall-scores-sustained-tank-not-repair-from`).
  */
-export function improveOverall(before: FittingStats, after: FittingStats): number {
-  const { overall, activeTank: repair } = gainMetrics(before, after);
+export function improveOverall(
+  before: FittingStats,
+  after: FittingStats,
+  weights?: JobOverallWeights
+): number {
+  const { overall, activeTank: repair } = gainMetrics(before, after, weights);
   const sustained = relative(before.tank.sustainedEffective, after.tank.sustainedEffective);
-  return overall + (sustained - repair) * overallWeight(before, after)('activeTank');
+  return overall + (sustained - repair) * overallWeight(before, after, weights)('activeTank');
 }
 
 function rawMetrics(before: FittingStats, after: FittingStats): Record<GainMetric, number> {
@@ -326,12 +334,18 @@ function rawMetrics(before: FittingStats, after: FittingStats): Record<GainMetri
   };
 }
 
+/** An Improve Job's multipliers (`overallWeightsOf`): they replace `OVERALL_WEIGHTS`, armed fit or not. */
+export type JobOverallWeights = Partial<Record<GainMetric, number>>;
+
 /** The weight `overall` gives each metric for this swap; see `gainMetrics`. */
-function overallWeight(before: FittingStats, after: FittingStats) {
+function overallWeight(before: FittingStats, after: FittingStats, jobWeights?: JobOverallWeights) {
   const flipped = before.capacitor.stable !== after.capacitor.stable;
   const weighted = isArmed(before);
-  return (metric: GainMetric) =>
-    !weighted || (metric === 'capacitor' && flipped) ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
+  return (metric: GainMetric) => {
+    if (metric === 'capacitor' && flipped) return 1;
+    if (jobWeights) return jobWeights[metric] ?? 1;
+    return !weighted ? 1 : (OVERALL_WEIGHTS[metric] ?? 1);
+  };
 }
 
 /**
