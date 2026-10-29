@@ -1463,6 +1463,7 @@
       "broke": {
         "budget": "Goes over CPU, powergrid or calibration",
         "capStable": "Makes the capacitor unstable",
+        "keepsTank": "Loses more than half of the sustained tank",
         "keepsStats": "Loses more than 10% of damage, tank or speed",
         "spend": "Costs more than your budget",
         "spendBudget": "Over your {{cap}} budget by {{over}}"
