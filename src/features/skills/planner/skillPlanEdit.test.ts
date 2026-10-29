@@ -26,6 +26,7 @@ import {
   alignedMarkerAttributes,
   removeEntry,
   removeRemapMarker,
+  removeTrainedEntries,
   replaceWithImport,
   setPriority,
   setRemapMarkerAttributes,
@@ -434,5 +435,60 @@ describe('splitByLevel', () => {
 
   it('returns null when every entry is already one level', () => {
     expect(splitByLevel(plan({ markers: [1] }), SKILLS, NO_TRAINED)).toBeNull();
+  });
+});
+
+describe('removeTrainedEntries', () => {
+  const trained = (levels: Record<number, number>) =>
+    new Map<number, TrainedSkill>(
+      Object.entries(levels).map(([id, level]) => [Number(id), { level, sp: 0 }])
+    );
+
+  it('drops every row the character already has, by level, and counts them', () => {
+    const edit = removeTrainedEntries(
+      { entries: [entry(1, 1), entry(1, 2), entry(1, 3), entry(2, 1)] },
+      trained({ 1: 2 })
+    );
+    expect(edit?.patch).toEqual({ entries: [entry(1, 3), entry(2, 1)] });
+    expect(edit?.removed).toBe(2);
+  });
+
+  it('is null when nothing in the plan is trained, so no write is made', () => {
+    expect(removeTrainedEntries(plan(), trained({ 9: 5 }))).toBeNull();
+  });
+
+  it('keeps each Remap Marker in front of the same surviving entry, with its attributes', () => {
+    // Markers before entry 2 and entry 3; entry 1 is trained and goes.
+    const edit = removeTrainedEntries(
+      plan({ markers: [1, 2], markerAttributes: [A, B] }),
+      trained({ 1: 1 })
+    );
+    expect(edit?.patch).toEqual({
+      entries: [entry(2), entry(3)],
+      markers: [0, 1],
+      markerAttributes: [A, B],
+    });
+  });
+
+  it('collapses markers that end up in the same place, the first one keeping its attributes', () => {
+    // Markers before entries 2 and 3; entry 2 is trained, so both land before entry 3.
+    const edit = removeTrainedEntries(
+      plan({ markers: [1, 2], markerAttributes: [A, B] }),
+      trained({ 2: 1 })
+    );
+    expect(edit?.patch).toEqual({
+      entries: [entry(1), entry(3)],
+      markers: [1],
+      markerAttributes: [A],
+    });
+  });
+
+  it('returns the plan as it was, for Undo', () => {
+    const before = plan({ markers: [1], markerAttributes: [A] });
+    expect(removeTrainedEntries(before, trained({ 3: 1 }))?.undo).toEqual({
+      entries: before.entries,
+      markers: [1],
+      markerAttributes: [A],
+    });
   });
 });
