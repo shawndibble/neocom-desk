@@ -43,6 +43,8 @@ import {
   broadcastEveTypeChannelPref,
   broadcastAllEveTypesChannelPref,
   setDeviceNotificationPrefs,
+  setMutedForCharacters,
+  setFeedMutedForCharacters,
   withCharacterEventThreshold as withThreshold,
 } from './preferences';
 import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
@@ -686,5 +688,76 @@ describe('Projection rebuild scheduling (issue #1259 follow-up)', () => {
     await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, true));
     await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, true));
     expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+});
+
+describe('setMutedForCharacters (Stop these alerts in the alerts panel)', () => {
+  const stored = () => useNotificationPreferences.getState().value;
+  const onFor = (characterId: number, eventId: NotificationEventId, channel: 'browser' | 'feed') =>
+    isEventEnabledFor(characterEventPrefs(stored(), characterId), eventId, channel);
+
+  it('turns an event off on both channels for every character it is given', async () => {
+    await setMutedForCharacters([1, 2, 3], { kind: 'event', eventId: EVENT_A }, true);
+
+    for (const id of [1, 2, 3]) {
+      expect(onFor(id, EVENT_A, 'browser')).toBe(false);
+      expect(onFor(id, EVENT_A, 'feed')).toBe(false);
+      // Only that event: a sibling is untouched.
+      expect(onFor(id, EVENT_B, 'feed')).toBe(true);
+    }
+  });
+
+  it('sets rather than toggles: a channel already off stays off', async () => {
+    await toggleEventChannelPref(1, DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(onFor(1, EVENT_A, 'browser')).toBe(false);
+
+    await setMutedForCharacters([1, 2], { kind: 'event', eventId: EVENT_A }, true);
+
+    expect(onFor(1, EVENT_A, 'browser')).toBe(false);
+    expect(onFor(1, EVENT_A, 'feed')).toBe(false);
+    expect(onFor(2, EVENT_A, 'browser')).toBe(false);
+    expect(onFor(2, EVENT_A, 'feed')).toBe(false);
+  });
+
+  it('mutes an EVE notification type on both channels for every character', async () => {
+    await setMutedForCharacters([1, 2], { kind: 'eveType', type: TYPE_A }, true);
+
+    for (const id of [1, 2]) {
+      const prefs = characterEveTypePrefs(stored(), id);
+      expect(isEveTypeEnabledFor(prefs, TYPE_A, 'browser')).toBe(false);
+      expect(isEveTypeEnabledFor(prefs, TYPE_A, 'feed')).toBe(false);
+      expect(isEveTypeEnabledFor(prefs, TYPE_B, 'feed')).toBe(true);
+    }
+  });
+
+  it('turns a muted event back on when asked to unmute', async () => {
+    await setMutedForCharacters([1, 2], { kind: 'event', eventId: EVENT_A }, true);
+    await setMutedForCharacters([1, 2], { kind: 'event', eventId: EVENT_A }, false);
+
+    for (const id of [1, 2]) {
+      expect(onFor(id, EVENT_A, 'browser')).toBe(true);
+      expect(onFor(id, EVENT_A, 'feed')).toBe(true);
+    }
+  });
+
+  it('writes nothing when every character is already in the asked state', async () => {
+    await setMutedForCharacters([1], { kind: 'event', eventId: EVENT_A }, false);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('a browser-only mute never reaches the synced setting; a feed mute does', async () => {
+    await setMutedForCharacters([1], { kind: 'event', eventId: EVENT_A }, true, ['browser']);
+    expect(onFor(1, EVENT_A, 'browser')).toBe(false);
+    expect(onFor(1, EVENT_A, 'feed')).toBe(true);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+
+    await setMutedForCharacters([1], { kind: 'event', eventId: EVENT_A }, true);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('setFeedMutedForCharacters still touches the feed channel alone', async () => {
+    await setFeedMutedForCharacters([1], { kind: 'event', eventId: EVENT_A }, true);
+    expect(onFor(1, EVENT_A, 'feed')).toBe(false);
+    expect(onFor(1, EVENT_A, 'browser')).toBe(true);
   });
 });
