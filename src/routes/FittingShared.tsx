@@ -306,6 +306,7 @@ export function FittingShareView({
                 moduleResults={stats?.modules ?? null}
                 hardpointsUsed={hardpoints.used}
                 hardpointKindOf={hardpoints.kindOf}
+                typeName={typeName ?? ((typeId) => `#${typeId}`)}
               />
               {typeName !== null && (
                 <FittingModuleList
