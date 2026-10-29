@@ -133,10 +133,11 @@ export async function writeOpenPricesToR2(
         const merged = merge(item, existing, item.days);
         // Key order follows the stored order when nothing changed, so a plain stringify compare is safe;
         // a reordered-but-equal object just costs one extra put.
-        if (existing !== null && JSON.stringify(existing) === JSON.stringify(merged)) {
+        const body = JSON.stringify(merged);
+        if (existing !== null && JSON.stringify(existing) === body) {
           skipped += 1;
         } else {
-          await io.put(key, gzipSync(JSON.stringify(merged)), OPEN_PRICES_HEADERS);
+          await io.put(key, gzipSync(body), OPEN_PRICES_HEADERS);
           written += 1;
           onProgress?.(written);
         }
