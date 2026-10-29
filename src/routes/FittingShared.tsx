@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly } from '@/lib/timestamp';
 import { useTranslation } from 'react-i18next';
 import { onReconnect, useOnline } from '@/stores/network';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
@@ -233,7 +233,7 @@ export function FittingShareView({
           <StatChips>
             <StatChip
               label={t('fittingShare.expiresLabel')}
-              value={formatTimestamp(new Date(expiresAt), timeZone)}
+              value={formatDateOnly(new Date(expiresAt), timeZone)}
             />
           </StatChips>
         )

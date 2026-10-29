@@ -27,7 +27,7 @@ interface ShareShellProps {
   wide?: boolean;
   /** A note for a signed-out visitor. On a `wide` page it fills the strip beside the page's `actions`. */
   notice?: ReactNode;
-  /** Quiet header facts beside the login, on `wide` pages (a link's expiry). */
+  /** Quiet header facts after the title, on `wide` pages (a link's expiry). */
   meta?: ReactNode;
   /** Beside the notice strip, on `wide` pages (the shared Fitting's ship and name). */
   lead?: ReactNode;
@@ -113,10 +113,8 @@ export function ShareShell({
           >
             {title}
           </h1>
-          <span className="ml-auto flex items-center gap-3">
-            {meta}
-            {signedOut ? loginControls : openInAppLink}
-          </span>
+          {meta !== undefined && <span className="border-l border-line pl-4">{meta}</span>}
+          <span className="ml-auto">{signedOut ? loginControls : openInAppLink}</span>
         </header>
 
         <main className="flex flex-1 flex-col gap-4">
