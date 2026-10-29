@@ -25,7 +25,7 @@ interface ShareShellProps {
   openInApp?: OpenInApp;
   /** Widens the frame for a page that lays out two columns; the other share pages stay a single narrow one. */
   wide?: boolean;
-  /** A signed-out visitor's login sits beside this note, in one strip, instead of in the header. */
+  /** A note for a signed-out visitor. Setting it moves their login out of the header into one strip beside the note. */
   notice?: ReactNode;
   children: ReactNode;
 }
@@ -90,9 +90,8 @@ export function ShareShell({
           {t('share.brand')}
         </Link>
         {signedOut ? (
-          notice === undefined ? (
-            loginControls
-          ) : null
+          // With a `notice`, the login sits in the strip below instead.
+          notice === undefined && loginControls
         ) : (
           <Link
             to={target.path}

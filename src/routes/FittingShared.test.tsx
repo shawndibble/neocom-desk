@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -104,6 +104,12 @@ describe('FittingShared', () => {
     expect(screen.getByRole('link', { name: /Neocom Desk/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Choose permissions/ })).toBeInTheDocument();
+    // The login rides in the notice strip, not the header.
+    expect(
+      within(screen.getByRole('link', { name: /Neocom Desk/ }).closest('header')!).queryByRole(
+        'button'
+      )
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Open in Neocom Desk' })).not.toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Copy Fitting' }));

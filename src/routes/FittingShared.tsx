@@ -174,7 +174,7 @@ export function FittingShareView({
   // Same frame as the ready page, so a stored link does not swap frames while the count loads.
   if (characterCount === undefined) {
     return (
-      <ShareShell title={t('fittingShare.title')}>
+      <ShareShell title={t('fittingShare.title')} wide>
         <div className="flex justify-center py-10">
           <Spinner label={t('common.loading')} />
         </div>
@@ -212,40 +212,42 @@ export function FittingShareView({
       wide
       notice={t('fittingShare.banner')}
       actions={
-        <span className="flex items-center gap-3">
-          {expiresAt !== undefined && (
-            <StatChips>
-              <StatChip
-                label={t('fittingShare.expiresLabel')}
-                value={formatTimestamp(new Date(expiresAt), timeZone)}
-              />
-            </StatChips>
-          )}
-          {state.status === 'ready' && (
-            <>
-              {/* Absolutely positioned, so it adds no flex gap. */}
-              <LiveStatus announceKey={copyCount}>
-                {copied
-                  ? t('fittingShare.copied')
-                  : copyFailed
-                    ? t('fittingShare.copyFailed')
-                    : null}
-              </LiveStatus>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => void copyEft()}
-                disabled={typeName === null}
-              >
-                {copied
-                  ? t('fittingShare.copied')
-                  : copyFailed
-                    ? t('fittingShare.copyFailed')
-                    : t('fittingShare.copyEft')}
-              </Button>
-            </>
-          )}
-        </span>
+        expiresAt === undefined && state.status !== 'ready' ? undefined : (
+          <span className="flex items-center gap-3">
+            {expiresAt !== undefined && (
+              <StatChips>
+                <StatChip
+                  label={t('fittingShare.expiresLabel')}
+                  value={formatTimestamp(new Date(expiresAt), timeZone)}
+                />
+              </StatChips>
+            )}
+            {state.status === 'ready' && (
+              <>
+                {/* Absolutely positioned, so it adds no flex gap. */}
+                <LiveStatus announceKey={copyCount}>
+                  {copied
+                    ? t('fittingShare.copied')
+                    : copyFailed
+                      ? t('fittingShare.copyFailed')
+                      : null}
+                </LiveStatus>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => void copyEft()}
+                  disabled={typeName === null}
+                >
+                  {copied
+                    ? t('fittingShare.copied')
+                    : copyFailed
+                      ? t('fittingShare.copyFailed')
+                      : t('fittingShare.copyEft')}
+                </Button>
+              </>
+            )}
+          </span>
+        )
       }
     >
       {/* Always mounted: Retry unmounts while the code resolves again, and focus waits here. */}
@@ -315,7 +317,7 @@ export function FittingShareView({
                 />
               )}
             </div>
-            <div className="min-w-0 lg:flex-1">
+            <div className="min-w-0 lg:min-w-80 lg:flex-1">
               <FittingStatsSections
                 abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
                 statsWeatherTypeId={statsWeatherTypeId}
