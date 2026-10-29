@@ -1,3 +1,4 @@
+import { MINUTE_MS, HOUR_MS } from '@/lib/age';
 /**
  * Sovereignty raid windows (issues #4775, #4798): pure maths over a skyhook's theft
  * window or a sov hub's vulnerability window, plus how long a hub's reagent
@@ -75,7 +76,7 @@ export function liveRaids<T extends { key: string; window: RaidWindow | null }>(
 }
 
 /** The theft link takes ten minutes, so a window with less than this left is closing. */
-export const THEFT_LINK_MS = 10 * 60_000;
+export const THEFT_LINK_MS = 10 * MINUTE_MS;
 
 /** An open window with under `THEFT_LINK_MS` left. */
 export function closingSoon(window: RaidWindow, nowMs: number): boolean {
@@ -126,5 +127,5 @@ export function hubReagentsRunOutMs(bay: {
   updatedMs: number;
 }): number | null {
   if (bay.burningPerHour <= 0) return null;
-  return bay.updatedMs + (bay.amount / bay.burningPerHour) * 3_600_000;
+  return bay.updatedMs + (bay.amount / bay.burningPerHour) * HOUR_MS;
 }

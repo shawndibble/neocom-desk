@@ -50,6 +50,8 @@ import { journalCoverageDays, withinRange } from './chartSeries';
 import { dayTitle, rollingTitles } from './chartTips';
 import type { ListRow, NumberModel, RowDetailModel, TableCell } from './types';
 import { formatNumber } from '@/lib/numberLocale';
+import { utcDay } from '@/engine/localDay';
+import { DAY_MS } from '@/lib/age';
 
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
@@ -782,7 +784,7 @@ const routeSafety: Builder = (feeds, { t, now }) => {
 const KILLS_PATH = '/travel/pilot';
 /** Newest killmails the table lists. */
 const KILLS_TABLE_ROWS = 25;
-const KILLS_DAY_MS = 86_400_000;
+const KILLS_DAY_MS = DAY_MS;
 
 const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) => {
   const feed = feeds.kills;
@@ -820,7 +822,7 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
   const perDay = new Map<string, number>();
   const lossesPerDay = new Map<string, number>();
   for (const entry of inRange) {
-    const day = new Date(entry.timeMs).toISOString().slice(0, 10);
+    const day = utcDay(entry.timeMs);
     perDay.set(day, (perDay.get(day) ?? 0) + 1);
     if (entry.side === 'loss') lossesPerDay.set(day, (lossesPerDay.get(day) ?? 0) + 1);
   }

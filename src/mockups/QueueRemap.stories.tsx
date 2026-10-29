@@ -16,6 +16,7 @@ import {
 } from './queueRemapFixtures';
 import { adviceMarkers, queueAdvice } from './queueRemapAdvice';
 import { OptimizeQueueButton, OptimizeQueueToast } from './queueRemapParts';
+import { DAY_MS } from '@/lib/age';
 
 const PLAN_ID = 'mockup-queue-plan';
 const characterId = SAMPLE_ACTIVE_CHARACTER.characterId;
@@ -53,7 +54,7 @@ async function seedExistingPlans() {
       name: 'Drone support',
       entries: [{ skillTypeID: 3441, targetLevel: 5 }],
       remapCount: 1,
-      updatedAt: Date.now() - 86_400_000,
+      updatedAt: Date.now() - DAY_MS,
     },
   ]);
 }

@@ -22,7 +22,7 @@ import type { Dismissal } from './dismissals';
 import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
 import type { Statement } from './statements';
 import type { ObservedRow } from './types';
-import { DAY_MS } from '@/lib/age';
+import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { utcDay } from '@/engine/localDay';
 
 /** What ESI is assumed to keep of a refinery's ledger: the character ledger's 30 days; the corp's is unconfirmed. */
@@ -452,8 +452,8 @@ export type StoredExtractionKey = Pick<
   'structureId' | 'moonId' | 'extractionStartTime' | 'chunkArrivalTime'
 >;
 
-const SAME_CHUNK_MS = 10 * 60_000;
-const WINDOW_SLACK_MS = 5 * 60_000;
+const SAME_CHUNK_MS = 10 * MINUTE_MS;
+const WINDOW_SLACK_MS = 5 * MINUTE_MS;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 /**

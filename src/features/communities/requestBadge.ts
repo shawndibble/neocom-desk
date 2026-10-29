@@ -21,13 +21,14 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isOnline, onReconnect } from '@/stores/network';
 import { communityBackendOverride } from './backendOverride';
 import type { CommunitySummary } from './communityStore';
+import { MINUTE_MS } from '@/lib/age';
 
 const watchKey = (characterId: number) => `communityWatch:${characterId}`;
 const seenKey = (characterId: number, communityId: string) =>
   `communityRequestsSeen:${characterId}:${communityId}`;
 
 /** How often the open app rereads the boards. */
-export const REQUEST_BADGE_POLL_MS = 5 * 60_000;
+export const REQUEST_BADGE_POLL_MS = 5 * MINUTE_MS;
 
 /** Called wherever the Character's Communities are loaded, so the poll knows whether to look. */
 export async function rememberCommunityWatch(

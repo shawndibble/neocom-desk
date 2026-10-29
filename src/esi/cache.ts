@@ -17,6 +17,7 @@ import { grantHoldsEndpointScope } from './grantScope';
 import { beginCacheMiss, type CacheMissReason } from './cacheMissSignal';
 import type { PageResponse, PaginatedResult, TruncatableResult } from './paginated';
 import type { EsiEndpointId } from './registry';
+import { MINUTE_MS, DAY_MS } from '@/lib/age';
 
 export interface CachedResult<T> {
   data: T;
@@ -243,14 +244,14 @@ export const STALE_AFTER = {
    * mail, colonies. Ten minutes is the app-wide promise: page-to-page
    * navigation inside it never touches the network.
    */
-  default: 10 * 60_000,
+  default: 10 * MINUTE_MS,
   /**
    * Data that does not meaningfully change: universe types, stations, systems,
    * routes, PI schematics and planet names, a delivered mail's body, an issued
    * contract's item list. Refetching these on a 10-minute cadence would spend
    * most of the prefetch budget re-learning constants.
    */
-  static: 24 * 60 * 60_000,
+  static: DAY_MS,
 } as const;
 
 /**

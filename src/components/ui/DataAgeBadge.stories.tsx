@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DataAgeBadge } from './DataAgeBadge';
+import { MINUTE_MS } from '@/lib/age';
 
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+const ago = (minutes: number) => new Date(Date.now() - minutes * MINUTE_MS);
 
 const meta = {
   title: 'ui/DataAgeBadge',

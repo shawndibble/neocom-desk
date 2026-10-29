@@ -1,6 +1,7 @@
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { WeekStart } from '@/lib/calendarGrid';
 import type { ClassifiedQueueEntry } from '@/engine/skills/queueStatus';
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 
 /** A queue row plus how long it adds to the queue on its own. */
 export interface QueueRowView extends ClassifiedQueueEntry {
@@ -72,7 +73,7 @@ function calendarDay(ms: number, timeZone: 'UTC' | undefined) {
     year,
     month,
     weekday: utc ? d.getUTCDay() : d.getDay(), // 0 = Sunday
-    dayIndex: Date.UTC(year, month, day) / 86_400_000,
+    dayIndex: Date.UTC(year, month, day) / DAY_MS,
   };
 }
 
@@ -158,6 +159,6 @@ export function heroProgress(entry: SkillQueueEntry, nowMs: number): number | nu
 export function heroSpPerHour(entry: SkillQueueEntry): number | null {
   const w = trainingWindow(entry);
   if (!w || entry.training_start_sp === undefined || entry.level_end_sp === undefined) return null;
-  const hours = (w.end - w.start) / 3_600_000;
+  const hours = (w.end - w.start) / HOUR_MS;
   return (entry.level_end_sp - entry.training_start_sp) / hours;
 }

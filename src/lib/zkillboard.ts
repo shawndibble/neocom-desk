@@ -14,6 +14,7 @@ import { createTtlCache } from '@/lib/ttlCache';
 import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
 import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
 import { isRecord } from '@/engine/guards';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * Why a zKillboard request failed: no answer (`offline`, a thrown fetch or a
@@ -171,7 +172,7 @@ export async function fetchHullLosses(shipTypeId: number): Promise<HullLossesRes
 export const PILOT_TOP_SHIPS = 5;
 
 /** How long a pilot's zKillboard stats are reused before asking again. */
-export const PILOT_STATS_CACHE_MS = 10 * 60_000;
+export const PILOT_STATS_CACHE_MS = 10 * MINUTE_MS;
 
 /** One hull from zKillboard's all-time "ships used on kills" list. */
 export interface PilotTopShip {

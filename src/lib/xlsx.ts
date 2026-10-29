@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from 'fflate';
 import type { CsvColumn } from './csv';
 import { toCell, type ExportCell, type ExportValue } from './exportCells';
+import { DAY_MS } from '@/lib/age';
 
 /**
  * A minimal .xlsx (Office Open XML) writer: one sheet for a table export, or
@@ -27,7 +28,6 @@ const ROOT_RELS_XML = `${XML_HEADER}<Relationships xmlns="http://schemas.openxml
 
 /** Excel's day 0 is 1899-12-30 (the 1900 leap-year bug baked in); Unix epoch is serial 25569. */
 const UNIX_EPOCH_SERIAL = 25569;
-const MS_PER_DAY = 86_400_000;
 
 // eslint-disable-next-line no-control-regex -- stripping exactly the control characters XML 1.0 forbids
 const XML_INVALID_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
@@ -86,7 +86,7 @@ function cellXml(ref: string, cell: ExportCell, style?: number): string {
     case 'number':
       return `<c r="${ref}"${s}><v>${cell.value}</v></c>`;
     case 'date':
-      return `<c r="${ref}" s="${STYLE_DATE}"><v>${cell.value.getTime() / MS_PER_DAY + UNIX_EPOCH_SERIAL}</v></c>`;
+      return `<c r="${ref}" s="${STYLE_DATE}"><v>${cell.value.getTime() / DAY_MS + UNIX_EPOCH_SERIAL}</v></c>`;
     case 'text':
       return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${escapeXml(cell.value.slice(0, MAX_CELL_TEXT))}</t></is></c>`;
   }

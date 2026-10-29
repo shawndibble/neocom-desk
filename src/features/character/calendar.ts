@@ -14,6 +14,7 @@ import { parseInstant } from '@/engine/esiInstant';
 import { selectCalendarEventsToPrefetch } from '@/engine/character/calendarPrefetch';
 import { CALENDAR_PREFETCH_DAYS, CALENDAR_PREFETCH_LIMIT, prefetchMissing } from './detailPrefetch';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
+import { MINUTE_MS, DAY_MS } from '@/lib/age';
 
 const KEYS = {
   events: 'calendar',
@@ -135,7 +136,7 @@ export async function loadCalendarEvents(
     // Shorter than STALE_AFTER.default (10 min): an RSVP made outside this
     // app (in-client, or another device) must reach the alert poller fast
     // enough that a declined event doesn't still fire calendarEventStarting.
-    { staleAfterMs: 2 * 60_000 }
+    { staleAfterMs: 2 * MINUTE_MS }
   );
   // Nothing read and nothing cached: a revoked scope or a cold offline start.
   // Retention has no read to add to, and must not invent one from a stale
@@ -180,7 +181,7 @@ export function prefetchCalendarEventDetails(
     select: (skip) =>
       selectCalendarEventsToPrefetch(events, {
         nowMs,
-        horizonMs: CALENDAR_PREFETCH_DAYS * 24 * 60 * 60_000,
+        horizonMs: CALENDAR_PREFETCH_DAYS * DAY_MS,
         cachedIds: skip,
         limit: CALENDAR_PREFETCH_LIMIT,
       }),

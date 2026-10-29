@@ -21,6 +21,7 @@ import { walletFixtureRoutes } from './esiFixtureRoutes';
 import type { FixtureRoute } from './fixtureFetch';
 import { sampleDate } from './sampleData';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { utcDay } from '@/engine/localDay';
 
 const hub = (id: string) => TRADE_HUBS.find((h) => h.id === id)!;
 const AMARR = hub('amarr');
@@ -202,7 +203,7 @@ function sizeDemand(
 }
 
 const markUp = (price: number, factor: number) => roundPriceUp(price * factor) ?? price;
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const isoDay = (ms: number) => utcDay(ms);
 
 /** Spreads `monthly` units over `days` trading days, ending yesterday; every second day for bursts. */
 function history(

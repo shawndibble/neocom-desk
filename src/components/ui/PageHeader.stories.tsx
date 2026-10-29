@@ -6,6 +6,7 @@ import * as Icon from './icons';
 import { Button } from './Button';
 import { HeaderMoreMenu } from './HeaderMoreMenu';
 import { DropdownMenuItem } from './DropdownMenu';
+import { MINUTE_MS } from '@/lib/age';
 
 const meta = {
   title: 'ui/PageHeader',
@@ -37,7 +38,7 @@ export const WithMetaAndActions: Story = {
 export const WithDataAge: Story = {
   args: {
     title: 'Wallet',
-    meta: <DataAgeBadge date={new Date(Date.now() - 12 * 60_000)} />,
+    meta: <DataAgeBadge date={new Date(Date.now() - 12 * MINUTE_MS)} />,
     actions: <IconButton label="Refresh" icon={<Icon.Refresh />} />,
   },
 };
@@ -75,7 +76,7 @@ const scopeStandIn = (
 export const WithScope: Story = {
   args: {
     title: 'Market orders',
-    meta: <DataAgeBadge date={new Date(Date.now() - 12 * 60_000)} />,
+    meta: <DataAgeBadge date={new Date(Date.now() - 12 * MINUTE_MS)} />,
     scope: scopeStandIn,
     actions: (
       <>

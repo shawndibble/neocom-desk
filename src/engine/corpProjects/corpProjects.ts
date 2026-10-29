@@ -6,6 +6,7 @@
  */
 
 import { isRecord } from '../guards';
+import { HOUR_MS } from '@/lib/age';
 
 /** The parts of a project detail read this module looks at (`getCorporationProject`). */
 export interface ProjectDetailInput {
@@ -101,7 +102,7 @@ export function remainingUnits(p: {
 export function hoursLeft(expires: string | null, now: Date): number | null {
   if (expires === null) return null;
   const ms = new Date(expires).getTime() - now.getTime();
-  return Math.max(0, Math.floor(ms / 3_600_000));
+  return Math.max(0, Math.floor(ms / HOUR_MS));
 }
 
 /** Profit at the remaining cap: the reward on every unit, less its build cost and the blueprint copy. */

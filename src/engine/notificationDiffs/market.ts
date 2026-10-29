@@ -1,6 +1,7 @@
 import { contractCauseOf } from '../walletCause';
 import type { FillMatch } from '../market/fillTime';
 import type { StationUndercutState } from '../market/stationUndercutState';
+import { HOUR_MS } from '@/lib/age';
 
 /** One of the Character's own open market orders and when it lapses (`ordersLapsing`, issue #3797). */
 export interface OrderExpiryEntrySnapshot {
@@ -32,7 +33,7 @@ export interface OrdersLapsingFire {
  * issued in one sitting), so they share one alert; orders further apart each
  * get their own once the earlier batch has gone.
  */
-export const ORDER_BATCH_WINDOW_MS = 3_600_000;
+export const ORDER_BATCH_WINDOW_MS = HOUR_MS;
 
 /** The orders lapsing inside their own lead time at `nowMs`, soonest first. */
 function ordersInWindow(snapshot: OrderExpirySnapshot): OrderExpiryEntrySnapshot[] {

@@ -10,6 +10,7 @@
 import type { SurveySummary } from './series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { textWidth } from './chatFont';
+import { MINUTE_MS } from '@/lib/age';
 
 export interface SurveyMessageLabels {
   /** The first line, before the box: chat puts the speaker's name beside it. */
@@ -188,7 +189,7 @@ export function formatEveClock(epochMs: number): string {
 
 /** "14m" or "2h 10m", rounded to the minute and never under 1m. */
 export function formatDuration(ms: number): string {
-  const minutes = Math.max(1, Math.round(ms / 60_000));
+  const minutes = Math.max(1, Math.round(ms / MINUTE_MS));
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return h > 0 ? `${h}h ${m}m` : `${m}m`;

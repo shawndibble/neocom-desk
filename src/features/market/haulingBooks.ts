@@ -9,11 +9,12 @@
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { LadderLevel } from '@/engine/market/haulingMarket';
+import { MINUTE_MS, HOUR_MS } from '@/lib/age';
 
 /** The backend republishes every 30 minutes. */
-const STALE_AFTER_MS = 10 * 60_000;
+const STALE_AFTER_MS = 10 * MINUTE_MS;
 /** A snapshot older than this means the job stopped (it is normally under an hour old): ESI is the better source. */
-export const MAX_BOOKS_AGE_MS = 3 * 60 * 60_000;
+export const MAX_BOOKS_AGE_MS = 3 * HOUR_MS;
 
 export interface StationBooks {
   sell: LadderLevel[];
@@ -61,7 +62,7 @@ export function parseHaulingBooks(raw: unknown): HaulingBooks | null {
 }
 
 /** Jita's object is about 1.2 MB gzipped: more room than the 20 s the small R2 objects get, or a slow link silently drops to the capped ESI path. */
-const READ_TIMEOUT_MS = 60_000;
+const READ_TIMEOUT_MS = MINUTE_MS;
 
 async function fetchBooks(stationId: number): Promise<HaulingBooks | null> {
   try {

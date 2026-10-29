@@ -13,8 +13,9 @@ import { db } from '@/db';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadMailOwner, loadMailOwnerCacheOnly, type MailOwnerLoad } from './mail';
+import { MINUTE_MS } from '@/lib/age';
 
-export const MAIL_REFRESH_MIN_GAP_MS = 60_000;
+export const MAIL_REFRESH_MIN_GAP_MS = MINUTE_MS;
 
 const lastLiveAt = new Map<number, number>();
 

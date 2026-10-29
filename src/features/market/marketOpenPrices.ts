@@ -19,6 +19,7 @@ import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import type { OpenPriceSeries } from '@/engine/market/priceHistoryOpen';
 import { TRADE_HUBS } from '@/market/hubs';
 import { isRecord } from '@/engine/guards';
+import { HOUR_MS } from '@/lib/age';
 
 /** Mirrors `openPricesR2Key` on the Functions side (`functions/src/r2DailySnapshots.ts`). */
 export function openPricesUrl(typeId: number): string {
@@ -38,7 +39,7 @@ async function fetchTypeObject(typeId: number): Promise<unknown | null> {
 }
 
 /** The backend publishes once a day. */
-const CACHE_TTL_MS = 60 * 60_000;
+const CACHE_TTL_MS = HOUR_MS;
 
 /** A type's object as series, by hub station id. */
 export interface StoredOpenPrices {

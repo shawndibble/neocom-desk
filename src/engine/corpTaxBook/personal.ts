@@ -47,6 +47,7 @@ import {
 } from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
+import { MINUTE_MS } from '@/lib/age';
 
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
@@ -977,7 +978,7 @@ export interface HeldPayment {
 }
 
 /** The corp's journal stamps the same ISK transfer within the same minute or two. */
-const SAME_TRANSFER_MS = 10 * 60_000;
+const SAME_TRANSFER_MS = 10 * MINUTE_MS;
 
 /**
  * Donations the member sent to the corp (their own journal) that the book does

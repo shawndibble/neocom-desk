@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { StoredWar, WarAgainstMe } from '@/engine/wars';
 import { WarModal } from './WarModal';
+import { HOUR_MS } from '@/lib/age';
 
-const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 9, 21, 12);
 
 const war = (over: Partial<StoredWar> = {}): StoredWar => ({
   id: 763512,
-  declared: NOW - 30 * HOUR,
-  started: NOW - 6 * HOUR,
+  declared: NOW - 30 * HOUR_MS,
+  started: NOW - 6 * HOUR_MS,
   mutual: false,
   openForAllies: false,
   aggressor: { allianceId: 99005338, iskDestroyed: 2_480_000_000, shipsKilled: 14 },
@@ -42,14 +42,14 @@ export const NotStartedWithAllies: Story = {
     wars: [
       {
         war: war({
-          started: NOW + 19 * HOUR,
-          finished: NOW + 9 * 24 * HOUR,
+          started: NOW + 19 * HOUR_MS,
+          finished: NOW + 9 * 24 * HOUR_MS,
           allies: [{ corporationId: 1 }, { allianceId: 2 }],
           aggressor: { corporationId: 98000002, iskDestroyed: 0, shipsKilled: 0 },
           defender: { corporationId: 98000001, iskDestroyed: 0, shipsKilled: 0 },
         }),
         side: 'defender',
-        status: { kind: 'pending', startsIn: 19 * HOUR },
+        status: { kind: 'pending', startsIn: 19 * HOUR_MS },
       },
     ],
   },
@@ -62,7 +62,7 @@ export const SeveralWars: Story = {
       active(),
       active({
         id: 763400,
-        declared: NOW - 90 * HOUR,
+        declared: NOW - 90 * HOUR_MS,
         mutual: true,
         aggressor: { corporationId: 98000003, iskDestroyed: 12_000_000, shipsKilled: 1 },
       }),

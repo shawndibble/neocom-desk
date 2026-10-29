@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * How often the page re-reads the character's in-game queue from ESI (#408):
@@ -10,7 +11,7 @@ import { loadCharacterSkillQueue, type CachedResult } from '../data';
  * honors ESI's own `Expires`), so a call landing inside a still-fresh window
  * is a cheap cache hit, not a wasted round trip.
  */
-const REFETCH_MS = 5 * 60_000;
+const REFETCH_MS = 5 * MINUTE_MS;
 /** Timer jitter allowance: a scheduled tick this close to a full cadence since the last fetch still counts as due. */
 const REFETCH_SLACK_MS = 5_000;
 

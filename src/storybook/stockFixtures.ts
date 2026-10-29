@@ -8,6 +8,7 @@ import type { CharacterAsset, CharacterBlueprint, MarketOrder } from '@/esi/endp
 import { walletFixtureRoutes } from './esiFixtureRoutes';
 import type { FixtureRoute } from './fixtureFetch';
 import { SAMPLE_CHARACTERS, sampleDate } from './sampleData';
+import { DAY_MS } from '@/lib/age';
 
 /** Dodixie IX - Moon 20 - Federation Navy Assembly Plant. */
 const DODIXIE = 60011866;
@@ -78,7 +79,6 @@ export const SAMPLE_STOCK_LISTS: readonly StockList[] = MARKETS.map((m) => ({
 }));
 
 const SELLER = SAMPLE_CHARACTERS[0].characterId;
-const DAY = 86_400_000;
 
 function sellOrders(now = Date.now()): MarketOrder[] {
   let id = 6_200_000_000;
@@ -94,7 +94,7 @@ function sellOrders(now = Date.now()): MarketOrder[] {
         price: Math.round(price * 1.18),
         volume_remain: listed,
         volume_total: listed,
-        issued: sampleDate(3 * DAY, now),
+        issued: sampleDate(3 * DAY_MS, now),
         duration: 90,
         range: 'station',
       }))

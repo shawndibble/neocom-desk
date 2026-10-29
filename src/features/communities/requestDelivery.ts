@@ -40,6 +40,7 @@ import { characterIdForUid, uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { pledgeEditVersion } from './pledgeWrites';
 import { loadMyPledges, loadRequestsById, updateMyPledge } from './requestStore';
+import { MINUTE_MS } from '@/lib/age';
 
 /** The Permission delivery marking needs. */
 export const DELIVERY_ENDPOINTS: readonly EsiEndpointId[] = [
@@ -148,7 +149,7 @@ function buildSlots(planned: readonly Planned[]): DeliverySlot[] {
 const itemReadFailures = new Map<number, { count: number; first: number }>();
 const GIVE_UP_AFTER = 2;
 /** The failures must span at least this long: one burst on a flaky network is not a verdict. */
-export const GIVE_UP_SPAN_MS = 5 * 60_000;
+export const GIVE_UP_SPAN_MS = 5 * MINUTE_MS;
 
 // Only a 404 is an answer about this contract alone. A 403 is the Permission itself (a revoke the
 // local scope check cannot see): it would give up on every contract, so it is never a give-up.

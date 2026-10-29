@@ -5,6 +5,7 @@ import { callableErrorText } from './feederErrorText';
 import { InviteLinkField } from './InviteLinkField';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
 import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
+import { utcDay } from '@/engine/localDay';
 
 /**
  * D10: a Director picks the start date (and the corp's default rate) to turn the book on.
@@ -34,7 +35,7 @@ export function TurnOnBook({
   onTurnedOn?: () => void;
 }) {
   const { t } = useTranslation();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = utcDay();
   const leaveDay = earliestStart ?? null;
   // Untouched, it is the first day of this month in EVE time, never before the leave day.
   const monthStart = `${today.slice(0, 8)}01`;

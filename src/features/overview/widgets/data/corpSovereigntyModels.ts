@@ -33,10 +33,9 @@ import type { CorpSovereigntyFeed, CorpSovereigntyRow } from './corpFeeds';
 import type { ChartModel } from '../charts/types';
 import type { RowDetailModel, TableCell, TableRowModel } from './types';
 import type { Translate } from '@/lib/translate';
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 
 const W = 'overview.widgets.corpSovereignty';
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
 /** Gantt horizon. */
 const CHART_AHEAD_MS = 48 * HOUR_MS;
 /** The Number counts skyhooks open now or opening within this. */

@@ -40,6 +40,7 @@ import { isMissingIndex } from '@/sync/missingIndex';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureAnySession } from '@/sync/syncAuth';
 import { MAX_SCAN_TEXT, rejectScanText, ScanRejected } from './scanResult';
+import { MINUTE_MS } from '@/lib/age';
 
 export { MAX_SCAN_TEXT };
 
@@ -254,7 +255,7 @@ export type LoadSurveyResult =
  * before reading them again. They rarely change, and this app's own edits mark
  * them due at once (`markDetailsDue`), so only another pilot's edit waits.
  */
-export const SURVEY_DETAILS_TTL_MS = 5 * 60_000;
+export const SURVEY_DETAILS_TTL_MS = 5 * MINUTE_MS;
 
 /**
  * What this tab has read of one survey. The lite SDK has no cache and every

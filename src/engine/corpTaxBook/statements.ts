@@ -14,6 +14,7 @@ import type { DayCharge } from './charges';
 import type { TaxPriceSource } from '../miningTax/priceBasis';
 import type { OreLine } from './types';
 import { DAY_MS } from '@/lib/age';
+import { utcDay } from '@/engine/localDay';
 
 export const DEFAULT_MINIMUM_STATEMENT = 5_000_000;
 
@@ -44,7 +45,7 @@ export function statementPeriod(
   if (cadence.kind === 'monthly') {
     const start = `${date.slice(0, 7)}-01`;
     const [y, m] = start.split('-').map(Number);
-    const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    const end = utcDay(Date.UTC(y, m, 0));
     return { start, end };
   }
   if (startDate !== undefined && startDate < cadence.anchor && date < cadence.anchor)

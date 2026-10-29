@@ -9,6 +9,7 @@ import { useTicker } from '@/lib/ticker';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { CONTRACT_STATUS_KEY } from '@/features/character/contractLabels';
 import type { Contract } from '@/esi/endpoints';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * Lapsed and unclaimed — still `outstanding` past its accept-by deadline.
@@ -28,7 +29,7 @@ function isStale(contract: Contract, nowMs: number): boolean {
  * changed — an outstanding contract would never flip to lapsed, a courier
  * never to overdue, while the page stayed open.
  */
-const CONTRACT_CLOCK_MS = 60_000;
+const CONTRACT_CLOCK_MS = MINUTE_MS;
 
 /** The status label, with the lapsed-offer warning once its accept-by deadline passes. */
 export function ContractStatusCell({ contract }: { contract: Contract }) {

@@ -59,6 +59,7 @@ import { forgetObservedCopy } from '../taxBook/observedStore';
 import { CORP_BOOK_READ_MODELS } from '../taxBook/readModelSwitch';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 import { refineryPlaceholder } from './moonsFormat';
+import { MINUTE_MS } from '@/lib/age';
 
 export interface BookNames {
   character: (id: number) => string;
@@ -177,7 +178,7 @@ export function useCorpBook(
 
   // A page left open turns stale and rolls a day over (the sync hook's known gap).
   useEffect(() => {
-    const id = window.setInterval(() => setNow(utcNow()), 60_000);
+    const id = window.setInterval(() => setNow(utcNow()), MINUTE_MS);
     return () => window.clearInterval(id);
   }, []);
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal } from '@/components/ui';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterLink, SystemLink } from '@/features/entities';
-import { formatAge } from '@/lib/age';
+import { formatAge, MINUTE_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
@@ -57,7 +57,7 @@ export function CorpRowDetailModal({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const hint = useCorpStateHint();
-  const now = useTicker(60_000);
+  const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
   const hub = hubForPayee(view.hubId);

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 /**
  * Order-book reduction (ADR 0003): splitting a region's raw order list into
  * sell/buy, and resolving each order's location to a display-ready station
@@ -110,5 +111,5 @@ export function summarizeOrderBook<T extends PricedOrder>(orders: readonly T[]):
 /** An order's expiry: issued + duration (days). */
 export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);
-  return new Date(issued.getTime() + order.duration * 86_400_000);
+  return new Date(issued.getTime() + order.duration * DAY_MS);
 }

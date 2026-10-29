@@ -47,6 +47,7 @@ import type {
 } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
+import { DAY_MS } from '@/lib/age';
 
 /*
  * `Overview` is the landing route and stays in the entry chunk (every other
@@ -203,8 +204,7 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
     unpaidIsk,
     payeeCount: payees.size,
     unassignedCount,
-    oldestUnpaidDays:
-      oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / 86_400_000),
+    oldestUnpaidDays: oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / DAY_MS),
     needsReauth:
       snapshot.reauthCharacters.length > 0 &&
       snapshot.reauthCharacters.length >= snapshot.characters.length,

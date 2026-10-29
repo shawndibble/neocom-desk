@@ -13,9 +13,10 @@
  * read: the server stamped every old row once (corpTaxBookObservedBackfill.ts).
  */
 import { BOOK_CACHE_MAX_AGE_MS } from './bookCache';
+import { MINUTE_MS } from '@/lib/age';
 
 /** Reread this much before the watermark: concurrent writes commit out of stamp order. */
-export const OBSERVED_OVERLAP_MS = 10 * 60_000;
+export const OBSERVED_OVERLAP_MS = 10 * MINUTE_MS;
 
 /** What a device remembers about its copy of one book's `observed`. */
 export interface ObservedCopyMeta {

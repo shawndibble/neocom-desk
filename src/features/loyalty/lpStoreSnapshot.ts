@@ -12,11 +12,12 @@ import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import type { R2Snapshot, R2SnapshotRead } from '@/features/contractSearch/r2Snapshot';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import type { LpSnapshotStore } from './itemSearch';
+import { HOUR_MS } from '@/lib/age';
 
 const SNAPSHOT_URL = `${R2_SNAPSHOT_ORIGIN}/lp-store-offers/snapshot.json`;
 const CACHE_KEY = 'lpStoreOffersR2';
 /** The backend republishes once a day. */
-const STALE_AFTER_MS = 12 * 60 * 60_000;
+const STALE_AFTER_MS = 12 * HOUR_MS;
 
 /** The fields the search reads unguarded; a row without them would throw in a render. */
 function isStoreRow(value: unknown): value is LpSnapshotStore {

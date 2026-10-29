@@ -14,8 +14,9 @@ import { getKillmail } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { fetchHullLosses, type ZkillFailureReason } from '@/lib/zkillboard';
 import { loadFittingSlots } from '@/sde/loadSde';
+import { MINUTE_MS } from '@/lib/age';
 
-const CACHE_TTL_MS = 10 * 60_000;
+const CACHE_TTL_MS = 10 * MINUTE_MS;
 
 /** `ok: false` when zKillboard or ESI couldn't supply the losses. */
 export type PopularFitsResult =

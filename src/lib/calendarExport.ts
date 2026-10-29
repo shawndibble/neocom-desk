@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 /**
  * Client-side "add to Google/Outlook calendar" export (issue #416): a plain
  * `.ics` file plus a Google Calendar prefilled-event URL, both generated from
@@ -27,7 +28,7 @@ function toUtcBasic(date: Date): string {
 }
 
 function endOf(event: CalendarExportEvent): Date {
-  return new Date(event.start.getTime() + event.durationMinutes * 60_000);
+  return new Date(event.start.getTime() + event.durationMinutes * MINUTE_MS);
 }
 
 /** RFC 5545 §3.3.11 text escaping: backslash first, then the characters it introduces. */

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { isInArrivalWindow } from '@/engine/miningTax/oreArrival';
+import { MINUTE_MS } from '@/lib/age';
 
 /** ESI caches the personal mining ledger for 10 minutes; asking sooner returns the same answer. */
-export const RECHECK_INTERVAL_MS = 10 * 60_000;
+export const RECHECK_INTERVAL_MS = 10 * MINUTE_MS;
 
 interface SettleUpRecheckOptions {
   /** The EVE dates of the entries Settle up is open on; `null` while it is closed. */

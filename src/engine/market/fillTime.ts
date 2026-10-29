@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 /**
  * When a sell order actually finished filling, worked out from the wallet.
  *
@@ -50,14 +51,14 @@ export type FillTimeResolution =
  * How far wallet transactions can trail the moment they are fetched: ESI's
  * one-hour cache, plus slack for a fetch landing just before a refresh.
  */
-export const WALLET_TRANSACTIONS_LAG_MS = 65 * 60_000;
+export const WALLET_TRANSACTIONS_LAG_MS = 65 * MINUTE_MS;
 
 /**
  * How far ESI's clock may run ahead of this device's. A sale dated later than
  * that past the poll that noticed the fill is not this order's — most often
  * a relist of the same item at the same price, already selling.
  */
-const CLOCK_SKEW_MS = 5 * 60_000;
+const CLOCK_SKEW_MS = 5 * MINUTE_MS;
 
 /** ISK prices go to the cent; compare in cents so float noise never splits a match. */
 function sameCents(a: number, b: number): boolean {

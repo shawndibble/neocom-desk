@@ -17,6 +17,7 @@
  */
 import { isGankChokepoint } from '../route/chokepoints';
 import type { CourierRouteRow, CourierEndpoint } from './courierSearch';
+import { HOUR_MS } from '@/lib/age';
 
 export type CourierRiskKind =
   | 'player-structure'
@@ -180,5 +181,5 @@ export function forcesFreighter(volume: number): boolean {
  * with, which is why it sits here rather than among the date formatters.
  */
 export function hoursToExpiry(dateExpired: number, now: number): number {
-  return Math.max(0, Math.floor((dateExpired - now) / 3_600_000));
+  return Math.max(0, Math.floor((dateExpired - now) / HOUR_MS));
 }

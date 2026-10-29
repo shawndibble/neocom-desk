@@ -24,6 +24,7 @@ import {
   bpcRowsFromContractOffers,
   bpoRowsFromContractOffers,
 } from '@/engine/contracts/contractOffers';
+import { MINUTE_MS } from '@/lib/age';
 
 /** The Dexie cache key; unchanged since the Firestore read so existing caches carry over. */
 const CACHE_KEY = 'publicContractOffers';
@@ -36,7 +37,7 @@ const CACHE_KEY = 'publicContractOffers';
  * cycle. The UI shows the snapshot's `lastSyncedAt` rather than when this
  * browser last read it.
  */
-const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * 60_000;
+const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * MINUTE_MS;
 
 export interface PublicBpcContractsSnapshot {
   rows: BpcContractRow[];
