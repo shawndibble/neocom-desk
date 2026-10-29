@@ -12,10 +12,11 @@ import {
   type ImproveOption,
   type ImproveResult,
 } from '@/engine/fittings/improve';
-import { activeTankTotal, alignOf, reachKm } from '@/engine/fittings/improveFigures';
+import { alignOf, reachKm } from '@/engine/fittings/improveFigures';
 import { bestOption } from '@/engine/fittings/improveKeys';
 import {
   overallTerms,
+  activeTank,
   roleChanges,
   type GainMetric,
   type RoleMetric,
@@ -94,8 +95,8 @@ export function leadLine(
         return text(
           metric,
           t('fittings.improve.activeTankLine', {
-            before: m3sFormat(activeTankTotal(own)),
-            after: m3sFormat(activeTankTotal(option.after)),
+            before: m3sFormat(activeTank(own)),
+            after: m3sFormat(activeTank(option.after)),
           })
         );
       case 'speed':

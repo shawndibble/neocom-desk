@@ -108,3 +108,5 @@ export function useSelectionCheck({ search, fitting, target, iskBudget, chosen }
 
   return { checkable, checked, summary, overruns, covers, offered, setAsFix, canApply };
 }
+
+export type SelectionCheck = ReturnType<typeof useSelectionCheck>;

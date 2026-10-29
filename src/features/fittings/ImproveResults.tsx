@@ -22,7 +22,7 @@ import { MakeItFitSection } from './MakeItFitSection';
 import type { ImproveState } from './useImprove';
 import type { ImproveLabels } from './useImproveLabels';
 import type { ImproveSelection } from './useImproveSelection';
-import type { useSelectionCheck } from './useSelectionCheck';
+import type { SelectionCheck } from './useSelectionCheck';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 
 /** How many overrun fixes get an implant search: each runs the Implant Finder whole. */
@@ -34,7 +34,7 @@ interface Props {
   settings: ImproveSettings;
   labels: ImproveLabels;
   selection: ImproveSelection;
-  check: ReturnType<typeof useSelectionCheck>;
+  check: SelectionCheck;
   /** Ticked rows that no list shows: covers added from the footer. */
   tickedCovers: ImproveOption[];
   target?: TargetProfile;

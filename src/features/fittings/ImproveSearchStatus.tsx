@@ -1,71 +1,11 @@
 /**
- * Where an Improve search stands when it has nothing to list: the warnings
- * about weapons and miners that hold nothing, then progress with Cancel and
- * "Show best so far", or why there is nothing to show.
+ * Where an Improve search stands when it has nothing to list: progress with
+ * Cancel and "Show best so far", or why there is nothing to show.
  */
 import { useTranslation } from 'react-i18next';
 import { Button, ProgressBar, Spinner } from '@/components/ui';
-import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
-import { crystalParts } from '@/engine/fittings/improveMining';
 import { formatIskCompact } from '@/lib/isk';
-import { crystalBasisOf } from './improveCrystalBasis';
-import { m3sFormat } from './improveLineText';
 import type { ImproveSearch } from './useImprove';
-
-interface UnloadedProps {
-  unloaded?: UnloadedWeapons | null;
-  onLoadBestCharge?: () => void;
-  state: ImproveSearch['state'];
-  oreFamily: string;
-  onLoadBestCrystal?: () => void;
-}
-
-/** Weapons holding no charge, which damage goals can't score, and Mine more's miners without the best crystals. */
-export function ImproveUnloadedNotices({
-  unloaded,
-  onLoadBestCharge,
-  state,
-  oreFamily,
-  onLoadBestCrystal,
-}: UnloadedProps) {
-  const { t } = useTranslation();
-  const { basis, unloaded: unloadedCrystals, now, best } = crystalBasisOf(state);
-  return (
-    <>
-      {unloaded && (
-        <div className="space-y-2">
-          <p role="status" className="text-warning text-sm">
-            {t(`fittings.improve.unloaded.${unloaded.kind}`, { count: unloaded.count })}
-          </p>
-          {onLoadBestCharge && (
-            <Button size="sm" onClick={onLoadBestCharge}>
-              {t('fittings.improve.loadBestCharge')}
-            </Button>
-          )}
-        </div>
-      )}
-
-      {unloadedCrystals && (
-        <div className="space-y-2">
-          <p role="status" className="text-warning text-sm">
-            {t('fittings.improve.unloadedCrystals', {
-              count: unloadedCrystals.count,
-              family: oreFamily,
-              now: m3sFormat(now),
-              crystal: t('fittings.improve.crystalType', crystalParts(basis?.bestKey ?? '')),
-              best: m3sFormat(best),
-            })}
-          </p>
-          {onLoadBestCrystal && (
-            <Button size="sm" onClick={onLoadBestCrystal}>
-              {t('fittings.improve.loadBestCrystal')}
-            </Button>
-          )}
-        </div>
-      )}
-    </>
-  );
-}
 
 /** The search's own state: progress, cancelled, below the budget's price, or failed. Nothing once done. */
 export function ImproveSearchStatus({ search }: { search: ImproveSearch }) {

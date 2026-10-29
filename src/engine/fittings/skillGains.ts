@@ -137,7 +137,8 @@ function capacitorGain(before: FittingStats['capacitor'], after: FittingStats['c
   return after.stable ? 1 : -1;
 }
 
-const activeTank = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
+/** Shield, armor and hull repair together. */
+export const activeTank = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
 const alignTime = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0;
 

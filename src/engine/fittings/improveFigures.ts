@@ -18,7 +18,3 @@ export const alignOf = (s: FittingStats) =>
 
 /** Whether a stat-change key is one of the fit's resources (CPU, powergrid, calibration). */
 export const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
-
-/** Shield, armor and hull repair together. */
-export const activeTankTotal = (s: FittingStats) =>
-  s.repair.shield + s.repair.armor + s.repair.hull;
