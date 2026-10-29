@@ -21,11 +21,9 @@
  * be written with the full fixture grant, never passing through the code
  * exchange this spec bends.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { loginAndSelectCharacter } from './support/login';
 import { CHARACTER_ID, CHARACTER_NAME, OWNER_HASH, SCOPES } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
 
 /** Far-future expiry, matching `mockSso.ts`'s own token. */
 const EXP_SECONDS = 4_102_444_800;

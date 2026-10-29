@@ -6,11 +6,9 @@
  * on a cold CI runner — so this spec asserts on the List view and the Load
  * control only, not on any stat figure.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
-
-const PHONE = { width: 390, height: 844 };
 
 const RIFTER_EFT = [
   '[Rifter, Tracer Test]',

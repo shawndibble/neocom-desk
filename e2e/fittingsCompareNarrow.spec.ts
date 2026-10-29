@@ -9,11 +9,9 @@
  * on here.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { answerAnyType } from './support/universeTypes';
-
-const PHONE = { width: 390, height: 844 };
 
 // A compare column's header shows the fit's own name — a Fitting Share Code carries it since
 // version 2 (#1718), so the name typed into the EFT header survives the round trip.

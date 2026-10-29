@@ -4,13 +4,12 @@
  * Close is visible and works, no sideways scroll. Invariants only; CI fonts differ.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import type { MarketOrder } from '../src/esi/endpoints';
 
 const WIDTHS = [700, 800, 900, 1000];
-const PHONE = { width: 390, height: 844 };
 
 const ORDER: MarketOrder = {
   order_id: 201,

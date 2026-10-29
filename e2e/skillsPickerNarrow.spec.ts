@@ -8,11 +8,9 @@
  * 390px, where the queue built by `addCaldariCruiserToNewPlan` (6 rows) is
  * tall enough to push a skill added afterward below the fold.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { addCaldariCruiserToNewPlan } from './support/planHelpers';
-
-const PHONE = { width: 390, height: 844 };
 
 test.beforeEach(async ({ page }) => {
   await signInAndGoto(page);

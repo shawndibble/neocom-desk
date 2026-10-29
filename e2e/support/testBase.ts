@@ -51,3 +51,11 @@ export const test = base.extend({
 /* eslint-enable react-hooks/rules-of-hooks */
 
 export { expect };
+
+/**
+ * The two viewports the specs share. A spec that needs a different size —
+ * `phoneTabStrip` at 360 wide, the 1440-wide specs, `settingsPhoneTabBar`'s
+ * `DESKTOP_SIZES` — keeps its own, because the size is what it is testing.
+ */
+export const PHONE = { width: 390, height: 844 };
+export const DESKTOP = { width: 1280, height: 800 };

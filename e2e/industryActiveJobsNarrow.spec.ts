@@ -15,12 +15,9 @@
  * answers empty. Registered after `signInAndGoto`, so Playwright (last route
  * wins) consults it first.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /** Rifter Blueprint, manufacturing, one running and one finished. */
 const BLUEPRINT_TYPE_ID = 691;

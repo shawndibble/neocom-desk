@@ -13,15 +13,12 @@
  * `selectedDayMs !== null`, independent of whether the rail has any items.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
 
 const HOUR_MS = 3_600_000;
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /**
  * Logs in, sets the viewport, opens Calendar and selects the first day —

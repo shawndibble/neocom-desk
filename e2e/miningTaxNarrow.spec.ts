@@ -19,12 +19,9 @@
  * `esi/cache.ts` serves them without ever attempting a live ESI call.
  */
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /** Real moon ore typeId (Zeolites) already in `public/data/moonOreTypes.json` and `public/data/types.json`, so grouping and name resolution both succeed with no ESI/network call. */
 const ORE_TYPE_ID = 45490;
