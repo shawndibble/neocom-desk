@@ -6,12 +6,8 @@
 // user of the client id), anything else is "try again next run". Nothing here
 // logs or returns a token.
 
-import {
-  ESI_BASE,
-  ESI_COMPATIBILITY_DATE,
-  ESI_USER_AGENT,
-  isBudgetLow,
-} from './esiNotifications.js';
+import { ESI_BASE, esiHeaders } from './esiClient.js';
+import { isBudgetLow } from './esiNotifications.js';
 import type {
   EsiExtractionLike,
   JournalEntryLike,
@@ -77,13 +73,7 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     let res: Response;
     try {
       res = await fetchImpl(`${ESI_BASE}${path}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'User-Agent': ESI_USER_AGENT,
-          'X-User-Agent': ESI_USER_AGENT,
-          'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-          Accept: 'application/json',
-        },
+        headers: esiHeaders(accessToken),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch {

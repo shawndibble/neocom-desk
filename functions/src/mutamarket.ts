@@ -27,7 +27,7 @@
  * import queue are global rather than per instance.
  */
 
-import { ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT } from './esiClient.js';
 import { isPlainRecord } from './guards.js';
 
 const MUTAMARKET_API = 'https://mutamarket.com/api';

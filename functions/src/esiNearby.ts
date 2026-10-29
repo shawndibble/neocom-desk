@@ -4,12 +4,8 @@
 // and a classified result so the poller never reads a status code — 403 is "this grant
 // cannot read the location", 420/429 stop the run, a low budget stops it after this call.
 
-import {
-  ESI_COMPATIBILITY_DATE,
-  ESI_USER_AGENT,
-  isBudgetLow,
-  retryAfterMs,
-} from './esiNotifications.js';
+import { esiHeaders } from './esiClient.js';
+import { isBudgetLow, retryAfterMs } from './esiNotifications.js';
 import type { IncursionListing, RaidableSkyhook } from './nearbyAlerts.js';
 import { isRecord } from './guards.js';
 
@@ -32,13 +28,7 @@ async function getJson(
   fetchImpl: typeof fetch
 ): Promise<{ kind: 'ok'; body: unknown; budgetLow: boolean } | Failure> {
   const res = await fetchImpl(`${ESI_ROOT}${path}`, {
-    headers: {
-      ...(accessToken === null ? {} : { Authorization: `Bearer ${accessToken}` }),
-      'User-Agent': ESI_USER_AGENT,
-      'X-User-Agent': ESI_USER_AGENT,
-      'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-      Accept: 'application/json',
-    },
+    headers: esiHeaders(accessToken),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (res.status === 403) return { kind: 'forbidden' };

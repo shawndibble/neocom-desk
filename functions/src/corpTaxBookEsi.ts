@@ -5,7 +5,7 @@
 // every other ESI call (esiNotifications.ts).
 
 import { HttpsError } from 'firebase-functions/v2/https';
-import { ESI_BASE, ESI_COMPATIBILITY_DATE, ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_BASE, esiHeaders } from './esiClient.js';
 
 export const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
 
@@ -23,13 +23,7 @@ async function getJson(
   fetchImpl: typeof fetch
 ): Promise<unknown> {
   const res = await fetchImpl(url, {
-    headers: {
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      'User-Agent': ESI_USER_AGENT,
-      'X-User-Agent': ESI_USER_AGENT,
-      'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-      Accept: 'application/json',
-    },
+    headers: esiHeaders(accessToken),
     signal: AbortSignal.timeout(15_000),
   });
   if (res.status === 403 || res.status === 401) {
@@ -107,13 +101,7 @@ export function esiIdCategoryLookup(fetchImpl: typeof fetch = fetch): IdCategory
   return async (id) => {
     const res = await fetchImpl(`${ESI_BASE}/universe/names/`, {
       method: 'POST',
-      headers: {
-        'User-Agent': ESI_USER_AGENT,
-        'X-User-Agent': ESI_USER_AGENT,
-        'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
+      headers: { ...esiHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify([id]),
       signal: AbortSignal.timeout(15_000),
     });

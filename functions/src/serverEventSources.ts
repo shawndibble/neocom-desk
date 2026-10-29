@@ -3,7 +3,7 @@
 // (`src/market/fuzzwork.ts`). It needs no token and sends the app's descriptive
 // User-Agent, which carries no email address.
 
-import { ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT } from './esiClient.js';
 import { isRecord } from './guards.js';
 
 const FUZZWORK_AGGREGATES = 'https://market.fuzzwork.co.uk/aggregates/';

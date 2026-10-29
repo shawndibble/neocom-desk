@@ -5,7 +5,7 @@
  * (`open-prices/<typeId>.json`). The shrink guard's last-run record, which the function
  * kept in Firestore, lives in an R2 object next to the output. Touches no Firestore.
  */
-import { ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT } from './esiClient.js';
 import {
   OpenPriceFold,
   SNAPSHOT_HUBS,

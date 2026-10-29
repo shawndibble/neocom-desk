@@ -5,13 +5,8 @@
 // reads a status code — 304 costs nothing, 403 is "this grant cannot read mail",
 // 420/429 stop the run, a low budget stops it after this call.
 
-import {
-  ESI_BASE,
-  ESI_COMPATIBILITY_DATE,
-  ESI_USER_AGENT,
-  isBudgetLow,
-  retryAfterMs,
-} from './esiNotifications.js';
+import { ESI_BASE, esiHeaders } from './esiClient.js';
+import { isBudgetLow, retryAfterMs } from './esiNotifications.js';
 import type { MailHeader } from './mailPush.js';
 
 export type MailHeadersResult =
@@ -44,14 +39,7 @@ export async function fetchMailHeaders(
   fetchImpl: typeof fetch = fetch
 ): Promise<MailHeadersResult> {
   const res = await fetchImpl(`${ESI_BASE}/characters/${characterId}/mail/`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'User-Agent': ESI_USER_AGENT,
-      'X-User-Agent': ESI_USER_AGENT,
-      'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-      Accept: 'application/json',
-      ...(etag ? { 'If-None-Match': etag } : {}),
-    },
+    headers: { ...esiHeaders(accessToken), ...(etag ? { 'If-None-Match': etag } : {}) },
     signal: AbortSignal.timeout(15_000),
   });
 
