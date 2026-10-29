@@ -19,9 +19,9 @@ import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import type { VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
+import type { Translate } from '@/lib/translate';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /** Tech I/II/III rank in that order; every other meta group (Faction, Storyline, Officer, …) sorts after them, alphabetically among themselves — not plain alphabetical, which would put "Faction" ahead of "T1". */
 const KNOWN_TIER_RANK: Record<string, number> = { T1: 0, T2: 1, T3: 2 };

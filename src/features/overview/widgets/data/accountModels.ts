@@ -59,7 +59,8 @@ import {
   stockTable,
 } from './moneyModels';
 import { ordersListed, ordersStateChart, ordersTable } from './ordersModels';
-import type { Feeds, ListRow, NumberModel, NumberSecondary, Translate } from './types';
+import type { Feeds, ListRow, NumberModel, NumberSecondary } from './types';
+import type { Translate } from '@/lib/translate';
 
 /** The Contracts History table, unfiltered: the widget counts hauls and outstanding contracts, which no one status covers. */
 export const CONTRACTS_HREF = '/contracts/history';

@@ -13,6 +13,7 @@ import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 import { createTtlCache } from '@/lib/ttlCache';
 import type { KillRecord, KillSpace } from '@/engine/pilotList/killActivity';
 import type { RecentKill, RecentKillAttacker } from '@/engine/route/recentKills';
+import { isRecord } from '@/engine/guards';
 
 /**
  * Why a zKillboard request failed: no answer (`offline`, a thrown fetch or a
@@ -113,10 +114,6 @@ export interface ZkillHullLoss {
 /** `ok: false` when zKillboard failed or rate-limited, so "no losses" and "couldn't load" differ. */
 export type HullLossesResult =
   { ok: true; losses: ZkillHullLoss[] } | { ok: false; losses: []; reason: ZkillFailureReason };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 function finiteOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;

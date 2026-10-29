@@ -16,15 +16,13 @@
  * readable), anything else is required and a baseline without it is discarded.
  */
 
+import { isRecord } from '@/engine/guards';
+
 /** A check for one field, narrowing to that field's type. */
 type Check<T> = (raw: unknown) => raw is T;
 
 /** One check per field of `T`, optional fields included. */
 type ShapeSpec<T> = { readonly [K in keyof T]-?: Check<T[K]> };
-
-function isRecord(raw: unknown): raw is Record<string, unknown> {
-  return typeof raw === 'object' && raw !== null;
-}
 
 /**
  * Builds a guard for `T` from one check per field. A value passes when it is

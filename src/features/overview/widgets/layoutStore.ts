@@ -31,15 +31,14 @@ import {
 import { migrateRetiredKind } from './migrate';
 import { SIZES } from './sizes';
 import { isRowsPerPage } from './tableSortPage';
+import { isPlainRecord } from '@/engine/guards';
 
 export const OVERVIEW_LAYOUT_KEY = 'sync.overviewLayout';
 
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-
 function parseWidget(stored: unknown): Widget | null {
-  const raw = isRecord(stored) ? migrateRetiredKind(stored) : stored;
-  if (!isRecord(raw) || typeof raw.id !== 'string' || typeof raw.kind !== 'string') return null;
+  const raw = isPlainRecord(stored) ? migrateRetiredKind(stored) : stored;
+  if (!isPlainRecord(raw) || typeof raw.id !== 'string' || typeof raw.kind !== 'string')
+    return null;
   const def = getKind(raw.kind);
   // A kind from a newer build: keep it exactly as found.
   if (!def) return raw as unknown as Widget;
@@ -85,7 +84,7 @@ function parseWidget(stored: unknown): Widget | null {
 }
 
 export function parseLayout(raw: unknown): OverviewLayout | null {
-  if (!isRecord(raw) || !Array.isArray(raw.widgets)) return null;
+  if (!isPlainRecord(raw) || !Array.isArray(raw.widgets)) return null;
   const seen = new Set<string>();
   const widgets: Widget[] = [];
   for (const entry of raw.widgets) {

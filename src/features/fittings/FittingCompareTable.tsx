@@ -12,8 +12,7 @@ import { STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
 import { formatSeconds } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 function formatValue(row: CompareRow, index: number, t: Translate): string {
   if (row.key === 'capacitor') {

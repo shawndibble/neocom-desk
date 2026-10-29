@@ -90,8 +90,6 @@ export interface ChargeQuickPicks {
 
 /** "Best value" looks at charges doing at least this share of the top damage. */
 export const BEST_VALUE_SHARE = 0.9;
-/** With a target distance set, a type landing under this share of the best is dimmed. */
-export const WEAK_SHARE = 0.5;
 /** A faction charge costing more than this many times its Tech I per minute is flagged. */
 export const PRICEY_RATIO = 10;
 

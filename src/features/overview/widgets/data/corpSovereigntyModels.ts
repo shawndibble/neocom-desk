@@ -31,7 +31,8 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpSovereigntyFeed, CorpSovereigntyRow } from './corpFeeds';
 import type { ChartModel } from '../charts/types';
-import type { RowDetailModel, TableCell, TableRowModel, Translate } from './types';
+import type { RowDetailModel, TableCell, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const W = 'overview.widgets.corpSovereignty';
 const HOUR_MS = 3_600_000;

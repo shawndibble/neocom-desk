@@ -17,6 +17,7 @@
  */
 import { growthCollector, type CoveringAssignment } from './ownership';
 import type { MiningLedgerEntry, OreLine } from './types';
+import { utcDay } from '@/engine/localDay';
 
 /** How long past its ETA a connection still claims ore: ESI's mining ledger runs a few minutes behind the game, sometimes more. */
 export const LEDGER_GRACE_MS = 60 * 60 * 1000;
@@ -58,10 +59,6 @@ export interface ConnectionWindowInput {
   expiresAt: number;
 }
 
-function utcDate(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
 /**
  * From the first scan's UTC date until the field runs out: the ETA while it is
  * being mined, the time it was found empty once finished, and 12 hours from
@@ -78,7 +75,7 @@ export function connectionWindow(
   const end = input.finished
     ? (input.finishedAt ?? input.lastAt)
     : (input.etaAt ?? connectedAt + NO_ETA_WINDOW_MS);
-  return { fromDate: utcDate(input.firstAt), untilMs: Math.min(end, input.expiresAt) };
+  return { fromDate: utcDay(input.firstAt), untilMs: Math.min(end, input.expiresAt) };
 }
 
 /**
@@ -166,7 +163,7 @@ function covers(c: SurveyConnection, e: MiningLedgerEntry, nowMs: number): boole
     c.characterId === e.characterId &&
     c.systemId === e.solarSystemId &&
     c.fromDate <= e.date &&
-    e.date <= utcDate(c.untilMs) &&
+    e.date <= utcDay(c.untilMs) &&
     isConnectionLive(c, nowMs)
   );
 }

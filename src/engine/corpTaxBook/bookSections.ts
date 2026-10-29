@@ -6,8 +6,8 @@
  */
 import type { BookView, DayRow, ExtractionRow } from './bookView';
 import type { OreLine } from './types';
+import { DAY_MS } from '@/lib/age';
 
-const DAY_MS = 86_400_000;
 /** How far ahead the Overview looks for an Extracting moon's chunk to arrive. */
 export const POPS_WINDOW_DAYS = 7;
 

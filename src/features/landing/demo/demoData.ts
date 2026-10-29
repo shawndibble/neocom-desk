@@ -33,8 +33,8 @@ import type {
   FeedState,
   KindView,
   TableModel,
-  Translate,
 } from '@/features/overview/widgets/data/types';
+import type { Translate } from '@/lib/translate';
 import type { Widget } from '@/features/overview/widgets/layout';
 import { formatIskCompact } from '@/lib/isk';
 import { NEXT_EVENT } from './demoCast';

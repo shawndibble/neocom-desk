@@ -3,8 +3,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import type { ResistRow } from './ResistTable';
 import { RESIST_TYPES, RESONANCE_KEY, formatEhp } from './resistFormat';
 import { fmt0 } from './fixedFormat';
-
-type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** The Defense table's rows: shield, armor, hull, then one row per RAH with its adapted resists. */
 export function resistRows(

@@ -19,8 +19,7 @@ import type {
   ShipLostFire,
 } from '@/engine/notificationDiffs';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-
-export type Translate = (key: string, vars?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /**
  * The fire a server push of `newMail` carries (issue #5143): the poller's own

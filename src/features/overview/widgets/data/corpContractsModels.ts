@@ -14,7 +14,8 @@ import { formatIskCompact } from '@/lib/isk';
 import { formatCountdown } from '@/lib/duration';
 import { openHref } from '@/lib/highlightParam';
 import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
-import type { TableCell, TableRowModel, Translate } from './types';
+import type { TableCell, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.corpContracts';
 /** The Contracts page's Corp view, where a member with no corp role reads the same list. */

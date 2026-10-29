@@ -21,7 +21,9 @@ import { formatIskCompact } from '@/lib/isk';
 import type { ChartModel } from '../charts/types';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { dayTitle } from './chartTips';
-import type { KindView, TableRowModel, Translate } from './types';
+import type { KindView, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
+import { utcDay } from '@/engine/localDay';
 
 const D = 'overview.widgets.data.omega';
 const C = 'overview.widgets.chart.omega';
@@ -29,12 +31,11 @@ const W = 'overview.widgets.omega';
 /** The Wallet page, where the journal behind the figure lives. */
 const OMEGA_PATH = '/wallet';
 
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 /** The day a period's last moment falls on. */
-const lastDay = (p: OmegaPeriod) => isoDay(p.endMs - 1);
+const lastDay = (p: OmegaPeriod) => utcDay(p.endMs - 1);
 
 function periodTitle(t: Translate, p: OmegaPeriod): string {
-  return t(`${W}.period`, { from: dayTitle(isoDay(p.startMs)), to: dayTitle(lastDay(p)) });
+  return t(`${W}.period`, { from: dayTitle(utcDay(p.startMs)), to: dayTitle(lastDay(p)) });
 }
 
 export const omega: Builder = (

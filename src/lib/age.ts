@@ -5,11 +5,12 @@
  * badge adds a staleness *tone* on top of this, which a fired notification
  * deliberately does not (an old notification is old, not wrong).
  */
+
+import type { Translate } from '@/lib/translate';
+
 export const MINUTE_MS = 60_000;
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 export function formatAge(ms: number, t: Translate): string {
   if (ms < MINUTE_MS) return t('common.age.justNow');

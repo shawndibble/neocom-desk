@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isFiniteNumber, isRecord } from './guards';
+import { isFiniteNumber, isPlainRecord, isRecord } from './guards';
 
 describe('isRecord', () => {
   it('accepts objects', () => expect(isRecord({ a: 1 })).toBe(true));
@@ -16,5 +16,14 @@ describe('isFiniteNumber', () => {
     expect(isFiniteNumber(NaN)).toBe(false);
     expect(isFiniteNumber(Infinity)).toBe(false);
     expect(isFiniteNumber('1')).toBe(false);
+  });
+});
+
+describe('isPlainRecord', () => {
+  it('accepts objects', () => expect(isPlainRecord({ a: 1 })).toBe(true));
+  it('rejects arrays, null and primitives', () => {
+    expect(isPlainRecord([])).toBe(false);
+    expect(isPlainRecord(null)).toBe(false);
+    expect(isPlainRecord('x')).toBe(false);
   });
 });

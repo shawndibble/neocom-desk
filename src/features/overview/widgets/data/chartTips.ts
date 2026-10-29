@@ -4,7 +4,7 @@
  * figures; the strings are translated here so a chart only draws them.
  */
 import { formatDateOnly } from '@/lib/timestamp';
-import type { Translate } from './types';
+import type { Translate } from '@/lib/translate';
 
 const TIP = 'overview.widgets.chart.tip';
 

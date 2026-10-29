@@ -15,8 +15,7 @@ import type {
 import type { HangarDivisionNumber } from '@/engine/corp/assetDivisions';
 import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
 import { tabForState, type CorpAssetTab } from './corpAssetsTabs';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 const STATE_KEY: Readonly<Record<LedgerState, string>> = {
   offices: 'corp.assets.state.offices',

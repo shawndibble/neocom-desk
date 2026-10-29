@@ -2,8 +2,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import type { Fact } from '../StatFacts';
 import type { Figure } from './statFigures';
 import { fmt0, fmt1, fmt2 } from './fixedFormat';
-
-type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
 export function resourceFacts(

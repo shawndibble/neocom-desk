@@ -3,8 +3,7 @@ import { formatSeconds } from '@/lib/duration';
 import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
 import { fixed0 } from '@/lib/fixedFormat';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 function formatDelta(change: StatChange): number {
   const digits = STAT_DIGITS[change.key];

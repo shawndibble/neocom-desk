@@ -5,6 +5,8 @@
  * Nothing here fetches; the loader and the pricing hook feed it.
  */
 
+import { isRecord } from '../guards';
+
 /** The parts of a project detail read this module looks at (`getCorporationProject`). */
 export interface ProjectDetailInput {
   id: string;
@@ -39,9 +41,6 @@ export interface CorpManufactureProject {
   /** ISO end date; null for a project with none. */
   expires: string | null;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
 
 /**
  * The one item a manufacture project asks for. A project naming a market group,

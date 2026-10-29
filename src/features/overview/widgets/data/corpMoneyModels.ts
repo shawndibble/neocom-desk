@@ -13,7 +13,8 @@ import { backwardBucketSums } from './chartSeries';
 import { rollingTitles, signTone } from './chartTips';
 import type { CorpJournalLine, CorpWalletFeed } from './corpFeeds';
 import type { BarsChartModel } from '../charts/types';
-import type { FeedState, KindView, NumberModel, TableCell, TableModel, Translate } from './types';
+import type { FeedState, KindView, NumberModel, TableCell, TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const TO = '/corp/wallet';
 const W = 'overview.widgets';

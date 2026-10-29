@@ -11,8 +11,11 @@
  * side of a DST change, and the error is invisible until someone's event files
  * under the wrong heading. Both boards had their own body for this before —
  * one rule, two implementations, and the DST prose duplicated with them.
+ *
+ * `utcDay` and `shiftUtcDate` are the same idea on the UTC (EVE) calendar.
  */
-const DAY_MS = 86_400_000;
+
+import { DAY_MS } from '@/lib/age';
 
 export function localMidnight(ms: number): number {
   const date = new Date(ms);

@@ -69,9 +69,7 @@ import type {
   SovRaidsWidgetData,
 } from './kindLoaders';
 import type { MarketTrendFeed } from './marketTrendLoader';
-
-/** The narrow slice of i18next's `t` the adapters need. */
-export type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /**
  * The one line under the headline figure. It must add a fact the headline

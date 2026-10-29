@@ -10,7 +10,8 @@ import { formatCountdown } from '@/lib/duration';
 import { openHref } from '@/lib/highlightParam';
 import type { StackChartModel, StackPart } from '../charts/types';
 import { UNKNOWN } from './builderKit';
-import type { TableCell, TableModel, TableRowModel, Translate } from './types';
+import type { TableCell, TableModel, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const W = 'overview.widgets';
 
