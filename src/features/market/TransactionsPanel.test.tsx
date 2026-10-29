@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -435,25 +436,13 @@ describe('TransactionsPanel — margin', () => {
 });
 
 describe('TransactionsPanel — phone', () => {
-  const original = window.matchMedia;
   const originalScroll = Element.prototype.scrollIntoView;
   beforeEach(() => {
     // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
+    stubViewport(() => true);
     Element.prototype.scrollIntoView = vi.fn();
   });
   afterEach(() => {
-    window.matchMedia = original;
     Element.prototype.scrollIntoView = originalScroll;
   });
 

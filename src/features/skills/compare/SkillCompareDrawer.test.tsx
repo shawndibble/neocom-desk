@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -447,31 +448,17 @@ describe('SkillCompareDrawer', () => {
   });
 
   it('draws one card per skill on a phone, with each character as a labelled line', async () => {
-    const original = window.matchMedia;
-    window.matchMedia = ((query: string) => ({
-      matches: query.includes('max-width'),
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-      onchange: null,
-    })) as typeof window.matchMedia;
-    try {
-      renderDrawer(`?ids=${CHAR_A},${CHAR_B}`);
+    stubViewport((query) => query.includes('max-width'));
+    renderDrawer(`?ids=${CHAR_A},${CHAR_B}`);
 
-      const dialog = await screen.findByRole('dialog', { name: 'Compare skills' });
-      const card = (
-        await within(dialog).findByText('Gunnery', { selector: 'a, button, span' })
-      ).closest('li')!;
-      expect(within(card).getByText('Pilot One')).toBeInTheDocument();
-      expect(within(card).getByText('Pilot Two')).toBeInTheDocument();
-      expect(within(card).getByText('+2')).toBeInTheDocument();
-      expect(screen.queryByRole('table', { name: 'Skill comparison' })).not.toBeInTheDocument();
-    } finally {
-      window.matchMedia = original;
-    }
+    const dialog = await screen.findByRole('dialog', { name: 'Compare skills' });
+    const card = (
+      await within(dialog).findByText('Gunnery', { selector: 'a, button, span' })
+    ).closest('li')!;
+    expect(within(card).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(card).getByText('Pilot Two')).toBeInTheDocument();
+    expect(within(card).getByText('+2')).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Skill comparison' })).not.toBeInTheDocument();
   });
 
   describe('loading contract (DESIGN §6a)', () => {

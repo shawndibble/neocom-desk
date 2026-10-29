@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { stubViewport } from '@/test/viewport';
 import {
   DataTable,
   DataTableDenseCell,
@@ -176,26 +177,15 @@ describe('DataTable selectedRowKey', () => {
   });
 
   it('draws the same selected visual on the phone card render', () => {
-    const real = window.matchMedia;
-    window.matchMedia = ((media: string) =>
-      ({
-        media,
-        matches: media === PHONE_QUERY,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList) as typeof window.matchMedia;
-    try {
-      renderTable({ selectedRowKey: 2 });
-      expect(screen.getByRole('table')).toHaveClass('dt-stacked');
-      // The card is the row itself (`display: flex` under `dt-stacked`).
-      const card = document.querySelector('[data-row-key="2"]');
-      expect(card).toHaveAttribute('aria-current', 'true');
-      expect(card).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
-      expect(card?.className).toContain('[&_.dt-primary]:text-accent');
-      expect(document.querySelector('[data-row-key="1"]')).toHaveClass('border-l-transparent');
-    } finally {
-      window.matchMedia = real;
-    }
+    stubViewport(PHONE_QUERY);
+    renderTable({ selectedRowKey: 2 });
+    expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+    // The card is the row itself (`display: flex` under `dt-stacked`).
+    const card = document.querySelector('[data-row-key="2"]');
+    expect(card).toHaveAttribute('aria-current', 'true');
+    expect(card).toHaveClass('border-l-2', 'border-l-accent', 'bg-panel-2');
+    expect(card?.className).toContain('[&_.dt-primary]:text-accent');
+    expect(document.querySelector('[data-row-key="1"]')).toHaveClass('border-l-transparent');
   });
 });
 
@@ -900,25 +890,15 @@ describe('DataTable', () => {
     });
 
     it('shows cards (`dt-stacked`) below `sm`, or wherever the caller says', () => {
-      const real = window.matchMedia;
-      window.matchMedia = ((media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList) as typeof window.matchMedia;
-      try {
-        const phone = renderTable();
-        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
-        phone.unmount();
-        // A table that knows it has room keeps its columns even on a phone.
-        const wide = renderTable({ stacked: false });
-        expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
-        wide.unmount();
-      } finally {
-        window.matchMedia = real;
-      }
+      const restoreViewport = stubViewport(PHONE_QUERY);
+      const phone = renderTable();
+      expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+      phone.unmount();
+      // A table that knows it has room keeps its columns even on a phone.
+      const wide = renderTable({ stacked: false });
+      expect(screen.getByRole('table')).not.toHaveClass('dt-stacked');
+      wide.unmount();
+      restoreViewport();
 
       // jsdom's own `matchMedia` never matches: a desktop viewport.
       const desktop = renderTable();
@@ -997,19 +977,8 @@ describe('DataTable opt-in phone features', () => {
     };
 
     function withPhone(run: () => void) {
-      const original = window.matchMedia;
-      window.matchMedia = ((media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList) as typeof window.matchMedia;
-      try {
-        run();
-      } finally {
-        window.matchMedia = original;
-      }
+      stubViewport(PHONE_QUERY);
+      run();
     }
 
     it('hides the column below sm on its th and tds in table mode', () => {
@@ -1365,25 +1334,9 @@ describe('DataTable opt-in phone features', () => {
     }
 
     describe('on a phone', () => {
-      let restore: () => void;
       beforeEach(() => {
-        const real = window.matchMedia;
-        window.matchMedia = ((media: string) =>
-          ({
-            media,
-            matches: media === PHONE_QUERY,
-            onchange: null,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-            addListener: () => {},
-            removeListener: () => {},
-            dispatchEvent: () => false,
-          }) as unknown as MediaQueryList) as typeof window.matchMedia;
-        restore = () => {
-          window.matchMedia = real;
-        };
+        stubViewport(PHONE_QUERY);
       });
-      afterEach(() => restore());
 
       it('folds a multi-row group behind a collapsed toggle; singletons stay ordinary rows', () => {
         renderOffers();
@@ -1593,29 +1546,18 @@ describe('DataTable virtualize', () => {
         { id: 'amount', header: 'Amount', width: '12ch', render: (row) => row.amount },
         { id: 'extra', header: 'Extra', width: '77ch', phoneHidden: true, render: () => 'x' },
       ];
-      const real = window.matchMedia;
-      window.matchMedia = ((media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList) as typeof window.matchMedia;
-      try {
-        render(
-          <DataTable
-            label="Offers"
-            columns={cols}
-            rows={many}
-            rowKey={(row) => row.id}
-            responsive="table"
-            virtualize
-          />
-        );
-        expect(screen.getByRole('table').getAttribute('style')).not.toContain('77ch');
-      } finally {
-        window.matchMedia = real;
-      }
+      stubViewport(PHONE_QUERY);
+      render(
+        <DataTable
+          label="Offers"
+          columns={cols}
+          rows={many}
+          rowKey={(row) => row.id}
+          responsive="table"
+          virtualize
+        />
+      );
+      expect(screen.getByRole('table').getAttribute('style')).not.toContain('77ch');
     });
 
     it('hugColumns sizes headers and the table floor but keeps the auto layout', () => {
@@ -1639,21 +1581,10 @@ describe('DataTable virtualize', () => {
     });
 
     it('keeps the card layout free of fixed widths on a phone', () => {
-      const real = window.matchMedia;
-      window.matchMedia = ((media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList) as typeof window.matchMedia;
-      try {
-        renderSized({ virtualize: true });
-        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
-        expect(screen.getByRole('table')).not.toHaveClass('table-fixed');
-      } finally {
-        window.matchMedia = real;
-      }
+      stubViewport(PHONE_QUERY);
+      renderSized({ virtualize: true });
+      expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+      expect(screen.getByRole('table')).not.toHaveClass('table-fixed');
     });
   });
 

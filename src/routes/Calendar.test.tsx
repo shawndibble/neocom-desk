@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -19,6 +19,7 @@ import {
 import { App } from '@/app/App';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { exportRows } from '@/lib/downloadCsv';
+import { stubViewport } from '@/test/viewport';
 
 // The export test reads the rows handed to the export rather than a file.
 vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
@@ -125,30 +126,9 @@ const server = mswServer(...baseHandlers());
  * the Calendar Map unless it calls this, which flips the page to its Day
  * Ticker branch. Same shape as `FilterBar.test.tsx`.
  */
-let restoreMatchMedia: (() => void) | undefined;
-
 function useNarrowViewport(): void {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  restoreMatchMedia = () => {
-    window.matchMedia = real;
-  };
+  stubViewport(NARROW_QUERY);
 }
-
-afterEach(() => {
-  restoreMatchMedia?.();
-  restoreMatchMedia = undefined;
-});
 
 /**
  * Every day cell's accessible name that reports a load, from whichever of the

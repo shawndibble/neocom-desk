@@ -14,6 +14,7 @@ import { useRecentNav } from '@/app/navPreferences';
 import { GLOBAL_CACHE_CHARACTER_ID, writeCached } from '@/esi/cache';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { SHIP_TREE } from '@/features/fittings/shipTree/__fixtures__/shipTreeFixture';
+import { stubViewport } from '@/test/viewport';
 import { loadPaletteContacts } from './contactsProvider';
 
 // The session catalogue is module-level; each test gets a fresh one behind it.
@@ -163,15 +164,7 @@ describe('CommandPalette', () => {
 
   describe('empty query', () => {
     function matchDesktop(matches: boolean) {
-      vi.spyOn(window, 'matchMedia').mockImplementation(
-        (media) =>
-          ({
-            matches,
-            media,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-          }) as unknown as MediaQueryList
-      );
+      stubViewport(() => matches);
     }
     const HINT = /paste a fit, item list, Local list or D-Scan/;
 

@@ -17,6 +17,7 @@ import {
 } from '@/features/character/contactsColumns';
 import * as routeChunks from '@/app/routeChunks';
 import * as download from '@/lib/download';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -84,25 +85,9 @@ function openFilters() {
   fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
 }
 
-let restoreMatchMedia: (() => void) | undefined;
-
 /** Below `md`, `FilterBar` opens its filters in a bottom sheet. */
 function useNarrowViewport(): void {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  restoreMatchMedia = () => {
-    window.matchMedia = real;
-  };
+  stubViewport(NARROW_QUERY);
 }
 
 const server = setupServer(
@@ -140,8 +125,6 @@ beforeAll(async () => {
 afterAll(() => server.close());
 afterEach(() => {
   server.resetHandlers();
-  restoreMatchMedia?.();
-  restoreMatchMedia = undefined;
   vi.restoreAllMocks();
 });
 async function seed() {

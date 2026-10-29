@@ -14,6 +14,7 @@ import { definePageTabs, type TabRouteDefaultState } from '@/lib/pageTabs';
 import { usePageTab, useRememberedPageTab, type RememberedTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
+import { stubViewport } from '@/test/viewport';
 import { TabRoute } from './TabRoute';
 
 const PAGE = definePageTabs('/page', [
@@ -151,12 +152,7 @@ describe('TabRoute with an index state', () => {
   );
 
   function renderIndexed(wide: boolean) {
-    vi.stubGlobal('matchMedia', (media: string) => ({
-      media,
-      matches: wide,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
+    stubViewport(() => wide);
     return render(
       <MemoryRouter initialEntries={['/idx']}>
         <Routes>

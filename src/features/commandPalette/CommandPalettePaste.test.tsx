@@ -5,6 +5,7 @@ import '@/i18n';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { DESTINATIONS } from '@/app/pasteRouting';
+import { stubViewport } from '@/test/viewport';
 import { CommandPaletteHost } from './CommandPaletteHost';
 import { useCommandPalette } from './store';
 
@@ -86,15 +87,7 @@ async function paste(target: Element, text: string) {
 }
 
 beforeEach(() => {
-  vi.spyOn(window, 'matchMedia').mockImplementation(
-    (media) =>
-      ({
-        matches: false,
-        media,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList
-  );
+  stubViewport(() => false);
 });
 
 afterEach(() => {

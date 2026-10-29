@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import PriceHistoryChart, { HistoryTooltip } from './PriceHistoryChart';
@@ -31,23 +32,8 @@ import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
  * max-width query reads as a phone. Same override the Market route tests use.
  */
 function withPhoneViewport(body: () => void): void {
-  const original = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: true,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  try {
-    body();
-  } finally {
-    window.matchMedia = original;
-  }
+  stubViewport(() => true);
+  body();
 }
 
 afterEach(async () => {

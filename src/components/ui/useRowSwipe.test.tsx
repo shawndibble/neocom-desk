@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { stubViewport } from '@/test/viewport';
 import {
   ROW_SWIPE_ACTIVATE_DISTANCE,
   ROW_SWIPE_DISMISS_DISTANCE,
@@ -59,19 +60,7 @@ function swipe(el: Element, dx: number, elapsedMs: number, opts: SwipeOptions = 
 }
 
 function mockReducedMotion(reduce: boolean) {
-  vi.spyOn(window, 'matchMedia').mockImplementation(
-    (query) =>
-      ({
-        media: query,
-        matches: reduce && query.includes('prefers-reduced-motion'),
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList
-  );
+  stubViewport((query) => reduce && query.includes('prefers-reduced-motion'));
 }
 
 afterEach(() => {

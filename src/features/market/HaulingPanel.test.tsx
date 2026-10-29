@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { configureClipboard } from '@/lib/clipboard';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
@@ -1035,21 +1036,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     phone = true;
     panelRem = 20;
     // jsdom's `matchMedia` never matches; the filter sheet needs the narrow query to.
-    const realMatchMedia = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    onTestFinished(() => {
-      window.matchMedia = realMatchMedia;
-    });
+    stubViewport(NARROW_QUERY);
     setCargo(100_000);
     const user = userEvent.setup();
     renderPanel();

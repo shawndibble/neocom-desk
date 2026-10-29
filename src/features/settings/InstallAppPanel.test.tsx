@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -19,7 +20,7 @@ function setUserAgent(userAgent: string) {
 beforeEach(() => {
   useInstallApp.setState({ deferredPrompt: null });
   setUserAgent(desktopUA);
-  window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as never;
+  stubViewport(() => false);
 });
 
 describe('InstallAppPanel', () => {
@@ -58,7 +59,7 @@ describe('InstallAppPanel', () => {
 
   it('says so when already installed', () => {
     setUserAgent(androidUA);
-    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as never;
+    stubViewport(() => true);
     render(<InstallAppPanel />);
     expect(screen.getByText(/is installed on this device/)).toBeInTheDocument();
   });
