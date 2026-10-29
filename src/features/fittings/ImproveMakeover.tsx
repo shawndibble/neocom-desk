@@ -5,6 +5,7 @@
  * after figures on top. Renders from props only: the search, names and prices
  * come from the owner.
  */
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, IskAmount, TypeIcon } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -15,7 +16,6 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { formatSignedPercent } from '@/lib/formatSignedPercent';
-import { m3sFormat } from './improveLineText';
 import { groupTick, groupToggleTarget, showsOwnGain } from './improveMakeoverTicks';
 import { MakeItFitSection } from './MakeItFitSection';
 
@@ -57,11 +57,7 @@ const resourceTone = (used: number, total: number): Tone =>
   used > total ? 'over' : total > 0 && used / total >= 0.98 ? 'tight' : 'same';
 
 /** The whole-fit figures: DPS, EHP, speed, capacitor, CPU, powergrid. */
-function figuresOf(
-  t: (key: string) => string,
-  before: FittingStats,
-  after: FittingStats
-): Figure[] {
+function figuresOf(t: TFunction, before: FittingStats, after: FittingStats): Figure[] {
   const cap = (s: FittingStats) =>
     s.capacitor.stable
       ? t('fittings.improve.makeover.capStable')
@@ -76,8 +72,12 @@ function figuresOf(
     { id: 'ehp', ...pair(before.ehp, after.ehp), tone: higher(before.ehp, after.ehp) },
     {
       id: 'speed',
-      before: `${formatCount(before.navigation.maxVelocity)} m/s`,
-      after: `${formatCount(after.navigation.maxVelocity)} m/s`,
+      before: t('fittings.improve.makeover.speedValue', {
+        value: formatCount(before.navigation.maxVelocity),
+      }),
+      after: t('fittings.improve.makeover.speedValue', {
+        value: formatCount(after.navigation.maxVelocity),
+      }),
       tone: higher(before.navigation.maxVelocity, after.navigation.maxVelocity),
     },
     {
@@ -94,8 +94,8 @@ function figuresOf(
     },
     {
       id: 'powergrid',
-      before: `${m3sFormat(before.powergridUsed)}/${m3sFormat(before.powergridTotal)}`,
-      after: `${m3sFormat(after.powergridUsed)}/${m3sFormat(after.powergridTotal)}`,
+      before: `${formatCount(before.powergridUsed)}/${formatCount(before.powergridTotal)}`,
+      after: `${formatCount(after.powergridUsed)}/${formatCount(after.powergridTotal)}`,
       tone: resourceTone(after.powergridUsed, after.powergridTotal),
     },
   ];
@@ -145,7 +145,6 @@ export function ImproveMakeover({
         >
           <Checkbox
             className="mt-0.5"
-            aria-label={t('fittings.improve.makeover.groupTick')}
             checked={state === 'all'}
             ref={(element) => {
               if (element) element.indeterminate = state === 'some';

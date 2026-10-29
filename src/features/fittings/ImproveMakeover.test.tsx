@@ -62,7 +62,7 @@ describe('ImproveMakeover', () => {
   it('unticking a row leaves the group partly ticked and shows the own gains', async () => {
     render(<Harness />);
     await userEvent.click(screen.getByRole('checkbox', { name: /Damage Control II/ }));
-    const group = screen.getByRole('checkbox', { name: 'Whole Makeover' });
+    const group = screen.getByRole('checkbox', { name: /Makeover/ });
     expect(group).not.toBeChecked();
     expect((group as HTMLInputElement).indeterminate).toBe(true);
     expect(screen.getByText('Makeover, 3 of 4 changes ticked')).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe('ImproveMakeover', () => {
 
   it('ticking the group ticks every row, and again unticks them all', async () => {
     render(<Harness initial={[]} />);
-    const group = screen.getByRole('checkbox', { name: 'Whole Makeover' });
+    const group = screen.getByRole('checkbox', { name: /Makeover/ });
     await userEvent.click(group);
     for (const box of screen.getAllByRole('checkbox')) expect(box).toBeChecked();
     await userEvent.click(group);
@@ -80,7 +80,7 @@ describe('ImproveMakeover', () => {
 
   it('a partly ticked group ticks the rest when clicked', async () => {
     render(<Harness initial={[MAKEOVER_KEYS[0]!]} />);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Whole Makeover' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Makeover/ }));
     for (const box of screen.getAllByRole('checkbox')) expect(box).toBeChecked();
   });
 });

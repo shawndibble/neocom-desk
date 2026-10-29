@@ -794,6 +794,7 @@
         "ammo": "Ammo",
         "speed": "Max speed",
         "capacitor": "Capacitor",
+        "speedValue": "{{value}} m/s",
         "capStable": "Stable at {{pct}}%",
         "capDepletes": "Empty in {{time}}",
         "signature": "Signature",
@@ -1532,7 +1533,6 @@
       },
       "makeover": {
         "heading": "Makeover",
-        "groupTick": "Whole Makeover",
         "whole_one": "Makeover · {{count}} change",
         "whole_other": "Whole Makeover · {{count}} changes",
         "partTicked_one": "Makeover, {{ticked}} of {{count}} change ticked",
