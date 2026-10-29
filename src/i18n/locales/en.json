@@ -1572,7 +1572,7 @@
       "repairLine": "Repairs {{before}} → {{after}} HP/s",
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
       "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
-      "exploreLine": "Hacking strength {{strengthBefore}} → {{strengthAfter}} · Coherence {{coherenceBefore}} → {{coherenceAfter}} · Scan strength {{scanBefore}}% → {{scanAfter}}%",
+      "exploreLine": "Hacking strength {{strengthBefore}} → {{strengthAfter}} · Coherence {{coherenceBefore}} → {{coherenceAfter}} · Cycle {{cycleBefore}} → {{cycleAfter}} s · Scan strength {{scanBefore}}% → {{scanAfter}}% · Scan time cut {{durationBefore}}% → {{durationAfter}}% · Deviation cut {{deviationBefore}}% → {{deviationAfter}}%",
       "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
       "command": {
         "strength": "Burst strength {{before}} → {{after}}",

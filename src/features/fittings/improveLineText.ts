@@ -3,7 +3,6 @@
  * scores, before and after, and why a rejected swap was turned down.
  */
 import type { TFunction } from 'i18next';
-import { exploreFigures } from '@/engine/fittings/explore';
 import { commandOf } from '@/engine/fittings/improveCommand';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import {
@@ -117,14 +116,20 @@ export function moveLine(
     });
   }
   if (goal === 'explore') {
-    const [was, now] = [exploreFigures(own.explore), exploreFigures(option.after.explore)];
+    const [was, now] = [own.explore, option.after.explore];
     return t('fittings.improve.exploreLine', {
-      strengthBefore: m3sFormat(was[0] ?? 0),
-      strengthAfter: m3sFormat(now[0] ?? 0),
-      coherenceBefore: m3sFormat(was[1] ?? 0),
-      coherenceAfter: m3sFormat(now[1] ?? 0),
-      scanBefore: m3sFormat(was[3] ?? 0),
-      scanAfter: m3sFormat(now[3] ?? 0),
+      strengthBefore: m3sFormat(was.hacking.strength),
+      strengthAfter: m3sFormat(now.hacking.strength),
+      coherenceBefore: m3sFormat(was.hacking.coherence),
+      coherenceAfter: m3sFormat(now.hacking.coherence),
+      cycleBefore: m3sFormat(was.hacking.cycleSeconds),
+      cycleAfter: m3sFormat(now.hacking.cycleSeconds),
+      scanBefore: m3sFormat(was.scanning.strength),
+      scanAfter: m3sFormat(now.scanning.strength),
+      durationBefore: m3sFormat(was.scanning.duration),
+      durationAfter: m3sFormat(now.scanning.duration),
+      deviationBefore: m3sFormat(was.scanning.deviation),
+      deviationAfter: m3sFormat(now.scanning.deviation),
     });
   }
   if (goal === 'align') return align();

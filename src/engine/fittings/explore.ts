@@ -13,7 +13,7 @@
  * percent); a Core Probe Launcher II takes scan probes (charge group 479).
  */
 
-export const EXPLORE_ATTRIBUTE = {
+const EXPLORE_ATTRIBUTE = {
   duration: 73,
   chargeGroup1: 604,
   virusStrength: 1909,

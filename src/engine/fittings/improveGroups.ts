@@ -42,7 +42,7 @@ const EXPLORE_GROUPS: readonly number[] = [538, 1223, 1238, 49, 1233, ...SPEED_G
 /** The rigs Explore better swaps a surplus CPU or powergrid rig for: scanning and hacking rigs, and the navigation rigs that speed or align. */
 export const EXPLORE_RIG_GROUPS: readonly number[] = [1233, 782];
 
-/** Engineering rigs (Processor Overclocking Unit, Ancillary Current Router, capacitor rigs): the CPU and powergrid rigs a fit may not need. */
+/** Engineering rigs (Processor Overclocking Unit, Ancillary Current Router, capacitor rigs): the CPU, powergrid and capacitor rigs a fit may not need. A needed capacitor rig is held by the capacitor Guardrail. */
 export const RESOURCE_RIG_GROUPS: readonly number[] = [781];
 
 /** Cap Recharger, Capacitor Power Relay, Capacitor Flux Coil, capacitor rigs. */
