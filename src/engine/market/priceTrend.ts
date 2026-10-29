@@ -4,8 +4,7 @@
  * scale that lets a 5 ISK mineral and a 5M ISK PLEX share a chart. Pure.
  */
 import { sortPriceHistory, type MarketHistoryPoint } from './priceHistory';
-
-const DAY_MS = 86_400_000;
+import { DAY_MS } from '@/lib/age';
 
 /** `YYYY-MM-DD` shifted by whole days (UTC, so no DST drift). */
 export function shiftDay(date: string, days: number): string {

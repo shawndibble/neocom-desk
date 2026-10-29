@@ -16,6 +16,7 @@ import { payeeOf, payoutPeriod, type Payee } from './payouts';
 import { effectiveOwnerRate, type OwnerRateEntry } from './ownerRate';
 import { resolveRate, type TaxRate } from './rates';
 import type { ObservedMiningEntry } from './types';
+import { utcDay } from '@/engine/localDay';
 
 /**
  * The accounting corporation's side of its moon owners (feeders): one row per
@@ -110,8 +111,6 @@ export interface MoonOwnerTotals {
 }
 
 export { deriveModeChanges, deriveOwnerRateHistory };
-
-const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 const paidOf = (payouts: readonly MoonOwnerPayout[]) =>
   payouts.reduce((sum, p) => (p.notAPayout ? sum : sum + p.amount), 0);

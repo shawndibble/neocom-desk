@@ -1,4 +1,4 @@
-const DAY_MS = 86_400_000;
+import { DAY_MS } from '@/lib/age';
 
 /**
  * An Extraction's window in days: the time from the pull's start to the chunk

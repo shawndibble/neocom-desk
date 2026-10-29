@@ -4,6 +4,7 @@
  * draws. No fetch here: `costIndexHistoryRead.ts` owns the network.
  */
 import type { IndustryActivity } from '@/engine/industry/types';
+import { DAY_MS } from '@/lib/age';
 
 export interface CostIndexHistory {
   systemId: number;
@@ -25,8 +26,6 @@ export const MIN_TREND_DAYS = 7;
 /** The trend's "ago" comparison, and the most days it plots. */
 const TREND_WINDOW_DAYS = 7;
 const MAX_TREND_DAYS = 90;
-const DAY_MS = 86_400_000;
-
 /** The Build Plan's activity as ESI's `/industry/systems` names it. */
 export function esiActivityName(activity: IndustryActivity): 'manufacturing' | 'reaction' {
   return activity === 'reaction' ? 'reaction' : 'manufacturing';

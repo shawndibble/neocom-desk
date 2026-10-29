@@ -1,3 +1,5 @@
+import { DAY_MS } from '@/lib/age';
+
 /**
  * Local calendar days, shared by both deadline boards.
  *
@@ -12,8 +14,6 @@
  * under the wrong heading. Both boards had their own body for this before —
  * one rule, two implementations, and the DST prose duplicated with them.
  */
-const DAY_MS = 86_400_000;
-
 export function localMidnight(ms: number): number {
   const date = new Date(ms);
   date.setHours(0, 0, 0, 0);

@@ -37,7 +37,8 @@ export const OVERVIEW_LAYOUT_KEY = 'sync.overviewLayout';
 
 function parseWidget(stored: unknown): Widget | null {
   const raw = isPlainRecord(stored) ? migrateRetiredKind(stored) : stored;
-  if (!isPlainRecord(raw) || typeof raw.id !== 'string' || typeof raw.kind !== 'string') return null;
+  if (!isPlainRecord(raw) || typeof raw.id !== 'string' || typeof raw.kind !== 'string')
+    return null;
   const def = getKind(raw.kind);
   // A kind from a newer build: keep it exactly as found.
   if (!def) return raw as unknown as Widget;
