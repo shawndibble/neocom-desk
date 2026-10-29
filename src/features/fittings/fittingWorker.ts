@@ -101,6 +101,10 @@ function createChannel() {
     get inFlight() {
       return pending.size;
     },
+    /** False once the worker crashed or was closed: the pool leaves it out. */
+    get usable() {
+      return !broken && !closed;
+    },
     /** Ends the worker; what still waits rejects `aborted`. */
     close() {
       closed = true;
@@ -139,7 +143,9 @@ export function createWorkerPool(size: number): WorkerPool {
   return {
     size: channels.length,
     send: (build, signal) => {
-      const idlest = channels.reduce((best, c) => (c.inFlight < best.inFlight ? c : best));
+      const live = channels.filter((c) => c.usable);
+      if (live.length === 0) return null;
+      const idlest = live.reduce((best, c) => (c.inFlight < best.inFlight ? c : best));
       return idlest.send(build, signal);
     },
     close: () => channels.forEach((c) => c.close()),

@@ -1228,13 +1228,19 @@ export async function findImprovements({
     return true;
   }
 
-  // Calculations run up to `concurrency` ahead of the one being scored; a failure is kept as null, never a loose rejection.
+  // Not `runPool`: results are scored in candidate order, so calculations run ahead of the one being scored, `concurrency` at once; a failure is kept as null, never a loose rejection.
   const started = new Map<number, { swapped: Fitting; after: Promise<FittingStats | null> }>();
+  const window = Math.max(1, concurrency);
   let nextToStart = 0;
   const startUpTo = (last: number) => {
     for (; nextToStart <= last && nextToStart < candidates.length; nextToStart++) {
       const swapped = applyImproveCandidate(fitting, candidates[nextToStart]);
-      started.set(nextToStart, { swapped, after: stats(swapped).catch(() => null) });
+      started.set(nextToStart, {
+        swapped,
+        after: Promise.resolve()
+          .then(() => stats(swapped))
+          .catch(() => null),
+      });
     }
   };
   for (const [index, candidate] of candidates.entries()) {
@@ -1243,7 +1249,7 @@ export async function findImprovements({
       stopped = true;
       break;
     }
-    startUpTo(index + Math.max(1, concurrency) - 1);
+    startUpTo(index + window - 1);
     const { swapped, after } = started.get(index)!;
     started.delete(index);
     const result = await after;

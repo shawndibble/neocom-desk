@@ -455,12 +455,14 @@ export function useImprove(
     [hullTypeId, hullGroupId]
   );
 
-  useEffect(() => {
-    if (enabled) return;
+  const closePool = useCallback(() => {
     poolRef.current?.close();
     poolRef.current = null;
-  }, [enabled]);
-  useEffect(() => () => poolRef.current?.close(), []);
+  }, []);
+  useEffect(() => {
+    if (!enabled) closePool();
+  }, [enabled, closePool]);
+  useEffect(() => closePool, [closePool]);
 
   useEffect(() => {
     if (!enabled || !variants || !catalogue) return;
