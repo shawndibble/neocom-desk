@@ -132,6 +132,31 @@ export function parseIskAmount(input: string): number | null {
   return numeric * multiplier;
 }
 
+/**
+ * Live mask for an ISK field being typed: the integer digits grouped with the
+ * display format's separator, a decimal mark kept (cents at most), and a
+ * `b`/`m`/`t` suffix left as typed. Text that is not an amount comes back
+ * untouched so the field's error can name it.
+ */
+export function maskIskTyping(text: string): string {
+  const match = /^([\d.,'\s\u00a0\u2009\u202f]*)\s*([bmt])?$/i.exec(text.trim());
+  if (!match) return text;
+  const decimal = getDecimalMark();
+  const group = maskIsk(1_000).replace(/\d/g, '')[0] ?? '';
+  const body = match[1];
+  const at = body.indexOf(decimal);
+  const whole = (at < 0 ? body : body.slice(0, at)).replace(/\D/g, '');
+  const cents =
+    at < 0
+      ? null
+      : body
+          .slice(at + 1)
+          .replace(/\D/g, '')
+          .slice(0, 2);
+  const grouped = whole.replace(/\B(?=(\d{3})+$)/g, group);
+  return `${grouped}${cents === null ? '' : decimal + cents}${match[2] ?? ''}`;
+}
+
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 export function parseNumeric(value: string): number | null {
   if (value.trim() === '') return null;

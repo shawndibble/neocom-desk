@@ -7,7 +7,7 @@ const before = baseFittingStats();
 const opt = (iskDelta: number | null): ImproveOption =>
   ({ candidate: { fromTypeId: 1, toTypeId: 2, at: [] }, iskDelta }) as unknown as ImproveOption;
 
-const base = { before, after: before, mode: 'buy' as const, spendCap: null, fitTotal: null };
+const base = { before, after: before, spendCap: null, fitTotal: null };
 
 describe('summariseSelection', () => {
   it('sums the priced costs and counts the unpriced', () => {
@@ -50,15 +50,5 @@ describe('summariseSelection', () => {
     });
     expect(s.total).toBe(110);
     expect(s.problems).toEqual([{ kind: 'spend' }]);
-  });
-
-  it('checks only the net extra spend when refitting', () => {
-    const refit = { ...base, mode: 'refit' as const, spendCap: 100 };
-    const ok = summariseSelection({ ...refit, options: [opt(30), opt(30)] });
-    expect(ok.total).toBeNull();
-    expect(ok.problems).toEqual([]);
-    expect(summariseSelection({ ...refit, options: [opt(60), opt(60)] }).problems).toEqual([
-      { kind: 'spend' },
-    ]);
   });
 });

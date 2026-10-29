@@ -11,7 +11,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, Spinner } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { overSpendCap, type ImproveMode, type RejectedOption } from '@/engine/fittings/improve';
+import { overSpendCap, type RejectedOption } from '@/engine/fittings/improve';
 import { cloneSeedSet } from '@/engine/fittings/implantBasis';
 import { placeAllInSet, type ImplantGoalId } from '@/engine/fittings/implantFinder';
 import { overageOf } from '@/engine/fittings/makeItFit';
@@ -34,7 +34,6 @@ interface Props {
   label: string;
   open: boolean;
   implants: MakeItFitImplantsInput;
-  mode: ImproveMode;
   spendCap: number | null;
   fitTotal: number | null;
   /** Makes the fix and sets the implants, as one edit. */
@@ -58,7 +57,6 @@ function Implants({
   label,
   open,
   implants,
-  mode,
   spendCap,
   fitTotal,
   onApply,
@@ -91,7 +89,7 @@ function Implants({
   // The implants are bought on top of the fix, so the budget covers both.
   const fixes = finder.fixes
     .filter((found) => fitsResourceBudget(found.stats))
-    .filter((found) => !overSpendCap(mode, spendCap, fitTotal, fix.iskDelta, found.cost))
+    .filter((found) => !overSpendCap(spendCap, fitTotal, fix.iskDelta, found.cost))
     .slice(0, FIX_LIMIT);
   const searching = finder.status === 'loading' || finder.updating;
 

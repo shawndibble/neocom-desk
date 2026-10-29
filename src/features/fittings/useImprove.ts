@@ -14,7 +14,6 @@ import {
   effectiveHold,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
-  IMPROVE_MODES,
   IMPROVE_REACHES,
   improveCandidates,
   type DefenseChoice,
@@ -23,7 +22,6 @@ import {
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveHold,
-  type ImproveMode,
   type ImproveReach,
   type ImproveResult,
   type ModulePool,
@@ -131,16 +129,6 @@ export const useImproveSort = createLocalSetting<ImproveSort>({
       : 'gain',
 });
 
-/** Planning to buy or Refitting a ship the pilot owns, remembered on this device. */
-export const useImproveMode = createLocalSetting<ImproveMode>({
-  key: 'fittingsImproveMode',
-  defaultValue: 'buy',
-  parse: (raw) =>
-    typeof raw === 'string' && (IMPROVE_MODES as readonly string[]).includes(raw)
-      ? (raw as ImproveMode)
-      : 'buy',
-});
-
 /** The ore Mine more scores, as its crystal family; remembered on this device. */
 export const DEFAULT_ORE_FAMILY = 'Simple Asteroid';
 export const useImproveOre = createLocalSetting<string>({
@@ -163,42 +151,40 @@ export const useImproveHold = createLocalSetting<ImproveHold>({
 const parseCap = (raw: unknown) =>
   typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
 
-/** Planning's total budget in ISK; null is no limit. Its own setting: a refit cap is not a budget. */
+/** The total budget in ISK; null is no limit. */
 export const useImproveBudget = createLocalSetting<number | null>({
   key: 'fittingsImproveBudget',
   defaultValue: null,
   parse: parseCap,
 });
 
-/** Refitting's extra-spend cap in ISK; null is no limit. */
-export const useImproveRefitCap = createLocalSetting<number | null>({
-  key: 'fittingsImproveRefitCap',
-  defaultValue: null,
-  parse: parseCap,
-});
+/** Rows of the removed Refitting mode, dropped on the next start. */
+const RETIRED_KEYS = ['fittingsImproveMode', 'fittingsImproveRefitCap'];
 
 const LEGACY_SPEND_CAP_KEY = 'fittingsImproveSpendCap';
 
 /**
- * One shared cap used to serve both modes. Moves it to the mode that was active (Planning when none is stored: it is the default), once, then drops the old row.
+ * One shared cap used to serve both modes. Moves it to the budget when Planning was the mode (or none was stored), once, then drops the old row; the Refitting rows go with it.
  */
 export async function migrateSpendCap(): Promise<void> {
+  const mode = (await db.settings.get('fittingsImproveMode'))?.value;
   const legacy = await db.settings.get(LEGACY_SPEND_CAP_KEY);
-  if (!legacy) return;
-  const cap = parseCap(legacy.value);
-  if (cap !== null) {
-    const stored = (await db.settings.get('fittingsImproveMode'))?.value;
-    const store = stored === undefined || stored === 'buy' ? useImproveBudget : useImproveRefitCap;
-    await store.getState().hydrate();
-    if (store.getState().value === null) await store.getState().setValue(cap);
+  if (legacy) {
+    const cap = parseCap(legacy.value);
+    if (cap !== null && (mode === undefined || mode === 'buy')) {
+      await useImproveBudget.getState().hydrate();
+      if (useImproveBudget.getState().value === null) {
+        await useImproveBudget.getState().setValue(cap);
+      }
+    }
+    await db.settings.delete(LEGACY_SPEND_CAP_KEY);
   }
-  await db.settings.delete(LEGACY_SPEND_CAP_KEY);
+  await db.settings.bulkDelete(RETIRED_KEYS);
 }
 
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
   reach: ImproveReach;
-  mode: ImproveMode;
   spendCap: number | null;
   defense: DefenseChoice;
   includeRigs: boolean;
@@ -453,7 +439,7 @@ export function useImprove(
   const stopRef = useRef(false);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
+  const { reach, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -514,7 +500,6 @@ export function useImprove(
             searched,
             {
               reach,
-              mode,
               spendCap,
               defense: side,
               includeRigs,
@@ -544,18 +529,16 @@ export function useImprove(
         ];
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
-          // The Price section's own total, for Planning's budget.
-          mode === 'buy'
-            ? loadFittingPrice(variants.fitting, hub)
-                .then((price) => price.totals.sell)
-                .catch(() => null)
-            : Promise.resolve(null),
+          // The Price section's own total, for the budget.
+          loadFittingPrice(variants.fitting, hub)
+            .then((price) => price.totals.sell)
+            .catch(() => null),
         ]);
         if (cancelled) return;
         // A cap that cannot be checked is not silently waived.
-        if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
+        if (spendCap !== null && (priceMap === null || fitTotal === null))
           throw new Error('Prices unavailable for the spend cap');
-        if (mode === 'buy' && spendCap !== null && fitTotal !== null && spendCap < fitTotal) {
+        if (spendCap !== null && fitTotal !== null && spendCap < fitTotal) {
           setState({ status: 'belowPrice', budget: spendCap, fitTotal });
           return;
         }
@@ -597,7 +580,6 @@ export function useImprove(
             stats,
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
-            mode,
             spendCap,
             fitTotal,
             compensators: (fix) =>
@@ -700,7 +682,6 @@ export function useImprove(
     hubId,
     attempt,
     reach,
-    mode,
     spendCap,
     defense,
     includeRigs,

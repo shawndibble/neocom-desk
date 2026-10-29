@@ -37,7 +37,6 @@ describe('findCompletions', () => {
       swaps: [swap(2, 5, 6), swap(2, 5, 7)],
       stats,
       priceOf: (id) => ({ 5: 100, 6: 300, 7: 120 })[id] ?? null,
-      mode: 'buy',
     });
     // 70+60+20 = 150, 70+60+55 = 185: both over, so nothing yet; the single swap cannot cover it.
     expect(options).toEqual([]);
@@ -51,7 +50,6 @@ describe('findCompletions', () => {
       swaps: [swap(1, 5, 6), swap(1, 5, 7)],
       stats,
       priceOf: (id) => ({ 5: 100, 6: 300, 7: 120 })[id] ?? null,
-      mode: 'buy',
     });
     expect(options.map((o) => o.candidate.toTypeId)).toEqual([6]);
     expect(options[0].iskDelta).toBe(200);
