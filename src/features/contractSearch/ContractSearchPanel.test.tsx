@@ -848,7 +848,7 @@ describe('ContractSearchPanel — contract detail modal', () => {
     // 100 Tritanium at 6,000 sell = 600,000 against a 500,000 ask.
     const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
     expect(await within(check).findByText('600,000 ISK')).toBeInTheDocument();
-    expect(within(check).getByText('−16.7%')).toBeInTheDocument();
+    expect(within(check).getByText('+16.7%')).toBeInTheDocument();
   });
 
   it("holds a blueprint copy per run against similar copies, never against the original's hub price", async () => {
