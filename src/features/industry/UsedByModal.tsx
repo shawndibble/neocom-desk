@@ -1,8 +1,9 @@
-import { Fragment, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
+import { sum } from '@/engine/math';
 import { formatCount } from '@/lib/formatCount';
 import { materialConsumers } from './subBuildPlan';
 
@@ -17,7 +18,7 @@ interface UsedByModalProps {
   mainJob: { typeID: number; runs: number };
   nameFor: (typeID: number) => string;
   itemMenuFor?: ItemMenuFor;
-  itemActionsFor?: (typeId: number) => ReactElement;
+  itemActionsFor?: (typeId: number, bordered?: boolean) => ReactElement;
 }
 
 /**
@@ -38,7 +39,7 @@ export function UsedByModal({
 }: UsedByModalProps) {
   const { t } = useTranslation();
   const consumers = typeID === null ? [] : materialConsumers(materials, typeID, mainJob);
-  const jobsTotal = consumers.reduce((sum, consumer) => sum + consumer.quantity, 0);
+  const jobsTotal = sum(consumers.map((consumer) => consumer.quantity));
   const material = typeID === null ? '' : nameFor(typeID);
   const withMenu = (id: number, trigger: ReactElement) =>
     itemMenuFor ? itemMenuFor(id, trigger) : trigger;
@@ -66,27 +67,27 @@ export function UsedByModal({
               <span className="min-w-16 text-right">{t('industry.usedBy.quantity')}</span>
             </li>
             {consumers.map((consumer, index) => (
-              <Fragment key={`${consumer.typeID}-${index}`}>
-                {withMenu(
-                  consumer.typeID,
-                  <li className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-1.5">
-                    <span>{nameFor(consumer.typeID)}</span>
-                    <span className="text-right tabular-nums">{formatCount(consumer.runs)}</span>
-                    <span className="min-w-16 text-right tabular-nums">
-                      {formatCount(consumer.quantity)}
-                    </span>
-                  </li>
-                )}
-              </Fragment>
+              <li
+                key={`${consumer.typeID}-${index}`}
+                className="grid grid-cols-[1fr_auto_auto] gap-x-4 py-1.5"
+              >
+                <span>{nameFor(consumer.typeID)}</span>
+                <span className="text-right tabular-nums">{formatCount(consumer.runs)}</span>
+                <span className="min-w-16 text-right tabular-nums">
+                  {formatCount(consumer.quantity)}
+                </span>
+              </li>
             ))}
           </ul>
           {tableTotal !== null && (
             <p className="text-xs text-text-dim">
-              {t('industry.usedBy.total', {
-                total: formatCount(tableTotal),
-                jobs: formatCount(jobsTotal),
-              })}{' '}
-              {jobsTotal !== tableTotal && t('industry.usedBy.roundUp')}
+              {t(
+                jobsTotal === tableTotal ? 'industry.usedBy.total' : 'industry.usedBy.totalRoundUp',
+                {
+                  total: formatCount(tableTotal),
+                  jobs: formatCount(jobsTotal),
+                }
+              )}
             </p>
           )}
         </div>

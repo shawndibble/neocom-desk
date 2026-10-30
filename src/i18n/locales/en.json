@@ -3398,7 +3398,7 @@
       "runs": "Runs",
       "quantity": "Quantity",
       "total": "Table total {{total}} · jobs need {{jobs}}",
-      "roundUp": "(round-up)"
+      "totalRoundUp": "Table total {{total}} · jobs need {{jobs}} (each job rounds its quantities up)"
     },
     "buildRecipe": {
       "action": "Build it",

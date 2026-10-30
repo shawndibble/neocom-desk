@@ -48,12 +48,12 @@ describe('UsedByModal', () => {
     expect(screen.getByText('Capital Ship')).toBeInTheDocument();
     expect(screen.getByText('Armor Plate')).toBeInTheDocument();
     expect(screen.getByText('Table total 400 · jobs need 400')).toBeInTheDocument();
-    expect(screen.queryByText('(round-up)')).not.toBeInTheDocument();
+    expect(screen.queryByText(/rounds its quantities up/)).not.toBeInTheDocument();
   });
 
   it('says so when the table total and the jobs differ', () => {
     renderModal(399);
     expect(screen.getByText(/Table total 399 · jobs need 400/)).toBeInTheDocument();
-    expect(screen.getByText(/\(round-up\)/)).toBeInTheDocument();
+    expect(screen.getByText(/rounds its quantities up/)).toBeInTheDocument();
   });
 });
