@@ -958,7 +958,7 @@ export function Market() {
                   // anything to do until there *is* something on screen.
                   disabled={
                     tab === 'appraisal'
-                      ? appraisal.result === null || appraisal.loading
+                      ? appraisal.result === null || appraisal.loading || appraisal.live.checking
                       : !catalogueError && (selectedTypeId === null || orderBookLoading)
                   }
                 />

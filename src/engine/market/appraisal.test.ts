@@ -645,7 +645,11 @@ describe('appraisalUndercut', () => {
   }
 
   it('prices one legal tick under the cheapest seller at the hub', () => {
-    expect(appraisalUndercut(item())).toEqual({ price: 1_233_000, atOrBelowBuy: false });
+    expect(appraisalUndercut(item())).toEqual({
+      price: 1_233_000,
+      atOrBelowBuy: false,
+      matchesOwn: false,
+    });
   });
 
   it('drops to the smaller tick at an exact power of ten', () => {
@@ -664,6 +668,7 @@ describe('appraisalUndercut', () => {
     expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000 }))).toEqual({
       price: 1_000,
       atOrBelowBuy: true,
+      matchesOwn: false,
     });
     expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000.5 }))?.atOrBelowBuy).toBe(true);
   });

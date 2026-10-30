@@ -12166,6 +12166,19 @@
       }
     },
     "appraisal": {
+      "live": {
+        "barLabel": "Live prices checked",
+        "checking": "Checking live prices {{done}} / {{total}}",
+        "done": "Live prices",
+        "partial": "Live prices for {{live}} of {{total}} rows",
+        "announceChecking": "Checking live prices",
+        "checkedAgo": "checked {{age}}",
+        "ageSeconds_one": "{{count}} s ago",
+        "ageSeconds_other": "{{count}} s ago",
+        "markCached": "Cached price, live price still loading",
+        "markFailed": "Fuzzwork price, live price could not be fetched"
+      },
+      "copyWaiting": "{{list}}: waiting for live prices",
       "copied_one": "{{list}} copied · {{count}} item",
       "copied_other": "{{list}} copied · {{count}} items",
       "copyList": {

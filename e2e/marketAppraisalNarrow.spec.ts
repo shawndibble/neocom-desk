@@ -34,6 +34,23 @@ const PRICES: Record<number, { buy: number; sell: number }> = {
  * trading it, and a dash in the table.
  */
 async function mockHubPrices(page: Page): Promise<void> {
+  // The page prices from the live Jita book first (#5591), Fuzzwork only as a
+  // per-row fallback: serve the same fixture prices as one order each side.
+  await page.route(/^https:\/\/esi\.evetech\.net\/(?:[^/]+\/)?markets\/\d+\/orders/, (route) => {
+    const price = PRICES[Number(new URL(route.request().url()).searchParams.get('type_id'))];
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        price
+          ? [
+              { order_id: 1, is_buy_order: false, location_id: 60_003_760, price: price.sell },
+              { order_id: 2, is_buy_order: true, location_id: 60_003_760, price: price.buy },
+            ]
+          : []
+      ),
+    });
+  });
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     const types = new URL(route.request().url()).searchParams.get('types') ?? '';
     const body = Object.fromEntries(

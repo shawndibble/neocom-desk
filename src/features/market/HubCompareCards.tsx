@@ -27,6 +27,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import type { HubComparisonRow } from './appraisalData';
+import { PriceMark } from './LivePriceStatus';
 
 /** How long the "copied" confirmation stays up before the bubble goes back to the figure. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -84,6 +85,7 @@ function HubFigure({
   label,
   shortLabel,
   value,
+  state,
   copied,
   onCopied,
 }: {
@@ -91,6 +93,8 @@ function HubFigure({
   /** What the label reads as below `sm`, where two figures share a row. */
   shortLabel: string;
   value: number | null;
+  /** Whether the figure is this hub's live books, still the cached price, or live with a failed row. */
+  state: HubComparisonRow['priceState'];
   copied: boolean;
   onCopied: () => void;
 }) {
@@ -104,6 +108,7 @@ function HubFigure({
         <span className="max-sm:hidden">{label}</span>
       </dt>
       <dd className="text-base text-text tabular-nums">
+        <PriceMark state={state} />
         {value === null ? '—' : <CopyableTotal value={value} copied={copied} onCopied={onCopied} />}
       </dd>
     </div>
@@ -185,6 +190,7 @@ export function HubCompareCards({
                   label={t('market.appraisal.sellTotal')}
                   shortLabel={t('market.appraisal.sellShort')}
                   value={row.sell}
+                  state={row.priceState}
                   copied={copied === `${row.hub.id}:sell`}
                   onCopied={() => announceCopied(`${row.hub.id}:sell`)}
                 />
@@ -192,6 +198,7 @@ export function HubCompareCards({
                   label={t('market.appraisal.buyTotal')}
                   shortLabel={t('market.appraisal.buyShort')}
                   value={row.buy}
+                  state={row.priceState}
                   copied={copied === `${row.hub.id}:buy`}
                   onCopied={() => announceCopied(`${row.hub.id}:buy`)}
                 />

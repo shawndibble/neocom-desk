@@ -30,6 +30,7 @@ import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
 import { formatVolume } from './format';
 import { ItemContextMenu } from './ItemContextMenu';
+import { PriceMark } from './LivePriceStatus';
 import { MarketItemLink } from './MarketItemLink';
 import type { AppraisalController } from './useAppraisal';
 
@@ -39,6 +40,13 @@ type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | '
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
 /** A phone starts with Item, Buy and Sell; the Columns menu swaps others in. */
+/** The columns whose cells wear the live-price mark. */
+const PRICE_MARK_COLUMNS: ReadonlySet<AppraisalColumnId> = new Set([
+  'buyEach',
+  'sellEach',
+  'buyTotal',
+  'sellTotal',
+]);
 const PHONE_ON_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyTotal', 'sellTotal'];
 
 export function useAppraisalColumns({
@@ -152,13 +160,27 @@ export function useAppraisalColumns({
   // Refine and LP store still only ever enter `availableColumns` when the
   // data backing them exists — a picker toggle for a column with nothing to
   // show would just be a lie.
+  // The price mark repeats in up to four cells of a row; only the first shown
+  // one speaks, the rest keep the icon and tooltip.
+  const firstPriceColumn = APPRAISAL_COLUMN_IDS.find(
+    (id) => PRICE_MARK_COLUMNS.has(id) && visibleColumns.includes(id)
+  );
+  const priceMark = (row: OwnedRow, id: AppraisalColumnId) => (
+    <PriceMark state={row.priceState} silent={id !== firstPriceColumn} />
+  );
+
   const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<OwnedRow>> = {
     buyEach: {
       id: 'buyEach',
       header: t('market.appraisal.columnBuyEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(row.buyEach),
+      render: (row) => (
+        <>
+          {priceMark(row, 'buyEach')}
+          {eachCell(row.buyEach)}
+        </>
+      ),
       sortValue: (row) => row.buyEach ?? undefined,
     },
     sellEach: {
@@ -166,7 +188,12 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnSellEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(row.sellEach),
+      render: (row) => (
+        <>
+          {priceMark(row, 'sellEach')}
+          {eachCell(row.sellEach)}
+        </>
+      ),
       sortValue: (row) => row.sellEach ?? undefined,
     },
     splitEach: {
@@ -186,7 +213,9 @@ export function useAppraisalColumns({
       render: (row) =>
         comparisonCell(
           totalCell(row.buyTotal),
-          row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
+          row.refineTotal !== undefined && !refineBeatsSellAsIs(row),
+          undefined,
+          priceMark(row, 'buyTotal')
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
     },
@@ -195,7 +224,12 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.sellTotal),
+      render: (row) => (
+        <>
+          {priceMark(row, 'sellTotal')}
+          {totalCell(row.sellTotal)}
+        </>
+      ),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
     refineTotal: {

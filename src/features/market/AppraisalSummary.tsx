@@ -9,6 +9,7 @@ import type { appraisalNet } from '@/engine/market/appraisal';
 import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { HubCompareCards } from './HubCompareCards';
+import { LivePriceBar, LivePriceStatus } from './LivePriceStatus';
 import type { AppraisalController } from './useAppraisal';
 import type { TradeHub } from '@/market/hubs';
 
@@ -31,6 +32,8 @@ interface AppraisalSummaryProps {
   hubId: TradeHub['id'];
   /** A Compare Hubs card's click re-quotes the appraisal at that hub. */
   onHubChange: (id: TradeHub['id']) => void;
+  /** Progress of the other hubs' live books, shown over the cards while they load. */
+  compareLive: AppraisalController['compareLive'];
 }
 
 export function AppraisalSummary({
@@ -48,6 +51,7 @@ export function AppraisalSummary({
   characterId,
   hubId,
   onHubChange,
+  compareLive,
 }: AppraisalSummaryProps) {
   const { t } = useTranslation();
   const totals = result.appraisal.totals;
@@ -102,7 +106,14 @@ export function AppraisalSummary({
         </p>
       )}
       {compare !== null && compareExpanded && (
-        <HubCompareCards rows={compare} selectedHubId={hubId} onSelectHub={onHubChange} />
+        // The same bar and text as the result table's, above the cards while the other hubs load.
+        <div className="relative flex flex-col gap-2">
+          {compareLive.checking && (
+            <LivePriceBar live={compareLive} className="absolute inset-x-0 -top-2" />
+          )}
+          <LivePriceStatus live={compareLive} checkingOnly />
+          <HubCompareCards rows={compare} selectedHubId={hubId} onSelectHub={onHubChange} />
+        </div>
       )}
     </div>
   );

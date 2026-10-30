@@ -95,7 +95,17 @@ export interface AppraisalItem {
   lpOption?: AppraisalLpOption;
   /** Packaged m³ per unit; null or absent when the catalogue does not know it. */
   unitVolume?: number | null;
+  /** The pilot's own order is (or ties) the cheapest sell, so a list matches it rather than undercutting it (issue #5591). */
+  sellIsOwn?: boolean;
+  /**
+   * Where `buy`/`sell` came from on the live-priced Appraisal page: the live
+   * hub book, the cached price while its book is still loading, or the cached
+   * price because the book failed. Absent where nothing prices live.
+   */
+  priceState?: PriceState;
 }
+
+export type PriceState = 'live' | 'cached' | 'failed';
 
 export interface AppraisalRow {
   typeId: number;
@@ -119,6 +129,8 @@ export interface AppraisalRow {
   lpAffordable?: boolean;
   /** `quantity` x packaged unit volume, m³; null when the unit volume is unknown. */
   volume: number | null;
+  /** Where the prices came from; see `AppraisalItem.priceState`. */
+  priceState?: PriceState;
 }
 
 /**
@@ -314,6 +326,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       lpIskCost: item.lpOption?.iskCost,
       lpAffordable: item.lpOption?.affordableLp,
       volume: rowVolume,
+      priceState: item.priceState,
     };
 
     const useLp = lpBeatsMarket(row);
@@ -376,6 +389,8 @@ export interface AppraisalUndercut {
    * the buy order instead pays the same or more, today, with no broker fee.
    */
   atOrBelowBuy: boolean;
+  /** The pilot's own order is the cheapest sell, so the price is that order's, unchanged. */
+  matchesOwn: boolean;
 }
 
 /**
@@ -387,14 +402,17 @@ export interface AppraisalUndercut {
  * 100%.
  *
  * Null when nobody is selling (nothing to undercut) or the cheapest seller
- * already sits on the 0.01 ISK floor (no legal price below it).
+ * already sits on the 0.01 ISK floor (no legal price below it). When the
+ * pilot's own order is the cheapest (`sellIsOwn`), the price matches it
+ * instead of undercutting the pilot's own listing (issue #5591).
  */
 export function appraisalUndercut(
-  item: Pick<AppraisalItem, 'buy' | 'sell'>
+  item: Pick<AppraisalItem, 'buy' | 'sell' | 'sellIsOwn'>
 ): AppraisalUndercut | null {
-  const price = item.sell === null ? null : undercutPrice(item.sell);
+  const matchesOwn = item.sellIsOwn === true;
+  const price = item.sell === null ? null : matchesOwn ? item.sell : undercutPrice(item.sell);
   if (price === null) return null;
-  return { price, atOrBelowBuy: item.buy !== null && price <= item.buy };
+  return { price, atOrBelowBuy: item.buy !== null && price <= item.buy, matchesOwn };
 }
 
 /**
