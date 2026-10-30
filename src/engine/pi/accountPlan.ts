@@ -41,6 +41,7 @@ import { baselineTotal } from './baseline';
 import { haulingOf } from './goalPlanSteps/flows';
 import type { JumpsFn, PlannerColony, PlannerPolicy, PriceBooks } from './goalTypes';
 import { HOURS_PER_DAY } from './planAdvice';
+import { salesCapPerDay, thinSales, type ThinSales } from './salesCap';
 
 export interface AccountPlanInput {
   colonies: readonly PlannerColony[];
@@ -58,6 +59,11 @@ export interface AccountPlanInput {
    * (after quick wins and rebuild) passes it.
    */
   soloPerDay?: ReadonlyMap<number, number | null>;
+  /**
+   * Units a day the hub's region trades, per product. A product's sales count
+   * at no more than the fixed share of it; absent (unknown) is uncapped.
+   */
+  hubTradesPerDay?: ReadonlyMap<number, number>;
   pi: PiData;
 }
 
@@ -87,6 +93,8 @@ export interface AccountGroup {
   legs: AccountLeg[];
   /** The group buys some of its inputs at the hub. */
   buys: boolean;
+  /** Set when the product's output is over the share the hub absorbs; `iskPerDay` counts the share only. */
+  thin: ThinSales | null;
 }
 
 export interface AccountPlan {
@@ -117,6 +125,7 @@ interface Chain {
   m3PerWeek: number;
   legs: AccountLeg[];
   buys: boolean;
+  thin: ThinSales | null;
 }
 
 /** The chain over `colonies`, and only the colonies it uses; null with no plan or no price. */
@@ -124,11 +133,21 @@ function chainOnColonies(
   typeId: number,
   colonies: readonly PlannerColony[],
   allowBuy: boolean,
-  ctx: Pick<AccountPlanInput, 'policy' | 'books' | 'jumps' | 'pi'>
+  ctx: Pick<AccountPlanInput, 'policy' | 'books' | 'jumps' | 'pi' | 'hubTradesPerDay'>
 ): Chain | null {
   const { policy, books, jumps, pi } = ctx;
+  const trades = ctx.hubTradesPerDay?.get(typeId);
+  const cap = salesCapPerDay(trades);
   const result = estimateChain(
-    { typeId, colonies, policy, books, allowBuy, ...(jumps ? { jumps } : {}) },
+    {
+      typeId,
+      colonies,
+      policy,
+      books,
+      allowBuy,
+      ...(jumps ? { jumps } : {}),
+      ...(cap === undefined ? {} : { salesCapPerDay: new Map([[typeId, cap]]) }),
+    },
     pi
   );
   if (result.status !== 'estimated') return null;
@@ -161,6 +180,7 @@ function chainOnColonies(
     m3PerWeek: haulingOf(touches, pi).m3PerWeek,
     legs: [...legs.values()].sort((a, b) => a.from - b.from || a.to - b.to),
     buys: allowBuy && touches.some((f) => f.from === 'hub'),
+    thin: thinSales(result.unitsPerDay, trades),
   };
 }
 
@@ -180,6 +200,7 @@ function groupOf(chain: Chain, apartPerDay: number): AccountGroup {
     m3PerWeek: chain.m3PerWeek,
     legs: chain.legs,
     buys: chain.buys,
+    thin: chain.thin,
   };
 }
 
@@ -195,14 +216,15 @@ function aloneGroup(planetId: number, perDay: number): AccountGroup {
     m3PerWeek: 0,
     legs: [],
     buys: false,
+    thin: null,
   };
 }
 
 export function* planAccount(
   input: AccountPlanInput
 ): Generator<AccountProgress, AccountPlan, void> {
-  const { colonies, policy, books, jumps, candidates, pi } = input;
-  const ctx = { policy, books, jumps, pi };
+  const { colonies, policy, books, jumps, candidates, pi, hubTradesPerDay } = input;
+  const ctx = { policy, books, jumps, pi, hubTradesPerDay };
   const buying = policy.buyTiers.length > 0;
 
   // Stage 1: each colony on its own best pick.

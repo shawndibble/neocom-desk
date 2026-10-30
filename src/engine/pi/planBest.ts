@@ -123,7 +123,7 @@ export function planBest(input: PlanGoalsInput, pi: PiData): BestPlan {
   const baseline = baselineTotal(input.colonies, pi, input.policy, input.books, input.jumps);
   const cost = (plan: GoalPlan): BestPlan => ({
     plan,
-    economics: planEconomics(plan, input.colonies, baseline, input.books),
+    economics: planEconomics(plan, input.colonies, baseline, input.books, input.salesCapPerDay),
     baseline,
   });
 

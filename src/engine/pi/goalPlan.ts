@@ -143,6 +143,11 @@ export interface PlanGoalsInput {
    */
   hostPlanetId?: number;
   /**
+   * Units a day per type the hub's market absorbs. `planBest` costs hub sales
+   * past it as unsold; planning itself ignores it. See `planEconomics`.
+   */
+  salesCapPerDay?: ReadonlyMap<number, number>;
+  /**
    * Jumps between colonies and to the hub. When given, every flow carries its
    * leg's `jumps` and `haulEffort` weighs m3 by distance; `planBest` uses it
    * to prefer the nearer of two hosts whose nets are close.

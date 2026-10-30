@@ -45,6 +45,13 @@
  * missing prices is `needs-price` with every missing typeId — a Lift over a
  * partial Baseline would be a confident wrong number.
  *
+ * ## Sales caps
+ *
+ * `salesCapPerDay` is a type's units a day the hub's market absorbs (a share of
+ * the region's daily volume). Hub-bound units of that type past it are unsold:
+ * no revenue and no sales tax; customs on the legs still stand, since the
+ * goods were shipped. A type with no entry is uncapped.
+ *
  * Pure: plan, colonies, Baseline and prices are parameters. No `PiData`:
  * every flow already carries its tier, which is all customs needs.
  */
@@ -52,6 +59,7 @@
 import type { BaselineTotal } from './baseline';
 import { CUSTOMS_TAXABLE_VALUE, IMPORT_TAXABLE_FRACTION } from './chain';
 import type { GoalPlan, PlannerColony, PriceBooks } from './goalTypes';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 
 export type PlanEconomics =
   | {
@@ -83,7 +91,8 @@ export function planEconomics(
   plan: GoalPlan,
   colonies: readonly PlannerColony[],
   baseline: BaselineTotal,
-  books: PriceBooks
+  books: PriceBooks,
+  salesCapPerDay?: ReadonlyMap<number, number>
 ): PlanEconomics {
   const byId = new Map(colonies.map((c) => [c.planetId, c]));
   const colonyOf = (id: number) => {
@@ -105,6 +114,10 @@ export function planEconomics(
     return { status: 'needs-price', missing: [...missing].sort((a, b) => a - b) };
 
   const salesTaxFraction = books.salesTaxPct / 100;
+  // Units a type may still sell at the hub this hour; the rest count as unsold.
+  const sellable = new Map<number, number>();
+  for (const [typeId, perDay] of salesCapPerDay ?? [])
+    sellable.set(typeId, perDay / (DAY_MS / HOUR_MS));
   let revenue = 0;
   let buys = 0;
   const customs = { exportFromExtractors: 0, importToHost: 0, exportFromHost: 0 };
@@ -127,7 +140,10 @@ export function planEconomics(
       credit(f.to, -tax);
     }
     if (f.to === 'hub') {
-      const sale = f.unitsPerHour * finite(books.bid, f.typeId)!;
+      const room = sellable.get(f.typeId);
+      const sold = room === undefined ? f.unitsPerHour : Math.min(f.unitsPerHour, room);
+      if (room !== undefined) sellable.set(f.typeId, room - sold);
+      const sale = sold * finite(books.bid, f.typeId)!;
       revenue += sale;
       if (f.from !== 'hub') credit(f.from, sale * (1 - salesTaxFraction));
     }

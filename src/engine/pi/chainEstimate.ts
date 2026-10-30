@@ -41,6 +41,8 @@ export interface ChainEstimateInput {
    * when the pilot has said which tiers they will buy.
    */
   allowBuy?: boolean;
+  /** Units a day per type the hub absorbs; sales past it are unsold. See `planEconomics`. */
+  salesCapPerDay?: ReadonlyMap<number, number>;
 }
 
 export type ChainEstimate =
@@ -87,6 +89,7 @@ export function estimateChain(input: ChainEstimateInput, pi: PiData): ChainEstim
         policy,
         books: input.books,
         ...(input.jumps ? { jumps: input.jumps } : {}),
+        ...(input.salesCapPerDay ? { salesCapPerDay: input.salesCapPerDay } : {}),
       },
       pi
     );
