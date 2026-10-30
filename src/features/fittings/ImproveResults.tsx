@@ -137,10 +137,12 @@ export function ImproveResults({
           {t('fittings.improve.partial', { checked: result.checked })}
         </p>
       )}
-      {/* A select under a visible label, not buttons: buttons read as a filter, and the sort only orders the goal's own swaps. */}
+      {/* A labelled select, not segments: segments read as a filter, and this only orders the goal's swaps. */}
       <div className="flex items-center gap-2">
         <span id={sortLabelId} className={eyebrowClassName}>
           {t('fittings.improve.sortLabel')}
+          {/* Visual only, so the control's name stays "Sort by" like every other sort label. */}
+          <span aria-hidden="true">:</span>
         </span>
         <Select
           value={settings.sort}

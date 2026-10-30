@@ -459,7 +459,7 @@ describe('ImprovePanel', () => {
     const onSortChange = vi.fn();
     const { unmount } = renderPanel(state, vi.fn(), vi.fn(), settings({ onSortChange }));
     expect(first()).toHaveTextContent('+50%');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Sort by:' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sort by' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Best value' }));
     expect(onSortChange).toHaveBeenCalledWith('value');
     unmount();
