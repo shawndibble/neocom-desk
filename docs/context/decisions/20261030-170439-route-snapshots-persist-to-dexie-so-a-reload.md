@@ -13,16 +13,27 @@ _Recorded 2026-10-30._
 - **Freshness: the snapshot is only ever a first frame.** The loader still runs
   on every mount exactly as before and replaces it; `loading` stays true
   meanwhile. A row is dropped on read when another build wrote it
-  (`__APP_VERSION__`, so a changed snapshot shape never reaches new code) or it
-  is older than 7 days. The ages a page shows come from the data itself (ESI
+  (`__APP_RELEASE__`, which carries the commit — `__APP_VERSION__` is the
+  package version and never changes — so a changed snapshot shape never reaches
+  new code) or it is older than 7 days. The cost: after each deploy, every page
+  spins once more on its first visit. The ages a page shows come from the data itself (ESI
   fetch times), so a revived snapshot shows its real age, not "just now".
 
 - **Purge mirrors the memory copy exactly.** The `onCachePurged` signal that
   forgets the memory copy deletes the Dexie rows too (that Character's and the
   account-wide id 0's; every row for a cache-wide purge), and removing a
-  Character deletes its rows with its other tables. A per-Character purge epoch
-  drops any hydrate or write that started before the purge, so a late write can
-  never bring a previous owner's rows back.
+  Character deletes its rows with its other tables; Settings › Clear cache and
+  deleting all local data clear them too. A per-Character purge epoch drops any
+  hydrate, queued write or _load_ that started before the purge (a load passes
+  the epoch it began under), so a late result can never store a previous
+  owner's rows. A purge that could not delete (`cachePurge` tier 3) is honoured
+  on read: a suppressed Character's rows — or, for the account-wide id 0, any
+  suppression — are never hydrated. Not covered: a purge in one tab does not
+  reach another tab's memory copy, the same limit `esiCache` suppression has.
+
+- **Some views stay memory-only by choice.** The Industry workspace load
+  carries the whole SDE type and blueprint catalog (megabytes) and is rebuilt
+  on every patch, so it passes `persist: false`.
 
 - **Only plain data is persisted.** IndexedDB's structured clone keeps a class
   instance's fields but loses its methods. A snapshot holding anything but

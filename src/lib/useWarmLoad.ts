@@ -13,7 +13,7 @@
  * its cache, and `ACCOUNT_SNAPSHOT_ID` values with any Character's.
  */
 import { useEffect, useState } from 'react';
-import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
+import { readRouteSnapshot, routeSnapshotEpoch, writeRouteSnapshot } from './routeSnapshotCache';
 import { useRouteSnapshotHydration } from './useRouteSnapshotHydration';
 import { MINUTE_MS } from '@/lib/age';
 
@@ -48,9 +48,15 @@ export function useWarmLoad<T>(
     const cached = readRouteSnapshot<Stamped<T>>(name, ownerId);
     if (cached && Date.now() - cached.loadedAt < WARM_LOAD_FRESH_MS) return;
     let cancelled = false;
+    const startedAt = routeSnapshotEpoch(ownerId);
     load(ownerId).then(
       (value) => {
-        writeRouteSnapshot<Stamped<T>>(name, ownerId, { value, loadedAt: Date.now() });
+        writeRouteSnapshot<Stamped<T>>(
+          name,
+          ownerId,
+          { value, loadedAt: Date.now() },
+          { startedAt }
+        );
         if (!cancelled) setLoaded({ name, ownerId, value });
       },
       () => {}

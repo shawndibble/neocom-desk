@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { purgeCharacterCache } from '@/esi/cachePurge';
+import {
+  clearCachePurgePending,
+  purgeCharacterCache,
+  purgeCharacterCacheOrSuppress,
+} from '@/esi/cachePurge';
 import { DAY_MS } from './age';
 import {
   ACCOUNT_SNAPSHOT_ID,
+  clearRouteSnapshots,
   flushRouteSnapshotWrites,
+  hasSessionRouteSnapshot,
   hydrateRouteSnapshots,
   readRouteSnapshot,
   resetRouteSnapshots,
+  routeSnapshotEpoch,
   setRouteSnapshotPersistence,
   writeRouteSnapshot,
 } from './routeSnapshotCache';
@@ -127,6 +134,65 @@ describe('routeSnapshotCache persistence', () => {
     setRouteSnapshotPersistence(false);
     writeRouteSnapshot('wallet', CHAR_A, { a: 1 });
     await flushRouteSnapshotWrites();
+    expect(await db.routeSnapshots.count()).toBe(0);
+  });
+
+  it('drops a load that started before its Character was purged', async () => {
+    const startedAt = routeSnapshotEpoch(CHAR_A);
+    await purgeCharacterCache(CHAR_A);
+    writeRouteSnapshot('wallet', CHAR_A, { previousOwner: true }, { startedAt });
+    await flushRouteSnapshotWrites();
+    expect(readRouteSnapshot('wallet', CHAR_A)).toBeNull();
+    expect(await db.routeSnapshots.count()).toBe(0);
+  });
+
+  it('keeps a snapshot marked memory-only out of Dexie', async () => {
+    writeRouteSnapshot('workspace', CHAR_A, { big: true }, { persist: false });
+    await flushRouteSnapshotWrites();
+    expect(readRouteSnapshot('workspace', CHAR_A)).toEqual({ big: true });
+    expect(await db.routeSnapshots.count()).toBe(0);
+  });
+
+  it('never hydrates a Character whose purge could not delete its rows', async () => {
+    const SUPPRESSED = 93;
+    writeRouteSnapshot('wallet', SUPPRESSED, { previousOwner: true });
+    await flushRouteSnapshotWrites();
+    reload();
+    // Tier 3: every delete fails, readonly reads still work.
+    const boom = () => {
+      throw new Error('index damaged');
+    };
+    const esiWhere = vi.spyOn(db.esiCache, 'where').mockImplementation(boom);
+    vi.spyOn(db.esiCache, 'clear').mockRejectedValue(new Error('QuotaExceeded'));
+    const snapWhere = vi.spyOn(db.routeSnapshots, 'where');
+    snapWhere.mockImplementationOnce(boom);
+    expect(await purgeCharacterCacheOrSuppress(SUPPRESSED)).toBe('suppressed');
+    esiWhere.mockRestore();
+    snapWhere.mockRestore();
+
+    expect(await db.routeSnapshots.count()).toBe(1);
+    await hydrateRouteSnapshots(SUPPRESSED);
+    expect(readRouteSnapshot('wallet', SUPPRESSED)).toBeNull();
+    await clearCachePurgePending(SUPPRESSED);
+  });
+
+  it('tells a snapshot loaded this session from one only revived from Dexie', async () => {
+    writeRouteSnapshot('wallet', CHAR_A, { a: 1 });
+    await flushRouteSnapshotWrites();
+    expect(hasSessionRouteSnapshot('wallet', CHAR_A)).toBe(true);
+    reload();
+    await hydrateRouteSnapshots(CHAR_A);
+    expect(readRouteSnapshot('wallet', CHAR_A)).not.toBeNull();
+    expect(hasSessionRouteSnapshot('wallet', CHAR_A)).toBe(false);
+  });
+
+  it('clears every stored and remembered snapshot, and drops writes queued before', async () => {
+    writeRouteSnapshot('wallet', CHAR_A, { a: 1 });
+    await flushRouteSnapshotWrites();
+    writeRouteSnapshot('mail', CHAR_B, { b: 1 });
+    await clearRouteSnapshots();
+    await flushRouteSnapshotWrites();
+    expect(readRouteSnapshot('wallet', CHAR_A)).toBeNull();
     expect(await db.routeSnapshots.count()).toBe(0);
   });
 });

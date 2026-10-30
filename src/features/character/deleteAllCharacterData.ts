@@ -10,6 +10,7 @@
 // would put the purged data straight back.
 
 import { db } from '@/db';
+import { clearRouteSnapshots } from '@/lib/routeSnapshotCache';
 import { haltSync, purgeCharacterRemoteData, signOutOfSync } from '@/sync';
 import {
   isCommunityAdmin,
@@ -203,6 +204,9 @@ export async function deleteAllLocalData(syncConfigured: boolean): Promise<void>
   await Promise.all([setAppBadgeCount(0), deleteOtherDatabases(), clearRuntimeCaches()]);
   clearWebStorage();
 
+  // First, so a snapshot write queued for an idle moment cannot land in the
+  // fresh database `db.open()` makes below.
+  await clearRouteSnapshots();
   if (!(await withTimeout(db.delete()))) {
     throw new Error('The app database delete is blocked by another tab');
   }

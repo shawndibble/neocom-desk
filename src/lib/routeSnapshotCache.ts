@@ -12,11 +12,11 @@
  * what it already has and updates in place.
  *
  * The stored copy is only ever a first frame: the view's loader still runs and
- * replaces it. A row another build wrote, or older than `MAX_AGE_MS`, is
- * dropped on read.
+ * replaces it. A row another build wrote (`__APP_RELEASE__`: its shape may
+ * differ), or older than `MAX_AGE_MS`, is dropped on read.
  */
 import { db } from '@/db';
-import { onCachePurged } from '@/esi/cachePurge';
+import { isAnyCachePurgePending, isCachePurgePending, onCachePurged } from '@/esi/cachePurge';
 import { DAY_MS } from './age';
 
 /**
@@ -70,6 +70,9 @@ let flushScheduled = false;
 
 const writeKey = (characterId: number, name: string) => `${characterId}\u0000${name}`;
 
+/** Views loaded (not just revived from Dexie) this session. */
+const sessionWritten = new Set<string>();
+
 /**
  * Whether structured clone gives `value` back intact. A class instance keeps
  * its fields but loses its methods, which fails only when a page calls one.
@@ -112,7 +115,7 @@ async function writeOne(entry: PendingWrite): Promise<void> {
       name: entry.name,
       data: entry.data,
       savedAt: Date.now(),
-      appVersion: __APP_VERSION__,
+      appVersion: __APP_RELEASE__,
     });
   } catch {
     // A full disk, a clone the check missed, a closing database: the memory
@@ -154,9 +157,34 @@ function remember(name: string, characterId: number, data: unknown): void {
   views.set(name, data);
 }
 
-export function writeRouteSnapshot<T>(name: string, characterId: number, data: T): void {
+/** The purge epoch a load starts under, for `writeRouteSnapshot`'s `startedAt`. */
+export function routeSnapshotEpoch(characterId: number): string {
+  return epochOf(characterId);
+}
+
+/** Whether this session loaded the view, rather than only reviving it from Dexie. */
+export function hasSessionRouteSnapshot(name: string, characterId: number): boolean {
+  return sessionWritten.has(writeKey(characterId, name));
+}
+
+export function writeRouteSnapshot<T>(
+  name: string,
+  characterId: number,
+  data: T,
+  options: {
+    /**
+     * `routeSnapshotEpoch` as the load began: a purge since then means the
+     * data may be the previous owner's, so it is neither kept nor stored.
+     */
+    startedAt?: string;
+    /** `false` keeps it in memory only: too large to clone on every load (the Industry catalog). */
+    persist?: boolean;
+  } = {}
+): void {
+  if (options.startedAt !== undefined && options.startedAt !== epochOf(characterId)) return;
   remember(name, characterId, data);
-  if (!persist) return;
+  sessionWritten.add(writeKey(characterId, name));
+  if (!persist || options.persist === false) return;
   pendingWrites.set(writeKey(characterId, name), {
     characterId,
     name,
@@ -177,12 +205,19 @@ export function hydrateRouteSnapshots(characterId: number): Promise<void> {
   const epoch = epochOf(characterId);
   const hydration = (async () => {
     try {
+      // A purge that could not delete (`cachePurge` tier 3) must not be undone
+      // by reading the rows it left behind.
+      const suppressed =
+        characterId === ACCOUNT_SNAPSHOT_ID
+          ? await isAnyCachePurgePending()
+          : await isCachePurgePending(characterId);
+      if (suppressed) return;
       const rows = await db.routeSnapshots.where('characterId').equals(characterId).toArray();
       if (epoch !== epochOf(characterId)) return;
       const oldest = Date.now() - MAX_AGE_MS;
       const expired: [number, string][] = [];
       for (const row of rows) {
-        if (row.appVersion !== __APP_VERSION__ || row.savedAt < oldest) {
+        if (row.appVersion !== __APP_RELEASE__ || row.savedAt < oldest) {
           expired.push([row.characterId, row.name]);
         } else if (readRouteSnapshot(row.name, characterId) === null) {
           remember(row.name, characterId, row.data);
@@ -220,25 +255,42 @@ export function forgetRouteSnapshots(characterId: number): void {
     byCharacter.delete(id);
     hydrations.delete(id);
     dropPending(id);
-    for (const key of lastStored.keys()) if (key.startsWith(`${id}\u0000`)) lastStored.delete(key);
+    for (const keys of [lastStored.keys(), sessionWritten.values()]) {
+      for (const key of [...keys]) {
+        if (key.startsWith(`${id}\u0000`)) {
+          lastStored.delete(key);
+          sessionWritten.delete(key);
+        }
+      }
+    }
   }
-  if (persist) {
+  if (!persist) return;
+  try {
     void db.routeSnapshots
       .where('characterId')
       .anyOf(characterId, ACCOUNT_SNAPSHOT_ID)
       .delete()
       .catch(() => undefined);
+  } catch {
+    // A broken store throws out of `where` synchronously. The rows stay on
+    // disk, but the purge's suppression keeps `hydrateRouteSnapshots` from
+    // reading them back.
   }
 }
 
-/** Every Character's, for the cache-wide `db.esiCache.clear()` fallback tier. */
-function forgetAllRouteSnapshots(): void {
+/**
+ * Every Character's, in memory and in Dexie: the cache-wide `esiCache.clear()`
+ * fallback tier, Settings › Clear cache, and deleting all local data. Writes
+ * queued or loads started before it are dropped (the epoch moves).
+ */
+export async function clearRouteSnapshots(): Promise<void> {
   globalEpoch += 1;
   byCharacter.clear();
   hydrations.clear();
   dropPending(null);
   lastStored.clear();
-  if (persist) void db.routeSnapshots.clear().catch(() => undefined);
+  sessionWritten.clear();
+  if (persist) await db.routeSnapshots.clear().catch(() => undefined);
 }
 
 /**
@@ -251,6 +303,7 @@ export function resetRouteSnapshots(): void {
   hydrations.clear();
   pendingWrites.clear();
   lastStored.clear();
+  sessionWritten.clear();
   flushScheduled = false;
 }
 
@@ -260,6 +313,6 @@ export function setRouteSnapshotPersistence(on: boolean): void {
 }
 
 onCachePurged((characterId) => {
-  if (characterId === null) forgetAllRouteSnapshots();
+  if (characterId === null) void clearRouteSnapshots();
   else forgetRouteSnapshots(characterId);
 });

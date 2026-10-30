@@ -19,7 +19,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invalidateFreshness } from '@/esi/cache';
-import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
+import {
+  readRouteSnapshot,
+  routeSnapshotEpoch,
+  writeRouteSnapshot,
+} from '@/lib/routeSnapshotCache';
 import { useRouteSnapshotHydration } from '@/lib/useRouteSnapshotHydration';
 
 export interface CorpSnapshotOptions {
@@ -88,13 +92,16 @@ export function useCorpSnapshot<T>(
   useEffect(() => {
     if (activeKey === null) return;
     let cancelled = false;
+    // A purge mid-load (a corp change) means the result may be the previous
+    // corporation's: `writeRouteSnapshot` then neither keeps nor stores it.
+    const startedAt = characterId === null ? undefined : routeSnapshotEpoch(characterId);
     void (async () => {
       try {
         const data = await loadRef.current();
         if (!cancelled) {
           setSnapshot({ epoch, data });
           if (retainAs !== null && characterId !== null) {
-            writeRouteSnapshot(retainAs, characterId, data);
+            writeRouteSnapshot(retainAs, characterId, data, { startedAt });
           }
         }
       } catch {
