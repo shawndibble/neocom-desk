@@ -5,6 +5,7 @@
  * Neutral home for `variationDelta.ts` (2-way before/after) and
  * `fittingCompare.ts` (N-way compare) to both import from.
  */
+import { ewarOf, tackleOf } from './improveTackle';
 import { resistPct } from './stats';
 import type { FittingStats } from './types';
 
@@ -57,10 +58,21 @@ export type FittingStatKey =
   | 'agility'
   | 'mass'
   | 'warpSpeed'
-  | 'cargoCapacity';
+  | 'cargoCapacity'
+  | 'tacklePoints'
+  | 'webStrength'
+  | 'tackleRange'
+  | 'ewarStrength'
+  | 'ewarRange'
+  | 'neutralizer'
+  | 'nosferatu'
+  | 'capTransfer'
+  | 'droneControlRange'
+  | 'miningWaste'
+  | ImproveExploreKey;
 
 /** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below. */
-export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey | ImproveExploreKey;
+export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey;
 
 /**
  * The damage figure an Improve row leads with, which no Fitting-diff view
@@ -69,7 +81,7 @@ export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey | Im
  */
 export type ImproveDamageKey = 'appliedDps';
 
-/** Explore better's figures, as Improve rows show them: the best analyzer's hacking figures and the arrays' scan bonuses. Not in `NUMERIC_FIELDS`. */
+/** Explore better's figures: the best analyzer's hacking figures and the arrays' scan bonuses. */
 export type ImproveExploreKey =
   | 'hackingStrength'
   | 'virusCoherence'
@@ -90,11 +102,14 @@ export interface NumericField {
   /**
    * Only Fitting Compare shows it; a Variations swap's diff lists what it
    * always has. Overheated DPS because Variations is worked out without heat
-   * (it would only repeat total DPS); the tank, cap-delta, sensor and hold
-   * rows because they restate a field the diff already shows (the repairs,
-   * the capacitor) or are no module swap's question (the hold).
+   * (it would only repeat total DPS); the tank, cap-delta and hold rows
+   * because they restate a field the diff already shows (the repairs, the
+   * capacitor) or are no module swap's question (a hauler's hold comes
+   * through `skillGains`' hold role).
    */
   compareOnly?: boolean;
+  /** A figure only a fit doing the job has (tackle, EWAR, hacking): Compare drops the row while every Fitting is at zero. */
+  role?: boolean;
 }
 
 export const NUMERIC_FIELDS: readonly NumericField[] = [
@@ -254,13 +269,7 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     digits: 0,
     value: (s) => s.targeting.scanResolution,
   },
-  {
-    key: 'sensorStrength',
-    direction: 'higher',
-    digits: 1,
-    value: (s) => s.sensor.strength,
-    compareOnly: true,
-  },
+  { key: 'sensorStrength', direction: 'higher', digits: 1, value: (s) => s.sensor.strength },
   {
     key: 'signatureRadius',
     direction: 'lower',
@@ -278,6 +287,112 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.holds.cargo,
     compareOnly: true,
   },
+  {
+    key: 'tacklePoints',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => tackleOf(s).points,
+    role: true,
+  },
+  { key: 'webStrength', direction: 'higher', digits: 0, value: (s) => tackleOf(s).web, role: true },
+  {
+    key: 'tackleRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => tackleOf(s).range / 1000,
+    role: true,
+  },
+  {
+    key: 'ewarStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => ewarOf(s).strength,
+    role: true,
+  },
+  {
+    key: 'ewarRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => ewarOf(s).range / 1000,
+    role: true,
+  },
+  {
+    key: 'neutralizer',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.support.neutralizer,
+    role: true,
+  },
+  {
+    key: 'nosferatu',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.support.nosferatu,
+    role: true,
+  },
+  {
+    key: 'capTransfer',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.support.capTransfer,
+    role: true,
+  },
+  {
+    key: 'droneControlRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.applied.droneControlRange / 1000,
+  },
+  {
+    key: 'miningWaste',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.mining.wastePct,
+    role: true,
+  },
+  {
+    key: 'hackingStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.hacking.strength,
+    role: true,
+  },
+  {
+    key: 'virusCoherence',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.hacking.coherence,
+    role: true,
+  },
+  // A shorter analyzer cycle is a faster hack.
+  {
+    key: 'hackingCycle',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.hacking.cycleSeconds,
+    role: true,
+  },
+  {
+    key: 'scanStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.scanning.strength,
+    role: true,
+  },
+  {
+    key: 'scanTimeCut',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.scanning.duration,
+    role: true,
+  },
+  {
+    key: 'deviationCut',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.scanning.deviation,
+    role: true,
+  },
 ];
 
 /** Same rounding every diff view compares/displays at, keyed by `StatChangeKey` including `capacitor`. */
@@ -285,12 +400,6 @@ export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
   capacitor: 0,
   appliedDps: 1,
-  hackingStrength: 0,
-  virusCoherence: 0,
-  hackingCycle: 1,
-  scanStrength: 0,
-  scanTimeCut: 0,
-  deviationCut: 0,
 } as Readonly<Record<StatChangeKey, number>>;
 
 export function round(value: number, digits: number): number {
@@ -307,13 +416,6 @@ export const STAT_DIRECTION: Readonly<Record<StatChangeKey, StatDirection>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.direction])),
   capacitor: 'higher',
   appliedDps: 'higher',
-  hackingStrength: 'higher',
-  virusCoherence: 'higher',
-  // A shorter analyzer cycle is a faster hack.
-  hackingCycle: 'lower',
-  scanStrength: 'higher',
-  scanTimeCut: 'higher',
-  deviationCut: 'higher',
 } as Readonly<Record<StatChangeKey, StatDirection>>;
 
 /** Role stats (`skillGains`) where less is better: a reload, a fuel bill. Absent: higher. */

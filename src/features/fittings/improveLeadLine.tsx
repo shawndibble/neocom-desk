@@ -198,7 +198,12 @@ export function leadLine(
       ];
       const changed = figures.filter((figure) => figure.before !== figure.after);
       return changed.length > 0
-        ? { node: <StatChangeList changes={changed} />, keys: [], rows: changed }
+        ? {
+            node: <StatChangeList changes={changed} />,
+            // The rows below are the shared stat diff, which carries these figures too.
+            keys: changed.map((figure) => figure.key),
+            rows: changed,
+          }
         : null;
     }
     default:

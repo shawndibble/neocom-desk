@@ -112,6 +112,20 @@ describe('compareFittingStats', () => {
     expect(row('sensorStrength').differs).toBe(false);
   });
 
+  it('drops a role row every Fitting is at zero, keeps it when one has the role', () => {
+    const keys = (table: ReturnType<typeof compareFittingStats>) => table.rows.map((r) => r.key);
+    expect(keys(compareFittingStats([stats(), stats()]))).not.toContain('hackingStrength');
+    const analyzer = {
+      ...stats().explore,
+      modules: 1,
+      hacking: { strength: 30, coherence: 60, cycleSeconds: 10 },
+    };
+    const table = compareFittingStats([stats(), stats({ explore: analyzer })]);
+    const row = table.rows.find((r) => r.key === 'hackingStrength')!;
+    expect(row.values).toEqual([0, 30]);
+    expect(row.bestIndices).toEqual([1]);
+  });
+
   it('marks a stat as not differing when every fitting rounds to the same value', () => {
     const table = compareFittingStats([stats(), stats()]);
     const ehpRow = table.rows.find((row) => row.key === 'ehp')!;

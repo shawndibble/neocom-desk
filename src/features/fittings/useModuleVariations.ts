@@ -19,7 +19,7 @@ import {
   type ResourceBudgetOverage,
 } from '@/engine/fittings/skillGaps';
 import type { FittingSlotKind } from '@/engine/fittings/types';
-import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
+import { swapChanges, type SwapChange } from '@/engine/fittings/swapChanges';
 import {
   buildVariationIndex,
   getVariations,
@@ -34,7 +34,7 @@ export interface VariationRow {
   typeId: number;
   name: string;
   metaGroupName: string;
-  delta: FittingStatsDelta | null;
+  delta: SwapChange[] | null;
   fits: boolean | null;
   /** Set only when the swap is over a CPU/PG/calibration budget; null otherwise (including a hull-rule miss). */
   overage: ResourceBudgetOverage | null;
@@ -54,7 +54,7 @@ interface UseModuleVariationsParams {
 }
 
 interface ComputedEntry {
-  delta: FittingStatsDelta;
+  delta: SwapChange[];
   fits: boolean;
   overage: ResourceBudgetOverage | null;
   canFly: boolean;
@@ -126,7 +126,7 @@ export function useModuleVariations({
           entries.push([
             member.typeId,
             {
-              delta: diffFittingStats(before, after),
+              delta: swapChanges(before, after),
               fits: fitsResourceBudget(after) && (check?.fitsHull ?? true),
               overage: firstResourceOverage(after),
               canFly: check?.canFly ?? true,
