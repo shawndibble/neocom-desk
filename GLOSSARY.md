@@ -57,9 +57,11 @@ here — they go one per file in `docs/context/decisions/`.
 - **Owner rate**: What a **Feeder** is owed, kept as its own effective-dated history: the **Agreed rate** if one exists, else the **Requested rate**. Player-facing: "their rate" or "your rate".
 - **Payout**: ISK a **Collector** sent a **Feeder** for what it is owed. Distinct from a **Tax Payment**. Player-facing: "payment".
 - **Pending removal**: A **Collector**-started removal of a **Feeder** while it waits out its 24 hours. Player-facing: "Removal pending".
+- **Place Nickname**: The user's own short name for a station or structure ("Home market", "Staging"), shown on the Assets page beside the real name. Personal: it never replaces the real name anywhere another person, a share or an export would see it. Distinct from a **Station Pin**, which orders locations but does not rename them.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
+- **Asset Category**: The top-level market group an item sits under ("Ships", "Ship Equipment", "Blueprints & Reactions"), as Assets and Corp Assets filter and label it. Not EVE's own inventory category. An item outside the market tree has none and reads "Not on the market".
 - **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore) to
   a Payee, snapshotting the tax % and ISK value at assignment time. It acts
   like an invoice thereafter: a later price move or an edited Payee default
@@ -545,6 +547,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Route Preference**: Which trip a distance describes: the game's Prefer shorter, Prefer safer or Prefer less secure, one vocabulary app-wide. The pilot's default lives in **Travel Settings**; a page with its own picker opens on it and overrides it for that view only.
 - **Travel Settings**: The in-game autopilot's route options, for planning: the default **Route Preference**, the security penalty, and what to avoid (the **Avoided Systems**, EDENCOM and Triglavian minor-victory systems, and systems over a pod-kill count in ESI's last-hour report).
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate from material cost. Sized from EIV, the system's **Cost Index**, a fixed SCC surcharge, and the facility's tax.
+- **Journal Party**: The other side of a wallet journal line: the player, corporation or NPC (CONCORD, Secure Commerce Commission) that paid or was paid, never the user's own Character. A transfer between the user's own Characters has none; it is netted away. Distinct from a corp journal's **player**, the member who made the line.
 - **Jump Basis**: The one set of rules every jump count in the app is worked out under: the Travel Settings plus Route Safety's saved Thera / Turnur hole and Ansiblex jump-bridge settings. It is how Assets, Market, BPC Sourcing, Contract Search and Courier agree with the route Route Safety draws.
 - **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within a set number of stargate jumps of it. Counted on the local stargate graph under the **Jump Basis**. A row the app cannot place (a player structure) drops out once a range is set.
 - **Kind Card**: Retired. One panel per kind of Corp Board Item on the old Corp Ops Board; the **Corp Board** now draws those kinds as **Widgets**.
