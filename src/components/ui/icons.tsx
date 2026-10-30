@@ -71,6 +71,7 @@ import { SketchLogo } from '@phosphor-icons/react/dist/csr/SketchLogo';
 import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
 import { DotsThree } from '@phosphor-icons/react/dist/csr/DotsThree';
 import { DotsThreeVertical } from '@phosphor-icons/react/dist/csr/DotsThreeVertical';
+import { ArrowCircleUp } from '@phosphor-icons/react/dist/csr/ArrowCircleUp';
 import { DownloadSimple } from '@phosphor-icons/react/dist/csr/DownloadSimple';
 import { EnvelopeSimple } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
 import { Export as ExportIcon } from '@phosphor-icons/react/dist/csr/Export';
@@ -206,6 +207,8 @@ export const Revert = withWeight(ArrowCounterClockwise);
 export const Run = withWeight(Play);
 /** Download the current view as CSV. */
 export const Download = withWeight(DownloadSimple);
+/** A newer build is waiting: apply it now. */
+export const Upgrade = withWeight(ArrowCircleUp);
 /** Search / filter. */
 export const Search = withWeight(MagnifyingGlass);
 /** Multi-select mode. */
