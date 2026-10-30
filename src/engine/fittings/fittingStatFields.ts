@@ -5,7 +5,7 @@
  * Neutral home for `variationDelta.ts` (2-way before/after) and
  * `fittingCompare.ts` (N-way compare) to both import from.
  */
-import { ewarOf, tackleOf } from './improveTackle';
+import type { SupportKind, SupportRow } from './support';
 import { resistPct } from './stats';
 import type { FittingStats } from './types';
 
@@ -60,10 +60,13 @@ export type FittingStatKey =
   | 'warpSpeed'
   | 'cargoCapacity'
   | 'tacklePoints'
+  | 'pointRange'
   | 'webStrength'
-  | 'tackleRange'
-  | 'ewarStrength'
-  | 'ewarRange'
+  | 'webRange'
+  | 'ecmStrength'
+  | 'dampStrength'
+  | 'disruptorStrength'
+  | 'painterStrength'
   | 'neutralizer'
   | 'nosferatu'
   | 'capTransfer'
@@ -108,9 +111,20 @@ export interface NumericField {
    * through `skillGains`' hold role).
    */
   compareOnly?: boolean;
-  /** A figure only a fit doing the job has (tackle, EWAR, hacking): Compare drops the row while every Fitting is at zero. */
-  role?: boolean;
+  /**
+   * A figure only a fit doing the job has (tackle, EWAR, hacking), zero meaning
+   * none: Compare drops the row while every Fitting is at zero, and a
+   * lower-is-better one counts no change to or from zero as better or worse.
+   */
+  hideWhenNone?: boolean;
 }
+
+/** The strongest (or longest-reaching) module of `kinds`: what a single swap moves; 0 with none. */
+const supportMax = (
+  s: FittingStats,
+  kinds: readonly SupportKind[],
+  pick: (row: SupportRow) => number
+) => Math.max(0, ...s.support.rows.filter((row) => kinds.includes(row.kind)).map(pick));
 
 export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'cpuUsed', direction: 'lower', digits: 1, value: (s) => s.cpuUsed },
@@ -291,51 +305,82 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     key: 'tacklePoints',
     direction: 'higher',
     digits: 0,
-    value: (s) => tackleOf(s).points,
-    role: true,
-  },
-  { key: 'webStrength', direction: 'higher', digits: 0, value: (s) => tackleOf(s).web, role: true },
-  {
-    key: 'tackleRange',
-    direction: 'higher',
-    digits: 1,
-    value: (s) => tackleOf(s).range / 1000,
-    role: true,
+    value: (s) =>
+      s.support.rows
+        .filter((row) => row.kind === 'warpDisruption')
+        .reduce((sum, row) => sum + row.amount, 0),
+    hideWhenNone: true,
   },
   {
-    key: 'ewarStrength',
+    key: 'pointRange',
     direction: 'higher',
     digits: 1,
-    value: (s) => ewarOf(s).strength,
-    role: true,
+    value: (s) => supportMax(s, ['warpDisruption'], (row) => row.optimal) / 1000,
+    hideWhenNone: true,
   },
   {
-    key: 'ewarRange',
+    key: 'webStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['web'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'webRange',
     direction: 'higher',
     digits: 1,
-    value: (s) => ewarOf(s).range / 1000,
-    role: true,
+    value: (s) => supportMax(s, ['web'], (row) => row.optimal) / 1000,
+    hideWhenNone: true,
+  },
+  // One figure per EWAR kind: a jam strength and a damp % are not one scale.
+  {
+    key: 'ecmStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportMax(s, ['ecm'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'dampStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['sensorDampener'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'disruptorStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['trackingDisruptor', 'guidanceDisruptor'], (row) => row.amount),
+    hideWhenNone: true,
+  },
+  {
+    key: 'painterStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => supportMax(s, ['targetPainter'], (row) => row.amount),
+    hideWhenNone: true,
   },
   {
     key: 'neutralizer',
     direction: 'higher',
     digits: 1,
     value: (s) => s.support.neutralizer,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'nosferatu',
     direction: 'higher',
     digits: 1,
     value: (s) => s.support.nosferatu,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'capTransfer',
     direction: 'higher',
     digits: 1,
     value: (s) => s.support.capTransfer,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'droneControlRange',
@@ -348,21 +393,21 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     direction: 'lower',
     digits: 1,
     value: (s) => s.mining.wastePct,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'hackingStrength',
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.hacking.strength,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'virusCoherence',
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.hacking.coherence,
-    role: true,
+    hideWhenNone: true,
   },
   // A shorter analyzer cycle is a faster hack.
   {
@@ -370,28 +415,28 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     direction: 'lower',
     digits: 1,
     value: (s) => s.explore.hacking.cycleSeconds,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'scanStrength',
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.scanning.strength,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'scanTimeCut',
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.scanning.duration,
-    role: true,
+    hideWhenNone: true,
   },
   {
     key: 'deviationCut',
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.scanning.deviation,
-    role: true,
+    hideWhenNone: true,
   },
 ];
 
@@ -426,6 +471,11 @@ export function statDirection(key: string): StatDirection {
   return LOWER_ROLE_KEYS.has(key) ? 'lower' : 'higher';
 }
 
+/** Stats where zero means the fit has none of the thing (`hideWhenNone`). */
+export const NONE_AT_ZERO: ReadonlySet<string> = new Set(
+  NUMERIC_FIELDS.filter((field) => field.hideWhenNone).map((field) => field.key)
+);
+
 export type ChangeVerdict = 'better' | 'worse' | 'neutral';
 
 /** Whether a before → after change is an improvement, by the stat's own direction. */
@@ -436,6 +486,13 @@ export function changeVerdict(change: {
 }): ChangeVerdict {
   const direction = statDirection(change.key);
   if (direction === 'neutral' || change.before === change.after) return 'neutral';
+  // A first analyzer's cycle, or a miner's residue, is not a slower hack or more waste than none.
+  if (
+    direction === 'lower' &&
+    NONE_AT_ZERO.has(change.key) &&
+    (change.before === 0 || change.after === 0)
+  )
+    return 'neutral';
   // Unstable capacitor is stored as a negated depletion time: longer (more negative) is better.
   const unstable = change.key === 'capacitor' && change.before < 0 && change.after < 0;
   const rose = unstable ? change.after < change.before : change.after > change.before;

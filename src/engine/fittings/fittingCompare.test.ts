@@ -126,6 +126,14 @@ describe('compareFittingStats', () => {
     expect(row.bestIndices).toEqual([1]);
   });
 
+  it('never highlights a Fitting with none as the least mining residue', () => {
+    const miner = (wastePct: number) => stats({ mining: { ...stats().mining, wastePct } });
+    const row = compareFittingStats([miner(0), miner(10), miner(5)]).rows.find(
+      (r) => r.key === 'miningWaste'
+    )!;
+    expect(row.bestIndices).toEqual([2]);
+  });
+
   it('marks a stat as not differing when every fitting rounds to the same value', () => {
     const table = compareFittingStats([stats(), stats()]);
     const ehpRow = table.rows.find((row) => row.key === 'ehp')!;

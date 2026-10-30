@@ -173,18 +173,28 @@ export function compareFittingStats(
 ): CompareTable {
   const rows: CompareRow[] = NUMERIC_FIELDS.flatMap((field) => {
     const values = statsList.map((s) => round(field.value(s), field.digits));
-    // A role figure no Fitting has (no tackle, no analyzer) is a row of zeros.
-    if (field.role && values.every((value) => value === 0)) return [];
+    if (!field.hideWhenNone)
+      return [
+        {
+          key: field.key,
+          values,
+          differs: new Set(values).size > 1,
+          bestIndices: bestIndicesFor(values, STAT_DIRECTION[field.key]),
+        },
+      ];
+    // A figure no Fitting has (no tackle, no analyzer) is a row of zeros.
+    if (values.every((value) => value === 0)) return [];
+    // Lower-is-better: a Fitting without the thing (0) is not the fastest or least wasteful.
+    const ranked = field.direction === 'lower' ? values.map((v) => v || Infinity) : values;
     return [
       {
         key: field.key,
         values,
         differs: new Set(values).size > 1,
-        // Role figures are never neutral, so their own direction is the highlight's.
         bestIndices: bestIndicesFor(
-          values,
-          field.role ? (field.direction as 'higher' | 'lower') : STAT_DIRECTION[field.key]
-        ),
+          ranked,
+          field.direction === 'neutral' ? undefined : field.direction
+        ).filter((index) => values[index] !== 0),
       },
     ];
   });

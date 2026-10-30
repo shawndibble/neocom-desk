@@ -4,7 +4,7 @@
  * weapon reach, mining yield, a hauler's hold, remote repair, bursts). One
  * list, so the Variations table and Improve's Gives up name the same things.
  */
-import { roleChanges, type RoleChange } from './skillGains';
+import { roleSwapChanges, type RoleChange } from './skillGains';
 import { diffFittingStats, type StatChange } from './variationDelta';
 import type { FittingStats } from './types';
 
@@ -17,6 +17,6 @@ export function swapChanges(before: FittingStats, after: FittingStats): SwapChan
       kind: 'stat',
       change,
     })),
-    ...roleChanges(before, after).map((change): SwapChange => ({ kind: 'role', change })),
+    ...roleSwapChanges(before, after).map((change): SwapChange => ({ kind: 'role', change })),
   ];
 }

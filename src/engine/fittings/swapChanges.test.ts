@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import en from '@/i18n/locales/en.json';
-import { NUMERIC_FIELDS } from './fittingStatFields';
+import { changeVerdict, NUMERIC_FIELDS } from './fittingStatFields';
 import { swapChanges } from './swapChanges';
 import { baseFittingStats } from './__fixtures__/fittingStats';
 import type { SupportRow } from './support';
@@ -48,7 +48,7 @@ describe('swapChanges', () => {
     });
   });
 
-  it('names a point, a web and the tackle reach', () => {
+  it('names a point, a web and their reach', () => {
     const base = baseFittingStats();
     const before = withRows(base, [
       row({ amount: 2, optimal: 9_000 }),
@@ -59,11 +59,47 @@ describe('swapChanges', () => {
       row({ kind: 'web', amount: 50, optimal: 10_000 }),
     ]);
     expect(keys(before, after)).toEqual(
-      expect.arrayContaining(['tacklePoints', 'webStrength', 'tackleRange'])
+      expect.arrayContaining(['tacklePoints', 'webStrength', 'pointRange', 'webRange'])
     );
   });
 
-  it('names neut, nos and cap transfer amounts and EWAR strength', () => {
+  it('does not read an added shorter-range point as lost reach', () => {
+    const base = baseFittingStats();
+    const before = withRows(base, [row({ amount: 1, optimal: 24_000 })]);
+    const after = withRows(base, [
+      row({ amount: 1, optimal: 24_000 }),
+      row({ kind: 'web', amount: 60, optimal: 10_000 }),
+    ]);
+    expect(keys(before, after)).not.toContain('pointRange');
+  });
+
+  it('compares EWAR per kind: a damp → ECM swap is not "strength 30 → 5"', () => {
+    const base = baseFittingStats();
+    const before = withRows(base, [row({ kind: 'sensorDampener', amount: 30 })]);
+    const after = withRows(base, [row({ kind: 'ecm', amount: 5 })]);
+    const changes = swapChanges(before, after).map(({ change }) => change);
+    expect(changes).toContainEqual({ key: 'dampStrength', before: 30, after: 0 });
+    expect(changes).toContainEqual({ key: 'ecmStrength', before: 0, after: 5 });
+  });
+
+  it('counts a first analyzer cycle or miner residue as neither better nor worse', () => {
+    const base = baseFittingStats();
+    const after: FittingStats = {
+      ...base,
+      mining: { ...base.mining, wastePct: 10 },
+      explore: {
+        ...base.explore,
+        modules: 1,
+        hacking: { strength: 30, coherence: 60, cycleSeconds: 10 },
+      },
+    };
+    const verdicts = swapChanges(base, after)
+      .filter(({ change }) => change.key === 'miningWaste' || change.key === 'hackingCycle')
+      .map(({ change }) => changeVerdict(change));
+    expect(verdicts).toEqual(['neutral', 'neutral']);
+  });
+
+  it('names neut, nos and cap transfer amounts and a damp strength', () => {
     const base = baseFittingStats();
     const before: FittingStats = {
       ...withRows(base, [row({ kind: 'sensorDampener', amount: 30, optimal: 30_000 })]),
@@ -86,7 +122,7 @@ describe('swapChanges', () => {
       },
     };
     expect(keys(before, after)).toEqual(
-      expect.arrayContaining(['neutralizer', 'nosferatu', 'capTransfer', 'ewarStrength'])
+      expect.arrayContaining(['neutralizer', 'nosferatu', 'capTransfer', 'dampStrength'])
     );
   });
 
