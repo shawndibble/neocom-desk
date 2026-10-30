@@ -72,7 +72,7 @@ interface ModalProps {
  * Per placement: the dialog's own box (with how it arrives, `index.css`
  * "Overlay motion"), and the height cap that box and its inner column share —
  * one entry, so the two can never disagree. A sheet rises from the bottom
- * edge, a centred dialog fades and scales up, and `page` does the first on a
+ * edge, a centred dialog fades, scales and rises, and `page` does the first on a
  * phone (where it fills the screen) and the second from `md`.
  */
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {

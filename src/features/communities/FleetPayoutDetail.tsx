@@ -145,6 +145,7 @@ export function FleetPayoutDetail({
     <SlideOver
       open
       onClose={onClose}
+      contentKey={payout.id}
       title={payout.name}
       subtitle={[
         mine

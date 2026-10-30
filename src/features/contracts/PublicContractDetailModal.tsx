@@ -343,6 +343,7 @@ export function PublicContractDetailModal({
     <SlideOver
       open
       onClose={onClose}
+      contentKey={contractId}
       maxWidthClassName="max-w-[28rem]"
       title={
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

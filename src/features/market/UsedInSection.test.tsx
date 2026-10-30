@@ -84,7 +84,7 @@ describe('UsedInSection', () => {
       ])
     );
 
-    expect(screen.getByRole('heading', { name: 'Used in (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Used in (2)' })).toBeInTheDocument();
     const rifter = screen.getByText('Rifter').closest('li')!;
     expect(rifter).toHaveTextContent('4,500 / run');
     const fiber = screen.getByText('Reinforced Carbon Fiber').closest('li')!;
@@ -156,6 +156,7 @@ describe('UsedInSection', () => {
         </FakeItemActions>
       </MemoryRouter>
     );
+    await user.click(screen.getByRole('button', { name: 'Used in (12)' }));
     await user.type(screen.getByRole('searchbox', { name: 'Filter products' }), 'nothing');
     expect(screen.getByText('No products match.')).toBeInTheDocument();
 
@@ -192,6 +193,7 @@ describe('UsedInSection', () => {
     );
     renderSection(catalogOf(many));
 
+    await user.click(screen.getByRole('button', { name: `Used in (${USED_IN_PAGE + 5})` }));
     expect(screen.getAllByRole('listitem')).toHaveLength(USED_IN_PAGE);
     await user.click(
       screen.getByRole('button', { name: `Show more (${USED_IN_PAGE} of ${USED_IN_PAGE + 5})` })
@@ -207,5 +209,55 @@ describe('UsedInSection', () => {
       expect.stringContaining('Product 053'),
       expect.stringContaining('Product 054'),
     ]);
+  });
+
+  it('opens a list of 10 and closes a list of 11, keeping the count in the header', async () => {
+    const user = userEvent.setup();
+    const make = (n: number) =>
+      catalogOf(
+        Array.from({ length: n }, (_, i) =>
+          entry(10_000 + i, 20_000 + i, `Product ${String(i).padStart(2, '0')}`, 1)
+        )
+      );
+    const { unmount } = render(
+      <MemoryRouter>
+        <FakeItemActions actions={fakeItemActions({ blueprints: make(10) })}>
+          <UsedInSection typeId={TRITANIUM} onNavigate={() => {}} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('button', { name: 'Used in (10)' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(10);
+    unmount();
+
+    renderSection(make(11));
+    const header = screen.getByRole('button', { name: 'Used in (11)' });
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    await user.click(header);
+    expect(screen.getAllByRole('listitem')).toHaveLength(11);
+  });
+
+  it('returns to its default open state when Show info swaps the item', async () => {
+    const user = userEvent.setup();
+    const catalog = catalogOf([entry(638, 587, 'Rifter', 4500), entry(639, 588, 'Hull', 1)]);
+    catalog.entries[1].blueprint.materials = [{ typeID: 587, quantity: 1 }];
+    const actions = fakeItemActions({ blueprints: catalog });
+    const tree = (typeId: number) => (
+      <MemoryRouter>
+        <FakeItemActions actions={actions}>
+          <UsedInSection typeId={typeId} onNavigate={() => {}} />
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    const { rerender } = render(tree(TRITANIUM));
+    await user.click(screen.getByRole('button', { name: 'Used in (1)' }));
+    expect(screen.queryByText('Rifter')).not.toBeInTheDocument();
+
+    rerender(tree(587));
+    expect(screen.getByText('Hull')).toBeInTheDocument();
   });
 });
