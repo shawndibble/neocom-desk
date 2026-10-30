@@ -305,7 +305,7 @@ export function Skills() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <SkillsPageHeader
         meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
         actions={

@@ -140,7 +140,7 @@ function Mockup({
   const [fits, setFits] = useState<readonly PickedFit[]>(SAMPLE_FITS);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4">
+    <div className="mx-auto flex max-w-page flex-col gap-4 px-4 py-4">
       <PageHeader title="Market" />
       <Tabs
         label="Market sections"

@@ -53,7 +53,7 @@ Answer "who is this pilot and what have they done" from facts: identity (public 
 - Nav: no page of its own (no Intel group); Ctrl K lists it as "Travel › Pilot Lookup" from `TRAVEL_TABS`. Tab label `nav.pilotLookup`.
 - Legacy redirects: `/pilot-lookup` -> `/travel/pilot` (`src/app/legacyPaths.ts`, query, hash and route state kept); defaulted `/travel?pilot=` -> `/travel/pilot` (`src/routes/Travel.tsx`).
 - Scope: only suggestions use one - `esi-search.search_structures.v1` (`getCharacterSearch`, `src/esi/registry.ts:573`), gated by `useEndpointsGranted(['getCharacterSearch'])` and an active Character (`PilotLookupPanel.tsx:75`). Without it the hint reads "Type the pilot's full name and press Enter. Suggestions need this character's search permission." and exact-name lookup still works. No grant banner or Grant button on the page.
-- Layout: `mx-auto max-w-6xl`; `PageHeader` title `travel.title` over the Travel tab bar; `DataAgeBadge` on the profile panel (when the profile loaded).
+- Layout: `mx-auto max-w-page`; `PageHeader` title `travel.title` over the Travel tab bar; `DataAgeBadge` on the profile panel (when the profile loaded).
 
 ## Data sources
 
@@ -196,7 +196,7 @@ Folder is `features/travel/`, where the tab lives.
 
 ## Mobile vs desktop
 
-- Page `max-w-6xl`; search input `w-72 max-w-full`. Stat tiles 6 columns from `md`, 2-3 below; ratio meters side by side, stacked on phone; top ships half width on desktop (`md:w-1/2`).
+- Page `max-w-page`; search input `w-72 max-w-full`. Stat tiles 6 columns from `md`, 2-3 below; ratio meters side by side, stacked on phone; top ships half width on desktop (`md:w-1/2`).
 - Killmail row: `min-h-11` on phone, party text takes its own last line below `sm` (#2520); corp/alliance links stay text height on a phone (they were 44 px tall in #2520; the compact header dropped that).
 - No separate mobile layout for search; `mobileTab: true` puts the page in the phone tab bar's More area.
 

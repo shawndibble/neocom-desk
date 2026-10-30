@@ -312,7 +312,7 @@ export function SkillCertificates() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <SkillsPageHeader
         meta={data.fetchedAt && <DataAgeBadge date={data.fetchedAt} />}
         actions={
