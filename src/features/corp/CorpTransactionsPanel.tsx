@@ -32,6 +32,7 @@ import {
   FilterField,
   Panel,
   SearchInput,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -40,6 +41,7 @@ import {
   Spinner,
   type DataTableColumn,
   type DataTableSort,
+  type MultiSelectOption,
   CachedNotice,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -49,6 +51,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
   activeWalletTransactionFilterCount,
   EMPTY_WALLET_TRANSACTION_FILTER,
+  type StationOrder,
   type TransactionSide,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
@@ -93,6 +96,14 @@ interface CorpTransactionsPanelProps {
 /** Radix needs a value here, and `''` reads to it as "nothing selected". */
 const SIDE_OPTIONS: readonly TransactionSide[] = ['all', 'buy', 'sell'];
 
+const STATION_ORDER_OPTIONS: readonly StationOrder[] = ['net', 'name', 'trades'];
+
+const STATION_ORDER_LABEL: Record<StationOrder, string> = {
+  net: 'wallet.stationsByNet',
+  name: 'wallet.stationsByName',
+  trades: 'wallet.stationsByTrades',
+};
+
 const SIDE_LABEL: Record<TransactionSide, string> = {
   all: 'wallet.sideFilterAll',
   buy: 'wallet.buy',
@@ -103,11 +114,18 @@ export function TransactionsFilterBar({
   filter,
   onChange,
   actions,
+  stationOptions,
 }: {
   filter: WalletTransactionFilter;
   onChange: (filter: WalletTransactionFilter) => void;
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
+  /**
+   * The stations to pick from. Market History passes them (its Station filter
+   * and, in the By station view, the "Stations by" picker); the corp wallet
+   * doesn't, and gets neither field.
+   */
+  stationOptions?: readonly MultiSelectOption<number>[];
 }) {
   const { t } = useTranslation();
   return (
@@ -153,6 +171,55 @@ export function TransactionsFilterBar({
             fromLabel={t('wallet.dateFromLabel')}
             toLabel={t('wallet.dateToLabel')}
           />
+          {stationOptions && (
+            <FilterField label={t('wallet.stationsFilterLabel')}>
+              <MultiSelect<number>
+                label={t('wallet.stationsFilterLabel')}
+                triggerLabel={
+                  draft.stations.length === 0
+                    ? t('wallet.stationsAll')
+                    : t('wallet.stationsFilterLabel')
+                }
+                summary={
+                  draft.stations.length === 0
+                    ? undefined
+                    : `${draft.stations.length} / ${stationOptions.length}`
+                }
+                searchPlaceholder={t('wallet.stationsSearchPlaceholder')}
+                noResultsLabel={t('wallet.stationsNoResults')}
+                options={stationOptions}
+                selected={new Set(draft.stations)}
+                onToggle={(id) =>
+                  setDraft({
+                    ...draft,
+                    stations: draft.stations.includes(id)
+                      ? draft.stations.filter((station) => station !== id)
+                      : [...draft.stations, id].sort((a, b) => a - b),
+                  })
+                }
+                className="w-44"
+              />
+            </FilterField>
+          )}
+          {stationOptions && draft.view === 'station' && (
+            <FilterField label={t('wallet.stationsByLabel')}>
+              <Select
+                value={draft.stationsBy}
+                onValueChange={(value) => setDraft({ ...draft, stationsBy: value as StationOrder })}
+              >
+                <SelectTrigger aria-label={t('wallet.stationsByLabel')} className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATION_ORDER_OPTIONS.map((order) => (
+                    <SelectItem key={order} value={order}>
+                      {t(STATION_ORDER_LABEL[order])}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          )}
         </>
       )}
     </FilterBar>

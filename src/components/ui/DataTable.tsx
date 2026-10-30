@@ -13,7 +13,7 @@ import { cx } from '@/lib/cx';
 import { rootFontScale } from '@/lib/fontScale';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { groupSortedRows } from './dataTableGroup';
+import { groupSortedRows, orderGroups } from './dataTableGroup';
 import { firstSortDirection, nextDataTableSort, sortRowsBy } from './dataTableSort';
 import { DataTableRow } from './DataTableRow';
 import { DataTableHeader } from './DataTableHeader';
@@ -279,9 +279,19 @@ export function DataTable<T>({
   // in sort order, exactly as the ungrouped table passes it.
   const groups = useMemo(() => {
     if (!grouping) return null;
-    return groupSortedRows(
+    const gathered = groupSortedRows(
       sortedRows.map((row, index) => ({ row, index })),
       (entry) => groupBy.key(entry.row)
+    );
+    const { groupCompare } = groupBy;
+    return orderGroups(
+      gathered,
+      groupCompare &&
+        ((a, b) =>
+          groupCompare(
+            a.map((e) => e.row),
+            b.map((e) => e.row)
+          ))
     );
   }, [grouping, groupBy, sortedRows]);
 

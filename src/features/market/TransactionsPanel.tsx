@@ -9,11 +9,13 @@ import {
   CachedEmptyState,
   ColumnPickerMenu,
   EmptyState,
+  FilterChip,
   IconButton,
   Panel,
   Spinner,
   Tooltip,
   type DataTableColumn,
+  type DataTableGroupBy,
   CachedNotice,
 } from '@/components/ui';
 import { COL_DATETIME, COL_DATETIME_STACKED } from '@/components/ui/dataTableWidths';
@@ -71,6 +73,9 @@ import {
   type PooledTransaction,
 } from './transactionMargins';
 import { summarizeTrading } from './tradingSummary';
+import { summarizeTransactions } from './transactionDays';
+import { compareStationGroups, distinctLocationIds, stationGroupKey } from './stationGroups';
+import { signedIsk } from '@/lib/signedIsk';
 import { useAllCharacterFills, useArchiveSince } from './useAllCharacterFills';
 import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
@@ -260,8 +265,11 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     DEFAULT_VISIBLE_TRANSACTIONS_COLUMNS,
     TRANSACTIONS_PHONE_OFF_BY_DEFAULT
   );
-  // Names only while Location is ticked: a structure's name is a lookup each.
-  const locationOn = isVisible('location');
+  // Names for every distinct place in the loaded fills, whether or not the
+  // Location column is ticked: the Station filter and the By station headers
+  // name them too. Only the few ids present are asked (a structure's name is a
+  // lookup each), never the filtered rows, so the filter lists stations a
+  // filter has hidden.
   // Under All a fill's place is asked as the Character that made it, since a
   // structure's name is ACL-checked per Character.
   const placeOwnerOf = useCallback(
@@ -270,17 +278,16 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [allScope, activeCharacterId]
   );
   const placeRefs = useMemo<PlaceRef[]>(() => {
-    if (!locationOn) return [];
     const byKey = new Map<string, PlaceRef>();
-    for (const txn of filteredTransactions) {
+    for (const txn of transactions) {
       const ref = { locationId: txn.location_id, characterId: placeOwnerOf(txn) };
       byKey.set(placeKey(ref), ref);
     }
     return [...byKey.values()];
-  }, [locationOn, filteredTransactions, placeOwnerOf]);
+  }, [transactions, placeOwnerOf]);
   const placeDetails = usePlaceDetails(placeRefs, {
     scopeId: activeCharacterId,
-    enabled: locationOn,
+    enabled: placeRefs.length > 0,
     origin: null,
     basis: null,
   });
@@ -289,6 +296,64 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       placeDetails.get(placeKey({ locationId: txn.location_id, characterId: placeOwnerOf(txn) }))
         ?.name ?? t('wallet.locationFallback', { id: txn.location_id }),
     [placeDetails, placeOwnerOf, t]
+  );
+
+  // One name per location id: grouping and filtering key on the id alone, so
+  // under All the first Character's resolved name stands for the station.
+  const stationNames = useMemo(() => {
+    const names = new Map<number, string>();
+    for (const txn of transactions) {
+      if (!names.has(txn.location_id)) names.set(txn.location_id, placeNameFor(txn));
+    }
+    return names;
+  }, [transactions, placeNameFor]);
+  const stationNameOf = useCallback(
+    (locationId: number) =>
+      stationNames.get(locationId) ?? t('wallet.locationFallback', { id: locationId }),
+    [stationNames, t]
+  );
+  const stationOptions = useMemo(
+    () =>
+      distinctLocationIds(transactions)
+        .map((id) => ({ id, label: stationNameOf(id) }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [transactions, stationNameOf]
+  );
+  const byStation = rowsFilter.view === 'station';
+  const stationGroupBy = useMemo<DataTableGroupBy<WalletTransaction> | undefined>(
+    () =>
+      byStation
+        ? {
+            key: stationGroupKey,
+            allWidths: true,
+            minSize: 1,
+            defaultExpanded: () => true,
+            groupCompare: compareStationGroups(rowsFilter.stationsBy, stationNameOf),
+            renderHeader: (rows) => {
+              const { sold, bought, net } = summarizeTransactions(rows);
+              return (
+                <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 tabular-nums">
+                  <span className="font-medium text-text">
+                    {stationNameOf(rows[0]?.location_id ?? 0)}
+                  </span>
+                  <span className="text-text-dim">
+                    {t('wallet.stationTrades', { count: rows.length })}
+                  </span>
+                  <span>
+                    {t('wallet.sold')} {signedIsk(sold, 0)}
+                  </span>
+                  <span>
+                    {t('wallet.bought')} {signedIsk(-bought, 0)}
+                  </span>
+                  <span className={iskToneClass(net)}>
+                    {t('wallet.net')} {signedIsk(net, 0)}
+                  </span>
+                </span>
+              );
+            },
+          }
+        : undefined,
+    [byStation, rowsFilter.stationsBy, stationNameOf, t]
   );
 
   // Number columns fit the loaded rows, not a worst case; see `fitColumnWidth`.
@@ -637,17 +702,29 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             <TransactionsFilterBar
               filter={filter}
               onChange={setFilter}
+              stationOptions={stationOptions}
               actions={
-                <ColumnPickerMenu
-                  available={TRANSACTIONS_COLUMN_IDS}
-                  visible={visible}
-                  columnsById={columnsById}
-                  onToggle={toggle}
-                  onReset={reset}
-                  buttonLabel={t('common.columnsButton')}
-                  menuTitle={t('common.columnsMenuTitle')}
-                  resetLabel={t('common.resetColumns')}
-                />
+                <>
+                  {/* A view, not a filter: it changes the table's row grain (DESIGN.md §6c). */}
+                  <FilterChip
+                    label={t('wallet.viewByStation')}
+                    size="md"
+                    selected={filter.view === 'station'}
+                    onToggle={() =>
+                      setFilter({ ...filter, view: filter.view === 'station' ? 'flat' : 'station' })
+                    }
+                  />
+                  <ColumnPickerMenu
+                    available={TRANSACTIONS_COLUMN_IDS}
+                    visible={visible}
+                    columnsById={columnsById}
+                    onToggle={toggle}
+                    onReset={reset}
+                    buttonLabel={t('common.columnsButton')}
+                    menuTitle={t('common.columnsMenuTitle')}
+                    resetLabel={t('common.resetColumns')}
+                  />
+                </>
               }
             />
             {filteredTransactions.length === 0 ? (
@@ -672,6 +749,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                   highlightRowKey={highlightId}
                   virtualize="auto"
                   hugColumns
+                  groupBy={stationGroupBy}
                   responsive="table"
                   // `transactions` already arrives newest-first (the `sort` above) —
                   // matches that so a header click is the first thing that reorders it.

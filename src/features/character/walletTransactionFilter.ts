@@ -12,10 +12,22 @@
  * It stays pure regardless, and its tests are the specification.
  */
 import type { WalletTransactionCommon } from '@/esi/endpoints';
-import { defineUrlFilter, enumParam, nullableTextParam, textParam } from '@/lib/urlState';
+import {
+  defineUrlFilter,
+  enumParam,
+  idListParam,
+  nullableTextParam,
+  textParam,
+} from '@/lib/urlState';
 
 /** Buy, sell, or don't care. */
 export type TransactionSide = 'all' | 'buy' | 'sell';
+
+/** Market History's transaction views: the flat list, or one group per station. */
+export type TransactionView = 'flat' | 'station';
+
+/** What the By station view ranks its groups on (the "Stations by" picker). */
+export type StationOrder = 'net' | 'name' | 'trades';
 
 export interface WalletTransactionFilter {
   side: TransactionSide;
@@ -24,6 +36,11 @@ export interface WalletTransactionFilter {
   /** Inclusive `YYYY-MM-DD`. */
   endDate: string | null;
   text: string;
+  /** Location ids to keep; empty is every station. The corp bar has no field for it. */
+  stations: readonly number[];
+  /** Market's view picker. Arranges rather than narrows; the corp wallet leaves it flat. */
+  view: TransactionView;
+  stationsBy: StationOrder;
 }
 
 export const EMPTY_WALLET_TRANSACTION_FILTER: WalletTransactionFilter = {
@@ -31,6 +48,9 @@ export const EMPTY_WALLET_TRANSACTION_FILTER: WalletTransactionFilter = {
   startDate: null,
   endDate: null,
   text: '',
+  stations: [],
+  view: 'flat',
+  stationsBy: 'net',
 };
 
 /** The corp Transactions filter bar's fields in the URL (issue #570, #1302), scoped `txn.`. */
@@ -43,6 +63,12 @@ export const {
   startDate: { key: 'txn.start', codec: nullableTextParam() },
   endDate: { key: 'txn.end', codec: nullableTextParam() },
   text: { key: 'txn.q', codec: textParam() },
+  stations: { key: 'txn.stations', codec: idListParam() },
+  view: { key: 'txn.view', codec: enumParam<TransactionView>(['flat', 'station'], 'flat') },
+  stationsBy: {
+    key: 'txn.stationsBy',
+    codec: enumParam<StationOrder>(['net', 'name', 'trades'], 'net'),
+  },
 });
 
 /**
@@ -61,7 +87,9 @@ export function filterWalletTransactions<T extends WalletTransactionCommon>(
   nameFor: (typeId: number) => string
 ): T[] {
   const text = filter.text.trim().toLowerCase();
+  const stations = filter.stations.length > 0 ? new Set(filter.stations) : null;
   return transactions.filter((txn) => {
+    if (stations && !stations.has(txn.location_id)) return false;
     if (filter.side === 'buy' && !txn.is_buy) return false;
     if (filter.side === 'sell' && txn.is_buy) return false;
     // ESI dates are ISO-8601 in UTC, so the first ten characters are the day
@@ -87,5 +115,6 @@ export function activeWalletTransactionFilterCount(filter: WalletTransactionFilt
   if (filter.side !== 'all') count += 1;
   if (filter.startDate !== null) count += 1;
   if (filter.endDate !== null) count += 1;
+  if (filter.stations.length > 0) count += 1;
   return count;
 }
