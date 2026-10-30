@@ -245,8 +245,8 @@ describe('PublicContractDetailModal — price check', () => {
     const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
     expect(await within(check).findByText('5,000,000,000 ISK')).toBeInTheDocument();
     expect(within(check).getByRole('button', { name: 'Sell orders' })).toBeInTheDocument();
-    expect(within(check).getByText('−10.0%')).toBeInTheDocument();
-    expect(within(check).getByText('Asking is below sell orders')).toBeInTheDocument();
+    expect(within(check).getByText('+10.0%')).toHaveClass('text-isk-pos');
+    expect(within(check).getByText('Below sell orders. You save.')).toBeInTheDocument();
   });
 
   it('flips to buy orders from the side label and the figures follow', async () => {
@@ -258,7 +258,8 @@ describe('PublicContractDetailModal — price check', () => {
     fireEvent.click(within(check).getByRole('button', { name: 'Sell orders' }));
     expect(within(check).getByRole('button', { name: 'Buy orders' })).toBeInTheDocument();
     expect(within(check).getAllByText('4,500,000,000 ISK')).toHaveLength(2); // asking and buy value
-    expect(within(check).getByText('Asking is level with buy orders')).toBeInTheDocument();
+    expect(within(check).getByText('0.0%')).toHaveClass('text-isk-pos');
+    expect(within(check).getByText('Level with buy orders. No saving.')).toBeInTheDocument();
   });
 
   it('tags the line the shopper searched for and splits the value into theirs and the rest', async () => {
@@ -345,8 +346,8 @@ describe('PublicContractDetailModal — price check', () => {
     expect(await within(check).findByText('1,000,000,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('Other contracts')).toBeInTheDocument();
     expect(within(check).getByText(/about 4,300,000,000 ISK/)).toBeInTheDocument();
-    // The difference stays against the hub value: 50M against 1B.
-    expect(within(check).getByText('−95.0%')).toBeInTheDocument();
+    // The saving stays against the hub value: 50M against 1B.
+    expect(within(check).getByText('+95.0%')).toBeInTheDocument();
   });
 
   it('has no price check for a contract with no ISK ask and nothing requested', async () => {
@@ -375,8 +376,8 @@ describe('PublicContractDetailModal — price check', () => {
     expect(within(check).getByText('850,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('920,000 ISK')).toBeInTheDocument();
     expect(within(check).getByText('790,000 ISK')).toBeInTheDocument();
-    expect(within(check).getByText('−7.6%')).toBeInTheDocument();
-    expect(within(check).getByText('Below the median per run')).toBeInTheDocument();
+    expect(within(check).getByText('+7.6%')).toBeInTheDocument();
+    expect(within(check).getByText('Below the median. You save.')).toBeInTheDocument();
     expect(within(check).queryByRole('button')).not.toBeInTheDocument();
   });
 

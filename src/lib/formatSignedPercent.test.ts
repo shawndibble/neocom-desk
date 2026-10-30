@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { setDecimalMark } from './numberLocale';
-import { formatSignedPercent, percentDirection } from './formatSignedPercent';
+import { formatSignedPercent, percentDirection, savingTone } from './formatSignedPercent';
 
 describe('formatSignedPercent', () => {
   afterEach(() => setDecimalMark('.'));
@@ -37,5 +37,14 @@ describe('percentDirection', () => {
     expect(percentDirection(0.04)).toBe('level');
     expect(percentDirection(-0.04)).toBe('level');
     expect(percentDirection(0)).toBe('level');
+  });
+});
+
+describe('savingTone', () => {
+  it('is good at 0.0% and above, bad below', () => {
+    expect(savingTone(5)).toBe('good');
+    expect(savingTone(0)).toBe('good');
+    expect(savingTone(-0.04)).toBe('good');
+    expect(savingTone(-0.1)).toBe('bad');
   });
 });

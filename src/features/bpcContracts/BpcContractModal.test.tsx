@@ -285,8 +285,8 @@ describe('BpcContractModal — Build Plan context menu', () => {
       expect(within(check).getByText('1,000,000 ISK')).toBeInTheDocument(); // this copy
       expect(within(check).getByText('1,100,000 ISK')).toBeInTheDocument(); // median
       expect(within(check).getByText('800,000 ISK')).toBeInTheDocument(); // cheapest
-      expect(within(check).getByText('−9.1%')).toBeInTheDocument();
-      expect(within(check).getByText('Below the median per run')).toBeInTheDocument();
+      expect(within(check).getByText('+9.1%')).toBeInTheDocument();
+      expect(within(check).getByText('Below the median. You save.')).toBeInTheDocument();
     });
 
     it('says there are too few similar copies when fewer than three are for sale', async () => {

@@ -82,7 +82,7 @@ import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { ContractPriceCheck, type PriceCheckRowModel } from './ContractPriceCheck';
 import { CopyContractIdButton } from './CopyContractIdButton';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
-import { formatSignedPercent, percentDirection } from '@/lib/formatSignedPercent';
+import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
 import { formatContractIsk } from '@/lib/isk';
 import { useContractPriceCheck } from './useContractPriceCheck';
 import {
@@ -271,6 +271,7 @@ export function PublicContractDetailModal({
     sellOverrides,
     otherValue,
     searchedTypeIds: anySearched ? searchedTypeIds : null,
+    asBuyer: true,
   });
 
   // Flag sentences (#4773): the row's flag, and the padded-bundle share, which
@@ -497,9 +498,12 @@ function BpcPriceCheck({ check }: { check: BpcPerRunCheck | null }) {
   ];
   if (check.diff !== null) {
     const direction = percentDirection(check.diff);
+    // Under the median per run is money kept: the Saving is the diff turned over.
+    const saving = -check.diff;
     rows.push({
-      label: t('contractDetail.priceCheckDifference'),
-      value: formatSignedPercent(check.diff),
+      label: t('contractDetail.priceCheckSaving'),
+      value: formatSignedPercent(saving),
+      tone: savingTone(saving),
       note: t(
         direction === 'below'
           ? 'contractDetail.priceCheckBpcBelow'

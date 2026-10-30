@@ -23,3 +23,11 @@ export function percentDirection(percent: number): 'below' | 'above' | 'level' {
   const rounded = Math.round(percent * 10) / 10;
   return rounded < 0 ? 'below' : rounded > 0 ? 'above' : 'level';
 }
+
+/**
+ * The tone of a Saving: green unless it prints as a loss. Judged on the
+ * printed figure, so 0.0% is not red.
+ */
+export function savingTone(percent: number): 'good' | 'bad' {
+  return Math.round(percent * 10) / 10 < 0 ? 'bad' : 'good';
+}
