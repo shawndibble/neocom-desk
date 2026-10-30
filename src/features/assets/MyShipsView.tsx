@@ -36,6 +36,7 @@ import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { loadOtherCharactersAssetsDetailed, type SkippedCharacterAssets } from './assets';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadCharacterAssetNames } from './assetNames';
 import type { AssetNameMap } from '@/engine/assetNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
@@ -87,10 +88,10 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   );
   const rows = findShips(owned, isShip);
   // Best-effort and per Character; the read swallows its own failures.
-  const nameMaps = await Promise.all(
-    entries.map((entry) => loadCharacterAssetNames(entry.characterId, entry.assets))
-  );
-  const gameNames: Record<number, string> = Object.assign({}, ...nameMaps);
+  const gameNames: Record<number, string> = {};
+  await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
+    Object.assign(gameNames, await loadCharacterAssetNames(entry.characterId, entry.assets));
+  });
   const typeNames = new Map<number, string>();
   const groupIdByType = new Map<number, number>();
   for (const typeId of new Set(rows.map((r) => r.typeId))) {

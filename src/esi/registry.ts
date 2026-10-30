@@ -876,16 +876,17 @@ export const ESI_REGISTRY = {
     scope: 'esi-assets.read_corporation_assets.v1',
     group: 'corp',
   },
-  /**
-   * The corp twin of `getCharacterBlueprints` (issue #839) — the
-   * corporation's own BPOs/BPCs, Director-only per `x-required-roles`
-   * (`engine/corpRoles.ts`'s `canReadBlueprints`).
-   */
+  /** In-game names of a corp's singleton assets; same Director gate as `getCorporationAssets`. */
   postCorporationAssetNames: {
     route: '/corporations/{corporation_id}/assets/names',
     scope: 'esi-assets.read_corporation_assets.v1',
     group: 'corp',
   },
+  /**
+   * The corp twin of `getCharacterBlueprints` (issue #839) — the
+   * corporation's own BPOs/BPCs, Director-only per `x-required-roles`
+   * (`engine/corpRoles.ts`'s `canReadBlueprints`).
+   */
   getCorporationBlueprints: {
     route: '/corporations/{corporation_id}/blueprints',
     scope: 'esi-corporations.read_blueprints.v1',
