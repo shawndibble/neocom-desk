@@ -245,7 +245,7 @@ export function FittingStartScreen({
   const showImport = page || importInline;
 
   return (
-    <div className="space-y-3">
+    <div className={cx('space-y-3', pageTitle && 'mx-auto max-w-page')}>
       {pageTitle && (
         <PageHeader
           title={pageTitle}

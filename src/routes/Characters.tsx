@@ -318,7 +318,7 @@ export function Characters() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader
         title={t('characters.title')}
         actions={

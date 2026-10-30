@@ -866,10 +866,7 @@ export function Market() {
 
   return (
     <ItemActionsProvider page={itemActions} detailLocation={orderBookLocation}>
-      {/* The Browser takes the width a wide screen has — a two-column finder
-          and order book wasted half a 1440px monitor at 6xl — while the
-          other tabs keep their reading width. */}
-      <div className={`mx-auto space-y-4 ${tab === 'browser' ? 'max-w-[96rem]' : 'max-w-6xl'}`}>
+      <div className="mx-auto max-w-page space-y-4">
         {tab === 'orders' && <FromWalletCrumb />}
         <PageHeader
           title={t('market.title')}

@@ -11,7 +11,7 @@ export function LoyaltyStoreLanding() {
   const [params, setParams] = useUrlParams(LANDING_PARAMS);
   const tabsId = useTabsId();
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-3">
+    <div className="mx-auto flex max-w-page flex-col gap-3">
       <PageHeader title={t('loyaltyStore.title')} actions={<LpStoreActions />} />
       <WalletTabBar tabsId={tabsId} />
       <TabPanel tabsId={tabsId} tabId="lp-store">

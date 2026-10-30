@@ -6821,7 +6821,7 @@
       "emptyHint": "A snapshot is recorded each day the app is open. Wallet history comes from your journal.",
       "firstDays": "Layers start on {{date}}. The chart fills in as days are recorded.",
       "gapNote": "Hatched days: the app was not open, so only the wallet is known. Nothing is estimated.",
-      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated. In contracts counts your open contracts' items at the same prices, plus a courier reward you have paid in. It leaves out the contract price and collateral, and any contract it cannot price.",
+      "footnote": "Assets are priced at your chosen hub on the day they were recorded and are not re-valued later. An abyssal module counts at the last MutaMarket estimate this device held that day, so the line steps up on the day one is first estimated. In contracts counts your open contracts' items at the same prices, plus a courier reward you have paid in and collateral you posted on a courier you are hauling, until its delivery deadline. It leaves out the contract price and any contract it cannot price.",
       "walletCrumb": "Wallet",
       "layers": {
         "isk": "ISK",

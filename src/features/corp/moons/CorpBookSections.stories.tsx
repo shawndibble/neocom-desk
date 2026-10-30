@@ -21,7 +21,7 @@ function Page({ children, tab }: { children: ReactNode; tab?: 'overview' | 'mine
   const [value, setValue] = useState(tab);
   return (
     <BookProvider value={BOOK_CONTEXT}>
-      <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-page space-y-4 px-4 py-4">
         {tab && (
           <>
             <PageHeader title={t('corp.moons.title')} />

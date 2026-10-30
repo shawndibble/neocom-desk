@@ -812,7 +812,7 @@ function CorpAssetsView({
 
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader
           title={t('corp.assets.title')}
           meta={
@@ -1016,7 +1016,7 @@ export function CorpAssets() {
 
   const content =
     gate.status === 'denied' ? (
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.assets.title')} />
         <CorpDenied
           reason={gate.reason}

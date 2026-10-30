@@ -194,7 +194,7 @@ function Neighbour({ kind }: { kind: 'corpKills' | 'corpContracts' }) {
 
 function Board({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto grid max-w-6xl gap-3 px-4 pt-3 pb-8">
+    <div className="mx-auto grid max-w-page gap-3 px-4 pt-3 pb-8">
       <PageHeader title="Corp Board" meta="Ashen Vanguard" />
       <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {children}

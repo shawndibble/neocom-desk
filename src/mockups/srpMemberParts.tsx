@@ -23,7 +23,7 @@ import { NewComponent } from './NewComponent';
 import { CLAIMS, type Claim, type ClaimState, type LostShip } from './srpMemberFixtures';
 
 export function Page({ children }: { children: ReactNode }) {
-  return <div className="mx-auto max-w-5xl space-y-4 px-4 py-4">{children}</div>;
+  return <div className="mx-auto max-w-page space-y-4 px-4 py-4">{children}</div>;
 }
 
 export function SrpHeader() {

@@ -18,7 +18,12 @@ import type { Contract } from '@/esi/endpoints';
 import { parseInstant } from '@/engine/esiInstant';
 import { DAY_MS } from '@/lib/age';
 
-export function courierDeliveryDeadlineMs(contract: Contract): number | null {
+export type DeadlineContract = Pick<
+  Contract,
+  'type' | 'status' | 'days_to_complete' | 'date_accepted'
+>;
+
+export function courierDeliveryDeadlineMs(contract: DeadlineContract): number | null {
   if (contract.type !== 'courier' || contract.status !== 'in_progress') return null;
   const days = contract.days_to_complete;
   if (days === undefined || !Number.isFinite(days) || days <= 0) return null;
