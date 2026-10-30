@@ -310,6 +310,7 @@ export function CourierContractDetailModal({
     <SlideOver
       open
       onClose={onClose}
+      contentKey={row.contractId}
       returnFocusFallback={returnFocusFallback}
       title={t('contractSearch.courierModalTitle', {
         origin: endpointSystemName(row.origin),

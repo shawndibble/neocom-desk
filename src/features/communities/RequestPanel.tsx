@@ -263,6 +263,7 @@ export function RequestPanel({
     <SlideOver
       open
       onClose={onClose}
+      contentKey={request.id}
       title={
         mine
           ? t('communities.board.panelTitleMine')
