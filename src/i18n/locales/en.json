@@ -11488,6 +11488,11 @@
     "materialColBuyCost": "Buy cost",
     "unpriceable": "Can't be priced at this hub — a material or the product has no listed sell price.",
     "unpriceableRequiredItem": "Can't be priced at this hub — a required item has no listed sell price.",
+    "howMany": "How many",
+    "iskPerLpAtN": "{{atN}} at {{n}} · {{at1}} at 1",
+    "walkedLoading": "Reading order books…",
+    "unfilledUnits": "{{count}} not on the book",
+    "unsoldUnits": "{{count}} units the buy orders cannot take",
     "viewInMarket": "View in Market",
     "planInIndustry": "Plan in Industry",
     "assumesBaseStandingsHint": "Broker fees on sell-order profits are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."

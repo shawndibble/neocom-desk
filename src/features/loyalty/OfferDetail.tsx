@@ -3,7 +3,7 @@
  * phone), plus the row-level helpers it shares with the offers table.
  */
 import { fixed1 } from '@/lib/fixedFormat';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -29,6 +29,12 @@ import type { LoyaltyOfferRow } from './offerRows';
 import { iskPerLpTone, resolveLoyaltyRowItem } from './offerRowDisplay';
 import { loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
 import { formatCount } from '@/lib/formatCount';
+import type { SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
+import type { TradeHub } from '@/market/hubs';
+import { SourcingInput } from '@/features/industry/SourcingInput';
+import { parseOrKeep } from '@/features/industry/planInputParsers';
+import { useRedemptionPricing } from './useRedemptionPricing';
 
 /**
  * Item name: plain text. The row's click selects it for the detail pane, so
@@ -44,8 +50,11 @@ export function LoyaltyItemName({ row }: { row: LoyaltyOfferRow }) {
 interface OfferDetailProps {
   row: LoyaltyOfferRow;
   catalog: BlueprintCatalog | null;
+  hub: TradeHub;
   hubId: string;
   hubName: string;
+  skills: SkillLevels;
+  standing: ResolvedStandings | undefined;
   priceBasis: PriceBasis;
   lpBasis: LpBasis;
   concord: ConcordRate | null;
@@ -61,8 +70,11 @@ const EMPTY_MATERIALS: readonly ResolvedMaterial[] = [];
 export function OfferDetail({
   row,
   catalog,
+  hub,
   hubId,
   hubName,
+  skills,
+  standing,
   priceBasis,
   lpBasis,
   concord,
@@ -74,13 +86,26 @@ export function OfferDetail({
 }: OfferDetailProps) {
   const { t } = useTranslation();
   const { typeId: marketTypeId, itemName: displayName } = resolveLoyaltyRowItem(row);
-  const { profit } = row;
-  const shownIskPerLp =
-    lpBasis === 'concord'
-      ? concord
-        ? iskPerConcordLp(profit.iskPerLp, concord.rate)
-        : null
-      : profit.iskPerLp;
+  // "How many" starts at 1 each time the detail opens (the route keys this
+  // component by offer) and is never remembered.
+  const [redemptions, setRedemptions] = useState(1);
+  const { result: walked, loading: walking } = useRedemptionPricing({
+    row,
+    catalog,
+    hub,
+    redemptions,
+    priceBasis,
+    skills,
+    standing,
+    playerLp,
+  });
+  const profit = walked?.profit ?? row.profit;
+  const requiredItemsCost = walked ? walked.requiredItemsCost : row.requiredItemsCost;
+  const anyUnfilled = walked?.requiredLines.some((line) => line.unfilled > 0) ?? false;
+  const inLpBasis = (iskPerLp: number | null): number | null =>
+    lpBasis === 'concord' ? (concord ? iskPerConcordLp(iskPerLp, concord.rate) : null) : iskPerLp;
+  const shownIskPerLp = inLpBasis(profit.iskPerLp);
+  const formatIskPerLp = (value: number | null): string => (value === null ? '—' : fixed1(value));
 
   const materialColumns = useMemo<DataTableColumn<ResolvedMaterial>[]>(
     () => [
@@ -168,6 +193,21 @@ export function OfferDetail({
         )}
       </div>
 
+      <label className="flex items-center gap-2 text-xs text-text-dim">
+        {t('loyaltyStore.howMany')}
+        <SourcingInput
+          value={redemptions}
+          label={t('loyaltyStore.howMany')}
+          inputMode="numeric"
+          widthClassName="w-16"
+          parse={(raw) => parseOrKeep(redemptions, raw, (n) => Math.max(1, Math.round(n)))}
+          onCommit={(next) => {
+            if (next !== undefined) setRedemptions(next);
+          }}
+        />
+        {walking && <span>{t('loyaltyStore.walkedLoading')}</span>}
+      </label>
+
       <div className="flex flex-wrap gap-6">
         <div>
           <div className={eyebrowClassName}>
@@ -182,6 +222,15 @@ export function OfferDetail({
                 ? '—'
                 : fixed1(shownIskPerLp)}
           </div>
+          {walked && (
+            <div className="text-[0.6875rem] tabular-nums text-text-dim">
+              {t('loyaltyStore.iskPerLpAtN', {
+                atN: formatIskPerLp(shownIskPerLp),
+                n: formatCount(redemptions),
+                at1: formatIskPerLp(inLpBasis(row.profit.iskPerLp)),
+              })}
+            </div>
+          )}
         </div>
         <div>
           <div className={eyebrowClassName}>{t('loyaltyStore.netProfit')}</div>
@@ -198,14 +247,20 @@ export function OfferDetail({
               hub: hubName,
             })}
           </dt>
-          <dd className="tabular-nums text-text">
+          <dd className={`tabular-nums ${walked?.output.moved ? 'text-warning' : 'text-text'}`}>
             {profit.revenue === null ? '—' : formatIsk(profit.revenue)}
           </dd>
         </div>
+        {walked && walked.output.unsold > 0 && (
+          <div className="text-right text-[0.6875rem] text-warning">
+            {t('loyaltyStore.unsoldUnits', { count: walked.output.unsold })}
+          </div>
+        )}
         <div className="flex justify-between gap-4 text-text-dim">
           <dt>{t('loyaltyStore.storeCost')}</dt>
           <dd className="tabular-nums text-text">
-            {formatCount(row.offer.lp_cost)} LP + {formatIsk(row.offer.isk_cost)} ISK
+            {formatCount(walked ? walked.totals.lpCost : row.offer.lp_cost)} LP +{' '}
+            {formatIsk(walked ? walked.totals.iskCost : row.offer.isk_cost)} ISK
           </dd>
         </div>
         {row.requiredItems.length > 0 && (
@@ -213,36 +268,49 @@ export function OfferDetail({
             <div className="flex justify-between gap-4 text-text-dim">
               <dt>{t('loyaltyStore.requiredItems')}</dt>
               <dd className="tabular-nums text-text">
-                {row.requiredItemsCost === null ? (
+                {requiredItemsCost === null ? (
                   <span className="text-warning">{t('loyaltyStore.requiredItemsNotPriced')}</span>
                 ) : (
-                  formatIsk(row.requiredItemsCost)
+                  formatIsk(requiredItemsCost)
                 )}
               </dd>
             </div>
             <div className="flex flex-col gap-0.5 pl-3">
-              {row.requiredItems.map((item) => (
-                <div
-                  key={item.typeId}
-                  className="flex justify-between gap-4 text-[0.6875rem] text-text-dim"
-                >
-                  <dt>
-                    {formatCount(item.quantity)} ×{' '}
-                    <MarketItemLink typeId={item.typeId} hubId={hubId}>
-                      {item.name}
-                    </MarketItemLink>
-                  </dt>
-                  <dd className="tabular-nums">
-                    {item.unitPrice === null ? (
-                      <span className="text-warning">
-                        {t('loyaltyStore.requiredItemsNotPriced')}
-                      </span>
-                    ) : (
-                      formatIsk(item.unitPrice * item.quantity)
-                    )}
-                  </dd>
-                </div>
-              ))}
+              {row.requiredItems.map((item, index) => {
+                const line = walked?.requiredLines[index];
+                return (
+                  <div
+                    key={item.typeId}
+                    className="flex justify-between gap-4 text-[0.6875rem] text-text-dim"
+                  >
+                    <dt>
+                      {formatCount(line ? line.unitsNeeded : item.quantity)} ×{' '}
+                      <MarketItemLink typeId={item.typeId} hubId={hubId}>
+                        {item.name}
+                      </MarketItemLink>
+                    </dt>
+                    <dd className="tabular-nums">
+                      {line && line.unfilled > 0 ? (
+                        <span className="text-warning">
+                          {t('loyaltyStore.unfilledUnits', { count: line.unfilled })}
+                        </span>
+                      ) : (line
+                          ? line.lineCost
+                          : item.unitPrice === null
+                            ? null
+                            : item.unitPrice * item.quantity) === null ? (
+                        <span className="text-warning">
+                          {t('loyaltyStore.requiredItemsNotPriced')}
+                        </span>
+                      ) : (
+                        <span className={line?.moved ? 'text-warning' : undefined}>
+                          {formatIsk(line ? line.lineCost! : item.unitPrice! * item.quantity)}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
@@ -269,7 +337,7 @@ export function OfferDetail({
           })}
         </p>
       )}
-      {profit.profit === null && (
+      {profit.profit === null && !anyUnfilled && (
         <p className="text-xs text-warning">
           {/* A required item with no hub price is a real, distinct cause from
               a material or the product itself lacking one (row.build's
@@ -279,7 +347,7 @@ export function OfferDetail({
               engine already used to null `profit.profit`, so this reads the
               actual cause rather than re-deriving it. */}
           {t(
-            row.requiredItemsCost === null
+            requiredItemsCost === null
               ? 'loyaltyStore.unpriceableRequiredItem'
               : 'loyaltyStore.unpriceable'
           )}
