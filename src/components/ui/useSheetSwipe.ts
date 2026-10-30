@@ -17,7 +17,7 @@ const DRAG_SLOP = 4;
 /** A release this long after the last move ignores velocity. */
 const VELOCITY_WINDOW_MS = 100;
 
-/** How long a released sheet takes to slide off the bottom before it closes. */
+/** How long a released sheet takes to slide off the bottom before it closes: `--motion-slow-exit`. */
 const DISMISS_SLIDE_MS = 240;
 
 /** After the close, how long before a sheet its parent kept open slides back. */

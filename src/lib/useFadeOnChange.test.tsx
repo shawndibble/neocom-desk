@@ -37,7 +37,7 @@ describe('useFadeOnChange', () => {
     rerender(<Harness value="b" />);
     expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
       duration: 220,
-      easing: 'ease-out',
+      easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
     });
   });
 

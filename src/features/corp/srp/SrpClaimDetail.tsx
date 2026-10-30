@@ -108,6 +108,7 @@ export function SrpClaimDetail({
     <SlideOver
       open
       onClose={onClose}
+      contentKey={claim.killmailId}
       title={t('srp.officer.detail.title', { pilot: claim.characterName, hull })}
       subtitle={t('srp.officer.detail.subtitle', { system: ctx.names.system(claim.solarSystemId) })}
       flush={phone}

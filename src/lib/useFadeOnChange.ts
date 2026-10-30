@@ -3,6 +3,9 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
 /** Long enough to read as a change of view, short enough never to hold up reading it. */
 const FADE_MS = 220;
 
+/** `--motion-ease-out` in `index.css`: one curve for every arrival. */
+const FADE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
+
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
@@ -36,7 +39,7 @@ export function useFadeOnChange(target: RefObject<HTMLElement | null>, key: stri
     running.current?.cancel();
     running.current = node.animate([{ opacity: 0 }, { opacity: 1 }], {
       duration: FADE_MS,
-      easing: 'ease-out',
+      easing: FADE_EASING,
     });
   }, [target, key]);
 }
