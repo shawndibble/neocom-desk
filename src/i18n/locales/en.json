@@ -13102,12 +13102,18 @@
       "sell": "Sell · {{count}}",
       "buy": "Buy · {{count}}"
     },
+    "headingFigure": {
+      "units": "Units listed",
+      "value": "ISK value listed"
+    },
     "sideSummary": {
-      "none": "{{count}} orders",
-      "sell_one": "{{count}} order · lowest {{price}}",
-      "sell_other": "{{count}} orders · lowest {{price}}",
-      "buy_one": "{{count}} order · highest {{price}}",
-      "buy_other": "{{count}} orders · highest {{price}}",
+      "orders_one": "{{count}} order",
+      "orders_other": "{{count}} orders",
+      "units_one": "{{formatted}} unit",
+      "units_other": "{{formatted}} units",
+      "value": "≈ {{amount}} ISK",
+      "lowest": "lowest {{price}}",
+      "highest": "highest {{price}}",
       "baitHidden_one": "{{count}} bait sell hidden",
       "baitHidden_other": "{{count}} bait sells hidden"
     },
