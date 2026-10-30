@@ -14,6 +14,17 @@ const withExplore = (explore: Partial<FittingStats['explore']>): FittingStats =>
 });
 
 describe('ExploreFacts', () => {
+  it('says whether a fitted cloak warps cloaked, and nothing without a cloak', () => {
+    const { rerender } = render(
+      <ExploreFacts stats={withExplore({ cloakRecalibrationSeconds: 10, warpsCloaked: true })} />
+    );
+    expect(fact('Warps cloaked')).toBe('yes');
+    rerender(<ExploreFacts stats={withExplore({ cloakRecalibrationSeconds: 30 })} />);
+    expect(fact('Warps cloaked')).toBe('no');
+    rerender(<ExploreFacts stats={withExplore({})} />);
+    expect(screen.queryByText('Warps cloaked')).toBeNull();
+  });
+
   it('shows data and relic strength, the probe and the cloak relock', () => {
     render(
       <ExploreFacts

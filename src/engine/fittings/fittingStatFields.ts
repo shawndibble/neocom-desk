@@ -80,6 +80,7 @@ export type FittingStatKey =
   | 'probeLauncherBonus'
   | 'probeLauncherCycle'
   | 'cloakRecalibration'
+  | 'warpsCloaked'
   | 'reactivationDelay'
   | 'reloadTime'
   | 'salvageChance'
@@ -528,6 +529,14 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.explore.cloakRecalibrationSeconds,
     hideWhenNone: true,
   },
+  // A yes/no (`FLAG_STATS`); display only, so it joins no gain metric.
+  {
+    key: 'warpsCloaked',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => (s.explore.warpsCloaked ? 1 : 0),
+    hideWhenNone: true,
+  },
   {
     key: 'reactivationDelay',
     direction: 'lower',
@@ -675,6 +684,9 @@ export function statDirection(key: string): StatDirection {
   if (key in STAT_DIRECTION) return STAT_DIRECTION[key as StatChangeKey];
   return LOWER_ROLE_KEYS.has(key) ? 'lower' : 'higher';
 }
+
+/** Stats that are a yes/no, 1 or 0, shown as words rather than a number. */
+export const FLAG_STATS: ReadonlySet<string> = new Set(['warpsCloaked']);
 
 /** Stats where zero means the fit has none of the thing (`hideWhenNone`). */
 export const NONE_AT_ZERO: ReadonlySet<string> = new Set(

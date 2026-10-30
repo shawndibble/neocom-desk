@@ -1,7 +1,7 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
 import type { SwapChange } from '@/engine/fittings/swapChanges';
-import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
+import { type StatChange, FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
 import { fixed0 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
@@ -20,6 +20,12 @@ export function changeLabel(change: StatChange, t: Translate): string {
       : t('fittings.variations.stat.capacitorUnstable', {
           time: formatSeconds(-change.after),
         });
+  }
+  if (FLAG_STATS.has(change.key)) {
+    const word = (value: number) => t(value ? 'fittings.statChange.yes' : 'fittings.statChange.no');
+    return t(`fittings.variations.stat.${change.key}`, {
+      value: `${word(change.before)} → ${word(change.after)}`,
+    });
   }
   const delta = formatDelta(change);
   const value = delta > 0 ? `+${delta}` : `${delta}`;

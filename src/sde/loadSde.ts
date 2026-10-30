@@ -126,6 +126,13 @@ export const loadFittingSlots = cached<FittingSlotMap>('fittingSlots.json');
  */
 export const loadMutaplasmids = cached<MutaplasmidData>('mutaplasmids.json');
 
+/**
+ * Type ids per dogma effect the app reads (`scripts/lib/typeEffects.mjs`): the
+ * engine's results carry no effects, so a fact that is only one (a Covert Ops
+ * cloak warping cloaked, effect 980) comes from here.
+ */
+export const loadTypeEffects = cached<Record<string, number[]>>('typeEffects.json');
+
 /** The Ship Tree's classes, factions and hulls — see `ShipTreeData`. */
 export const loadShipTree = cached<ShipTreeData>('shipTree.json');
 

@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { Tooltip } from '@/components/ui';
 import type { CompareRow } from '@/engine/fittings/fittingCompare';
-import { STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
+import { FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
 import { formatSeconds } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
@@ -20,6 +20,9 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
     return value >= 0
       ? t('fittings.compare.stat.capacitorStable', { pct: fixed0(value) })
       : t('fittings.compare.stat.capacitorUnstable', { time: formatSeconds(-value) });
+  }
+  if (FLAG_STATS.has(row.key)) {
+    return t(row.values[index] ? 'fittings.statChange.yes' : 'fittings.statChange.no');
   }
   if (row.key === 'appliedDps' || row.key === 'bestRange') return fixed1(row.values[index]!);
   if (row.key === 'priceSell' || row.key === 'priceBuy') {

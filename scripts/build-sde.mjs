@@ -25,6 +25,7 @@ import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { bakeAgents, bakeNpcCorporations } from './lib/npcAgents.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
 import { buildShipTree } from './lib/shipTree.mjs';
+import { bakeTypeEffects } from './lib/typeEffects.mjs';
 import { bakeTypeInfoShards } from './lib/typeInfo.mjs';
 import { bakeTypeNames } from './lib/typeNames.mjs';
 
@@ -162,7 +163,14 @@ async function main() {
   );
 
   // --- typeInfo shards (issue #3882); see lib/typeInfo.mjs ---
-  const typeInfoShards = bakeTypeInfoShards(ccpTypes, parseJsonl(ccpStaticData['typeDogma.jsonl']));
+  const typeDogma = parseJsonl(ccpStaticData['typeDogma.jsonl']);
+  const typeInfoShards = bakeTypeInfoShards(ccpTypes, typeDogma);
+
+  // --- typeEffects.json: the types carrying each effect we read; see lib/typeEffects.mjs ---
+  const typeEffects = bakeTypeEffects(ccpTypes, typeDogma);
+  if (!typeEffects[980].includes(11578)) {
+    throw new Error('typeEffects.json looks wrong: Covert Ops Cloaking Device II is not under 980');
+  }
 
   // --- mutaplasmids.json: what each mutaplasmid rolls; see lib/mutaplasmids.mjs ---
   const mutaplasmids = bakeMutaplasmids(
@@ -232,6 +240,7 @@ async function main() {
     compressedOreTypeIds,
     shipTree,
     typeNames,
+    typeEffects,
     mutaplasmids,
     wormholeMass,
     shipMass,

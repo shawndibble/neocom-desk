@@ -18,6 +18,16 @@ const HACKING = 21718;
 const ARCHAEOLOGY = 13278;
 
 describe('extractExplore', () => {
+  it('warps cloaked only with an online module whose type the caller names as a covert cloak', () => {
+    const covert = new Set([11578]);
+    const warps = (typeId: number, state = 'active') =>
+      extractExplore([item(typeId)], [result({ 560: 10_000 }, state)], covert).warpsCloaked;
+    expect(warps(11578)).toBe(true);
+    expect(warps(11370)).toBe(false);
+    expect(warps(11578, 'offline')).toBe(false);
+    expect(extractExplore([item(11578)], [result({ 560: 10_000 })]).warpsCloaked).toBe(false);
+  });
+
   it('is empty for a fit with no explorer module', () => {
     expect(extractExplore([item()], [result({ 73: 5000 })])).toEqual(NO_EXPLORE);
   });

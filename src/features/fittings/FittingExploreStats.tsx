@@ -42,6 +42,17 @@ export function ExploreFacts({ stats }: { stats: FittingStats }) {
         ...fact('scanTimeCut', scanning.duration, percent),
         ...fact('deviationCut', scanning.deviation, percent),
         ...fact('cloakRelock', explore.cloakRecalibrationSeconds, seconds),
+        // A cloak is fitted when it has a relock delay.
+        ...(explore.cloakRecalibrationSeconds > 0
+          ? [
+              {
+                label: label('warpsCloaked'),
+                value: t(
+                  explore.warpsCloaked ? 'fittings.statChange.yes' : 'fittings.statChange.no'
+                ),
+              },
+            ]
+          : []),
       ]}
     />
   );
