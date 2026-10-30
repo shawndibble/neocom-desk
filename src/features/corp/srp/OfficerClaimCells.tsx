@@ -43,7 +43,7 @@ export function OffDoctrineFlag({ claim, ctx }: { claim: SrpClaim; ctx: ClaimCol
 export function Pilot({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
   return (
     <span className="block min-w-0">
-      <span className="font-semibold break-words">{claim.characterName}</span>
+      <span className="font-semibold wrap-anywhere">{claim.characterName}</span>
       <span className="block text-xs">
         <ExternalLink href={`https://zkillboard.com/kill/${claim.killmailId}/`}>
           {ctx.t('srp.officer.killmailLink')}
