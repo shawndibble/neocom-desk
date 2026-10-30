@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Button, SearchInput, LiveStatus } from '@/components/ui';
+import { Button, LiveStatus } from '@/components/ui';
+import { AssetsFilterRow } from './AssetsFilterRow';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
 
@@ -10,13 +11,11 @@ export function AssetsToolbar({
   assetsData: AssetsData;
   assetsRows: AssetsRows;
 }) {
-  const { activeCharacterId, debouncedSearch, search, setSearch, searchActive, assetsResult } =
-    assetsData;
+  const { activeCharacterId, debouncedSearch, searchActive, assetsResult } = assetsData;
   const {
     selectMode,
     selectedIds,
     flatMatches,
-    searchRef,
     handleBulkAddToQuickbar,
     handleBulkAppraise,
     handleBulkCopyNames,
@@ -37,14 +36,7 @@ export function AssetsToolbar({
         </LiveStatus>
       }
 
-      {assetsResult && (
-        <SearchInput
-          ref={searchRef}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('assets.searchPlaceholder')}
-        />
-      )}
+      {assetsResult && <AssetsFilterRow assetsData={assetsData} assetsRows={assetsRows} />}
 
       {selectMode && (
         <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">

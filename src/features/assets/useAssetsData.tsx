@@ -17,8 +17,20 @@ import {
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { useRememberedUrlParams } from '@/lib/useUrlState';
+import { useRememberedUrlParams, type RememberedDefaults } from '@/lib/useUrlState';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { boolParam, textParam } from '@/lib/urlState';
+import {
+  assetPassesKindFilter,
+  blueprintKindParam,
+  blueprintsTicked,
+  categoryPickParam,
+  filterIsOpen,
+  pickIsAll,
+  type AssetKindFilter,
+} from '@/features/assets/assetCategoryFilter';
+import { useAssetCategoryIndex } from '@/features/assets/useAssetCategoryIndex';
+import { useAssetKindPreference } from '@/features/assets/assetKindPreference';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import type { TableExport } from '@/components/ui/useTableExport';
@@ -50,10 +62,13 @@ import { locationLabel, matchAssets } from './assetsLogic';
 const SEARCH_PARAM = textParam();
 const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
+const CATEGORY_PARAM = categoryPickParam();
 const ASSETS_VIEW_PARAMS = {
   q: SEARCH_PARAM,
   all: ALL_ITEMS_PARAM,
   min: MIN_VALUE_PARAM,
+  cat: CATEGORY_PARAM,
+  bp: blueprintKindParam(),
   chars: characterFilterParam('current'),
 };
 
@@ -82,7 +97,32 @@ export function useAssetsData() {
     'assets',
     'chars'
   );
-  const [view, setView] = useRememberedUrlParams(ASSETS_VIEW_PARAMS, rememberedCharacterFilter);
+  // The Category and Blueprints picks are remembered per device as well
+  // (issue #5601); the min-value box stays per-visit, as before.
+  const kindPreference = useAssetKindPreference((state) => state.value);
+  const kindPreferenceHydrated = useAssetKindPreference((state) => state.hydrated);
+  const setKindPreference = useAssetKindPreference((state) => state.setValue);
+  useHydratedStore(useAssetKindPreference);
+  const remembered = useMemo<RememberedDefaults<typeof ASSETS_VIEW_PARAMS>>(
+    () => ({
+      values: {
+        ...rememberedCharacterFilter.values,
+        cat: CATEGORY_PARAM.parse(kindPreference.cat),
+        bp: kindPreference.bp,
+      },
+      remember: (patch) => {
+        if (patch.chars !== undefined) rememberedCharacterFilter.remember({ chars: patch.chars });
+        if (patch.cat !== undefined || patch.bp !== undefined) {
+          void setKindPreference({
+            cat: patch.cat === undefined ? kindPreference.cat : CATEGORY_PARAM.serialize(patch.cat),
+            bp: patch.bp ?? kindPreference.bp,
+          });
+        }
+      },
+    }),
+    [rememberedCharacterFilter, kindPreference, setKindPreference]
+  );
+  const [view, setView] = useRememberedUrlParams(ASSETS_VIEW_PARAMS, remembered);
   const search = view.q;
   const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
@@ -99,6 +139,20 @@ export function useAssetsData() {
   const flatModeActive = searchActive || allItemsView;
   // Held off while prices are still loading: every asset values 0 until then.
   const minValueThreshold = data?.pricesReady === false ? 0 : (parseIskAmount(minValueInput) ?? 0);
+
+  // Category and Blueprints (issue #5601): `kindFilter` is null until the
+  // market tree has loaded, so a not-yet-known type is never hidden.
+  const categoryIndex = useAssetCategoryIndex(data !== undefined && data !== null);
+  const catKey = CATEGORY_PARAM.serialize(view.cat);
+
+  const categoryPick = useMemo(() => CATEGORY_PARAM.parse(catKey), [catKey]);
+  const blueprintKind = view.bp;
+  const showBlueprintSelect = categoryIndex ? blueprintsTicked(categoryIndex, categoryPick) : false;
+  const activeFilterCount =
+    (pickIsAll(categoryPick) ? 0 : 1) +
+    (blueprintKind !== 'any' && showBlueprintSelect ? 1 : 0) +
+    (minValueThreshold > 0 ? 1 : 0);
+  const resetFilters = () => setView({ cat: 'all', bp: 'any', min: '' });
 
   // Viewing a named Character is a fixed scope: the cross-Character filter
   // (and its legacy `chars` value, which here named the Character) stands down.
@@ -257,12 +311,14 @@ export function useAssetsData() {
       (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
     );
     const searched = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
-    // Flat views hide stacks under the minimum value on screen; the export
-    // follows. Tree view ignores the filter, so its export does too.
+    // The export follows the on-screen filters: Category, Blueprints, min value.
     const matches =
-      flatModeActive && minValueThreshold > 0
+      kindFilter || minValueThreshold > 0
         ? searched.filter(
-            (m) => assetStackValue(m.asset, priceByTypeId, itemValueByItemId) >= minValueThreshold
+            (m) =>
+              (!kindFilter || assetPassesKindFilter(m.asset, kindFilter)) &&
+              (minValueThreshold <= 0 ||
+                assetStackValue(m.asset, priceByTypeId, itemValueByItemId) >= minValueThreshold)
           )
         : searched;
 
@@ -332,6 +388,17 @@ export function useAssetsData() {
     return merged;
   }, [typeNames, activeCrossCharacterData]);
   const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const kindFilter = useMemo<AssetKindFilter | null>(() => {
+    if (!categoryIndex) return null;
+    const filter = {
+      index: categoryIndex,
+      pick: categoryPick,
+      blueprints: blueprintKind,
+      blueprintTypeIds,
+    };
+    return filterIsOpen(filter) ? null : filter;
+  }, [categoryIndex, categoryPick, blueprintKind, blueprintTypeIds]);
   const mergedLocationNames = useMemo(() => {
     if (!activeCrossCharacterData) return locationNames;
     const merged = new Map(locationNames);
@@ -395,7 +462,8 @@ export function useAssetsData() {
     data,
     error,
     loading,
-    hydrated,
+    // Held until the remembered Category pick is read, so the list never flashes unfiltered.
+    hydrated: hydrated && kindPreferenceHydrated,
     activeCharacterId,
     refresh,
     view,
@@ -415,6 +483,13 @@ export function useAssetsData() {
     minValueInput,
     flatModeActive,
     minValueThreshold,
+    categoryIndex,
+    categoryPick,
+    blueprintKind,
+    kindFilter,
+    showBlueprintSelect,
+    activeFilterCount,
+    resetFilters,
     crossCharacterFilter,
     resolvedCrossCharacterFilter,
     allCharactersQuery,

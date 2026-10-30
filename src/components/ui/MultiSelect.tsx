@@ -56,6 +56,13 @@ export interface MultiSelectProps<Id> {
    */
   extraContent?: ReactNode | ((close: () => void) => ReactNode);
   contentClassName?: string;
+  /**
+   * Makes each group heading tickable: the checked state it shows, and what
+   * ticking it does (usually ticking or clearing every option under it). A
+   * search also matches heading text, keeping the whole group.
+   */
+  groupState?: (group: MultiSelectGroup<Id>) => boolean | 'mixed';
+  onToggleGroup?: (group: MultiSelectGroup<Id>) => void;
 }
 
 /**
@@ -86,6 +93,8 @@ export function MultiSelect<Id>({
   noResultsLabel,
   extraContent,
   contentClassName,
+  groupState,
+  onToggleGroup,
 }: MultiSelectProps<Id>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -98,14 +107,27 @@ export function MultiSelect<Id>({
     [groups, options]
   );
   const filteredGroups = useMemo(
-    () => filterMultiSelectGroups(normalizedGroups, query),
-    [normalizedGroups, query]
+    () => filterMultiSelectGroups(normalizedGroups, query, onToggleGroup !== undefined),
+    [normalizedGroups, query, onToggleGroup]
   );
   const hasResults = filteredGroups.some((group) => group.options.length > 0);
-  const flatOptions = useMemo(
-    () => filteredGroups.flatMap((group) => group.options),
-    [filteredGroups]
+  const tickableHeadings = onToggleGroup !== undefined;
+  // What the arrow keys walk: each tickable heading, then its options.
+  const navItems = useMemo(
+    () =>
+      filteredGroups.flatMap((group) => [
+        ...(tickableHeadings && group.label ? [{ group, option: null }] : []),
+        ...group.options.map((option) => ({ group, option })),
+      ]),
+    [filteredGroups, tickableHeadings]
   );
+  // A heading acts on its whole group, not only the options the search left.
+  const fullGroup = (group: MultiSelectGroup<Id>) =>
+    normalizedGroups.find((candidate) => candidate.label === group.label) ?? group;
+  function activate(item: { group: MultiSelectGroup<Id>; option: MultiSelectOption<Id> | null }) {
+    if (item.option) onToggle(item.option.id);
+    else onToggleGroup?.(fullGroup(item.group));
+  }
 
   useEffect(() => {
     if (highlight === null) return;
@@ -125,10 +147,10 @@ export function MultiSelect<Id>({
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (COMBOBOX_NAV_KEYS.includes(event.key)) {
       event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, flatOptions.length));
-    } else if (event.key === 'Enter' && highlight !== null && flatOptions[highlight]) {
+      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, navItems.length));
+    } else if (event.key === 'Enter' && highlight !== null && navItems[highlight]) {
       event.preventDefault();
-      onToggle(flatOptions[highlight].id);
+      activate(navItems[highlight]);
     }
   }
 
@@ -170,7 +192,7 @@ export function MultiSelect<Id>({
             aria-expanded="true"
             aria-autocomplete="list"
             aria-activedescendant={
-              highlight === null || !flatOptions[highlight] ? undefined : `${listId}-${highlight}`
+              highlight === null || !navItems[highlight] ? undefined : `${listId}-${highlight}`
             }
           />
         </div>
@@ -188,7 +210,35 @@ export function MultiSelect<Id>({
           )}
           {filteredGroups.map((group) => (
             <div key={group.label}>
-              {group.label && <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{group.label}</p>}
+              {group.label &&
+                (tickableHeadings ? (
+                  (() => {
+                    const index = ++flatIndex;
+                    const state = groupState?.(fullGroup(group)) ?? false;
+                    return (
+                      <div
+                        id={`${listId}-${index}`}
+                        role="option"
+                        aria-selected={state === true}
+                        aria-checked={state === 'mixed' ? 'mixed' : undefined}
+                        className={cx(
+                          menuItemClassName,
+                          eyebrowClassName,
+                          index === highlight && `bg-panel-2 ${activeOptionClassName}`
+                        )}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => onToggleGroup?.(fullGroup(group))}
+                      >
+                        <span aria-hidden="true" className="inline-block w-3 text-center">
+                          {state === 'mixed' ? '–' : state ? '✓' : ''}
+                        </span>
+                        {group.label}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{group.label}</p>
+                ))}
               {group.options.map((option) => {
                 const checked = selected.has(option.id);
                 const index = ++flatIndex;
@@ -200,6 +250,7 @@ export function MultiSelect<Id>({
                     aria-selected={checked}
                     className={cx(
                       menuItemClassName,
+                      tickableHeadings && group.label && 'pl-5',
                       index === highlight && `bg-panel-2 ${activeOptionClassName}`
                     )}
                     onMouseDown={(event) => event.preventDefault()}

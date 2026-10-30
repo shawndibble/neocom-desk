@@ -18,19 +18,33 @@ export interface AssetCategory {
   name: string;
 }
 
+/**
+ * A market group's top of ancestry (`root`) and the group directly beneath it
+ * on that path (`child`; null when the group is the root itself).
+ */
+export function marketGroupBranch(
+  groups: ReadonlyMap<number, MarketGroupNode>,
+  groupId: number
+): { root: MarketGroupNode; child: MarketGroupNode | null } | null {
+  let node = groups.get(groupId) ?? null;
+  if (node === null) return null;
+  let child: MarketGroupNode | null = null;
+  // Bounded: a malformed catalogue with a parent cycle must not hang the page.
+  for (let hops = 0; node.parentId !== null && hops < 32; hops += 1) {
+    const parent = groups.get(node.parentId);
+    if (!parent) break;
+    child = node;
+    node = parent;
+  }
+  return { root: node, child };
+}
+
 /** The root of a market group's ancestry; the group itself when it has no parent. */
 export function rootMarketGroup(
   groups: ReadonlyMap<number, MarketGroupNode>,
   groupId: number
 ): MarketGroupNode | null {
-  let node = groups.get(groupId) ?? null;
-  // Bounded: a malformed catalogue with a parent cycle must not hang the page.
-  for (let hops = 0; node !== null && node.parentId !== null && hops < 32; hops += 1) {
-    const parent = groups.get(node.parentId);
-    if (!parent) break;
-    node = parent;
-  }
-  return node;
+  return marketGroupBranch(groups, groupId)?.root ?? null;
 }
 
 export async function loadTypeCategories(

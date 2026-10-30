@@ -26,6 +26,8 @@ import {
   parseAssetPath,
   resolveAssetPath,
 } from '@/engine/assetPath';
+import { pruneAssetTree } from '@/engine/assetTreeFilter';
+import { assetPassesKindFilter } from '@/features/assets/assetCategoryFilter';
 import { useStationSort } from '@/features/assets/stationSortPreference';
 import { useAssetSort } from '@/features/assets/assetSortPreference';
 import {
@@ -60,6 +62,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     allItemsView,
     flatModeActive,
     minValueThreshold,
+    kindFilter,
     resolvedCrossCharacterFilter,
     crossCharacterCandidates,
     itemActions,
@@ -151,12 +154,28 @@ export function useAssetsRows(assetsData: AssetsData) {
     placeDetails.get(placeKey({ locationId, characterId: activeCharacterId }));
   const jumpsAwayOf = (locationId: number) => placeDetailFor(locationId)?.jumps;
 
-  // The tree is built from every asset, unpruned: search no longer filters it
-  // (results are a separate flat list), so browsing always sees the whole
-  // structure and clearing a search never has to rebuild it.
-  const tree = useMemo(
+  // The tree is built from every asset: search no longer filters it (results
+  // are a separate flat list), so clearing a search never has to rebuild it.
+  // Category, Blueprints and min value (issue #5601) prune it afterwards, so a
+  // match keeps its container path and every total covers the matches only.
+  const fullTree = useMemo(
     () => buildAssetTree(mergedAssets, priceByTypeId, itemValueByItemId),
     [mergedAssets, priceByTypeId, itemValueByItemId]
+  );
+  const tree = useMemo(
+    () =>
+      kindFilter || minValueThreshold > 0
+        ? pruneAssetTree(
+            fullTree,
+            (asset) =>
+              (!kindFilter || assetPassesKindFilter(asset, kindFilter)) &&
+              (minValueThreshold <= 0 ||
+                assetStackValue(asset, priceByTypeId, itemValueByItemId) >= minValueThreshold),
+            priceByTypeId,
+            itemValueByItemId
+          )
+        : fullTree,
+    [fullTree, kindFilter, minValueThreshold, priceByTypeId, itemValueByItemId]
   );
   const stationLabelFor = useMemo(
     () => (station: AssetTreeStation) =>
@@ -299,12 +318,19 @@ export function useAssetsRows(assetsData: AssetsData) {
       value: assetStackValue(match.asset, priceByTypeId, itemValueByItemId),
     }));
     const filtered =
-      minValueThreshold > 0 ? valued.filter((v) => v.value >= minValueThreshold) : valued;
+      minValueThreshold > 0 || kindFilter
+        ? valued.filter(
+            (v) =>
+              v.value >= minValueThreshold &&
+              (!kindFilter || assetPassesKindFilter(v.match.asset, kindFilter))
+          )
+        : valued;
     return filtered.sort((a, b) => compareValuedAssetMatches(a, b, sortField)).map((v) => v.match);
   }, [
     flatModeActive,
     searchMatches,
     minValueThreshold,
+    kindFilter,
     priceByTypeId,
     itemValueByItemId,
     sortField,
