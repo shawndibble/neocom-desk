@@ -226,7 +226,6 @@ export function IskBreakdownPanel({
             rowKey={(row) => row.key}
             density="compact"
             responsive="table"
-            defaultSort={{ columnId: 'net', direction: 'desc' }}
             selectedRowKey={
               selectedRefType === MARKET_TRADES_REF_TYPE ? MARKET_TRADES_KEY : parties.selected
             }

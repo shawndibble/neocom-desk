@@ -8,10 +8,12 @@ import { resolveNames } from '@/features/character/names';
  */
 export function usePartyNames(ids: readonly number[]): ReadonlyMap<number, string> {
   const [loaded, setLoaded] = useState<ReadonlyMap<number, string>>();
+  // Keyed on the ids' content: the array is new whenever the journal is reclassified.
+  const key = ids.join(',');
   useEffect(() => {
-    if (ids.length === 0) return;
+    if (key === '') return;
     let cancelled = false;
-    resolveNames(ids)
+    resolveNames(key.split(',').map(Number))
       .then((names) => {
         if (!cancelled) setLoaded(names);
       })
@@ -21,6 +23,6 @@ export function usePartyNames(ids: readonly number[]): ReadonlyMap<number, strin
     return () => {
       cancelled = true;
     };
-  }, [ids]);
+  }, [key]);
   return loaded ?? NO_NAMES;
 }

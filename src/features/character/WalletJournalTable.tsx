@@ -445,8 +445,8 @@ export function JournalTable({
     [grouped, openDays, t, i18n.language]
   );
   const partyRows = useMemo(
-    () => (partyView ? journalPartyBreakdown(partyView.journal) : undefined),
-    [partyView]
+    () => (partyView && panel.open ? journalPartyBreakdown(partyView.journal) : undefined),
+    [partyView, panel.open]
   );
   // Corp journal only: a line with a Player offers that player's filter and actions,
   // and its ref type's filter; a line with none has one action, so no menu.
