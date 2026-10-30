@@ -186,7 +186,7 @@ describe('Market Browser: All regions', () => {
   it('offers All regions in the region picker and switches the book to it', async () => {
     const hits = new Map<number, number>();
     server.use(regionOrdersHandler(hits));
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', `/market/browser?type=${RIFTER}&region=${THE_FORGE}`);
     render(<App />);
 
@@ -211,7 +211,9 @@ describe('Market Browser: All regions', () => {
     expect(within(sellTable).getByText('1,100,000')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,200,000')).toBeInTheDocument();
     // The note sits behind the scope bar's info tip.
-    await userEvent.setup().hover(screen.getByRole('button', { name: 'What else this covers' }));
+    await userEvent
+      .setup({ delay: null })
+      .hover(screen.getByRole('button', { name: 'What else this covers' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/use The Forge/);
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
@@ -300,7 +302,9 @@ describe('Market Browser: All regions', () => {
     expect(hits.get(THE_FORGE)).toBe(1);
     expect(hits.get(DOMAIN)).toBe(1);
     // The note sits behind the scope bar's info tip.
-    await userEvent.setup().hover(screen.getByRole('button', { name: 'What else this covers' }));
+    await userEvent
+      .setup({ delay: null })
+      .hover(screen.getByRole('button', { name: 'What else this covers' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       /use Jita — only the order book reaches/
     );
@@ -309,7 +313,7 @@ describe('Market Browser: All regions', () => {
   it('offers the Distance filter before any item is picked, named after the header scope', async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/market/browser');
     render(<App />);
 

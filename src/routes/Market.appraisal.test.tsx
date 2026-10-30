@@ -72,7 +72,7 @@ function renderAt(entry: string) {
 }
 
 async function pickHub(name: string) {
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null });
   await user.click(screen.getByRole('combobox', { name: /Trade Hub/i }));
   await user.click(await screen.findByRole('option', { name }));
 }
@@ -135,7 +135,7 @@ describe('Market Appraisal tab navigation', () => {
    * follows the new pathname to the Browser like any other navigation.
    */
   it('opens an appraised item in the Browser when its name is clicked', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     vi.mocked(appraisePaste).mockResolvedValueOnce({
       appraisal: {
         rows: [
