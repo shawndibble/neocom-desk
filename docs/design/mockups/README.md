@@ -11,7 +11,7 @@ Hand-written HTML and copied token CSS are not the default. A mockup is a page-l
 5. Phone variant: a second story with `globals: { viewport: { value: 'mobile1', isRotated: false } }`.
 6. Screenshots: `npm run ui:shot -- mockups-<page>--<story>` (1440 and 390 by default; PNGs land in `.cache/ui-shot/`). Today: `npm run ui:shot -- pages-<page>--<story>` from the real page story, or an e2e-seeded page if no page story exists.
 7. Publish: copy the PNGs to `docs/design/mockups/<name>/` with a README that shows today vs proposed in a table (see `wallet-balance-trend/`). Link that README from the ticket.
-8. Mockup stories are excluded from the manifest (`!manifest`) and from coverage (`src/mockups/**` in `vite.config.ts`). They still render in `src/stories.test.tsx`, so a broken mockup fails CI.
+8. Mockup stories are excluded from the manifest (`!manifest`) and from coverage (`src/mockups/**` in `vite.config.ts`). They still render in `src/storybook/smoke/*.test.tsx`, so a broken mockup fails CI.
 9. Delete the mockup story and its folder when the ticket closes; git history keeps it.
 
 ## Mockup screenshots

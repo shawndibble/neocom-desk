@@ -4,7 +4,7 @@
  * fixture for is recorded and rejected, and logged as a console error. ESI's
  * client turns a rejected request into a silent offline/empty state, so the
  * record, not the throw, is what makes a missed fixture visible:
- * `unexpectedRequests()` is asserted empty by `src/stories.test.tsx`.
+ * `unexpectedRequests()` is asserted empty by `src/test/storySmoke.tsx`.
  *
  * Same-origin requests (the SDE bake, fonts) pass through to the real fetch.
  */
