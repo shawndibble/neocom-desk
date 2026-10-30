@@ -30,20 +30,30 @@ export function LivePriceBar({ live, className }: { live: LiveProgress; classNam
   );
 }
 
-function CheckedAgo({ checkedAt }: { checkedAt: number }) {
+function CheckedAgo({ summary, checkedAt }: { summary: string; checkedAt: number }) {
   const { t } = useTranslation();
   const now = useTicker(AGE_TICK_MS);
   const ms = Math.max(0, now - checkedAt);
-  return ms < MINUTE_MS
-    ? t('market.appraisal.live.ageSeconds', { count: Math.floor(ms / 1000) })
-    : formatAge(ms, t);
+  const age =
+    ms < MINUTE_MS
+      ? t('market.appraisal.live.ageSeconds', { count: Math.floor(ms / 1000) })
+      : formatAge(ms, t);
+  return (
+    <span className="text-xs text-text-dim">
+      {summary} · {t('market.appraisal.live.checkedAgo', { age })}
+    </span>
+  );
 }
 
 /**
  * "Checking live prices 23 / 60" while rows load, then "Live prices · checked
  * 14 s ago". It never says "live" for a list with a cached row: a failed row
- * turns the done line into "Live prices for 59 of 60 rows". Renders nothing
+ * turns the done line into "Live prices for 59 of 60 rows". Shows nothing
  * before any run (`checkingOnly` also hides the done line, for Compare Hubs).
+ *
+ * A persistent polite live region announces only the start and the finish,
+ * never the per-row count or the ticking age: the bar's own value carries the
+ * progress. It stays mounted so a later change is announced.
  */
 export function LivePriceStatus({
   live,
@@ -53,29 +63,43 @@ export function LivePriceStatus({
   checkingOnly?: boolean;
 }) {
   const { t } = useTranslation();
-  if (live.total === 0) return null;
-  if (live.checking) {
-    return (
-      <span className="text-xs text-text-dim tabular-nums" role="status">
-        {t('market.appraisal.live.checking', { done: live.done, total: live.total })}
-      </span>
-    );
-  }
-  if (checkingOnly || live.checkedAt === null) return null;
-  const summary =
-    live.failed === 0
+  const showDone = live.total > 0 && !live.checking && !checkingOnly && live.checkedAt !== null;
+  const summary = !showDone
+    ? ''
+    : live.failed === 0
       ? t('market.appraisal.live.done')
       : t('market.appraisal.live.partial', { live: live.total - live.failed, total: live.total });
+  const announcement =
+    live.total > 0 && live.checking ? t('market.appraisal.live.announceChecking') : summary;
   return (
-    <span className="text-xs text-text-dim">
-      {summary} · {t('market.appraisal.live.checkedPrefix')}{' '}
-      <CheckedAgo checkedAt={live.checkedAt} />
-    </span>
+    <>
+      <span className="sr-only" role="status">
+        {announcement}
+      </span>
+      {live.total > 0 && live.checking && (
+        <span className="text-xs text-text-dim tabular-nums" aria-hidden="true">
+          {t('market.appraisal.live.checking', { done: live.done, total: live.total })}
+        </span>
+      )}
+      {showDone && live.checkedAt !== null && (
+        <CheckedAgo summary={summary} checkedAt={live.checkedAt} />
+      )}
+    </>
   );
 }
 
-/** A clock (still the cached price) or a warning (its live book failed) beside a price; nothing once live. */
-export function PriceMark({ state }: { state: PriceState | undefined }) {
+/**
+ * A clock (still the cached price) or a warning (its live book failed) beside
+ * a price; nothing once live. `silent` keeps the icon and tooltip but drops the
+ * spoken text, for the second and later price cells of one row.
+ */
+export function PriceMark({
+  state,
+  silent = false,
+}: {
+  state: PriceState | undefined;
+  silent?: boolean;
+}) {
   const { t } = useTranslation();
   if (state === undefined || state === 'live') return null;
   const failed = state === 'failed';
@@ -84,13 +108,14 @@ export function PriceMark({ state }: { state: PriceState | undefined }) {
     <Tooltip content={label}>
       <span
         className={cx('mr-1 inline-flex align-middle', failed ? 'text-warning' : 'text-text-dim')}
+        aria-hidden={silent || undefined}
       >
         {failed ? (
           <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         ) : (
           <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         )}
-        <span className="sr-only">{label}</span>
+        {!silent && <span className="sr-only">{label}</span>}
       </span>
     </Tooltip>
   );

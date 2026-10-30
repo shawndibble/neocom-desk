@@ -40,6 +40,13 @@ type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | '
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
 const COMPACT_OFF_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyEach', 'sellEach', 'volume'];
 /** A phone starts with Item, Buy and Sell; the Columns menu swaps others in. */
+/** The columns whose cells wear the live-price mark. */
+const PRICE_MARK_COLUMNS: ReadonlySet<AppraisalColumnId> = new Set([
+  'buyEach',
+  'sellEach',
+  'buyTotal',
+  'sellTotal',
+]);
 const PHONE_ON_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyTotal', 'sellTotal'];
 
 export function useAppraisalColumns({
@@ -153,6 +160,15 @@ export function useAppraisalColumns({
   // Refine and LP store still only ever enter `availableColumns` when the
   // data backing them exists — a picker toggle for a column with nothing to
   // show would just be a lie.
+  // The price mark repeats in up to four cells of a row; only the first shown
+  // one speaks, the rest keep the icon and tooltip.
+  const firstPriceColumn = APPRAISAL_COLUMN_IDS.find(
+    (id) => PRICE_MARK_COLUMNS.has(id) && visibleColumns.includes(id)
+  );
+  const priceMark = (row: OwnedRow, id: AppraisalColumnId) => (
+    <PriceMark state={row.priceState} silent={id !== firstPriceColumn} />
+  );
+
   const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<OwnedRow>> = {
     buyEach: {
       id: 'buyEach',
@@ -161,7 +177,7 @@ export function useAppraisalColumns({
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => (
         <>
-          <PriceMark state={row.priceState} />
+          {priceMark(row, 'buyEach')}
           {eachCell(row.buyEach)}
         </>
       ),
@@ -174,7 +190,7 @@ export function useAppraisalColumns({
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       render: (row) => (
         <>
-          <PriceMark state={row.priceState} />
+          {priceMark(row, 'sellEach')}
           {eachCell(row.sellEach)}
         </>
       ),
@@ -199,7 +215,7 @@ export function useAppraisalColumns({
           totalCell(row.buyTotal),
           row.refineTotal !== undefined && !refineBeatsSellAsIs(row),
           undefined,
-          <PriceMark state={row.priceState} />
+          priceMark(row, 'buyTotal')
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
     },
@@ -210,7 +226,7 @@ export function useAppraisalColumns({
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => (
         <>
-          <PriceMark state={row.priceState} />
+          {priceMark(row, 'sellTotal')}
           {totalCell(row.sellTotal)}
         </>
       ),
