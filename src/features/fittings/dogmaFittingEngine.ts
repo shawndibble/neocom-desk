@@ -50,6 +50,7 @@ import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import { extractExplore } from '@/engine/fittings/explore';
+import { extractModuleFigures } from '@/engine/fittings/moduleFigures';
 import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
 import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
 import { projectsNothing } from '@/engine/fittings/projection';
@@ -591,6 +592,7 @@ function statsFrom(
     support: extractSupport(dogmaFit.items, shown.items),
     mining: miningYield(extractMining(dogmaFit.items, shown.items)),
     explore: extractExplore(dogmaFit.items, shown.items),
+    moduleFigures: extractModuleFigures(dogmaFit.items, shown.items),
     fleetSupport: extractFleetSupport(dogmaFit.items, shown.items),
     fighters: extractFighterStats(shown.ship.attributes),
     lockedTargets,
