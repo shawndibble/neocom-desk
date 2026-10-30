@@ -1,10 +1,11 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
 import type { SwapChange } from '@/engine/fittings/swapChanges';
-import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
+import { type StatChange, FLAG_STATS, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
 import { fixed0 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
+import { flagWord } from './flagWord';
 
 function formatDelta(change: StatChange): number {
   const digits = STAT_DIGITS[change.key];
@@ -20,6 +21,11 @@ export function changeLabel(change: StatChange, t: Translate): string {
       : t('fittings.variations.stat.capacitorUnstable', {
           time: formatSeconds(-change.after),
         });
+  }
+  if (FLAG_STATS.has(change.key)) {
+    return t(`fittings.variations.stat.${change.key}`, {
+      value: `${flagWord(change.before, t)} → ${flagWord(change.after, t)}`,
+    });
   }
   const delta = formatDelta(change);
   const value = delta > 0 ? `+${delta}` : `${delta}`;

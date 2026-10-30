@@ -27,6 +27,10 @@ vi.mock('@eveshipfit/dogma-engine', () => ({
 vi.mock('@/features/abyssal/mutaplasmidData', () => ({
   loadMutaplasmidLookup: () => Promise.reject(new Error('not in these tests')),
 }));
+vi.mock('@/sde/loadSde', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sde/loadSde')>()),
+  loadTypeEffects: () => Promise.reject(new Error('not in these tests')),
+}));
 vi.mock('./implantSlotLookup', () => ({
   loadImplantMarketEntries: () => Promise.reject(new Error('not in these tests')),
 }));

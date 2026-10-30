@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { FittingStats } from '@/engine/fittings/types';
 import { Facts } from './StatFacts';
+import { flagWord } from './flagWord';
 import { fixed0, fixed1 } from '@/lib/fixedFormat';
 
 /**
@@ -42,6 +43,15 @@ export function ExploreFacts({ stats }: { stats: FittingStats }) {
         ...fact('scanTimeCut', scanning.duration, percent),
         ...fact('deviationCut', scanning.deviation, percent),
         ...fact('cloakRelock', explore.cloakRecalibrationSeconds, seconds),
+        // A cloak is fitted when it has a relock delay.
+        ...(explore.cloakRecalibrationSeconds > 0
+          ? [
+              {
+                label: label('warpsCloaked'),
+                value: flagWord(explore.warpsCloaked, t),
+              },
+            ]
+          : []),
       ]}
     />
   );

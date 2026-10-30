@@ -1207,6 +1207,7 @@
         "scanTimeCut": "Scan time cut",
         "deviationCut": "Deviation cut",
         "cloakRelock": "Cloak relock delay",
+        "warpsCloaked": "Warps cloaked",
         "strengthMeta": "Strength {{value}}",
         "probeMeta": "Probes {{value}}",
         "scanMeta": "Scan bonus {{value}}%"
@@ -1329,6 +1330,8 @@
     "statChange": {
       "better": "better",
       "worse": "worse",
+      "yes": "yes",
+      "no": "no",
       "spoken": "{{before}} to {{after}}",
       "capacitor": "Capacitor {{value}}",
       "stable": "{{pct}}%",
@@ -1725,6 +1728,7 @@
         "probeLauncherBonus": "Launcher probe bonus {{value}}%",
         "probeLauncherCycle": "Probe launch cycle {{value}} s",
         "cloakRecalibration": "Cloak relock delay {{value}} s",
+        "warpsCloaked": "Warps cloaked: {{value}}",
         "reactivationDelay": "Reactivation delay {{value}} s",
         "reloadTime": "Reload time {{value}} s",
         "salvageChance": "Salvage chance bonus {{value}}%",
@@ -1985,6 +1989,7 @@
         "probeLauncherBonus": "Launcher probe bonus (%)",
         "probeLauncherCycle": "Probe launch cycle (s)",
         "cloakRecalibration": "Cloak relock delay (s)",
+        "warpsCloaked": "Warps cloaked",
         "reactivationDelay": "Reactivation delay (s)",
         "reloadTime": "Reload time (s)",
         "salvageChance": "Salvage chance bonus (%)",

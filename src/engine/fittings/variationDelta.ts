@@ -2,7 +2,7 @@ import { NUMERIC_FIELDS, round, type StatChangeKey } from './fittingStatFields';
 import type { FittingStats } from './types';
 
 export type { FittingStatKey, StatChangeKey } from './fittingStatFields';
-export { STAT_DIGITS, changeVerdict } from './fittingStatFields';
+export { FLAG_STATS, STAT_DIGITS, changeVerdict } from './fittingStatFields';
 
 export interface StatChange {
   key: StatChangeKey;

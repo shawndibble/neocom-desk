@@ -34,6 +34,7 @@ const SECTION_KEYS: Partial<Record<Section, readonly StatChangeKey[]>> = {
     'scanTimeCut',
     'deviationCut',
     'cloakRecalibration',
+    'warpsCloaked',
   ],
   offense: ['totalDps', 'totalVolley', 'sustainedDps'],
   drones: ['droneDps', 'droneBandwidthUsed', 'droneBandwidthTotal', 'droneCapacity'],

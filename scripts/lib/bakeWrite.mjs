@@ -30,6 +30,7 @@ export async function writeOutputs({
   compressedOreTypeIds,
   shipTree,
   typeNames,
+  typeEffects,
   mutaplasmids,
   wormholeMass,
   shipMass,
@@ -104,6 +105,8 @@ export async function writeOutputs({
     ['shipTree.json', shipTree],
     // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
     ['typeNames.json', typeNames],
+    // Which types carry the dogma effects the app reads (the engine's results hold none); see lib/typeEffects.mjs.
+    ['typeEffects.json', typeEffects],
     ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],

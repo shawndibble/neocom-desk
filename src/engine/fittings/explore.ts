@@ -6,7 +6,9 @@
  * Acquisition Array bonuses; probing is the loaded probe's strength (the
  * engine folds the launcher, rigs, skills and hull into it) and the
  * launcher's own bonus, which an empty launcher still has. A cloak's relock
- * delay rides along but does not make a fit an explorer's. Pure.
+ * delay rides along but does not make a fit an explorer's, and so does whether
+ * it can warp cloaked: a type effect (980), which the engine's results do not
+ * carry, so the caller passes the covert cloak type ids (`typeEffects.json`). Pure.
  *
  * Attribute ids are plain SDE, named by `market/attributes.json`: 1910 is Virus
  * Strength and 1909 Virus Coherence (a Data Analyzer II carries 30 and 60; a
@@ -43,6 +45,9 @@ const SITE_SKILL: Readonly<Record<number, ExploreSite>> = { 21718: 'data', 13278
 
 export type ExploreSite = 'data' | 'relic';
 
+/** The dogma effect (`cloakingWarpSafe`) of a cloak that lets the ship warp while cloaked. */
+export const COVERT_CLOAK_EFFECT = 980;
+
 /** The charge group a Scan Probe Launcher loads. */
 const SCAN_PROBE_CHARGE_GROUP = 479;
 
@@ -76,6 +81,8 @@ export interface ExploreStats {
   probe: { strength: number; launcherBonus: number; cycleSeconds: number };
   /** The quickest cloak's relock delay, seconds; 0 with no cloak. */
   cloakRecalibrationSeconds: number;
+  /** An online Covert Ops cloak is fitted, so the ship can warp while cloaked. */
+  warpsCloaked: boolean;
 }
 
 export const NO_EXPLORE: ExploreStats = {
@@ -88,6 +95,7 @@ export const NO_EXPLORE: ExploreStats = {
   scanning: { strength: 0, duration: 0, deviation: 0 },
   probe: { strength: 0, launcherBonus: 0, cycleSeconds: 0 },
   cloakRecalibrationSeconds: 0,
+  warpsCloaked: false,
 };
 
 /** The smaller of two positive figures, where 0 means none yet. */
@@ -110,10 +118,11 @@ interface ResultLike {
 
 const MODULE_SLOTS: ReadonlySet<string> = new Set(['high', 'medium', 'low', 'rig', 'subsystem']);
 
-/** The fit's explorer figures off a calculation: `items`/`results` are the index-parallel `dogmaFit.items` and `calculation.items`. */
+/** The fit's explorer figures off a calculation: `items`/`results` are the index-parallel `dogmaFit.items` and `calculation.items`; `covertCloakTypeIds` are the types that warp cloaked. */
 export function extractExplore(
   items: readonly ItemLike[],
-  results: readonly ResultLike[]
+  results: readonly ResultLike[],
+  covertCloakTypeIds: ReadonlySet<number> = new Set()
 ): ExploreStats {
   const explore: ExploreStats = {
     ...NO_EXPLORE,
@@ -126,6 +135,7 @@ export function extractExplore(
     const result = results[index];
     if (!result || !MODULE_SLOTS.has(item.slot.type) || result.state === 'offline') return;
     const read = (id: number) => result.attributes.get(id)?.value ?? 0;
+    if (covertCloakTypeIds.has(item.type_id)) explore.warpsCloaked = true;
     const recalibration = read(EXPLORE_ATTRIBUTE.recalibration) / 1000;
     explore.cloakRecalibrationSeconds = minPositive(
       explore.cloakRecalibrationSeconds,
