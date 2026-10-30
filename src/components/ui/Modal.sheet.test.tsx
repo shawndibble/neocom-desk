@@ -130,7 +130,7 @@ describe('Modal bottom sheet', () => {
     // Escape (or a tap on the backdrop) while the sheet is still sliding off.
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     expect(closes).toHaveBeenCalledTimes(1);
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 320));
     expect(closes).toHaveBeenCalledTimes(1);
   });
 

@@ -18,14 +18,14 @@ const DRAG_SLOP = 4;
 const VELOCITY_WINDOW_MS = 100;
 
 /** How long a released sheet takes to slide off the bottom before it closes. */
-const DISMISS_SLIDE_MS = 180;
+const DISMISS_SLIDE_MS = 240;
 
 /** After the close, how long before a sheet its parent kept open slides back. */
 const KEPT_OPEN_CHECK_MS = 300;
 
 function applyOffset(el: HTMLElement | null, px: number, animate: boolean, reduced: boolean) {
   if (!el) return;
-  el.style.transition = animate && !reduced ? 'transform 200ms ease-out' : 'none';
+  el.style.transition = animate && !reduced ? 'transform 240ms var(--motion-ease-out)' : 'none';
   el.style.transform = px === 0 ? '' : `translateY(${px}px)`;
 }
 

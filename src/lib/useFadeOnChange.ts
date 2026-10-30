@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 /** Long enough to read as a change of view, short enough never to hold up reading it. */
-const FADE_MS = 140;
+const FADE_MS = 220;
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 

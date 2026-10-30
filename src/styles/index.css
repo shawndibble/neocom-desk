@@ -1394,13 +1394,24 @@
    * matches, so Radix's Presence sees no exit animation and unmounts at once.
    */
   :root {
-    --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+    /* Cubic ease: the motion is spread across the whole duration. A sharper
+       curve finished most of the travel in the first few frames and read as
+       no animation at all. */
+    --motion-ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+    --motion-ease-in: cubic-bezier(0.32, 0, 0.67, 0);
+    /* Small anchored overlays (menus, Select, Popover, tooltips). */
+    --motion-quick: 200ms;
+    --motion-quick-exit: 150ms;
+    /* Dialogs, backdrops, rises. */
+    --motion-medium: 280ms;
+    /* Surfaces that travel their own size (sheets, slide-overs). */
+    --motion-slow: 340ms;
+    --motion-slow-exit: 240ms;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     /* Menus, Select and Popover: a short fade and scale out of the trigger,
-       nudged 4px from the side they open on. Radix sets each one's origin. */
+       nudged 8px from the side they open on. Radix sets each one's origin. */
     .motion-pop,
     .motion-pop-exit {
       transform-origin: var(
@@ -1416,29 +1427,29 @@
     }
 
     .motion-pop[data-state='open'] {
-      animation: motion-pop-in 150ms var(--motion-ease-out) backwards;
+      animation: motion-pop-in var(--motion-quick) var(--motion-ease-out) backwards;
     }
 
     .motion-pop[data-side='bottom'] {
-      --motion-pop-y: -4px;
+      --motion-pop-y: -8px;
     }
 
     .motion-pop[data-side='top'] {
-      --motion-pop-y: 4px;
+      --motion-pop-y: 8px;
     }
 
     .motion-pop[data-side='left'] {
-      --motion-pop-x: 4px;
+      --motion-pop-x: 8px;
     }
 
     .motion-pop[data-side='right'] {
-      --motion-pop-x: -4px;
+      --motion-pop-x: -8px;
     }
 
     /* Popover only: a menu or Select closes at once, since the item picked
        usually opens the next thing and a fade would delay it. */
     .motion-pop-exit[data-state='closed'] {
-      animation: motion-pop-out 100ms var(--motion-ease-in) forwards;
+      animation: motion-pop-out var(--motion-quick-exit) var(--motion-ease-in) forwards;
     }
 
     /* Submenus and tooltips: opacity only. A submenu that moved would trail
@@ -1448,16 +1459,16 @@
     .motion-fade:not([data-state]),
     .motion-fade[data-state='open'],
     .motion-fade[data-state='delayed-open'] {
-      animation: motion-fade-in 120ms ease-out backwards;
+      animation: motion-fade-in var(--motion-quick) var(--motion-ease-out) backwards;
     }
 
     /* `Modal`, centred placements (and `page` from `md`): a fade and a slight
-       scale up. Native `<dialog>` goes from `display: none` on `showModal()`,
+       scale up with a short rise. Native `<dialog>` goes from `display: none` on `showModal()`,
        which starts the animation every time it opens. Entry only — see
        `Modal.tsx`. */
     .motion-dialog[open],
     .motion-page[open] {
-      animation: motion-dialog-in 200ms var(--motion-ease-out) backwards;
+      animation: motion-dialog-in var(--motion-medium) var(--motion-ease-out) backwards;
     }
 
     /* `Modal` sheets (and `page` below Tailwind's `md`, where it fills the
@@ -1465,19 +1476,19 @@
        the viewport edge. */
     .motion-sheet[open],
     .motion-rise-full {
-      animation: motion-sheet-in 260ms var(--motion-ease-out) backwards;
+      animation: motion-sheet-in var(--motion-slow) var(--motion-ease-out) backwards;
     }
 
     @media (width < 48rem) {
       .motion-page[open] {
-        animation: motion-sheet-in 260ms var(--motion-ease-out) backwards;
+        animation: motion-sheet-in var(--motion-slow) var(--motion-ease-out) backwards;
       }
     }
 
     .motion-dialog[open]::backdrop,
     .motion-sheet[open]::backdrop,
     .motion-page[open]::backdrop {
-      animation: motion-fade-in 200ms ease-out backwards;
+      animation: motion-fade-in var(--motion-medium) var(--motion-ease-out) backwards;
     }
 
     /* `SlideOver`: in from its edge, and back out the same way. */
@@ -1491,26 +1502,26 @@
 
     .motion-slide-right[data-state='open'],
     .motion-slide-left[data-state='open'] {
-      animation: motion-slide-in 240ms var(--motion-ease-out) backwards;
+      animation: motion-slide-in var(--motion-slow) var(--motion-ease-out) backwards;
     }
 
     .motion-slide-right[data-state='closed'],
     .motion-slide-left[data-state='closed'] {
-      animation: motion-slide-out 180ms var(--motion-ease-in) forwards;
+      animation: motion-slide-out var(--motion-slow-exit) var(--motion-ease-in) forwards;
     }
 
     /* A docked drawer that opens above its own handle (Market's Compare
        drawer), or a floating prompt: a short rise, not its full height, which
        would cross the handle. */
     .motion-rise {
-      animation: motion-rise-in 200ms var(--motion-ease-out) backwards;
+      animation: motion-rise-in var(--motion-medium) var(--motion-ease-out) backwards;
     }
   }
 
   @keyframes motion-pop-in {
     from {
       opacity: 0;
-      scale: 0.97;
+      scale: 0.95;
       translate: var(--motion-pop-x, 0) var(--motion-pop-y, 0);
     }
   }
@@ -1518,7 +1529,7 @@
   @keyframes motion-pop-out {
     to {
       opacity: 0;
-      scale: 0.97;
+      scale: 0.95;
     }
   }
 
@@ -1531,7 +1542,8 @@
   @keyframes motion-dialog-in {
     from {
       opacity: 0;
-      scale: 0.96;
+      scale: 0.92;
+      translate: 0 16px;
     }
   }
 
@@ -1556,7 +1568,7 @@
   @keyframes motion-rise-in {
     from {
       opacity: 0;
-      translate: 0 12px;
+      translate: 0 16px;
     }
   }
 

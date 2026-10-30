@@ -36,7 +36,7 @@ describe('useFadeOnChange', () => {
     animate.mockClear();
     rerender(<Harness value="b" />);
     expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 140,
+      duration: 220,
       easing: 'ease-out',
     });
   });

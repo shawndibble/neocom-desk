@@ -796,7 +796,7 @@ describe('Layout route fade', () => {
     await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
     await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
     expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 140,
+      duration: 220,
       easing: 'ease-out',
     });
   });

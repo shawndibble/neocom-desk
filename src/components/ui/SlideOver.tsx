@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
+import { useFadeOnChange } from '@/lib/useFadeOnChange';
 import { useOverlayHistory } from '@/lib/useOverlayHistory';
 import { IconButton } from './IconButton';
 import { Close } from './icons';
@@ -31,6 +32,11 @@ interface SlideOverProps {
   closeOnBack?: boolean;
   /** Where focus goes on close when the opener is gone (e.g. a panel a URL opened). */
   returnFocusFallback?: () => HTMLElement | null;
+  /**
+   * Identity of the record shown (a contract id). When it changes while the
+   * panel stays open, the body fades the new record in rather than swapping.
+   */
+  contentKey?: string | number;
 }
 
 /** The edge it sits on, and slides in from and back out to (`index.css` "Overlay motion"). */
@@ -66,6 +72,7 @@ export function SlideOver({
   maxWidthClassName,
   closeOnBack = true,
   returnFocusFallback,
+  contentKey,
 }: SlideOverProps) {
   const { t } = useTranslation();
   // Back closes it, like every other overlay (§6c).
@@ -132,11 +139,34 @@ export function SlideOver({
             </div>
             <IconButton icon={<Close />} label={t('common.close')} onClick={onClose} />
           </div>
-          <div className={cx('min-h-0 flex-1 overflow-y-auto', !flush && 'p-3')}>
-            <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
-          </div>
+          <SlideOverBody flush={flush} contentKey={contentKey}>
+            {children}
+          </SlideOverBody>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
+  );
+}
+
+/**
+ * Its own component so it mounts with the panel's content (Radix portals one
+ * render late): the fade then runs as the panel opens and on each new
+ * `contentKey`, never on a re-render of the same record.
+ */
+function SlideOverBody({
+  flush,
+  contentKey,
+  children,
+}: {
+  flush: boolean;
+  contentKey: string | number | undefined;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFadeOnChange(ref, String(contentKey ?? ''));
+  return (
+    <div ref={ref} className={cx('min-h-0 flex-1 overflow-y-auto', !flush && 'p-3')}>
+      <RowTappableContext.Provider value={false}>{children}</RowTappableContext.Provider>
+    </div>
   );
 }
