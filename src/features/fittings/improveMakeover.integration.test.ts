@@ -291,6 +291,8 @@ const EXPLORER_GROUPS = new Map([
   [481, 1],
   [538, 2],
   [46, 1],
+  // The 'Stoic' Core Equalizer: a warp core stabilizer, what gets it away when pointed.
+  [315, 1],
 ]);
 
 describe('Improve makeover on an Explore Astero (real WASM + real pinned SDE)', () => {

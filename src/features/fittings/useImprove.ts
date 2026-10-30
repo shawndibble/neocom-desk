@@ -49,6 +49,7 @@ import {
   DEFAULT_IMPROVE_JOB,
   EXPLORE_SPACES,
   IMPROVE_JOBS,
+  effectiveSpace,
   jobSettingOf,
   type ExploreSpace,
   type ImproveJob,
@@ -385,6 +386,20 @@ export interface CompletionPool {
 }
 
 /** The candidates for one side of the search, the hull takes and the pilot can fly. */
+/** Combat drones (Hobgoblin, Hammerhead, Ogre and the like); salvage, mining and EWAR drones are other groups. */
+const COMBAT_DRONE_GROUP = 100;
+
+/** Whether the fit carries combat drones: an explorer that does expects combat sites (`effectiveSpace`). */
+function carriesCombatDrones(
+  fitting: Fitting | undefined,
+  catalogue: FittingCatalogue | null
+): boolean {
+  return (fitting?.drones ?? []).some(
+    (drone) =>
+      drone.quantity > 0 && catalogue?.types[String(drone.typeId)]?.groupID === COMBAT_DRONE_GROUP
+  );
+}
+
 function searchCandidates(
   variants: VariantEvaluator,
   catalogue: FittingCatalogue,
@@ -400,7 +415,11 @@ function searchCandidates(
     defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
-    jobSetting: jobSettingOf(config.job, config.space, config.noPropulsion),
+    jobSetting: jobSettingOf(
+      config.job,
+      effectiveSpace(config.space ?? 'dangerous', carriesCombatDrones(variants.fitting, catalogue)),
+      config.noPropulsion
+    ),
     commonality,
     slotCounts,
     pool: modulePool(catalogue, variants),
@@ -553,8 +572,13 @@ export function useImprove(
     hold,
   } = config;
   const jobSetting = useMemo(
-    () => jobSettingOf(job, space, noPropulsion),
-    [job, space, noPropulsion]
+    () =>
+      jobSettingOf(
+        job,
+        effectiveSpace(space ?? 'dangerous', carriesCombatDrones(variants?.fitting, catalogue)),
+        noPropulsion
+      ),
+    [job, space, noPropulsion, variants?.fitting, catalogue]
   );
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =

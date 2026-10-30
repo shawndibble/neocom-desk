@@ -134,7 +134,8 @@ export type Job =
   | 'tractor'
   | 'cyno'
   | 'sphereLauncher'
-  | 'smartBomb';
+  | 'smartBomb'
+  | 'warpCore';
 
 /**
  * The groups that do a job no damage or EHP score notices when it is lost.
@@ -168,6 +169,8 @@ const JOB_GROUPS: Record<Job, readonly number[]> = {
   cyno: [658],
   sphereLauncher: [589],
   smartBomb: [72],
+  // No score sees warp strength, so a warp core stabilizer (what gets a ship away when pointed) is never dropped for one.
+  warpCore: [315],
 };
 
 const JOB_OF_GROUP = new Map<number, Job>(

@@ -24,12 +24,13 @@ describe('utility jobs', () => {
     [658, 'cynosural field generators'],
     [589, 'interdiction sphere launchers'],
     [72, 'smart bombs'],
+    [315, 'warp core stabilizers'],
   ])('group %i (%s) is a protected job', (group) => {
     expect(jobOf(group)).not.toBeNull();
   });
 
   it('gives each kind its own job, so one goal never drops another’s last module', () => {
-    const groups = [538, 481, 1223, 1238, 49, 1122, 650, 658, 589, 72];
+    const groups = [538, 481, 1223, 1238, 49, 1122, 650, 658, 589, 72, 315];
     expect(new Set(groups.map(jobOf)).size).toBe(groups.length);
   });
 });

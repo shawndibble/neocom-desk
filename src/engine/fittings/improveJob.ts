@@ -95,7 +95,7 @@ export function overallWeightsOf(job: ImproveJob): Partial<Record<GainMetric, nu
 export const HELD_EVERY_COPY: Record<ImproveJob, readonly Job[]> = {
   pve: [],
   pvp: [],
-  explore: ['cloak', 'analyzer', 'probeLauncher', 'propulsion'],
+  explore: ['cloak', 'analyzer', 'probeLauncher', 'propulsion', 'warpCore'],
 };
 
 /**
@@ -207,3 +207,10 @@ export function firstLimitBreach(
 export function unguardedJobs(goal: ImproveGoal, job?: ImproveJob): readonly Job[] {
   return job ? [...scoredJobs(goal), ...FREED_JOBS[job]] : scoredJobs(goal);
 }
+
+/**
+ * Explore's space for the search: a fit that carries combat drones expects combat
+ * sites, so Safe still holds its tank as Dangerous does; without them Safe may drop it.
+ */
+export const effectiveSpace = (space: ExploreSpace, carriesCombatDrones: boolean): ExploreSpace =>
+  carriesCombatDrones ? 'dangerous' : space;

@@ -10,6 +10,7 @@ import {
   type ImproveOption,
   type RejectedOption,
 } from '@/engine/fittings/improve';
+import { fittedSide } from '@/engine/fittings/improveCandidateFilter';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
 import {
@@ -368,6 +369,9 @@ export function useImproveDrawer({
         onIskBudgetChange: (next) => void setIskBudget(next),
         defense,
         onDefenseChange: setDefense,
+        fittedSide: fitting
+          ? fittedSide(fitting.modules, (typeId) => catalogue?.types[String(typeId)]?.groupID)
+          : null,
         includeRigs,
         onIncludeRigsChange: (next) => void setIncludeRigs(next),
         includeOfficer,

@@ -10,8 +10,10 @@ import { findMakeover } from './improveMakeover';
 import {
   DEFAULT_EXPLORE_SPACE,
   DEFAULT_IMPROVE_JOB,
+  effectiveSpace,
   EXPLORE_SPACES,
   FREED_JOBS,
+  HELD_EVERY_COPY,
   IMPROVE_JOBS,
   JOB_WEIGHTS,
   dropLimitsOf,
@@ -368,5 +370,17 @@ describe('Explore holds the explorer kit and, in dangerous space, the tank modul
     expect(from(moves('explore', 'dangerous'), 7)).not.toContain(3);
     expect(from(moves('explore'), 7)).not.toContain(3);
     expect(from(moves('explore', 'safe'), 7)).toContain(3);
+  });
+});
+
+describe('an Explore fit that carries combat drones', () => {
+  it('keeps its tank in Safe space too: it expects combat sites', () => {
+    expect(effectiveSpace('safe', true)).toBe('dangerous');
+    expect(effectiveSpace('safe', false)).toBe('safe');
+    expect(effectiveSpace('dangerous', false)).toBe('dangerous');
+  });
+
+  it('holds every warp core stabilizer, the module that gets it away when tackled', () => {
+    expect(HELD_EVERY_COPY.explore).toContain('warpCore');
   });
 });

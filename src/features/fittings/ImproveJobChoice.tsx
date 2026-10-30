@@ -47,22 +47,15 @@ export function ImproveJobChoice({
         onChange={onJobChange}
         fill
       />
-      <p className="text-text-dim text-xs">{t(`fittings.improve.job.hint.${job}`)}</p>
       {job === 'pve' && onNoPropulsionChange && (
         <label
-          className={cx('flex cursor-pointer items-start gap-2 text-sm', tappableRowClassName)}
+          className={cx('flex cursor-pointer items-center gap-2 text-sm', tappableRowClassName)}
         >
           <Checkbox
-            className="mt-0.5"
             checked={noPropulsion}
             onChange={(event) => onNoPropulsionChange(event.target.checked)}
           />
-          <span>
-            {t('fittings.improve.job.noPropulsion')}
-            <span className="text-text-dim block text-xs">
-              {t('fittings.improve.job.noPropulsionHint')}
-            </span>
-          </span>
+          {t('fittings.improve.job.noPropulsion')}
         </label>
       )}
       {job === 'explore' && (

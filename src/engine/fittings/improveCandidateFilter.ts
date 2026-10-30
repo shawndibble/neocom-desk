@@ -44,7 +44,7 @@ export function defenseSides(
 }
 
 /** The side of the tank the fit already has; null when it has none (or an even split). */
-function fittedSide(
+export function fittedSide(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined
 ): DefenseSide | null {
@@ -119,6 +119,9 @@ export interface CandidateFilter {
 }
 
 /** The shared candidate filter for `modules` under the goal, Defense Choice and job. */
+/** Data and Relic Analyzers (and the Integrated ones that hack both). */
+const ANALYZER_GROUP = 538;
+
 export function candidateFilter(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined,
@@ -132,6 +135,22 @@ export function candidateFilter(
   const kindOf = (typeId: number | null) =>
     typeId === null ? null : propulsionKindOf(groupOf(typeId), nameOf?.(typeId));
   const heldWhole: readonly Job[] = jobSetting ? HELD_EVERY_COPY[jobSetting.job] : [];
+  /** The site types an analyzer hacks, by name: Data, Relic, or both for an Integrated one; null for no analyzer. */
+  const sitesOf = (typeId: number | null): readonly ('data' | 'relic')[] | null => {
+    if (typeId === null || groupOf(typeId) !== ANALYZER_GROUP) return null;
+    const name = nameOf?.(typeId) ?? '';
+    if (/integrated/i.test(name)) return ['data', 'relic'];
+    if (/relic/i.test(name)) return ['relic'];
+    if (/data/i.test(name)) return ['data'];
+    return null;
+  };
+  /** Whether the swap loses a site type the fitted analyzer could hack: a Data Analyzer never becomes a Relic one. */
+  const losesSiteType = (toTypeId: number, fromTypeId: number | null) => {
+    const was = sitesOf(fromTypeId);
+    if (!was) return false;
+    const now = sitesOf(toTypeId) ?? [];
+    return was.some((site) => !now.includes(site));
+  };
 
   const groupsFitted = new Map<number, number>();
   const jobsFitted = new Map<Job, number>();
@@ -172,7 +191,8 @@ export function candidateFilter(
         (from === 'mjd' && kindOf(toTypeId) !== 'mjd') ||
         (holdsMwd && from === 'mwd' && kindOf(toTypeId) !== 'mwd') ||
         // "No propulsion needed": the fit never moves, so nothing adds a propulsion module, not even on score.
-        (jobSetting?.noPropulsion === true && from === null && kindOf(toTypeId) !== null)
+        (jobSetting?.noPropulsion === true && from === null && kindOf(toTypeId) !== null) ||
+        losesSiteType(toTypeId, fromTypeId)
       );
     },
     firstFreeSlot: (slot, slotCounts) => {

@@ -1,4 +1,5 @@
 import type { DefenseChoice, ImproveHold, ImproveReach } from '@/engine/fittings/improve';
+import type { DefenseSide } from '@/engine/fittings/improveGroups';
 import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
 import type { ImproveSort } from '@/engine/fittings/improveRows';
 
@@ -23,6 +24,8 @@ export interface ImproveSettings {
   onIskBudgetChange: (cap: number | null) => void;
   defense: DefenseChoice;
   onDefenseChange: (defense: DefenseChoice) => void;
+  /** The tank side the fit already has (`fittedSide`); null for none or an even split. */
+  fittedSide?: DefenseSide | null;
   includeRigs: boolean;
   onIncludeRigsChange: (on: boolean) => void;
   includeOfficer: boolean;
@@ -34,3 +37,14 @@ export interface ImproveSettings {
   hold: ImproveHold;
   onHoldChange: (hold: ImproveHold) => void;
 }
+
+/** The two sides the Defense control offers; the fit's own one is Keep as is. */
+export const DEFENSE_SIDES: readonly DefenseSide[] = ['shield', 'armor'];
+
+/** The side the Defense control shows: a chosen side as itself, else the fit's own (Keep as is); 'keep' (nothing selected) when the fit has none. */
+export const shownDefense = (defense: DefenseChoice, fitted: DefenseSide | null): DefenseChoice =>
+  defense === 'keep' ? (fitted ?? 'keep') : defense;
+
+/** A pick on the Defense control: the fit's own side keeps its tank, the other side converts. */
+export const pickedDefense = (picked: DefenseSide, fitted: DefenseSide | null): DefenseChoice =>
+  picked === fitted ? 'keep' : picked;

@@ -79,6 +79,31 @@ describe('candidateFilter, propulsion kinds', () => {
   });
 });
 
+describe('candidateFilter, analyzer kinds', () => {
+  // 30 a Data, 31 a Relic and 32 an Integrated Analyzer, all group 538.
+  const groupOf = (typeId: number) => ({ 30: 538, 31: 538, 32: 538 })[typeId];
+  const nameOf = (typeId: number) =>
+    ({ 30: 'Data Analyzer II', 31: 'Relic Analyzer II', 32: 'Zeugma Integrated Analyzer' })[typeId];
+  const filter = candidateFilter([mod('medium', 0, 30), mod('medium', 1, 31)], groupOf, {
+    goal: 'explore',
+    defense: 'keep',
+    includeRigs: false,
+    jobSetting: jobSettingOf('explore', 'safe'),
+    nameOf,
+  });
+
+  it('never trades a site type away: a Data Analyzer never becomes a Relic Analyzer, nor the reverse', () => {
+    expect(filter.kindBlocks(31, 30)).toBe(true);
+    expect(filter.kindBlocks(30, 31)).toBe(true);
+  });
+
+  it('an Integrated Analyzer, which hacks both, may replace either but is never narrowed to one', () => {
+    expect(filter.kindBlocks(32, 30)).toBe(false);
+    expect(filter.kindBlocks(32, 31)).toBe(false);
+    expect(filter.kindBlocks(30, 32)).toBe(true);
+  });
+});
+
 describe('coveringFreed', () => {
   const over = (cpu: number) => ({
     ...baseFittingStats(),

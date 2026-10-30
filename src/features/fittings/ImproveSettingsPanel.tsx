@@ -9,11 +9,16 @@ import { Caret, Checkbox, IskInput, SegmentedControl } from '@/components/ui';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { DEFENSE_CHOICES, IMPROVE_REACHES, type ImproveGoal } from '@/engine/fittings/improve';
+import { IMPROVE_REACHES, type DefenseChoice, type ImproveGoal } from '@/engine/fittings/improve';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { formatIskCompact } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import type { ImproveSettings } from './improveSettings';
+import {
+  DEFENSE_SIDES,
+  pickedDefense,
+  shownDefense,
+  type ImproveSettings,
+} from './improveSettings';
 import { ImproveJobChoice } from './ImproveJobChoice';
 
 interface Props {
@@ -130,18 +135,23 @@ export function ImproveSettingsPanel({
           </label>
           {TANK_GOALS.has(goal) && (
             <>
-              <SegmentedControl
+              <SegmentedControl<DefenseChoice>
                 label={t('fittings.improve.defenseLabel')}
-                options={DEFENSE_CHOICES.map((value) => ({
+                // The fit's own side shows selected (Keep as is); the other side converts.
+                options={DEFENSE_SIDES.map((value) => ({
                   value,
                   label: t(`fittings.improve.defense.${value}`),
                   // Upgrade swaps a module within its own type, so it can't change tank side.
-                  ...(value !== 'keep' && settings.reach === 'upgrade'
+                  ...(value !== settings.fittedSide && settings.reach === 'upgrade'
                     ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
                     : {}),
                 }))}
-                value={settings.defense}
-                onChange={settings.onDefenseChange}
+                value={shownDefense(settings.defense, settings.fittedSide ?? null)}
+                onChange={(picked) =>
+                  settings.onDefenseChange(
+                    picked === 'keep' ? 'keep' : pickedDefense(picked, settings.fittedSide ?? null)
+                  )
+                }
                 fill
               />
               {settings.reach === 'upgrade' && (
@@ -162,18 +172,12 @@ export function ImproveSettingsPanel({
             </button>
             <Collapse open={moreOpen} id={moreId} className="pt-2">
               <div className="space-y-1">
-                <label className={cx('flex items-start gap-2 text-sm', tappableRowClassName)}>
+                <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
-                    className="mt-0.5"
                     checked={settings.includeRigs}
                     onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
                   />
-                  <span>
-                    {t('fittings.improve.includeRigs')}
-                    <span className="text-text-dim block text-xs">
-                      {t('fittings.improve.rigsHint')}
-                    </span>
-                  </span>
+                  {t('fittings.improve.includeRigs')}
                 </label>
                 <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox

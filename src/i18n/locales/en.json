@@ -1479,7 +1479,7 @@
       "reachHint": {
         "upgrade": "Turns a fitted module into a variation of itself.",
         "rebalance": "Also tries a different module doing the same job.",
-        "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
+        "rework": "Tries any module that helps this goal."
       },
       "cap": "Total budget (ISK)",
       "defenseLabel": "Defense Choice",
@@ -1502,7 +1502,6 @@
       "summaryCap": "budget {{cap}}",
       "includeRigs": "Rigs",
       "summaryRigsOn": "rigs on",
-      "rigsHint": "A rig is destroyed when removed, so a rig swap costs the new rig's full price.",
       "checkingMakeover": "Looking for a Makeover · {{checked}} of up to {{total}} calculations…",
       "checkingRound": "Round {{round}} of up to {{max}} · checking {{checked}} of {{total}} swaps…",
       "reworkNudge": {
@@ -1519,11 +1518,6 @@
         "pve": "PvE",
         "pvp": "PvP",
         "explore": "Explore",
-        "hint": {
-          "pve": "Missions, anomalies, Abyss. Tackle may go; sustained tank and applied damage count most.",
-          "pvp": "Keeps propulsion, scram, web and EWAR. Burst tank, speed and lock range count most.",
-          "explore": "Keeps cloak, probe launcher, analyzers and propulsion."
-        },
         "spaceLabel": "Where it flies",
         "space": {
           "dangerous": "Dangerous (wormholes, busy null)",
@@ -1535,8 +1529,7 @@
         },
         "spaceShort": { "dangerous": "dangerous", "safe": "safe" },
         "summaryExplore": "Explore, {{space}}",
-        "noPropulsion": "No propulsion needed",
-        "noPropulsionHint": "A Makeover adds an afterburner, MWD or micro jump drive when the fit has none. Tick this for a fit that never moves, such as a bastioned Marauder."
+        "noPropulsion": "No propulsion needed"
       },
       "makeover": {
         "heading": "Makeover",

@@ -5,9 +5,11 @@ import '@/i18n';
 import { ImproveJobChoice } from './ImproveJobChoice';
 
 describe('ImproveJobChoice', () => {
-  it('shows a hint for the job and no space choice outside Explore', () => {
+  it('shows the three jobs with no help text, and no space choice outside Explore', () => {
     render(<ImproveJobChoice job="pve" onJobChange={vi.fn()} onSpaceChange={vi.fn()} />);
-    expect(screen.getByText(/Missions, anomalies, Abyss/)).toBeInTheDocument();
+    for (const name of ['PvE', 'PvP', 'Explore'])
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    expect(screen.queryByText(/Missions, anomalies/)).toBeNull();
     expect(screen.queryByRole('radio')).toBeNull();
   });
 
