@@ -22,10 +22,11 @@ Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#4022), EVE Appraisal, Iron Whales Appraiser, Fuzzwork, EVE Ref, EveLens
 (#5006), jEveAssets, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
 EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6.2 read in full; #5601, #5602, #5605), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
-licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043).
+licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043), EQM
+(2.0 changelog + Local Scan/D-Scan docs read; #5668, #5669).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
-Courier, EVE Retroindustry, ISK.GG, EVE Miner Hub, EQM, EVE-Industry-Scanner,
+Courier, EVE Retroindustry, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
 EVE TradeLooper, EVE Night Trade Tools, SquadB Excel workbooks (EVE Online
 Excel Workbook v1.6, EVE Market Analysis v1.1; CCP's Excel add-in), TradeRelay, EVEAIO, MONW, Mudoteve,
 Solo Industry App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance,
@@ -211,6 +212,9 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
   net worth; #5658 SP Farm mark; #5659 LP Redeem ×N; #5660 History By station;
   #5661 PI vs 90d spike/drop; #5663 data age "ESI updates in N min"; #5664 order
   book units/ISK listed.
+- EQM 2.0: #5668 NARROW Local list org tally strip over the whole paste (ids
+  chunked at 500, zKill cap stays 40, no click-filter; mockups first). #5669
+  NARROW D-Scan hull mass floor, J-space only (baked `shipMass.json`).
 - EVE Empire 1.6.3: #5642 NARROW PI plans cap sold units at 10% of hub daily
   volume (account-plan candidates sort by price alone). #5643 NARROW Route Safety
   kills-ahead alert (desktop, foreground, spike first). #5644 NARROW search: any-
@@ -358,6 +362,12 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   filter over Hauling Trip Plan; cheap fix is hubs as optional Trip Plan
   stops); gate-camp check, D-Scan, live map (intel, kill-test 2).
 - **IntelParser leftover:** per-pilot cyno/hot-drop/bait/FC chips on Local rows from zKillboard stats (non-ISK, thin; only revive if intel gets asked for).
+- **EQM 2.0 leftovers:** saved org red-list (a −10 contact on the corp/alliance
+  does it, synced); typed-in recons on D-Scan (flips an evidence Read-out, 47);
+  Local share link (Firestore cost, audience already sees Local); regroup Local
+  by org (`20261008-143948`); intel dossiers/sightings, battle reports, ship/
+  industry reports, fleet assignments (corp or cross-player, 1); appraisal
+  5-day regional trades (item detail price history); PI checkpoint sim (17).
 - **EVE Empire leftovers:** in-game PI template export (unbuilt plans have no pin
   geometry; CCP's JSON is undocumented, 13); virtual pilots (alts dropped with the
   Advisor, #2619 not-planned, what-ifs never in a plan, 47); setup capital/payback
