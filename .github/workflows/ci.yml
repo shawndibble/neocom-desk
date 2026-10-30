@@ -204,12 +204,10 @@ jobs:
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
     #
-    # Four, not more. Whole files are dealt out by measured run time from
-    # `scripts/test-shard-weights.json` (see `scripts/test-shard.mjs`), the same
-    # way `e2e-shard` does it. Vitest's own `--shard` hashes the file path and
-    # ignores run time: in CI the slowest shard took 481s and the fastest 266s.
-    # A file missing from the table is treated as median, so a new test needs no
-    # edit; refresh the table from the `vitest-timing-shard-N` artifacts.
+    # Four, not more. Whole files are dealt out by measured run time
+    # (`scripts/test-shard.mjs`, weights in `scripts/test-shard-weights.json`),
+    # as `e2e-shard` does; vitest's own `--shard` hashes the path and ignores
+    # run time. A file with no weight counts as median.
     #
     # Unlike the e2e worker experiment, this adds no concurrency per machine:
     # each shard still runs vitest's default 3 workers on its own runner.
@@ -236,8 +234,11 @@ jobs:
       # 1s budget cannot be found from a CI run.
       - name: Run this shard's test files
         run: |
-          mapfile -t files < <(node scripts/test-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
-          if [ "${#files[@]}" -eq 0 ]; then echo "no test files in this shard"; exit 0; fi
+          # Assigned first so a crash in the script fails the step; `mapfile < <(...)`
+          # would swallow it and the shard would pass with no tests run.
+          list=$(node scripts/test-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
+          if [ -z "$list" ]; then echo "::error::no test files assigned to this shard"; exit 1; fi
+          mapfile -t files <<< "$list"
           npm run test:run -- "${files[@]}" \
             --reporter=agent --reporter=github-actions --reporter=json \
             --outputFile.json=vitest-timing-${{ matrix.shard }}.json

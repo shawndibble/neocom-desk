@@ -30,6 +30,17 @@ describe('weightsFromVitestReports', () => {
     expect(weights).toEqual({ 'src/routes/Mail.test.tsx': 12 });
   });
 
+  it('strips a local clone or worktree prefix as well as the CI one', () => {
+    const weights = weightsFromVitestReports([
+      report(
+        ['/Users/me/Documents/neocom-desk/src/a.test.ts', 0, 2000],
+        ['/Users/me/Documents/neocom-desk.worktrees/perf-x/src/b.test.ts', 0, 3000],
+        ['/home/me/src/neocom-desk/src/c.test.ts', 0, 4000]
+      ),
+    ]);
+    expect(weights).toEqual({ 'src/a.test.ts': 2, 'src/b.test.ts': 3, 'src/c.test.ts': 4 });
+  });
+
   it('never weighs a file at zero', () => {
     const weights = weightsFromVitestReports([report(['/x/neocom-desk/src/a.test.ts', 0, 40])]);
     expect(weights['src/a.test.ts']).toBe(1);

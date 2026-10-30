@@ -88,7 +88,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   no edit (it counts as median). Refresh the table every so often from the
   `vitest-timing-shard-N` artifacts of a recent run:
   `node scripts/test-shard.mjs --weights vitest-timing-*.json`. Vitest's own
-  `--shard` hashes the path and left the shards at 266s to 481s.
+  `--shard` hashes the path and ignores run time.
 - **Aim for under 1s per unit test and under 10s per e2e test.** Each CI
   `test-shard` job prints the tests over 1s in its job summary
   (`scripts/test-budget.mjs`) and uploads the full per-test report as

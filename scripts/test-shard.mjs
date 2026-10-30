@@ -16,9 +16,12 @@ import { isUnitTestFile, weightsFromVitestReports } from './lib/testShards.mjs';
 
 const WEIGHTS_PATH = 'scripts/test-shard-weights.json';
 const args = process.argv.slice(2);
+const flag = (name) => args[args.indexOf(name) + 1];
 
-if (args[0] === '--weights') {
-  const reports = args.slice(1).map((path) => JSON.parse(readFileSync(path, 'utf8')));
+if (args.includes('--weights')) {
+  const reports = args
+    .slice(args.indexOf('--weights') + 1)
+    .map((path) => JSON.parse(readFileSync(path, 'utf8')));
   const weights = weightsFromVitestReports(reports);
   // Reports with no test files must not overwrite the table with `{}`.
   if (Object.keys(weights).length === 0) {
@@ -30,12 +33,13 @@ if (args[0] === '--weights') {
   process.exit(0);
 }
 
-const [current, total] = (args[args.indexOf('--shard') + 1] ?? '').split('/').map(Number);
+const [current, total] = (flag('--shard') ?? '').split('/').map(Number);
 if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || current > total) {
   console.error('usage: test-shard.mjs --shard <current>/<total>');
   process.exit(2);
 }
 
+// Recursive, unlike `e2e/`, so ask git rather than read one directory.
 const files = execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
   .split('\n')
   .filter(isUnitTestFile);
