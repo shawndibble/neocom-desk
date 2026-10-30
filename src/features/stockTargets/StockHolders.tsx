@@ -45,7 +45,7 @@ export function StockHolders({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+              className="inline-flex min-h-6 items-center gap-1 px-1 text-xs text-accent hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
               <span className="inline-flex -space-x-1.5">
@@ -59,8 +59,7 @@ export function StockHolders({
             </button>
           </PopoverTrigger>
           <PopoverContent align="end">
-            // A portalled popover still bubbles React events to the row, whose click opens Show
-            Info.
+            {/* A portalled popover still bubbles React events to the row (Show Info). */}
             <div
               className="flex min-w-48 flex-col gap-1 text-xs"
               onClick={(e) => e.stopPropagation()}

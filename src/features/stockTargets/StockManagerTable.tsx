@@ -3,7 +3,7 @@
  * in place (§6c's faint pencil); a row opens Show Info; the row's ⋮ is the
  * item menu every other item row has, plus "Remove from list".
  */
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -354,15 +354,10 @@ export function StockManagerTable({
     useVisibleStockColumns,
     STOCK_COLUMN_IDS
   );
-  const columnsById = useMemo(
-    () =>
-      Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
-        StockColumnId,
-        DataTableColumn<StockRow>
-      >,
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `columns` is rebuilt each render; only its headers are read, and they change with `t`
-    [t]
-  );
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    StockColumnId,
+    DataTableColumn<StockRow>
+  >;
   const shownColumns = columns.filter(
     (column) =>
       column.id === 'select' || column.id === 'item' || isVisible(column.id as StockColumnId)

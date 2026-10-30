@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { StockHolders } from './StockHolders';
 
@@ -36,6 +36,28 @@ describe('StockHolders', () => {
     expect(await screen.findByText('Listed by')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('Orsa Tellemar')).toBeInTheDocument();
+  });
+
+  it('renders no stray comment text in the split and keeps clicks off the row', async () => {
+    const onRowClick = vi.fn();
+    render(
+      <div onClick={onRowClick}>
+        <StockHolders
+          total={20}
+          holders={[
+            { characterId: 1, quantity: 12 },
+            { characterId: 2, quantity: 8 },
+          ]}
+          heading="Listed by"
+          nameOf={nameOf}
+        />
+      </div>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /2 characters/ }));
+    const heading = await screen.findByText('Listed by');
+    expect(heading.parentElement?.textContent).not.toContain('//');
+    await userEvent.click(screen.getByText('Orsa Tellemar'));
+    expect(onRowClick).not.toHaveBeenCalled();
   });
 
   it('shows the bare total when nobody is attributed', () => {
