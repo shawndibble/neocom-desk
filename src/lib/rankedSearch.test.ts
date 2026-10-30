@@ -103,4 +103,44 @@ describe('rankedSearch', () => {
     });
     expect(result).toHaveLength(1);
   });
+
+  describe('looser tiers (#5644)', () => {
+    const row = (name: string): Row => ({ name, groupName: '' });
+    const names = (rows: Row[]) => rows.map((r) => r.name);
+
+    it('matches words in any order, a digit standing for its roman numeral', () => {
+      const rows = [row('Gyrostabilizer II'), row('Gyrostabilizer I'), row('Other')];
+      expect(names(rankedSearch(rows, 'gyro 2', { primary: byName, limit: 50 }))).toEqual([
+        'Gyrostabilizer II',
+      ]);
+      expect(names(rankedSearch(rows, '2 gyro', { primary: byName, limit: 50 }))).toEqual([
+        'Gyrostabilizer II',
+      ]);
+      expect(names(rankedSearch(rows, 'ii gyro', { primary: byName, limit: 50 }))).toEqual([
+        'Gyrostabilizer II',
+      ]);
+    });
+
+    it('ranks below exact, prefix, substring and secondary matches', () => {
+      const rows = [
+        { name: 'Fleet Republic', groupName: '' },
+        { name: 'Republic Fleet', groupName: '' },
+        { name: 'Zeta', groupName: 'republic fleet' },
+      ];
+      const result = rankedSearch(rows, 'republic fleet', {
+        primary: byName,
+        secondary: [byGroup],
+        limit: 50,
+      });
+      expect(names(result)).toEqual(['Republic Fleet', 'Zeta', 'Fleet Republic']);
+    });
+
+    it('ignores dashes and spaces only when asked', () => {
+      const rows = [row('TTP-2B'), row('Jita')];
+      expect(rankedSearch(rows, 'ttp2b', { primary: byName, limit: 50 })).toEqual([]);
+      const loose = { primary: byName, ignoreSeparators: true, limit: 50 };
+      expect(names(rankedSearch(rows, 'ttp2b', loose))).toEqual(['TTP-2B']);
+      expect(names(rankedSearch(rows, 'TTP 2b', loose))).toEqual(['TTP-2B']);
+    });
+  });
 });

@@ -131,6 +131,7 @@ export function searchLocalPlaces(
 ): SurveyPlace[] {
   const foundSystems = rankedSearch(systems, query, {
     primary: (s) => s.name,
+    ignoreSeparators: true,
     limit: SYSTEM_LIMIT,
   }).map((s): SurveyPlace => ({ id: s.id, name: s.name, kind: 'system', security: s.security }));
   const foundStations = rankedSearch(stations, query, {

@@ -26,7 +26,7 @@ export function buildPickerOptions(
   const systemOptions = rankedSearch(
     exclude?.size ? systems.filter((system) => !exclude.has(system.id)) : systems,
     query,
-    { primary: (system) => system.name, limit }
+    { primary: (system) => system.name, ignoreSeparators: true, limit }
   ).map((system): PickerOption => ({
     key: `system:${system.id}`,
     kind: 'system',

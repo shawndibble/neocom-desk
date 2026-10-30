@@ -34,6 +34,19 @@ describe('searchMarketItems', () => {
   it('matches nothing for a query no name contains', () => {
     expect(searchMarketItems(index, 'veldspar', 10)).toEqual([]);
   });
+
+  it('ranks any-order word prefixes and digit = roman numeral below substring hits', () => {
+    const items = buildMarketItemIndex([
+      { typeId: 10, name: 'Gyrostabilizer II', marketGroupId: 1, volume: 1 },
+      { typeId: 11, name: 'Gyrostabilizer I', marketGroupId: 1, volume: 1 },
+      { typeId: 12, name: 'Republic Fleet EMP S', marketGroupId: 1, volume: 1 },
+      { typeId: 13, name: 'Big gyro 2 thing', marketGroupId: 1, volume: 1 },
+    ]);
+    expect(ids(searchMarketItems(items, 'gyro 2', 10))).toEqual([13, 10]);
+    expect(ids(searchMarketItems(items, '2 gyro', 10))).toEqual([13, 10]);
+    expect(ids(searchMarketItems(items, 'rf emp', 10))).toEqual([]);
+    expect(ids(searchMarketItems(items, 'emp repub', 10))).toEqual([12]);
+  });
 });
 
 describe('createMarketItemCatalogue', () => {
