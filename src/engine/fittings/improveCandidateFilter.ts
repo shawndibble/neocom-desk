@@ -8,7 +8,7 @@
  * Pure data over the fit's modules; the type catalogue is injected as
  * `groupOf`.
  */
-import { commonGroups, type JobCommonality } from './hullCommonality';
+import { commonGroups, propulsionKindOf, type JobCommonality } from './hullCommonality';
 import type { DefenseChoice, ImproveGoal } from './improve';
 import {
   jobOf,
@@ -20,7 +20,13 @@ import {
   type DefenseSide,
   type Job,
 } from './improveGroups';
-import { HELD_EVERY_COPY, holdsTankModules, unguardedJobs, type JobSetting } from './improveJob';
+import {
+  HELD_EVERY_COPY,
+  holdsTankModules,
+  propulsionNeedOf,
+  unguardedJobs,
+  type JobSetting,
+} from './improveJob';
 import type { FittingModule, FittingSlotKind } from './types';
 
 /** The racks an empty slot is filled in. */
@@ -38,7 +44,7 @@ export function defenseSides(
 }
 
 /** The side of the tank the fit already has; null when it has none (or an even split). */
-function fittedSide(
+export function fittedSide(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined
 ): DefenseSide | null {
@@ -65,6 +71,8 @@ export interface CandidateFilterInput {
    * enough of them join the search's groups. Only adds; absent or null: today's.
    */
   commonality?: JobCommonality | null;
+  /** A type's name, to tell an afterburner from an MWD (same group); absent: only micro jump drives are told apart. */
+  nameOf?: (typeId: number) => string | undefined;
 }
 
 export interface CandidateFilter {
@@ -96,6 +104,13 @@ export interface CandidateFilter {
     fromGroup: number | undefined,
     removed: number
   ) => boolean;
+  /**
+   * Whether turning the `fromTypeId` module (null: an empty slot) into `toTypeId` swaps
+   * a propulsion KIND the fit must keep: a micro jump drive is never replaced by another
+   * kind (the engine has no figure for a jump), and under Explore an MWD never becomes
+   * an afterburner or a jump drive.
+   */
+  kindBlocks: (toTypeId: number, fromTypeId: number | null) => boolean;
   /** The first empty slot index of the rack, or null when it is full. */
   firstFreeSlot: (
     slot: FittingSlotKind,
@@ -103,17 +118,39 @@ export interface CandidateFilter {
   ) => number | null;
 }
 
+/** Data and Relic Analyzers (and the Integrated ones that hack both). */
+const ANALYZER_GROUP = 538;
+
 /** The shared candidate filter for `modules` under the goal, Defense Choice and job. */
 export function candidateFilter(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined,
-  { goal, defense, includeRigs, jobSetting, commonality }: CandidateFilterInput
+  { goal, defense, includeRigs, jobSetting, commonality, nameOf }: CandidateFilterInput
 ): CandidateFilter {
   const sides = defenseSides(modules, groupOf, defense);
   const freesTank = defense !== 'keep' && TANK_GOALS.has(goal);
   const holdsTank = holdsTankModules(jobSetting);
   const scored: readonly Job[] = unguardedJobs(goal, jobSetting?.job);
+  const holdsMwd = propulsionNeedOf(jobSetting) === 'mwd';
+  const kindOf = (typeId: number | null) =>
+    typeId === null ? null : propulsionKindOf(groupOf(typeId), nameOf?.(typeId));
   const heldWhole: readonly Job[] = jobSetting ? HELD_EVERY_COPY[jobSetting.job] : [];
+  /** The site types an analyzer hacks, by name: Data, Relic, or both for an Integrated one; null for no analyzer. */
+  const sitesOf = (typeId: number | null): readonly ('data' | 'relic')[] | null => {
+    if (typeId === null || groupOf(typeId) !== ANALYZER_GROUP) return null;
+    const name = nameOf?.(typeId) ?? '';
+    if (/integrated/i.test(name)) return ['data', 'relic'];
+    if (/relic/i.test(name)) return ['relic'];
+    if (/data/i.test(name)) return ['data'];
+    return null;
+  };
+  /** Whether the swap loses a site type the fitted analyzer could hack: a Data Analyzer never becomes a Relic one, under any job. */
+  const losesSiteType = (toTypeId: number, fromTypeId: number | null) => {
+    const was = sitesOf(fromTypeId);
+    if (!was) return false;
+    const now = sitesOf(toTypeId) ?? [];
+    return was.some((site) => !now.includes(site));
+  };
 
   const groupsFitted = new Map<number, number>();
   const jobsFitted = new Map<Job, number>();
@@ -147,6 +184,16 @@ export function candidateFilter(
       const fromJob = jobOf(fromGroup);
       if (fromJob === null || scored.includes(fromJob) || jobOf(toGroup) === fromJob) return false;
       return (jobsFitted.get(fromJob) ?? 0) - removed < 1 || heldWhole.includes(fromJob);
+    },
+    kindBlocks: (toTypeId, fromTypeId) => {
+      const from = kindOf(fromTypeId);
+      return (
+        (from === 'mjd' && kindOf(toTypeId) !== 'mjd') ||
+        (holdsMwd && from === 'mwd' && kindOf(toTypeId) !== 'mwd') ||
+        // "No propulsion needed": the fit never moves, so nothing adds a propulsion module, not even on score.
+        (jobSetting?.noPropulsion === true && from === null && kindOf(toTypeId) !== null) ||
+        losesSiteType(toTypeId, fromTypeId)
+      );
     },
     firstFreeSlot: (slot, slotCounts) => {
       const taken = new Set(modules.filter((m) => m.slot === slot).map((m) => m.slotIndex));

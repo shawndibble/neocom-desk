@@ -130,13 +130,15 @@ export type SpacesByRole = Partial<Record<HullRole, ExploreSpace>>;
 /**
  * The Job to start on for `role`: its own remembered one, else (once, while no
  * role has one) the old device-wide Job if the pilot ever moved it off the
- * default (a stored default says nothing, so the Astero still opens on
- * Explore), else the role's default.
+ * default and it suits the role (a stored default says nothing, so the Astero
+ * still opens on Explore; Explore seeds only explorers), else the role's default.
  */
 export function rememberedJob(byRole: JobsByRole, legacy: ImproveJob, role: HullRole): ImproveJob {
   const own = byRole[role];
   if (own) return own;
-  if (Object.keys(byRole).length === 0 && legacy !== DEFAULT_IMPROVE_JOB) return legacy;
+  // The old row seeds only a role it suits: Explore chosen on an Astero must not open a Drake on Explore.
+  const suits = (legacy === 'explore') === (DEFAULT_JOB_OF_ROLE[role] === 'explore');
+  if (Object.keys(byRole).length === 0 && legacy !== DEFAULT_IMPROVE_JOB && suits) return legacy;
   return DEFAULT_JOB_OF_ROLE[role];
 }
 

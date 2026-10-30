@@ -175,10 +175,13 @@ describe('explorer hulls and the Job per role', () => {
     expect(rememberedJob({ ...byRole, explorer: 'pve' }, 'pve', 'explorer')).toBe('pve');
   });
 
-  it('uses the old device-wide Job once, only while no role has one and it was moved', () => {
+  it('uses the old device-wide Job once, only while no role has one, it was moved, and it suits the role', () => {
     expect(rememberedJob({}, 'pvp', 'combat')).toBe('pvp');
-    expect(rememberedJob({}, 'pvp', 'explorer')).toBe('pvp');
-    expect(rememberedJob({ combat: 'pve' }, 'pvp', 'explorer')).toBe('explore');
+    expect(rememberedJob({ combat: 'pve' }, 'pvp', 'mining')).toBe('pve');
+    // Explore set on an Astero must not open a Drake on Explore, nor PvP an Astero on PvP.
+    expect(rememberedJob({}, 'explore', 'combat')).toBe('pve');
+    expect(rememberedJob({}, 'explore', 'explorer')).toBe('explore');
+    expect(rememberedJob({}, 'pvp', 'explorer')).toBe('explore');
   });
 
   it('remembers the Explore space per role the same way', () => {

@@ -10,13 +10,17 @@ import { findMakeover } from './improveMakeover';
 import {
   DEFAULT_EXPLORE_SPACE,
   DEFAULT_IMPROVE_JOB,
+  effectiveSpace,
   EXPLORE_SPACES,
   FREED_JOBS,
+  HELD_EVERY_COPY,
   IMPROVE_JOBS,
   JOB_WEIGHTS,
   dropLimitsOf,
   firstLimitBreach,
+  JOB_NEEDS,
   jobSettingOf,
+  propulsionNeedOf,
   overallWeightsOf,
   unguardedJobs,
 } from './improveJob';
@@ -86,6 +90,25 @@ describe('the Improve Job tables', () => {
     expect(unguardedJobs('overall', 'pvp')).toEqual(['cap']);
     expect(unguardedJobs('overall')).toEqual(['cap']);
     expect(unguardedJobs('explore', 'explore')).toEqual([]);
+  });
+});
+
+describe('what a job needs of the fit (#5578)', () => {
+  it('PvE needs any propulsion, Explore an MWD, PvP nothing', () => {
+    expect(JOB_NEEDS).toEqual({
+      pve: { propulsion: 'any' },
+      pvp: { propulsion: null },
+      explore: { propulsion: 'mwd' },
+    });
+    expect(propulsionNeedOf(jobSettingOf('pve'))).toBe('any');
+    expect(propulsionNeedOf(jobSettingOf('explore'))).toBe('mwd');
+    expect(propulsionNeedOf(jobSettingOf('pvp'))).toBeNull();
+    expect(propulsionNeedOf(undefined)).toBeNull();
+  });
+
+  it('the PvE opt-out drops the need; Explore ignores it', () => {
+    expect(propulsionNeedOf(jobSettingOf('pve', 'dangerous', true))).toBeNull();
+    expect(propulsionNeedOf(jobSettingOf('explore', 'dangerous', true))).toBe('mwd');
   });
 });
 
@@ -347,5 +370,17 @@ describe('Explore holds the explorer kit and, in dangerous space, the tank modul
     expect(from(moves('explore', 'dangerous'), 7)).not.toContain(3);
     expect(from(moves('explore'), 7)).not.toContain(3);
     expect(from(moves('explore', 'safe'), 7)).toContain(3);
+  });
+});
+
+describe('an Explore fit that carries combat drones', () => {
+  it('keeps its tank in Safe space too: it expects combat sites', () => {
+    expect(effectiveSpace('safe', true)).toBe('dangerous');
+    expect(effectiveSpace('safe', false)).toBe('safe');
+    expect(effectiveSpace('dangerous', false)).toBe('dangerous');
+  });
+
+  it('holds every warp core stabilizer, the module that gets it away when tackled', () => {
+    expect(HELD_EVERY_COPY.explore).toContain('warpCore');
   });
 });

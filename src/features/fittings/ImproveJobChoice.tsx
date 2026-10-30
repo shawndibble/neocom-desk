@@ -5,7 +5,7 @@
  * strength unused. Controlled; the owner stores the choice.
  */
 import { useTranslation } from 'react-i18next';
-import { Radio, SegmentedControl } from '@/components/ui';
+import { Checkbox, Radio, SegmentedControl } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import {
@@ -21,9 +21,19 @@ interface Props {
   /** Only read under Explore. */
   space?: ExploreSpace;
   onSpaceChange: (space: ExploreSpace) => void;
+  /** Only read under PvE: the pilot needs no propulsion module. Without a handler the control is left out. */
+  noPropulsion?: boolean;
+  onNoPropulsionChange?: (on: boolean) => void;
 }
 
-export function ImproveJobChoice({ job, onJobChange, space = 'dangerous', onSpaceChange }: Props) {
+export function ImproveJobChoice({
+  job,
+  onJobChange,
+  space = 'dangerous',
+  onSpaceChange,
+  noPropulsion = false,
+  onNoPropulsionChange,
+}: Props) {
   const { t } = useTranslation();
   return (
     <div className="space-y-2">
@@ -37,7 +47,17 @@ export function ImproveJobChoice({ job, onJobChange, space = 'dangerous', onSpac
         onChange={onJobChange}
         fill
       />
-      <p className="text-text-dim text-xs">{t(`fittings.improve.job.hint.${job}`)}</p>
+      {job === 'pve' && onNoPropulsionChange && (
+        <label
+          className={cx('flex cursor-pointer items-center gap-2 text-sm', tappableRowClassName)}
+        >
+          <Checkbox
+            checked={noPropulsion}
+            onChange={(event) => onNoPropulsionChange(event.target.checked)}
+          />
+          {t('fittings.improve.job.noPropulsion')}
+        </label>
+      )}
       {job === 'explore' && (
         <fieldset className="space-y-1">
           <legend className="text-text-dim text-xs">{t('fittings.improve.job.spaceLabel')}</legend>

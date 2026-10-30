@@ -10,8 +10,10 @@ import {
   makeoverBar,
   makeoverMoves,
   MAKEOVER_CALCS,
+  propulsionStart,
   type Makeover,
   type MakeoverMoveOptions,
+  type PropulsionStart,
 } from '@/engine/fittings/improveMakeover';
 import type { ImproveGoal } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
@@ -39,6 +41,19 @@ export function makeoverMovesFor(
   return (fitting) => makeoverMoves(fitting.modules, index, catalogue.rackOf, { ...options, pool });
 }
 
+/** The forced propulsion step of the Makeover for the Job and this pilot's catalogue; null when the Job needs none. */
+export function makeoverPropulsionFor(
+  variants: VariantEvaluator,
+  catalogue: FittingCatalogue,
+  options: Omit<MakeoverMoveOptions, 'pool'>
+): PropulsionStart | null {
+  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
+  return propulsionStart(index, catalogue.rackOf, {
+    ...options,
+    pool: modulePool(catalogue, variants),
+  });
+}
+
 export interface MakeoverPhaseParams {
   variants: VariantEvaluator;
   catalogue: FittingCatalogue;
@@ -50,6 +65,8 @@ export interface MakeoverPhaseParams {
   target: TargetProfile | null | undefined;
   hold: ImproveHold;
   jobSetting: JobSetting;
+  /** The propulsion the Job needs, added first; null: none needed. */
+  propulsion?: PropulsionStart | null;
   /** How common a move's target group is on the hull for the Job; orders near-ties. */
   targetShare?: (move: ImproveCandidate) => number;
   iskBudget: number | null;
@@ -82,6 +99,7 @@ export async function runMakeoverPhase(
     ...(target ? { target } : {}),
     hold: params.hold,
     jobSetting: params.jobSetting,
+    propulsion: params.propulsion,
     ...(params.targetShare ? { targetShare: params.targetShare } : {}),
     iskBudget: params.iskBudget,
     fitTotal: params.fitTotal,

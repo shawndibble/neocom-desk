@@ -49,6 +49,7 @@ import {
   DEFAULT_IMPROVE_JOB,
   EXPLORE_SPACES,
   IMPROVE_JOBS,
+  effectiveSpace,
   jobSettingOf,
   type ExploreSpace,
   type ImproveJob,
@@ -56,7 +57,12 @@ import {
 import { targetShareOf, type JobCommonality } from '@/engine/fittings/hullCommonality';
 import { communityHintsOf, type CommunityHints } from './improveCommonHints';
 import { loadHullCommonality } from './hullCommonalityLoad';
-import { makeoverMovesFor, runMakeoverPhase, type MakeoverResult } from './improveMakeoverPhase';
+import {
+  makeoverMovesFor,
+  makeoverPropulsionFor,
+  runMakeoverPhase,
+  type MakeoverResult,
+} from './improveMakeoverPhase';
 import { modulePool } from './improveModulePool';
 import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
@@ -208,6 +214,16 @@ export const useImproveSort = createLocalSetting<ImproveSort>({
       : 'gain',
 });
 
+/**
+ * PvE needs a propulsion module, and a Makeover adds one when the fit has none; this opts out
+ * (a bastioned Marauder never moves). Off until the pilot ticks it, remembered on this device (#5578).
+ */
+export const useImproveNoPropulsion = createLocalSetting<boolean>({
+  key: 'fittingsImproveNoPropulsion',
+  defaultValue: false,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
+});
+
 /** The ore Mine more scores, as its crystal family; remembered on this device. */
 export const DEFAULT_ORE_FAMILY = 'Simple Asteroid';
 export const useImproveOre = createLocalSetting<string>({
@@ -252,6 +268,7 @@ export function useImproveSettingsHydrated(): boolean {
     useImproveSpace,
     useImproveSpaceByRole,
     useImproveRigs,
+    useImproveNoPropulsion,
     useImproveSort,
     useImproveOre,
     useImproveHold,
@@ -288,6 +305,8 @@ export interface ImproveConfig {
   job: ImproveJob;
   /** Explore only. */
   space: ExploreSpace;
+  /** PvE only: no propulsion module is needed, so a Makeover adds none. */
+  noPropulsion: boolean;
   reach: ImproveReach;
   iskBudget: number | null;
   defense: DefenseChoice;
@@ -366,6 +385,24 @@ export interface CompletionPool {
   priceOf: (typeId: number) => number | null;
 }
 
+/** Combat drones (Hobgoblin, Hammerhead, Ogre and the like); salvage, mining and EWAR drones are other groups. */
+const COMBAT_DRONE_GROUP = 100;
+
+/** Explore's space for the search: Safe still holds the tank of a fit that carries combat drones (it expects combat sites). Other jobs: as chosen. */
+function searchSpace(
+  job: ImproveJob,
+  space: ExploreSpace,
+  fitting: Fitting | undefined,
+  catalogue: FittingCatalogue | null
+): ExploreSpace {
+  if (job !== 'explore') return space;
+  const combat = (fitting?.drones ?? []).some(
+    (drone) =>
+      drone.quantity > 0 && catalogue?.types[String(drone.typeId)]?.groupID === COMBAT_DRONE_GROUP
+  );
+  return effectiveSpace(space, combat);
+}
+
 /** The candidates for one side of the search, the hull takes and the pilot can fly. */
 function searchCandidates(
   variants: VariantEvaluator,
@@ -382,7 +419,11 @@ function searchCandidates(
     defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
-    jobSetting: jobSettingOf(config.job, config.space),
+    jobSetting: jobSettingOf(
+      config.job,
+      searchSpace(config.job, config.space, variants.fitting, catalogue),
+      config.noPropulsion
+    ),
     commonality,
     slotCounts,
     pool: modulePool(catalogue, variants),
@@ -522,9 +563,22 @@ export function useImprove(
   const poolRef = useRef<WorkerPool | null>(null);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  const { job, space, reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } =
-    config;
-  const jobSetting = useMemo(() => jobSettingOf(job, space), [job, space]);
+  const {
+    job,
+    space,
+    noPropulsion,
+    reach,
+    iskBudget,
+    defense,
+    includeRigs,
+    includeOfficer,
+    oreFamily,
+    hold,
+  } = config;
+  const jobSetting = useMemo(
+    () => jobSettingOf(job, searchSpace(job, space, variants?.fitting, catalogue), noPropulsion),
+    [job, space, noPropulsion, variants?.fitting, catalogue]
+  );
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -601,6 +655,7 @@ export function useImprove(
             {
               job,
               space,
+              noPropulsion,
               reach,
               iskBudget,
               defense: side,
@@ -621,17 +676,25 @@ export function useImprove(
         const candidates = sets.flatMap((set) => set.candidates);
         // The Makeover is Rework's: it follows the single swaps, and the Cheaper goal has none. One search, for the chosen Defense side.
         const wantMakeover = reach === 'rework' && searched !== 'cheaper';
+        const makeoverOptions = {
+          goal: searched,
+          defense: sets[0].side,
+          includeRigs,
+          jobSetting,
+          commonality,
+          slotCounts: own.slotCounts,
+        };
         const movesFor = wantMakeover
-          ? makeoverMovesFor(variants, catalogue, {
-              goal: searched,
-              defense: sets[0].side,
-              includeRigs,
-              jobSetting,
-              commonality,
-              slotCounts: own.slotCounts,
-            })
+          ? makeoverMovesFor(variants, catalogue, makeoverOptions)
           : null;
-        const makeoverStart = movesFor ? movesFor(variants.fitting) : [];
+        // The propulsion the Job needs is a forced first step of the Makeover (#5578).
+        const propulsion = wantMakeover
+          ? makeoverPropulsionFor(variants, catalogue, makeoverOptions)
+          : null;
+        const makeoverStart = [
+          ...(movesFor ? movesFor(variants.fitting) : []),
+          ...(propulsion?.tiers(variants.fitting).flat() ?? []),
+        ];
         const compensation = compensationSwaps(
           variants,
           catalogue,
@@ -761,6 +824,7 @@ export function useImprove(
             target,
             hold: effectiveHold(own.holds, hold),
             jobSetting,
+            propulsion,
             ...(targetShare ? { targetShare } : {}),
             iskBudget,
             fitTotal,
@@ -778,7 +842,8 @@ export function useImprove(
             shouldStop: () => stopRef.current,
           });
           if (cancelled || search === null) return;
-          makeoverStopped = search.stopped;
+          // Only the pilot's "Show best so far" reads as stopped; the Makeover's own calculation cap is its normal end.
+          makeoverStopped = search.stopped && stopRef.current;
           makeover = search.makeover ?? undefined;
         }
         setRecalc(() => stats);
@@ -864,6 +929,7 @@ export function useImprove(
     hold,
     job,
     space,
+    noPropulsion,
     jobSetting,
     chargePlanKey,
   ]);

@@ -152,6 +152,8 @@ export interface ImproveCandidate {
   dropsResourceRig?: boolean;
   /** Strips the other side's tank first; the candidate and its `pairedWith` chain then fill the chosen side's rack. */
   conversion?: TankConversion;
+  /** A Makeover row that adds the propulsion module this Improve Job needs (#5578): the row says why. */
+  addsPropulsionFor?: ImproveJob;
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
@@ -549,6 +551,8 @@ export interface ModulePool {
   flyable?: (slot: FittingSlotKind, typeId: number) => boolean;
   /** Whether the pilot's skills alone allow the module, for a fitted one (its hull fit is not in question); absent: `flyable`. */
   pilotCanFly?: (slot: FittingSlotKind, typeId: number) => boolean;
+  /** A type's name; tells an afterburner from an MWD (one group) for the propulsion rules. Absent: those rules see micro jump drives only. */
+  nameOf?: (typeId: number) => string | undefined;
 }
 
 export interface CandidateOptions {
@@ -847,7 +851,7 @@ export function improveCandidates(
 ): ImproveCandidate[] {
   const o: CandidateOptions = { ...DEFAULT_OPTIONS, ...options };
   const groupOf = o.pool?.groupOf ?? (() => undefined);
-  const filter = candidateFilter(modules, groupOf, o);
+  const filter = candidateFilter(modules, groupOf, { ...o, nameOf: o.pool?.nameOf });
   // A chosen side frees the other side's tank modules; nothing else swaps into tank modules.
   const { freesTank, goalGroups } = filter;
   // The table's own groups; the community's extras (`filter.commonGroups`) are tried after them.
@@ -889,7 +893,7 @@ export function improveCandidates(
     const taken = [0, 0, 0, 0, 0];
     const canOffer = (typeId: number, group: number | undefined) => {
       if (seen.has(typeId) || !allowed(typeId, slot, from, at.length)) return false;
-      if (filter.tankBlocks(group, from)) return false;
+      if (filter.tankBlocks(group, from) || filter.kindBlocks(typeId, fromTypeId)) return false;
       // Never the last module doing a job nobody scores (every copy, for a job the pilot's Job holds whole).
       return !filter.losesJob(group, from, at.length);
     };
@@ -984,6 +988,7 @@ export function improveCandidates(
         let added = 0;
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
+          if (filter.kindBlocks(typeId, null)) continue;
           added++;
           tiers[tier].push({
             fromTypeId: null,

@@ -1479,7 +1479,7 @@
       "reachHint": {
         "upgrade": "Turns a fitted module into a variation of itself.",
         "rebalance": "Also tries a different module doing the same job.",
-        "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
+        "rework": "Tries any module that helps this goal."
       },
       "cap": "Total budget (ISK)",
       "defenseLabel": "Defense Choice",
@@ -1502,7 +1502,6 @@
       "summaryCap": "budget {{cap}}",
       "includeRigs": "Rigs",
       "summaryRigsOn": "rigs on",
-      "rigsHint": "A rig is destroyed when removed, so a rig swap costs the new rig's full price.",
       "checkingMakeover": "Looking for a Makeover · {{checked}} of up to {{total}} calculations…",
       "checkingRound": "Round {{round}} of up to {{max}} · checking {{checked}} of {{total}} swaps…",
       "reworkNudge": {
@@ -1519,11 +1518,6 @@
         "pve": "PvE",
         "pvp": "PvP",
         "explore": "Explore",
-        "hint": {
-          "pve": "Missions, anomalies, Abyss. Tackle may go; sustained tank and applied damage count most.",
-          "pvp": "Keeps propulsion, scram, web and EWAR. Burst tank, speed and lock range count most.",
-          "explore": "Keeps cloak, probe launcher, analyzers and propulsion."
-        },
         "spaceLabel": "Where it flies",
         "space": {
           "dangerous": "Dangerous (wormholes, busy null)",
@@ -1534,7 +1528,8 @@
           "safe": "Tank may go; each drop says what it gives up."
         },
         "spaceShort": { "dangerous": "dangerous", "safe": "safe" },
-        "summaryExplore": "Explore, {{space}}"
+        "summaryExplore": "Explore, {{space}}",
+        "noPropulsion": "No propulsion needed"
       },
       "makeover": {
         "heading": "Makeover",
@@ -1544,6 +1539,7 @@
         "partTicked_other": "Makeover, {{ticked}} of {{count}} changes ticked",
         "rounds_one": "Found in {{count}} round.",
         "rounds_other": "Found in {{count}} rounds.",
+        "addsPropulsion": "{{job}}: adds propulsion",
         "wholeFit": "The figures are the whole Makeover, recalculated as one fit.",
         "figure": {
           "dps": "Total DPS",
@@ -1554,8 +1550,8 @@
           "powergrid": "Powergrid"
         },
         "speedValue": "{{value}} m/s",
-        "capStable": "Stable",
-        "capUnstable": "Runs dry",
+        "capStable": "{{pct}}%",
+        "capEmptyIn": "{{time}}",
         "become_one": "{{name}} becomes",
         "become_other": "{{count}}× {{name}} become",
         "splitInto_one": "{{name}} becomes",
