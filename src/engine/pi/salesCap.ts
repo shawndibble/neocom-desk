@@ -33,7 +33,8 @@ export function thinSales(
   tradesPerDay: number | undefined,
   sharePct: number = PI_SALES_SHARE_PCT
 ): ThinSales | null {
-  const cap = salesCapPerDay(tradesPerDay, sharePct);
-  if (cap === undefined || tradesPerDay === undefined || planPerDay <= cap) return null;
+  if (tradesPerDay === undefined) return null;
+  const cap = salesCapPerDay(tradesPerDay, sharePct)!;
+  if (planPerDay <= cap) return null;
   return { planPerDay, tradesPerDay, countedPerDay: cap, sharePct };
 }

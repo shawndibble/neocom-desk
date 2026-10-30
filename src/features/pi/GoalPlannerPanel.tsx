@@ -366,9 +366,15 @@ function GoalPlanner({
     const distancesPending = jumpsFn === undefined && rows.length > 0;
     const hasGoals = plannedGoals.some((goal) => goal.unitsPerDay > 0);
     const steps = changeSteps(best.plan, planDiff(best.plan, planned), rows);
-    const thinGoals = best.plan.achieved.flatMap((a) => {
-      const thin = thinSales(a.unitsPerHour * HOURS_PER_DAY, trades.get(a.typeId));
-      return thin ? [{ typeId: a.typeId, thin }] : [];
+    // Only units sent to the hub are capped, so only those can be over the share.
+    const soldPerDay = new Map<number, number>();
+    for (const f of best.plan.flows) {
+      if (f.to === 'hub')
+        soldPerDay.set(f.typeId, (soldPerDay.get(f.typeId) ?? 0) + f.unitsPerHour * HOURS_PER_DAY);
+    }
+    const thinGoals = [...trades.keys()].flatMap((typeId) => {
+      const thin = thinSales(soldPerDay.get(typeId) ?? 0, trades.get(typeId));
+      return thin ? [{ typeId, thin }] : [];
     });
     results = (
       <div className="space-y-4">
