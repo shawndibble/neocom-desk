@@ -29,13 +29,13 @@ describe('spExtractionDomain.load', () => {
   it('reads nothing for an unmarked character, even with monitoring on', async () => {
     await useSpExtractionMonitoringEnabled.getState().setValue(true);
     await useSpFarmCharacters.getState().setValue([MARKED]);
-    expect(await spExtractionDomain.load(UNMARKED)).toBeNull();
+    expect(await spExtractionDomain.load(UNMARKED)).toEqual([]);
     expect(loadCharacterSkillsWithStatus).not.toHaveBeenCalled();
   });
 
   it('reads nothing when no character is marked', async () => {
     await useSpExtractionMonitoringEnabled.getState().setValue(true);
-    expect(await spExtractionDomain.load(MARKED)).toBeNull();
+    expect(await spExtractionDomain.load(MARKED)).toEqual([]);
   });
 
   it('reads a marked character', async () => {

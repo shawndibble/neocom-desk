@@ -2,21 +2,22 @@
 
 Route `/characters` (`src/routes/Characters.tsx`). The roster of every Character logged in on this device: stats, filtering, grouping, starring, add, remove. Picking one makes it active and navigates away. UNGATED (`src/app/routeScopes.ts:51`), cache-first from Dexie. Also the landing after adding an alt (`Callback.tsx`) and the fallback when Characters exist but none is active (`Root`). Shared pieces `CharacterHeader` and `CharacterFilterControl` are described at the end.
 
-| Feature                                                            | Where                                                                |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Card (default) / Table view toggle                                 | `Characters.tsx:1751`, `useCharacterViewMode` (`charactersViewMode`) |
-| Search (name or corp)                                              | `FILTER_PARAMS.q`                                                    |
-| Filters: queue state, corporation, group, starred only, has alerts | `Characters.tsx:1585-1671`                                           |
-| Sort: name, SP, wallet, group, alerts + direction                  | `SORT_KEYS`, `groups.ts sortCharacterIds`                            |
-| Starred-first layer                                                | `starredCharacters.ts`                                               |
-| Groups (create, rename, reorder, delete, assign)                   | `GroupSectionHeader`, `overviewGroups.ts`, `groups.ts`               |
-| Columns picker (table)                                             | `ColumnPickerMenu`, `characterColumns.ts`                            |
-| Export CSV / XLSX / copy                                           | `charactersCsv.ts`, `TableActionsMenu`                               |
-| Row menu (context menu / more actions)                             | `CharacterRowContextMenu.tsx`                                        |
-| Refresh all (live)                                                 | `handleRefreshAll` `:1192`                                           |
-| Add character (plain / custom permissions)                         | split button `:1501`, `loginFlow.ts`                                 |
-| Remove character                                                   | modal `:1819`, `removeCharacter.ts`                                  |
-| Density select                                                     | shared `useFontScale`                                                |
+| Feature                                                               | Where                                                                |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Card (default) / Table view toggle                                    | `Characters.tsx:1751`, `useCharacterViewMode` (`charactersViewMode`) |
+| Search (name or corp)                                                 | `FILTER_PARAMS.q`                                                    |
+| Filters: queue state, corporation, group, starred only, has alerts    | `Characters.tsx:1585-1671`                                           |
+| Sort: name, SP, wallet, group, alerts + direction                     | `SORT_KEYS`, `groups.ts sortCharacterIds`                            |
+| Starred-first layer                                                   | `starredCharacters.ts`                                               |
+| SP Farm mark (table column + row menu; scopes SP-ready and its alert) | `spExtractionSettings.ts` (`sync.spFarmCharacters`)                  |
+| Groups (create, rename, reorder, delete, assign)                      | `GroupSectionHeader`, `overviewGroups.ts`, `groups.ts`               |
+| Columns picker (table)                                                | `ColumnPickerMenu`, `characterColumns.ts`                            |
+| Export CSV / XLSX / copy                                              | `charactersCsv.ts`, `TableActionsMenu`                               |
+| Row menu (context menu / more actions)                                | `CharacterRowContextMenu.tsx`                                        |
+| Refresh all (live)                                                    | `handleRefreshAll` `:1192`                                           |
+| Add character (plain / custom permissions)                            | split button `:1501`, `loginFlow.ts`                                 |
+| Remove character                                                      | modal `:1819`, `removeCharacter.ts`                                  |
+| Density select                                                        | shared `useFontScale`                                                |
 
 ## Purpose and user goal
 

@@ -138,7 +138,7 @@ export function Characters() {
   useHydratedStore(useSpExtractionThresholdSp);
   const spFarm = useSpFarmCharacters((state) => state.value);
   const setSpFarm = useSpFarmCharacters((state) => state.setValue);
-  useHydratedStore(useSpFarmCharacters);
+  const spFarmHydrated = useHydratedStore(useSpFarmCharacters);
 
   const extractionPrices = useExtractionPrices();
   const alertCounts = useAlertCountsByCharacter();
@@ -316,7 +316,10 @@ export function Characters() {
     0
   );
   const extractionSummary =
-    spExtractionEnabled && spFarm.length === 0 && activeColumnIds.includes('spReady')
+    spExtractionEnabled &&
+    spFarmHydrated &&
+    spFarm.length === 0 &&
+    activeColumnIds.includes('spReady')
       ? t('characters.spFarmHint')
       : !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
         ? null

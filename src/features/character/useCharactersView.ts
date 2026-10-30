@@ -6,6 +6,7 @@ import {
   availableCharacterColumns,
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
+import { isSpFarmCharacter } from '@/features/character/spExtractionSettings';
 import { isCharacterStarred, partitionStarredFirst } from '@/features/character/starredCharacters';
 import {
   sortCharacterIds,
@@ -263,7 +264,7 @@ export function useCharactersView(input: CharactersViewInput) {
         jobSlotSkills: core?.jobSlotSkills,
         totalSp: core?.totalSp,
         starred: isCharacterStarred(starred, character.characterId),
-        spFarm: isCharacterStarred(spFarm, character.characterId),
+        spFarm: isSpFarmCharacter(spFarm, character.characterId),
         groupId: groupIdByCharacterId.get(character.characterId) ?? null,
         whereabouts: whereabouts.of(character.characterId),
         locationGranted: whereabouts.hasLocationGrant(character.characterId),

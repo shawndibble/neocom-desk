@@ -51,9 +51,9 @@ export const spExtractionDomain = defineDomain<
     // pilot has turned monitoring on, matching `corpContextFor`'s "err
     // toward not calling the endpoint" precedent above.
     if (!(await currentSpExtractionEnabled())) return null;
-    // Only a character marked SP Farm (#5658) is ever ready; an unmarked one
-    // is skipped before the ESI call, same as monitoring off.
-    if (!(await isMarkedSpFarm(characterId))) return null;
+    // Only a marked SP Farm character is ever ready. Unmarked: no ESI call, and
+    // an empty entry list resets the baseline so a later re-mark can fire.
+    if (!(await isMarkedSpFarm(characterId))) return [];
     const result = await loadCharacterSkillsWithStatus(characterId);
     if (result.needsReauth || result.cached === null) return null;
     const thresholdSp = await currentSpExtractionThresholdSp();
