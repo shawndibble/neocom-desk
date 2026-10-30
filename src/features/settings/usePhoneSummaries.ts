@@ -8,7 +8,7 @@ import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { TRADE_HUBS } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub } from '@/features/market/hub';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import { useAssumedTe } from '@/features/industry/assumedTe';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -25,7 +25,7 @@ export function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> 
   const timeFormat = useTimeFormat((state) => state.value);
   const assumedMe = useAssumedMe((state) => state.value);
   const assumedTe = useAssumedTe((state) => state.value);
-  const hub = useMarketHub((state) => state.value);
+  const hub = useDefaultMarketHub((state) => state.value);
   const characterFilter = useDefaultCharacterFilter((state) => state.value);
   const darkAfterDays = useDarkThreshold((state) => state.value);
   const avoidedCount = useAvoidedSystems((state) => state.value.length);
