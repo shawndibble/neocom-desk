@@ -9,7 +9,9 @@ import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { ImproveOption, RejectedOption } from '@/engine/fittings/improve';
 import { isResource } from '@/engine/fittings/improveFigures';
 import type { FittingStats } from '@/engine/fittings/types';
+import { roleSwapChanges } from '@/engine/fittings/skillGains';
 import {
+  changeVerdict,
   diffFittingStats,
   type StatChange as StatChangeValue,
 } from '@/engine/fittings/variationDelta';
@@ -52,7 +54,12 @@ export function changeLine(
   leading: readonly StatChangeValue[] = []
 ): ReactNode {
   const changes = otherChanges(option, own, omit);
-  if (changes.length === 0 && leading.length === 0) return t('fittings.variations.noChanges');
+  // Role figures it raises (reach, remote repair, bursts…); one it cuts is under Gives up.
+  const roleGains = roleSwapChanges(own, option.after).filter(
+    (change) => !omit.includes(change.key) && changeVerdict(change) === 'better'
+  );
+  if (changes.length === 0 && leading.length === 0 && roleGains.length === 0)
+    return t('fittings.variations.noChanges');
   // One stat per row, so a long list reads down instead of running on as a sentence.
   const shown = changes.slice(0, all ? undefined : CHANGES_SHOWN);
   const rest = changes.length - shown.length;
@@ -60,6 +67,14 @@ export function changeLine(
   return (
     <>
       <StatChangeList changes={[...leading, ...shown]} />
+      {roleGains.map((change) => (
+        <span key={change.key} className="block">
+          {t(`fittings.whatToTrain.role.${change.key}`, {
+            before: change.before,
+            after: change.after,
+          })}
+        </span>
+      ))}
       {label !== null &&
         (onOpen ? (
           <button type="button" className={textActionClassName()} onClick={onOpen}>
