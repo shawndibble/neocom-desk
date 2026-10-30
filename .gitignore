@@ -35,3 +35,4 @@ ui-debug.log
 
 # TypeScript incremental build info
 *.tsbuildinfo
+vitest-timing-*.json

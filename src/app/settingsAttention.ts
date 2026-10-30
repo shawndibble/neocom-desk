@@ -10,6 +10,14 @@ import { useUpdateStatus } from './updateAvailable';
  */
 export function useSettingsNeedsAttention(): boolean {
   const updateAvailable = useUpdateStatus((state) => state.status === 'available');
-  const storageAtRisk = useStorageAtRisk((state) => state.atRisk);
+  const storageAtRisk = useRailSettingsNeedsAttention();
   return updateAvailable || storageAtRisk;
+}
+
+/**
+ * The desktop rail's Settings dot: storage only. An update waiting has its own
+ * upgrade icon beside the row (`RailUpgradeButton`), so it adds no dot here.
+ */
+export function useRailSettingsNeedsAttention(): boolean {
+  return useStorageAtRisk((state) => state.atRisk);
 }

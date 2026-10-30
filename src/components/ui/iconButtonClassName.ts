@@ -2,7 +2,7 @@ import { cx } from '@/lib/cx';
 import { disabledClassName, focusRingClassName, interactiveClassName } from './controlStyles';
 
 export type IconButtonVariant = 'ghost' | 'plain';
-export type IconButtonTone = 'default' | 'danger' | 'positive' | 'warning';
+export type IconButtonTone = 'default' | 'danger' | 'positive' | 'warning' | 'accent';
 export type IconButtonSize = 'md' | 'sm' | 'row';
 
 export interface IconButtonClassNameOptions {
@@ -12,7 +12,7 @@ export interface IconButtonClassNameOptions {
    * around every line of a list.
    */
   variant?: IconButtonVariant;
-  /** `danger` is the destructive treatment; `positive` the "worth doing" one; `warning` the amber caution one (`text-warning`). */
+  /** `danger` is the destructive treatment; `positive` the "worth doing" one; `warning` the amber caution one (`text-warning`); `accent` the blue "something is waiting on you" one (`text-accent`). */
   tone?: IconButtonTone;
   /**
    * `md` (default) is the toolbar size; `sm` is for controls nested in a
@@ -92,21 +92,28 @@ export function iconButtonClassName({
               !disabled && 'hover:bg-isk-pos/10 active:bg-isk-pos/20',
               variant === 'ghost' && !disabled && 'hover:border-isk-pos'
             )
-          : tone === 'warning'
+          : tone === 'accent'
             ? cx(
-                'text-warning',
+                'text-accent',
                 variant === 'ghost' && 'border-line',
-                !disabled && 'hover:bg-warning/10 active:bg-warning/20',
-                variant === 'ghost' && !disabled && 'hover:border-warning'
+                !disabled && 'hover:bg-accent/10 active:bg-accent/20',
+                variant === 'ghost' && !disabled && 'hover:border-accent'
               )
-            : cx(
-                'text-text-dim',
-                variant === 'ghost' && 'border-line',
-                !disabled && 'hover:text-text active:bg-panel',
-                variant === 'plain' && !disabled && 'hover:bg-panel-2',
-                variant === 'ghost' && 'bg-panel-2',
-                variant === 'ghost' && !disabled && 'hover:border-line-bright'
-              ),
+            : tone === 'warning'
+              ? cx(
+                  'text-warning',
+                  variant === 'ghost' && 'border-line',
+                  !disabled && 'hover:bg-warning/10 active:bg-warning/20',
+                  variant === 'ghost' && !disabled && 'hover:border-warning'
+                )
+              : cx(
+                  'text-text-dim',
+                  variant === 'ghost' && 'border-line',
+                  !disabled && 'hover:text-text active:bg-panel',
+                  variant === 'plain' && !disabled && 'hover:bg-panel-2',
+                  variant === 'ghost' && 'bg-panel-2',
+                  variant === 'ghost' && !disabled && 'hover:border-line-bright'
+                ),
     className
   );
 }

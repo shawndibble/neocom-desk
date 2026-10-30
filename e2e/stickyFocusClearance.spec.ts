@@ -54,17 +54,23 @@ async function focusedBox(page: Page, insideSelector: string) {
     const el = document.activeElement as HTMLElement | null;
     if (!el || !el.closest(selector)) return null;
     const rect = el.getBoundingClientRect();
+    // The sticky bar: the nearest sticky ancestor of the first search box.
+    const search = [...document.querySelectorAll('input')].find((i) =>
+      /search/i.test(i.placeholder)
+    );
+    const barRect = search!.closest('div[class*="sticky"]')!.getBoundingClientRect();
     return {
       top: rect.top,
+      barBottom: barRect.bottom,
       label: el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 40) ?? '',
     };
   }, insideSelector);
 }
 
 /**
- * The first assertion after a `goto` waits out the dev server's cold compile of
- * the route (seen failing the Plan editor test at the default 5s on a CI shard).
- * Same allowance as segmentedSelectedCue.dev.spec.ts.
+ * The first assertion after a `goto` waits out the route's cold load (seen failing the
+ * Plan editor test at the default 5s on a CI shard, when this ran on the dev server).
+ * Same allowance as segmentedSelectedCue.spec.ts.
  */
 const COLD_LOAD = { timeout: 15_000 };
 
@@ -96,7 +102,6 @@ test('Skills > Trained: Shift+Tab through rows never lands under the sticky sear
   await expect(search).toBeVisible(COLD_LOAD);
   await page.getByRole('button', { name: 'Expand all' }).click();
 
-  const bar = search.locator('xpath=ancestor::div[contains(@class,"sticky")][1]');
   const rowButtons = page.locator('main section button');
   const count = await rowButtons.count();
   expect(count).toBeGreaterThan(40);
@@ -106,11 +111,10 @@ test('Skills > Trained: Shift+Tab through rows never lands under the sticky sear
   // stretch of them rather than all.
   let checked = 0;
   for (let i = 0; i < Math.min(count + 5, 80); i += 1) {
-    const barBottom = (await bar.boundingBox())!.y + (await bar.boundingBox())!.height;
     const focused = await focusedBox(page, 'main section');
     if (!focused) break; // left the list (reached the sticky bar's controls)
     expect(focused.top, `"${focused.label}" is under the sticky bar`).toBeGreaterThanOrEqual(
-      barBottom - 0.5
+      focused.barBottom - 0.5
     );
     checked += 1;
     await page.keyboard.press('Shift+Tab');
@@ -142,11 +146,6 @@ test('Plan editor: Shift+Tab / Tab through the entry list never lands under the 
   await expect(moreButtons.first()).toBeVisible();
   await moreButtons.last().focus();
 
-  const headerBottom = async () => {
-    const box = (await header.boundingBox())!;
-    return box.y + box.height;
-  };
-
   let checked = 0;
   const visit = async (key: string, steps: number) => {
     for (let i = 0; i < steps; i += 1) {
@@ -159,14 +158,14 @@ test('Plan editor: Shift+Tab / Tab through the entry list never lands under the 
         const rect = el.getBoundingClientRect();
         return {
           top: rect.top,
+          bottom: h.getBoundingClientRect().bottom,
           inHeader: h.contains(el),
           label: el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 40) ?? '',
         };
       });
       if (!info || info.inHeader) continue;
-      const bottom = await headerBottom();
       expect(info.top, `"${info.label}" is under the sticky header`).toBeGreaterThanOrEqual(
-        bottom - 0.5
+        info.bottom - 0.5
       );
       checked += 1;
     }

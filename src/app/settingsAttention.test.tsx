@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useUpdateStatus } from './updateAvailable';
 import { useStorageAtRisk } from '@/features/settings/storageAtRisk';
-import { useSettingsNeedsAttention } from './settingsAttention';
+import { useRailSettingsNeedsAttention, useSettingsNeedsAttention } from './settingsAttention';
 
 beforeEach(() => {
   useUpdateStatus.setState({ status: 'unknown' });
@@ -24,5 +24,15 @@ describe('useSettingsNeedsAttention', () => {
     expect(result.current).toBe(true);
     act(() => useStorageAtRisk.setState({ atRisk: false }));
     expect(result.current).toBe(false);
+  });
+});
+
+describe('useRailSettingsNeedsAttention', () => {
+  it('ignores a waiting update (the rail has its Upgrade icon) but lights for unprotected storage', () => {
+    const { result } = renderHook(() => useRailSettingsNeedsAttention());
+    act(() => useUpdateStatus.setState({ status: 'available' }));
+    expect(result.current).toBe(false);
+    act(() => useStorageAtRisk.setState({ atRisk: true }));
+    expect(result.current).toBe(true);
   });
 });

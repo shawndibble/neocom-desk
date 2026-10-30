@@ -1,5 +1,6 @@
 import { useNavBadges } from './navBadges';
-import { useSettingsNeedsAttention } from './settingsAttention';
+import { useRailSettingsNeedsAttention, useSettingsNeedsAttention } from './settingsAttention';
+import { RailUpgradeButton } from './RailUpgradeButton';
 import { UnreadAlertsContext } from '@/components/ui/unreadAlertsContext';
 import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
@@ -347,6 +348,7 @@ export const Layout = memo(function Layout() {
   useRequestBadgePoll();
   const navBadge = useNavBadges();
   const settingsAttention = useSettingsNeedsAttention();
+  const railSettingsAttention = useRailSettingsNeedsAttention();
   const tabs = barTabs(useMobileTabs((state) => state.value));
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -401,15 +403,22 @@ export const Layout = memo(function Layout() {
             heights the scrolling nav's last row is cut by this edge; the rule makes
             that read as scroll, not overlap. */}
             <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
-              {FOOTER_PAGES.map((page) => (
-                <NavItem
-                  key={page.path}
-                  to={page.path}
-                  label={t(page.labelKey)}
-                  locked={false}
-                  attention={page.path === '/settings' && settingsAttention}
-                />
-              ))}
+              {FOOTER_PAGES.map((page) =>
+                page.path === '/settings' ? (
+                  <div key={page.path} className="flex items-center gap-1">
+                    <NavItem
+                      to={page.path}
+                      label={t(page.labelKey)}
+                      locked={false}
+                      attention={railSettingsAttention}
+                      className="flex-1"
+                    />
+                    <RailUpgradeButton />
+                  </div>
+                ) : (
+                  <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
+                )
+              )}
             </div>
             <div className="flex shrink-0 items-center pr-2">
               <div className="min-w-0 flex-1">

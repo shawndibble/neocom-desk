@@ -69,6 +69,7 @@
     "mobileLabel": "Mobile navigation",
     "alerts": "Alerts",
     "needsAttention": "{{label}}, needs attention",
+    "upgrade": "Upgrade",
     "alertsWithCount_one": "Alerts, {{count}} waiting",
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",
