@@ -17,6 +17,7 @@ export function bakeTypeEffects(types, typeDogma) {
   for (const record of typeDogma) {
     if (!published.has(record._key)) continue;
     for (const { effectID } of record.dogmaEffects ?? []) {
+      // An effect off the allow-list has no entry, so it is skipped.
       byEffect[effectID]?.push(record._key);
     }
   }

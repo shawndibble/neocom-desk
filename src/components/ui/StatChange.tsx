@@ -4,6 +4,7 @@ import type { StatChange as StatChangeValue } from '@/engine/fittings/variationD
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatSeconds } from '@/lib/duration';
 import { cx } from '@/lib/cx';
+import { flagWord } from '@/features/fittings/flagWord';
 
 interface StatChangeProps {
   change: StatChangeValue;
@@ -45,7 +46,7 @@ function useStatChangeParts(change: StatChangeValue) {
         ? t('fittings.statChange.stable', { pct: formatAt(0, value) })
         : t('fittings.statChange.depletes', { time: formatSeconds(-value) })
       : isFlag
-        ? t(value ? 'fittings.statChange.yes' : 'fittings.statChange.no')
+        ? flagWord(value, t)
         : formatAt(digits, value);
   const before = show(change.before);
   const after = show(change.after);

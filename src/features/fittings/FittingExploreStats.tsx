@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { FittingStats } from '@/engine/fittings/types';
 import { Facts } from './StatFacts';
+import { flagWord } from './flagWord';
 import { fixed0, fixed1 } from '@/lib/fixedFormat';
 
 /**
@@ -47,9 +48,7 @@ export function ExploreFacts({ stats }: { stats: FittingStats }) {
           ? [
               {
                 label: label('warpsCloaked'),
-                value: t(
-                  explore.warpsCloaked ? 'fittings.statChange.yes' : 'fittings.statChange.no'
-                ),
+                value: flagWord(explore.warpsCloaked, t),
               },
             ]
           : []),

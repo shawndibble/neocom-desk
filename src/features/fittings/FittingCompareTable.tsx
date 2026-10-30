@@ -13,6 +13,7 @@ import { formatSeconds } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
+import { flagWord } from './flagWord';
 
 function formatValue(row: CompareRow, index: number, t: Translate): string {
   if (row.key === 'capacitor') {
@@ -22,7 +23,7 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
       : t('fittings.compare.stat.capacitorUnstable', { time: formatSeconds(-value) });
   }
   if (FLAG_STATS.has(row.key)) {
-    return t(row.values[index] ? 'fittings.statChange.yes' : 'fittings.statChange.no');
+    return flagWord(row.values[index]!, t);
   }
   if (row.key === 'appliedDps' || row.key === 'bestRange') return fixed1(row.values[index]!);
   if (row.key === 'priceSell' || row.key === 'priceBuy') {
