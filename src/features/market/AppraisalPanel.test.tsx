@@ -382,17 +382,22 @@ describe('AppraisalPanel', () => {
       expect(screen.queryByText('List it, after fees')).not.toBeInTheDocument();
     });
 
-    it('offers the sales tax columns off by default, once the Character is resolved', async () => {
+    it('offers the fee columns off by default, once the Character is resolved', async () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
       expect(screen.queryByRole('columnheader', { name: 'Sales tax' })).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
       await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Sales tax' }));
-      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Sell after tax' }));
+      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Broker fee' }));
+      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Sell after fees' }));
       await userEvent.keyboard('{Escape}');
 
       expect(screen.getByRole('columnheader', { name: 'Sales tax' })).toBeInTheDocument();
-      expect(screen.getByRole('columnheader', { name: 'Sell after tax' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Broker fee' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Sell after fees' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('columnheader', { name: 'Sell after tax' })
+      ).not.toBeInTheDocument();
     });
 
     it('does not offer the sales tax columns while skills are loading', async () => {

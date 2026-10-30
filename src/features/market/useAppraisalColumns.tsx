@@ -7,13 +7,15 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import {
   lpBeatsMarket,
   refineBeatsSellAsIs,
-  sellAfterTax,
+  sellAfterFees,
+  sellBrokerFee,
   sellSalesTax,
   splitEach,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
 import { subtractOwned, type WithOwned } from '@/engine/market/appraisalOwned';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { removeItemFromPaste } from '@/engine/market/appraisalPaste';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { formatIskAuto } from '@/lib/isk';
@@ -52,9 +54,12 @@ const PHONE_ON_BY_DEFAULT: readonly AppraisalColumnId[] = ['buyTotal', 'sellTota
 export function useAppraisalColumns({
   controller,
   owned,
+  standing,
 }: {
   controller: AppraisalController;
   owned: ReadonlyMap<number, number> | null;
+  /** The active Character's standing toward this hub's NPC station owner, for the broker fee. */
+  standing: ResolvedStandings;
 }) {
   const { t } = useTranslation();
   const { text, result } = controller;
@@ -146,14 +151,22 @@ export function useAppraisalColumns({
     },
   ];
 
-  // Sales tax is the Accounting skill's rate, so with no Character (or skills
-  // still loading) there is no honest figure and the columns stay out of the
-  // table and the picker, as Refine does without refine data.
+  // Sales tax is the Accounting skill's rate and the broker fee is Broker
+  // Relations plus standing, so with no Character (or skills still loading)
+  // there is no honest figure and the fee columns stay out of the table and
+  // the picker, as Refine does without refine data.
   const accountingLevel = result?.accountingLevel ?? null;
+  const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
+  const feeInputs =
+    accountingLevel === null || brokerRelationsLevel === null
+      ? null
+      : { accountingLevel, brokerRelationsLevel, standing };
   const taxFor = (row: OwnedRow) =>
     accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
-  const afterTaxFor = (row: OwnedRow) =>
-    accountingLevel === null ? null : sellAfterTax(row, accountingLevel);
+  const brokerFor = (row: OwnedRow) =>
+    feeInputs === null ? null : sellBrokerFee(row, feeInputs.brokerRelationsLevel, standing);
+  const afterFeesFor = (row: OwnedRow) =>
+    feeInputs === null ? null : sellAfterFees(row, feeInputs);
 
   // The optional columns' catalog, keyed by `AppraisalColumnId` so the
   // `ColumnPickerMenu` below and the push loop past it share one definition.
@@ -315,20 +328,28 @@ export function useAppraisalColumns({
       render: (row) => totalCell(taxFor(row)),
       sortValue: (row) => taxFor(row) ?? undefined,
     },
-    sellAfterTax: {
-      id: 'sellAfterTax',
-      header: t('market.appraisal.columnSellAfterTax'),
+    brokerFee: {
+      id: 'brokerFee',
+      header: t('market.appraisal.columnBrokerFee'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => totalCell(brokerFor(row)),
+      sortValue: (row) => brokerFor(row) ?? undefined,
+    },
+    sellAfterFees: {
+      id: 'sellAfterFees',
+      header: t('market.appraisal.columnSellAfterFees'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(afterTaxFor(row)),
-      sortValue: (row) => afterTaxFor(row) ?? undefined,
+      render: (row) => totalCell(afterFeesFor(row)),
+      sortValue: (row) => afterFeesFor(row) ?? undefined,
     },
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(
     (id) =>
       (id !== 'refineTotal' || hasRefine) &&
       (id !== 'lpTotal' || hasLpOption) &&
-      (accountingLevel !== null || (id !== 'salesTax' && id !== 'sellAfterTax'))
+      (feeInputs !== null || (id !== 'salesTax' && id !== 'brokerFee' && id !== 'sellAfterFees'))
   );
   for (const id of availableColumns) {
     if (visibleColumns.includes(id)) columns.push(optionalColumnsById[id]);

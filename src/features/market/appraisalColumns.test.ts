@@ -15,10 +15,13 @@ describe('appraisal columns', () => {
     expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('splitEach');
   });
 
-  it('offers sales tax and the after-tax sell total, off until ticked', () => {
+  it('offers sales tax, broker fee and the after-fees sell total, off until ticked', () => {
     const ids = [...APPRAISAL_COLUMN_IDS];
-    expect(ids.indexOf('sellAfterTax')).toBe(ids.indexOf('salesTax') + 1);
+    expect(ids.indexOf('brokerFee')).toBe(ids.indexOf('salesTax') + 1);
+    expect(ids.indexOf('sellAfterFees')).toBe(ids.indexOf('brokerFee') + 1);
+    expect(ids).not.toContain('sellAfterTax');
     expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('salesTax');
-    expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('sellAfterTax');
+    expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('brokerFee');
+    expect(DEFAULT_VISIBLE_APPRAISAL_COLUMNS).not.toContain('sellAfterFees');
   });
 });
