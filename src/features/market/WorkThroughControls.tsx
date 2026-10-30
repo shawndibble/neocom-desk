@@ -7,6 +7,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import * as Icon from '@/components/ui/icons';
 import { Button, IskAmount, NeedsConnection, textActionClassName } from '@/components/ui';
 import { formatMarketIsk } from '@/lib/isk';
 import type { OpenOrderRow } from './openOrdersModel';
@@ -203,8 +204,9 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
 function SentMark() {
   const { t } = useTranslation();
   return (
-    <span className="text-xs text-success">
-      <span>{t('market.orders.workThrough.sent')}</span> <span aria-hidden="true">✓</span>
+    <span className="inline-flex items-center gap-1 text-xs text-success">
+      <span>{t('market.orders.workThrough.sent')}</span>
+      <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
     </span>
   );
 }

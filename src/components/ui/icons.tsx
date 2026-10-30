@@ -58,6 +58,7 @@ import { Check } from '@phosphor-icons/react/dist/csr/Check';
 import { CloudCheck } from '@phosphor-icons/react/dist/csr/CloudCheck';
 import { CloudWarning } from '@phosphor-icons/react/dist/csr/CloudWarning';
 import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
+import { CheckSquare } from '@phosphor-icons/react/dist/csr/CheckSquare';
 import { Clipboard } from '@phosphor-icons/react/dist/csr/Clipboard';
 import { ClockCounterClockwise } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
@@ -117,6 +118,7 @@ import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
+import { Square } from '@phosphor-icons/react/dist/csr/Square';
 import { SquaresFour } from '@phosphor-icons/react/dist/csr/SquaresFour';
 import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
 import { Plant } from '@phosphor-icons/react/dist/csr/Plant';
@@ -301,6 +303,10 @@ export const CopyToClipboard = withWeight(Copy);
 export const Share = withWeight(ShareNetwork);
 /** Confirms an action that leaves nothing on screen to look at, e.g. a copy that went to the clipboard. */
 export const Done = withWeight(Check);
+/** A ticked task-list box in static text (survey notes). Not a control: no checkbox semantics. */
+export const TaskDone = withWeight(CheckSquare);
+/** An unticked task-list box in static text (survey notes). Not a control: no checkbox semantics. */
+export const TaskOpen = withWeight(Square);
 /** Overflow menu. */
 export const More = withWeight(DotsThreeVertical);
 /** Send the plan queue to the clipboard or a CSV download (#224 icon-only toolbar). */
