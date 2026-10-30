@@ -1534,7 +1534,9 @@
           "safe": "Tank may go; each drop says what it gives up."
         },
         "spaceShort": { "dangerous": "dangerous", "safe": "safe" },
-        "summaryExplore": "Explore, {{space}}"
+        "summaryExplore": "Explore, {{space}}",
+        "noPropulsion": "No propulsion needed",
+        "noPropulsionHint": "A Makeover adds an afterburner, MWD or micro jump drive when the fit has none. Tick this for a fit that never moves, such as a bastioned Marauder."
       },
       "makeover": {
         "heading": "Makeover",
@@ -1544,6 +1546,7 @@
         "partTicked_other": "Makeover, {{ticked}} of {{count}} changes ticked",
         "rounds_one": "Found in {{count}} round.",
         "rounds_other": "Found in {{count}} rounds.",
+        "addsPropulsion": "{{job}}: adds propulsion",
         "wholeFit": "The figures are the whole Makeover, recalculated as one fit.",
         "figure": {
           "dps": "Total DPS",

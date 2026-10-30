@@ -39,6 +39,7 @@ import {
   useImproveHold,
   useImproveJob,
   useImproveJobByRole,
+  useImproveNoPropulsion,
   useImproveRigs,
   useImproveSpace,
   useImproveSpaceByRole,
@@ -143,6 +144,8 @@ export function useImproveDrawer({
   const setSpacesByRole = useImproveSpaceByRole((state) => state.setValue);
   const space = rememberedSpace(spacesByRole, legacySpace, role);
   const setSpace = (next: ExploreSpace) => setSpacesByRole({ ...spacesByRole, [role]: next });
+  const noPropulsion = useImproveNoPropulsion((state) => state.value);
+  const setNoPropulsion = useImproveNoPropulsion((state) => state.setValue);
   // Rigs are on until the pilot unticks them, and that choice is remembered on this device.
   const includeRigs = useImproveRigs((state) => state.value);
   const setIncludeRigs = useImproveRigs((state) => state.setValue);
@@ -210,6 +213,7 @@ export function useImproveDrawer({
     {
       job,
       space,
+      noPropulsion,
       reach,
       iskBudget,
       defense,
@@ -354,6 +358,8 @@ export function useImproveDrawer({
         onJobChange: (next) => void setJob(next),
         space,
         onSpaceChange: (next) => void setSpace(next),
+        noPropulsion,
+        onNoPropulsionChange: (next) => void setNoPropulsion(next),
         reach,
         onReachChange: (next) => void setReach(next),
         sort,

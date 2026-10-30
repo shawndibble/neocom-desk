@@ -5,8 +5,11 @@ import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import {
   findMakeover,
   makeoverMoves,
+  propulsionStart,
+  type MakeoverMoveOptions,
   type MakeoverSearch,
 } from '@/engine/fittings/improveMakeover';
+import type { JobCommonality } from '@/engine/fittings/hullCommonality';
 import { damageOf, scoreOf, type ImproveGoal } from '@/engine/fittings/improve';
 import { jobSettingOf, type ExploreSpace, type ImproveJob } from '@/engine/fittings/improveJob';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
@@ -87,34 +90,39 @@ async function loadWorld() {
     computeFittingStats(fitting, pilot, undefined, undefined, { overheated: false });
   const search = async (
     fitting: Fitting,
-    job?: { job: ImproveJob; space?: ExploreSpace },
-    goal: ImproveGoal = 'overall'
+    job?: { job: ImproveJob; space?: ExploreSpace; noPropulsion?: boolean },
+    goal: ImproveGoal = 'overall',
+    commonality?: JobCommonality | null
   ): Promise<{ before: FittingStats; result: MakeoverSearch | null }> => {
     const before = await stats(fitting);
+    const jobSetting = job ? jobSettingOf(job.job, job.space, job.noPropulsion) : undefined;
+    const options: MakeoverMoveOptions = {
+      goal,
+      defense: 'keep',
+      includeRigs: true,
+      ...(jobSetting ? { jobSetting } : {}),
+      commonality,
+      slotCounts: before.slotCounts,
+      pool: {
+        groupOf: (typeId) => types[String(typeId)]?.groupID,
+        typeIdsInGroup: (group) => typeIdsByGroup.get(group) ?? [],
+        published: (typeId) => listed.has(typeId),
+        nameOf: (typeId) => types[String(typeId)]?.name,
+        flyable: (slot, typeId) => {
+          const check = engine
+            .checkCandidates(fitting.shipTypeId, slot as CandidateRack, [typeId], pilot)
+            .get(typeId);
+          return check ? check.fitsHull && check.canFly : true;
+        },
+      },
+    };
     const result = await findMakeover({
       fitting,
       before,
       goal,
-      ...(job ? { jobSetting: jobSettingOf(job.job, job.space) } : {}),
-      moves: (current) =>
-        makeoverMoves(current.modules, index, rackOf, {
-          goal,
-          defense: 'keep',
-          includeRigs: true,
-          ...(job ? { jobSetting: jobSettingOf(job.job, job.space) } : {}),
-          slotCounts: before.slotCounts,
-          pool: {
-            groupOf: (typeId) => types[String(typeId)]?.groupID,
-            typeIdsInGroup: (group) => typeIdsByGroup.get(group) ?? [],
-            published: (typeId) => listed.has(typeId),
-            flyable: (slot, typeId) => {
-              const check = engine
-                .checkCandidates(fitting.shipTypeId, slot as CandidateRack, [typeId], pilot)
-                .get(typeId);
-              return check ? check.fitsHull && check.canFly : true;
-            },
-          },
-        }),
+      ...(jobSetting ? { jobSetting } : {}),
+      moves: (current) => makeoverMoves(current.modules, index, rackOf, options),
+      propulsion: propulsionStart(index, rackOf, options),
       stats,
       priceOf: () => null,
     });
@@ -153,11 +161,27 @@ function drakeFit(id: (name: string) => number): Fitting {
   } as unknown as Fitting;
 }
 
+/** The Drake's PvE commonality from the Workbench fixture (`hullCommonality.realData.test.ts`): 14 fits, 6 afterburner, 5 MWD. */
+const DRAKE_PVE: JobCommonality = {
+  fits: 14,
+  groupShare: new Map(),
+  propulsion: { afterburner: 6 / 14, mwd: 5 / 14, mjd: 0 },
+};
+/** The Dominix's: 14 PvE fits, 10 with a micro jump drive, 5 afterburner, 3 MWD. */
+const DOMINIX_PVE: JobCommonality = {
+  fits: 14,
+  groupShare: new Map(),
+  propulsion: { afterburner: 5 / 14, mwd: 3 / 14, mjd: 10 / 14 },
+};
+const PROPULSION_GROUPS = [46, 1189];
+
 describe('Improve makeover on a PvE Drake (real WASM + real pinned SDE)', () => {
   let types: TypeMap;
   let search: MakeoverSearch | null;
   let pveBefore: FittingStats;
   let pveSearch: MakeoverSearch | null;
+  let pveCommon: MakeoverSearch | null;
+  let optOut: MakeoverSearch | null;
 
   beforeAll(async () => {
     const world = await loadWorld();
@@ -165,7 +189,9 @@ describe('Improve makeover on a PvE Drake (real WASM + real pinned SDE)', () => 
     const drake = drakeFit(world.id);
     ({ result: search } = await world.search(drake));
     ({ before: pveBefore, result: pveSearch } = await world.search(drake, { job: 'pve' }));
-  }, 90_000);
+    ({ result: pveCommon } = await world.search(drake, { job: 'pve' }, 'overall', DRAKE_PVE));
+    ({ result: optOut } = await world.search(drake, { job: 'pve', noPropulsion: true }));
+  }, 120_000);
   afterAll(() => vi.unstubAllGlobals());
 
   const named = (found: MakeoverSearch | null, rack: FittingSlotKind) =>
@@ -203,6 +229,31 @@ describe('Improve makeover on a PvE Drake (real WASM + real pinned SDE)', () => 
       expect(makeover).toBeTruthy();
       const was = damageOf(pveBefore, undefined);
       expect(damageOf(makeover!.after, undefined)).toBeGreaterThanOrEqual(was * 0.9);
+    });
+
+    const propulsionOf = (found: MakeoverSearch | null) =>
+      (found?.makeover?.fitting.modules ?? [])
+        .filter((m) => PROPULSION_GROUPS.includes(types[String(m.typeId)].groupID))
+        .map((m) => types[String(m.typeId)].name);
+
+    it('adds a propulsion module, by score without data on the hull, and says why', () => {
+      const names = propulsionOf(pveSearch);
+      expect(names).toHaveLength(1);
+      expect(names[0]).toMatch(/Afterburner|Microwarpdrive/);
+      expect(pveSearch?.makeover?.rows.some((row) => row.addsPropulsionFor === 'pve')).toBe(true);
+    });
+
+    it('with the Drake commonality (mostly afterburners) adds an afterburner and keeps damage within 10%', () => {
+      const names = propulsionOf(pveCommon);
+      expect(names).toHaveLength(1);
+      expect(names[0]).toMatch(/Afterburner/);
+      expect(damageOf(pveCommon!.makeover!.after, undefined)).toBeGreaterThanOrEqual(
+        damageOf(pveBefore, undefined) * 0.9
+      );
+    });
+
+    it('with the opt-out adds none', () => {
+      expect(propulsionOf(optOut)).toEqual([]);
     });
 
     it('still fits a Damage Control, at least two shield hardeners and the Extender rigs', () => {
@@ -268,6 +319,17 @@ describe('Improve makeover on an Explore Astero (real WASM + real pinned SDE)', 
   /** The fit the search ends on; the open fit when it finds no Makeover. */
   const namesOf = (found: MakeoverSearch | null) =>
     (found?.makeover?.fitting ?? astero).modules.map((m) => types[String(m.typeId)].name);
+
+  it.each([
+    ['Dangerous', () => dangerous],
+    ['Safe', () => safe],
+  ])('%s keeps an MWD, never an afterburner', (_space, found) => {
+    const names = (found()?.makeover?.fitting ?? astero).modules
+      .filter((m) => types[String(m.typeId)].groupID === 46)
+      .map((m) => types[String(m.typeId)].name);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/Microwarpdrive/);
+  });
 
   it('Dangerous keeps Small Armor Repairer II and Damage Control II', () => {
     expect(namesOf(dangerous)).toEqual(expect.arrayContaining(TANK));
@@ -335,5 +397,82 @@ describe('Explore score on the Astero rigs (real WASM + real pinned SDE)', () =>
       scoreWith('Small Polycarbon Engine Housing II', low),
     ];
     expect(memetic).toBeGreaterThan(polycarbon);
+  });
+});
+
+/** A sentry Dominix with no propulsion: the #5548 review's drone boat without its micro jump drive. */
+const DOMINIX = {
+  low: [
+    'Large Armor Repairer II',
+    'Multispectrum Energized Membrane II',
+    'Reactive Armor Hardener',
+    'Damage Control II',
+    'Drone Damage Amplifier II',
+    'Drone Damage Amplifier II',
+    'Drone Damage Amplifier II',
+  ],
+  medium: [
+    'Omnidirectional Tracking Link II',
+    'Omnidirectional Tracking Link II',
+    'Sensor Booster II',
+    'Cap Recharger II',
+    'Cap Recharger II',
+  ],
+  high: [
+    'Drone Link Augmentor II',
+    'Drone Link Augmentor II',
+    'Drone Link Augmentor II',
+    'Drone Link Augmentor II',
+  ],
+  rig: [
+    'Large Auxiliary Nano Pump I',
+    'Large Auxiliary Nano Pump I',
+    'Large Processor Overclocking Unit I',
+  ],
+};
+
+describe('Improve makeover on a PvE Dominix without propulsion (real WASM + real pinned SDE)', () => {
+  let types: TypeMap;
+  let plain: MakeoverSearch | null;
+  let common: MakeoverSearch | null;
+  let optOut: MakeoverSearch | null;
+  let pvp: MakeoverSearch | null;
+
+  beforeAll(async () => {
+    const world = await loadWorld();
+    types = world.types;
+    const dominix = {
+      name: 'Sentry Dominix',
+      shipTypeId: world.id('Dominix'),
+      modules: Object.entries(DOMINIX).flatMap(([slot, names]) =>
+        names.map((name, i) => fitModule(world.id, slot as FittingSlotKind, i, name))
+      ),
+      drones: [{ typeId: world.id('Garde II'), quantity: 5, state: 'active' }],
+      cargo: [],
+    } as unknown as Fitting;
+    plain = (await world.search(dominix, { job: 'pve' })).result;
+    common = (await world.search(dominix, { job: 'pve' }, 'overall', DOMINIX_PVE)).result;
+    optOut = (await world.search(dominix, { job: 'pve', noPropulsion: true })).result;
+    pvp = (await world.search(dominix, { job: 'pvp' })).result;
+  }, 150_000);
+
+  const propulsionOf = (found: MakeoverSearch | null) =>
+    (found?.makeover?.fitting.modules ?? [])
+      .filter((m) => PROPULSION_GROUPS.includes(types[String(m.typeId)].groupID))
+      .map((m) => types[String(m.typeId)].name);
+
+  it('adds a Large Micro Jump Drive: by the battleship rule, and as the hull fits mostly carry', () => {
+    expect(propulsionOf(plain)).toEqual(['Large Micro Jump Drive']);
+    expect(propulsionOf(common)).toEqual(['Large Micro Jump Drive']);
+  });
+
+  it('adds none with the opt-out, and none under PvP', () => {
+    expect(propulsionOf(optOut)).toEqual([]);
+    expect(propulsionOf(pvp)).toEqual([]);
+  });
+
+  it('never removes the micro jump drive it added, nor turns it into an afterburner', () => {
+    const fit = plain?.makeover?.fitting;
+    expect(fit?.modules.filter((m) => types[String(m.typeId)].groupID === 46)).toEqual([]);
   });
 });

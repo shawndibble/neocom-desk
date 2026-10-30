@@ -11,6 +11,31 @@ describe('ImproveJobChoice', () => {
     expect(screen.queryByRole('radio')).toBeNull();
   });
 
+  it('offers the no-propulsion opt-out under PvE only, off until ticked', async () => {
+    const onNoPropulsionChange = vi.fn();
+    const { rerender } = render(
+      <ImproveJobChoice
+        job="pve"
+        onJobChange={vi.fn()}
+        onSpaceChange={vi.fn()}
+        onNoPropulsionChange={onNoPropulsionChange}
+      />
+    );
+    const box = screen.getByRole('checkbox', { name: /No propulsion needed/ });
+    expect(box).not.toBeChecked();
+    await userEvent.click(box);
+    expect(onNoPropulsionChange).toHaveBeenCalledWith(true);
+    rerender(
+      <ImproveJobChoice
+        job="pvp"
+        onJobChange={vi.fn()}
+        onSpaceChange={vi.fn()}
+        onNoPropulsionChange={onNoPropulsionChange}
+      />
+    );
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
   it('defaults Explore to Dangerous, listed first', () => {
     render(<ImproveJobChoice job="explore" onJobChange={vi.fn()} onSpaceChange={vi.fn()} />);
     const radios = screen.getAllByRole('radio');

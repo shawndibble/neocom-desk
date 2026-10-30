@@ -6,6 +6,7 @@ import {
   useImproveJobByRole,
   useImproveReach,
   useImproveRigs,
+  useImproveNoPropulsion,
   useImproveSettingsHydrated,
   useImproveSpace,
   useImproveSpaceByRole,
@@ -19,6 +20,7 @@ beforeEach(async () => {
   useImproveJobByRole.setState({ value: {}, hydrated: false });
   useImproveSpaceByRole.setState({ value: {}, hydrated: false });
   useImproveRigs.setState({ value: true, hydrated: false });
+  useImproveNoPropulsion.setState({ value: false, hydrated: false });
   useImproveReach.setState({ value: 'upgrade', hydrated: false });
 });
 
@@ -36,6 +38,14 @@ describe('useImproveSettingsHydrated', () => {
     expect(useImproveSpace.getState().value).toBe('safe');
     expect(useImproveRigs.getState().value).toBe(false);
     expect(useImproveReach.getState().value).toBe('rework');
+  });
+
+  it('reads the PvE no-propulsion opt-out back after a reload, off by default', async () => {
+    expect(useImproveNoPropulsion.getState().value).toBe(false);
+    await db.settings.put({ key: 'fittingsImproveNoPropulsion', value: true });
+    const { result } = renderHook(() => useImproveSettingsHydrated());
+    await waitFor(() => expect(result.current).toBe(true));
+    expect(useImproveNoPropulsion.getState().value).toBe(true);
   });
 
   it('reads the Job and space remembered per hull role back after a reload', async () => {

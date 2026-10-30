@@ -16,7 +16,9 @@ import {
   JOB_WEIGHTS,
   dropLimitsOf,
   firstLimitBreach,
+  JOB_NEEDS,
   jobSettingOf,
+  propulsionNeedOf,
   overallWeightsOf,
   unguardedJobs,
 } from './improveJob';
@@ -86,6 +88,25 @@ describe('the Improve Job tables', () => {
     expect(unguardedJobs('overall', 'pvp')).toEqual(['cap']);
     expect(unguardedJobs('overall')).toEqual(['cap']);
     expect(unguardedJobs('explore', 'explore')).toEqual([]);
+  });
+});
+
+describe('what a job needs of the fit (#5578)', () => {
+  it('PvE needs any propulsion, Explore an MWD, PvP nothing', () => {
+    expect(JOB_NEEDS).toEqual({
+      pve: { propulsion: 'any' },
+      pvp: { propulsion: null },
+      explore: { propulsion: 'mwd' },
+    });
+    expect(propulsionNeedOf(jobSettingOf('pve'))).toBe('any');
+    expect(propulsionNeedOf(jobSettingOf('explore'))).toBe('mwd');
+    expect(propulsionNeedOf(jobSettingOf('pvp'))).toBeNull();
+    expect(propulsionNeedOf(undefined)).toBeNull();
+  });
+
+  it('the PvE opt-out drops the need; Explore ignores it', () => {
+    expect(propulsionNeedOf(jobSettingOf('pve', 'dangerous', true))).toBeNull();
+    expect(propulsionNeedOf(jobSettingOf('explore', 'dangerous', true))).toBe('mwd');
   });
 });
 

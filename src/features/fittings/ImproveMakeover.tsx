@@ -250,6 +250,13 @@ export function ImproveMakeover({
                               })}
                             </span>
                           )}
+                          {row.addsPropulsionFor && (
+                            <span className="text-text-dim block text-xs">
+                              {t('fittings.improve.makeover.addsPropulsion', {
+                                job: t(`fittings.improve.job.${row.addsPropulsionFor}`),
+                              })}
+                            </span>
+                          )}
                           {hint && <span className="text-text-dim block text-xs">{hint}</span>}
                           {cost !== null && (
                             <span className="block text-xs">

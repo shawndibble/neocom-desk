@@ -107,12 +107,36 @@ export interface JobSetting {
   job: ImproveJob;
   /** Only Explore reads it. */
   space: ExploreSpace;
+  /** PvE only: the pilot needs no propulsion module (a bastioned Marauder), so none is added. Absent: false. */
+  noPropulsion?: boolean;
 }
 
 export const jobSettingOf = (
   job: ImproveJob,
-  space: ExploreSpace = DEFAULT_EXPLORE_SPACE
-): JobSetting => ({ job, space });
+  space: ExploreSpace = DEFAULT_EXPLORE_SPACE,
+  noPropulsion = false
+): JobSetting => ({ job, space, ...(noPropulsion ? { noPropulsion } : {}) });
+
+/**
+ * What a job needs of the fit (issue #5578, scope decision
+ * `20261029-193005-job-needs-pve-needs-propulsion-explore-needs-an`): a functional need, never a
+ * weight. PvE needs a propulsion module (an afterburner, an MWD or a micro
+ * jump drive); Explore needs an MWD (cloak + MWD); PvP needs nothing extra,
+ * since fleets split roles. The kind a missing one is added as comes from the
+ * hull's community fits, else `propulsionTiers`.
+ */
+export type PropulsionNeed = 'any' | 'mwd';
+export const JOB_NEEDS: Record<ImproveJob, { propulsion: PropulsionNeed | null }> = {
+  pve: { propulsion: 'any' },
+  pvp: { propulsion: null },
+  explore: { propulsion: 'mwd' },
+};
+
+/** The propulsion `setting` needs of the fit; null for none, and for PvE once the pilot opted out. */
+export function propulsionNeedOf(setting: JobSetting | undefined): PropulsionNeed | null {
+  if (!setting || (setting.job === 'pve' && setting.noPropulsion)) return null;
+  return JOB_NEEDS[setting.job].propulsion;
+}
 
 /** Whether tank modules stay tank modules: Explore in dangerous space, whatever the score says of a lost repairer. */
 export const holdsTankModules = (setting: JobSetting | undefined): boolean =>

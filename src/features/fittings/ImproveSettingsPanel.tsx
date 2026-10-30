@@ -94,6 +94,8 @@ export function ImproveSettingsPanel({
               onJobChange={settings.onJobChange}
               space={settings.space}
               onSpaceChange={(space) => settings.onSpaceChange?.(space)}
+              noPropulsion={settings.noPropulsion}
+              onNoPropulsionChange={settings.onNoPropulsionChange}
             />
           )}
           <p className="text-text-dim text-xs">

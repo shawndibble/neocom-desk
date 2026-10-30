@@ -10,6 +10,9 @@ export interface ImproveSettings {
   /** Explore only; Dangerous when absent. */
   space?: ExploreSpace;
   onSpaceChange?: (space: ExploreSpace) => void;
+  /** PvE only: the Makeover adds no propulsion module. */
+  noPropulsion?: boolean;
+  onNoPropulsionChange?: (on: boolean) => void;
   reach: ImproveReach;
   onReachChange: (reach: ImproveReach) => void;
   /** How each section's rows are ordered. */

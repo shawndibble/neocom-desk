@@ -11,6 +11,7 @@ export function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluat
     groupOf: (typeId) => catalogue.types[String(typeId)]?.groupID,
     typeIdsInGroup: (groupId) => catalogue.typeIdsByGroup.get(groupId) ?? [],
     published: (typeId) => listed.has(typeId),
+    nameOf: (typeId) => catalogue.types[String(typeId)]?.name,
     // A fitted module the pilot lacks skills for is replaced; its hull fit is not asked again.
     pilotCanFly: (slot, typeId) => {
       const key = `${slot}:${typeId}`;

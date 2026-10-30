@@ -12,7 +12,15 @@
  * Pure: no DOM, fetch or Dexie.
  */
 import type { VariationIndex } from '../market/variations';
-import { withinTie, type JobCommonality } from './hullCommonality';
+import {
+  commonPropulsionKind,
+  MICRO_JUMP_DRIVE_GROUP,
+  propulsionKindOf,
+  PROPULSION_GROUP,
+  withinTie,
+  type JobCommonality,
+  type PropulsionKind,
+} from './hullCommonality';
 import {
   applyImproveCandidate,
   brokenGuardrail,
@@ -31,7 +39,8 @@ import {
   type ModulePool,
 } from './improve';
 import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
-import type { JobSetting } from './improveJob';
+import { jobOf } from './improveGroups';
+import { propulsionNeedOf, type JobSetting } from './improveJob';
 import { coveringFreed, freedBy, overrunBy } from './improvePairSeed';
 import type { Resource } from './makeItFit';
 import { newRuleBreaks } from './ruleBreaks';
@@ -54,6 +63,40 @@ export interface MakeoverMoveOptions {
   pool: ModulePool;
   /** The hull's slots per rack, to find the empty ones; absent: no fills. */
   slotCounts?: Readonly<Record<FittingSlotKind, number>>;
+}
+
+/**
+ * The members of a group the Makeover offers for a rack, one tier per group: the Tech II the hull takes
+ * and the pilot flies, else its Tech I (rigs: both, for calibration). A type outside the variation index
+ * has no variations: it is its group's Tech I.
+ */
+function tierRepresentatives(
+  index: VariationIndex,
+  rackOf: Readonly<Record<string, string>>,
+  pool: ModulePool
+): (group: number, slot: FittingSlotKind) => readonly number[] {
+  const metaOf = (typeId: number) => index.types[typeId]?.metaGroupId ?? TECH_I;
+  const tiers = new Map<string, readonly number[]>();
+  return (group, slot) => {
+    const key = `${group}:${slot}`;
+    let found = tiers.get(key);
+    if (!found) {
+      const members = pool
+        .typeIdsInGroup(group)
+        .filter(
+          (typeId) =>
+            rackOf[String(typeId)] === slot &&
+            pool.published(typeId) &&
+            (pool.flyable?.(slot, typeId) ?? true)
+        );
+      const techTwo = members.filter((typeId) => metaOf(typeId) === TECH_II);
+      const techOne = members.filter((typeId) => metaOf(typeId) === TECH_I);
+      // A rig's Tech II often needs more calibration than the hull has left, so its Tech I is offered too.
+      found = techTwo.length === 0 ? techOne : slot === 'rig' ? [...techTwo, ...techOne] : techTwo;
+      tiers.set(key, found);
+    }
+    return found;
+  };
 }
 
 /**
@@ -84,33 +127,11 @@ export function makeoverMoves(
     includeRigs,
     jobSetting,
     commonality,
+    nameOf: pool.nameOf,
   });
   const groupOf = pool.groupOf;
 
-  // A type outside the variation index has no variations: it is its group's Tech I.
-  const metaOf = (typeId: number) => index.types[typeId]?.metaGroupId ?? TECH_I;
-  const tiers = new Map<string, readonly number[]>();
-  /** The group's Tech II members for the rack the hull takes and the pilot flies, else its Tech I. */
-  const representatives = (group: number, slot: FittingSlotKind): readonly number[] => {
-    const key = `${group}:${slot}`;
-    let found = tiers.get(key);
-    if (!found) {
-      const members = pool
-        .typeIdsInGroup(group)
-        .filter(
-          (typeId) =>
-            rackOf[String(typeId)] === slot &&
-            pool.published(typeId) &&
-            (pool.flyable?.(slot, typeId) ?? true)
-        );
-      const techTwo = members.filter((typeId) => metaOf(typeId) === TECH_II);
-      const techOne = members.filter((typeId) => metaOf(typeId) === TECH_I);
-      // A rig's Tech II often needs more calibration than the hull has left, so its Tech I is offered too.
-      found = techTwo.length === 0 ? techOne : slot === 'rig' ? [...techTwo, ...techOne] : techTwo;
-      tiers.set(key, found);
-    }
-    return found;
-  };
+  const representatives = tierRepresentatives(index, rackOf, pool);
 
   /** Whether `group` may take a slot whose module (of `fromGroup`, or none) leaves. */
   const allowed = (group: number, fromGroup: number | undefined) =>
@@ -130,7 +151,7 @@ export function makeoverMoves(
       for (const group of groups) {
         if (filter.losesJob(group, from, 1) || !allowed(group, from)) continue;
         for (const toTypeId of representatives(group, slot)) {
-          if (offered.has(toTypeId)) continue;
+          if (offered.has(toTypeId) || filter.kindBlocks(toTypeId, fromTypeId)) continue;
           offered.add(toTypeId);
           into.push({ fromTypeId, toTypeId, at: [{ slot, slotIndex }] });
         }
@@ -171,6 +192,126 @@ export function makeoverMoves(
   }
   moves.push(...added);
   return moves;
+}
+
+/** The propulsion Makeover's forced first step reads: its tiers of moves on a fit, and which types are propulsion. */
+export interface PropulsionStart {
+  /**
+   * The moves that add a propulsion module to `fitting`, in tiers of preference (the first tier
+   * with a move that passes the Guardrails wins); none when the fit already has one.
+   */
+  tiers: (fitting: Fitting) => ImproveCandidate[][];
+  /** Whether the type is a propulsion module (any kind). */
+  isPropulsion: (typeId: number) => boolean;
+  /** The Improve Job whose need it answers, for the row's reason. */
+  job: NonNullable<JobSetting['job']>;
+}
+
+/**
+ * The kinds to add when a fit has no propulsion, in tiers of preference (issue #5578).
+ * Explore needs an MWD. PvE takes the kind most of the hull's fits for the job carry
+ * (`commonPropulsionKind`: the group, never a variant; the score picks the module); with too
+ * little data, a hull that can fit a Large Micro Jump Drive gets one (the engine has no figure
+ * for a jump), and any other an afterburner or MWD by score. Where the preferred kind cannot be
+ * added, the rules' kinds follow. Empty when the job needs none.
+ */
+export function propulsionTiers(
+  jobSetting: JobSetting | undefined,
+  commonality: JobCommonality | null | undefined,
+  canFitLargeMjd: boolean
+): PropulsionKind[][] {
+  const need = propulsionNeedOf(jobSetting);
+  if (need === null) return [];
+  if (need === 'mwd') return [['mwd']];
+  const rules: PropulsionKind[][] = canFitLargeMjd
+    ? [['mjd'], ['afterburner', 'mwd']]
+    : [['afterburner', 'mwd']];
+  const common = commonPropulsionKind(commonality);
+  return common ? [[common], ...rules] : rules;
+}
+
+/**
+ * The forced propulsion step of a Makeover for the job and fit, or null when the job needs none.
+ * Its moves put a propulsion module in the medium rack: in place of each distinct module (one copy
+ * stands for identical copies) the shared filters allow, and in the first empty slot. The search
+ * takes the passing move that costs the least score.
+ */
+export function propulsionStart(
+  index: VariationIndex,
+  rackOf: Readonly<Record<string, string>>,
+  { goal, defense, includeRigs, pool, slotCounts, jobSetting, commonality }: MakeoverMoveOptions
+): PropulsionStart | null {
+  if (propulsionNeedOf(jobSetting) === null || !jobSetting) return null;
+  const nameOf = pool.nameOf;
+  const kindOf = (typeId: number) => propulsionKindOf(pool.groupOf(typeId), nameOf?.(typeId));
+  const largeMjd = pool
+    .typeIdsInGroup(MICRO_JUMP_DRIVE_GROUP)
+    .some(
+      (typeId) =>
+        /^large\b/i.test(nameOf?.(typeId) ?? '') &&
+        pool.published(typeId) &&
+        (pool.flyable?.('medium', typeId) ?? true)
+    );
+  const kindTiers = propulsionTiers(jobSetting, commonality, largeMjd);
+  const representatives = tierRepresentatives(index, rackOf, pool);
+  return {
+    job: jobSetting.job,
+    isPropulsion: (typeId) => jobOf(pool.groupOf(typeId)) === 'propulsion',
+    tiers: (fitting) => {
+      if (fitting.modules.some((m) => jobOf(pool.groupOf(m.typeId)) === 'propulsion')) return [];
+      const filter = candidateFilter(fitting.modules, pool.groupOf, {
+        goal,
+        defense,
+        includeRigs,
+        jobSetting,
+        commonality,
+        nameOf,
+      });
+      const mids = [...fitting.modules]
+        .filter((m) => m.slot === 'medium')
+        .sort((a, b) => a.slotIndex - b.slotIndex);
+      const free = slotCounts ? filter.firstFreeSlot('medium', slotCounts) : null;
+      return kindTiers.map((kinds) => {
+        const targets = [
+          ...(kinds.some((kind) => kind === 'afterburner' || kind === 'mwd')
+            ? representatives(PROPULSION_GROUP, 'medium')
+            : []),
+          ...(kinds.includes('mjd') ? representatives(MICRO_JUMP_DRIVE_GROUP, 'medium') : []),
+        ].filter((typeId) => kinds.includes(kindOf(typeId) ?? 'afterburner'));
+        const moves: ImproveCandidate[] = [];
+        const seen = new Set<number>();
+        for (const module of mids) {
+          if (seen.has(module.typeId)) continue;
+          seen.add(module.typeId);
+          const from = pool.groupOf(module.typeId);
+          for (const toTypeId of targets) {
+            const to = pool.groupOf(toTypeId);
+            if (
+              filter.losesJob(to, from, 1) ||
+              filter.tankBlocks(to, from) ||
+              filter.uniqueBlocks(to, from, 1)
+            )
+              continue;
+            moves.push({
+              fromTypeId: module.typeId,
+              toTypeId,
+              at: [{ slot: 'medium', slotIndex: module.slotIndex }],
+              addsPropulsionFor: jobSetting.job,
+            });
+          }
+        }
+        if (free !== null)
+          for (const toTypeId of targets)
+            moves.push({
+              fromTypeId: null,
+              toTypeId,
+              at: [{ slot: 'medium', slotIndex: free }],
+              addsPropulsionFor: jobSetting.job,
+            });
+        return moves;
+      });
+    },
+  };
 }
 
 /**
@@ -247,6 +388,14 @@ export interface FindMakeoverParams {
    * never part of a score. Absent: the larger gain wins, as before.
    */
   targetShare?: (move: ImproveCandidate) => number;
+  /**
+   * The propulsion the job needs (#5578), added as a forced first step: when the open fit has
+   * none, the passing move that costs the least score is applied before the search starts, and
+   * the search then works round it (the last propulsion module is guarded like any job's).
+   * A constraint on the finished fit would have the greedy spend the slot first and then undo
+   * its work to make room. Absent, or no move passes: no propulsion is forced.
+   */
+  propulsion?: PropulsionStart | null;
   onProgress?: (calcs: number, max: number) => void;
   isCancelled?: () => boolean;
   shouldStop?: () => boolean;
@@ -329,6 +478,7 @@ export async function findMakeover({
   lazy = true,
   pairKick = true,
   targetShare,
+  propulsion,
   onProgress,
   isCancelled,
   shouldStop,
@@ -570,7 +720,29 @@ export async function findMakeover({
     steps++;
   }
 
+  /** The forced propulsion step: the best passing move of the first tier that has one. */
+  async function addPropulsion() {
+    for (const tier of propulsion?.tiers(fitting) ?? []) {
+      pending.clear();
+      await evaluate(
+        tier,
+        () => false,
+        (trial) => {
+          if (trial?.ok) pending.offer(trial);
+        }
+      );
+      const best = pending.get();
+      if (best) {
+        applyStep(best);
+        forced = best.move.at[0];
+        return;
+      }
+    }
+  }
+  let forced: { slot: FittingSlotKind; slotIndex: number } | null = null;
+
   try {
+    await addPropulsion();
     for (let first = true; ; first = false) {
       const { best, overran } = await round(first);
       if (best && gainOf(best) > minGain) {
@@ -595,6 +767,16 @@ export async function findMakeover({
 
   if (steps === 0) return { makeover: null, calcs, stopped };
   const rows = rowsBetween(original, fitting);
+  // The row that holds the forced module says why it is there, whatever the search made of it since.
+  const forcedRow =
+    propulsion && forced
+      ? rows.find(
+          (row) =>
+            propulsion.isPropulsion(row.toTypeId) &&
+            row.at.some((at) => at.slot === forced!.slot && at.slotIndex === forced!.slotIndex)
+        )
+      : undefined;
+  if (forcedRow && propulsion) forcedRow.addsPropulsionFor = propulsion.job;
   if (rows.length < 2) return { makeover: null, calcs, stopped };
   // The figures shown are one recalculation of the rows, never the path's last step.
   const remade = rows.reduce(applyImproveCandidate, original);

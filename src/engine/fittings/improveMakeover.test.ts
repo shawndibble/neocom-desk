@@ -9,9 +9,12 @@ import {
   findMakeover,
   makeoverBar,
   makeoverMoves,
+  propulsionStart,
+  propulsionTiers,
   rowsBetween,
   type MakeoverMoveOptions,
 } from './improveMakeover';
+import { jobSettingOf } from './improveJob';
 import type { JobCommonality } from './hullCommonality';
 import { buildVariationIndex } from '../market/variations';
 import type { Fitting, FittingSlotKind, FittingStats } from './types';
@@ -26,6 +29,7 @@ interface Type {
   ehp?: number;
   cpu?: number;
   capUnstable?: boolean;
+  name?: string;
 }
 const TYPES: Record<number, Type> = {
   1: { group: 38, rack: 'medium', meta: 1, ehp: 100, cpu: 10 },
@@ -60,6 +64,7 @@ function catalogue(types: Record<number, Type>) {
       groupOf: (id) => types[id]?.group,
       typeIdsInGroup: (group) => ids.filter((id) => types[id].group === group),
       published: () => true,
+      nameOf: (id) => types[id]?.name,
     },
     ...extra,
   });
@@ -579,6 +584,190 @@ describe('hull commonality (#5581)', () => {
 
     it('keeps the larger gain when it is more than 1% ahead', async () => {
       expect(await run(43, prefers41)).toContain('40>43@l0');
+    });
+  });
+});
+
+describe('the propulsion a job needs (#5578)', () => {
+  // 1 extender and 2 hardener (mediums), 11 and 10 the lows (a Damage Control gain keeps the Makeover over one row),
+  // 20 an afterburner, 21 an MWD, 22 a Large and 23 a Medium Micro Jump Drive.
+  const types: Record<number, Type> = {
+    1: { group: 38, rack: 'medium', meta: 2, ehp: 150 },
+    2: { group: 77, rack: 'medium', meta: 2, ehp: 120 },
+    10: { group: 60, rack: 'low', meta: 2, ehp: 200 },
+    11: { group: 57, rack: 'low', meta: 2, ehp: 20 },
+    20: { group: 46, rack: 'medium', meta: 2, ehp: 0, name: '10MN Afterburner II' },
+    21: { group: 46, rack: 'medium', meta: 2, ehp: 0, name: '50MN Microwarpdrive II' },
+    22: { group: 1189, rack: 'medium', meta: 1, ehp: 0, name: 'Large Micro Jump Drive' },
+    23: { group: 1189, rack: 'medium', meta: 1, ehp: 0, name: 'Medium Micro Jump Drive' },
+  };
+  const noProp = () =>
+    fit([
+      ['medium', 0, 2],
+      ['medium', 1, 1],
+      ['low', 0, 11],
+      ['low', 1, 11],
+    ]);
+  const common = (propulsion: Partial<JobCommonality['propulsion']>): JobCommonality => ({
+    fits: 20,
+    groupShare: new Map(),
+    propulsion: { afterburner: 0, mwd: 0, mjd: 0, ...propulsion },
+  });
+
+  /** A Makeover of `fitting` under the job, with the propulsion the job needs. */
+  async function run(
+    fitting: Fitting,
+    extra: Partial<MakeoverMoveOptions> = {},
+    // A cruiser: no Large Micro Jump Drive.
+    flyable: (slot: FittingSlotKind, typeId: number) => boolean = (_slot, typeId) => typeId !== 22
+  ) {
+    const { index, rackOf, options } = catalogue(types);
+    const base = options(extra);
+    const opts: MakeoverMoveOptions = {
+      ...base,
+      pool: { ...base.pool, flyable },
+    };
+    const { result } = await search(
+      fitting,
+      {
+        jobSetting: opts.jobSetting,
+        moves: (f) => makeoverMoves(f.modules, index, rackOf, opts),
+        propulsion: propulsionStart(index, rackOf, opts),
+        bestSingle: 0,
+      },
+      types,
+      {}
+    );
+    return result?.makeover?.rows ?? [];
+  }
+
+  it('PvE adds a propulsion module in the slot that costs the least score, and the row says why', async () => {
+    const rows = await run(noProp(), { jobSetting: jobSettingOf('pve') });
+    const added = rows.find((row) => row.addsPropulsionFor);
+    expect(added && label(added)).toBe('2>20@m0');
+    expect(added?.addsPropulsionFor).toBe('pve');
+  });
+
+  it('fills a free medium slot before it costs a module', async () => {
+    const rows = await run(
+      fit([
+        ['medium', 0, 2],
+        ['low', 0, 11],
+        ['low', 1, 11],
+      ]),
+      { jobSetting: jobSettingOf('pve') }
+    );
+    expect(rows.map(label)).toContain('->20@m1');
+  });
+
+  it('with the opt-out, PvE adds none', async () => {
+    const rows = await run(noProp(), { jobSetting: jobSettingOf('pve', 'dangerous', true) });
+    expect(rows.some((row) => [20, 21, 22, 23].includes(row.toTypeId))).toBe(false);
+  });
+
+  it('PvP adds none', async () => {
+    const rows = await run(noProp(), { jobSetting: jobSettingOf('pvp') });
+    expect(rows.some((row) => [20, 21, 22, 23].includes(row.toTypeId))).toBe(false);
+  });
+
+  it('Explore adds an MWD, never an afterburner', async () => {
+    const rows = await run(noProp(), { jobSetting: jobSettingOf('explore', 'safe') });
+    expect(rows.find((row) => row.addsPropulsionFor)?.toTypeId).toBe(21);
+  });
+
+  it('leaves a fit that has propulsion alone', async () => {
+    const rows = await run(
+      fit([
+        ['medium', 0, 20],
+        ['medium', 1, 1],
+        ['low', 0, 11],
+        ['low', 1, 11],
+      ]),
+      { jobSetting: jobSettingOf('pve') }
+    );
+    expect(rows.some((row) => row.addsPropulsionFor)).toBe(false);
+  });
+
+  describe('a hull that can fit a Large Micro Jump Drive', () => {
+    const battleship = (_slot: FittingSlotKind, typeId: number) => typeId !== 23;
+
+    it('gets one without data on the hull', async () => {
+      const rows = await run(noProp(), { jobSetting: jobSettingOf('pve') }, battleship);
+      expect(rows.find((row) => row.addsPropulsionFor)?.toTypeId).toBe(22);
+    });
+
+    it('takes what the hull fits mostly carry over that rule', async () => {
+      const rows = await run(
+        noProp(),
+        { jobSetting: jobSettingOf('pve'), commonality: common({ mwd: 0.8 }) },
+        (_slot, typeId) => typeId !== 23
+      );
+      expect(rows.find((row) => row.addsPropulsionFor)?.toTypeId).toBe(21);
+    });
+
+    it('falls back to an afterburner or MWD where no jump drive passes', async () => {
+      const rows = await run(noProp(), { jobSetting: jobSettingOf('pve') }, (_slot, typeId) =>
+        [20, 21, 1, 2, 10, 11].includes(typeId)
+      );
+      expect([20, 21]).toContain(rows.find((row) => row.addsPropulsionFor)?.toTypeId);
+    });
+  });
+
+  describe('tiers', () => {
+    it('PvE: the common kind, then the rules; PvP: none; Explore: MWD', () => {
+      expect(propulsionTiers(jobSettingOf('pve'), common({ afterburner: 0.7 }), false)).toEqual([
+        ['afterburner'],
+        ['afterburner', 'mwd'],
+      ]);
+      expect(propulsionTiers(jobSettingOf('pve'), null, true)).toEqual([
+        ['mjd'],
+        ['afterburner', 'mwd'],
+      ]);
+      expect(propulsionTiers(jobSettingOf('pve'), null, false)).toEqual([['afterburner', 'mwd']]);
+      expect(propulsionTiers(jobSettingOf('pve', 'dangerous', true), null, true)).toEqual([]);
+      expect(propulsionTiers(jobSettingOf('pvp'), null, true)).toEqual([]);
+      expect(propulsionTiers(jobSettingOf('explore'), common({ afterburner: 0.9 }), true)).toEqual([
+        ['mwd'],
+      ]);
+      expect(propulsionTiers(undefined, null, true)).toEqual([]);
+    });
+  });
+
+  describe('single swaps and moves', () => {
+    const labels = (fitting: Fitting, extra: Partial<MakeoverMoveOptions>) =>
+      catalogue(types).moves(extra)(fitting).map(label);
+    const withMjd = fit([
+      ['medium', 0, 22],
+      ['medium', 1, 1],
+    ]);
+    const withMwd = fit([
+      ['medium', 0, 21],
+      ['medium', 1, 1],
+    ]);
+
+    it('PvE never removes a fitted micro jump drive, nor trades it for another kind', () => {
+      const list = labels(withMjd, { jobSetting: jobSettingOf('pve'), goal: 'overall' });
+      expect(list.filter((l) => l.startsWith('22>') && !l.startsWith('22>23'))).toEqual([]);
+    });
+
+    it('Explore never turns an MWD into an afterburner', () => {
+      const explore = labels(withMwd, { jobSetting: jobSettingOf('explore'), goal: 'overall' });
+      expect(explore.filter((l) => l.startsWith('21>20'))).toEqual([]);
+      // PvE may still: the score decides.
+      const pve = labels(withMwd, { jobSetting: jobSettingOf('pve'), goal: 'overall' });
+      expect(pve).toContain('21>20@m0');
+    });
+
+    it('Explore single swaps follow the same rule', () => {
+      const { index, rackOf, options } = catalogue(types);
+      const pool = options().pool;
+      const found = improveCandidates(withMwd.modules, index, rackOf, {
+        goal: 'overall',
+        reach: 'rework',
+        pool,
+        jobSetting: jobSettingOf('explore'),
+      });
+      expect(found.some((c) => c.fromTypeId === 21 && c.toTypeId === 20)).toBe(false);
     });
   });
 });
