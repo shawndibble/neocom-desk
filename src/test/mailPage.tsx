@@ -1,8 +1,8 @@
-import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -63,7 +63,7 @@ export const mailLabels = {
   total_unread_count: 3,
 };
 
-export const server = setupServer(
+export const server = mswServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json(headers)),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
     HttpResponse.json(mailLabels)
@@ -102,7 +102,6 @@ export const server = setupServer(
 
 export function installMailHarness(): void {
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
     // One throwaway render, so no test pays for the first one. A worker's first
     // `App` render (compiling the lazy Layout and route chunks, warming jsdom
     // and React) took seconds under parallel load and landed on whichever test
@@ -117,9 +116,7 @@ export function installMailHarness(): void {
     unmount();
     server.resetHandlers();
   }, 30_000);
-  afterAll(() => server.close());
   afterEach(() => {
-    server.resetHandlers();
     vi.useRealTimers();
   });
   beforeEach(seed);

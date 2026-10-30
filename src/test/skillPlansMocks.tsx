@@ -1,18 +1,11 @@
 import { vi } from 'vitest';
+export { pwaRegisterMock } from '@/test/assetsMocks';
 import type { SkillType } from '@/sde/types';
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 
 // Shared mock factories and fixtures for the SkillPlans route tests
 // (SkillPlans*.test.tsx). Kept free of app runtime imports: a `vi.mock` factory
 // imports this module while the app graph is still loading.
-
-export const pwaRegisterMock = () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
-});
 
 // Real src/sync would attempt actual Firebase network calls (this repo's
 // .env carries a real dev project config). markPlanDeleted is faked down to
@@ -101,7 +94,7 @@ export const FIXTURE_SKILLS: SkillType[] = [
 ];
 
 export const RIFTER_TYPE_ID = 587;
-export const FIXTURE_TYPES = {
+const FIXTURE_TYPES = {
   [RIFTER_TYPE_ID]: { name: 'Rifter', groupID: 25, volume: 27_000 },
 };
 

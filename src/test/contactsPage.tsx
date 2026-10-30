@@ -50,7 +50,7 @@ export const contactsPayload = [
 
 // Good Friend flies for the signed-in pilot's own corp; Stranger Pilot flies
 // for Hostile Corp, in no alliance.
-export const affiliationPayload = [
+const affiliationPayload = [
   { character_id: 1001, corporation_id: 2001 },
   { character_id: 1005, corporation_id: 1004 },
   { character_id: CHAR_ID, corporation_id: 2001, alliance_id: 3001 },

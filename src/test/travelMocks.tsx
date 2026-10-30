@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+export { pwaRegisterMock } from '@/test/assetsMocks';
 
 // Shared fixtures and mock factories for the Travel route tests
 // (Travel*.test.tsx). Kept free of app imports: a `vi.mock` factory imports this
@@ -64,14 +65,6 @@ export const incursion = (
 });
 
 export const loadSolarSystemJumps = vi.fn();
-
-export const pwaRegisterMock = () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
-});
 
 export const loadSdeMock = () => ({
   loadSkills: vi.fn(async () => []),

@@ -1,7 +1,7 @@
-import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { beforeAll, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -43,7 +43,7 @@ export const loyaltyPayload = [
   { corporation_id: 1000419, loyalty_points: 250 }, // Paragon — EverMarks
 ];
 
-export const server = setupServer(
+export const server = mswServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.json(4500)),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, ({ request }) => {
     const page = new URL(request.url).searchParams.get('page');
@@ -89,7 +89,6 @@ export async function seed() {
 
 export function installWalletHarness(): void {
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
     // One throwaway render, so no test pays for the first one. A worker's first
     // `App` render (compiling the lazy Layout and route chunks, warming jsdom
     // and React) took seconds under parallel load and landed on whichever test
@@ -108,7 +107,5 @@ export function installWalletHarness(): void {
     unmount();
     server.resetHandlers();
   }, 30_000);
-  afterAll(() => server.close());
-  afterEach(() => server.resetHandlers());
   beforeEach(seed);
 }

@@ -268,8 +268,8 @@ beforeAll(async () => {
   await db.buildPlans.add(seedPlan());
   const { unmount } = render(<App />);
   await screen.findByRole('heading', { name: 'Rifter' }, { timeout: 25_000 });
-  // Also the setup panel and the facility picker, which the first test to
-  // open them would otherwise pay for (~1s of lazy chunks and list builds).
+  // Also the setup panel and facility picker, so the first test to open them
+  // doesn't pay for their lazy chunks.
   const warmUser = userEvent.setup({ delay: null });
   await warmUser.click(await screen.findByRole('button', { name: 'Edit setup' }));
   await warmUser.click(screen.getByRole('button', { name: /Override/ }));
@@ -284,9 +284,8 @@ beforeAll(async () => {
 beforeEach(resetSession);
 
 describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
-  // ~1s locally and not a cold-start cost (the warm-up above opens the same
-  // picker): it walks Edit setup, Override, the Facility combobox and a Dexie
-  // read-modify-write on a full plan page, each step re-rendering the plan.
+  // Slow by steps, not by cold start: Edit setup, Override, the Facility picker
+  // and a Dexie read-modify-write, each re-rendering the full plan page.
   it('gives the facility tax input an accessible tooltip without polluting its label', async () => {
     const user = userEvent.setup({ delay: null });
     await db.buildPlans.add(seedPlan());
