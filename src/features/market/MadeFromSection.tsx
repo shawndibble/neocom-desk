@@ -47,7 +47,7 @@ export function MadeFromSection({ typeId }: { typeId: number }) {
   }
 
   const entry = catalog?.byProductTypeID.get(typeId);
-  if (!catalog || !entry) return null;
+  if (!catalog || !entry || entry.blueprint.materials.length === 0) return null;
   const { blueprint } = entry;
   const made = blueprint.products.find((product) => product.typeID === typeId);
 
@@ -79,7 +79,7 @@ export function MadeFromSection({ typeId }: { typeId: number }) {
                 </ItemInfoLink>
               </span>
               <span className="shrink-0 tabular-nums text-text-dim">
-                {t('market.itemDetail.madeFromPerRun', {
+                {t('market.itemDetail.usedInPerRun', {
                   quantity: formatCount(material.quantity),
                 })}
               </span>

@@ -12720,7 +12720,6 @@
       "planetaryRaw": "Extracted straight off a planet with an Extractor Control Unit — no schematic produces it.",
       "madeFromManufacturing": "Made from · Manufacturing",
       "madeFromReaction": "Made from · Reaction",
-      "madeFromPerRun": "{{quantity}} / run",
       "madeFromFooter": "Makes {{quantity}} per run · {{duration}}",
       "usedInTitle_one": "Used in ({{formatted}})",
       "usedInTitle_other": "Used in ({{formatted}})",
