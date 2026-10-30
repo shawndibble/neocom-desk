@@ -149,6 +149,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     pricesUnreachable,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
+    skills,
+    standing,
   } = useLoyaltyStoreOffers(corporationId);
 
   const offersColumnVisibility = useColumnVisibility(
@@ -409,7 +411,11 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
 
   const detail = selectedRow ? (
     <OfferDetail
+      key={selectedRow.offer.offer_id}
       row={selectedRow}
+      hub={hub}
+      skills={skills}
+      standing={standing}
       catalog={catalog}
       hubId={hub.id}
       hubName={hub.name}
