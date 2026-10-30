@@ -229,7 +229,20 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run test:run -- --shard=${{ matrix.shard }}/4
+      # The JSON reporter writes per-test and per-file durations. The default
+      # `agent` reporter prints totals only, so without this a test over the
+      # 1s budget cannot be found from a CI run.
+      - run: >-
+          npm run test:run -- --shard=${{ matrix.shard }}/4
+          --reporter=agent --reporter=github-actions --reporter=json
+          --outputFile.json=vitest-timing-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vitest-timing-shard-${{ matrix.shard }}
+          path: vitest-timing-${{ matrix.shard }}.json
+          retention-days: 14
+          if-no-files-found: warn
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
