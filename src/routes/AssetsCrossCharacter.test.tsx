@@ -593,7 +593,10 @@ describe('jumps-away distance (issue #87)', () => {
     // The Travel default is Prefer safer: the three jumps through high-sec Hed and Far.
     await screen.findByText('3 jumps');
 
-    await user.click(screen.getByRole('combobox', { name: 'Route' }));
+    // Route shows only under the Jumps away sort.
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(await screen.findByRole('option', { name: 'Jumps away' }));
+    await user.click(await screen.findByRole('combobox', { name: 'Route' }));
     await user.click(await screen.findByRole('option', { name: 'Prefer shorter' }));
 
     expect(await screen.findByText('2 jumps')).toBeInTheDocument();

@@ -397,6 +397,26 @@ describe('location sort (issue #88)', () => {
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Name');
   });
 
+  it('shows the Route picker, left of Sort, only under the "Jumps away" sort', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<App />);
+    await screen.findByText(JITA);
+    expect(screen.queryByRole('combobox', { name: 'Route' })).not.toBeInTheDocument();
+
+    const sort = screen.getByRole('combobox', { name: 'Sort' });
+    await user.click(sort);
+    await user.click(await screen.findByRole('option', { name: 'Jumps away' }));
+
+    const route = await screen.findByRole('combobox', { name: 'Route' });
+    expect(route.compareDocumentPosition(sort) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(sort);
+    await user.click(await screen.findByRole('option', { name: 'Name' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('combobox', { name: 'Route' })).not.toBeInTheDocument();
+    });
+  });
+
   it('re-sorts the location list by estimated value when "Value" is selected', async () => {
     const user = userEvent.setup({ delay: null });
     priceStructureAboveJita();

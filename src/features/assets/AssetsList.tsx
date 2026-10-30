@@ -412,11 +412,31 @@ export function AssetsList({
                     </span>
                   )}
                 </h2>
-                {/* flex-wrap (issue #415): on a narrow phone the two Selects no
-                        longer share one row with no priority order — Sort stays put
-                        (it comes first in DOM order) and Route is the one that drops
-                        to its own line when both can't fit beside the label. */}
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                {/* Route only matters to the Jumps away sort, so it shows only
+                        then, left of Sort. flex-wrap-reverse (issue #415): when both
+                        can't fit beside the label, Sort keeps the top row and Route
+                        drops below it. */}
+                <div className="ml-auto flex flex-wrap-reverse items-center justify-end gap-2">
+                  {stationSortField === 'jumpsAway' && (
+                    <Select
+                      value={routePreference}
+                      onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
+                    >
+                      <SelectTrigger
+                        aria-label={t('assets.jumpsAway.routePreference.label')}
+                        className="w-40"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROUTE_PREFERENCES.map((preference) => (
+                          <SelectItem key={preference} value={preference}>
+                            {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Select
                     value={stationSortField}
                     onValueChange={(value) => void setStationSortField(value as StationSortField)}
@@ -429,24 +449,6 @@ export function AssetsList({
                       <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
                       <SelectItem value="itemCount">{t('assets.stationSort.itemCount')}</SelectItem>
                       <SelectItem value="jumpsAway">{t('assets.stationSort.jumpsAway')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={routePreference}
-                    onValueChange={(value) => setRouteOverride(value as RoutePreferenceKind)}
-                  >
-                    <SelectTrigger
-                      aria-label={t('assets.jumpsAway.routePreference.label')}
-                      className="w-40"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROUTE_PREFERENCES.map((preference) => (
-                        <SelectItem key={preference} value={preference}>
-                          {t(ROUTE_PREFERENCE_LABEL_KEYS[preference])}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
