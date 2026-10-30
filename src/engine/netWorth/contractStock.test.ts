@@ -103,6 +103,7 @@ describe('contractStockValue', () => {
     // Offer expiry passed, delivery deadline (Oct 9 13:00) has not.
     expect(value([haul])).toBe(90_000);
     expect(value([{ ...haul, status: 'finished' }])).toBe(0);
+    expect(value([{ ...haul, status: 'failed' }])).toBe(0);
     expect(value([{ ...haul, date_accepted: '2026-10-03T12:00:00Z' }])).toBe(0);
     expect(value([{ ...haul, acceptor_id: 5 }])).toBe(0);
     expect(value([{ ...haul, for_corporation: true }])).toBe(0);

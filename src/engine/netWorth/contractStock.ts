@@ -43,6 +43,11 @@ export interface StockContractItem {
   raw_quantity?: number;
 }
 
+/** Delivery deadline of an accepted courier; `null` when not accepted or not derivable. */
+function runningDeadline(contract: StockContract): number | null {
+  return courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
+}
+
 function isOpenOwnContract(contract: StockContract, characterId: number, now: number): boolean {
   if (contract.issuer_id !== characterId || contract.for_corporation) return false;
   if (!isActiveContractStatus(contract.status)) return false;
@@ -50,7 +55,7 @@ function isOpenOwnContract(contract: StockContract, characterId: number, now: nu
   const expires = parseInstant(contract.date_expired);
   if (contract.type === 'courier') {
     // Once accepted, the offer expiry no longer matters: delivery is owed by the real deadline.
-    const deadline = courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
+    const deadline = runningDeadline(contract);
     if (deadline !== null) return deadline > now;
   }
   return expires === null || expires > now;
@@ -60,7 +65,8 @@ function isOpenOwnContract(contract: StockContract, characterId: number, now: nu
 function postedCollateral(contract: StockContract, characterId: number, now: number): number {
   if (contract.type !== 'courier' || contract.for_corporation) return 0;
   if (contract.acceptor_id !== characterId || contract.issuer_id === characterId) return 0;
-  const deadline = courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
+  // Only an accepted, still-outstanding courier has a deadline: finished or failed ones return null.
+  const deadline = runningDeadline(contract);
   if (deadline === null || deadline <= now) return 0;
   return contract.collateral ?? 0;
 }
