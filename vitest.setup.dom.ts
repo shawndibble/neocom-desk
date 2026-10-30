@@ -15,7 +15,7 @@
  */
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterAll, afterEach, beforeEach } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 import { settleEsiCacheLoads } from '@/esi/cache';
 import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
 import { fakeMediaQueryList } from '@/test/viewport';
@@ -58,7 +58,8 @@ afterEach(async () => {
     // ...) leaves a request that hangs on CI's offline network. That load can
     // never write a row, so failing the test would be a false positive; the
     // message still names the key, so a real late writer is findable.
-    console.warn(error instanceof Error ? error.message : error);
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(`[esi settle] ${expect.getState().currentTestName}: ${reason}`);
   }
 });
 

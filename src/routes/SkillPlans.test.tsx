@@ -1930,7 +1930,10 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
   });
-  afterEach(() => {
+  afterEach(async () => {
+    // A load sleeping on a fake timer (clones prefetch) would never wake once the
+    // real clock is back, and the setup's settle wait would burn its full second.
+    await vi.runOnlyPendingTimersAsync();
     vi.useRealTimers();
   });
 
