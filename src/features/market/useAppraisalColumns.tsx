@@ -228,7 +228,28 @@ export function useAppraisalColumns({
           totalCell(row.buyTotal),
           row.refineTotal !== undefined && !refineBeatsSellAsIs(row),
           undefined,
-          priceMark(row, 'buyTotal')
+          <>
+            {row.buyWalk && (
+              <HintText
+                content={t(
+                  row.buyWalk.unsold > 0
+                    ? 'market.appraisal.buyWalkUnsoldHint'
+                    : 'market.appraisal.buyWalkHint',
+                  {
+                    avg: formatIskAuto(row.buyEach ?? 0),
+                    topBid: formatIskAuto(row.buyWalk.topBid),
+                    takes: formatVolume(row.buyWalk.topBidTakes),
+                    units: formatVolume(row.quantity),
+                    unsold: formatVolume(row.buyWalk.unsold),
+                  }
+                )}
+                className="mr-1 text-warning"
+              >
+                !
+              </HintText>
+            )}
+            {priceMark(row, 'buyTotal')}
+          </>
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
     },

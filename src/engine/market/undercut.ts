@@ -39,6 +39,10 @@ export interface CompetingOrder {
   systemId: number;
   volumeRemain: number;
   isBuyOrder: boolean;
+  /** ESI `range` of a buy order (`station`, `solarsystem`, `region` or a jump count); absent where the source has none. */
+  range?: string;
+  /** ESI `min_volume` of a buy order. */
+  minVolume?: number;
 }
 
 export interface UndercutRival {
