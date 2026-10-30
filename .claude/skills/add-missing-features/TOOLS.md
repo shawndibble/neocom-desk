@@ -26,7 +26,8 @@ licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
 Courier, EVE Retroindustry, ISK.GG, EVE Miner Hub, EQM, EVE-Industry-Scanner,
-EVE TradeLooper, EVE Night Trade Tools, TradeRelay, EVEAIO, MONW, Mudoteve,
+EVE TradeLooper, EVE Night Trade Tools, SquadB Excel workbooks (EVE Online
+Excel Workbook v1.6, EVE Market Analysis v1.1; CCP's Excel add-in), TradeRelay, EVEAIO, MONW, Mudoteve,
 Solo Industry App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance,
 EVE Data Site, PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve,
 EVE Fleet Mining & Ratting Tool, FW LP Store cart tool, EVE ONE, EVE Buddy,
@@ -312,6 +313,13 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   a feed row duplicating Open Orders; detection needs competitor prices. Only
   revival: `belowFloor` alone, Production-Run-linked, station scope, feed-only,
   after the cost-basis work.
+- **Station-trading margin finder (same-hub Hauling mode)**, re-pitched after
+  the R2 hub-books snapshot: still dead. History can't split buy-side from
+  sell-side fills, so "units/day" for a two-sided flip is a guess; an hour-old
+  book is useless for a 0.01-ISK war; one top-10 per hub for every user is the
+  self-defeat `haulingMarket.ts`'s header argues against; spread/after-fees
+  already ships (`compareMargin`, Compare drawer). Reopen only with per-minute
+  books or a side-split fill series.
 - **MoMa leftovers:** station-trading flip finder (no new tabs; Hauling's 3-pass
   scan if revived inline); compressed-ore buying as a facility-rate model
   (structure rates out, `20260906-180034`; #5134 is the narrowed shape); guided
