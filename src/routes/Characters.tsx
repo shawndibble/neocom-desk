@@ -75,6 +75,7 @@ import { useCharactersHousekeeping } from '@/features/character/useCharactersHou
 import { characterLastSynced } from '@/features/character/rosterQueueChip';
 import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
 import { buildColumns } from '@/features/character/charactersTableColumns';
+import { useCharacterWhereabouts } from '@/features/character/useCharacterWhereabouts';
 import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
 
@@ -168,6 +169,12 @@ export function Characters() {
   }, [removeFailedName]);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
+  // Read only while the table shows one of the two optional columns.
+  const whereabouts = useCharacterWhereabouts(
+    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
+    viewMode === 'table' && (visibleColumns.includes('dockedAt') || visibleColumns.includes('ship'))
+  );
+
   const {
     search,
     sortKey,
@@ -198,6 +205,7 @@ export function Characters() {
     notTrainingAlertEnabledFor,
     visibleColumns,
     spExtractionEnabled,
+    whereabouts,
   });
 
   // One batched read for the roster: every card's line, or the table's column while it shows.

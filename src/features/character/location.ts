@@ -47,3 +47,42 @@ export async function loadCharacterSolarSystemRead(characterId: number): Promise
 export async function loadCharacterSolarSystemId(characterId: number): Promise<number | null> {
   return (await loadCharacterSolarSystemRead(characterId)).systemId;
 }
+
+/** Where a character is: the solar system, plus the station or structure when docked. */
+export interface CharacterPlace {
+  systemId: number;
+  stationId: number | null;
+  structureId: number | null;
+}
+
+/** A read of the full location, with when ESI last said so. */
+export interface PlaceRead {
+  place: CharacterPlace | null;
+  fetchedAt: Date | null;
+}
+
+/**
+ * The same `/location` read as `loadCharacterSolarSystemRead`, keeping the
+ * docked station or structure too. Its own cache key: the system-only row
+ * stores a bare number and other pages already read it.
+ */
+export async function loadCharacterPlaceRead(characterId: number): Promise<PlaceRead> {
+  const result = await loadWithCache(
+    characterId,
+    'characterPlace',
+    async (): Promise<CharacterPlace | null> => {
+      const data = (await getCharacterLocation(characterId)).data;
+      if (!data) return null;
+      return {
+        systemId: data.solar_system_id,
+        stationId: data.station_id ?? null,
+        structureId: data.structure_id ?? null,
+      };
+    },
+    {
+      detectAuthFailure: isCredentialFailure,
+      staleAfterMs: LOCATION_FRESH_MS,
+    }
+  );
+  return { place: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
+}

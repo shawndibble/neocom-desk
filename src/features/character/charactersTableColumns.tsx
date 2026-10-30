@@ -22,6 +22,11 @@ import { type CharacterColumnId } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
+import {
+  placeLabel,
+  placeSortText,
+  type CharacterWhereabouts,
+} from '@/features/character/characterWhereabouts';
 import { type CharacterGroup, type CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { AffiliationName } from '@/features/character/CharacterCard';
@@ -51,6 +56,11 @@ export interface CharacterRow {
   starred: boolean;
   /** Null when ungrouped — same as the card's `groupId` prop. */
   groupId: string | null;
+  /** Undefined until read (and never read while neither column shows). */
+  whereabouts: CharacterWhereabouts | undefined;
+  /** False when the stored grant lacks the scope: the cell says which Permission, not "unknown". */
+  locationGranted: boolean;
+  shipGranted: boolean;
 }
 
 /**
@@ -102,6 +112,24 @@ function openJobsColumn(
   };
 }
 
+/** A dash that names the Permission this Character has not granted. */
+function missingPermission(
+  name: string,
+  permission: 'characterDetails' | 'currentShip',
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
+  return (
+    <HintText
+      content={t('characters.needsPermission', {
+        name,
+        permission: t(`permissions.${permission}.label`),
+      })}
+    >
+      —
+    </HintText>
+  );
+}
+
 /**
  * Every column the table can show, keyed by id — the picker offers a subset
  * of these keys, and the table renders whichever the pilot has checked, in
@@ -143,6 +171,37 @@ export function buildColumns(
       className: 'text-text-dim',
       sortValue: (row) => row.corporationName ?? '',
       render: (row) => <AffiliationName name={row.corporationName} />,
+    },
+    dockedAt: {
+      id: 'dockedAt',
+      header: t('characters.column.dockedAt'),
+      sortValue: (row) => placeSortText(row.whereabouts?.place ?? null),
+      render: (row) => {
+        if (!row.locationGranted)
+          return missingPermission(row.character.name, 'characterDetails', t);
+        const place = row.whereabouts?.place;
+        if (!place) return '—';
+        const label = placeLabel(place);
+        if (label.kind === 'docked') return label.name;
+        const system = label.system ?? t('common.unknown');
+        return (
+          <span>
+            {system}{' '}
+            <span className="text-text-dim">
+              {t(label.kind === 'inSpace' ? 'characters.inSpace' : 'characters.structure')}
+            </span>
+          </span>
+        );
+      },
+    },
+    ship: {
+      id: 'ship',
+      header: t('characters.column.ship'),
+      sortValue: (row) => row.whereabouts?.shipName ?? undefined,
+      render: (row) =>
+        !row.shipGranted
+          ? missingPermission(row.character.name, 'currentShip', t)
+          : (row.whereabouts?.shipName ?? '—'),
     },
     // Same Select the card view's group control renders (issue #2077) — a
     // visible, Tab-reachable move-to-group in table view, no context-menu

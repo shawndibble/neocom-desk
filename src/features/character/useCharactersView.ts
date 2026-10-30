@@ -26,6 +26,7 @@ import {
   textParam,
 } from '@/lib/urlState';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
+import type { WhereaboutsLookup } from '@/features/character/useCharacterWhereabouts';
 import type { CharacterRow } from '@/features/character/charactersTableColumns';
 
 export const SORT_KEYS: readonly CharacterSortKey[] = [
@@ -105,6 +106,7 @@ interface CharactersViewInput {
   notTrainingAlertEnabledFor: (characterId: number) => boolean;
   visibleColumns: readonly CharacterColumnId[];
   spExtractionEnabled: boolean;
+  whereabouts: WhereaboutsLookup;
 }
 
 /**
@@ -126,6 +128,7 @@ export function useCharactersView(input: CharactersViewInput) {
     notTrainingAlertEnabledFor,
     visibleColumns,
     spExtractionEnabled,
+    whereabouts,
   } = input;
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
@@ -258,6 +261,9 @@ export function useCharactersView(input: CharactersViewInput) {
         totalSp: core?.totalSp,
         starred: isCharacterStarred(starred, character.characterId),
         groupId: groupIdByCharacterId.get(character.characterId) ?? null,
+        whereabouts: whereabouts.of(character.characterId),
+        locationGranted: whereabouts.hasLocationGrant(character.characterId),
+        shipGranted: whereabouts.hasShipGrant(character.characterId),
       };
     });
   const allIds = (characters ?? []).map((character) => character.characterId);

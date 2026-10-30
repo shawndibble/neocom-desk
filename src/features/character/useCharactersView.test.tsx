@@ -25,6 +25,11 @@ function view(url: string, starred: number[] = []) {
         notTrainingAlertEnabledFor: () => true,
         visibleColumns: ['name'],
         spExtractionEnabled: false,
+        whereabouts: {
+          of: () => undefined,
+          hasLocationGrant: () => true,
+          hasShipGrant: () => true,
+        },
       }),
     { wrapper }
   ).result.current;

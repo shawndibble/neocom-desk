@@ -44,6 +44,21 @@ describe('availableCharacterColumns', () => {
   });
 });
 
+describe('whereabouts columns', () => {
+  it('are in the picker but off by default', () => {
+    expect(CHARACTER_COLUMN_IDS).toContain('dockedAt');
+    expect(CHARACTER_COLUMN_IDS).toContain('ship');
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain('dockedAt');
+    expect(DEFAULT_VISIBLE_CHARACTER_COLUMNS).not.toContain('ship');
+  });
+
+  it('stay hidden for a stored preference that predates them', async () => {
+    await db.settings.put({ key: VISIBLE_CHARACTER_COLUMNS_KEY, value: ['name', 'alerts'] });
+    await useVisibleCharacterColumns.getState().hydrate();
+    expect(useVisibleCharacterColumns.getState().value).toEqual(['name', 'alerts']);
+  });
+});
+
 describe('visibleAvailableColumns', () => {
   it('drops spReady from a stored preference while monitoring is off, without mutating the preference itself', () => {
     const stored = ['name', 'spReady', 'alerts'] as const;
