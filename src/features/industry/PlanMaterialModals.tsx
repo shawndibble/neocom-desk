@@ -1,4 +1,5 @@
 import type { BuildPlanRecord } from '@/db';
+import type { BuildResult } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
@@ -6,11 +7,13 @@ import { BuildRecipeModal } from './BuildRecipeModal';
 import { BuyOreDialog } from './buyOre/BuyOreDialog';
 import type { buildItemMenuProps } from './buildItemMenuProps';
 import type { PlanPatch } from './planPatch';
+import { UsedByModal } from './UsedByModal';
 import type { useMaterialModals } from './useMaterialModals';
 import type { usePlanEdits } from './usePlanEdits';
 
 interface PlanMaterialModalsProps {
   modals: ReturnType<typeof useMaterialModals>;
+  result: BuildResult;
   plan: BuildPlanRecord;
   catalog: BlueprintCatalog;
   hub: TradeHub;
@@ -24,6 +27,7 @@ interface PlanMaterialModalsProps {
 /** The three dialogs the Materials table opens: Buy ore, a built row's recipe, and the blueprint acquisition picker. */
 export function PlanMaterialModals({
   modals,
+  result,
   plan,
   catalog,
   hub,
@@ -50,6 +54,19 @@ export function PlanMaterialModals({
         onClose={() => modals.setRecipeTypeId(null)}
         nameFor={(typeID) => nameForType(catalog, typeID)}
         onOpenRecipe={modals.setRecipeTypeId}
+        itemMenuFor={itemMenuFor}
+        itemActionsFor={itemActionsFor}
+      />
+      <UsedByModal
+        typeID={modals.usedByTypeId}
+        tableTotal={modals.usedByTotal}
+        onClose={() => modals.setUsedByTypeId(null)}
+        materials={result.materials}
+        mainJob={{
+          typeID: catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productTypeID ?? 0,
+          runs: plan.runs,
+        }}
+        nameFor={(typeID) => nameForType(catalog, typeID)}
         itemMenuFor={itemMenuFor}
         itemActionsFor={itemActionsFor}
       />
