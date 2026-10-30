@@ -14,6 +14,7 @@ import Markdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
+import * as Icon from '@/components/ui/icons';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 
 const ALLOWED_ELEMENTS = [
@@ -53,9 +54,13 @@ function TaskBox({ done }: { done: boolean }) {
     <span
       role="img"
       aria-label={t(done ? 'survey.info.taskDone' : 'survey.info.taskOpen')}
-      className="mr-2"
+      className="mr-2 inline-flex align-middle"
     >
-      {done ? '☑' : '☐'}
+      {done ? (
+        <Icon.TaskDone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+      ) : (
+        <Icon.TaskOpen size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+      )}
     </span>
   );
 }
