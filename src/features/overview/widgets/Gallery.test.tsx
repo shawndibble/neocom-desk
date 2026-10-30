@@ -93,7 +93,7 @@ const SUBTITLE = `${OVERVIEW_KINDS.length} widgets · 3 on your Overview`;
 beforeAll(async () => {
   await openGallery();
   cleanup();
-}, 30000);
+});
 
 describe('Gallery', () => {
   it('says how many widgets there are and how many are on the Overview', async () => {
