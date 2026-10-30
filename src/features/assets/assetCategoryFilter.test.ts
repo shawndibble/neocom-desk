@@ -6,6 +6,7 @@ import {
   blueprintsTicked,
   buildCategoryIndex,
   categoryPickParam,
+  expandLegacyCategoryIds,
   headingState,
   toggleHeading,
   toggleOption,
@@ -115,5 +116,28 @@ describe('off-market blueprint originals', () => {
     };
     expect(assetPassesKindFilter({ type_id: 999 }, filter)).toBe(true);
     expect(assetPassesKindFilter({ type_id: 999, is_blueprint_copy: true }, filter)).toBe(false);
+  });
+});
+
+describe('expandLegacyCategoryIds', () => {
+  it('turns an old top-level market group id into all its rows', () => {
+    expect(expandLegacyCategoryIds(index, new Set([1]))).toEqual(new Set([11, 12]));
+  });
+
+  it('leaves picker option ids alone', () => {
+    expect(expandLegacyCategoryIds(index, new Set([11, NOT_ON_MARKET]))).toEqual(
+      new Set([11, NOT_ON_MARKET])
+    );
+  });
+
+  it('keeps all as all', () => {
+    expect(expandLegacyCategoryIds(index, 'all')).toBe('all');
+  });
+});
+
+describe('categoryPickParam malformed ids', () => {
+  it('reads an empty segment or zero as all', () => {
+    expect(categoryPickParam().parse('1,')).toBe('all');
+    expect(categoryPickParam().parse('0')).toBe('all');
   });
 });

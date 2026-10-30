@@ -3,6 +3,7 @@ import { buildLocationLedger, classifyCorpAssets } from '@/engine/corp/assetLedg
 import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
 import {
   buildLocationRows,
+  filterClassified,
   makeLedgerLabels,
   officeUsage,
   placementLabel,
@@ -173,5 +174,22 @@ describe('buildLocationRows', () => {
   it('shows only the matching places on a state tab', () => {
     const rows = buildLocationRows(ledger, { ...base, tab: 'impounded' });
     expect(rows.map((r) => r.kind)).toEqual(['place']);
+  });
+});
+
+describe('filterClassified kind', () => {
+  const { items } = classifyCorpAssets([
+    input({ itemId: 1, typeId: 34 }),
+    input({ itemId: 2, typeId: 35, isBlueprintCopy: true }),
+  ]);
+  const base = { query: '', onlyTypeIds: null, typeName: labels.typeName };
+
+  it('keeps everything without a kind predicate', () => {
+    expect(filterClassified(items, { ...base, kind: null })).toHaveLength(2);
+  });
+
+  it('keeps only stacks the kind predicate accepts, copies included', () => {
+    const kept = filterClassified(items, { ...base, kind: (a) => a.isBlueprintCopy === true });
+    expect(kept.map((i) => i.input.itemId)).toEqual([2]);
   });
 });

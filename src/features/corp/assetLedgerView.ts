@@ -133,8 +133,8 @@ export function stackPathText(stack: LedgerStack, labels: LedgerLabels): string 
 export interface ClassifiedFilter {
   /** Lower-cased search text; empty matches everything. */
   query: string;
-  categoryId: number | null;
-  categoryOf: (typeId: number) => number | null;
+  /** The Asset Category / Blueprints filter; null keeps everything. */
+  kind: ((asset: { typeId: number; isBlueprintCopy?: boolean }) => boolean) | null;
   /** When set, only these types (the Below target filter). */
   onlyTypeIds: ReadonlySet<number> | null;
   typeName: (typeId: number) => string;
@@ -149,12 +149,12 @@ export function filterClassified(
   items: readonly ClassifiedAsset[],
   filter: ClassifiedFilter
 ): ClassifiedAsset[] {
-  const { query, categoryId, categoryOf, onlyTypeIds, typeName } = filter;
-  if (query === '' && categoryId === null && onlyTypeIds === null) return [...items];
+  const { query, kind, onlyTypeIds, typeName } = filter;
+  if (query === '' && kind === null && onlyTypeIds === null) return [...items];
   return items.filter((item) => {
     const typeId = item.input.typeId;
     if (onlyTypeIds !== null && !onlyTypeIds.has(typeId)) return false;
-    if (categoryId !== null && categoryOf(typeId) !== categoryId) return false;
+    if (kind !== null && !kind(item.input)) return false;
     return query === '' || typeName(typeId).toLowerCase().includes(query);
   });
 }
