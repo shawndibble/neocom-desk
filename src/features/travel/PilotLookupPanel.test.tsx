@@ -27,8 +27,14 @@ vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => undefined,
 }));
 vi.mock('@/stores/activeCharacter', () => ({
-  useActiveCharacter: (select: (state: { activeCharacterId: number }) => unknown) =>
-    select({ activeCharacterId: 1 }),
+  // The market hub store reads the active character through getState/subscribe too.
+  useActiveCharacter: Object.assign(
+    (select: (state: { activeCharacterId: number }) => unknown) => select({ activeCharacterId: 1 }),
+    {
+      getState: () => ({ activeCharacterId: 1, hydrated: true, hydrate: async () => {} }),
+      subscribe: () => () => {},
+    }
+  ),
 }));
 vi.mock('@/features/character/mailRecipientSearch', () => ({
   MIN_RECIPIENT_SEARCH_LENGTH: 3,

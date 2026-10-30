@@ -83,7 +83,8 @@ export const useMarketHub = create<SettingState<TradeHub['id']>>((set, get) => (
     await Promise.all([
       useDefaultMarketHub.getState().hydrate(),
       useHubByCharacter.getState().hydrate(),
-      useActiveCharacter.getState().hydrate(),
+      // Never re-read a settled selection: the read would overwrite one already in force.
+      useActiveCharacter.getState().hydrated ? undefined : useActiveCharacter.getState().hydrate(),
     ]);
     set(inForce());
   },
@@ -92,7 +93,9 @@ export const useMarketHub = create<SettingState<TradeHub['id']>>((set, get) => (
     if (!useHubByCharacter.getState().hydrated || !useActiveCharacter.getState().hydrated) {
       await Promise.all([
         useHubByCharacter.getState().hydrate(),
-        useActiveCharacter.getState().hydrate(),
+        useActiveCharacter.getState().hydrated
+          ? undefined
+          : useActiveCharacter.getState().hydrate(),
       ]);
     }
     const activeId = useActiveCharacter.getState().activeCharacterId;
