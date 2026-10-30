@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubAnimate } from '@/test/animate';
 import { TabPanel, Tabs } from './Tabs';
 
 const tabs = [
@@ -188,6 +189,30 @@ describe('Tabs', () => {
       );
       expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-controls');
       expect(screen.getByRole('tab', { name: 'History' })).not.toHaveAttribute('aria-controls');
+    });
+  });
+
+  describe('switching tabs', () => {
+    let stub: ReturnType<typeof stubAnimate>;
+    beforeEach(() => {
+      stub = stubAnimate();
+    });
+    afterEach(() => stub.restore());
+
+    it('fades the panel in as it appears and on each switch', () => {
+      const { rerender } = render(
+        <TabPanel tabsId="t" tabId="open">
+          open body
+        </TabPanel>
+      );
+      expect(stub.animate).toHaveBeenCalledTimes(1);
+      rerender(
+        <TabPanel tabsId="t" tabId="history">
+          history body
+        </TabPanel>
+      );
+      expect(stub.animate).toHaveBeenCalledTimes(2);
+      expect(stub.animate.mock.contexts[1]).toBe(screen.getByRole('tabpanel'));
     });
   });
 

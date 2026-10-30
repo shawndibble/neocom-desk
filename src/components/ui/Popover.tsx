@@ -26,15 +26,18 @@ export function PopoverContent({
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
+  // The provider wraps the portal, never sits inside it: Radix's Portal hands
+  // its child a ref to time the exit animation, and a context provider would
+  // swallow it, unmounting the popover before its fade could play.
   return (
-    <PopoverPrimitive.Portal container={container}>
-      <RowTappableContext.Provider value={false}>
+    <RowTappableContext.Provider value={false}>
+      <PopoverPrimitive.Portal container={container}>
         <PopoverPrimitive.Content
           sideOffset={sideOffset}
-          className={cx(menuContentClassName, className)}
+          className={cx(menuContentClassName, 'motion-pop-exit', className)}
           {...props}
         />
-      </RowTappableContext.Provider>
-    </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Portal>
+    </RowTappableContext.Provider>
   );
 }

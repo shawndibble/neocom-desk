@@ -69,29 +69,42 @@ interface ModalProps {
 }
 
 /**
- * Per placement: the dialog's own box, and the height cap that box and its
- * inner column share — one entry, so the two can never disagree.
+ * Per placement: the dialog's own box (with how it arrives, `index.css`
+ * "Overlay motion"), and the height cap that box and its inner column share —
+ * one entry, so the two can never disagree. A sheet rises from the bottom
+ * edge, a centred dialog fades and scales up, and `page` does the first on a
+ * phone (where it fills the screen) and the second from `md`.
  */
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
-  center: { dialogClass: 'm-auto w-full max-w-lg', heightClass: 'h-fit max-h-[85vh]' },
+  center: {
+    dialogClass: 'motion-dialog m-auto w-full max-w-lg',
+    heightClass: 'h-fit max-h-[85vh]',
+  },
   sheet: {
-    dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
+    dialogClass: 'motion-sheet mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
     heightClass: 'h-fit max-h-[85vh]',
   },
   'sheet-full': {
-    dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
+    dialogClass: 'motion-sheet mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
     heightClass: 'h-dvh max-h-dvh',
   },
-  medium: { dialogClass: 'm-auto w-full max-w-3xl', heightClass: 'h-fit max-h-[85vh]' },
+  medium: {
+    dialogClass: 'motion-dialog m-auto w-full max-w-3xl',
+    heightClass: 'h-fit max-h-[85vh]',
+  },
   wide: {
-    dialogClass: 'm-auto w-full max-w-[min(64rem,100vw)]',
+    dialogClass: 'motion-dialog m-auto w-full max-w-[min(64rem,100vw)]',
     heightClass: 'h-fit max-h-[85vh]',
   },
   page: {
-    dialogClass: 'm-0 w-full max-w-none max-md:rounded-none md:m-auto md:w-[min(72rem,95vw)]',
+    dialogClass:
+      'motion-page m-0 w-full max-w-none max-md:rounded-none md:m-auto md:w-[min(72rem,95vw)]',
     heightClass: 'h-dvh max-h-dvh md:h-[90dvh] md:max-h-[90dvh]',
   },
-  media: { dialogClass: 'm-auto w-fit max-w-[95vw]', heightClass: 'h-fit max-h-[95vh]' },
+  media: {
+    dialogClass: 'motion-dialog m-auto w-fit max-w-[95vw]',
+    heightClass: 'h-fit max-h-[95vh]',
+  },
 };
 
 /**
@@ -104,6 +117,12 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
  * closes. The `<dialog>` *is* the surface (docs/DESIGN.md §5 sanctions shadows
  * for modals), and stays content-sized rather than viewport-filling — otherwise
  * it would cover its own `::backdrop`.
+ *
+ * It animates in, never out: children render only while `open`, many callers
+ * unmount the whole Modal on close, and focus return runs in the close
+ * effect, so holding the dialog up for an exit would mean an empty shell or a
+ * late focus move. A swiped sheet is the exception: the gesture itself
+ * slides it off (`useSheetSwipe`).
  */
 export function Modal({
   open,
@@ -123,7 +142,7 @@ export function Modal({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const isSheet = placement.startsWith('sheet');
   useOverlayHistory(open, onClose, closeOnBack);
-  const swipe = useSheetSwipe(dialogRef, onClose, isSheet);
+  const swipe = useSheetSwipe(dialogRef, onClose, isSheet, open);
   const titleId = useId();
   // State, not a ref: a Radix portal needs to re-render once the node exists,
   // and a ref assignment alone would not schedule that render.

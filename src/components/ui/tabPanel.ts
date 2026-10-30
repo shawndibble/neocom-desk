@@ -1,4 +1,5 @@
-import { useId, type HTMLAttributes } from 'react';
+import { useCallback, useId, useRef, type HTMLAttributes } from 'react';
+import { useFadeOnChange } from '@/lib/useFadeOnChange';
 import { focusRingInsetClassName } from './controlStyles';
 
 /**
@@ -17,14 +18,26 @@ export const panelDomId = (tabsId: string, tabId: string) => `${tabsId}-panel-${
 /**
  * Attributes that make an existing content container the tab's panel. Use it
  * where a wrapper `<div>` would disturb the parent's flex/grid layout.
+ *
+ * Spread every prop: the `ref` fades the panel in on a tab switch
+ * (DESIGN.md §6b).
  */
 export function useTabPanelProps(
   tabsId: string,
   tabId: string
 ): Required<Pick<HTMLAttributes<HTMLElement>, 'role' | 'id' | 'tabIndex' | 'className'>> & {
   'aria-labelledby': string;
+  ref: (node: HTMLElement | null) => void;
 } {
+  const panel = useRef<HTMLElement | null>(null);
+  // On mount too: a page that renders each tab as its own component mounts a
+  // fresh panel per switch.
+  useFadeOnChange(panel, tabId);
+  const ref = useCallback((node: HTMLElement | null) => {
+    panel.current = node;
+  }, []);
   return {
+    ref,
     role: 'tabpanel',
     id: panelDomId(tabsId, tabId),
     'aria-labelledby': tabDomId(tabsId, tabId),
