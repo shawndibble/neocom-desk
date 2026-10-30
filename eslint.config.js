@@ -337,5 +337,12 @@ export default tseslint.config(
     rules: {
       'react-refresh/only-export-components': 'off',
     },
+  },
+  {
+    // A test harness exports its Harness component beside fixtures; it is never hot-reloaded.
+    files: ['**/*.testutil.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   }
 );
