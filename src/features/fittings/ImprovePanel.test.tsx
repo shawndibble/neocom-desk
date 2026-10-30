@@ -459,7 +459,8 @@ describe('ImprovePanel', () => {
     const onSortChange = vi.fn();
     const { unmount } = renderPanel(state, vi.fn(), vi.fn(), settings({ onSortChange }));
     expect(first()).toHaveTextContent('+50%');
-    await userEvent.click(screen.getByRole('button', { name: 'Best value' }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sort by:' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Best value' }));
     expect(onSortChange).toHaveBeenCalledWith('value');
     unmount();
     renderPanel(state, vi.fn(), vi.fn(), settings({ sort: 'value' }));
@@ -990,6 +991,8 @@ describe('ImprovePanel', () => {
       const summary = await screen.findByTestId('improve-selection');
       expect(summary).toHaveTextContent('2 changes');
       expect(summary).toHaveTextContent('EHP 1,000 → 1,700');
+      // DPS did not move, so it is not listed.
+      expect(summary).not.toHaveTextContent('DPS');
       expect(s.recalc).toHaveBeenLastCalledWith(expect.anything());
       await userEvent.click(screen.getByRole('button', { name: 'Apply 2 changes' }));
       expect(onApply).toHaveBeenCalledWith([a, b]);

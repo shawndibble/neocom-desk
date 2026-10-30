@@ -3,13 +3,21 @@
  * Trade-offs, never ranked against each other) under the best swap found,
  * and the footer where the ticked set is checked and applied.
  */
-import { Fragment, useMemo, type ReactNode } from 'react';
+import { Fragment, useId, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, SegmentedControl } from '@/components/ui';
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  eyebrowClassName,
+} from '@/components/ui';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { ImproveGoal, ImproveOption, RejectedOption } from '@/engine/fittings/improve';
 import { optionKey } from '@/engine/fittings/improveKeys';
-import { IMPROVE_SORTS } from '@/engine/fittings/improveRows';
+import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { ImproveBlockedRow } from './ImproveBlockedRow';
 import { ImproveCoverOffer } from './ImproveCoverOffer';
 import { ImproveFooter } from './ImproveFooter';
@@ -60,6 +68,7 @@ export function ImproveResults({
   footerTarget,
 }: Props) {
   const { t } = useTranslation();
+  const sortLabelId = useId();
   const { result } = state;
   const { chosen, setTicked } = selection;
   const lead = { goal, hold: settings.hold, target };
@@ -128,16 +137,27 @@ export function ImproveResults({
           {t('fittings.improve.partial', { checked: result.checked })}
         </p>
       )}
-      <SegmentedControl
-        label={t('fittings.improve.sortLabel')}
-        options={IMPROVE_SORTS.map((value) => ({
-          value,
-          label: t(`fittings.improve.sort.${value}`),
-        }))}
-        value={settings.sort}
-        onChange={settings.onSortChange}
-        fill
-      />
+      {/* A select under a visible label, not buttons: buttons read as a filter, and the sort only orders the goal's own swaps. */}
+      <div className="flex items-center gap-2">
+        <span id={sortLabelId} className={eyebrowClassName}>
+          {t('fittings.improve.sortLabel')}
+        </span>
+        <Select
+          value={settings.sort}
+          onValueChange={(value) => settings.onSortChange(value as ImproveSort)}
+        >
+          <SelectTrigger size="sm" aria-labelledby={sortLabelId} className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {IMPROVE_SORTS.map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(`fittings.improve.sort.${value}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {(result.makeFlyable.length > 0 || result.flyableBlocked.length > 0) && (
         <MakeItFitSection heading={t('fittings.improve.section.makeFlyable')}>
           {result.makeFlyable.length > 0 && list(result.makeFlyable, 'mf')}
