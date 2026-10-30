@@ -319,14 +319,15 @@ export function OrderSideCard({
     }
     return { units: u, value: v };
   }, [rows]);
-  const figureTexts = [
-    headingFigures.includes('units')
-      ? t('market.sideSummary.units', { count: units, formatted: formatVolume(units) })
-      : null,
-    headingFigures.includes('value')
-      ? t('market.sideSummary.value', { amount: formatIskCompact(value) })
-      : null,
-  ].filter((text): text is string => text !== null);
+  const figureTexts = ORDER_HEADING_FIGURE_IDS.filter((id) => headingFigures.includes(id)).map(
+    (id) => ({
+      id,
+      text:
+        id === 'units'
+          ? t('market.sideSummary.units', { count: units, formatted: formatVolume(units) })
+          : t('market.sideSummary.value', { amount: formatIskCompact(value) }),
+    })
+  );
   const toggleHeadingFigure = (id: OrderHeadingFigureId) =>
     void setHeadingFigures(
       headingFigures.includes(id)
@@ -362,8 +363,8 @@ export function OrderSideCard({
             <span className="max-sm:hidden">
               {t('market.sideSummary.orders', { count: total })}
             </span>
-            {figureTexts.map((text, i) => (
-              <span key={text}>
+            {figureTexts.map(({ id, text }, i) => (
+              <span key={id}>
                 <span className={i === 0 ? 'max-sm:hidden' : undefined}>{SEPARATOR}</span>
                 {text}
               </span>

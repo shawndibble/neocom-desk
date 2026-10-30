@@ -317,6 +317,20 @@ describe('OrderSideCard', () => {
       await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Units listed' }));
     });
 
+    it('follows the rows on screen', async () => {
+      const { rerender } = renderHarness([make(1, 1000, 1_000), make(2, 2000, 1_500)]);
+      expect(await screen.findByText('2,500 units')).toBeInTheDocument();
+      rerender(
+        withItemActions(
+          <MemoryRouter>
+            <Harness orders={[make(1, 1000, 1_000)]} />
+          </MemoryRouter>,
+          fakeItemActions()
+        )
+      );
+      expect(await screen.findByText('1,000 units')).toBeInTheDocument();
+    });
+
     it('says "1 unit" for a single unit', async () => {
       renderHarness([make(1, 1000, 1)]);
       expect(await screen.findByText('1 unit')).toBeInTheDocument();
