@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { db } from '@/db';
+import { clearRouteSnapshots } from '@/lib/routeSnapshotCache';
 import { useOnline } from '@/stores/network';
 import { ResetViewPreferences } from '@/features/settings/ResetViewPreferences';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
@@ -20,6 +21,8 @@ export function DataPanel() {
     // every character's rows, global reference data included. `esiCache` is
     // 100% re-derivable from ESI, so over-clearing costs a refetch, not data.
     await db.esiCache.clear();
+    // Each view's stored last snapshot is built from those rows: it goes too.
+    await clearRouteSnapshots();
     setClearedConfirm(true);
     clearConfirmTimer.current = setTimeout(() => setClearedConfirm(false), 2000);
   }

@@ -6,6 +6,7 @@ import type {
   CorpBookObservedMetaRecord,
   CorpBookObservedRecord,
   CorpBookPartRecord,
+  RouteSnapshotRecord,
   AnsiblexGateRecord,
   ArchiveKind,
   BuildPlanRecord,
@@ -79,6 +80,7 @@ export const db = new Dexie('neocom') as Dexie & {
   corpBookObserved: Dexie.Table<CorpBookObservedRecord, [number, number, string]>;
   corpBookObservedMeta: Dexie.Table<CorpBookObservedMetaRecord, [number, number]>;
   corpBookParts: Dexie.Table<CorpBookPartRecord, [number, number, string]>;
+  routeSnapshots: Dexie.Table<RouteSnapshotRecord, [number, string]>;
 };
 
 /**
@@ -309,10 +311,17 @@ db.version(29).stores({
   corpBookParts: '[characterId+corporationId+slot], [characterId+corporationId], characterId',
 });
 
+// Adds `routeSnapshots`, each view's last rendered snapshot, so the first
+// visit after a reload opens on it (decision 20261030-170439). Device-local,
+// never synced; purged with the in-memory copy (`lib/routeSnapshotCache.ts`).
+db.version(30).stores({
+  routeSnapshots: '[characterId+name], characterId',
+});
+
 // Adds the contract archive: the Character's own contracts kept a year, longer than the 30 days
 // ESI returns, and the item lines of the ones the pilot opened. Device-local, never synced,
 // wiped with the Character (features/character/removeCharacter.ts).
-db.version(30).stores({
+db.version(31).stores({
   contractArchive: '[characterId+contract_id], characterId, [characterId+archiveDate]',
   contractItemArchive: '[characterId+contract_id], characterId',
 });

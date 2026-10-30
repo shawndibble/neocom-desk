@@ -45,7 +45,10 @@ export function lastWorkspaceLoad(characterId: number | null): WorkspaceLoad | n
 }
 
 export function rememberWorkspaceLoad(load: WorkspaceLoad): void {
-  writeRouteSnapshot(SNAPSHOT_NAME, load.characterId, load);
+  // Memory only: the catalog carries the whole SDE type and blueprint maps
+  // (megabytes), and every patch is a new object, so storing it would clone
+  // all of it on each Industry load.
+  writeRouteSnapshot(SNAPSHOT_NAME, load.characterId, load, { persist: false });
 }
 
 /**

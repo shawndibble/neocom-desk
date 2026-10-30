@@ -136,6 +136,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.corpBookObserved,
       db.corpBookObservedMeta,
       db.corpBookParts,
+      db.routeSnapshots,
       db.notificationFeed,
       db.settings,
     ],
@@ -164,6 +165,9 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await clearCharacterSyncBookkeeping(characterId);
       await deleteShareSelections(characterId);
       await deleteCommunitySnapshots(characterId);
+      // Its views' stored first frames; the cache purge below also forgets the
+      // in-memory copies and the account-wide ones.
+      await db.routeSnapshots.where('characterId').equals(characterId).delete();
     }
   );
   // Its Trade Hub entry (issue #5593). After the transaction: the synced write loads Firebase lazily.

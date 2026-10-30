@@ -1178,6 +1178,22 @@ export interface CorpBookObservedMetaRecord {
 }
 
 /**
+ * One view's last rendered snapshot, so the first visit after a reload opens
+ * on it (`lib/routeSnapshotCache.ts`). Device-local, never synced.
+ */
+export interface RouteSnapshotRecord {
+  /** The Character, or 0 for a value pooled across the account. */
+  characterId: number;
+  /** The view's `cacheKey`. */
+  name: string;
+  data: unknown;
+  /** When it was written, ms. */
+  savedAt: number;
+  /** The build that wrote it: another build's snapshot may have another shape. */
+  appVersion: string;
+}
+
+/**
  * One of a Character's own contracts, kept after ESI stops returning it (a finished contract
  * drops after 30 days). `archiveDate` is the contract's last date, which the 365-day prune
  * reads. Device-local, not synced, not in the backup (decision 20261030-173142-contracts-kept-a-year-on-this-device).

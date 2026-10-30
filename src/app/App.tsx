@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, type ReactElement } from 'react';
+import { ACCOUNT_SNAPSHOT_ID, hydrateRouteSnapshots } from '@/lib/routeSnapshotCache';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -302,6 +303,14 @@ function AppEffects() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  // The active Character's stored view snapshots, read while the first route's
+  // code is still loading, so that route's first frame already has them.
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    void hydrateRouteSnapshots(activeCharacterId);
+    void hydrateRouteSnapshots(ACCOUNT_SNAPSHOT_ID);
+  }, [activeCharacterId]);
 
   // Applies the stored text-scale to <html> as early as possible, regardless
   // of which route the user lands on — it is not something visiting /settings
