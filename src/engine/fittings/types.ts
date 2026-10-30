@@ -9,6 +9,7 @@ import type { AppliedDpsInputs } from './appliedDps';
 import type { CapacitorBudget } from './tank';
 import type { SupportStats } from './support';
 import type { ExploreStats } from './explore';
+import type { ModuleFigures } from './moduleFigures';
 import type { MiningStats } from './mining';
 import type { FleetSupportStats } from './fleetSupport';
 
@@ -364,6 +365,8 @@ export interface FittingStats {
   mining: MiningStats;
   /** Hacking and scanning modules' figures (`explore.ts`). */
   explore: ExploreStats;
+  /** Reactivation, reload, salvager, tractor and scanner figures (`moduleFigures.ts`). */
+  moduleFigures: ModuleFigures;
   /** What the running bursts and industrial core give the fleet (`fleetSupport.ts`). */
   fleetSupport: FleetSupportStats;
   fighters: FighterStats;

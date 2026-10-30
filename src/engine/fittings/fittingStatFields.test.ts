@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { baseFittingStats } from './__fixtures__/fittingStats';
 import { NUMERIC_FIELDS, STAT_DIRECTION, changeVerdict, statDirection } from './fittingStatFields';
 
 describe('stat direction', () => {
@@ -48,5 +49,62 @@ describe('changeVerdict', () => {
     expect(changeVerdict({ key: 'capacitor', before: 60, after: 70 })).toBe('better');
     expect(changeVerdict({ key: 'capacitor', before: -90, after: -120 })).toBe('better');
     expect(changeVerdict({ key: 'capacitor', before: -120, after: -90 })).toBe('worse');
+  });
+});
+
+describe('swap figures read off the fit', () => {
+  const stats_ = (over: object = {}) => ({ ...baseFittingStats(), ...over });
+  const field = (key: string) => NUMERIC_FIELDS.find((f) => f.key === key)!;
+  const row = (kind: string, optimal: number, falloff: number) => ({
+    kind,
+    typeId: 1,
+    count: 1,
+    amount: 1,
+    optimal,
+    falloff,
+    effects: [],
+  });
+
+  it('takes the longest reach per EWAR kind, so adding a module never reads as lost reach', () => {
+    const base = stats_();
+    const one = stats_({
+      support: { ...base.support, rows: [row('ecm', 20000, 10000)] },
+    } as never);
+    const two = stats_({
+      support: { ...base.support, rows: [row('ecm', 20000, 10000), row('ecm', 5000, 1000)] },
+    } as never);
+    expect(field('ecmRange').value(one)).toBe(30);
+    expect(field('ecmRange').value(two)).toBe(30);
+    expect(field('dampRange').value(two)).toBe(0);
+  });
+
+  it('reads the worst missile launcher and skips sentries for drone speed', () => {
+    const missile = (explosionVelocity: number, explosionRadius: number) => ({
+      kind: 'missile',
+      dps: 1,
+      range: 1,
+      explosionVelocity,
+      explosionRadius,
+      damageReductionFactor: 0.5,
+    });
+    const drone = (speed: number, tracking: number) => ({
+      kind: 'drone',
+      dps: 1,
+      speed,
+      tracking,
+      optimal: 1,
+      falloff: 1,
+      optimalSigRadius: 1,
+    });
+    const stats = stats_({
+      applied: {
+        droneControlRange: 0,
+        weapons: [missile(150, 140), missile(100, 200), drone(0, 0.5), drone(3000, 0.04)],
+      },
+    } as never);
+    expect(field('missileExplosionVelocity').value(stats)).toBe(100);
+    expect(field('missileExplosionRadius').value(stats)).toBe(200);
+    expect(field('droneSpeed').value(stats)).toBe(3000);
+    expect(field('droneTracking').value(stats)).toBe(0.04);
   });
 });
