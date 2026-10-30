@@ -67,6 +67,13 @@ function openPricesOn(
 
 const CHAR_ID = 91;
 
+/**
+ * A station lookup that declines. Tests that don't care about the location answer with this, not a
+ * request that never resolves: a pending request stays in the ESI cache's in-flight map, so every
+ * later test reading the same station inherited it and waited out the full 1000ms cache settle.
+ */
+const NO_STATION = () => new HttpResponse(null, { status: 404 });
+
 const ITEM_EXCHANGE: Contract = {
   contract_id: 12345,
   issuer_id: 500001,
@@ -291,7 +298,7 @@ describe('ContractDetailModal System rows', () => {
 describe('ContractDetailModal', () => {
   it('renders the summary fields immediately from the contract prop, no fetch needed', () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([])
       )
@@ -310,7 +317,7 @@ describe('ContractDetailModal', () => {
 
   it('opens a link from the description in a new tab, from a button', () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([])
       )
@@ -469,7 +476,7 @@ describe('ContractDetailModal', () => {
 
   it('links an item-exchange line item through to Market (issue #417)', async () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([
           { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
@@ -488,7 +495,7 @@ describe('ContractDetailModal', () => {
 
   it('right-clicking a blueprint line item starts a Build Plan for what it builds', async () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
         HttpResponse.json([
           { record_id: 1, type_id: 638, quantity: 1, is_included: true, is_singleton: true },
@@ -584,7 +591,7 @@ describe('ContractDetailModal', () => {
 
     function serve(items: unknown[]) {
       server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
         http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
           HttpResponse.json(items)
         )
@@ -869,7 +876,7 @@ describe('ContractDetailModal', () => {
 
     it('folds the volume into the Items figure instead of a chip of its own', async () => {
       server.use(
-        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, NO_STATION),
         http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
           HttpResponse.json([
             { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },

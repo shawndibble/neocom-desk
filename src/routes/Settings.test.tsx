@@ -5,6 +5,9 @@ import { clearPushFailure, usePushFailure } from '@/features/notifications/pushF
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { http, HttpResponse } from 'msw';
+import { mswServer } from '@/test/msw';
+import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { AVOIDED_SYSTEMS_KEY, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -24,7 +27,10 @@ import {
 } from '@/features/notifications/permission';
 import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
-import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
+import {
+  PROJECTION_REBUILD_DELAY_MS,
+  scheduleProjectionRebuild,
+} from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
 import { stubViewport } from '@/test/viewport';
 import { MD_UP_QUERY } from '@/lib/useMediaQuery';
@@ -123,6 +129,17 @@ vi.mock('@/app/bootPrefetch', () => ({
 }));
 
 const CHAR_ID = 91;
+
+/**
+ * The corp-roles read every mounted character makes. With no server it went to the real network,
+ * where it hangs under jsdom, and the after-each cache settle then sat out its full 1000ms on
+ * every test that rendered the app (about 30s of this file).
+ */
+mswServer(
+  http.get(`${ESI_BASE_URL}/characters/:id/roles`, () => HttpResponse.json({})),
+  // The update check reads the published release first; unreadable falls back to the worker.
+  http.get('*/version.json', () => new HttpResponse(null, { status: 404 }))
+);
 
 /**
  * jsdom has no Notification API, so every test above renders the panel's
@@ -1089,6 +1106,7 @@ describe('Settings — Notifications (issue #170)', () => {
    * badge on that row would make the promise for 25 types that cannot keep it
    * — which is what breaks if someone later drops the filter.
    */
+  // About 0.9s: one cold App render plus five topic opens, each a real click on a virtualized list.
   it('marks only the events that really arrive with the app closed', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -1254,11 +1272,13 @@ describe('Settings — Notifications (issue #170)', () => {
       await notificationsPanel();
       await openTopic(userEvent.setup(), 'Skills');
       await waitFor(() => expect(rowCheckbox('Skill level complete', 'device')).toBeChecked());
-      // The scheduler is module state: let a rebuild an earlier test's
-      // browser click queued (on real timers) land before counting.
-      await act(
-        () => new Promise((resolve) => setTimeout(resolve, PROJECTION_REBUILD_DELAY_MS + 50))
-      );
+      // The scheduler is module state: drop a rebuild an earlier test's browser click queued on
+      // real timers (waiting out its 1s delay cost every test here a second), and let one already
+      // past its timer land before counting.
+      await act(async () => {
+        scheduleProjectionRebuild.cancel();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
       vi.mocked(rebuildProjection).mockClear();
       vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
       return userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
