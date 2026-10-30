@@ -149,8 +149,8 @@ const supportMax = (
 const supportReach = (s: FittingStats, kinds: readonly SupportKind[]) =>
   supportMax(s, kinds, (row) => row.optimal + row.falloff) / 1000;
 
-/** One figure per combat drone or missile, worst (`'min'`) or best across the fit; 0 with none. */
-const droneFigure = (
+/** The best figure among mobile combat drones (a sentry's speed is 0); 0 with none. */
+const fastestDroneFigure = (
   s: FittingStats,
   pick: (drone: { speed: number; tracking: number }) => number
 ) =>
@@ -589,14 +589,14 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     key: 'droneSpeed',
     direction: 'higher',
     digits: 0,
-    value: (s) => droneFigure(s, (drone) => drone.speed),
+    value: (s) => fastestDroneFigure(s, (drone) => drone.speed),
     hideWhenNone: true,
   },
   {
     key: 'droneTracking',
     direction: 'higher',
     digits: 3,
-    value: (s) => droneFigure(s, (drone) => drone.tracking),
+    value: (s) => fastestDroneFigure(s, (drone) => drone.tracking),
     hideWhenNone: true,
   },
   // Worst launcher, so one that gets worse reads as a loss.

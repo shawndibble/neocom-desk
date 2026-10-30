@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { extractModuleFigures, NO_MODULE_FIGURES } from './moduleFigures';
 
-const mod = (attrs: Record<number, number>, state = 'active', slot = 'medium') => ({
+const mod = (
+  attrs: Record<number, number>,
+  state = 'active',
+  slot = 'medium',
+  charge?: object
+) => ({
   item: { slot: { type: slot } },
   result: {
     state,
+    charge,
     attributes: { get: (id: number) => (id in attrs ? { value: attrs[id] } : undefined) },
   },
 });
@@ -24,9 +30,10 @@ describe('extractModuleFigures', () => {
     expect(extract(mod({ 669: 30000 }), mod({ 669: 10000 }), mod({})).reactivationSeconds).toBe(30);
   });
 
-  it('counts a reload only on a non-weapon', () => {
-    expect(extract(mod({ 1795: 60000 })).reloadSeconds).toBe(60);
-    expect(extract(mod({ 1795: 5000, [-12]: 40 }, 'active', 'high')).reloadSeconds).toBe(0);
+  it('counts a reload only on a loaded non-weapon', () => {
+    expect(extract(mod({ 1795: 60000 }, 'active', 'medium', {})).reloadSeconds).toBe(60);
+    expect(extract(mod({ 1795: 60000 })).reloadSeconds).toBe(0);
+    expect(extract(mod({ 1795: 5000, [-12]: 40 }, 'active', 'high', {})).reloadSeconds).toBe(0);
   });
 
   it('pairs a salvager chance with its own range', () => {

@@ -26,7 +26,7 @@ const FIGURE_ATTRIBUTE = {
 export interface ModuleFigures {
   /** The longest reactivation delay, seconds; 0 with none. */
   reactivationSeconds: number;
-  /** The longest reload of a charge-fed non-weapon (ancillary repairer), seconds; 0 with none. */
+  /** The longest reload of a loaded non-weapon (ancillary repairer), seconds; 0 with none. */
   reloadSeconds: number;
   /** The best salvager's chance bonus, % ; its optimal range, metres. */
   salvageChance: number;
@@ -57,6 +57,7 @@ interface ItemLike {
 interface ResultLike {
   attributes: { get(attributeId: number): { value: number } | undefined };
   state: string;
+  charge?: unknown;
 }
 
 const MODULE_SLOTS: ReadonlySet<string> = new Set(['high', 'medium', 'low']);
@@ -75,7 +76,8 @@ export function extractModuleFigures(
       figures.reactivationSeconds,
       read(FIGURE_ATTRIBUTE.reactivationDelay) / 1000
     );
-    if (read(FIGURE_ATTRIBUTE.dps) <= 0)
+    // A loaded non-weapon: an ancillary repairer's reload; a weapon's already shapes sustained DPS.
+    if (result.charge && read(FIGURE_ATTRIBUTE.dps) <= 0)
       figures.reloadSeconds = Math.max(
         figures.reloadSeconds,
         read(FIGURE_ATTRIBUTE.reloadTime) / 1000
