@@ -39,6 +39,7 @@ const PINNED = [
   'planColumnVisibility.v2',
   'planGroupingMode',
   'walletJournalBreakdownOpen',
+  'walletJournalBreakdownView',
   'walletJournalFlowChartHidden',
 ];
 

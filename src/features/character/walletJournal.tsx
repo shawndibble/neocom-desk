@@ -48,6 +48,8 @@ export function useJournalFilterResult(
   filteredJournal: JournalRow[];
   /** Filtered by date range and text only: the ref-type breakdown ignores the ref-type filter. */
   breakdownJournal: JournalRow[];
+  /** Filtered by ref type, date range and text but not party: the By party list keeps every party. */
+  partyBreakdownJournal: JournalRow[];
   /** Filtered by ref type and text but not date: the chart draws its own date axis. */
   chartJournal: JournalRow[];
   refTypeOptions: string[];
@@ -66,6 +68,15 @@ export function useJournalFilterResult(
           ),
     [journal, filter, filteredJournal, t]
   );
+  const partyBreakdownJournal = useMemo(
+    () =>
+      filter.party === null
+        ? filteredJournal
+        : filterWalletJournal(journal, { ...filter, party: null }, (entry) =>
+            journalDescriptionText(entry, t)
+          ),
+    [journal, filter, filteredJournal, t]
+  );
   const chartJournal = useMemo(
     () =>
       filter.startDate === null && filter.endDate === null
@@ -76,7 +87,7 @@ export function useJournalFilterResult(
     [journal, filter, filteredJournal, t]
   );
   const refTypeOptions = useMemo(() => journalRefTypes(journal), [journal]);
-  return { filteredJournal, breakdownJournal, chartJournal, refTypeOptions };
+  return { filteredJournal, breakdownJournal, partyBreakdownJournal, chartJournal, refTypeOptions };
 }
 
 /**

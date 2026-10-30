@@ -4,6 +4,8 @@ import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   filterWalletJournal,
+  journalPartyBreakdown,
+  toggleBreakdownParty,
   journalRefTypeBreakdown,
   toggleBreakdownRefType,
   journalRefTypes,
@@ -120,6 +122,7 @@ describe('filterWalletJournal', () => {
       startDate: '2026-08-02',
       endDate: null,
       player: null,
+      party: null,
       text: 'x',
     };
     expect(filterWalletJournal(rows, filter).map((r) => r.id)).toEqual([2]);
@@ -153,6 +156,7 @@ describe('activeWalletJournalFilterCount', () => {
         startDate: '2026-01-01',
         endDate: null,
         player: null,
+        party: null,
         text: '',
       })
     ).toBe(2);
@@ -262,5 +266,40 @@ describe('journalRefTypeBreakdown netting', () => {
       },
     ]);
     expect(result.rows[0].refType).toBe('plex_bought');
+  });
+});
+
+describe('party filter and breakdown', () => {
+  const rows = [
+    { ...entry({ id: 1, amount: 100 }), partyId: 7 },
+    { ...entry({ id: 2, amount: -30 }), partyId: 7 },
+    { ...entry({ id: 3, amount: 500 }), partyId: 9 },
+    { ...entry({ id: 4, amount: 20, ref_type: 'market_transaction' }), partyId: 11 },
+    { ...entry({ id: 5, amount: -25, ref_type: 'market_transaction' }), partyId: 12 },
+    { ...entry({ id: 6, amount: 900 }), partyId: 7, internal: true },
+    { ...entry({ id: 7, amount: 5 }) },
+  ];
+
+  it('filters to one party', () => {
+    const out = filterWalletJournal(rows, { ...EMPTY_WALLET_JOURNAL_FILTER, party: '7' });
+    expect(out.map((r) => r.id)).toEqual([1, 2, 6]);
+  });
+
+  it('counts the party as an active criterion', () => {
+    expect(activeWalletJournalFilterCount({ ...EMPTY_WALLET_JOURNAL_FILTER, party: '7' })).toBe(1);
+  });
+
+  it('rolls up In / Out / Net per party, groups market fills, skips internal and party-less lines', () => {
+    expect(journalPartyBreakdown(rows)).toEqual([
+      { key: '9', partyId: 9, income: 500, expense: 0, net: 500, count: 1 },
+      { key: '7', partyId: 7, income: 100, expense: 30, net: 70, count: 2 },
+      { key: 'market', partyId: null, income: 20, expense: 25, net: -5, count: 2 },
+    ]);
+  });
+
+  it('toggles the party filter', () => {
+    const on = toggleBreakdownParty(EMPTY_WALLET_JOURNAL_FILTER, 7);
+    expect(on.party).toBe('7');
+    expect(toggleBreakdownParty(on, 7).party).toBeNull();
   });
 });
