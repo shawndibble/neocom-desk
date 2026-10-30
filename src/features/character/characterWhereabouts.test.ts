@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./location', () => ({ loadCharacterPlaceRead: mocks.place }));
 vi.mock('./ship', () => ({ loadCharacterShipTypeRead: mocks.ship }));
 vi.mock('./stations', () => ({ loadStationName: mocks.station }));
-vi.mock('./structures', () => ({ loadStructureName: mocks.structure }));
+vi.mock('./structures', () => ({ loadStructureNameNoRoster: mocks.structure }));
 vi.mock('./systemSecurity', () => ({ loadSystemName: mocks.system }));
 vi.mock('./typeNames', () => ({ loadTypeNames: mocks.types }));
 

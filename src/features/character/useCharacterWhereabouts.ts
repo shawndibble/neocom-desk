@@ -18,7 +18,7 @@ export interface WhereaboutsLookup {
 }
 
 /**
- * Each Character's docked place and ship (issue #5592). With `enabled` false
+ * Each Character's docked place and ship. With `enabled` false
  * nothing is read: the columns are off by default.
  */
 export function useCharacterWhereabouts(
@@ -28,16 +28,18 @@ export function useCharacterWhereabouts(
   const withLocation = useCharacterIdsWithScopes([LOCATION_SCOPE], characterIds);
   const withShip = useCharacterIdsWithScopes([SHIP_SCOPE], characterIds);
   const ready = enabled && withLocation !== undefined && withShip !== undefined;
-  const load = useMemo(
-    () => (entry: string) => {
+  // Keyed by value: any token write re-runs the live query into a fresh Set,
+  // which would otherwise reload every row from ESI.
+  const locationKey = withLocation ? idSetKey(withLocation) : '';
+  const shipKey = withShip ? idSetKey(withShip) : '';
+  const load = useMemo(() => {
+    const location = new Set(locationKey.split(',').map(Number));
+    const ship = new Set(shipKey.split(',').map(Number));
+    return (entry: string) => {
       const id = Number(entry);
-      return loadCharacterWhereabouts(id, {
-        location: withLocation?.has(id) ?? false,
-        ship: withShip?.has(id) ?? false,
-      });
-    },
-    [withLocation, withShip]
-  );
+      return loadCharacterWhereabouts(id, { location: location.has(id), ship: ship.has(id) });
+    };
+  }, [locationKey, shipKey]);
   const { values } = useBatchedMap(ready ? idSetKey(characterIds) : '', load);
   return useMemo(
     () => ({

@@ -1,6 +1,6 @@
 /**
  * Where a character is and what it flies, for the Characters table's optional
- * "Docked at" and "Ship" columns (issue #5592). Read per character, a few at a
+ * "Docked at" and "Ship" columns. Read per character, a few at a
  * time, only while a column shows. Every lookup absorbs its own failure: a
  * structure the character is not on the ACL of, or an offline read, leaves that
  * part null and the row still renders.
@@ -9,7 +9,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { loadCharacterPlaceRead } from './location';
 import { loadCharacterShipTypeRead } from './ship';
 import { loadStationName } from './stations';
-import { loadStructureName } from './structures';
+import { loadStructureNameNoRoster } from './structures';
 import { loadSystemName } from './systemSecurity';
 import { loadTypeNames } from './typeNames';
 
@@ -65,7 +65,7 @@ export async function loadCharacterWhereabouts(
     raw?.stationId != null
       ? settle(loadStationName(raw.stationId))
       : raw?.structureId != null
-        ? settle(loadStructureName(characterId, raw.structureId))
+        ? settle(loadStructureNameNoRoster(characterId, raw.structureId))
         : null,
     shipTypeId === null
       ? null

@@ -182,7 +182,7 @@ export function buildColumns(
         const place = row.whereabouts?.place;
         if (!place) return '—';
         const label = placeLabel(place);
-        if (label.kind === 'docked') return <span className="truncate">{label.name}</span>;
+        if (label.kind === 'docked') return label.name;
         const system = label.system ?? t('common.unknown');
         return (
           <span>
