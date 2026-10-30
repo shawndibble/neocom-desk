@@ -26,7 +26,7 @@ import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
 
 /**
- * The first assertion after `goto`: a cold dev server on a CI runner was seen
+ * The first assertion after `goto`: a cold load on a CI runner (then on the dev server) was seen
  * taking ~6s just to serve the Industry route's module graph, past
  * Playwright's default 5s, with the page still on its route spinner.
  */
