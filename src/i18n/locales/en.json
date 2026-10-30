@@ -9211,6 +9211,8 @@
     }
   },
   "piPlan": {
+    "vs90dSpike": "{{pct}} vs 90d",
+    "vs90dDrop": "{{pct}} vs 90d · below its 90-day price",
     "thinSales": "Plan sells {{plan}}/day · {{region}} trades {{trades}}/day ({{pct}}%) · counted at {{counted}}/day",
     "account": {
       "title": "Best use of all your planets",

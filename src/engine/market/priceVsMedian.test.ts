@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   PRICE_SPIKE_PCT,
   VS_MEDIAN_MIN_TRADED_DAYS,
+  isPriceDrop,
   isPriceSpike,
   priceVsMedianPct,
 } from './priceVsMedian';
@@ -77,5 +78,15 @@ describe('isPriceSpike', () => {
     expect(isPriceSpike(19.4)).toBe(false);
     expect(isPriceSpike(-35)).toBe(false);
     expect(isPriceSpike(null)).toBe(false);
+  });
+});
+
+describe('isPriceDrop', () => {
+  it('flags from the negative threshold down, on the rounded percent shown', () => {
+    expect(isPriceDrop(-PRICE_SPIKE_PCT)).toBe(true);
+    expect(isPriceDrop(-19.6)).toBe(true);
+    expect(isPriceDrop(-19.4)).toBe(false);
+    expect(isPriceDrop(35)).toBe(false);
+    expect(isPriceDrop(null)).toBe(false);
   });
 });
