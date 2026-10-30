@@ -72,6 +72,13 @@ export type FittingStatKey =
   | 'capTransfer'
   | 'droneControlRange'
   | 'miningWaste'
+  | 'dataStrength'
+  | 'relicStrength'
+  | 'utilitySlots'
+  | 'probeStrength'
+  | 'probeLauncherBonus'
+  | 'probeLauncherCycle'
+  | 'cloakRecalibration'
   | ImproveExploreKey;
 
 /** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below. */
@@ -395,11 +402,26 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.mining.wastePct,
     hideWhenNone: true,
   },
+  // Per site, so an Integrated → Data Analyzer swap names the relic sites it can no longer open.
   {
-    key: 'hackingStrength',
+    key: 'dataStrength',
     direction: 'higher',
     digits: 0,
-    value: (s) => s.explore.hacking.strength,
+    value: (s) => s.explore.dataStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'relicStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.relicStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'utilitySlots',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.utilitySlots,
     hideWhenNone: true,
   },
   {
@@ -438,6 +460,34 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.explore.scanning.deviation,
     hideWhenNone: true,
   },
+  {
+    key: 'probeStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.explore.probe.strength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherBonus',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.probe.launcherBonus,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherCycle',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.probe.cycleSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'cloakRecalibration',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => s.explore.cloakRecalibrationSeconds,
+    hideWhenNone: true,
+  },
 ];
 
 /** Same rounding every diff view compares/displays at, keyed by `StatChangeKey` including `capacitor`. */
@@ -445,6 +495,8 @@ export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
   capacitor: 0,
   appliedDps: 1,
+  // Explore's lead figure: the best analyzer, whatever site it opens.
+  hackingStrength: 0,
 } as Readonly<Record<StatChangeKey, number>>;
 
 export function round(value: number, digits: number): number {
@@ -461,6 +513,7 @@ export const STAT_DIRECTION: Readonly<Record<StatChangeKey, StatDirection>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.direction])),
   capacitor: 'higher',
   appliedDps: 'higher',
+  hackingStrength: 'higher',
 } as Readonly<Record<StatChangeKey, StatDirection>>;
 
 /** Role stats (`skillGains`) where less is better: a reload, a fuel bill. Absent: higher. */
