@@ -947,7 +947,8 @@ composing on hover and focus.
   main content area, so any movement reads as the whole app sliding rather
   than a page turn. A transform would also make the outlet the containing
   block for every `position: fixed` element inside it for the length of the
-  animation. A tab panel is smaller and holds no fixed bars.
+  animation. A tab panel holds no fixed elements; keep it that way, or portal
+  them to `body`.
 - **A switch lands on loaded content.** The router wraps navigations in
   `startTransition`, so a tab whose lazy chunk is still loading keeps the old
   tab on screen until it arrives, and the fade plays on the new tab. A page

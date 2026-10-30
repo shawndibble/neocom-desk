@@ -5,26 +5,18 @@ import { Spinner, Tabs, useTabsId } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePageTab } from '@/lib/usePageTab';
 import { MINING_TABS } from '@/app/pageTabs';
-import { guarded, preloadChunk } from '@/app/routeChunks';
+import { named, preloadFrom } from '@/app/routeChunks';
 
 // Each tab loads on first visit, or as the pilot reaches for it (`preloadTab`).
 const TAB_LOADERS = {
-  tax: () =>
-    guarded(() => import('@/features/miningTax/TaxTab')).then((m) => ({ default: m.TaxTab })),
-  overview: () =>
-    guarded(() => import('@/features/miningTax/OverviewTab')).then((m) => ({
-      default: m.OverviewTab,
-    })),
-  survey: () =>
-    guarded(() => import('@/features/survey/SurveyTab')).then((m) => ({ default: m.SurveyTab })),
+  tax: named(() => import('@/features/miningTax/TaxTab'), 'TaxTab'),
+  overview: named(() => import('@/features/miningTax/OverviewTab'), 'OverviewTab'),
+  survey: named(() => import('@/features/survey/SurveyTab'), 'SurveyTab'),
 };
 const TaxTab = lazy(TAB_LOADERS.tax);
 const OverviewTab = lazy(TAB_LOADERS.overview);
 const SurveyTab = lazy(TAB_LOADERS.survey);
-
-function preloadTab(id: string): void {
-  if (Object.hasOwn(TAB_LOADERS, id)) preloadChunk(TAB_LOADERS[id as keyof typeof TAB_LOADERS]);
-}
+const preloadTab = preloadFrom(TAB_LOADERS);
 
 /**
  * Mining (issue #671): renamed from "Moon Mining" — every internal

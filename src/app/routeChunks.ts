@@ -38,10 +38,10 @@ type RouteModule = { default: ComponentType };
  * reload lands; if that recovery gives up, or none is running, `guarded` rejects
  * into the route's error boundary instead.
  */
-export function named<K extends string>(
-  importer: () => Promise<Record<K, ComponentType>>,
+export function named<M extends Record<K, unknown>, K extends keyof M & string>(
+  importer: () => Promise<M>,
   key: K
-): () => Promise<RouteModule> {
+): () => Promise<{ default: M[K] }> {
   return () => guarded(importer).then((m) => ({ default: m[key] }));
 }
 
@@ -260,6 +260,13 @@ export function preloadRouteChunk(path: AppRoutePath): void {
  */
 export function preloadChunk(load: () => Promise<unknown>): void {
   void load().catch(() => {});
+}
+
+/** A `Tabs` `onPreload` for a page whose lazy tabs load through `loaders`, keyed by tab id. */
+export function preloadFrom(loaders: Record<string, () => Promise<unknown>>): (id: string) => void {
+  return (id) => {
+    if (Object.hasOwn(loaders, id)) preloadChunk(loaders[id]);
+  };
 }
 
 /**

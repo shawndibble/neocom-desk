@@ -1,7 +1,7 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { guarded, preloadChunk } from '@/app/routeChunks';
+import { named, preloadFrom } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -124,29 +124,16 @@ import {
 // One tab renders at a time: each panel loads on first visit, or as the
 // pilot reaches for its tab (`preloadTab`).
 const TAB_LOADERS = {
-  orders: () =>
-    guarded(() => import('@/features/market/OrdersTab')).then((m) => ({ default: m.OrdersTab })),
-  stock: () =>
-    guarded(() => import('@/features/stockTargets/StockTab')).then((m) => ({
-      default: m.StockTab,
-    })),
-  history: () =>
-    guarded(() => import('@/features/market/TransactionsPanel')).then((m) => ({
-      default: m.TransactionsPanel,
-    })),
-  appraisal: () =>
-    guarded(() => import('@/features/market/AppraisalPanel')).then((m) => ({
-      default: m.AppraisalPanel,
-    })),
+  orders: named(() => import('@/features/market/OrdersTab'), 'OrdersTab'),
+  stock: named(() => import('@/features/stockTargets/StockTab'), 'StockTab'),
+  history: named(() => import('@/features/market/TransactionsPanel'), 'TransactionsPanel'),
+  appraisal: named(() => import('@/features/market/AppraisalPanel'), 'AppraisalPanel'),
 };
 const OrdersTab = lazy(TAB_LOADERS.orders);
 const StockTab = lazy(TAB_LOADERS.stock);
 const TransactionsPanel = lazy(TAB_LOADERS.history);
 const AppraisalPanel = lazy(TAB_LOADERS.appraisal);
-
-function preloadTab(id: string): void {
-  if (Object.hasOwn(TAB_LOADERS, id)) preloadChunk(TAB_LOADERS[id as keyof typeof TAB_LOADERS]);
-}
+const preloadTab = preloadFrom(TAB_LOADERS);
 
 /** Rows shown per side before "show all" (GLOSSARY.md). */
 const ROW_CAP = 15;

@@ -3,11 +3,7 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
 /** Long enough to read as a change of view, short enough never to hold up reading it. */
 const FADE_MS = 220;
 
-/**
- * The rise's travel and length. This curve has an opacity fade mostly done in
- * its first 70ms, which reads as a cut; the short rise is the movement the eye
- * actually catches.
- */
+/** The tab-panel rise (DESIGN.md §6b says why). */
 const RISE = '8px';
 const RISE_MS = 240;
 
@@ -16,8 +12,8 @@ const FADE_EASING = 'cubic-bezier(0.33, 1, 0.68, 1)';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
-/** Marks this hook's animations, so an outer fade can find the inner ones. */
-const FADE_ID = 'fade-on-change';
+/** Fades still running, by element: an outer fade cancels the ones inside it. */
+const running = new Map<Animation, Element>();
 
 /**
  * Fades `target` in as it mounts and whenever `key` changes: the route outlet
@@ -48,12 +44,13 @@ export function useFadeOnChange(
     const node = target.current;
     if (node === null || typeof node.animate !== 'function') return;
     if (window.matchMedia?.(REDUCED_MOTION_QUERY).matches) return;
-    // Cancels this element's own unfinished fade (two would drive one
-    // property) and any inside it: a page change mounts a fresh tab panel, a
-    // tab switch can mount a nested one, and layout effects run inner-first,
-    // so those started already. One movement per change, the outermost.
-    for (const animation of node.getAnimations?.({ subtree: true }) ?? []) {
-      if (animation.id === FADE_ID) animation.cancel();
+    // Cancel unfinished fades here and below (two would drive one property):
+    // layout effects run inner-first, so a panel this change mounted has
+    // already started its own. One movement per change, the outermost.
+    for (const [animation, element] of running) {
+      if (!node.contains(element)) continue;
+      running.delete(animation);
+      animation.cancel();
     }
     const keyframes = rise
       ? [
@@ -61,10 +58,11 @@ export function useFadeOnChange(
           { opacity: 1, translate: '0 0' },
         ]
       : [{ opacity: 0 }, { opacity: 1 }];
-    node.animate(keyframes, {
-      id: FADE_ID,
+    const animation = node.animate(keyframes, {
       duration: rise ? RISE_MS : FADE_MS,
       easing: FADE_EASING,
     });
+    running.set(animation, node);
+    animation.onfinish = () => running.delete(animation);
   }, [target, key, rise]);
 }

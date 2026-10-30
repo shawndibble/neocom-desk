@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stubAnimate } from '@/test/animate';
 import { TabPanel, Tabs } from './Tabs';
+import { useTabPanelProps } from './tabPanel';
 
 const tabs = [
   { id: 'open', label: 'Open' },
@@ -226,6 +227,22 @@ describe('Tabs', () => {
         expect.anything()
       );
     });
+  });
+
+  it('animates a bar-less panel without naming a tab that is not there', () => {
+    const stub = stubAnimate();
+    function Bare() {
+      const { className, ...props } = useTabPanelProps(null, 'only');
+      return (
+        <div {...props} className={className}>
+          only view
+        </div>
+      );
+    }
+    render(<Bare />);
+    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
+    expect(stub.animate.mock.contexts[0]).toBe(screen.getByText('only view'));
+    stub.restore();
   });
 
   describe('preloading a tab the pilot is about to pick', () => {

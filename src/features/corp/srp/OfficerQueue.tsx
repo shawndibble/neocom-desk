@@ -113,9 +113,12 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     if (tab === 'history' && history.status === 'idle') loadHistory();
   }, [tab, history.status, loadHistory]);
 
-  // Fades the queue on every switch, phone included; only the desktop bar's
-  // panel takes the tabpanel role, since the phone's SegmentedControl has no tab to name it.
-  const { ref: fadeRef, className: panelRing, ...panelAttrs } = useTabPanelProps(tabsId, tab);
+  // The phone's SegmentedControl has no tab to name a tabpanel; the queue still animates.
+  const {
+    ref: fadeRef,
+    className: panelRing,
+    ...panelAttrs
+  } = useTabPanelProps(phone ? null : tabsId, tab);
   const setPanel = useCallback(
     (node: HTMLDivElement | null) => {
       panelRef.current = node;
@@ -333,8 +336,9 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
       <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>
         <div
           ref={setPanel}
-          {...(phone ? { tabIndex: -1 } : panelAttrs)}
-          className={cx('grid gap-3 outline-none', !phone && panelRing)}
+          tabIndex={-1}
+          {...panelAttrs}
+          className={cx('grid gap-3 outline-none', panelRing)}
         >
           {tab !== 'history' && (
             <SrpBulkBar

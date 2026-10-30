@@ -25,14 +25,10 @@ export function SrpPage({
   const [tab, selectTab] = usePageTab(SRP_TABS);
   const views = SRP_VIEWS.filter((v) => v.visible({ canManageSrp, srpOn, isDirector }));
   const view = views.find((v) => v.id === tab) ?? views[0];
-  const {
-    ref: fadeRef,
-    className: panelRing,
-    ...panelAttrs
-  } = useTabPanelProps(tabsId, view?.id ?? tab);
+  const tabbed = views.length > 1;
+  const panel = useTabPanelProps(tabbed ? tabsId : null, view?.id ?? tab);
   if (!view) return null;
   const View = view.component;
-  const tabbed = views.length > 1;
   return (
     <div className={cx('mx-auto grid gap-4 px-4 py-4', view.wide ? 'max-w-6xl' : 'max-w-5xl')}>
       <PageHeader title={t('srp.title')} />
@@ -52,8 +48,8 @@ export function SrpPage({
         />
       )}
       {/* One wrapper either way: a second view appearing (SRP turned on) must
-          not remount the first. The tabpanel role only comes with the bar. */}
-      <div ref={fadeRef} {...(tabbed && panelAttrs)} className={cx(tabbed && panelRing)}>
+          not remount the first. */}
+      <div {...panel}>
         <View />
       </div>
     </div>
