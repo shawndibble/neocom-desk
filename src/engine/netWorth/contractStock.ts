@@ -5,16 +5,32 @@
  * contract ends. Pure — the fetching lives in `features/netWorth`.
  *
  * Counted at item value, never at contract price (what a buyer would pay the
- * Character) and never courier collateral (escrowed by the courier): either
- * would sum one party's money into another's net worth.
+ * Character): that would sum one party's money into another's net worth. The one
+ * exception is collateral the Character posted as acceptor of a running courier:
+ * it is the Character's own ISK in escrow, so it counts until the real deadline
+ * (`date_accepted` + `days_to_complete`, never the offer expiry).
  */
-import { isActiveContractStatus } from '@/engine/contracts/contractStatus';
+import {
+  isActiveContractStatus,
+  withAcceptedCourierInProgress,
+} from '@/engine/contracts/contractStatus';
+import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import type { Contract } from '@/esi/endpoints';
 import { parseInstant } from '../esiInstant';
 
 export type StockContract = Pick<
   Contract,
-  'contract_id' | 'issuer_id' | 'type' | 'status' | 'for_corporation' | 'date_expired' | 'reward'
+  | 'contract_id'
+  | 'issuer_id'
+  | 'acceptor_id'
+  | 'type'
+  | 'status'
+  | 'for_corporation'
+  | 'date_expired'
+  | 'reward'
+  | 'collateral'
+  | 'days_to_complete'
+  | 'date_accepted'
 >;
 
 export interface StockContractItem {
@@ -32,7 +48,21 @@ function isOpenOwnContract(contract: StockContract, characterId: number, now: nu
   if (!isActiveContractStatus(contract.status)) return false;
   // An expired contract stays outstanding in ESI until its items are returned.
   const expires = parseInstant(contract.date_expired);
+  if (contract.type === 'courier') {
+    // Once accepted, the offer expiry no longer matters: delivery is owed by the real deadline.
+    const deadline = courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
+    if (deadline !== null) return deadline > now;
+  }
   return expires === null || expires > now;
+}
+
+/** Collateral the Character posted by accepting a courier whose haul is still running. */
+function postedCollateral(contract: StockContract, characterId: number, now: number): number {
+  if (contract.type !== 'courier' || contract.for_corporation) return 0;
+  if (contract.acceptor_id !== characterId || contract.issuer_id === characterId) return 0;
+  const deadline = courierDeliveryDeadlineMs(withAcceptedCourierInProgress(contract));
+  if (deadline === null || deadline <= now) return 0;
+  return contract.collateral ?? 0;
 }
 
 function isItemContract(contract: StockContract): boolean {
@@ -74,6 +104,7 @@ export function contractStockValue(input: {
 }): number {
   let total = 0;
   for (const contract of input.contracts) {
+    total += postedCollateral(contract, input.characterId, input.now);
     if (!isOpenOwnContract(contract, input.characterId, input.now)) continue;
     if (contract.type === 'courier') {
       total += contract.reward ?? 0;

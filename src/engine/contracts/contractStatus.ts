@@ -26,7 +26,9 @@ export function isActiveContractStatus(status: Contract['status']): boolean {
  * `acceptor_id` and `date_accepted` — so `in_progress` is never sent in practice.
  * Read it as `in_progress` here, once, so every surface that asks sees the real state.
  */
-export function withAcceptedCourierInProgress(contract: Contract): Contract {
+export function withAcceptedCourierInProgress<
+  T extends Pick<Contract, 'type' | 'status' | 'acceptor_id' | 'date_accepted'>,
+>(contract: T): T {
   if (
     contract.type === 'courier' &&
     contract.status === 'outstanding' &&

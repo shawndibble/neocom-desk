@@ -12,6 +12,7 @@ const FUTURE = '2026-10-20T00:00:00Z';
 function contract(over: Partial<StockContract> & { contract_id: number }): StockContract {
   return {
     issuer_id: 1,
+    acceptor_id: 0,
     type: 'item_exchange',
     status: 'outstanding',
     for_corporation: false,
@@ -88,6 +89,37 @@ describe('contractStockValue', () => {
     } as StockContract;
     expect(value([courier])).toBe(5_000);
     expect(value([{ ...courier, status: 'in_progress' }])).toBe(5_000);
+  });
+
+  it('counts collateral posted as acceptor until accept date + days to complete', () => {
+    const haul = {
+      ...contract({ contract_id: 3, type: 'courier', issuer_id: 9, acceptor_id: 1 }),
+      reward: 5_000,
+      collateral: 90_000,
+      days_to_complete: 3,
+      date_accepted: '2026-10-06T13:00:00Z',
+      date_expired: '2026-10-07T00:00:00Z',
+    } as StockContract;
+    // Offer expiry passed, delivery deadline (Oct 9 13:00) has not.
+    expect(value([haul])).toBe(90_000);
+    expect(value([{ ...haul, status: 'finished' }])).toBe(0);
+    expect(value([{ ...haul, date_accepted: '2026-10-03T12:00:00Z' }])).toBe(0);
+    expect(value([{ ...haul, acceptor_id: 5 }])).toBe(0);
+    expect(value([{ ...haul, for_corporation: true }])).toBe(0);
+    expect(value([{ ...haul, date_accepted: undefined }])).toBe(0);
+  });
+
+  it('keeps an accepted issued courier reward until its real deadline, past the offer expiry', () => {
+    const issued = {
+      ...contract({ contract_id: 4, type: 'courier', acceptor_id: 9 }),
+      reward: 5_000,
+      collateral: 90_000,
+      days_to_complete: 3,
+      date_accepted: '2026-10-06T13:00:00Z',
+      date_expired: '2026-10-07T00:00:00Z',
+    } as StockContract;
+    expect(value([issued])).toBe(5_000);
+    expect(value([{ ...issued, date_accepted: '2026-10-03T12:00:00Z' }])).toBe(0);
   });
 
   it('leaves out a courier that is not own, corporate, finished or expired', () => {
