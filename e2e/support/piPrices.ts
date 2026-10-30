@@ -13,10 +13,27 @@ export const pi = JSON.parse(
 const UNIT_PRICE = [5, 760, 14_000, 100_000, 1_900_000];
 
 /**
+ * The region volume object PI plans cap sales against: every product trades far
+ * more than a pilot makes, so no plan is capped. Unmocked, the read 404s and the
+ * console-error check fails.
+ */
+async function mockHubVolume(page: Page): Promise<void> {
+  const perDay = Object.fromEntries(Object.keys(pi.schematics).map((id) => [id, 1_000_000]));
+  await page.route('https://data.neocomdesk.com/lp-store-volume/*.json', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ lastSyncedAt: Date.now(), perDay }),
+    })
+  );
+}
+
+/**
  * Quotes every type asked about, at its tier's price, both sides of the book.
  * A later `page.route` wins over an earlier one — see `support/testBase.ts`.
  */
 export async function mockHubPrices(page: Page): Promise<void> {
+  await mockHubVolume(page);
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     const types = new URL(route.request().url()).searchParams.get('types') ?? '';
     const body: Record<string, unknown> = {};
@@ -40,6 +57,7 @@ export async function mockFlatHubPrices(
   page: Page,
   quote: { buy: number; sell: number }
 ): Promise<void> {
+  await mockHubVolume(page);
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     const types = new URL(route.request().url()).searchParams.get('types') ?? '';
     const body = Object.fromEntries(
