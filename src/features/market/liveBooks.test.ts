@@ -94,4 +94,21 @@ describe('loadLiveBooks', () => {
       ])
     );
   });
+  it('skips requests not yet started once cancelled, and lets those in flight finish', async () => {
+    let cancelled = false;
+    const started: number[] = [];
+    getMarketOrders.mockImplementation(async (_region: number, typeId: number) => {
+      started.push(typeId);
+      cancelled = true;
+      return { items: [order(typeId, jita.stationId, 5)], truncated: false };
+    });
+    const seen: number[] = [];
+    const requests = Array.from({ length: 40 }, (_, i) => ({ hub: jita, typeId: i + 1 }));
+    await loadLiveBooks(requests, (request) => seen.push(request.typeId), {
+      isCancelled: () => cancelled,
+    });
+    expect(started.length).toBeLessThanOrEqual(12);
+    expect(seen).toHaveLength(started.length);
+    expect(peekLiveBook(requests[0])).toBeDefined();
+  });
 });

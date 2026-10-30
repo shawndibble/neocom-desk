@@ -103,16 +103,20 @@ export async function getLiveBook(
  * Fetches every request at `LIVE_BOOK_CONCURRENCY`, in the order given (most
  * valuable first), reporting each as it settles. Never rejects: a failed
  * request settles as `'failed'` so one bad row leaves the rest untouched.
+ * Once `isCancelled` is true, requests not yet started are skipped (and not
+ * reported); those already in flight finish and still fill the cache.
  */
 export async function loadLiveBooks(
   requests: readonly LiveBookRequest[],
   onSettled: (request: LiveBookRequest, result: LiveBook | 'failed') => void,
-  options: { force?: boolean; now?: Clock } = {}
+  options: { force?: boolean; now?: Clock; isCancelled?: () => boolean } = {}
 ): Promise<void> {
+  const { isCancelled, ...bookOptions } = options;
   await mapWithConcurrencyLimit(requests, LIVE_BOOK_CONCURRENCY, async (request) => {
+    if (isCancelled?.()) return;
     let result: LiveBook | 'failed';
     try {
-      result = await getLiveBook(request, options);
+      result = await getLiveBook(request, bookOptions);
     } catch {
       result = 'failed';
     }
