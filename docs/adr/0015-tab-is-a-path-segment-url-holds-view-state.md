@@ -39,9 +39,8 @@ path segment, plus label key) and registers them in `app/pageTabs.ts`'s
 - `usePageTab` reads the tab from the path; a switch is a history _push_, so
   Back returns to the previous tab.
 - `Layout`'s fade keys on `pageKeyFor(pathname)`, which collapses a declared
-  tab to its page: no fade of the outlet between tabs. (Later: the tab panel
-  alone fades its content on a switch, leaving the header and tab bar still —
-  DESIGN.md §6b.)
+  tab to its page: no outlet fade between tabs; the tab panel fades itself
+  (DESIGN.md §6b).
 - `pagePathFor` reports each declared tab as its own analytics path — a
   closed set, unlike an id.
 

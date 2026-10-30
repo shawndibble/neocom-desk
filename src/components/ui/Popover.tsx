@@ -34,8 +34,6 @@ export function PopoverContent({
       <PopoverPrimitive.Portal container={container}>
         <PopoverPrimitive.Content
           sideOffset={sideOffset}
-          // Fades back out too: a popover holds reading, not a command whose
-          // next step a closing fade would hold up.
           className={cx(menuContentClassName, 'motion-pop-exit', className)}
           {...props}
         />

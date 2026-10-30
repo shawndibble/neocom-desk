@@ -65,14 +65,15 @@ export function useSheetSwipe(
   // Layout effect: runs before `Modal`'s `showModal()`, so a sheet a swipe
   // left off screen never opens there.
   useLayoutEffect(() => {
-    if (open) applyOffset(target.current, 0, false, true);
-  }, [open, target]);
+    if (open && enabled) applyOffset(target.current, 0, false, true);
+  }, [open, enabled, target]);
 
-  const timers = useRef<number[]>([]);
-  useEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach((id) => window.clearTimeout(id));
-  }, []);
+  const timer = useRef<number | undefined>(undefined);
+  const later = (fn: () => void, ms: number) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(fn, ms);
+  };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   if (!enabled) return {};
 
@@ -121,21 +122,17 @@ export function useSheetSwipe(
         const sheet = target.current;
         const stillOpen = () => sheet?.isConnected === true && sheet.hasAttribute('open');
         slideOff(sheet);
-        timers.current.push(
-          window.setTimeout(() => {
-            // Escape, Back or a backdrop tap during the slide already closed
-            // it: a second close could run a parent's navigate(-1) twice.
-            if (!stillOpen()) return;
-            onDismiss();
-            // A parent may keep the sheet open (it asks to confirm first):
-            // bring it back rather than leave it parked off screen.
-            timers.current.push(
-              window.setTimeout(() => {
-                if (stillOpen()) applyOffset(sheet, 0, true, false);
-              }, KEPT_OPEN_CHECK_MS)
-            );
-          }, DISMISS_SLIDE_MS)
-        );
+        later(() => {
+          // Escape, Back or a backdrop tap during the slide already closed
+          // it: a second close could run a parent's navigate(-1) twice.
+          if (!stillOpen()) return;
+          onDismiss();
+          // A parent may keep the sheet open (it asks to confirm first):
+          // bring it back rather than leave it parked off screen.
+          later(() => {
+            if (stillOpen()) applyOffset(sheet, 0, true, false);
+          }, KEPT_OPEN_CHECK_MS);
+        }, DISMISS_SLIDE_MS);
       } else {
         setOffset(0, true);
       }

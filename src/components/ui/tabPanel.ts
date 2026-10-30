@@ -19,8 +19,8 @@ export const panelDomId = (tabsId: string, tabId: string) => `${tabsId}-panel-${
  * Attributes that make an existing content container the tab's panel. Use it
  * where a wrapper `<div>` would disturb the parent's flex/grid layout.
  *
- * The `ref` fades the panel's content in on a tab switch (DESIGN.md §6b), so
- * spread every prop: the tab bar above it stays put.
+ * Spread every prop: the `ref` fades the panel in on a tab switch
+ * (DESIGN.md §6b).
  */
 export function useTabPanelProps(
   tabsId: string,

@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
-import { usePrefersReducedMotion } from './useMediaQuery';
 
 /** Long enough to read as a change of view, short enough never to hold up reading it. */
 const FADE_MS = 140;
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 /**
  * Fades `target` in as it mounts and whenever `key` changes: the route outlet
@@ -17,23 +18,19 @@ const FADE_MS = 140;
  * frame of the new view is already at opacity 0; an effect after paint would
  * flash the content in at full opacity and then fade it.
  *
- * The `animate` guard is a real capability check, not a test shim: jsdom
- * implements no Web Animations API, so this must degrade to an instant swap
- * exactly as it does in a browser that lacks it.
+ * No `animate` (jsdom, an old browser): an instant swap. Reduced motion is
+ * read as the fade would start, not subscribed to: it only matters then.
  */
 export function useFadeOnChange(target: RefObject<HTMLElement | null>, key: string): void {
   const running = useRef<Animation | null>(null);
   const shownKey = useRef<string | null>(null);
-  const reduced = usePrefersReducedMotion();
 
   useLayoutEffect(() => {
-    // Keyed on what is shown, not on every run: turning reduced motion off
-    // must not fade a view that has not changed.
     if (shownKey.current === key) return;
     shownKey.current = key;
     const node = target.current;
     if (node === null || typeof node.animate !== 'function') return;
-    if (reduced) return;
+    if (window.matchMedia?.(REDUCED_MOTION_QUERY).matches) return;
     // Changing again mid-fade would otherwise leave two animations driving
     // the same property, and the abandoned one still holds its own opacity.
     running.current?.cancel();
@@ -41,5 +38,5 @@ export function useFadeOnChange(target: RefObject<HTMLElement | null>, key: stri
       duration: FADE_MS,
       easing: 'ease-out',
     });
-  }, [target, key, reduced]);
+  }, [target, key]);
 }
