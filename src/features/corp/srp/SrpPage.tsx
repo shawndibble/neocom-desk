@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { PageHeader, TabPanel, Tabs, useTabsId } from '@/components/ui';
+import { PageHeader, Tabs, useTabPanelProps, useTabsId } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
 import { SRP_TABS } from './srpTabs';
@@ -25,12 +25,18 @@ export function SrpPage({
   const [tab, selectTab] = usePageTab(SRP_TABS);
   const views = SRP_VIEWS.filter((v) => v.visible({ canManageSrp, srpOn, isDirector }));
   const view = views.find((v) => v.id === tab) ?? views[0];
+  const {
+    ref: fadeRef,
+    className: panelRing,
+    ...panelAttrs
+  } = useTabPanelProps(tabsId, view?.id ?? tab);
   if (!view) return null;
   const View = view.component;
+  const tabbed = views.length > 1;
   return (
     <div className={cx('mx-auto grid gap-4 px-4 py-4', view.wide ? 'max-w-6xl' : 'max-w-5xl')}>
       <PageHeader title={t('srp.title')} />
-      {views.length > 1 && (
+      {tabbed && (
         <Tabs
           tabsId={tabsId}
           label={t('srp.title')}
@@ -45,13 +51,11 @@ export function SrpPage({
           }))}
         />
       )}
-      {views.length > 1 ? (
-        <TabPanel tabsId={tabsId} tabId={view.id}>
-          <View />
-        </TabPanel>
-      ) : (
+      {/* One wrapper either way: a second view appearing (SRP turned on) must
+          not remount the first. The tabpanel role only comes with the bar. */}
+      <div ref={fadeRef} {...(tabbed && panelAttrs)} className={cx(tabbed && panelRing)}>
         <View />
-      )}
+      </div>
     </div>
   );
 }

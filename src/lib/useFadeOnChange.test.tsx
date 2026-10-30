@@ -5,6 +5,16 @@ import { stubAnimate } from '@/test/animate';
 import { stubViewport } from '@/test/viewport';
 import { useFadeOnChange } from './useFadeOnChange';
 
+function Nested({ outer, inner }: { outer: string; inner: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFadeOnChange(ref, outer);
+  return (
+    <div ref={ref} data-testid="outer">
+      <Harness value={inner} rise />
+    </div>
+  );
+}
+
 function Harness({ value, rise }: { value: string; rise?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useFadeOnChange(ref, value, rise === undefined ? undefined : { rise });
@@ -36,6 +46,7 @@ describe('useFadeOnChange', () => {
     animate.mockClear();
     rerender(<Harness value="b" />);
     expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
+      id: 'fade-on-change',
       duration: 220,
       easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
     });
@@ -50,7 +61,7 @@ describe('useFadeOnChange', () => {
         { opacity: 0, translate: '0 8px' },
         { opacity: 1, translate: '0 0' },
       ],
-      { duration: 240, easing: 'cubic-bezier(0.33, 1, 0.68, 1)' }
+      { id: 'fade-on-change', duration: 240, easing: 'cubic-bezier(0.33, 1, 0.68, 1)' }
     );
   });
 
@@ -70,6 +81,14 @@ describe('useFadeOnChange', () => {
     const { rerender } = render(<Harness value="a" />);
     rerender(<Harness value="b" />);
     expect(cancel).toHaveBeenCalled();
+  });
+
+  it('lets the outer view alone move when both change at once', () => {
+    const { getByTestId, rerender } = render(<Nested outer="page" inner="tab" />);
+    expect(cancel).toHaveBeenCalledWith(getByTestId('outer').firstElementChild);
+    cancel.mockClear();
+    rerender(<Nested outer="page" inner="other-tab" />);
+    expect(cancel).not.toHaveBeenCalled();
   });
 
   it('does not animate under prefers-reduced-motion', () => {
