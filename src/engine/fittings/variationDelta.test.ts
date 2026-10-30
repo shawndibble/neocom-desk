@@ -85,10 +85,16 @@ describe('diffFittingStats', () => {
       } as FittingStats['offense'],
       tank: { ...base.tank, burstEffective: 999, sustainedEffective: 999 },
       capacitorBudget: { ...base.capacitorBudget, delta: 999 },
-      sensor: { ...base.sensor, strength: 999 },
       holds: { ...base.holds, cargo: 999 },
     };
     expect(diffFittingStats(base, after).changes).toEqual([]);
+  });
+
+  it('reports a sensor strength change (an ECCM or Sensor Booster swap)', () => {
+    const after: FittingStats = { ...base, sensor: { ...base.sensor, strength: 999 } };
+    expect(diffFittingStats(base, after).changes.map((change) => change.key)).toEqual([
+      'sensorStrength',
+    ]);
   });
 
   it('reports a total DPS change (e.g. a turret variation)', () => {

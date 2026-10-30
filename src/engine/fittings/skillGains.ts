@@ -253,7 +253,9 @@ const ROLE_FIELDS: readonly RoleField[] = [
  */
 function roleResults(
   before: FittingStats,
-  after: FittingStats
+  after: FittingStats,
+  /** Report the item that loses most, if any does: a swap can raise one gun's reach and cut another's. */
+  lossFirst = false
 ): { change: RoleChange; gain: number }[] {
   const results: { change: RoleChange; gain: number }[] = [];
   for (const field of ROLE_FIELDS) {
@@ -267,8 +269,10 @@ function roleResults(
       const lowerIsBetter = statDirection(field.key) === 'lower';
       if (b === a || (lowerIsBetter && b === 0)) continue;
       const gain = lowerIsBetter ? -relative(b, a) : relative(b, a);
-      if (best === null || gain > best.gain)
-        best = { change: { key: field.key, before: b, after: a }, gain };
+      const pick =
+        best === null ||
+        (lossFirst && (gain < 0 || best.gain < 0) ? gain < best.gain : gain > best.gain);
+      if (pick) best = { change: { key: field.key, before: b, after: a }, gain };
     }
     if (best) results.push(best);
   }
@@ -278,6 +282,11 @@ function roleResults(
 /** Role stats the +1 level changes, after the rounding they display at. */
 export function roleChanges(before: FittingStats, after: FittingStats): RoleChange[] {
   return roleResults(before, after).map(({ change }) => change);
+}
+
+/** Role stats a module swap changes: a field where any item gets worse reports that loss. */
+export function roleSwapChanges(before: FittingStats, after: FittingStats): RoleChange[] {
+  return roleResults(before, after, true).map(({ change }) => change);
 }
 
 /**

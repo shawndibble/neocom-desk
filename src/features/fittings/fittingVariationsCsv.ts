@@ -1,5 +1,6 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
+import type { SwapChange } from '@/engine/fittings/swapChanges';
 import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
 import { fixed0 } from '@/lib/fixedFormat';
@@ -25,6 +26,13 @@ export function changeLabel(change: StatChange, t: Translate): string {
   return t(`fittings.variations.stat.${change.key}`, { value });
 }
 
+/** A swap's change as the Variations table words it: a role figure reads before → after. */
+export function swapChangeLabel({ kind, change }: SwapChange, t: Translate): string {
+  return kind === 'role'
+    ? t(`fittings.whatToTrain.role.${change.key}`, { before: change.before, after: change.after })
+    : changeLabel(change, t);
+}
+
 /**
  * Export columns for the Variations table. The stat changes are one text
  * cell (the table's own wording, `; `-joined) — each is a different stat and
@@ -38,8 +46,8 @@ export function fittingVariationsCsvColumns(t: Translate): CsvColumn<VariationRo
       header: t('fittings.variations.changes'),
       value: (row) => {
         if (row.delta === null) return null;
-        if (row.delta.count === 0) return t('fittings.variations.noChanges');
-        return row.delta.changes.map((change) => changeLabel(change, t)).join('; ');
+        if (row.delta.length === 0) return t('fittings.variations.noChanges');
+        return row.delta.map((change) => swapChangeLabel(change, t)).join('; ');
       },
     },
     {

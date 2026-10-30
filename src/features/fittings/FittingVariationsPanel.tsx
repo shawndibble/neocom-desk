@@ -7,23 +7,23 @@ import { IskAmount, TypeIcon } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { changeLabel, fittingVariationsCsvColumns } from './fittingVariationsCsv';
+import { fittingVariationsCsvColumns, swapChangeLabel } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
 import { fixed1 } from '@/lib/fixedFormat';
 import type { Translate } from '@/lib/translate';
 
 function ChangesCell({ row, t }: { row: VariationRow; t: Translate }) {
   if (row.delta === null) return <span className="text-text-dim">{t('common.loading')}</span>;
-  if (row.delta.count === 0)
+  if (row.delta.length === 0)
     return <span className="text-text-dim">{t('fittings.variations.noChanges')}</span>;
   return (
     <div className="space-y-0.5">
       <p className="text-text-dim">
-        {t('fittings.variations.changedCount', { count: row.delta.count })}
+        {t('fittings.variations.changedCount', { count: row.delta.length })}
       </p>
       <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-        {row.delta.changes.map((change) => (
-          <span key={change.key}>{changeLabel(change, t)}</span>
+        {row.delta.map((change) => (
+          <span key={change.change.key}>{swapChangeLabel(change, t)}</span>
         ))}
       </div>
     </div>

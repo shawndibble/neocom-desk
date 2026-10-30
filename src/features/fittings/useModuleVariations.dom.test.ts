@@ -133,10 +133,9 @@ describe('useModuleVariations', () => {
     expect(result.current.rows.map((row) => row.typeId)).toEqual([101]);
 
     await waitFor(() => expect(result.current.rows[0].delta).not.toBeNull());
-    expect(result.current.rows[0].delta).toEqual({
-      changes: [{ key: 'ehp', before: 20000, after: 24000 }],
-      count: 1,
-    });
+    expect(result.current.rows[0].delta).toEqual([
+      { kind: 'stat', change: { key: 'ehp', before: 20000, after: 24000 } },
+    ]);
     expect(result.current.rows[0].fits).toBe(true);
     expect(result.current.rows[0].canFly).toBe(true);
     expect(result.current.rows[0].price).toBe(5_000_000);
@@ -170,7 +169,7 @@ describe('useModuleVariations', () => {
     rerender(evaluator(() => ({ ...baseStats, ehp: 26000 })));
     expect(result.current.rows[0].delta).toBeNull();
     await waitFor(() =>
-      expect(result.current.rows[0].delta?.changes[0]).toMatchObject({ after: 26000 })
+      expect(result.current.rows[0].delta?.[0]?.change).toMatchObject({ after: 26000 })
     );
   });
 
@@ -294,7 +293,7 @@ describe('useModuleVariations', () => {
       await waitFor(() => expect(result.current.loading).toBe(false));
       expect(stale.compare).toHaveBeenCalledTimes(1);
       expect(current.compare).toHaveBeenCalledTimes(2);
-      expect(result.current.rows.map((row) => row.delta?.changes[0]?.after)).toEqual([
+      expect(result.current.rows.map((row) => row.delta?.[0]?.change.after)).toEqual([
         26000, 26000,
       ]);
     });

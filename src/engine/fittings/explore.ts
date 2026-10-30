@@ -6,22 +6,23 @@
  * Acquisition Array bonuses. A Scan Probe Launcher and a Survey Scanner have
  * no figure of their own but count as explorer modules. Pure.
  *
- * Attribute ids are plain SDE, read back off a live run of the pinned engine
- * on a Buzzard (2026-10-29): Data/Relic Analyzer II read 1909 = 60 and
- * 1910 = 40; the Pinpointing, Acquisition and Rangefinding Array II read
- * 1905 = -20, 1906 = -20 and 1907 = 10 (the first two cut, a negative
- * percent); a Core Probe Launcher II takes scan probes (charge group 479).
+ * Attribute ids are plain SDE, named by `market/attributes.json`: 1910 is Virus
+ * Strength and 1909 Virus Coherence (a Data Analyzer II carries 30 and 60; a
+ * Buzzard's +10 strength lands on 1910, 40). The Pinpointing, Acquisition and
+ * Rangefinding Array II read 1905 = -20, 1906 = -20 and 1907 = 10 (the first
+ * two cut, a negative percent); a Core Probe Launcher II takes scan probes
+ * (charge group 479). Survey Scan Range is 197 (6050 is a mining crit bonus).
  */
 
 const EXPLORE_ATTRIBUTE = {
   duration: 73,
   chargeGroup1: 604,
-  virusStrength: 1909,
-  virusCoherence: 1910,
+  virusStrength: 1910,
+  virusCoherence: 1909,
   scanDeviationBonus: 1905,
   scanDurationBonus: 1906,
   scanStrengthBonus: 1907,
-  surveyScannerRange: 6050,
+  surveyScannerRange: 197,
 } as const;
 
 /** The charge group a Scan Probe Launcher loads. */
