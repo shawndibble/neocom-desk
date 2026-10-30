@@ -153,4 +153,112 @@ describe('useAppraisalLive', () => {
     expect(requests).toHaveLength(8);
     expect(requests.some((r) => r.hub.id === hub.id)).toBe(false);
   });
+  it('tells a superseded run to stop, and refetches after Compare closes and reopens', async () => {
+    loadLiveBooks.mockImplementation(() => new Promise<void>(() => {}));
+    const baseCompare: HubComparisonRow[] = TRADE_HUBS.map((h) => ({
+      hub: h,
+      buy: 1,
+      sell: 2,
+      unreachable: false,
+      items: ITEMS,
+    }));
+    const base = outcome();
+    const other = TRADE_HUBS.find((h) => h.id !== hub.id)!;
+    const { rerender } = renderHook(
+      ({ open, h }) =>
+        useAppraisalLive({ base, baseCompare, hub: h, pricePercent: 100, compareOpen: open }),
+      { initialProps: { open: false, h: hub } }
+    );
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(1));
+    const firstRun = loadLiveBooks.mock.calls[0][2].isCancelled as () => boolean;
+    expect(firstRun()).toBe(false);
+    rerender({ open: false, h: other });
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(2));
+    expect(firstRun()).toBe(true);
+
+    rerender({ open: true, h: other });
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(3));
+    const compareRun = loadLiveBooks.mock.calls[2][2].isCancelled as () => boolean;
+    expect(compareRun()).toBe(false);
+    rerender({ open: false, h: other });
+    expect(compareRun()).toBe(true);
+    rerender({ open: true, h: other });
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(4));
+    expect((loadLiveBooks.mock.calls[3][2].isCancelled as () => boolean)()).toBe(false);
+  });
+
+  it('fetches books while the own orders load, and shows no live row until both are in', async () => {
+    let releaseOwn: (value: unknown) => void = () => {};
+    loadOrders.mockReturnValue(new Promise((resolve) => (releaseOwn = resolve)));
+    loadLiveBooks.mockImplementation(
+      async (
+        requests: LiveBookRequest[],
+        onSettled: (r: LiveBookRequest, b: LiveBook | 'failed') => void
+      ) => {
+        for (const request of requests) onSettled(request, book(77, 50));
+      }
+    );
+    const base = outcome();
+    const { result } = renderHook(() =>
+      useAppraisalLive({ base, baseCompare: null, hub, pricePercent: 100, compareOpen: false })
+    );
+    await waitFor(() => expect(result.current.live.done).toBe(2));
+    expect(loadLiveBooks).toHaveBeenCalled();
+    expect(result.current.live.checking).toBe(true);
+    expect(result.current.result?.appraisal.items.some((i) => i.priceState === 'live')).toBe(false);
+    await act(async () => {
+      releaseOwn({ entries: [{ orders: [{ order_id: 77 }] }] });
+    });
+    await waitFor(() => expect(result.current.live.checking).toBe(false));
+    expect(result.current.result?.appraisal.items.every((i) => i.sellIsOwn)).toBe(true);
+  });
+
+  it('stops checking when the base goes away', async () => {
+    loadLiveBooks.mockImplementation(() => new Promise<void>(() => {}));
+    const base = outcome();
+    const { result, rerender } = renderHook(
+      ({ b }: { b: AppraisalOutcome | null }) =>
+        useAppraisalLive({
+          base: b,
+          baseCompare: null,
+          hub,
+          pricePercent: 100,
+          compareOpen: false,
+        }),
+      { initialProps: { b: base as AppraisalOutcome | null } }
+    );
+    await waitFor(() => expect(result.current.live.checking).toBe(true));
+    rerender({ b: null });
+    expect(result.current.live.checking).toBe(false);
+    await expect(result.current.settle()).resolves.toBeNull();
+  });
+
+  it('applies a Refresh force to the next base only, not to a re-run of the same one', async () => {
+    loadLiveBooks.mockResolvedValue(undefined);
+    const base = outcome();
+    const next = outcome();
+    const other = TRADE_HUBS.find((h) => h.id !== hub.id)!;
+    const { result, rerender } = renderHook(
+      ({ b, h }) =>
+        useAppraisalLive({
+          base: b,
+          baseCompare: null,
+          hub: h,
+          pricePercent: 100,
+          compareOpen: false,
+        }),
+      { initialProps: { b: base, h: hub } }
+    );
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(1));
+    act(() => result.current.forceNextRun());
+    rerender({ b: base, h: other });
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(2));
+    expect(loadLiveBooks.mock.calls[1][2].force).toBe(false);
+    rerender({ b: next, h: other });
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(3));
+    expect(loadLiveBooks.mock.calls[2][2].force).toBe(true);
+    rerender({ b: outcome(), h: other });
+    await waitFor(() => expect(loadLiveBooks).toHaveBeenCalledTimes(4));
+    expect(loadLiveBooks.mock.calls[3][2].force).toBe(false);
+  });
 });

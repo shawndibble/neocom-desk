@@ -27,6 +27,11 @@ type Books = ReadonlyMap<string, LiveBook | 'failed'>;
 const NO_BOOKS: Books = new Map();
 const NO_OWN: ReadonlySet<number> = new Set();
 
+/** A Refresh waiting for the base it asked for: a re-run of the same `base` is not it. */
+interface PendingForce {
+  from: AppraisalOutcome | null;
+}
+
 const bookKey = (hub: TradeHub, typeId: number) => `${hub.stationId}:${typeId}`;
 
 /** How far a live run has got, for the progress text and bar. */
@@ -52,7 +57,7 @@ export interface AppraisalLive {
   compareLive: LiveProgress;
   /** Resolves with the result once every row has settled, so a copy never reads a cached row. */
   settle: () => Promise<AppraisalOutcome | null>;
-  /** The next run refetches whatever the age: the Refresh button. */
+  /** The run for the next `base` refetches whatever the age: the Refresh button. */
   forceNextRun: () => void;
 }
 
@@ -131,14 +136,17 @@ export function useAppraisalLive({
   compareOpen: boolean;
 }): AppraisalLive {
   const [books, setBooks] = useState<Books>(NO_BOOKS);
-  const [own, setOwn] = useState<ReadonlySet<number>>(NO_OWN);
+  // Null until the pilot's own order ids first load: rows stay cached until then, so none briefly undercuts the pilot's own cheapest order.
+  const [own, setOwn] = useState<ReadonlySet<number> | null>(null);
   const [checking, setChecking] = useState(false);
   const [compareChecking, setCompareChecking] = useState(false);
-  const forcePrimary = useRef(false);
-  const forceCompare = useRef(false);
+  const forcePrimary = useRef<PendingForce | null>(null);
+  const forceCompare = useRef<PendingForce | null>(null);
+  const baseRef = useRef<AppraisalOutcome | null>(base);
   const compareOpenRef = useRef(compareOpen);
   const percentRef = useRef(pricePercent);
-  const run = useRef<Promise<AppraisalOutcome> | null>(null);
+  // Null once the run was cancelled: a copy then waits for the run that replaced it.
+  const run = useRef<Promise<AppraisalOutcome | null> | null>(null);
   const latest = useRef<AppraisalOutcome | null>(null);
 
   const typeIds = useMemo(() => (base === null ? [] : valueOrdered(base.appraisal.items)), [base]);
@@ -157,16 +165,22 @@ export function useAppraisalLive({
   useEffect(() => {
     compareOpenRef.current = compareOpen;
     percentRef.current = pricePercent;
-  }, [compareOpen, pricePercent]);
+    baseRef.current = base;
+  }, [compareOpen, pricePercent, base]);
 
   // The selected hub's books.
   useEffect(() => {
-    if (base === null || requests.length === 0) return;
-    const force = forcePrimary.current;
-    forcePrimary.current = false;
+    const pending = forcePrimary.current;
+    const force = pending !== null && pending.from !== base;
+    if (force) forcePrimary.current = null;
+    if (base === null || requests.length === 0) {
+      run.current = null;
+      return;
+    }
     let cancelled = false;
+    const isCancelled = () => cancelled;
 
-    const promise = (async () => {
+    const promise = (async (): Promise<AppraisalOutcome | null> => {
       const settled = new Map<string, LiveBook | 'failed'>();
       for (const request of requests) {
         const cached = force ? undefined : peekLiveBook(request);
@@ -185,19 +199,26 @@ export function useAppraisalLive({
         return next;
       });
       setChecking(wanted.length > 0);
-      const ownIds = await loadOwnOrderIds();
-      if (!cancelled) setOwn(ownIds);
-      await loadLiveBooks(
-        wanted,
-        (request, result) => {
-          settled.set(bookKey(hub, request.typeId), result);
-          if (!cancelled) {
-            setBooks((previous) => new Map(previous).set(bookKey(hub, request.typeId), result));
-          }
-        },
-        { force }
-      );
-      if (!cancelled) setChecking(false);
+      // Own order ids load beside the books, not before them.
+      const ownPromise = loadOwnOrderIds();
+      void ownPromise.then((ids) => {
+        if (!cancelled) setOwn(ids);
+      });
+      const [ownIds] = await Promise.all([
+        ownPromise,
+        loadLiveBooks(
+          wanted,
+          (request, result) => {
+            settled.set(bookKey(hub, request.typeId), result);
+            if (!cancelled) {
+              setBooks((previous) => new Map(previous).set(bookKey(hub, request.typeId), result));
+            }
+          },
+          { force, isCancelled }
+        ),
+      ]);
+      if (cancelled) return null;
+      setChecking(false);
       return mergeOutcome(base, percentRef.current, lookupFrom(settled, hub, ownIds));
     })();
     run.current = promise;
@@ -207,15 +228,20 @@ export function useAppraisalLive({
 
     return () => {
       cancelled = true;
+      if (run.current === promise) run.current = null;
+      setChecking(false);
     };
   }, [base, requests, hub]);
 
   // The other four hubs, only while Compare Hubs is open.
   useEffect(() => {
+    const pending = forceCompare.current;
+    const force = compareOpen && pending !== null && pending.from !== base;
+    // Closed Compare drops a waiting force: it must not fire on a later open.
+    if (force || !compareOpen) forceCompare.current = null;
     if (base === null || !compareOpen || compareRequests.length === 0) return;
-    const force = forceCompare.current;
-    forceCompare.current = false;
     let cancelled = false;
+    const isCancelled = () => cancelled;
     void (async () => {
       const wanted = compareRequests.filter((r) => force || peekLiveBook(r) === undefined);
       setCompareChecking(wanted.length > 0);
@@ -237,17 +263,18 @@ export function useAppraisalLive({
             new Map(previous).set(bookKey(request.hub, request.typeId), result)
           );
         },
-        { force }
+        { force, isCancelled }
       );
       if (!cancelled) setCompareChecking(false);
     })();
     return () => {
       cancelled = true;
+      setCompareChecking(false);
     };
   }, [base, compareOpen, compareRequests]);
 
   const result = useMemo(() => {
-    if (base === null || base.appraisal.items.length === 0) return base;
+    if (base === null || base.appraisal.items.length === 0 || own === null) return base;
     return mergeOutcome(base, pricePercent, lookupFrom(books, hub, own));
   }, [base, books, hub, own, pricePercent]);
 
@@ -256,7 +283,9 @@ export function useAppraisalLive({
   }, [result]);
 
   const compare = useMemo(() => {
-    if (baseCompare === null || !baseCompare.some((row) => row.items?.length)) return baseCompare;
+    if (own === null || baseCompare === null || !baseCompare.some((row) => row.items?.length)) {
+      return baseCompare;
+    }
     return baseCompare.map((row): HubComparisonRow => {
       const items = row.items ?? [];
       if (items.length === 0) return row;
@@ -281,10 +310,17 @@ export function useAppraisalLive({
     [books, compareRequests, compareChecking]
   );
 
-  const settle = useCallback(async () => (run.current ? await run.current : latest.current), []);
+  const settle = useCallback(async (): Promise<AppraisalOutcome | null> => {
+    for (let pending = run.current; pending !== null; pending = run.current) {
+      const settled = await pending;
+      // A cancelled run answers null: wait for the run that replaced it.
+      if (settled !== null) return settled;
+    }
+    return latest.current;
+  }, []);
   const forceNextRun = useCallback(() => {
-    forcePrimary.current = true;
-    forceCompare.current = compareOpenRef.current;
+    forcePrimary.current = { from: baseRef.current };
+    forceCompare.current = compareOpenRef.current ? { from: baseRef.current } : null;
   }, []);
 
   return { result, compare, live, compareLive, settle, forceNextRun };
