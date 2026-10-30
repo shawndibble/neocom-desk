@@ -333,6 +333,25 @@ describe('buildAppraisal', () => {
   });
 });
 
+describe('buildAppraisal with a buy walk (issue #5653)', () => {
+  it('totals the buy side over the units the walk sold, not the unsold ones', () => {
+    const items = [
+      {
+        typeId: 1,
+        name: 'Item',
+        quantity: 50,
+        buy: 4,
+        sell: 6,
+        buyWalk: { topBid: 5, topBidTakes: 10, filled: 20, unsold: 30, movedPrice: true },
+      },
+    ];
+    const { rows, totals } = buildAppraisal(items, 100);
+    expect(rows[0].buyTotal).toBe(80);
+    expect(rows[0].buyWalk?.unsold).toBe(30);
+    expect(totals.buy).toBe(80);
+  });
+});
+
 describe('lpBeatsMarket', () => {
   function row(overrides: Partial<AppraisalRow> = {}): AppraisalRow {
     return {

@@ -22,7 +22,7 @@ export const LIVE_BOOK_TTL_MS = 600_000;
 export const LIVE_BOOK_CONCURRENCY = 12;
 
 export interface LiveBook {
-  /** Only the hub station's orders. */
+  /** The hub station's orders, plus every buy order in the region (its range may reach the station). */
   orders: LiveOrder[];
   /** When ESI was asked, kept across cache hits for "checked N s ago". */
   fetchedAt: number;
@@ -80,13 +80,28 @@ export async function getLiveBook(
     if (truncated)
       throw new Error(`order book ${request.hub.regionId}:${request.typeId} truncated`);
     const orders = items
-      .filter((order) => order.location_id === request.hub.stationId)
-      .map(({ order_id, is_buy_order, location_id, price }) => ({
-        order_id,
-        is_buy_order,
-        location_id,
-        price,
-      }));
+      .filter((order) => order.is_buy_order || order.location_id === request.hub.stationId)
+      .map(
+        ({
+          order_id,
+          is_buy_order,
+          location_id,
+          price,
+          system_id,
+          range,
+          min_volume,
+          volume_remain,
+        }) => ({
+          order_id,
+          is_buy_order,
+          location_id,
+          price,
+          system_id,
+          range,
+          min_volume,
+          volume_remain,
+        })
+      );
     const book: LiveBook = { orders, fetchedAt };
     cache.set(key, book);
     return book;

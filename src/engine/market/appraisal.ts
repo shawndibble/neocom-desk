@@ -103,6 +103,23 @@ export interface AppraisalItem {
    * price because the book failed. Absent where nothing prices live.
    */
   priceState?: PriceState;
+  /**
+   * Set where the live buy walk (issue #5653) priced `buy`: `buy` is then the
+   * average over `filled` units, not the top bid, and `unsold` units no
+   * reachable buy order could take are left out of the buy total.
+   */
+  buyWalk?: AppraisalBuyWalk;
+}
+
+/** What walking the reachable buy orders did to a line's Sell now price. */
+export interface AppraisalBuyWalk {
+  topBid: number;
+  topBidTakes: number;
+  /** Units sold; `buy` is their average. */
+  filled: number;
+  unsold: number;
+  /** The walk went past the top bid, so `buy` is below it. */
+  movedPrice: boolean;
 }
 
 export type PriceState = 'live' | 'cached' | 'failed';
@@ -131,6 +148,8 @@ export interface AppraisalRow {
   volume: number | null;
   /** Where the prices came from; see `AppraisalItem.priceState`. */
   priceState?: PriceState;
+  /** See `AppraisalItem.buyWalk`; `buyTotal` covers `buyWalk.filled` units, not `quantity`. */
+  buyWalk?: AppraisalBuyWalk;
 }
 
 /**
@@ -303,7 +322,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   for (const item of items) {
     const buyEach = scale(item.buy, pricePercent);
     const sellEach = scale(item.sell, pricePercent);
-    const buyTotal = buyEach === null ? null : buyEach * item.quantity;
+    const buyTotal = buyEach === null ? null : buyEach * (item.buyWalk?.filled ?? item.quantity);
     const sellTotal = sellEach === null ? null : sellEach * item.quantity;
 
     if (buyTotal !== null) buy += buyTotal;
@@ -334,6 +353,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       quantity: item.quantity,
       buyEach,
       sellEach,
+      buyWalk: item.buyWalk,
       buyTotal,
       sellTotal,
       refineTotal,
@@ -455,7 +475,7 @@ export function appraisalNet(
   for (const raw of items) {
     const item = { ...raw, buy: scale(raw.buy, pricePercent), sell: scale(raw.sell, pricePercent) };
     if (item.buy !== null) {
-      const buyTotal = item.buy * item.quantity;
+      const buyTotal = item.buy * (item.buyWalk?.filled ?? item.quantity);
       instantNet += buyTotal - salesTax(buyTotal, accountingLevel);
     }
 

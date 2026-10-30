@@ -35,6 +35,7 @@ import {
 } from '@/engine/industry/refiningSetup';
 import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { undercutPrice } from '@/engine/market/priceTick';
+import { buyOrderReaches, walkSellIntoBuys } from '@/engine/market/buyReach';
 
 export type OrderExitKind = 'hold' | 'undercutStation' | 'dumpToBuyOrder' | 'reprocess';
 
@@ -48,6 +49,21 @@ export interface OrderExit {
   partial?: boolean;
   /** Units that cannot make up a whole reprocessing portion, and so return nothing. */
   unitsLeftOver?: number;
+  /** Dump only: what walking the reachable buy orders did to the price. */
+  dump?: DumpWalk;
+}
+
+/** The Dump exit's walk over every buy order that reaches the station (issue #5653). */
+export interface DumpWalk {
+  /** The dearest reachable bid. */
+  topBid: number;
+  /** Units that bid takes. */
+  topBidTakes: number;
+  /** Units the walk sold, and the units no reachable order could take. */
+  units: number;
+  unsold: number;
+  /** The walk went past the top bid, so `price` is below it. */
+  movedPrice: boolean;
 }
 
 /** What the refine comparison needs: the baked yield, the character's skills, and a price for each material where the stock sits. */
@@ -67,13 +83,14 @@ export interface OrderExitsInput {
   competitors?: readonly CompetingOrder[];
   /** Absent until the refining data and the material prices for this item have loaded. */
   reprocessing?: ReprocessingInput;
+  /** Gate jumps from the order's solar system to every system, over the plain stargate graph; absent until loaded, when a numbered range cannot be proven to reach. */
+  buyJumps?: ReadonlyMap<number, number>;
 }
 
 /**
- * The best buy order sitting at the player's OWN station. Region-wide buy
- * orders are excluded on purpose: a buy order carries a range this app does
- * not read, so one elsewhere in the region may not reach the player's stock
- * at all, and an exit that might not exist is worse than no row.
+ * The best buy order sitting at the player's OWN station. This prices the
+ * hub-gap comparison only; the Dump exit walks every order whose range
+ * reaches the station (`dumpWalk`).
  */
 function bestLocalBuyPrice(
   row: OpenOrderRow,
@@ -85,6 +102,36 @@ function bestLocalBuyPrice(
     if (best === null || c.price > best) best = c.price;
   }
   return best;
+}
+
+/** The system the order sits in, read off any competing order at its station; 0 when none is known. */
+export function stationSystemId(row: OpenOrderRow, competitors: readonly CompetingOrder[]): number {
+  return competitors.find((c) => c.locationId === row.locationId)?.systemId ?? 0;
+}
+
+/** Walks every buy order whose range reaches the order's station over the units still on it; null when none takes a unit. */
+function dumpExit(
+  row: OpenOrderRow,
+  competitors: readonly CompetingOrder[],
+  jumps: ReadonlyMap<number, number> | undefined
+): OrderExit | null {
+  if (!row.floor) return null;
+  const station = { locationId: row.locationId, systemId: stationSystemId(row, competitors) };
+  const reaching = competitors.filter((c) => c.isBuyOrder && buyOrderReaches(c, station, jumps));
+  const walk = walkSellIntoBuys(reaching, row.volumeRemain);
+  if (walk.average === null || walk.topBid === null) return null;
+  return {
+    kind: 'dumpToBuyOrder',
+    price: walk.average,
+    netPerUnit: walk.average - row.floor.fill,
+    dump: {
+      topBid: walk.topBid,
+      topBidTakes: walk.topBidTakes,
+      units: walk.filled,
+      unsold: walk.unsold,
+      movedPrice: walk.movedPrice,
+    },
+  };
 }
 
 /**
@@ -128,7 +175,12 @@ function reprocessExit(row: OpenOrderRow, input: ReprocessingInput): OrderExit |
   };
 }
 
-export function orderExits({ row, competitors, reprocessing }: OrderExitsInput): OrderExit[] {
+export function orderExits({
+  row,
+  competitors,
+  reprocessing,
+  buyJumps,
+}: OrderExitsInput): OrderExit[] {
   if (row.isBuyOrder || !row.floor) return [];
   const exits: OrderExit[] = [
     { kind: 'hold', price: row.price, netPerUnit: row.price - row.floor.fill },
@@ -151,14 +203,8 @@ export function orderExits({ row, competitors, reprocessing }: OrderExitsInput):
     }
   }
 
-  const buyPrice = competitors ? bestLocalBuyPrice(row, competitors) : null;
-  if (buyPrice !== null) {
-    exits.push({
-      kind: 'dumpToBuyOrder',
-      price: buyPrice,
-      netPerUnit: buyPrice - row.floor.fill,
-    });
-  }
+  const dump = competitors ? dumpExit(row, competitors, buyJumps) : null;
+  if (dump) exits.push(dump);
 
   if (reprocessing) {
     const refine = reprocessExit(row, reprocessing);

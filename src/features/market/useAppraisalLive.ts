@@ -20,12 +20,15 @@ import { applyLiveBooks, liveStationBook, type LiveBookLookup } from '@/engine/m
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 import { loadLiveBooks, peekLiveBook, type LiveBook, type LiveBookRequest } from './liveBooks';
+import { loadHubJumps } from './hubJumps';
 import { loadAllCharactersOpenOrders } from './openOrdersData';
 import { ownOrderIdSet } from './openOrdersModel';
 
 type Books = ReadonlyMap<string, LiveBook | 'failed'>;
 const NO_BOOKS: Books = new Map();
 const NO_OWN: ReadonlySet<number> = new Set();
+type HubJumps = ReadonlyMap<number, ReadonlyMap<number, number>>;
+const NO_JUMPS: HubJumps = new Map();
 
 /** A Refresh waiting for the base it asked for: a re-run of the same `base` is not it. */
 interface PendingForce {
@@ -75,7 +78,7 @@ function valueOrdered(items: readonly AppraisalItem[]): number[] {
 function mergeOutcome(
   base: AppraisalOutcome,
   pricePercent: number,
-  lookup: (typeId: number) => LiveBookLookup
+  lookup: (typeId: number, quantity: number) => LiveBookLookup
 ): AppraisalOutcome {
   const items = applyLiveBooks(base.appraisal.items, lookup);
   const allLive = items.every((item) => item.priceState === 'live');
@@ -87,11 +90,17 @@ function mergeOutcome(
   };
 }
 
-function lookupFrom(books: Books, hub: TradeHub, own: ReadonlySet<number>) {
-  return (typeId: number): LiveBookLookup => {
+function lookupFrom(books: Books, hub: TradeHub, own: ReadonlySet<number>, jumps: HubJumps) {
+  return (typeId: number, quantity: number): LiveBookLookup => {
     const book = books.get(bookKey(hub, typeId));
     if (book === undefined) return undefined;
-    return book === 'failed' ? 'failed' : liveStationBook(book.orders, hub.stationId, own);
+    return book === 'failed'
+      ? 'failed'
+      : liveStationBook(book.orders, hub.stationId, own, {
+          systemId: hub.systemId,
+          jumps: jumps.get(hub.systemId),
+          units: quantity,
+        });
   };
 }
 
@@ -138,6 +147,8 @@ export function useAppraisalLive({
   const [books, setBooks] = useState<Books>(NO_BOOKS);
   // Null until the pilot's own order ids first load: rows stay cached until then, so none briefly undercuts the pilot's own cheapest order.
   const [own, setOwn] = useState<ReadonlySet<number> | null>(null);
+  // Gate jumps from each hub's system, so a buy order's range can be told to reach the hub; a numbered range counts only once its hub's are in.
+  const [hubJumps, setHubJumps] = useState<HubJumps>(NO_JUMPS);
   const [checking, setChecking] = useState(false);
   const [compareChecking, setCompareChecking] = useState(false);
   const forcePrimary = useRef<PendingForce | null>(null);
@@ -204,8 +215,16 @@ export function useAppraisalLive({
       void ownPromise.then((ids) => {
         if (!cancelled) setOwn(ids);
       });
-      const [ownIds] = await Promise.all([
+      const jumpsPromise = loadHubJumps(hub.systemId);
+      void jumpsPromise.then((jumps) => {
+        if (!cancelled && jumps)
+          setHubJumps((previous) =>
+            previous.has(hub.systemId) ? previous : new Map(previous).set(hub.systemId, jumps)
+          );
+      });
+      const [ownIds, jumps] = await Promise.all([
         ownPromise,
+        jumpsPromise,
         loadLiveBooks(
           wanted,
           (request, result) => {
@@ -219,7 +238,8 @@ export function useAppraisalLive({
       ]);
       if (cancelled) return null;
       setChecking(false);
-      return mergeOutcome(base, percentRef.current, lookupFrom(settled, hub, ownIds));
+      const hubJumpsNow = jumps ? new Map([[hub.systemId, jumps]]) : NO_JUMPS;
+      return mergeOutcome(base, percentRef.current, lookupFrom(settled, hub, ownIds, hubJumpsNow));
     })();
     run.current = promise;
     void promise.finally(() => {
@@ -242,6 +262,14 @@ export function useAppraisalLive({
     if (base === null || !compareOpen || compareRequests.length === 0) return;
     let cancelled = false;
     const isCancelled = () => cancelled;
+    for (const other of TRADE_HUBS) {
+      void loadHubJumps(other.systemId).then((jumps) => {
+        if (!cancelled && jumps)
+          setHubJumps((previous) =>
+            previous.has(other.systemId) ? previous : new Map(previous).set(other.systemId, jumps)
+          );
+      });
+    }
     void (async () => {
       const wanted = compareRequests.filter((r) => force || peekLiveBook(r) === undefined);
       setCompareChecking(wanted.length > 0);
@@ -275,8 +303,8 @@ export function useAppraisalLive({
 
   const result = useMemo(() => {
     if (base === null || base.appraisal.items.length === 0 || own === null) return base;
-    return mergeOutcome(base, pricePercent, lookupFrom(books, hub, own));
-  }, [base, books, hub, own, pricePercent]);
+    return mergeOutcome(base, pricePercent, lookupFrom(books, hub, own, hubJumps));
+  }, [base, books, hub, own, pricePercent, hubJumps]);
 
   useEffect(() => {
     latest.current = result;
@@ -289,7 +317,7 @@ export function useAppraisalLive({
     return baseCompare.map((row): HubComparisonRow => {
       const items = row.items ?? [];
       if (items.length === 0) return row;
-      const lookup = lookupFrom(books, row.hub, own);
+      const lookup = lookupFrom(books, row.hub, own, hubJumps);
       const applied = applyLiveBooks(items, lookup);
       const states = new Set<PriceState | undefined>(applied.map((item) => item.priceState));
       // Cards stay on their cached figure until every row has settled: half live and half cached would be a total of neither.
@@ -302,7 +330,7 @@ export function useAppraisalLive({
         priceState: states.has('failed') ? 'failed' : 'live',
       };
     });
-  }, [baseCompare, books, own, pricePercent]);
+  }, [baseCompare, books, hubJumps, own, pricePercent]);
 
   const live = useMemo(() => progressOf(books, requests, checking), [books, requests, checking]);
   const compareLive = useMemo(

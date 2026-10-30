@@ -124,3 +124,61 @@ describe('the undercut off a live book', () => {
     expect(appraisalUndercut(item)?.atOrBelowBuy).toBe(true);
   });
 });
+
+describe('liveStationBook with a buy walk', () => {
+  const reachBuy = (
+    order_id: number,
+    price: number,
+    over: Partial<LiveOrder> & { volume_remain: number }
+  ): LiveOrder => ({ ...buy(order_id, price, 1), system_id: 30000142, range: 'station', ...over });
+  const walkAt = (units: number, jumps?: ReadonlyMap<number, number>) => ({
+    systemId: 30000142,
+    jumps,
+    units,
+  });
+
+  it('walks past a thin top bid to the average and says what the top bid takes', () => {
+    const book = liveStationBook(
+      [
+        reachBuy(1, 4.5, { location_id: HUB, volume_remain: 40 }),
+        reachBuy(2, 4, { location_id: HUB, volume_remain: 460 }),
+      ],
+      HUB,
+      new Set(),
+      walkAt(500)
+    );
+    expect(book.buy).toBeCloseTo((40 * 4.5 + 460 * 4) / 500);
+    expect(book.buyWalk).toMatchObject({ topBid: 4.5, topBidTakes: 40, filled: 500, unsold: 0 });
+  });
+
+  it('counts a buy order elsewhere in range, and reports units the book cannot take', () => {
+    const book = liveStationBook(
+      [
+        reachBuy(1, 4, { location_id: HUB, volume_remain: 10 }),
+        reachBuy(2, 5, { location_id: 9, system_id: 30000143, range: '5', volume_remain: 10 }),
+        reachBuy(3, 6, { location_id: 8, system_id: 30000144, range: '2', volume_remain: 10 }),
+      ],
+      HUB,
+      new Set(),
+      walkAt(
+        30,
+        new Map([
+          [30000143, 3],
+          [30000144, 3],
+        ])
+      )
+    );
+    expect(book.buy).toBeCloseTo((10 * 5 + 10 * 4) / 20);
+    expect(book.buyWalk).toMatchObject({ filled: 20, unsold: 10 });
+  });
+
+  it('carries no walk note where the top bid took every unit', () => {
+    const book = liveStationBook(
+      [reachBuy(1, 4.5, { location_id: HUB, volume_remain: 100 })],
+      HUB,
+      new Set(),
+      walkAt(40)
+    );
+    expect(book).toEqual({ sell: null, buy: 4.5, sellIsOwn: false });
+  });
+});
