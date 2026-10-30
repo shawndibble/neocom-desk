@@ -1,7 +1,7 @@
 /**
  * The ticked set checked together: how many changes, the DPS and EHP they
- * leave, what they cost, and any problem they cause. While the check runs, or
- * if it failed, a line says so.
+ * move (a figure that stays put is left out), what they cost, and any
+ * problem they cause. While the check runs, or if it failed, a line says so.
  */
 import { useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
@@ -20,23 +20,23 @@ interface Props {
 
 export function ImproveSelectionSummary({ summary, checked, iskBudget }: Props) {
   const { t } = useTranslation();
+  // Only a figure the ticks move, compared as shown: "DPS 0 → 0" tells the pilot nothing.
+  const figures: string[] = [];
+  if (summary) {
+    const dps = [m3sFormat(summary.dps.before), m3sFormat(summary.dps.after)];
+    const ehp = [m3Format(summary.ehp.before), m3Format(summary.ehp.after)];
+    if (dps[0] !== dps[1])
+      figures.push(t('fittings.improve.selection.dps', { before: dps[0], after: dps[1] }));
+    if (ehp[0] !== ehp[1])
+      figures.push(t('fittings.improve.selection.ehp', { before: ehp[0], after: ehp[1] }));
+  }
   return (
     <div className="flex items-end justify-between gap-3 text-sm" data-testid="improve-selection">
       {summary ? (
         <>
           <div className="min-w-0 space-y-1">
             <p>{t('fittings.improve.selection.changes', { count: summary.count })}</p>
-            <p>
-              {t('fittings.improve.selection.dps', {
-                before: m3sFormat(summary.dps.before),
-                after: m3sFormat(summary.dps.after),
-              })}
-              {' · '}
-              {t('fittings.improve.selection.ehp', {
-                before: m3Format(summary.ehp.before),
-                after: m3Format(summary.ehp.after),
-              })}
-            </p>
+            {figures.length > 0 && <p>{figures.join(' · ')}</p>}
             {summary.problems.map((problem) => (
               <p
                 key={problem.kind === 'over' ? problem.resource : problem.kind}
