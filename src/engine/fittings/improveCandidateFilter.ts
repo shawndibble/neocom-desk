@@ -8,6 +8,7 @@
  * Pure data over the fit's modules; the type catalogue is injected as
  * `groupOf`.
  */
+import { commonGroups, type JobCommonality } from './hullCommonality';
 import type { DefenseChoice, ImproveGoal } from './improve';
 import {
   jobOf,
@@ -59,13 +60,20 @@ export interface CandidateFilterInput {
   includeRigs: boolean;
   /** The job and its space: its freed and held jobs, and the Explore tank hold. Absent: today's guard. */
   jobSetting?: JobSetting;
+  /**
+   * What the hull's community fits say for the job (#5581): the module groups on
+   * enough of them join the search's groups. Only adds; absent or null: today's.
+   */
+  commonality?: JobCommonality | null;
 }
 
 export interface CandidateFilter {
   /** The Defense sides the search works on. */
   sides: readonly DefenseSide[];
-  /** The goal's Rework groups for those sides. */
+  /** The goal's Rework groups for those sides, then the groups the hull's community fits add. */
   goalGroups: readonly number[];
+  /** Only the groups the community fits add (already not in the goal's): a search tries them after its own. */
+  commonGroups: readonly number[];
   /** A chosen side with a tank goal frees the other side's tank modules. */
   freesTank: boolean;
   /** Whether the rack is searched: never subsystems, rigs only when included. */
@@ -99,7 +107,7 @@ export interface CandidateFilter {
 export function candidateFilter(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined,
-  { goal, defense, includeRigs, jobSetting }: CandidateFilterInput
+  { goal, defense, includeRigs, jobSetting, commonality }: CandidateFilterInput
 ): CandidateFilter {
   const sides = defenseSides(modules, groupOf, defense);
   const freesTank = defense !== 'keep' && TANK_GOALS.has(goal);
@@ -117,9 +125,13 @@ export function candidateFilter(
     if (job) jobsFitted.set(job, (jobsFitted.get(job) ?? 0) + 1);
   }
 
+  const base = reworkGroups(goal, sides);
+  const added = commonGroups(commonality).filter((group) => !base.includes(group));
+
   return {
     sides,
-    goalGroups: reworkGroups(goal, sides),
+    goalGroups: [...base, ...added],
+    commonGroups: added,
     freesTank,
     usesRack: (slot) => slot !== 'subsystem' && (slot !== 'rig' || includeRigs),
     tankBlocks: (toGroup, fromGroup) => {

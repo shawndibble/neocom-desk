@@ -12,6 +12,7 @@
  * Pure: no DOM, fetch or Dexie.
  */
 import type { VariationIndex } from '../market/variations';
+import { withinTie, type JobCommonality } from './hullCommonality';
 import {
   applyImproveCandidate,
   brokenGuardrail,
@@ -47,6 +48,8 @@ export interface MakeoverMoveOptions {
   includeRigs: boolean;
   /** The Improve Job and, for Explore, its space: its freed jobs may go, Dangerous keeps tank modules tank modules. Absent: today's guard. */
   jobSetting?: JobSetting;
+  /** What the hull's community fits say for the job (#5581): the groups on enough of them join Rework's. Absent: today's. */
+  commonality?: JobCommonality | null;
   /** Market-listed, hull and skill checks, and the groups' members. */
   pool: ModulePool;
   /** The hull's slots per rack, to find the empty ones; absent: no fills. */
@@ -73,9 +76,15 @@ export function makeoverMoves(
   modules: readonly FittingModule[],
   index: VariationIndex,
   rackOf: Readonly<Record<string, string>>,
-  { goal, defense, includeRigs, pool, slotCounts, jobSetting }: MakeoverMoveOptions
+  { goal, defense, includeRigs, pool, slotCounts, jobSetting, commonality }: MakeoverMoveOptions
 ): ImproveCandidate[] {
-  const filter = candidateFilter(modules, pool.groupOf, { goal, defense, includeRigs, jobSetting });
+  const filter = candidateFilter(modules, pool.groupOf, {
+    goal,
+    defense,
+    includeRigs,
+    jobSetting,
+    commonality,
+  });
   const groupOf = pool.groupOf;
 
   // A type outside the variation index has no variations: it is its group's Tech I.
@@ -108,6 +117,8 @@ export function makeoverMoves(
     !filter.tankBlocks(group, fromGroup) && !filter.uniqueBlocks(group, fromGroup, 1);
 
   const moves: ImproveCandidate[] = [];
+  // The groups the community fits add come after every move the table's groups make, so a capped search never loses one for them.
+  const added: ImproveCandidate[] = [];
   const seen = new Set<string>();
   for (const module of [...modules].sort((a, b) => a.slotIndex - b.slotIndex)) {
     const { slot, slotIndex, typeId: fromTypeId } = module;
@@ -115,14 +126,24 @@ export function makeoverMoves(
     seen.add(`${slot}:${fromTypeId}`);
     const from = groupOf(fromTypeId);
     const offered = new Set<number>([fromTypeId]);
-    for (const group of new Set([...(from === undefined ? [] : [from]), ...filter.goalGroups])) {
-      if (filter.losesJob(group, from, 1) || !allowed(group, from)) continue;
-      for (const toTypeId of representatives(group, slot)) {
-        if (offered.has(toTypeId)) continue;
-        offered.add(toTypeId);
-        moves.push({ fromTypeId, toTypeId, at: [{ slot, slotIndex }] });
+    const offerGroups = (groups: Iterable<number>, into: ImproveCandidate[]) => {
+      for (const group of groups) {
+        if (filter.losesJob(group, from, 1) || !allowed(group, from)) continue;
+        for (const toTypeId of representatives(group, slot)) {
+          if (offered.has(toTypeId)) continue;
+          offered.add(toTypeId);
+          into.push({ fromTypeId, toTypeId, at: [{ slot, slotIndex }] });
+        }
       }
-    }
+    };
+    offerGroups(
+      new Set([
+        ...(from === undefined ? [] : [from]),
+        ...filter.goalGroups.filter((group) => !filter.commonGroups.includes(group)),
+      ]),
+      moves
+    );
+    offerGroups(filter.commonGroups, added);
   }
 
   if (slotCounts) {
@@ -131,16 +152,24 @@ export function makeoverMoves(
       const free = filter.firstFreeSlot(slot, slotCounts);
       if (free === null) continue;
       const offered = new Set<number>();
-      for (const group of filter.goalGroups) {
-        if (!allowed(group, undefined)) continue;
-        for (const toTypeId of representatives(group, slot)) {
-          if (offered.has(toTypeId)) continue;
-          offered.add(toTypeId);
-          moves.push({ fromTypeId: null, toTypeId, at: [{ slot, slotIndex: free }] });
+      const fillGroups = (groups: readonly number[], into: ImproveCandidate[]) => {
+        for (const group of groups) {
+          if (!allowed(group, undefined)) continue;
+          for (const toTypeId of representatives(group, slot)) {
+            if (offered.has(toTypeId)) continue;
+            offered.add(toTypeId);
+            into.push({ fromTypeId: null, toTypeId, at: [{ slot, slotIndex: free }] });
+          }
         }
-      }
+      };
+      fillGroups(
+        filter.goalGroups.filter((group) => !filter.commonGroups.includes(group)),
+        moves
+      );
+      fillGroups(filter.commonGroups, added);
     }
   }
+  moves.push(...added);
   return moves;
 }
 
@@ -212,6 +241,12 @@ export interface FindMakeoverParams {
   lazy?: boolean;
   /** False: no pair is tried when the rounds stop gaining. */
   pairKick?: boolean;
+  /**
+   * How common a move's target group is on the hull for the job, 0..1 (#5581).
+   * When two moves' gains are within 1% of each other, the more common wins;
+   * never part of a score. Absent: the larger gain wins, as before.
+   */
+  targetShare?: (move: ImproveCandidate) => number;
   onProgress?: (calcs: number, max: number) => void;
   isCancelled?: () => boolean;
   shouldStop?: () => boolean;
@@ -293,6 +328,7 @@ export async function findMakeover({
   concurrency = 1,
   lazy = true,
   pairKick = true,
+  targetShare,
   onProgress,
   isCancelled,
   shouldStop,
@@ -395,6 +431,34 @@ export async function findMakeover({
 
   const gainOf = (trial: Trial | null) => (trial?.score ?? -Infinity) - score;
 
+  /** Whether `trial` is the better move: the larger gain, or within 1% of it the more common target group. */
+  const trialBeats = (trial: Trial, best: Trial): boolean => {
+    if (targetShare && withinTie(gainOf(trial), gainOf(best))) {
+      const common = targetShare(trial.move) - targetShare(best.move);
+      if (common !== 0) return common > 0;
+    }
+    return gainOf(trial) > gainOf(best);
+  };
+
+  /** The slots an earlier step already changed. */
+  const placed = new Set<string>();
+  const slotKey = (at: { slot: FittingSlotKind; slotIndex: number }) =>
+    `${at.slot}:${at.slotIndex}`;
+
+  /**
+   * Whether `trial` only swaps a module an earlier step placed for a target group that is
+   * less common on the hull, for a gain within 1% of the score already reached: the first
+   * step's tie-break stands. (An original module is never held by this.)
+   */
+  const undoesTieBreak = (trial: Trial): boolean => {
+    if (!targetShare || trial.move.fromTypeId === null || !withinTie(score + gainOf(trial), score))
+      return false;
+    return (
+      trial.move.at.every((at) => placed.has(slotKey(at))) &&
+      targetShare(trial.move) < targetShare({ ...trial.move, toTypeId: trial.move.fromTypeId })
+    );
+  };
+
   /** A round's best passing move so far, taken if "Show best so far" or the cap ends the round. */
   const pending = (() => {
     let best: Trial | null = null;
@@ -404,7 +468,7 @@ export async function findMakeover({
         best = null;
       },
       offer: (trial: Trial) => {
-        if (gainOf(trial) > gainOf(best)) best = trial;
+        if (!undoesTieBreak(trial) && (best === null || trialBeats(trial, best))) best = trial;
       },
     };
   })();
@@ -497,6 +561,8 @@ export async function findMakeover({
     const gain = gainOf(trial);
     for (let link: ImproveCandidate | undefined = trial.move; link; link = link.pairedWith)
       estimateFrom(link, gain);
+    for (let link: ImproveCandidate | undefined = trial.move; link; link = link.pairedWith)
+      for (const at of link.at) placed.add(slotKey(at));
     fitting = trial.fitting;
     current = trial.after;
     isk = addIsk(isk, iskDeltaOf(trial.move, priceOf));

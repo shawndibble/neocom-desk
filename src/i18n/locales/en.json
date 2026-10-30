@@ -1510,6 +1510,10 @@
         "button": "Search with Rework",
         "time": "Rework usually takes 10 to 15 seconds."
       },
+      "community": {
+        "hint": "{{group}} on {{percent}}% of {{job}} {{hull}} fits",
+        "caution": "Removes {{group}}, which {{percent}}% of {{job}} {{hull}} fits keep"
+      },
       "job": {
         "label": "Job",
         "pve": "PvE",

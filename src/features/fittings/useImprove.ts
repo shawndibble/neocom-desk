@@ -53,6 +53,9 @@ import {
   type ExploreSpace,
   type ImproveJob,
 } from '@/engine/fittings/improveJob';
+import { targetShareOf, type JobCommonality } from '@/engine/fittings/hullCommonality';
+import { communityHintsOf, type CommunityHints } from './improveCommonHints';
+import { loadHullCommonality } from './hullCommonalityLoad';
 import { makeoverMovesFor, runMakeoverPhase, type MakeoverResult } from './improveMakeoverPhase';
 import { modulePool } from './improveModulePool';
 import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
@@ -324,6 +327,8 @@ export type ImproveState =
       elapsedMs: number;
       /** Rework's whole-fit rework, when it beat the best single swap; its rows as options, ready to tick. */
       makeover?: MakeoverResult;
+      /** What the hull's community fits say for the Job searched (#5581); absent: none loaded. Shown as hints, never scored. */
+      hints?: CommunityHints;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
       /** With `sides`: the options on neither side (Damage Control, hull), shown as "Either". */
@@ -367,7 +372,8 @@ function searchCandidates(
   catalogue: FittingCatalogue,
   goal: ImproveGoal,
   config: ImproveConfig,
-  slotCounts: FittingStats['slotCounts']
+  slotCounts: FittingStats['slotCounts'],
+  commonality: JobCommonality | null
 ): ImproveCandidate[] {
   const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
   return improveCandidates(variants.fitting.modules, index, catalogue.rackOf, {
@@ -377,6 +383,7 @@ function searchCandidates(
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
     jobSetting: jobSettingOf(config.job, config.space),
+    commonality,
     slotCounts,
     pool: modulePool(catalogue, variants),
   });
@@ -574,6 +581,12 @@ export function useImprove(
         }
         // A remembered goal this fit cannot score (Longer reach on a drone boat) searches the role's default.
         const searched = searchableGoal(goal, own, hull);
+        // What the hull's community fits say for this Job; null (no fits, a failed load) leaves the search as it is.
+        const commonality =
+          (await loadHullCommonality(variants.fitting.shipTypeId, catalogue.types))?.[job] ?? null;
+        if (cancelled) return;
+        const groupOfType = (typeId: number) => catalogue.types[String(typeId)]?.groupID;
+        const targetShare = targetShareOf(commonality, groupOfType);
         // A tank goal under Shield or Armor runs both sides, the chosen one first, to compare them.
         const sides: DefenseChoice[] =
           defense !== 'keep' && reach !== 'upgrade' && TANK_GOALS.has(searched)
@@ -596,7 +609,8 @@ export function useImprove(
               oreFamily,
               hold,
             },
-            own.slotCounts
+            own.slotCounts,
+            commonality
           ),
         }));
         const total = sets.reduce((sum, set) => sum + set.candidates.length, 0);
@@ -613,6 +627,7 @@ export function useImprove(
               defense: sets[0].side,
               includeRigs,
               jobSetting,
+              commonality,
               slotCounts: own.slotCounts,
             })
           : null;
@@ -684,6 +699,7 @@ export function useImprove(
             stats,
             concurrency: workers.size,
             jobSetting,
+            ...(targetShare ? { targetShare } : {}),
             priceOf,
             ...(target ? { target } : {}),
             iskBudget,
@@ -745,6 +761,7 @@ export function useImprove(
             target,
             hold: effectiveHold(own.holds, hold),
             jobSetting,
+            ...(targetShare ? { targetShare } : {}),
             iskBudget,
             fitTotal,
             listed,
@@ -791,6 +808,18 @@ export function useImprove(
             stopped: listed.stopped || makeoverStopped,
           },
           ...(makeover ? { makeover } : {}),
+          ...(commonality
+            ? {
+                hints: communityHintsOf(
+                  commonality,
+                  job,
+                  catalogue,
+                  variants.fitting.shipTypeId,
+                  variants.fitting.modules,
+                  makeover?.makeover.rows ?? []
+                ),
+              }
+            : {}),
           before: scoredBefore,
           ...(plan
             ? {

@@ -1,0 +1,73 @@
+{
+  "shipTypeId": 645,
+  "fits": [
+    {
+      "name": "*L4 Sentry Drone Build",
+      "eft": "[Dominix, *L4 Sentry Drone Build]\nLarge Armor Repairer II\nMultispectrum Energized Membrane II\nReactive Armor Hardener\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\n\n100MN Afterburner I\nAlumel-Wired Enduring Sensor Booster\nOmnidirectional Tracking Link II\nOmnidirectional Tracking Link II\nLarge Micro Jump Drive\n\n425mm Railgun II\n425mm Railgun II\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\n\nLarge Processor Overclocking Unit I\nLarge Auxiliary Nano Pump I\nLarge Auxiliary Nano Pump I\n"
+    },
+    {
+      "name": "Passive Shield Tank / L4",
+      "eft": "[Dominix, Passive Shield Tank / L4]\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nMagnetic Field Stabilizer II\nMagnetic Field Stabilizer II\nMagnetic Field Stabilizer II\nDamage Control II\n\nLarge Micro Jump Drive\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nPithum C-Type EM Shield Amplifier\nOmnidirectional Tracking Link II\n\n425mm Prototype Gauss Gun\n425mm Prototype Gauss Gun\n425mm Prototype Gauss Gun\n425mm Prototype Gauss Gun\nDrone Link Augmentor II\nDrone Link Augmentor II\n\nLarge Core Defense Field Extender I\nLarge Core Defense Field Extender I\nLarge Thermal Shield Reinforcer I\n"
+    },
+    {
+      "name": "L4 Dominix Sentry MJD AB",
+      "eft": "[Dominix, L4 Dominix Sentry MJD AB]\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\nCapacitor Flux Coil II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\n\nSensor Booster II\nMultispectrum Shield Hardener II\n100MN Afterburner II\nX-Large Shield Booster II\nLarge Micro Jump Drive\n\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nSmall Tractor Beam II\nAuto Targeting System I\nCivilian Gatling Railgun\n\nLarge Capacitor Control Circuit II\nLarge Capacitor Control Circuit II\nLarge Capacitor Control Circuit I\n"
+    },
+    {
+      "name": "Drone Mission Runner",
+      "eft": "[Dominix, Drone Mission Runner]\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\n\nLarge Micro Jump Drive\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nX-Large Shield Booster II\nSensor Booster II\n\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\n\nLarge Processor Overclocking Unit I\nLarge Processor Overclocking Unit I\nLarge Capacitor Control Circuit I\n"
+    },
+    {
+      "name": "L3 domi",
+      "eft": "[Dominix,  L3 domi]\nCentus C-Type Large Armor Repairer\nDark Blood Multispectrum Energized Membrane\nDark Blood Multispectrum Energized Membrane\nSyndicate Damage Control\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\n\nLarge Micro Jump Drive\nFederation Navy 100MN Afterburner\nOmnidirectional Tracking Link I\nRepublic Fleet Large Cap Battery\nRepublic Fleet Large Cap Battery\n\n425mm Railgun I\n425mm Railgun I\n425mm Railgun I\n425mm Railgun I\nDrone Link Augmentor I\nDrone Link Augmentor I\n\nLarge Explosive Armor Reinforcer II\nLarge Auxiliary Nano Pump II\nLarge Auxiliary Nano Pump II\n"
+    },
+    {
+      "name": "PvE SPIDER c3/4",
+      "eft": "[Dominix,  PvE SPIDER c3/4]\n1600mm Steel Plates II\nMultispectrum Energized Membrane II\nMultispectrum Energized Membrane II\nReactive Armor Hardener\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDamage Control II\n\nSensor Booster II\nLarge Compact Pb-Acid Cap Battery\nOmnidirectional Tracking Link II\n500MN Cold-Gas Enduring Microwarpdrive\nLarge Micro Jump Drive\n\nLarge Remote Armor Repairer II\nLarge Remote Armor Repairer II\nLarge Remote Capacitor Transmitter II\nLarge Remote Capacitor Transmitter II\nHeavy Gremlin Compact Energy Neutralizer\nHeavy Gremlin Compact Energy Neutralizer\n\nLarge Explosive Armor Reinforcer I\nLarge Remote Repair Augmentor I\nLarge Egress Port Maximizer I\n"
+    },
+    {
+      "name": "General Purpose Drone L4 Mission Runner",
+      "eft": "[Dominix,  General Purpose Drone L4 Mission Runner]\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\nDamage Control II\n\nLarge Micro Jump Drive\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nX-Large Shield Booster II\nSensor Booster II, Targeting Range Script\n\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nSmall Tractor Beam II\n\nLarge EM Shield Reinforcer I\nLarge Processor Overclocking Unit I\nLarge Capacitor Control Circuit II\n"
+    },
+    {
+      "name": "Dominix, L4 Mission Runner",
+      "eft": "[Dominix, Dominix, L4 Mission Runner]\nReactive Armor Hardener\nLarge Armor Repairer II\nLarge Armor Repairer II\nThermal Armor Hardener II\nKinetic Armor Hardener II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\n\nCap Recharger II\nCap Recharger II\nCap Recharger II\nCap Recharger II\n100MN Afterburner II\n\nDrone Link Augmentor II\nDrone Link Augmentor II\nMedium Remote Armor Repairer II\nMedium Remote Hull Repairer II\nSmall Tractor Beam I\nSalvager I\n\nLarge Capacitor Control Circuit II\nLarge Capacitor Control Circuit II\nLarge Capacitor Control Circuit I\n"
+    },
+    {
+      "name": "PVE arti flagman concept",
+      "eft": "[Dominix, PVE arti flagman concept]\nTrue Sansha Reactor Control Unit\nGyrostabilizer II\nGyrostabilizer II\nGyrostabilizer II\nFederation Navy Drone Damage Amplifier\nFederation Navy Drone Damage Amplifier\nFederation Navy Drone Damage Amplifier\n\nGist A-Type X-Large Shield Booster\nParallel Enduring Target Painter\nRepublic Fleet Large Cap Battery\nDomination Multispectrum Shield Hardener\nTracking Computer II\n\nDomination 1200mm Artillery\nDomination 1200mm Artillery\nDomination 1200mm Artillery\nDomination 1200mm Artillery\nDomination 1200mm Artillery\nDomination 1200mm Artillery\n\nLarge Ancillary Current Router I\nLarge Drone Control Range Augmentor I\nLarge Capacitor Control Circuit II\n"
+    },
+    {
+      "name": "Dominix Standard Incursion",
+      "eft": "[Dominix, Dominix Standard Incursion]\nMagnetic Field Stabilizer II\nMagnetic Field Stabilizer II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDamage Control II\nPower Diagnostic System II\n\nDomination 500MN Microwarpdrive\nLarge Shield Extender II\nPithum C-Type EM Shield Amplifier\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\n\nNeutron Blaster Cannon II, Void L\nNeutron Blaster Cannon II, Void L\nNeutron Blaster Cannon II, Void L\nNeutron Blaster Cannon II, Void L\nNeutron Blaster Cannon II, Void L\nNeutron Blaster Cannon II, Void L\n\nLarge Core Defense Field Extender I\nLarge EM Shield Reinforcer I\nLarge Thermal Shield Reinforcer I\n"
+    },
+    {
+      "name": "Drone Mission Runner",
+      "eft": "[Dominix, Drone Mission Runner]\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\nOmnidirectional Tracking Enhancer II\n\nLarge Micro Jump Drive\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nX-Large Shield Booster II\nSensor Booster II\n\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\n\nLarge Processor Overclocking Unit I\nLarge Processor Overclocking Unit I\nLarge Capacitor Control Circuit I\n"
+    },
+    {
+      "name": "Dominix Actual - Cheap Level 4 Mission Omni Runner",
+      "eft": "[Dominix, Dominix Actual - Cheap Level 4 Mission Omni Runner]\nLarge Armor Repairer II\nImperial Navy Multispectrum Energized Membrane\nDrone Damage Amplifier II\nReactive Armor Hardener\nCapacitor Power Relay II\nImperial Navy Multispectrum Energized Membrane\nLarge Armor Repairer II\n\nCap Recharger II\nCap Recharger II\nOmnidirectional Tracking Link II\nLarge Cap Battery II\n100MN Afterburner II\n\nDrone Link Augmentor II\nDrone Link Augmentor II\nDrone Link Augmentor II\nMedium Remote Armor Repairer II\nMedium Remote Armor Repairer II\n1400mm Howitzer Artillery II\n\nLarge Auxiliary Nano Pump I\nLarge Auxiliary Nano Pump I\nLarge Capacitor Control Circuit II\n"
+    },
+    {
+      "name": "PvE cheap",
+      "eft": "[Dominix, PvE cheap]\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDamage Control II\nShadow Serpentis Large Armor Repairer\n\nLarge Micro Jump Drive\nOmnidirectional Tracking Link II, Optimal Range Script\nOmnidirectional Tracking Link II, Optimal Range Script\nOmnidirectional Tracking Link II, Optimal Range Script\nSensor Booster II, Targeting Range Script\n\nTachyon Modulated Energy Beam I, Imperial Navy Radio L\nDrone Link Augmentor II\nTachyon Modulated Energy Beam I, Imperial Navy Radio L\nTachyon Modulated Energy Beam I, Imperial Navy Radio L\nDrone Link Augmentor II\nDrone Link Augmentor II\n\nLarge Drone Scope Chip I\nLarge Drone Control Range Augmentor I\nLarge Processor Overclocking Unit I\n"
+    },
+    {
+      "name": "Mission Defence",
+      "eft": "[Dominix, Mission Defence]\nCoreli A-Type Multispectrum Coating\nCoreli A-Type Multispectrum Coating\nImperial Navy 1600mm Steel Plates\nImperial Navy 1600mm Steel Plates\nCormack's Modified Damage Control\nUnit W-634's Modified Drone Damage Amplifier\nUnit W-634's Modified Drone Damage Amplifier\n\nOmnidirectional Tracking Link II\nOmnidirectional Tracking Link II\nSensor Booster II\nLarge Micro Jump Drive\n500MN Quad LiF Restrained Microwarpdrive\n\nAhremen's Modified Dual Heavy Pulse Laser\nAhremen's Modified Dual Heavy Pulse Laser\nAhremen's Modified Dual Heavy Pulse Laser\nUnit W-634's Modified Drone Link Augmentor\nUnit W-634's Modified Drone Link Augmentor\nUnit W-634's Modified Drone Link Augmentor\n\nLarge Trimark Armor Pump I\nLarge Sentry Damage Augmentor I\nLarge Trimark Armor Pump I\n"
+    },
+    {
+      "name": "C4/C5 (Fleet)",
+      "eft": "[Dominix, C4/C5 (Fleet)]\nDamage Control II\n1600mm Steel Plates II\nMultispectrum Energized Membrane II\nMultispectrum Energized Membrane II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nExplosive Energized Membrane II\n\nCap Recharger II\nCap Recharger II\nCap Recharger II\nCap Recharger II\nLarge Micro Jump Drive\n\nLarge Remote Armor Repairer II\nLarge Remote Armor Repairer II\nLarge Remote Armor Repairer II\nLarge Inductive Compact Remote Capacitor Transmitter\nLarge Inductive Compact Remote Capacitor Transmitter\nDrone Link Augmentor II\n\nLarge Remote Repair Augmentor I\nLarge Remote Repair Augmentor I\nLarge Remote Repair Augmentor I\n"
+    },
+    {
+      "name": "WH Fleet bling roller, NOS + ECM, 450dps, 160K ehp",
+      "eft": "[Dominix, WH Fleet bling roller, NOS + ECM, 450dps, 160K ehp]\nOverdrive Injector System II\nOverdrive Injector System II\nCorelum A-Type Explosive Energized Membrane\nCorelum B-Type Multispectrum Energized Membrane\nCorelum B-Type Multispectrum Energized Membrane\nImperial Navy 1600mm Steel Plates\nDamage Control II\n\n500MN Y-T8 Compact Microwarpdrive\nSentient Burst Jammer\n100MN Monopropellant Enduring Afterburner\nLarge Micro Jump Drive\nHeavy F-RX Compact Capacitor Booster, Navy Cap Booster 3200\n\nCorpum A-Type Medium Energy Neutralizer\nCorpum A-Type Medium Energy Neutralizer\nCorpus C-Type Heavy Energy Neutralizer\nCorpus B-Type Heavy Energy Neutralizer\nImproved Cloaking Device II\nCorpus A-Type Heavy Energy Nosferatu\n\nLarge Higgs Anchor I\nLarge Trimark Armor Pump II\nLarge Trimark Armor Pump II\n"
+    },
+    {
+      "name": "Blood Raider Shield Tank short range brawler",
+      "eft": "[Dominix, Blood Raider Shield Tank short range brawler]\nDamage Control II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nDrone Damage Amplifier II\nMagnetic Field Stabilizer II\nMagnetic Field Stabilizer II\nTracking Enhancer II\n\nX-Large C5-L Compact Shield Booster\nGist C-Type EM Shield Hardener\nGist C-Type Thermal Shield Hardener\nHeavy F-RX Compact Capacitor Booster\n100MN Monopropellant Enduring Afterburner\n\n350mm Prototype Gauss Gun, Antimatter Charge L\n350mm Prototype Gauss Gun, Antimatter Charge L\n350mm Prototype Gauss Gun, Antimatter Charge L\n350mm Prototype Gauss Gun, Antimatter Charge L\n350mm Prototype Gauss Gun, Antimatter Charge L\n350mm Prototype Gauss Gun, Antimatter Charge L\n\nLarge Capacitor Control Circuit I\nLarge Capacitor Control Circuit I\nLarge Capacitor Control Circuit I\n"
+    }
+  ]
+}

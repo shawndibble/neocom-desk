@@ -1,0 +1,73 @@
+{
+  "shipTypeId": 24698,
+  "fits": [
+    {
+      "name": "Krenko's Mission t4 HAM missile boat, passive shield tank",
+      "eft": "[Drake, Krenko's Mission t4 HAM missile boat, passive shield tank]\nCaldari Navy Shield Power Relay\nCaldari Navy Shield Power Relay\nBallistic Control System II\nBallistic Control System II\n\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\n10MN Afterburner II\nLarge Shield Extender II\nLarge Shield Extender II\nCap Recharger II\n\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nDrone Link Augmentor II\n\nMedium Core Defense Field Purger II\nMedium Core Defense Field Purger II\nMedium Core Defense Field Purger II\n"
+    },
+    {
+      "name": "Lynne's Level 4 Mission Blitzing Machine",
+      "eft": "[Drake, Lynne's Level 4 Mission Blitzing Machine]\nCrosslink Compact Ballistic Control System\nCrosslink Compact Ballistic Control System\nMark I Compact Shield Power Relay\nMark I Compact Shield Power Relay\n\nEnduring Multispectrum Shield Hardener\nLarge Azeotropic Restrained Shield Extender\nCompact EM Shield Hardener\nLarge Azeotropic Restrained Shield Extender\n50MN Cold-Gas Enduring Microwarpdrive\nEnduring Multispectrum Shield Hardener\n\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n\nMedium Core Defense Field Purger II\nMedium Core Defense Field Purger II\nMedium Core Defense Field Extender II\n"
+    },
+    {
+      "name": "L3 Misson Runner - Low Budget Alpha Fit",
+      "eft": "[Drake, L3 Misson Runner - Low Budget Alpha Fit]\nBallistic Control System II\nBallistic Control System II\nBallistic Control System II\nDamage Control II\n\n50MN Y-T8 Compact Microwarpdrive\nCompact Multispectrum Shield Hardener\nLarge Shield Extender II\nEnduring Multispectrum Shield Hardener\nLarge Shield Extender II\nEnduring Multispectrum Shield Hardener\n\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nAuto Targeting System I\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\n\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\n"
+    },
+    {
+      "name": "L4 Drake HAM 100mn Active",
+      "eft": "[Drake, L4 Drake HAM 100mn Active]\nBallistic Control System II\nBallistic Control System II\nMissile Guidance Enhancer II\nPower Diagnostic System II\n\n100MN Y-S8 Compact Afterburner\nPithum B-Type Medium Shield Booster\nShield Boost Amplifier II\nRepublic Fleet Medium Cap Battery\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\n\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nHeavy Assault Missile Launcher II, Scourge Rage Heavy Assault Missile\nAuto Targeting System I\n\nMedium Ancillary Current Router II\nMedium Capacitor Control Circuit II\nMedium Capacitor Control Circuit I\n"
+    },
+    {
+      "name": "*PvE",
+      "eft": "[Drake, *PvE]\nBallistic Control System II\nBallistic Control System II\nDamage Control II\nShield Power Relay II\n\nLarge Shield Extender II\nLarge Shield Extender II\n50MN Cold-Gas Enduring Microwarpdrive\nMultispectrum Shield Hardener II\nEM Shield Hardener II\nThermal Shield Amplifier II\n\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nLight Missile Launcher II\nCore Probe Launcher I\n\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\n"
+    },
+    {
+      "name": "PVE*HAM AB Shield Passive",
+      "eft": "[Drake,  PVE*HAM AB Shield Passive]\nShield Power Relay II\nShield Power Relay II\nBallistic Control System II\nBallistic Control System II\n\n10MN Afterburner II\nLarge Shield Extender II\nEM Shield Amplifier II\nLarge Shield Extender II\nMultispectrum Shield Hardener II\nLarge Shield Extender II\n\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nCore Probe Launcher I\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\n\nMedium Core Defense Field Purger II\nMedium Core Defense Field Purger II\nMedium Core Defense Field Purger II\n"
+    },
+    {
+      "name": "Drake PvE",
+      "eft": "[Drake,  Drake PvE]\nBallistic Control System II\nBallistic Control System II\nMissile Guidance Enhancer II\nBallistic Control System II\n\nMedium Shield Booster II\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nLarge Shield Extender II\nMissile Guidance Computer II, Missile Precision Script\nThermal Shield Amplifier II\n\nPrototype 'Arbalest' Heavy Assault Missile Launcher I, Caldari Navy Mjolnir Heavy Assault Missile\nPrototype 'Arbalest' Heavy Assault Missile Launcher I, Caldari Navy Mjolnir Heavy Assault Missile\nPrototype 'Arbalest' Heavy Assault Missile Launcher I, Caldari Navy Mjolnir Heavy Assault Missile\nPrototype 'Arbalest' Heavy Assault Missile Launcher I, Caldari Navy Mjolnir Heavy Assault Missile\nPrototype 'Arbalest' Heavy Assault Missile Launcher I, Caldari Navy Mjolnir Heavy Assault Missile\nPrototype 'Arbalest' Heavy Assault Missile Launcher I, Caldari Navy Mjolnir Heavy Assault Missile\n\nMedium EM Shield Reinforcer II\nMedium Core Defense Field Extender II\nMedium Thermal Shield Reinforcer II\n"
+    },
+    {
+      "name": "Drake pve",
+      "eft": "[Drake, Drake pve]\nCapacitor Power Relay II\nIFFA Compact Damage Control\nBallistic Control System II\nBallistic Control System II\n\nLarge C5-L Compact Shield Booster\nThermal Shield Amplifier II\nCap Recharger II\nStalwart Restrained Shield Boost Amplifier\nStalwart Restrained Shield Boost Amplifier\nEM Shield Amplifier II\n\nDrone Link Augmentor I\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n\nMedium Capacitor Control Circuit I\nMedium Capacitor Control Circuit II\nMedium Capacitor Control Circuit II\n"
+    },
+    {
+      "name": "\u262f PvE \u262f",
+      "eft": "[Drake,  \u262f PvE \u262f]\nDamage Control II\nPhotonic Upgraded Co-Processor\nBallistic Control System II\nBallistic Control System II\n\n10MN Monopropellant Enduring Afterburner\nLarge Shield Extender II\nLarge Ancillary Shield Booster\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nEnduring EM Shield Hardener\n\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\nCore Probe Launcher I\n\nMedium Hydraulic Bay Thrusters II\nMedium Core Defense Field Extender II\nMedium Core Defense Field Extender II\n"
+    },
+    {
+      "name": "T1 Mission Running Drake",
+      "eft": "[Drake, T1 Mission Running Drake]\nDamage Control II\nBallistic Control System II\nBallistic Control System II\nBallistic Control System II\n\nLarge Shield Extender II\nLarge Shield Extender I\nMultispectrum Shield Hardener I\nMultispectrum Shield Hardener I\n50MN Y-T8 Compact Microwarpdrive\n\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n'Arbalest' Heavy Missile Launcher\n\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\nMedium Core Defense Field Extender I\n"
+    },
+    {
+      "name": "Drake PVE 4/10",
+      "eft": "[Drake,  Drake PVE 4/10]\nBallistic Control System II\nBallistic Control System II\nBallistic Control System II\nBallistic Control System II\n\n50MN Quad LiF Restrained Microwarpdrive\nMultispectrum Shield Hardener II\nPithum C-Type Medium Shield Booster\nMissile Guidance Computer II\nCap Recharger II\nTarget Painter II\n\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nCore Probe Launcher I\n\nMedium Capacitor Control Circuit II\nMedium Capacitor Control Circuit II\nMedium Kinetic Shield Reinforcer II\n"
+    },
+    {
+      "name": "Drake PvE",
+      "eft": "[Drake, Drake PvE]\nBallistic Control System II\nBallistic Control System II\nShield Power Relay II\nShield Power Relay II\n\nLarge Shield Extender II\nLarge Shield Extender II\nThermal Shield Amplifier II\nMultispectrum Shield Hardener II\nEM Shield Hardener II\n10MN Monopropellant Enduring Afterburner\n\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nSalvager I\n\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\nMedium Core Defense Field Purger I\n"
+    },
+    {
+      "name": "General PVE",
+      "eft": "[Drake, General PVE]\nMissile Guidance Enhancer II\nMissile Guidance Enhancer II\nBallistic Control System II\nCrosslink Compact Ballistic Control System\n\nMultispectrum Shield Hardener II\nThermal Shield Amplifier II\nCompact EM Shield Hardener\nLarge F-S9 Regolith Compact Shield Extender\nLarge F-S9 Regolith Compact Shield Extender\n10MN Afterburner II\n\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nXR-3200 Heavy Missile Bay\nShield Command Burst I\n\nMedium Warhead Rigor Catalyst I\nMedium Core Defense Field Extender I\nMedium Core Defense Field Extender I\n"
+    },
+    {
+      "name": "PvE",
+      "eft": "[Drake, PvE]\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nHeavy Missile Launcher II\nCore Probe Launcher I\n"
+    },
+    {
+      "name": "T1 BC Fleet Drake",
+      "eft": "[Drake, T1 BC Fleet Drake]\nBallistic Control System II\nBallistic Control System II\nBallistic Control System II\nCo-Processor I\n\nLarge Shield Extender II\nLarge Shield Extender II\nEM Shield Hardener II\nMultispectrum Shield Hardener II\n10MN Afterburner II\nTarget Painter II\n\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nShield Command Burst II\n\nMedium Thermal Shield Reinforcer II\nMedium Core Defense Field Extender II\nMedium Core Defense Field Extender II\n"
+    },
+    {
+      "name": "#T1M Drake HAM Brawler",
+      "eft": "[Drake, #T1M Drake HAM Brawler]\nIFFA Compact Damage Control\nCrosslink Compact Ballistic Control System\nCrosslink Compact Ballistic Control System\nCrosslink Compact Ballistic Control System\n\n50MN Y-T8 Compact Microwarpdrive\nLarge F-S9 Regolith Compact Shield Extender\nLarge F-S9 Regolith Compact Shield Extender\nEnduring Multispectrum Shield Hardener\nInitiated Compact Warp Scrambler\nX5 Enduring Stasis Webifier\n\nPrototype 'Arbalest' Heavy Assault Missile Launcher I\nPrototype 'Arbalest' Heavy Assault Missile Launcher I\nPrototype 'Arbalest' Heavy Assault Missile Launcher I\nPrototype 'Arbalest' Heavy Assault Missile Launcher I\nPrototype 'Arbalest' Heavy Assault Missile Launcher I\nPrototype 'Arbalest' Heavy Assault Missile Launcher I\nShield Command Burst I\n\nMedium Core Defense Field Extender I\nMedium Core Defense Field Extender I\nMedium Ancillary Current Router I\n"
+    },
+    {
+      "name": "Drake PVP",
+      "eft": "[Drake,  Drake PVP]\nBallistic Control System II\nBallistic Control System II\nBallistic Control System II\nDamage Control II\n\nStasis Webifier II\nWarp Scrambler II\n10MN Monopropellant Enduring Afterburner\nMultispectrum Shield Hardener II\nMultispectrum Shield Hardener II\nLarge Shield Extender II\n\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nHeavy Assault Missile Launcher II\nMedium Energy Neutralizer II\n\nMedium Core Defense Field Extender II\nMedium Core Defense Field Extender II\nMedium Core Defense Field Extender II\n"
+    }
+  ]
+}

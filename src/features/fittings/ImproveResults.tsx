@@ -17,6 +17,7 @@ import { ImproveMakeover } from './ImproveMakeover';
 import { ImproveOptionList } from './ImproveOptionList';
 import { ImproveSelectionSummary } from './ImproveSelectionSummary';
 import { crystalBasisOf } from './improveCrystalBasis';
+import { cautionLines, hintLine } from './improveCommonHints';
 import { singleGainsOf } from './improveMakeoverTicks';
 import { bestFoundLine } from './improveLeadLine';
 import type { ImproveSettings } from './improveSettings';
@@ -72,6 +73,7 @@ export function ImproveResults({
     [makeover, result]
   );
   const basisDiffers = crystalBasisOf(state).differs;
+  const hintOf = (candidate: { toTypeId: number }) => hintLine(t, state.hints, candidate);
   const list = (options: ImproveOption[], section: string) => (
     <ImproveOptionList
       options={options}
@@ -81,6 +83,7 @@ export function ImproveResults({
       labels={labels}
       selection={selection}
       lead={lead}
+      hintOf={hintOf}
     />
   );
 
@@ -99,6 +102,8 @@ export function ImproveResults({
           }
           singleGains={singleGains}
           typeName={labels.typeName}
+          hintOf={hintOf}
+          cautions={cautionLines(t, state.hints)}
           rowCost={(row) =>
             makeover.options.find((option) => option.candidate === row)?.iskDelta ?? null
           }

@@ -50,6 +50,8 @@ export interface MakeoverPhaseParams {
   target: TargetProfile | null | undefined;
   hold: ImproveHold;
   jobSetting: JobSetting;
+  /** How common a move's target group is on the hull for the Job; orders near-ties. */
+  targetShare?: (move: ImproveCandidate) => number;
   iskBudget: number | null;
   fitTotal: number | null;
   /** The single swaps' results: the Makeover must beat the best of them. */
@@ -80,6 +82,7 @@ export async function runMakeoverPhase(
     ...(target ? { target } : {}),
     hold: params.hold,
     jobSetting: params.jobSetting,
+    ...(params.targetShare ? { targetShare: params.targetShare } : {}),
     iskBudget: params.iskBudget,
     fitTotal: params.fitTotal,
     // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.

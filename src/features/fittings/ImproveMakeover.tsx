@@ -34,6 +34,10 @@ export interface ImproveMakeoverProps {
   typeName: (typeId: number) => string;
   /** ISK the row costs (a rig at full price); null: no price. */
   rowCost: (row: ImproveCandidate) => number | null;
+  /** A quiet line for a row whose target group most community fits carry (#5581); null: none. */
+  hintOf?: (row: ImproveCandidate) => string | null;
+  /** Quiet cautions: groups this Makeover removes that most community fits keep. */
+  cautions?: readonly string[];
 }
 
 type Tone = 'up' | 'same' | 'tight' | 'over';
@@ -130,6 +134,8 @@ export function ImproveMakeover({
   rounds,
   typeName,
   rowCost,
+  hintOf,
+  cautions = [],
 }: ImproveMakeoverProps) {
   const { t } = useTranslation();
   const keys = makeover.rows.map((row) => moveKey(row));
@@ -172,6 +178,13 @@ export function ImproveMakeover({
             </span>
           </span>
         </label>
+        {cautions.length > 0 && (
+          <ul className="text-text-dim space-y-0.5 text-xs">
+            {cautions.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
           {figures.map((figure) => (
             <div key={figure.id} className="min-w-0">
@@ -208,6 +221,7 @@ export function ImproveMakeover({
                   const key = moveKey(row);
                   const gain = singleGains?.get(key);
                   const cost = rowCost(row);
+                  const hint = hintOf?.(row) ?? null;
                   return (
                     <li key={key}>
                       <label
@@ -236,6 +250,7 @@ export function ImproveMakeover({
                               })}
                             </span>
                           )}
+                          {hint && <span className="text-text-dim block text-xs">{hint}</span>}
                           {cost !== null && (
                             <span className="block text-xs">
                               {cost < 0 ? (
