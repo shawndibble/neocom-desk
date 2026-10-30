@@ -204,10 +204,10 @@ jobs:
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
     #
-    # Four, not more: vitest shards by a stable hash of the file path, and
-    # replaying that split over measured per-file costs puts the worst shard
-    # at 27.7% against an ideal 25%. Six splits worse (20.9% worst) for four
-    # more runners. The four heavy route tests land in different shards.
+    # Four, not more. Whole files are dealt out by measured run time
+    # (`scripts/test-shard.mjs`, weights in `scripts/test-shard-weights.json`),
+    # as `e2e-shard` does; vitest's own `--shard` hashes the path and ignores
+    # run time. A file with no weight counts as median.
     #
     # Unlike the e2e worker experiment, this adds no concurrency per machine:
     # each shard still runs vitest's default 3 workers on its own runner.
@@ -232,10 +232,16 @@ jobs:
       # The JSON reporter writes per-test and per-file durations. The default
       # `agent` reporter prints totals only, so without this a test over the
       # 1s budget cannot be found from a CI run.
-      - run: >-
-          npm run test:run -- --shard=${{ matrix.shard }}/4
-          --reporter=agent --reporter=github-actions --reporter=json
-          --outputFile.json=vitest-timing-${{ matrix.shard }}.json
+      - name: Run this shard's test files
+        run: |
+          # Assigned first so a crash in the script fails the step; `mapfile < <(...)`
+          # would swallow it and the shard would pass with no tests run.
+          list=$(node scripts/test-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
+          if [ -z "$list" ]; then echo "::error::no test files assigned to this shard"; exit 1; fi
+          mapfile -t files <<< "$list"
+          npm run test:run -- "${files[@]}" \
+            --reporter=agent --reporter=github-actions --reporter=json \
+            --outputFile.json=vitest-timing-${{ matrix.shard }}.json
       - name: List tests over the 1s budget
         if: always()
         run: node scripts/test-budget.mjs vitest-timing-${{ matrix.shard }}.json >> "$GITHUB_STEP_SUMMARY" || true

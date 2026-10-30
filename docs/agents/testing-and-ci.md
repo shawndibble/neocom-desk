@@ -82,6 +82,13 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   render (lazy route chunks, jsdom, React warm-up), which lands on whichever
   test happens to run first. Pay it once in a `beforeAll` warm-up render with
   its own hook timeout, as `src/routes/IndustryPlanPage.test.tsx` does.
+- **Unit shards are dealt out by file run time, not by hash.** `ci.yml`'s
+  `test-shard` jobs run the files `scripts/test-shard.mjs` assigns them, using
+  `scripts/test-shard-weights.json` (seconds per file). A new test file needs
+  no edit (it counts as median). Refresh the table every so often from the
+  `vitest-timing-shard-N` artifacts of a recent run:
+  `node scripts/test-shard.mjs --weights vitest-timing-*.json`. Vitest's own
+  `--shard` hashes the path and ignores run time.
 - **Aim for under 1s per unit test and under 10s per e2e test.** Each CI
   `test-shard` job prints the tests over 1s in its job summary
   (`scripts/test-budget.mjs`) and uploads the full per-test report as
