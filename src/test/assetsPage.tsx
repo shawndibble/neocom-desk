@@ -1,8 +1,7 @@
-import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
+import { afterEach, beforeAll, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
 import { clearMarketPriceCache } from '@/market/prices';
@@ -14,6 +13,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { mswServer } from '@/test/msw';
 
 // Shared harness for the Assets route tests (src/routes/Assets*.test.tsx), one
 // file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
@@ -46,7 +46,7 @@ export const assetPage2 = [
   },
 ];
 
-export const server = setupServer(
+export const server = mswServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
     const page = new URL(request.url).searchParams.get('page');
     return HttpResponse.json(page === '2' ? assetPage2 : assetPage1, {
@@ -115,17 +115,12 @@ async function resetSession() {
 }
 
 /**
- * Registers the file's server lifecycle, the cold-render warm-up and the
- * per-test session reset. Call once at module scope of each Assets test file.
+ * Registers the cold-render warm-up, the per-test session reset and the market
+ * price cache clear (the MSW server's own lifecycle comes from `mswServer`). Call once at module scope of each Assets test file.
  */
 export function installAssetsHarness(): void {
-  afterAll(() => server.close());
-  afterEach(() => {
-    server.resetHandlers();
-    clearMarketPriceCache();
-  });
+  afterEach(clearMarketPriceCache);
   beforeAll(async () => {
-    server.listen({ onUnhandledRequest: 'error' });
     // One throwaway render, so no test pays for the first one. A worker's first
     // `App` render — compiling the lazy route chunks, warming jsdom and React —
     // lands on whichever test runs first and can outlast its 1s `findByText`
