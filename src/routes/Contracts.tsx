@@ -278,6 +278,7 @@ export function Contracts() {
     tab === 'history' &&
     source === 'current' &&
     highlightParamId !== null &&
+    !loading &&
     contractsResult !== null &&
     !contracts.some((c) => c.contract_id === highlightParamId);
   const selectedContract = picked?.scope === selectionScope ? picked.contract : paramContract;

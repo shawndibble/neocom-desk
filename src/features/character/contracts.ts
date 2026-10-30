@@ -44,14 +44,9 @@ export async function loadContractsWithArchive(
   characterId: number
 ): Promise<StatusResult<Contract[]>> {
   const result = await loadContracts(characterId);
-  const merged = await contractsWithArchive(characterId, result.cached);
-  return {
-    ...result,
-    cached: merged && {
-      ...merged,
-      data: merged.data.map(withAcceptedCourierInProgress),
-    },
-  };
+  // Live rows are already mapped; archived ones stay as ESI last said, since an accepted
+  // courier that has since dropped out of ESI is not known to still be in progress.
+  return { ...result, cached: await contractsWithArchive(characterId, result.cached) };
 }
 
 // Re-exported rather than defined here: the predicate is pure and now lives

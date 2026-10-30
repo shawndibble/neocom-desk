@@ -9,7 +9,7 @@ import { captureException } from '@sentry/react';
 import { db } from '@/db';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
-import { ARCHIVE_DAYS } from '@/engine/wallet/archiveCoverage';
+import { archiveCutoffIso } from '@/engine/wallet/archiveCoverage';
 import { DAY_MS } from '@/lib/age';
 
 /** The newest of a contract's dates: the clock the one-year prune runs on. */
@@ -30,16 +30,11 @@ export function pastEsiWindow(contract: Contract, nowMs: number = Date.now()): b
   return Date.parse(contractArchiveDate(contract)) < nowMs - ESI_CONTRACT_DAYS * DAY_MS;
 }
 
-/** ESI dates are second-resolution `…Z`; match that shape so string compares agree. */
-function cutoffIso(nowMs: number): string {
-  return `${new Date(nowMs - ARCHIVE_DAYS * DAY_MS).toISOString().slice(0, 19)}Z`;
-}
-
 /** Drops rows past a year, with the item lines filed under them. */
 async function prune(characterId: number, nowMs: number): Promise<void> {
   const stale = await db.contractArchive
     .where('[characterId+archiveDate]')
-    .between([characterId, ''], [characterId, cutoffIso(nowMs)], true, false)
+    .between([characterId, ''], [characterId, archiveCutoffIso(nowMs)], true, false)
     .primaryKeys();
   if (stale.length === 0) return;
   await db.contractArchive.bulkDelete(stale);
@@ -80,11 +75,13 @@ export async function archiveContractItems(
 ): Promise<void> {
   try {
     // Only for a contract the archive holds: a row with no header would never be pruned.
-    if ((await db.contractArchive.get([characterId, contractId])) === undefined) return;
-    await db.contractItemArchive.put({
-      characterId,
-      contract_id: contractId,
-      items: [...items],
+    await db.transaction('rw', db.contractArchive, db.contractItemArchive, async () => {
+      if ((await db.contractArchive.get([characterId, contractId])) === undefined) return;
+      await db.contractItemArchive.put({
+        characterId,
+        contract_id: contractId,
+        items: [...items],
+      });
     });
   } catch (error) {
     captureException(error);

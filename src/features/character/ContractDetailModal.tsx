@@ -231,7 +231,8 @@ export function ContractDetailModal({
           if (!cancelled) setItems({ list: kept, typeNames });
           return;
         }
-        if (outcome.failureStatus === 404 && pastEsi) setItemsNotKept(true);
+        if (corporationId === undefined && outcome.failureStatus === 404 && pastEsi)
+          setItemsNotKept(true);
         // ESI answered 404: this contract has no item lines (it is gone, or never had
         // any), a definite answer that Retry cannot change. Anything else — no
         // answer, a 5xx, a 403 — is "couldn't load" and keeps Retry.
