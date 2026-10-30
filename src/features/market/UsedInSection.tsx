@@ -10,12 +10,10 @@
  * filter to reach anything further down. The row's "More actions" button
  * opens the menu `ItemContextMenu` publishes rather than building its own.
  */
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigationType } from 'react-router-dom';
-import { Button, RowMoreActions, SearchInput, TypeIcon } from '@/components/ui';
+import { Button, Disclosure, RowMoreActions, SearchInput, TypeIcon } from '@/components/ui';
 import {
   loadBlueprintCatalog,
   materialUsesFor,
@@ -50,6 +48,8 @@ export function UsedInSection({
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(actions?.blueprints ?? null);
   const [query, setQuery] = useState('');
   const [pages, setPages] = useState(1);
+  // null = the default: open for a short list, closed above the filter threshold.
+  const [toggled, setToggled] = useState<boolean | null>(null);
 
   const hasActions = actions !== null;
   useEffect(() => {
@@ -73,6 +73,7 @@ export function UsedInSection({
     setShownFor(typeId);
     setQuery('');
     setPages(1);
+    setToggled(null);
   }
 
   const uses = useMemo(() => (catalog ? materialUsesFor(catalog, typeId) : []), [catalog, typeId]);
@@ -85,78 +86,90 @@ export function UsedInSection({
   if (!actions || uses.length === 0) return null;
 
   const visible = filtered.slice(0, pages * USED_IN_PAGE);
+  const expanded = toggled ?? uses.length <= FILTER_THRESHOLD;
 
   return (
     <section>
       <CloseOnNavigate onNavigate={onNavigate} />
-      <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
-        {t('market.itemDetail.usedInTitle', {
+      <Disclosure
+        label={t('market.itemDetail.usedInTitle', {
           count: uses.length,
           formatted: formatCount(uses.length),
         })}
-      </h3>
-      {uses.length > FILTER_THRESHOLD && (
-        <SearchInput
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t('market.itemDetail.usedInFilter')}
-          aria-label={t('market.itemDetail.usedInFilter')}
-          className="mt-2"
-        />
-      )}
-      {filtered.length === 0 ? (
-        <p className="mt-1 text-xs text-text-dim">{t('market.itemDetail.usedInNoMatch')}</p>
-      ) : (
-        <ul className="mt-1 divide-y divide-line">
-          {visible.map((use) => (
-            <ItemContextMenu
-              key={use.productTypeID}
-              typeId={use.productTypeID}
-              itemName={use.productName}
-              // Every row here is buildable by definition; the page's own
-              // lookup answers "No blueprint options" on pages that don't
-              // load the catalog.
-              blueprintTypeID={use.blueprintTypeID}
-            >
-              <li className="flex items-center justify-between gap-3 py-1 text-xs">
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <TypeIcon
-                    typeId={use.productTypeID}
-                    size={32}
-                    width={20}
-                    height={20}
-                    className="shrink-0"
-                  />
-                  <ItemInfoLink typeId={use.productTypeID} className="truncate">
-                    {use.productName}
-                  </ItemInfoLink>
-                  {use.activity === 'reaction' && (
-                    <span className="shrink-0 text-text-dim">
-                      {t('market.itemDetail.usedInReaction')}
+        expanded={expanded}
+        onToggle={() => setToggled(!expanded)}
+        className="border-b border-line"
+      >
+        <div className="px-2.5 pb-1">
+          {uses.length > FILTER_THRESHOLD && (
+            <SearchInput
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('market.itemDetail.usedInFilter')}
+              aria-label={t('market.itemDetail.usedInFilter')}
+              className="mt-2"
+            />
+          )}
+          {filtered.length === 0 ? (
+            <p className="mt-1 text-xs text-text-dim">{t('market.itemDetail.usedInNoMatch')}</p>
+          ) : (
+            <ul className="mt-1 divide-y divide-line">
+              {visible.map((use) => (
+                <ItemContextMenu
+                  key={use.productTypeID}
+                  typeId={use.productTypeID}
+                  itemName={use.productName}
+                  // Every row here is buildable by definition; the page's own
+                  // lookup answers "No blueprint options" on pages that don't
+                  // load the catalog.
+                  blueprintTypeID={use.blueprintTypeID}
+                >
+                  <li className="flex items-center justify-between gap-3 py-1 text-xs">
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      <TypeIcon
+                        typeId={use.productTypeID}
+                        size={32}
+                        width={20}
+                        height={20}
+                        className="shrink-0"
+                      />
+                      <ItemInfoLink typeId={use.productTypeID} className="truncate">
+                        {use.productName}
+                      </ItemInfoLink>
+                      {use.activity === 'reaction' && (
+                        <span className="shrink-0 text-text-dim">
+                          {t('market.itemDetail.usedInReaction')}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-2">
-                  <span className="tabular-nums text-text-dim">
-                    {t('market.itemDetail.usedInPerRun', {
-                      quantity: formatCount(use.quantity),
-                    })}
-                  </span>
-                  <RowMoreActions />
-                </span>
-              </li>
-            </ItemContextMenu>
-          ))}
-        </ul>
-      )}
-      {visible.length < filtered.length && (
-        <Button size="sm" variant="ghost" className="mt-1" onClick={() => setPages((n) => n + 1)}>
-          {t('market.itemDetail.usedInShowMore', {
-            shown: formatCount(visible.length),
-            total: formatCount(filtered.length),
-          })}
-        </Button>
-      )}
+                    <span className="inline-flex shrink-0 items-center gap-2">
+                      <span className="tabular-nums text-text-dim">
+                        {t('market.itemDetail.usedInPerRun', {
+                          quantity: formatCount(use.quantity),
+                        })}
+                      </span>
+                      <RowMoreActions />
+                    </span>
+                  </li>
+                </ItemContextMenu>
+              ))}
+            </ul>
+          )}
+          {visible.length < filtered.length && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mt-1"
+              onClick={() => setPages((n) => n + 1)}
+            >
+              {t('market.itemDetail.usedInShowMore', {
+                shown: formatCount(visible.length),
+                total: formatCount(filtered.length),
+              })}
+            </Button>
+          )}
+        </div>
+      </Disclosure>
     </section>
   );
 }
