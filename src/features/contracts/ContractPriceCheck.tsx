@@ -5,8 +5,9 @@
  * formatted, so the same block serves an own contract's issue-day check, a
  * live Contract Search check and a BPC per-run check.
  *
- * Neutral type throughout, never `isk-pos`/`isk-neg`: a contract does not say
- * which side the reader is on, so a gain-or-loss colour would be a wrong signal.
+ * Neutral type unless a row carries a `tone`: a contract does not say which
+ * side the reader is on, so only a panel that knows (the buyer's Saving) tints
+ * a value with `isk-pos`/`isk-neg`. The row's note says it in words too.
  *
  * The side label, when the panel offers a flip, is accent text with no
  * underline and a tooltip naming the press (DESIGN.md §6c: a value that flips
@@ -28,6 +29,8 @@ export interface PriceCheckRowModel {
   sub?: boolean;
   /** An estimate, not a hub figure: dimmed so it does not read as part of the verdict. */
   dim?: boolean;
+  /** A gain or loss for the reader; tints the value. The note repeats it in words. */
+  tone?: 'good' | 'bad';
 }
 
 export interface PriceCheckFlip {
@@ -79,7 +82,14 @@ export function ContractPriceCheck({
             >
               <dt className="text-text-dim">{row.label}</dt>
               <dd className="text-right">
-                <span className={cx('tabular-nums font-semibold', row.dim && 'text-text-dim')}>
+                <span
+                  className={cx(
+                    'tabular-nums font-semibold',
+                    row.dim && 'text-text-dim',
+                    row.tone === 'good' && 'text-isk-pos',
+                    row.tone === 'bad' && 'text-isk-neg'
+                  )}
+                >
                   {row.value}
                 </span>
                 {row.note && <span className="block text-text-dim">{row.note}</span>}
