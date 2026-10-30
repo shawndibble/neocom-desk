@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ageTone, monthlyBySpace, summarizeKills, topShips, type KillRecord } from './killActivity';
+import {
+  ageTone,
+  LAST_KILL_SHOWN_DAYS,
+  monthlyBySpace,
+  shownLastKill,
+  summarizeKills,
+  topShips,
+  type KillRecord,
+} from './killActivity';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
 const HOUR = 3_600_000;
@@ -83,5 +91,22 @@ describe('topShips', () => {
       { shipTypeId: 7, count: 3 },
       { shipTypeId: 5, count: 2 },
     ]);
+  });
+});
+
+describe('shownLastKill', () => {
+  it('keeps a kill up to six months old', () => {
+    expect(LAST_KILL_SHOWN_DAYS).toBe(183);
+    expect(shownLastKill(NOW - 3 * DAY, NOW)).toBe(NOW - 3 * DAY);
+    expect(shownLastKill(NOW - 183 * DAY, NOW)).toBe(NOW - 183 * DAY);
+  });
+
+  it('drops a kill older than six months, so no age is drawn for it', () => {
+    expect(shownLastKill(NOW - 184 * DAY, NOW)).toBeNull();
+    expect(shownLastKill(NOW - 390 * DAY, NOW)).toBeNull();
+  });
+
+  it('has nothing to show for no kill', () => {
+    expect(shownLastKill(null, NOW)).toBeNull();
   });
 });

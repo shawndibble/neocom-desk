@@ -34,6 +34,7 @@ vi.mock('./useHereSpace', () => ({
 }));
 
 import { DscanShareControl, PilotListView } from './PilotListView';
+import { useLocalGroupMode } from './localGroupMode';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -353,5 +354,122 @@ describe('PilotListView (new since last paste)', () => {
     paste([...PREVIOUS, 'Eve']);
     expect(await screen.findByText('1 new since last paste')).toBeTruthy();
     expect(screen.getAllByText('New')).toHaveLength(1);
+  });
+});
+
+describe('PilotListView (Group by Organization, issue #5668)', () => {
+  const lotus = { allianceId: 501, allianceName: 'Black Lotus' };
+  const ORG_ROWS: PilotListRow[] = [
+    row('Kael', {
+      ...lotus,
+      corporationId: 601,
+      corporationName: 'Vanguard',
+      kills: ready(kill(2 * HOUR, 'highsec')),
+    }),
+    row('Mira', {
+      ...lotus,
+      corporationId: 601,
+      corporationName: 'Vanguard',
+      kills: ready(kill(3 * HOUR, 'highsec')),
+    }),
+    row('Bram', { ...lotus, corporationId: 602, corporationName: 'Harbor', kills: ready() }),
+    row('Wren', { corporationId: 701, corporationName: 'Ember', kills: ready() }),
+    row('Imre', { corporationId: 701, corporationName: 'Ember', kills: { kind: 'notLookedUp' } }),
+    row('Varek', { corporationId: 801, corporationName: 'Quiet Orbit', kills: ready() }),
+    row('Corpmate', { corporationId: 901, ownOrganization: 'corporation' }),
+  ];
+
+  beforeEach(async () => {
+    await db.settings.clear();
+    useLocalGroupMode.setState({ value: 'kills', hydrated: false });
+    vi.resetAllMocks();
+    mocks.here.space = 'highsec';
+    mocks.phone = false;
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(ORG_ROWS);
+        return Promise.resolve();
+      }
+    );
+  });
+
+  function renderOrgList() {
+    // The fifth name is past the zKillboard cap in the real list; here the row says so.
+    return render(
+      <MemoryRouter>
+        <PilotListView paste={{ kind: 'local', names: ORG_ROWS.map((r) => r.name), overflow: 0 }} />
+      </MemoryRouter>
+    );
+  }
+
+  it('groups by Kills by default, and switches to Organization, remembering the pick on this device', async () => {
+    renderOrgList();
+    const group = await screen.findByRole('group', { name: 'Group by' });
+    expect(within(group).getByRole('button', { name: 'Kills' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(within(group).getByRole('button', { name: 'Organization' }));
+
+    expect(await screen.findByRole('link', { name: 'Black Lotus' })).toBeInTheDocument();
+    await waitFor(async () =>
+      expect((await db.settings.get('pilotLookupLocalGrouping'))?.value).toBe('organization')
+    );
+  });
+
+  it('heads an alliance with a group per corporation, a lone corporation by itself, and lone pilots apart', async () => {
+    await db.settings.put({ key: 'pilotLookupLocalGrouping', value: 'organization' });
+    renderOrgList();
+
+    const alliance = (await screen.findByRole('link', { name: 'Black Lotus' })).closest('h3');
+    expect(alliance?.textContent).toContain('3 pilots');
+    expect(screen.getByRole('table', { name: 'Vanguard' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Harbor' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Ember' })).toBeInTheDocument();
+    const alone = screen.getByRole('table', { name: 'On their own' });
+    expect(within(alone).getByText('Varek')).toBeInTheDocument();
+    // Friendly stays last and folded, as in the Kills view.
+    expect(screen.queryByText('Corpmate')).toBeNull();
+  });
+
+  it('places a pilot past the zKillboard cap by organization, saying the kills were not looked up', async () => {
+    await db.settings.put({ key: 'pilotLookupLocalGrouping', value: 'organization' });
+    renderOrgList();
+    const ember = await screen.findByRole('table', { name: 'Ember' });
+    const imre = within(ember).getByText('Imre').closest('tr');
+    expect(imre?.textContent).toContain('Not looked up');
+  });
+});
+
+describe('PilotListView (old kills)', () => {
+  beforeEach(async () => {
+    await db.settings.clear();
+    useLocalGroupMode.setState({ value: 'kills', hydrated: false });
+    vi.resetAllMocks();
+    mocks.here.space = 'highsec';
+    mocks.phone = false;
+  });
+
+  it('dates a kill up to six months old, and leaves an older one undated', async () => {
+    const rows = [
+      row('Recent', { kills: ready(kill(100 * DAY, 'lowsec')) }),
+      row('Ancient', { kills: ready(kill(390 * DAY, 'nullsec')) }),
+    ];
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(rows);
+        return Promise.resolve();
+      }
+    );
+    render(
+      <MemoryRouter>
+        <PilotListView paste={{ kind: 'local', names: rows.map((r) => r.name), overflow: 0 }} />
+      </MemoryRouter>
+    );
+    const recent = (await screen.findByText('Recent')).closest('tr');
+    const ancient = screen.getByText('Ancient').closest('tr');
+    expect(recent?.textContent).toMatch(/\d+mo ago|\d+d ago/);
+    expect(ancient?.textContent).not.toMatch(/ago/);
   });
 });

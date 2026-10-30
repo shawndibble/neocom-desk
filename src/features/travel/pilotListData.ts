@@ -8,12 +8,17 @@
  * Rows are reported as they settle so the table fills in while zKillboard
  * answers. zKillboard calls are made a few at a time, not all 40 at once, with
  * unknown and neutral pilots ahead of red and orange contacts.
+ *
+ * Only the first `MAX_LIST_PILOTS` names get a kill list; every name is still
+ * resolved and placed by corporation and alliance, which is a few bulk ESI
+ * requests however busy the Local (issue #5668).
  */
 import { postUniverseIds } from '@/esi/endpoints';
 import { resolveAffiliations } from '@/features/character/affiliations';
 import { loadContacts } from '@/features/character/contacts';
 import { resolveNames } from '@/features/character/names';
 import { summarizeKills, type KillRecord, type KillSummary } from '@/engine/pilotList/killActivity';
+import { MAX_LIST_PILOTS } from '@/engine/pilotList/parsePilotPaste';
 import { resolveStanding, type ContactStanding } from '@/engine/pilotList/standing';
 import { needsDangerRatio, needsLossHistory } from '@/engine/pilotList/threatVerdict';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -64,6 +69,8 @@ export type PilotKillsState =
   | { kind: 'skipped' }
   /** zKillboard could not be reached. */
   | { kind: 'unreachable' }
+  /** Past the first `MAX_LIST_PILOTS` names: placed by organization only. */
+  | { kind: 'notLookedUp' }
   | { kind: 'ready'; kills: KillRecord[]; summary: KillSummary };
 
 /**
@@ -121,7 +128,7 @@ export async function loadPilotList(
   names: readonly string[],
   { signal, onRows, viewer = Promise.resolve(NO_VIEWER) }: LoadPilotListOptions
 ): Promise<void> {
-  let rows: PilotListRow[] = names.map((name) => ({
+  let rows: PilotListRow[] = names.map((name, index) => ({
     name,
     characterId: null,
     notFound: false,
@@ -131,7 +138,7 @@ export async function loadPilotList(
     allianceName: null,
     standing: null,
     ownOrganization: null,
-    kills: { kind: 'loading' },
+    kills: index < MAX_LIST_PILOTS ? { kind: 'loading' } : { kind: 'notLookedUp' },
     extras: { kind: 'idle' },
   }));
   onRows(rows);
