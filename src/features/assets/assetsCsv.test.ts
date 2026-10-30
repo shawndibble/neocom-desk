@@ -10,16 +10,20 @@ describe('assetCsvRows', () => {
       {
         label: 'Jita IV - Moon 4',
         entries: [
-          { name: 'Tritanium', quantity: 100 },
-          { name: 'Veldspar', quantity: 50 },
+          { name: 'Tritanium', quantity: 100, nickname: '' },
+          { name: 'Veldspar', quantity: 50, nickname: '' },
         ],
       },
-      { label: 'Amarr VIII', entries: [{ name: 'Rifter', quantity: 1 }] },
+      {
+        label: 'Amarr VIII',
+        nickname: 'Home market',
+        entries: [{ name: 'Rifter', quantity: 1 }],
+      },
     ];
     expect(assetCsvRows(groups)).toEqual([
-      { location: 'Jita IV - Moon 4', name: 'Tritanium', quantity: 100 },
-      { location: 'Jita IV - Moon 4', name: 'Veldspar', quantity: 50 },
-      { location: 'Amarr VIII', name: 'Rifter', quantity: 1 },
+      { location: 'Jita IV - Moon 4', name: 'Tritanium', quantity: 100, nickname: '' },
+      { location: 'Jita IV - Moon 4', name: 'Veldspar', quantity: 50, nickname: '' },
+      { location: 'Amarr VIII', name: 'Rifter', quantity: 1, nickname: 'Home market' },
     ]);
   });
 
@@ -29,18 +33,19 @@ describe('assetCsvRows', () => {
 });
 
 describe('assetsCsvColumns', () => {
-  it('orders columns location, item, quantity', () => {
+  it('orders columns location, item, quantity, nickname (real name column unchanged)', () => {
     const columns = assetsCsvColumns(t);
     expect(columns.map((c) => c.header)).toEqual([
       'assets.csvLocation',
       'assets.csvItem',
       'assets.csvQuantity',
+      'assets.csvNickname',
     ]);
   });
 
   it('emits a raw number for quantity', () => {
     const columns = assetsCsvColumns(t);
-    const row = { location: 'Jita', name: 'Tritanium', quantity: 12345 };
+    const row = { location: 'Jita', name: 'Tritanium', quantity: 12345, nickname: '' };
     const csv = toCsv([row], columns);
     const fields = csv.split('\r\n')[1].split(',');
     expect(fields[2]).toBe('12345');

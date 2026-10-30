@@ -169,6 +169,8 @@ export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
 interface LocationRowProps {
   href: string;
   label: string;
+  /** The pilot's Place Nickname (personal Assets only): shown first, the real label dim beneath. */
+  nickname?: string;
   security: number | null | undefined;
   jumpsAway: JumpsAwayResult | undefined;
   itemCount: number;
@@ -193,6 +195,7 @@ interface LocationRowProps {
 export function LocationRow({
   href,
   label,
+  nickname,
   security,
   jumpsAway,
   itemCount,
@@ -234,7 +237,16 @@ export function LocationRow({
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{label}</span>
+          {nickname !== undefined ? (
+            <Tooltip content={label}>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">{nickname}</span>
+                <span className="truncate text-[0.6875rem] text-text-dim">{label}</span>
+              </span>
+            </Tooltip>
+          ) : (
+            <span className="truncate text-sm font-medium">{label}</span>
+          )}
           <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim">
             {unresolvedParent ? (
               <span className="text-warning">{t('assets.unresolved.rowHint')}</span>

@@ -34,6 +34,7 @@ import { useAssetKindPreference } from '@/features/assets/assetKindPreference';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import type { TableExport } from '@/components/ui/useTableExport';
+import { usePlaceNicknameMap } from '@/features/assets/placeNicknames';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/assets/assetsCsv';
 import { withoutAbyssalTypePrices } from '@/engine/market/abyssalValuation';
 import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
@@ -420,6 +421,7 @@ export function useAssetsData() {
 
   // Not `useTableExport`: this list isn't a DataTable, and `getRows` builds
   // the grouped rows lazily, only when an export actually runs.
+  const placeNicknames = usePlaceNicknameMap();
   const assetsCsvColumnList = useMemo(() => assetsCsvColumns(t), [t]);
   const assetsExport: TableExport<AssetCsvRow> = {
     surface: 'assets',
@@ -429,6 +431,7 @@ export function useAssetsData() {
       assetCsvRows(
         buildCsvGroups().map((group) => ({
           label: group.label,
+          nickname: placeNicknames[group.locationId],
           entries: group.entries.map((entry) => ({
             name: entry.name,
             quantity: entry.asset.quantity,
@@ -466,6 +469,7 @@ export function useAssetsData() {
     hydrated: hydrated && kindPreferenceHydrated,
     activeCharacterId,
     refresh,
+    placeNicknames,
     view,
     setView,
     debouncedSearch,

@@ -25,6 +25,7 @@ import {
   SectionHeading,
 } from '@/features/assets/assetBrowserRows';
 import type { Translate } from '@/lib/translate';
+import type { PlaceNicknamesValue } from './placeNicknames';
 import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
@@ -142,6 +143,8 @@ interface BrowseRowViewProps {
   selectedIds: ReadonlySet<number>;
   onToggleSelection: (ids: readonly number[]) => void;
   stationLabelFor: (station: AssetTreeStation) => string;
+  /** Place Nicknames by location id: the personal Assets display only. */
+  placeNicknames: PlaceNicknamesValue;
   nodeLabel: (node: AssetTreeNode) => string;
   locationNames: ReadonlyMap<number, string>;
   securityForStation: (locationId: number) => number | null | undefined;
@@ -172,6 +175,7 @@ export function BrowseRowView(props: BrowseRowViewProps) {
       <LocationRow
         href={assetHref(station.locationId, [], props.query)}
         label={props.stationLabelFor(station)}
+        nickname={props.placeNicknames[station.locationId]}
         security={orphan ? undefined : props.securityForStation(station.locationId)}
         jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
         itemCount={station.itemCount}

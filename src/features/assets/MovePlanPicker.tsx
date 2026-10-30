@@ -12,6 +12,7 @@ import { cx } from '@/lib/cx';
 import { formatCubicMetres } from '@/lib/volume';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
 import type { PickerStack } from './movePlanInput';
+import { PlaceName } from './PlaceName';
 
 interface PickerListProps {
   /** Stacks by Character, then by pickup location. */
@@ -103,7 +104,7 @@ export function PickerList({
                       >
                         <Caret expanded={isOpen} />
                         <span className="min-w-0 flex-1 py-1.5 leading-tight font-bold [overflow-wrap:anywhere]">
-                          {place}
+                          <PlaceName locationId={locationId} name={place} />
                         </span>
                         <span className="shrink-0 pl-2 text-xs whitespace-nowrap text-text-dim tabular-nums">
                           {here

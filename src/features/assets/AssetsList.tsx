@@ -36,6 +36,7 @@ import { collectItemIds, collectStationItemIds, type StationSortField } from '@/
 import { assetNodeSegment } from '@/engine/assetPath';
 import { ItemColumnLabels, JumpsAwayText, SecurityValue } from '@/features/assets/assetBrowserRows';
 import { BrowseRowView } from '@/features/assets/AssetBrowseRows';
+import { StationHeading } from '@/features/assets/StationHeading';
 import {
   AssetItemActionsContext,
   assetHref,
@@ -78,6 +79,7 @@ export function AssetsList({
     characterBadges,
     assetsByItemId,
     assetsExport,
+    placeNicknames,
     assetItemActions,
     pinStateFor,
     handleTogglePin,
@@ -124,7 +126,10 @@ export function AssetsList({
     resolved.station === null
       ? []
       : [
-          { label: stationLabelFor(resolved.station), href: assetHref(pathStationId, [], query) },
+          {
+            label: placeNicknames[resolved.station.locationId] ?? stationLabelFor(resolved.station),
+            href: assetHref(pathStationId, [], query),
+          },
           ...resolved.trail.map((node, index) => ({
             label: nodeLabel(node),
             href: assetHref(
@@ -134,6 +139,16 @@ export function AssetsList({
             ),
           })),
         ];
+  // The station's own heading is the one place a Place Nickname is renamed. An
+  // orphan group (a parent that never resolved) is no place, so it has none.
+  const stationHeading =
+    resolved.station !== null &&
+    resolved.trail.length === 0 &&
+    !isUnresolvedParent(resolved.station, mergedLocationNames)
+      ? { locationId: resolved.station.locationId, name: stationLabelFor(resolved.station) }
+      : null;
+  const headingClassName =
+    'min-w-0 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
   const parentHref =
     crumbs.length > 1 ? crumbs[crumbs.length - 2].href : assetHref(null, [], query);
   // A leaf item carries no aggregate of its own — there is nothing below it to
@@ -141,6 +156,13 @@ export function AssetsList({
   const deepest = resolved.trail[resolved.trail.length - 1] ?? resolved.station;
   const currentTotals =
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
+  const itemsSuffix = currentTotals && (
+    <span className="sr-only">
+      {t('assets.levelHeading.itemsSuffix', {
+        items: t('assets.itemCount', { count: currentTotals.itemCount }),
+      })}
+    </span>
+  );
 
   // How the abyssal modules in view are valued: every asset at the root, the
   // level's contents when drilled in, the matches in a flat list.
@@ -277,20 +299,22 @@ export function AssetsList({
                 onClick={() => void navigate(parentHref)}
               />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <h2
-                  ref={levelHeadingRef}
-                  tabIndex={-1}
-                  className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
-                  {currentTotals && (
-                    <span className="sr-only">
-                      {t('assets.levelHeading.itemsSuffix', {
-                        items: t('assets.itemCount', { count: currentTotals.itemCount }),
-                      })}
-                    </span>
-                  )}
-                </h2>
+                {stationHeading ? (
+                  <StationHeading
+                    locationId={stationHeading.locationId}
+                    name={stationHeading.name}
+                    nickname={placeNicknames[stationHeading.locationId]}
+                    headingRef={levelHeadingRef}
+                    headingClassName={headingClassName}
+                  >
+                    {itemsSuffix}
+                  </StationHeading>
+                ) : (
+                  <h2 ref={levelHeadingRef} tabIndex={-1} className={headingClassName}>
+                    {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
+                    {itemsSuffix}
+                  </h2>
+                )}
                 {phoneFacts && (
                   <span className="flex flex-wrap items-center gap-x-1 text-[0.6875rem] text-text-dim tabular-nums">
                     {phoneFacts.map((fact, index) => (
@@ -497,6 +521,7 @@ export function AssetsList({
                           selectedIds={selectedIds}
                           onToggleSelection={toggleNodeSelection}
                           stationLabelFor={stationLabelFor}
+                          placeNicknames={placeNicknames}
                           nodeLabel={nodeLabel}
                           locationNames={mergedLocationNames}
                           securityForStation={securityForStation}

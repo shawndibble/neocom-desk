@@ -40,6 +40,7 @@ import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
 import { JumpsAwayText, SecurityValue } from './assetBrowserRows';
+import { PlaceName } from './PlaceName';
 import type { JumpBasis } from '@/features/route/jumpBasis';
 
 /** SDE category 6. */
@@ -341,7 +342,7 @@ function ShipRowView({
           role="cell"
           className="min-w-0 text-xs break-words max-sm:order-3 max-sm:flex-1 max-sm:truncate"
         >
-          {name}
+          <PlaceName locationId={row.locationId} name={name} />
           {trail && (
             <>
               <span className="text-text-dim"> · </span>
