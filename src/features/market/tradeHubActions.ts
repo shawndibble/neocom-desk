@@ -39,8 +39,10 @@ export async function changeDefaultHub(hub: HubId, localIds: readonly number[]):
     if (own.length > 0)
       await useHubByCharacter.getState().setValue(applyDefaultToAll(map, own, hub));
   } else if (hub !== defaultHub) {
-    const filled = fillMissingHubs(map, localIds, defaultHub);
-    if (localIds.some((id) => !(id in map))) await useHubByCharacter.getState().setValue(filled);
+    const needsPin = localIds.some((id) => !(id in map));
+    if (needsPin) {
+      await useHubByCharacter.getState().setValue(fillMissingHubs(map, localIds, defaultHub));
+    }
   }
   await useDefaultMarketHub.getState().setValue(hub);
 }

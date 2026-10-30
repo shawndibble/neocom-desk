@@ -14,7 +14,6 @@
  * **Not** the Market Browser page's own current hub, which is device-local —
  * see `browserHub.ts`'s doc comment for why the two are split.
  *
-
  * Since issue #5593 there are two layers. `useDefaultMarketHub` is the
  * account-wide default (`sync.marketHub`, Settings' "Default Trade Hub for new
  * characters"); `useMarketHub` is the hub in force: the active Character's own

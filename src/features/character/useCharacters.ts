@@ -10,6 +10,11 @@ export function useCharacters(): readonly CharacterRecord[] {
   return useLiveQuery(() => db.characters.toArray(), [], NO_CHARACTERS);
 }
 
+/** Like `useCharacters`, but `undefined` until loaded, so a gate can tell "none yet" from "none". */
+export function useCharactersOrLoading(): CharacterRecord[] | undefined {
+  return useLiveQuery(() => db.characters.toArray());
+}
+
 /** Character id -> name. Empty until loaded, so a miss reads as "unknown", not "no characters". */
 export function useCharacterNames(): Map<number, string> {
   const characters = useCharacters();

@@ -18,6 +18,14 @@ async function setup(map: Record<number, HubId>, ids: number[]) {
 }
 
 describe('TradeHubField', () => {
+  it('renders nothing until the characters have loaded', async () => {
+    await setup({}, [1, 2]);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(
+      await screen.findByRole('combobox', { name: 'Default Trade Hub for new characters' })
+    ).toBeInTheDocument();
+  });
+
   it('shows only a plain Trade Hub select for one character', async () => {
     await setup({}, [1]);
     expect(await screen.findByRole('combobox', { name: 'Trade Hub' })).toBeInTheDocument();

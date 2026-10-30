@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { Collapse } from '@/components/ui/Collapse';
-import { useCharacters } from '@/features/character/useCharacters';
+import { useCharactersOrLoading } from '@/features/character/useCharacters';
 import {
   hubCounts,
   resolveTradeHub,
@@ -64,11 +64,14 @@ function HubSelect({
  */
 export function TradeHubField() {
   const { t } = useTranslation();
-  const characters = useCharacters();
+  const loaded = useCharactersOrLoading();
   const defaultHub = useDefaultMarketHub((state) => state.value);
   const map = useHubByCharacter((state) => state.value);
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  // Nothing until the roster has loaded: an empty one reads as "single" and would pin nobody.
+  if (loaded === undefined) return null;
+  const characters = loaded;
   const ids = characters.map((c) => c.characterId);
   const single = characters.length <= 1;
 

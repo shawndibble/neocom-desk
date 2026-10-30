@@ -57,8 +57,8 @@ describe('hubCounts', () => {
   it('counts resolved hubs, biggest first', () => {
     expect(hubCounts({ 2: 'hek', 3: 'amarr' }, [1, 2, 3, 4], 'jita')).toEqual([
       ['jita', 2],
-      ['hek', 1],
       ['amarr', 1],
+      ['hek', 1],
     ]);
   });
 });

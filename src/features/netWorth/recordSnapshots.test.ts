@@ -1,6 +1,9 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
+import { useHubByCharacter } from '@/features/market/characterHubs';
+import { useDefaultMarketHub } from '@/features/market/hub';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   liveSources,
   recordAllNetWorthSnapshots,
@@ -197,6 +200,14 @@ describe('liveSources.fetch', () => {
     mocks.hubPrices.mockResolvedValue(new Map([[34, { sellMin: 5 }]]));
     mocks.averages.mockResolvedValue(new Map());
     mocks.abyssal.mockResolvedValue({ isAbyssalType: () => false, values: new Map() });
+  });
+
+  it("prices at the polled character's own hub, not the active one's", async () => {
+    useDefaultMarketHub.setState({ value: 'jita', hydrated: true });
+    useHubByCharacter.setState({ value: { 1: 'hek', 2: 'amarr' }, hydrated: true });
+    useActiveCharacter.setState({ activeCharacterId: 2, hydrated: true });
+    await liveSources.fetch(1);
+    expect(mocks.hubPrices.mock.calls[0][0]).toMatchObject({ id: 'hek' });
   });
 
   it('returns the figures when every source answered live', async () => {

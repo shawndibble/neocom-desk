@@ -67,7 +67,7 @@ export function applyDefaultToAll(
   return next;
 }
 
-/** Hubs the given Characters resolve to with how many are on each, most first. */
+/** Hubs the given Characters resolve to with how many are on each, most first, equal counts by hub id. */
 export function hubCounts(
   map: HubMap,
   characterIds: readonly number[],
@@ -78,5 +78,5 @@ export function hubCounts(
     const hub = resolveTradeHub(map, id, defaultHub);
     counts.set(hub, (counts.get(hub) ?? 0) + 1);
   }
-  return [...counts].sort((a, b) => b[1] - a[1]);
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
