@@ -104,3 +104,16 @@ describe('assetPassesKindFilter', () => {
     expect(assetPassesKindFilter({ type_id: 100 }, noBp)).toBe(true);
   });
 });
+
+describe('off-market blueprint originals', () => {
+  it('keeps an unlisted original once the SDE blueprint ids are known', () => {
+    const filter = {
+      index,
+      pick: 'all' as const,
+      blueprints: 'original' as const,
+      blueprintTypeIds: new Set([999]),
+    };
+    expect(assetPassesKindFilter({ type_id: 999 }, filter)).toBe(true);
+    expect(assetPassesKindFilter({ type_id: 999, is_blueprint_copy: true }, filter)).toBe(false);
+  });
+});

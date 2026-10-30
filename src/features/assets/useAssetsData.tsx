@@ -100,6 +100,7 @@ export function useAssetsData() {
   // The Category and Blueprints picks are remembered per device as well
   // (issue #5601); the min-value box stays per-visit, as before.
   const kindPreference = useAssetKindPreference((state) => state.value);
+  const kindPreferenceHydrated = useAssetKindPreference((state) => state.hydrated);
   const setKindPreference = useAssetKindPreference((state) => state.setValue);
   useHydratedStore(useAssetKindPreference);
   const remembered = useMemo<RememberedDefaults<typeof ASSETS_VIEW_PARAMS>>(
@@ -146,11 +147,6 @@ export function useAssetsData() {
 
   const categoryPick = useMemo(() => CATEGORY_PARAM.parse(catKey), [catKey]);
   const blueprintKind = view.bp;
-  const kindFilter = useMemo<AssetKindFilter | null>(() => {
-    if (!categoryIndex) return null;
-    const filter = { index: categoryIndex, pick: categoryPick, blueprints: blueprintKind };
-    return filterIsOpen(filter) ? null : filter;
-  }, [categoryIndex, categoryPick, blueprintKind]);
   const showBlueprintSelect = categoryIndex ? blueprintsTicked(categoryIndex, categoryPick) : false;
   const activeFilterCount =
     (pickIsAll(categoryPick) ? 0 : 1) +
@@ -392,6 +388,17 @@ export function useAssetsData() {
     return merged;
   }, [typeNames, activeCrossCharacterData]);
   const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const kindFilter = useMemo<AssetKindFilter | null>(() => {
+    if (!categoryIndex) return null;
+    const filter = {
+      index: categoryIndex,
+      pick: categoryPick,
+      blueprints: blueprintKind,
+      blueprintTypeIds,
+    };
+    return filterIsOpen(filter) ? null : filter;
+  }, [categoryIndex, categoryPick, blueprintKind, blueprintTypeIds]);
   const mergedLocationNames = useMemo(() => {
     if (!activeCrossCharacterData) return locationNames;
     const merged = new Map(locationNames);
@@ -455,7 +462,8 @@ export function useAssetsData() {
     data,
     error,
     loading,
-    hydrated,
+    // Held until the remembered Category pick is read, so the list never flashes unfiltered.
+    hydrated: hydrated && kindPreferenceHydrated,
     activeCharacterId,
     refresh,
     view,

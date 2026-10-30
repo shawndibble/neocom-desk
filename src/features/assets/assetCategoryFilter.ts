@@ -153,10 +153,6 @@ export function pickIsAll(pick: CategoryPick): pick is 'all' {
   return pick === 'all';
 }
 
-export function pickIsNone(pick: CategoryPick): boolean {
-  return pick !== 'all' && pick.size === 0;
-}
-
 /** True while a Blueprints & Reactions option is ticked: the Blueprints select only means something then. */
 export function blueprintsTicked(index: AssetCategoryIndex, pick: CategoryPick): boolean {
   if (pick === 'all') return index.blueprintOptionIds.size > 0;
@@ -167,6 +163,8 @@ export interface AssetKindFilter {
   index: AssetCategoryIndex;
   pick: CategoryPick;
   blueprints: BlueprintKind;
+  /** The SDE's blueprint type ids, once loaded: an off-market original still counts. */
+  blueprintTypeIds?: ReadonlySet<number> | null;
 }
 
 /** True when the filter keeps every asset, so callers can skip the work. */
@@ -188,7 +186,10 @@ export function assetPassesKindFilter(
   if (blueprints === 'any' || !blueprintsTicked(index, pick)) return true;
   const isCopy = asset.is_blueprint_copy === true;
   if (blueprints === 'copy') return isCopy;
-  return !isCopy && index.blueprintOptionIds.has(option);
+  return (
+    !isCopy &&
+    (index.blueprintOptionIds.has(option) || (filter.blueprintTypeIds?.has(asset.type_id) ?? false))
+  );
 }
 
 /** `cat`: absent = all; `cat=` = none; else comma-separated option ids. */
