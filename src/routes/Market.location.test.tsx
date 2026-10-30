@@ -199,7 +199,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     server.use(
       plexOrdersHandler(hits),
       // PLEX's Variations table falls back to Tritanium (same market group,
-      // fixtures above), whose order book lives at the Forge region rather
+      // fixtures in @/test/marketMocks), whose order book lives at the Forge region rather
       // than PLEX's Global Market Region.
       ordersHandler({ count: 0 })
     );
@@ -392,7 +392,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     server.use(
       ordersHandler({ count: 0 }),
       // Tritanium's Variations table falls back to PLEX (same market group,
-      // fixtures above), whose order book lives at its own Global Market
+      // fixtures in @/test/marketMocks), whose order book lives at its own Global Market
       // Region rather than Tritanium's.
       plexOrdersHandler({ count: 0 })
     );

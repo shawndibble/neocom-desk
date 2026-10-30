@@ -43,12 +43,12 @@ export const loadSdeMock = () => ({
   loadSkills: vi.fn(async () => []),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
-  // ItemDetailModal (opened via "Show info" below) loads this unconditionally.
+  // ItemDetailModal (opened via "Show info") loads this unconditionally.
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
 });
 
 // ItemDetailModal reads the baked type-info shard first. Mocked rather than
-// fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers below.
+// fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers in marketPage.tsx.
 export const loadTypeInfoMock = () => ({ loadTypeInfo: vi.fn(async () => null) });
 
 export const priceHistoryChartMock = () => ({
@@ -117,9 +117,9 @@ export const GLOBAL_MARKETS: GlobalMarketEntry[] = [
 ];
 // Empty by default — none of the TYPES fixtures above carry a Tech/Meta/
 // Faction classification, so the Variations table falls back to Market Group
-// siblings exactly like the tests below expect. The variation-sourced path
+// siblings exactly like the tests expect. The variation-sourced path
 // is exercised separately (see "shows the variation group, not Market Group
-// siblings, when the item has variation data" below).
+// siblings, when the item has variation data" in Market.variations.test.tsx).
 export const VARIATION_DATA: VariationData = { types: {}, metaGroups: {} };
 
 // Rifter's own detail attribute (issue #9 "Item Detail"): matches the

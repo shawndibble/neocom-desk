@@ -256,7 +256,7 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
       http.get('https://esi.evetech.net/characters/:id/implants', () => HttpResponse.json([])),
       // The sidebar's character switcher now has two characters to show and
       // fetches public/corp info for each — not exercised by any single-
-      // character test in this file.
+      // character test in this suite.
       http.get('https://esi.evetech.net/characters/:id', ({ params }) =>
         HttpResponse.json({
           name: params.id === String(ALT_ID) ? 'Alt Pilot' : 'Pilot One',

@@ -245,7 +245,7 @@ export function installMarketHarness(): void {
     useCompareSet.setState({ items: [] });
     clearOrderBookCache();
     // Module state, and it latches. One test provoking an ESI error (the 420 in
-    // "an ESI failure clears the spinner" below) trips the error-limit gate, and
+    // "an ESI failure clears the spinner" in Market.variations.test.tsx) trips the error-limit gate, and
     // without this every later test in the file has its fetches declined before
     // they are sent — eleven of them failed that way on a "Sell Orders" table
     // that never arrived, with nothing in the message to say why.
