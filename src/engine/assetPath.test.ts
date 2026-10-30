@@ -193,7 +193,7 @@ describe('legacyAssetsLocation', () => {
     expect(legacyAssetsLocation('/assets', '')).toBeNull();
     expect(legacyAssetsLocation('/assets', '?q=x')).toBeNull();
     expect(legacyAssetsLocation('/assets/nope', '')).toBeNull();
-    expect(legacyAssetsLocation('/assets/items/1', '?view=ships')).toBeUndefined();
+    expect(legacyAssetsLocation('/assets/items/1', '?view=ships')).toBeNull();
   });
 });
 
