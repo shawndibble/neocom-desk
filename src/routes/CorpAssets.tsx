@@ -119,6 +119,8 @@ import { useCorpStockTargets } from '@/features/corp/stockTargets';
 import { useTargetTypeInfo } from '@/features/corp/useTargetTypeInfo';
 import { StockTargetsDialog } from '@/features/corp/StockTargetsDialog';
 import { loadTypeVolumes } from '@/features/character/typeNames';
+import { NO_ASSET_NAMES, type AssetNameMap } from '@/engine/assetNames';
+import { loadCorporationAssetNames } from '@/features/assets/assetNames';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
@@ -181,6 +183,8 @@ interface AssetsSnapshot {
   labels: CorpAssetLabels;
   /** Every station/structure the assets sit in, named or not. */
   placeIds: readonly number[];
+  /** In-game names of the corporation's ships and containers by item id (issue #5652); empty when none can be read. */
+  assetNames: AssetNameMap;
   /** Global average market price per type, best-effort — an outage degrades ISK figures to 0 rather than the whole page. */
   priceByTypeId: ReadonlyMap<number, number>;
   /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
@@ -204,6 +208,7 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
   divisionNames: new Map(),
   labels: EMPTY_CORP_ASSET_LABELS,
   placeIds: [],
+  assetNames: NO_ASSET_NAMES,
   priceByTypeId: new Map(),
   copyValueByItemId: new Map(),
   volumeByTypeId: new Map(),
@@ -246,19 +251,24 @@ async function loadAssetsSnapshot(
         .then((result) => structureNameMap(result.cached?.data))
         .catch(() => new Map<number, string>())
     : Promise.resolve(new Map<number, string>());
-  const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId] = await Promise.all([
-    assets === null
-      ? EMPTY_CORP_ASSET_LABELS
-      : loadCorpAssetLabels(assets, placeIds, structureNames),
-    loadTypeVolumes(typeIds),
-    loadTypeCategories(typeIds),
-    // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
-    loadAssetCopyValues(characterId, assets ?? [], async () =>
-      canReadBlueprints
-        ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
-        : null
-    ),
-  ]);
+  const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId, assetNames] =
+    await Promise.all([
+      assets === null
+        ? EMPTY_CORP_ASSET_LABELS
+        : loadCorpAssetLabels(assets, placeIds, structureNames),
+      loadTypeVolumes(typeIds),
+      loadTypeCategories(typeIds),
+      // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
+      loadAssetCopyValues(characterId, assets ?? [], async () =>
+        canReadBlueprints
+          ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
+          : null
+      ),
+      // Only past the Director-gated assets read above; swallows its own failures.
+      assets === null
+        ? NO_ASSET_NAMES
+        : loadCorporationAssetNames(characterId, corporationId, assets),
+    ]);
   const divisionNames = new Map(
     hangarDivisions(divisionsResult.cached?.data ?? null).map((d) => [d.division, d.name])
   );
@@ -277,6 +287,7 @@ async function loadAssetsSnapshot(
     divisionNames,
     labels,
     placeIds,
+    assetNames,
     priceByTypeId,
     copyValueByItemId,
     volumeByTypeId,
@@ -434,6 +445,8 @@ function CorpAssetsView({
   );
   const [targetsOpen, setTargetsOpen] = useState(false);
 
+  const assetNames = data?.assetNames ?? NO_ASSET_NAMES;
+
   const valuation = useMemo(
     () => ({
       prices: data?.priceByTypeId ?? EMPTY_PRICES,
@@ -460,7 +473,11 @@ function CorpAssetsView({
         if (params.below && !shortTypeIds.has(row.typeId)) return false;
         if (params.below && row.isBlueprintCopy) return false;
         if (keepKind && !keepKind(row)) return false;
-        return query === '' || labels.typeName(row.typeId).toLowerCase().includes(query);
+        return (
+          query === '' ||
+          labels.typeName(row.typeId).toLowerCase().includes(query) ||
+          row.stacks.some((stack) => assetNames[stack.itemId]?.toLowerCase().includes(query))
+        );
       })
       .map((row) => ({
         key: rowKeyOf(row),
@@ -483,6 +500,7 @@ function CorpAssetsView({
     categoryByTypeId,
     query,
     labels,
+    assetNames,
   ]);
 
   // Which offices are empty is a fact about the corporation, not about the current search.
@@ -936,6 +954,7 @@ function CorpAssetsView({
                       <CorpAssetItemTable
                         rows={itemRows}
                         labels={labels}
+                        assetNames={assetNames}
                         below={params.below}
                         blueprintTypeIds={blueprintTypeIds}
                         selectMode={selectMode}

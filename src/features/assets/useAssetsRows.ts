@@ -74,6 +74,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     mergedTypeNames,
     mergedLocationNames,
     assetsByItemId,
+    assetNames,
     pinStateFor,
   } = assetsData;
   const { t } = useTranslation();
@@ -306,8 +307,8 @@ export function useAssetsRows(assetsData: AssetsData) {
   const searchMatches = useMemo(() => {
     if (!flatModeActive) return [];
     if (!allItemsView && debouncedSearch.trim().length === 0) return [];
-    return matchAssets(mergedAssets, mergedTypeNames, debouncedSearch);
-  }, [flatModeActive, allItemsView, mergedAssets, mergedTypeNames, debouncedSearch]);
+    return matchAssets(mergedAssets, mergedTypeNames, debouncedSearch, assetNames);
+  }, [flatModeActive, allItemsView, mergedAssets, mergedTypeNames, debouncedSearch, assetNames]);
   // Min-value filter and sort (issue #414) apply to both the search results
   // list and the permanent all-items view — the same flat shape either way.
   // Value is computed once per match up front (not inside the comparator),

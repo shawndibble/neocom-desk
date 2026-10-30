@@ -53,6 +53,8 @@ import {
   postRoute,
   getCharacterSearch,
   postUniverseIds,
+  postCharacterAssetNames,
+  postCorporationAssetNames,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -1364,5 +1366,40 @@ describe('entity name search and resolution', () => {
 
     expect(result.corporations).toEqual([{ id: 2, name: 'Moon Corp' }]);
     expect(result.alliances).toEqual([{ id: 3, name: 'Moon Corp' }]);
+  });
+});
+
+describe('asset names', () => {
+  it('postCharacterAssetNames POSTs ids, authenticated, in batches of 1000', async () => {
+    const sizes: number[] = [];
+    let authorization: string | null = null;
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/assets/names`, async ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        authorization = request.headers.get('authorization');
+        const body = (await request.json()) as number[];
+        sizes.push(body.length);
+        return HttpResponse.json(body.map((id) => ({ item_id: id, name: `n${id}` })));
+      })
+    );
+    const ids = Array.from({ length: 1200 }, (_, i) => i + 1);
+    const names = await postCharacterAssetNames(CHARACTER_ID, ids);
+    expect(sizes.sort((a, b) => b - a)).toEqual([1000, 200]);
+    expect(names).toHaveLength(1200);
+    expect(authorization).toMatch(/^Bearer /);
+  });
+
+  it('postCorporationAssetNames posts to the corporation route', async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${ESI_BASE_URL}/corporations/98000001/assets/names`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json([{ item_id: 5, name: 'Corp can' }]);
+      })
+    );
+    const names = await postCorporationAssetNames(CHARACTER_ID, 98000001, [5]);
+    expect(body).toEqual([5]);
+    expect(names).toEqual([{ item_id: 5, name: 'Corp can' }]);
   });
 });

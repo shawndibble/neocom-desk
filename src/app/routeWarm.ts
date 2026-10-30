@@ -33,7 +33,7 @@
  */
 import type { AppRoutePath } from './routeScopes';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
+import { hasSessionRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { onCachePurged } from '@/esi/cachePurge';
 import type { EsiEndpointId } from '@/esi/registry';
 import { grantCovers } from './grantCovers';
@@ -166,9 +166,10 @@ export async function warmRoute(
   // a loader that ignores the signal declares only its first parameter.
   const { cacheKey, endpoints, load }: RouteWarmer = ROUTE_WARMERS[path];
   if (!grantCovers(new Set(granted), endpoints)) return;
-  // Already rendered once this session: the hook would read this same row on
-  // mount, so recomposing it would spend the hover for nothing.
-  if (readRouteSnapshot(cacheKey, characterId) !== null) return;
+  // Already loaded this session: the hook would read this same row on mount,
+  // so recomposing it would spend the hover for nothing. A row only revived
+  // from Dexie may be days old, so it still warms.
+  if (hasSessionRouteSnapshot(cacheKey, characterId)) return;
 
   const token = `${cacheKey}:${characterId}`;
   if (inFlight.has(token)) return;

@@ -10,6 +10,7 @@ import {
 import { type AssetSortField } from '@/features/assets/assetSortPreference';
 import { type AssetMatch } from '@/features/assets/assetBrowseModel';
 import type { Translate } from '@/lib/translate';
+import { NO_ASSET_NAMES, type AssetNameMap } from '@/engine/assetNames';
 
 export function locationLabel(
   locationId: number,
@@ -50,18 +51,24 @@ export function locationLabel(
   return t('assets.structureLabel', { id: locationId });
 }
 
-/** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen results path. */
+/**
+ * Name-substring search over a flat asset list, shared by the CSV export path
+ * and the on-screen results path. Matches the type name or, for a ship or
+ * container the player named, its in-game name (issue #5652).
+ */
 export function matchAssets(
   assets: readonly CharacterAsset[],
   typeNames: ReadonlyMap<number, string>,
-  query: string
+  query: string,
+  assetNames: AssetNameMap = NO_ASSET_NAMES
 ): AssetMatch[] {
   const q = query.trim().toLowerCase();
   const matches: AssetMatch[] = [];
   for (const asset of assets) {
     const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
-    if (q && !name.toLowerCase().includes(q)) continue;
-    matches.push({ asset, name });
+    const gameName = assetNames[asset.item_id];
+    if (q && !name.toLowerCase().includes(q) && !gameName?.toLowerCase().includes(q)) continue;
+    matches.push(gameName === undefined ? { asset, name } : { asset, name, gameName });
   }
   return matches;
 }

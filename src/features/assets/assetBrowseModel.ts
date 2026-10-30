@@ -32,7 +32,10 @@ export function queryLeavingSearch(query: string): string {
 
 export interface AssetMatch {
   asset: CharacterAsset;
+  /** The type name. */
   name: string;
+  /** The in-game name the player gave this ship or container, when it has one. */
+  gameName?: string;
 }
 
 /**

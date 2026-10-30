@@ -19,6 +19,7 @@ _Recorded 2026-09-05._
   the only key that cannot rot that way.
 
 - **It lives in memory (`lib/routeSnapshotCache.ts`), never in Dexie.**
+  _Superseded by decision 20261030-170439: it is now mirrored to Dexie._
   `esiCache` is already the durable copy with its own freshness and purge
   rules; a second persisted copy would need to restate both. This one answers
   only "what did this tab render last time", so a page reload rightly starts

@@ -78,6 +78,7 @@ export function AssetsList({
     mergedLocationNames,
     characterBadges,
     assetsByItemId,
+    assetNames,
     assetsExport,
     placeNicknames,
     assetItemActions,
@@ -529,6 +530,7 @@ export function AssetsList({
                           row={row}
                           t={t}
                           typeNames={mergedTypeNames}
+                          assetNames={assetNames}
                           characterBadges={characterBadges}
                           selectMode={selectMode}
                           selectedIds={selectedIds}
