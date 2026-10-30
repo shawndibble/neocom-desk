@@ -326,7 +326,7 @@ export function Contracts() {
   }[source];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-2 sm:space-y-4">
+    <div className="mx-auto max-w-page space-y-2 sm:space-y-4">
       {/* Both tabs read something datable and reloadable, but not the same
           thing: History is the chosen source's contract list (this Character,
           all of them, or the corporation; the table looks the same for each),

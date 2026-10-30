@@ -46,6 +46,10 @@
      two-column layouts (Fittings, Build Plans, Overview and others) split a little sooner. */
   --breakpoint-xl: 78.125rem;
 
+  /* `max-w-page`: every app page's content width, so a page's tabs never
+     jump between widths. Wide enough for the PI Map's docked panel (1500px). */
+  --container-page: 96rem;
+
   /* Background layers (darkest -> lightest) */
   --color-bg: #0a0e14;
   --color-panel: #11161d;

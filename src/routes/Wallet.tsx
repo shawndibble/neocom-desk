@@ -238,7 +238,7 @@ export function Wallet() {
   return (
     <div
       className={cx(
-        'mx-auto max-w-6xl space-y-4',
+        'mx-auto max-w-page space-y-4',
         // The side panel is non-modal: the page shifts aside so no column is covered.
         // 26rem = SlideOver's 25rem max width plus a 1rem gutter; change them together.
         tab === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
