@@ -2,8 +2,7 @@ import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
 import { typeNameOr } from '@/lib/typeNameOr';
 import type { CompareRow, ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** One compared Fitting as an export column. */
 export interface FittingCompareCsvFitting {

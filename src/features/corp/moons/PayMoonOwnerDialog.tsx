@@ -9,6 +9,7 @@ import { useCopiedField } from '@/features/miningTax/settleUpFields';
 import { SettleCopyRow, SettleSentOnAndMethod } from '@/features/miningTax/SettleUpParts';
 import { DialogShell, Effect } from './BookDialogs';
 import { isk } from './moonsFormat';
+import { utcDay } from '@/engine/localDay';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.pay.${key}`;
 
@@ -40,7 +41,7 @@ export function PayMoonOwnerDialog({
   const { t } = useTranslation();
   const { copied, copy } = useCopiedField();
   const whole = Math.max(0, Math.floor(balance));
-  const [paidOn, setPaidOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paidOn, setPaidOn] = useState(() => utcDay());
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [different, setDifferent] = useState(manual);
   const [sentText, setSentText] = useState('');

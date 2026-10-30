@@ -4,7 +4,7 @@
  * own glyph, and the filter menu is the legend (glyph, name, count).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { CHARACTER_ID } from './support/fixtureData';
 import { signInAndGoto } from './support/authSeed';
 
@@ -86,7 +86,7 @@ test('den clocks land on the rail and the map, and the filter menu names the kin
 });
 
 test('den clocks show on the phone rail too', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(PHONE);
   await mockDens(page);
   await signInAndGoto(page, './calendar');
   await expect(page.getByText('leaves reinforcement').first()).toBeVisible();

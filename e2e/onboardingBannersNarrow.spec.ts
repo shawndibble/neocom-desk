@@ -17,11 +17,9 @@
  * Android Chrome — headless Chromium's desktop UA would hide it. It also
  * waits for five page visits after login, so the profile is seeded past that.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_NAME } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
 
 test.use({
   userAgent:

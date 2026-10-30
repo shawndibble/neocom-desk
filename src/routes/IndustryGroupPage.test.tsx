@@ -9,6 +9,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import {
@@ -95,6 +96,9 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
     HttpResponse.json([])
   ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/corporationhistory`, () =>
+    HttpResponse.json([])
+  ),
   http.get('https://esi.evetech.net/markets/prices', () =>
     HttpResponse.json([
       { type_id: 34, adjusted_price: 8 },
@@ -139,7 +143,6 @@ async function seedGroup(id: string, name: string) {
   await db.settings.put({ key: SYNCED_BUILD_GROUPS_KEY, value });
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 
 afterEach(() => {
@@ -147,7 +150,7 @@ afterEach(() => {
   clearMarketPriceCache();
   clearCostIndexCache();
 });
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -174,7 +177,33 @@ beforeEach(async () => {
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
 
   window.history.pushState({}, '', '/industry/groups/g1');
-});
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the group page, so no test pays for the first one.
+  // A worker's first `App` render (compiling the lazy route chunks, warming
+  // jsdom and React) takes longer than the 5s `findBy*` budget on a cold
+  // worker, and it landed on whichever test ran first: the page sat on
+  // "Loading..." until that test's `findByText` gave up. Done here under the
+  // hook's own budget, as IndustryPlanPage.test.tsx does.
+  await Promise.all([
+    routeChunks.loadIndustryGroupPage(),
+    routeChunks.loadIndustryPlanPage(),
+    routeChunks.loadIndustry(),
+  ]);
+  await resetSession();
+  await seedGroup('g1', 'Rifter fit');
+  await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
+  const { unmount } = render(<App />);
+  await screen.findByRole('link', { name: /Rifter run/ }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+  clearMarketPriceCache();
+  clearCostIndexCache();
+}, 30_000);
+
+beforeEach(resetSession);
 
 describe('IndustryGroupPage', () => {
   it("opens the group's rollup, listing its members", async () => {

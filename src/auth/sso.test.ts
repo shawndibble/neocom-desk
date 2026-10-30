@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { buildAuthorizeUrl, exchangeCode, refreshToken, AuthError } from './sso';
 
 const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
@@ -10,7 +10,7 @@ let lastAuthHeader: string | null = null;
 /** Set by the "hangs forever" tests below to make the mock handler never respond. */
 let hang = false;
 
-const server = setupServer(
+mswServer(
   http.post(TOKEN_URL, async ({ request }) => {
     if (hang) await delay('infinite');
     lastBody = new URLSearchParams(await request.text());
@@ -39,14 +39,11 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
-  server.resetHandlers();
   lastBody = null;
   lastAuthHeader = null;
   hang = false;
 });
-afterAll(() => server.close());
 
 describe('buildAuthorizeUrl', () => {
   it('builds the v2 authorize URL with all PKCE params', () => {

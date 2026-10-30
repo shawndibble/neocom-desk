@@ -18,7 +18,6 @@ import { HintText } from '@/components/ui/HintText';
 import type { AppraisalNetTotals, AppraisalTotals } from '@/engine/market/appraisal';
 import { iskToneClass } from '@/features/character/format';
 import { AppraisalVolumeChip } from './AppraisalVolumeChip';
-import { RefiningSetupChips } from '@/features/refining/RefiningSetupChips';
 
 /** How long the "copied" bubble stays on the card. */
 const COPIED_FEEDBACK_MS = 2000;
@@ -136,7 +135,6 @@ export function AppraisalHeaderStats({
           }
         />
       )}
-      {!pricesUnavailable && showRefine && <RefiningSetupChips />}
       {!pricesUnavailable && showCheapest && (
         <StatChip
           label={t('market.appraisal.cheapestBuy')}

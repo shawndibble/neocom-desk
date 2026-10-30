@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -59,12 +60,7 @@ describe('OverviewDemo alert auto-play', () => {
 
   it('is static (all 5 alerts) when reduced motion is requested', () => {
     mockObserver();
-    vi.stubGlobal('matchMedia', (media: string) => ({
-      media,
-      matches: media.includes('reduce'),
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
+    stubViewport((media) => media.includes('reduce'));
     render(
       <MemoryRouter>
         <OverviewDemo />

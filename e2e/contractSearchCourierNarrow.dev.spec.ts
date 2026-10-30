@@ -19,11 +19,9 @@
  * thing in the table is that lane's collapsed header; both tests open it
  * before touching a haul.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
-
-const PHONE = { width: 390, height: 844 };
 
 /**
  * Layout coordinates are fractional, so a pixel of slack absorbs sub-pixel

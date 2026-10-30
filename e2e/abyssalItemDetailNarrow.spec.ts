@@ -9,10 +9,9 @@
  * (Firebase is blanked), so the estimate line shows its unavailable state.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const PHONE = { width: 390, height: 844 };
 /** 5MN Abyssal Microwarpdrive, made from a 5MN Microwarpdrive II by an Unstable mutaplasmid. */
 const ABYSSAL_TYPE = 47740;
 const ITEM_ID = 1_000_000_001;

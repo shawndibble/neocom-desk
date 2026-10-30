@@ -29,6 +29,7 @@ import { DscanMeta } from './DscanMeta';
 import { useLastScan } from './lastScan';
 import { OwnShipPicker } from './OwnShipPicker';
 import { useManualShip } from './ownShip';
+import { HOUR_MS } from '@/lib/age';
 
 /**
  * Role -> clock-kind token. Identity only, never a status; the legend and the
@@ -70,7 +71,7 @@ interface Loaded {
 /** How often the scan's age line re-reads the clock. */
 const AGE_TICK_MS = 15_000;
 /** The age line is not shown, so nothing needs a fast clock. */
-const IDLE_TICK_MS = 60 * 60_000;
+const IDLE_TICK_MS = HOUR_MS;
 
 /**
  * A D-Scan read for danger: an answer to "am I in danger?", the ships to watch,

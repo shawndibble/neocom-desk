@@ -11,7 +11,8 @@ import { planetarySummary } from '../../data/boardSummary';
 import type { PlanetaryBoardData } from '../../data/boardData';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
-import type { NumberModel, NumberSecondary, TableModel, Translate } from './types';
+import type { NumberModel, NumberSecondary, TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const C = 'overview.widgets.chart';
 

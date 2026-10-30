@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db, type BuildPlanRecord } from '@/db';
@@ -48,14 +48,13 @@ vi.mock('@/sde/loadSde', () => ({
 const CHAR_ID = 91;
 const NOW = new Date('2026-08-29T12:00:00Z');
 
-const server = setupServer();
+const server = mswServer();
 
 /** Any character's `/skills` — the job-slot header (#679) reads this for every render, so a default with no trained slot skills keeps the rest of this file's tests unconcerned with it. */
 function skillsUrl(characterId: number | string = ':characterId') {
   return `${ESI_BASE_URL}/characters/${characterId}/skills`;
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -70,14 +69,12 @@ beforeEach(async () => {
   server.use(http.get(skillsUrl(), () => HttpResponse.json({ skills: [], total_sp: 0 })));
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
   vi.useRealTimers();
   // The fan-out failure test spies on `db.tokens`; left in place it would
   // reject every later test's scope check too.
   vi.restoreAllMocks();
 });
-afterAll(() => server.close());
 
 function jobsUrl() {
   return `${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`;

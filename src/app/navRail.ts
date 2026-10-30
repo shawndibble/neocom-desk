@@ -124,15 +124,6 @@ export const DEFAULT_SHOWN_NAV: readonly string[] = [
   '/corp/srp',
 ];
 
-/** The first-run question's answers, each with the pages it brings onto the rail. */
-export const NAV_ACTIVITIES = [
-  { id: 'mining', paths: ['/mining'] },
-  { id: 'pi', paths: ['/planetary-industry'] },
-  { id: 'trading', paths: ['/contracts'] },
-  { id: 'industry', paths: [] },
-  { id: 'social', paths: ['/mail', '/calendar', '/contacts', '/communities'] },
-] as const satisfies readonly { id: string; paths: readonly string[] }[];
-
 function hiddenExcept(shown: ReadonlySet<string>): string[] {
   // A page with no rail row (the Alerts bell's) has nothing to fold away.
   return (NAV_PAGES as readonly NavPage[])

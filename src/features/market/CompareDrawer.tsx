@@ -597,9 +597,7 @@ export function CompareDrawer({
           >
             {view === 'attributes' ? (
               attributes.loading || rows.length === 0 ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
-                </div>
+                <Spinner block="panel" label={t('common.loading')} />
               ) : attributes.error || !attributes.data ? (
                 <EmptyState
                   title={t('market.compare.errorTitle')}
@@ -634,9 +632,7 @@ export function CompareDrawer({
                 </div>
               </>
             ) : rows.length === 0 ? (
-              <div className="flex justify-center py-8">
-                <Spinner label={t('common.loading')} />
-              </div>
+              <Spinner block="panel" label={t('common.loading')} />
             ) : (
               <>
                 {narrow && (

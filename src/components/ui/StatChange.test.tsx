@@ -39,7 +39,8 @@ describe('StatChange', () => {
     );
 
     expect(container.querySelector('[data-verdict]')).toHaveClass('text-danger');
-    expect(container).toHaveTextContent('Capacitor stable at 60% → depletes in');
+    // Just the level or the time: the Capacitor label already says what each is.
+    expect(container).toHaveTextContent(/Capacitor\s*60% → \d/);
   });
 });
 

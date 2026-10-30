@@ -189,11 +189,7 @@ function useOpenSeries(typeId: number, regionIds: readonly number[]) {
 }
 
 function ChartFallback({ label }: { label: string }) {
-  return (
-    <div className="flex justify-center py-8">
-      <Spinner label={label} />
-    </div>
-  );
+  return <Spinner block="panel" label={label} />;
 }
 
 /** Price History tab body: fetches the region's daily history for the item, then hands it to the lazy chart. */

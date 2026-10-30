@@ -18,7 +18,8 @@ import { backwardBucketSums } from './chartSeries';
 import { rollingTitles, signTone } from './chartTips';
 import type { TradingProfitWidgetData } from './kindLoaders';
 import type { SourceProfit } from './profitCombine';
-import type { BuildContext, TableModel, Translate } from './types';
+import type { BuildContext, TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const D = 'overview.widgets.data.tradingProfit';
 const C = 'overview.widgets.chart.tradingProfit';

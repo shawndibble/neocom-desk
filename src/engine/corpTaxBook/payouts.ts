@@ -1,5 +1,6 @@
 import type { BalanceDisplay, FeederPayout } from './feederAccrual';
 import type { JournalEntryLike } from './sync';
+import { DAY_MS } from '@/lib/age';
 
 /**
  * Payouts to a moon owner (feeder): recording one, and attaching the wallet
@@ -24,7 +25,6 @@ export interface OutgoingDonation {
 /** How far a recorded date may sit from the journal's day and still be the same payment. */
 export const PAYOUT_LINK_WINDOW_DAYS = 3;
 
-const DAY_MS = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const payoutId = (d: Pick<OutgoingDonation, 'division' | 'refId'>) =>

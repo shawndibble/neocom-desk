@@ -19,6 +19,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -271,18 +272,12 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
   });
 
   it('keeps focus on the caret after a phone folds the panel on a division pick (WCAG 2.4.3)', async () => {
-    const real = window.matchMedia;
-    window.matchMedia = ((query: string) =>
-      ({ ...real(query), matches: query.includes('max-width') }) as MediaQueryList) as typeof real;
-    try {
-      const user = userEvent.setup();
-      render(<App />);
-      await user.click(await screen.findByRole('button', { name: /show all divisions/i }));
-      await user.click(divisionButton('SRP'));
-      expect(screen.getByRole('button', { name: /show all divisions/i })).toHaveFocus();
-    } finally {
-      window.matchMedia = real;
-    }
+    stubViewport((query) => query.includes('max-width'));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /show all divisions/i }));
+    await user.click(divisionButton('SRP'));
+    expect(screen.getByRole('button', { name: /show all divisions/i })).toHaveFocus();
   });
 
   it('carries a long division name in full as the label tooltip (issue #2600)', async () => {

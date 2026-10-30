@@ -10,6 +10,7 @@
  */
 import { planTrendSeries, type TrendSeriesRef } from '@/engine/market/trendSeries';
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import { DAY_MS } from '@/lib/age';
 
 export interface MarketTrendSeries {
   key: string;
@@ -107,7 +108,7 @@ export async function loadMarketTrend(request: MarketTrendRequest): Promise<Mark
       const cutoff =
         newest === undefined
           ? ''
-          : new Date(Date.parse(`${newest}T00:00:00Z`) - KEEP_DAYS * 86_400_000)
+          : new Date(Date.parse(`${newest}T00:00:00Z`) - KEEP_DAYS * DAY_MS)
               .toISOString()
               .slice(0, 10);
       return {

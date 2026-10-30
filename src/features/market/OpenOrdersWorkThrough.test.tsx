@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -348,22 +349,8 @@ describe('Open Orders work through', () => {
 });
 
 describe('Open Orders work through — phone', () => {
-  const original = window.matchMedia;
   beforeEach(() => {
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-  });
-  afterEach(() => {
-    window.matchMedia = original;
+    stubViewport(() => true);
   });
 
   it('shows the new price large with Open in EVE · Next · Skip, and never copies', async () => {

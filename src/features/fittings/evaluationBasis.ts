@@ -26,6 +26,7 @@ import { raisedSkillLevels } from '@/engine/fittings/moduleUpgrades';
 import type { PlanEntry } from '@/engine/types';
 import { loadSkills } from '@/sde/loadSde';
 import { computeStatsOffThread, skillSourcesOffThread } from './evaluationService';
+import type { WorkerSend } from './fittingWorker';
 
 /**
  * Changes to the open Fitting (Variations' swap candidates), worked out
@@ -43,11 +44,13 @@ export interface VariantEvaluator {
   /**
    * A variant's stats beside the open Fitting's own, both without overheat.
    * Worked out off the main thread; `signal` drops the variant's own
-   * calculation if the caller moves on.
+   * calculation if the caller moves on. `send` runs it on a search's own
+   * worker pool instead of the shared worker.
    */
   compare: (
     variant: Fitting,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    send?: WorkerSend
   ) => Promise<{ before: FittingStats; after: FittingStats }>;
 }
 
@@ -134,7 +137,7 @@ export function statsUnder(
 export function offThreadStatsUnder(
   fitting: Fitting,
   basis: EvaluationBasis,
-  extra: { overheated?: boolean; signal?: AbortSignal } = {}
+  extra: { overheated?: boolean; signal?: AbortSignal; send?: WorkerSend } = {}
 ): Promise<FittingStats> {
   return underBasis(basis, (pilot, options) =>
     computeStatsOffThread(
@@ -145,7 +148,8 @@ export function offThreadStatsUnder(
         ...(extra.overheated === undefined ? {} : { overheated: extra.overheated }),
         ...options,
       },
-      extra.signal
+      extra.signal,
+      extra.send
     )
   );
 }
@@ -179,10 +183,14 @@ export function variantEvaluator(
     fitting,
     profile: basis.pilot,
     engine,
-    async compare(variant, signal) {
+    async compare(variant, signal, send) {
       const [before, after] = await Promise.all([
         baseline(),
-        offThreadStatsUnder(variant, basis, { overheated: false, ...(signal ? { signal } : {}) }),
+        offThreadStatsUnder(variant, basis, {
+          overheated: false,
+          ...(signal ? { signal } : {}),
+          ...(send ? { send } : {}),
+        }),
       ]);
       return { before, after };
     },

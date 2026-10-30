@@ -1,15 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render as rtlRender, screen } from '@testing-library/react';
-import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingFightersPanel } from './FittingFightersPanel';
-
-// Entity names are real links, so every render needs a Router.
-const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+import { renderInRouter } from '@/test/render';
 
 const NAMES: Record<number, string> = { 23055: 'Templar I', 37599: 'Cenobite I' };
 const typeName = (typeId: number) => NAMES[typeId] ?? `#${typeId}`;
@@ -39,7 +35,7 @@ describe('FittingFightersPanel', () => {
   it('adds a full squadron, launched into a free tube', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
-    render(
+    renderInRouter(
       <FittingFightersPanel
         fitting={carrier}
         stats={stats(4)}
@@ -62,7 +58,7 @@ describe('FittingFightersPanel', () => {
       ...carrier,
       fighters: [{ typeId: 23055, quantity: 6, state: 'active' }],
     };
-    render(
+    renderInRouter(
       <FittingFightersPanel
         fitting={fitting}
         stats={stats(4, 1)}
@@ -81,7 +77,7 @@ describe('FittingFightersPanel', () => {
   });
 
   it('is not there for a hull without tubes and a Fitting without fighters', () => {
-    const { container } = render(
+    const { container } = renderInRouter(
       <FittingFightersPanel
         fitting={carrier}
         stats={stats(0)}
@@ -104,7 +100,7 @@ describe('FittingFightersPanel', () => {
         { typeId: 23055, quantity: 6, state: 'online' },
       ],
     };
-    render(
+    renderInRouter(
       <FittingFightersPanel
         fitting={fitting}
         stats={stats(4, 3)}

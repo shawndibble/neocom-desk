@@ -14,9 +14,10 @@ import { averageDailyVolume } from '@/engine/industry/marketWideSanity';
 import { EsiError } from '@/esi/errors';
 import { loadLpStoreVolume, type LpStoreVolume } from '@/features/loyalty/lpStoreVolume';
 import { loadPriceHistory } from '@/features/market/priceHistory';
+import { MINUTE_MS } from '@/lib/age';
 
 /** How long one complete read of a region's volume object is reused, across products and rescans. */
-const VOLUME_TTL_MS = 30 * 60_000;
+const VOLUME_TTL_MS = 30 * MINUTE_MS;
 const volumeCache = new Map<number, { at: number; promise: Promise<LpStoreVolume | null> }>();
 
 /**

@@ -13,8 +13,7 @@
  * — the shape `stockLocationLabel` already uses.
  */
 import { FACILITY_PRESETS, type FacilityKind } from '@/engine/industry/types';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /**
  * `name` is null wherever ESI withheld it from a Character whose role cannot

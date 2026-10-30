@@ -4,7 +4,7 @@
  * row that opens its facts in a modal with the jump count linking to Route
  * Safety.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { CORPORATION_ID } from './support/fixtureData';
 import { openCorpOverview, overflow } from './support/corpBoard';
 
@@ -147,7 +147,7 @@ test.describe('Sovereignty widget', () => {
     await page.screenshot({ path: testInfo.outputPath('modal-1440.png') });
 
     await page.keyboard.press('Escape');
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await widget.getByRole('button', { name: 'Efa II' }).click();
     await expect(page.getByRole('dialog', { name: 'Efa II' })).toContainText('Superionic Ice');
     await page.screenshot({ path: testInfo.outputPath('modal-390.png') });

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
@@ -12,14 +12,11 @@ import {
 import { DAY_MS } from '@/lib/age';
 
 const CHAR_ID = 91;
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 const ENTRY = (
   recordId: number,

@@ -8,13 +8,15 @@
  * recomputing them too.
  */
 import { useEffect, useRef, useState } from 'react';
-import { decodeFittingShare, type DecodeFittingShareResult } from '@/engine/fittings/fittingShare';
+import {
+  decodeFittingShare,
+  type DecodeFittingShareResult,
+  type ShareDecodeError,
+} from '@/engine/fittings/fittingShare';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { typeName } from '@/sde/loadSde';
 import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
-
-export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
 export interface CompareSlot {
   code: string;

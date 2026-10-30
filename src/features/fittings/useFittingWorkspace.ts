@@ -30,7 +30,11 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { FITTING_EDIT_PATH, FITTINGS_PATH, fittingEditLocation } from './fittingRoutes';
 import { nullableTextParam } from '@/lib/urlState';
-import { decodeFittingShare, encodeFittingShare } from '@/engine/fittings/fittingShare';
+import {
+  decodeFittingShare,
+  encodeFittingShare,
+  type ShareDecodeError,
+} from '@/engine/fittings/fittingShare';
 import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
 import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
@@ -49,8 +53,6 @@ import { typeName } from '@/sde/loadSde';
 import { resolveFittingXmlDocument, type FittingXmlListItem } from './fittingXmlList';
 import { usePilotProfile } from './fittingPilotProfile';
 import { useFittingEvaluation, type FittingEvaluation } from './useFittingEvaluation';
-
-export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
 const COALESCE_MS = 1000;
 

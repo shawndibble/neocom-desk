@@ -9,11 +9,12 @@
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import type { DemandAggregate } from '@/engine/market/haulingMarket';
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 
 /** The backend republishes once a day. */
-const STALE_AFTER_MS = 12 * 60 * 60_000;
+const STALE_AFTER_MS = 12 * HOUR_MS;
 /** Newest day of data older than this means the daily job stopped (it is normally 1 to 2 days old): ESI is the better source. */
-export const MAX_DEMAND_AGE_MS = 4 * 24 * 60 * 60_000;
+export const MAX_DEMAND_AGE_MS = 4 * DAY_MS;
 
 export interface HaulingDemand {
   /** The newest day the 30-day window ends on (ISO date). */

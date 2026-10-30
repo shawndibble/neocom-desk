@@ -13,8 +13,10 @@
  * hull for ten minutes, like the zKillboard tab's.
  */
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
+import { isRecord } from '@/engine/guards';
+import { MINUTE_MS } from '@/lib/age';
 
-const CACHE_TTL_MS = 10 * 60_000;
+const CACHE_TTL_MS = 10 * MINUTE_MS;
 const READ_TIMEOUT_MS = 20_000;
 
 /** One stored Workbench fit — mirrors `StoredWorkbenchFit` on the Functions side. */
@@ -34,10 +36,6 @@ export type WorkbenchFitsResult = { ok: true; fits: WorkbenchFit[] } | { ok: fal
 /** Mirrors `workbenchFitsR2Key` on the Functions side. */
 export function workbenchFitsUrl(shipTypeId: number): string {
   return `${R2_SNAPSHOT_ORIGIN}/workbench-fits/${shipTypeId}.json`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 /** A hull object's fits, one per id, newest first; malformed rows (or a malformed object) are skipped. */

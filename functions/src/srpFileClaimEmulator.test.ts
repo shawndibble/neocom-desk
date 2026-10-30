@@ -1,9 +1,8 @@
 // fileSrpClaim against the Firestore emulator (issue #4850, ADR 0026). Runs only under the
 // emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { afterAll, beforeEach, expect, it } from 'vitest';
+import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -23,10 +22,6 @@ const HASH = 'b'.repeat(40);
 const HULL = 587; // Rifter
 const GROUP = 25; // Frigate
 
-const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
-const suite = runnable ? describe : describe.skip;
-
-let db: Firestore;
 let now = T0;
 const affiliations = new Map<number, number>();
 const killmails = new Map<number, EsiKillmail>();
@@ -121,22 +116,10 @@ function loss(
   });
 }
 
-if (runnable) {
-  if (getApps().length === 0) initializeApp({ projectId: 'demo-neocom-rules' });
-  db = getFirestore();
-}
-
-async function clearEmulator(): Promise<void> {
-  await fetch(
-    `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-neocom-rules/databases/(default)/documents`,
-    { method: 'DELETE' }
-  );
-}
-
 const setRules = (patch: Record<string, unknown>) =>
   saveSrpSettings(deps(), who(DIRECTOR), call(DIRECTOR), parseSrpSettingsPatch(patch));
 
-suite('fileSrpClaim (emulator)', () => {
+emulatorSuite('fileSrpClaim (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(async () => {
     await clearEmulator();

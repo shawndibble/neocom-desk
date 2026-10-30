@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "check:case": "node scripts/check-case-collisions.mjs",
     "test": "vitest",
     "test:run": "vitest run",

@@ -7,6 +7,7 @@ import { utcDay } from '../localDay';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import { assetStackValue } from '@/engine/assetTree';
 import { contractStockValue, type StockContract, type StockContractItem } from './contractStock';
+import { DAY_MS } from '@/lib/age';
 
 export interface NetWorthSnapshotRow {
   /** `${characterId}:${day}` */
@@ -135,7 +136,7 @@ export function findMissingDays(days: readonly string[]): string[] {
   const sorted = [...have].sort();
   const missing: string[] = [];
   const end = Date.parse(sorted[sorted.length - 1]!);
-  for (let t = Date.parse(sorted[0]!) + 86_400_000; t < end; t += 86_400_000) {
+  for (let t = Date.parse(sorted[0]!) + DAY_MS; t < end; t += DAY_MS) {
     const day = utcDay(t);
     if (!have.has(day)) missing.push(day);
   }

@@ -8,7 +8,8 @@
  * in units, never a percentage (see the `calendar.skyhookRaid.note` line).
  */
 import { raidState } from '@/engine/corp/sovereignty';
-import type { RowDetailModel, Translate } from '@/features/overview/widgets/data/types';
+import type { RowDetailModel } from '@/features/overview/widgets/data/types';
+import type { Translate } from '@/lib/translate';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { SkyhookRaid } from './calendarBoardSources';
 

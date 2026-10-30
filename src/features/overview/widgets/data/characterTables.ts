@@ -12,7 +12,7 @@ import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { ContractTableRow } from '@/engine/contracts/contractsBoard';
 import type { UpcomingCalendarEvent } from '@/engine/character/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { DAY_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
 import { mailOpenHref, openHref } from '@/lib/highlightParam';
@@ -20,7 +20,8 @@ import type { BoardMail } from '../../data/boardData';
 import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
-import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
+import type { SpExtras, TableCell, TableModel, TableRowModel } from './types';
+import type { Translate } from '@/lib/translate';
 import { highlightHref } from '@/lib/highlightParam';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
@@ -58,7 +59,7 @@ export function trainingTable(
     if (finish !== null && finish <= now) continue;
     const declaredStart = instant(entry.start_date);
     const start = declaredStart ?? previousFinish;
-    const hours = finish !== null && start !== null ? (finish - start) / 3_600_000 : 0;
+    const hours = finish !== null && start !== null ? (finish - start) / HOUR_MS : 0;
     const sp =
       entry.level_end_sp !== undefined && entry.training_start_sp !== undefined
         ? entry.level_end_sp - entry.training_start_sp

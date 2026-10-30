@@ -6,7 +6,7 @@
  * in Firestore, is an R2 object next to the output. Touches no Firestore.
  */
 import { setTimeout as sleep } from 'node:timers/promises';
-import { ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT } from './esiClient.js';
 import { r2ConfigFromEnv } from './publicDataActiveWars.js';
 import { createR2Get, createR2Put } from './r2Client.js';
 import { runWorkbenchSync, type WorkbenchSyncDeps } from './workbenchFits.js';

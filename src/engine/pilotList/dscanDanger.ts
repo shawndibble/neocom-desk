@@ -13,6 +13,7 @@ import { buildReadout, KILL_GANG_MIN, type Readout, type Tone } from './dscanRea
 import { CAPITAL_GROUPS, roleOfType, type DscanTypeInfo } from './dscanRoles';
 import type { HullCount } from './dscanWorth';
 import type { DscanRow } from './parsePilotPaste';
+import { MINUTE_MS } from '@/lib/age';
 
 export type DangerLevel = 'clear' | 'watch' | 'danger' | 'busy';
 /** What a ship on the scan can do to you, most pressing first. */
@@ -27,7 +28,7 @@ export const ROLE_BAR_PROMOTE_MIN = 12;
 /** The watch list shows this many groups; the rest collapse behind "+N more". */
 export const WATCH_MAX_GROUPS = 5;
 /** A scan this old may no longer match what is on grid: the page says so. */
-export const SCAN_STALE_MS = 2 * 60_000;
+export const SCAN_STALE_MS = 2 * MINUTE_MS;
 /** The shortest age the line states, so a scan just pasted never reads "0 seconds". */
 const SCAN_AGE_FLOOR_S = 5;
 
@@ -43,7 +44,7 @@ export function scanAge(ageMs: number): ScanAge {
   if (!stale) {
     return { stale, unit: 'seconds', value: Math.max(SCAN_AGE_FLOOR_S, Math.floor(ageMs / 1000)) };
   }
-  return { stale, unit: 'minutes', value: Math.floor(ageMs / 60_000) };
+  return { stale, unit: 'minutes', value: Math.floor(ageMs / MINUTE_MS) };
 }
 
 /** With no ship known, a damage ship threatens at this rank and up (cruiser). */

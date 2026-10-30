@@ -61,11 +61,7 @@ export function DataGate({
           }
         />
       ) : status === 'busy' ? (
-        (busy ?? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ))
+        (busy ?? <Spinner block="page" label={t('common.loading')} />)
       ) : (
         children
       )}

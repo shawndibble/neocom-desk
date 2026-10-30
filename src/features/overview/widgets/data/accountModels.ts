@@ -59,7 +59,9 @@ import {
   stockTable,
 } from './moneyModels';
 import { ordersListed, ordersStateChart, ordersTable } from './ordersModels';
-import type { Feeds, ListRow, NumberModel, NumberSecondary, Translate } from './types';
+import type { Feeds, ListRow, NumberModel, NumberSecondary } from './types';
+import type { Translate } from '@/lib/translate';
+import { utcDay } from '@/engine/localDay';
 
 /** The Contracts History table, unfiltered: the widget counts hauls and outstanding contracts, which no one status covers. */
 export const CONTRACTS_HREF = '/contracts/history';
@@ -68,11 +70,7 @@ export const CONTRACTS_HREF = '/contracts/history';
 function walletSeries(feeds: Feeds, now: number, range: number, balance: number | null) {
   const journal = feeds.journal?.data?.result?.data;
   if (!journal || balance === null) return null;
-  return dailyBalanceSeries(
-    dailyWalletFromJournal(journal),
-    new Date(now).toISOString().slice(0, 10),
-    range
-  );
+  return dailyBalanceSeries(dailyWalletFromJournal(journal), utcDay(now), range);
 }
 
 const wallet: Builder = (feeds, { t, now, range }) => {

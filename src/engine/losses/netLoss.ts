@@ -6,6 +6,7 @@
  */
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { parseInstant } from '../esiInstant';
+import { MINUTE_MS, HOUR_MS } from '@/lib/age';
 
 export interface LossInsurance {
   amount: number;
@@ -101,9 +102,9 @@ export interface InsuranceJournalRow {
 }
 
 /** Insurance pays out within minutes of the loss; later positive rows belong to other losses. */
-export const INSURANCE_WINDOW_MS = 60 * 60_000;
+export const INSURANCE_WINDOW_MS = HOUR_MS;
 /** Journal and killmail clocks come from different services; allow a few minutes either way. */
-const INSURANCE_SKEW_MS = 5 * 60_000;
+const INSURANCE_SKEW_MS = 5 * MINUTE_MS;
 
 /**
  * The payout for a loss: positive `insurance` journal rows (premiums are

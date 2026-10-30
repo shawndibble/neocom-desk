@@ -4,12 +4,12 @@
  * its own Close follows the entity-modal rule. Data loaders are stubbed; this
  * is the router seam.
  */
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 
 const mocks = vi.hoisted(() => ({ where: vi.fn(), facts: vi.fn() }));
@@ -32,9 +32,7 @@ const CALDARI_NAVY = 1000035;
 const CALDARI = 500001;
 const PERIMETER = 30000144;
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
+const server = mswServer();
 beforeEach(async () => {
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
@@ -63,7 +61,6 @@ beforeEach(async () => {
     http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
   );
 });
-afterEach(() => server.resetHandlers());
 
 const probe: { navigate: ReturnType<typeof useNavigate>; search: string; pathname: string } = {
   navigate: () => Promise.resolve(),

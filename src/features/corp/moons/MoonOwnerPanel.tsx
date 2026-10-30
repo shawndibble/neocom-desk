@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -132,11 +133,7 @@ export function MoonOwnerPanel({
             {isStale(view.summary) && view.summary.staleSince !== null && (
               <>
                 <OwnerStaleBanner since={view.summary.staleSince} onReconnect={reconnect} />
-                {reconnectError && (
-                  <p role="alert" className="text-xs text-danger">
-                    {reconnectError}
-                  </p>
-                )}
+                {reconnectError && <InlineError>{reconnectError}</InlineError>}
               </>
             )}
             {/* Optional (#4654): a grant from before reads no refinery names. Reconnect covers it while stale. */}
@@ -145,11 +142,7 @@ export function MoonOwnerPanel({
               !isStale(view.summary) && (
                 <>
                   <RefineryNamesBanner onGrant={reconnect} />
-                  {reconnectError && (
-                    <p role="alert" className="text-xs text-danger">
-                      {reconnectError}
-                    </p>
-                  )}
+                  {reconnectError && <InlineError>{reconnectError}</InlineError>}
                 </>
               )}
             {view.summary.status === 'pending-removal' && (

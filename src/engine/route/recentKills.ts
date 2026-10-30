@@ -11,6 +11,7 @@
  * names and supplies the type → group lookup.
  */
 import type { SecurityBand } from '@/engine/securityStatus';
+import { MINUTE_MS } from '@/lib/age';
 
 /*
  * Group ids verified against the SDE (`public/data/types.json`): Sabre, Eris,
@@ -111,7 +112,7 @@ export interface RecentKillsContext extends KillTagContext {
 const OTHER_KEY = 'other';
 
 function minutesBefore(now: number, time: number): number {
-  return Math.max(0, Math.floor((now - time) / 60_000));
+  return Math.max(0, Math.floor((now - time) / MINUTE_MS));
 }
 
 export function summarizeRecentKills(

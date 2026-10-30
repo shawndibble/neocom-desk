@@ -17,8 +17,8 @@ import type {
   Feeds,
   KindView,
   NumberModel,
-  Translate,
 } from './types';
+import type { Translate } from '@/lib/translate';
 
 /** The Stock page, where the market-stock rows and their per-market summary lead. */
 export const STOCK_PATH = '/market/stock';

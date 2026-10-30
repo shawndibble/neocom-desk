@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly } from '@/lib/timestamp';
 import { useTranslation } from 'react-i18next';
 import { onReconnect, useOnline } from '@/stores/network';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
@@ -174,7 +174,7 @@ export function FittingShareView({
   // Same frame as the ready page, so a stored link does not swap frames while the count loads.
   if (characterCount === undefined) {
     return (
-      <ShareShell title={t('fittingShare.title')}>
+      <ShareShell title={t('fittingShare.title')} wide>
         <div className="flex justify-center py-10">
           <Spinner label={t('common.loading')} />
         </div>
@@ -209,6 +209,35 @@ export function FittingShareView({
     <ShareShell
       title={t('fittingShare.title')}
       openInApp={openInApp}
+      wide
+      notice={t('fittingShare.banner')}
+      lead={
+        state.status === 'ready' ? (
+          <div className="flex items-center gap-3">
+            <TypeIcon typeId={state.fitting.shipTypeId} size={64} className="size-12 shrink-0" />
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">
+                {typeName?.(state.fitting.shipTypeId) ?? ''}
+              </h2>
+              {typeName !== null &&
+                state.fitting.name !== '' &&
+                state.fitting.name !== typeName(state.fitting.shipTypeId) && (
+                  <p className="truncate text-sm text-text-dim">{state.fitting.name}</p>
+                )}
+            </div>
+          </div>
+        ) : undefined
+      }
+      footer={
+        expiresAt === undefined ? undefined : (
+          <StatChips>
+            <StatChip
+              label={t('fittingShare.expiresLabel')}
+              value={formatDateOnly(new Date(expiresAt), timeZone)}
+            />
+          </StatChips>
+        )
+      }
       actions={
         state.status === 'ready' ? (
           <>
@@ -232,19 +261,6 @@ export function FittingShareView({
         ) : undefined
       }
     >
-      <p className="rounded-xs border border-warning bg-panel-2 px-3 py-2 text-xs text-warning">
-        {t('fittingShare.banner')}
-      </p>
-
-      {expiresAt !== undefined && (
-        <StatChips>
-          <StatChip
-            label={t('fittingShare.expiresLabel')}
-            value={formatTimestamp(new Date(expiresAt), timeZone)}
-          />
-        </StatChips>
-      )}
-
       {/* Always mounted: Retry unmounts while the code resolves again, and focus waits here. */}
       <div ref={focusRef} tabIndex={-1} className="focus:outline-none">
         {state.status === 'loading' && (
@@ -282,45 +298,39 @@ export function FittingShareView({
 
       {state.status === 'ready' && (
         <>
-          <div className="flex items-center gap-3">
-            <TypeIcon typeId={state.fitting.shipTypeId} size={64} className="size-12 shrink-0" />
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">
-                {typeName?.(state.fitting.shipTypeId) ?? ''}
-              </h2>
-              {typeName !== null &&
-                state.fitting.name !== '' &&
-                state.fitting.name !== typeName(state.fitting.shipTypeId) && (
-                  <p className="truncate text-sm text-text-dim">{state.fitting.name}</p>
-                )}
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <div className="flex min-w-0 flex-col gap-4 lg:w-[30rem] lg:shrink-0">
+              <FittingRing
+                fitting={state.fitting}
+                stats={stats}
+                moduleResults={stats?.modules ?? null}
+                hardpointsUsed={hardpoints.used}
+                hardpointKindOf={hardpoints.kindOf}
+                typeName={typeName ?? ((typeId) => `#${typeId}`)}
+              />
+              {typeName !== null && (
+                <FittingModuleList
+                  fitting={state.fitting}
+                  typeName={typeName}
+                  title={t('fittingShare.moduleListTitle')}
+                />
+              )}
+            </div>
+            <div className="min-w-0 lg:min-w-80 lg:flex-1">
+              <FittingStatsSections
+                abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
+                statsWeatherTypeId={statsWeatherTypeId}
+                stats={stats}
+                statsProgress={statsProgress}
+                statsError={statsError}
+                onRetry={retry}
+                price={price}
+                typeName={typeName ?? ((typeId) => `#${typeId}`)}
+                damageProfiles={damageProfiles}
+                targetProfiles={targetProfiles}
+              />
             </div>
           </div>
-          <FittingRing
-            fitting={state.fitting}
-            stats={stats}
-            moduleResults={stats?.modules ?? null}
-            hardpointsUsed={hardpoints.used}
-            hardpointKindOf={hardpoints.kindOf}
-          />
-          <FittingStatsSections
-            abyssal={{ hullGroupId: shipGroupId, compare: compareWeather }}
-            statsWeatherTypeId={statsWeatherTypeId}
-            stats={stats}
-            statsProgress={statsProgress}
-            statsError={statsError}
-            onRetry={retry}
-            price={price}
-            typeName={typeName ?? ((typeId) => `#${typeId}`)}
-            damageProfiles={damageProfiles}
-            targetProfiles={targetProfiles}
-          />
-          {typeName !== null && (
-            <FittingModuleList
-              fitting={state.fitting}
-              typeName={typeName}
-              title={t('fittingShare.moduleListTitle')}
-            />
-          )}
         </>
       )}
     </ShareShell>

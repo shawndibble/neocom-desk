@@ -11,7 +11,7 @@
 import { useEffect, useRef } from 'react';
 import type { BuildPlanRecord } from '@/db';
 import type { IndustryActivity, MaterialSourcing } from '@/engine/industry/types';
-import type { PlanPatch } from './BuildPlanDetail';
+import type { PlanPatch } from './planPatch';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
 import {
   facilityMemoryKey,

@@ -10,8 +10,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { changeLabel, fittingVariationsCsvColumns } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
 import { fixed1 } from '@/lib/fixedFormat';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 function ChangesCell({ row, t }: { row: VariationRow; t: Translate }) {
   if (row.delta === null) return <span className="text-text-dim">{t('common.loading')}</span>;

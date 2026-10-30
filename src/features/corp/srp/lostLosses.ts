@@ -13,11 +13,12 @@ import {
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadTypes } from '@/sde/loadSde';
 import type { LostLoss } from './srpMemberModel';
+import { MINUTE_MS } from '@/lib/age';
 
 /** ESI serves 50 a page; this bounds the detail reads one visit costs, newest first. */
 const MAX_PAGES = 3;
 const REFS_KEY = 'killmailsRecent';
-const REFS_STALE_MS = 60_000;
+const REFS_STALE_MS = MINUTE_MS;
 
 export interface CollectLossesInput {
   refs: readonly CharacterKillmailRef[];

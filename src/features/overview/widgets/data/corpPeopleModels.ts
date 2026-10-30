@@ -10,7 +10,8 @@ import { ageText, blank, corpUnreadable, count, statusOf, type Builder } from '.
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { BarsChartModel } from '../charts/types';
-import type { TableModel, Translate } from './types';
+import type { TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const M = 'overview.widgets.corpMembers';
 const I = 'overview.widgets.corpInactive';

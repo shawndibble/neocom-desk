@@ -26,6 +26,7 @@ import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { QuietHoursPayload } from '@/features/notifications/quietTime';
 import type { ServerEventRegistration } from '@/features/notifications/serverEvents';
 import type { RouteRules } from '@/features/route/routeRules';
+import { HOUR_MS } from '@/lib/age';
 
 interface RegisterDeviceResponse {
   deviceId: string;
@@ -72,7 +73,7 @@ const NO_SERVER_EVENTS: ServerEventRegistration = { serverEvents: [], serverInpu
  *   two installs share one registration doc and one set of rows, each upload
  *   overwriting the other's token and Projection without either noticing.
  */
-export const REREGISTER_AFTER_MS = 3_600_000;
+export const REREGISTER_AFTER_MS = HOUR_MS;
 
 /** Device-local, never synced: what this device last registered, and when. */
 const LAST_REGISTRATION_KEY = 'neocom.lastPushRegistration';

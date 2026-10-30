@@ -1,3 +1,4 @@
+import { NO_EXPLORE } from '../explore';
 import type { FittingStats, HoldStats } from '../types';
 
 /** Every hold empty: spread into a test's `holds` so a new hold lands here once. */
@@ -26,6 +27,7 @@ export function neutralExtendedStats(): Pick<
   | 'tank'
   | 'support'
   | 'mining'
+  | 'explore'
   | 'fleetSupport'
   | 'fighters'
   | 'sensor'
@@ -46,6 +48,7 @@ export function neutralExtendedStats(): Pick<
       bay: { used: 0, total: 0 },
     },
     mining: { rows: [], perSecond: 0, perHour: 0, wastePerSecond: 0, wastePct: 0 },
+    explore: NO_EXPLORE,
     fleetSupport: { bursts: [], compressors: [], core: null },
     support: {
       rows: [],

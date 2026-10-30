@@ -17,6 +17,7 @@
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { colonyAttention, EXPIRING_SOON_WINDOW_MS } from './colonyStatus';
 import type { ColonyStatus } from './types';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * How far apart two expiries can be and still be one trip.
@@ -31,7 +32,7 @@ import type { ColonyStatus } from './types';
  * preference: those answer "is this urgent", a question about now. This one
  * answers "were these installed in one sitting", a question about each other.
  */
-export const BATCH_WINDOW_MS = 90 * 60_000;
+export const BATCH_WINDOW_MS = 90 * MINUTE_MS;
 
 export type ColonyBatchKind =
   /** Extractors that have already stopped. Nothing is being produced. */

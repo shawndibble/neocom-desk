@@ -23,7 +23,7 @@ import {
 import { priceComparison, type DepthAt } from '@/engine/market/orderBookDepth';
 import { PlaceLink, SystemLink } from '@/features/entities';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatAge } from '@/lib/age';
+import { formatAge, DAY_MS } from '@/lib/age';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -96,7 +96,7 @@ export function OrderRowDetail({
   const filled = order.volume_total - order.volume_remain;
   const versusBest = priceComparison(best, order.price);
   const expiry = orderExpiry(order);
-  const daysLeft = Math.max(0, Math.ceil((expiry.getTime() - now) / 86_400_000));
+  const daysLeft = Math.max(0, Math.ceil((expiry.getTime() - now) / DAY_MS));
   const buy = order.is_buy_order;
 
   return (

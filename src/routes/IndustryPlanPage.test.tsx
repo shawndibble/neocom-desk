@@ -24,6 +24,7 @@ import {
   useReactionFacilityDefaults,
 } from '@/features/industry/reactionFacilityDefaults';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
+import { stubViewport } from '@/test/viewport';
 
 // The "vs 90d" figures read market history; nothing here is about them.
 vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
@@ -202,21 +203,10 @@ async function openSetup(user: ReturnType<typeof userEvent.setup>) {
 // (`BuildPlanDetail.tsx`'s `costsExpanded = costsOpen ?? isDesktop`). jsdom's
 // unstubbed `matchMedia` never matches, i.e. it reads as narrow, which would
 // collapse that panel by default and hide everything this file asserts on.
-const realMatchMedia = window.matchMedia;
 function stubDesktopViewport() {
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      // Every min-width breakpoint is met, and no max-width one is — a
-      // desktop is not also a phone (`useIsPhone` asks a max-width query).
-      matches: !media.includes('max-width'),
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
+  // Every min-width breakpoint is met, and no max-width one is — a desktop is
+  // not also a phone (`useIsPhone` asks a max-width query).
+  stubViewport((query) => !query.includes('max-width'));
 }
 
 afterEach(async () => {
@@ -226,7 +216,6 @@ afterEach(async () => {
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
-  window.matchMedia = realMatchMedia;
 });
 /** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
 async function resetSession() {
@@ -283,7 +272,6 @@ beforeAll(async () => {
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
-  window.matchMedia = realMatchMedia;
 }, 30_000);
 
 beforeEach(resetSession);

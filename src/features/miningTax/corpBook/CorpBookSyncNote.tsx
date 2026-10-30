@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { dayClosesAt } from '@/engine/corpTaxBook/billable';
-import { formatAge } from '@/lib/age';
+import { formatAge, MINUTE_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import type { CorpBookViewBook } from './corpBookView';
+import { utcDay } from '@/engine/localDay';
 
 /** "17 Oct": an EVE/UTC calendar date, day first as the book's wording prints it ("12 Jul is closed"). */
 function shortDate(date: string, language: string): string {
@@ -35,7 +36,7 @@ export function CorpBookSyncNote({
   /** The Tax page leaves the Statement credit line out; the pay dialog keeps it. */
   showCredit?: boolean;
 }) {
-  const ticked = useTicker(60_000);
+  const ticked = useTicker(MINUTE_MS);
   const now = nowOverride ?? ticked;
   const { t, i18n } = useTranslation();
   const { summary, corpName, loaded } = book;
@@ -73,7 +74,7 @@ export function CorpBookSyncNote({
           {t('miningTax.corpBook.sync.openDay', {
             date: shortDate(book.pendingFrom, i18n.language),
             time: closesAt.toISOString().slice(11, 16),
-            closeDate: shortDate(closesAt.toISOString().slice(0, 10), i18n.language),
+            closeDate: shortDate(utcDay(closesAt.getTime()), i18n.language),
             corp: corpName,
           })}
         </span>

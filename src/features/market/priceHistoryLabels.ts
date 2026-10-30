@@ -7,8 +7,7 @@
  * strings, so unused-key tooling still sees them.
  */
 import type { OpenPriceSide, PriceSeriesChoice } from '@/engine/market/priceHistoryOpen';
-
-export type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** Table and CSV header: "Domain buy" once places are compared; plain "Buy" otherwise. */
 export function openSideLabel(t: Translate, side: OpenPriceSide, place?: string): string {

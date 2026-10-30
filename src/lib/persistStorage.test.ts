@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
+import { seedCharacter } from '@/test/seed';
 import {
   PERSIST_ASKED_INSTALLED_KEY,
   PERSIST_ASKED_KEY,
@@ -20,10 +21,6 @@ beforeEach(async () => {
   await db.settings.clear();
   await db.characters.clear();
 });
-
-async function seedCharacter() {
-  await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: 'h', addedAt: 0 });
-}
 
 describe('requestPersistenceOnce', () => {
   it('asks once, records that it asked, and never asks again', async () => {
@@ -88,7 +85,7 @@ describe('requestPersistence / readPersisted', () => {
 
 describe('requestPersistenceWhenInstalled', () => {
   it('asks once when launched installed with Characters and storage not persisted', async () => {
-    await seedCharacter();
+    await seedCharacter(1, 'Pilot');
     const s = storage(false);
     await expect(requestPersistenceWhenInstalled(true, s)).resolves.toBe('granted');
     await expect(requestPersistenceWhenInstalled(true, s)).resolves.toBe('skipped');
@@ -97,7 +94,7 @@ describe('requestPersistenceWhenInstalled', () => {
   });
 
   it('asks even when the first-Character ask already happened in the browser tab', async () => {
-    await seedCharacter();
+    await seedCharacter(1, 'Pilot');
     await db.settings.put({ key: PERSIST_ASKED_KEY, value: true });
     const s = storage(false);
     await expect(requestPersistenceWhenInstalled(true, s)).resolves.toBe('granted');
@@ -105,7 +102,7 @@ describe('requestPersistenceWhenInstalled', () => {
   });
 
   it('does nothing in a browser tab', async () => {
-    await seedCharacter();
+    await seedCharacter(1, 'Pilot');
     const s = storage(false);
     await expect(requestPersistenceWhenInstalled(false, s)).resolves.toBe('skipped');
     expect(s.persist).not.toHaveBeenCalled();
@@ -119,7 +116,7 @@ describe('requestPersistenceWhenInstalled', () => {
   });
 
   it('does not ask when storage is already persisted', async () => {
-    await seedCharacter();
+    await seedCharacter(1, 'Pilot');
     const s = storage(true);
     await expect(requestPersistenceWhenInstalled(true, s)).resolves.toBe('skipped');
     expect(s.persist).not.toHaveBeenCalled();

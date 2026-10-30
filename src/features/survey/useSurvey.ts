@@ -15,12 +15,13 @@ import {
   type SurveyInfoShare,
   type SurveyTaxShare,
 } from './surveyStore';
+import { MINUTE_MS } from '@/lib/age';
 
 export const SURVEY_POLL_MS = 30_000;
 /** The slower poll once the field has gone quiet. */
 export const SURVEY_IDLE_POLL_MS = 120_000;
 /** How long without a new scan before the poll slows down. */
-export const SURVEY_IDLE_AFTER_MS = 5 * 60_000;
+export const SURVEY_IDLE_AFTER_MS = 5 * MINUTE_MS;
 
 /** The wait before the next poll, given how long ago the last new scan came in. */
 export function surveyPollDelay(sinceNewScanMs: number): number {

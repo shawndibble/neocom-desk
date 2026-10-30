@@ -1,7 +1,7 @@
 import { db, type QuickbarItem } from '@/db';
 import { getHubPrices } from '@/market/prices';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
+import { tradeHubIdFor } from '@/features/market/hub';
 import type {
   PriceAlertEntrySnapshot,
   PriceAlertSnapshot,
@@ -21,10 +21,14 @@ const isPriceAlertEntrySnapshot = shapeGuard<PriceAlertEntrySnapshot>({
   price: is.nullable(is.number),
 });
 
-/** The Trade Hub Quickbar prices at, re-read every poll for the same reason as `currentThresholds` in `shared.ts`: AC4's "without a reload" needs the live value. */
-export async function currentHub() {
-  await useMarketHub.getState().hydrate();
-  return getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+/**
+ * The Trade Hub this Character's Quickbar prices at (their own, else the
+ * account default; issue #5593), re-read every poll for the same reason as
+ * `currentThresholds` in `shared.ts`: AC4's "without a reload" needs the live
+ * value. Polling runs per Character, so never the active one's.
+ */
+export async function currentHub(characterId: number) {
+  return getTradeHub(await tradeHubIdFor(characterId)) ?? DEFAULT_TRADE_HUB;
 }
 
 type TargetedItem = QuickbarItem & { targetPrice: number; targetDirection: 'above' | 'below' };
@@ -42,7 +46,7 @@ export async function targetedQuickbarItems(characterId: number): Promise<Target
  * Prices only the Quickbar items carrying a target (issue #680) — an item
  * with no target has nothing for `diffPriceAlertTriggered` to compare, so
  * pricing it would be a wasted Fuzzwork call. Always prices "the item's
- * Quickbar entry" at the one Trade Hub Quickbar and Compare already share
+ * Quickbar entry" at the Trade Hub the Character's Quickbar and Compare already share
  * (`features/market/hub.ts`); `QuickbarItem` carries no hub of its own.
  */
 export const priceAlertDomain = defineDomain<
@@ -57,7 +61,7 @@ export const priceAlertDomain = defineDomain<
   load: async (characterId) => {
     const targeted = await targetedQuickbarItems(characterId);
     if (targeted.length === 0) return [];
-    const hub = await currentHub();
+    const hub = await currentHub(characterId);
     const prices = await getHubPrices(
       hub,
       targeted.map((item) => item.typeId),

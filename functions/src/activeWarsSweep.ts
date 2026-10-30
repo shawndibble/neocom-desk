@@ -14,7 +14,7 @@ import {
   type StoredWar,
   type SweepState,
 } from './activeWars.js';
-import { ESI_BASE, ESI_COMPATIBILITY_DATE, ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_BASE, esiHeaders } from './esiClient.js';
 
 /** Detail reads in one run. Each costs 2 of the 3,600 tokens ESI gives this route per 15 minutes. */
 export const ACTIVE_WARS_RUN_BUDGET = 1500;
@@ -53,12 +53,7 @@ export interface ActiveWarsOutcome {
   floorId?: number;
 }
 
-const headers = {
-  'User-Agent': ESI_USER_AGENT,
-  'X-User-Agent': ESI_USER_AGENT,
-  'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-  Accept: 'application/json',
-};
+const headers = esiHeaders();
 
 /** Every war id back to the horizon, newest first; null when ESI would not say. */
 async function listWarIds(fetchImpl: typeof fetch): Promise<number[] | null> {

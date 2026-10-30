@@ -4,7 +4,8 @@ import {
   iskPerM3,
   splitEach,
   sellSalesTax,
-  sellAfterTax,
+  sellAfterFees,
+  sellBrokerFee,
   appraisalUndercut,
   compareMargin,
   buildAppraisal,
@@ -15,7 +16,7 @@ import {
   type AppraisalItem,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { salesTaxPct } from '@/engine/industry/fees';
+import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -645,7 +646,11 @@ describe('appraisalUndercut', () => {
   }
 
   it('prices one legal tick under the cheapest seller at the hub', () => {
-    expect(appraisalUndercut(item())).toEqual({ price: 1_233_000, atOrBelowBuy: false });
+    expect(appraisalUndercut(item())).toEqual({
+      price: 1_233_000,
+      atOrBelowBuy: false,
+      matchesOwn: false,
+    });
   });
 
   it('drops to the smaller tick at an exact power of ten', () => {
@@ -664,6 +669,7 @@ describe('appraisalUndercut', () => {
     expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000 }))).toEqual({
       price: 1_000,
       atOrBelowBuy: true,
+      matchesOwn: false,
     });
     expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000.5 }))?.atOrBelowBuy).toBe(true);
   });
@@ -763,13 +769,37 @@ describe('sellSalesTax', () => {
   });
 });
 
-describe('sellAfterTax', () => {
-  it('is the sell total less its sales tax', () => {
-    const tax = sellSalesTax({ sellTotal: 1_000_000 }, 4) as number;
-    expect(sellAfterTax({ sellTotal: 1_000_000 }, 4)).toBeCloseTo(1_000_000 - tax, 6);
+describe('sellBrokerFee', () => {
+  const standing = { factionStanding: 0, corpStanding: 0 };
+
+  it('charges the broker fee on the row sell total', () => {
+    const fee = sellBrokerFee({ sellTotal: 1_000_000 }, 5, standing) as number;
+    expect(fee).toBeCloseTo((1_000_000 * brokerFeePct(5)) / 100, 6);
+  });
+
+  it('keeps the 100 ISK minimum', () => {
+    expect(sellBrokerFee({ sellTotal: 10 }, 5, standing)).toBe(100);
   });
 
   it('is null where nothing sells', () => {
-    expect(sellAfterTax({ sellTotal: null }, 4)).toBeNull();
+    expect(sellBrokerFee({ sellTotal: null }, 5, standing)).toBeNull();
+  });
+});
+
+describe('sellAfterFees', () => {
+  const fees = {
+    accountingLevel: 4,
+    brokerRelationsLevel: 3,
+    standing: { factionStanding: 0, corpStanding: 0 },
+  };
+
+  it('is the sell total less sales tax and broker fee', () => {
+    const tax = sellSalesTax({ sellTotal: 1_000_000 }, 4) as number;
+    const broker = sellBrokerFee({ sellTotal: 1_000_000 }, 3, fees.standing) as number;
+    expect(sellAfterFees({ sellTotal: 1_000_000 }, fees)).toBeCloseTo(1_000_000 - tax - broker, 6);
+  });
+
+  it('is null where nothing sells', () => {
+    expect(sellAfterFees({ sellTotal: null }, fees)).toBeNull();
   });
 });

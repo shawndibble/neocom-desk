@@ -28,12 +28,9 @@
  * (control sizing, not the milestone feature's own round trip).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, SKILL } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 const PLAN_ID = 'e2e-skill-plan-1';
 const PLAN_NAME = 'Narrow viewport plan';

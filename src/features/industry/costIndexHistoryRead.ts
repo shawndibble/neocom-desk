@@ -7,9 +7,10 @@ import { useEffect, useState } from 'react';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import { parseCostIndexHistory, type CostIndexHistory } from './costIndexHistory';
+import { HOUR_MS } from '@/lib/age';
 
 /** The job republishes daily. */
-const STALE_AFTER_MS = 12 * 60 * 60_000;
+const STALE_AFTER_MS = 12 * HOUR_MS;
 
 export async function loadCostIndexHistory(systemId: number): Promise<CostIndexHistory | null> {
   const fetchLive = async () => {

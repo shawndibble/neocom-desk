@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import {
   completeAlertsLogin,
   completeCorpSyncLogin,
@@ -35,7 +35,7 @@ function jwt(characterId: number): string {
 }
 
 let returnedCharacterId = 111;
-const server = setupServer(
+mswServer(
   http.post('https://login.eveonline.com/v2/oauth/token', () =>
     HttpResponse.json({
       access_token: jwt(returnedCharacterId),
@@ -46,15 +46,12 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
 beforeEach(async () => {
   sessionStorage.clear();
   returnedCharacterId = 111;
   await db.characters.clear();
   await db.tokens.clear();
 });
-afterEach(() => server.resetHandlers());
 
 const stateOf = (url: string) => new URL(url).searchParams.get('state')!;
 

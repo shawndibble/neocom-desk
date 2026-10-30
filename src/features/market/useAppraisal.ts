@@ -29,6 +29,7 @@ import {
   type HubComparisonRow,
 } from './appraisalData';
 import { addRecent, useRecentAppraisals } from './appraisalRecent';
+import { useAppraisalLive, type LiveProgress } from './useAppraisalLive';
 import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/refiningSetup';
 
 export interface AppraisalController {
@@ -55,8 +56,16 @@ export interface AppraisalController {
   canAppraise: boolean;
   appraise: () => void;
   clear: () => void;
-  /** Re-price the current list, bypassing the price cache. */
+  /** Re-price the current list, bypassing the price cache and refetching the live books. */
   refresh: () => void;
+  /** How far the live hub books have got: `result`'s rows swap to them as they land (issue #5591). */
+  live: LiveProgress;
+  /** The same for the other four hubs, fetched only while Compare Hubs is open. */
+  compareLive: LiveProgress;
+  /** Tells the controller Compare Hubs is open, so the other hubs' books are fetched only then. */
+  setCompareOpen: (open: boolean) => void;
+  /** Resolves with the result once every row has a live price or has failed; a copy waits on it. */
+  settleLive: () => Promise<AppraisalOutcome | null>;
 }
 
 export function useAppraisal(
@@ -71,8 +80,10 @@ export function useAppraisal(
   const { stationRate, taxRate } = refining;
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState('');
-  const [result, setResult] = useState<AppraisalOutcome | null>(null);
-  const [compare, setCompare] = useState<HubComparisonRow[] | null>(null);
+  // The cached (Fuzzwork) outcome; `useAppraisalLive` swaps rows to live books on top of it.
+  const [base, setBase] = useState<AppraisalOutcome | null>(null);
+  const [baseCompare, setBaseCompare] = useState<HubComparisonRow[] | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   // Bumped by the refresh button only. Part of the effect's dependencies so a
@@ -104,13 +115,13 @@ export function useAppraisal(
           compareHubs(submitted, pricePercent, { force }),
         ]);
         if (cancelled) return;
-        setResult(outcome);
-        setCompare(compareRows);
+        setBase(outcome);
+        setBaseCompare(compareRows);
       } catch {
         // Only the catalogue load throws; prices degrade to nulls in place.
         if (cancelled) return;
-        setResult(null);
-        setCompare(null);
+        setBase(null);
+        setBaseCompare(null);
         setFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
@@ -147,16 +158,26 @@ export function useAppraisal(
   const clear = useCallback(() => {
     setText('');
     setSubmitted('');
-    setResult(null);
-    setCompare(null);
+    setBase(null);
+    setBaseCompare(null);
     setLoading(false);
     setFailed(false);
   }, []);
 
+  const {
+    result,
+    compare,
+    live,
+    compareLive,
+    settle: settleLive,
+    forceNextRun,
+  } = useAppraisalLive({ base, baseCompare, hub, pricePercent, compareOpen });
+
   const refresh = useCallback(() => {
     forced.current = true;
+    forceNextRun();
     setForceTick((tick) => tick + 1);
-  }, []);
+  }, [forceNextRun]);
 
   return {
     text,
@@ -171,5 +192,9 @@ export function useAppraisal(
     appraise,
     clear,
     refresh,
+    live,
+    compareLive,
+    setCompareOpen,
+    settleLive,
   };
 }

@@ -36,6 +36,15 @@ const REACH_GROUPS: readonly number[] = [211, 213, 212, 775, 776, 777];
 /** Afterburner and Microwarpdrive, Inertial Stabilizers, Nanofiber, Overdrive Injector, Hyperspatial rigs. */
 const SPEED_GROUPS: readonly number[] = [46, 762, 763, 764, 782];
 
+/** Data and Relic Analyzer 538, Scan Rangefinding and Pinpointing Array 1223, Scan Acquisition Array 1238, Survey Scanner 49, scanning rigs 1233 (the Memetic, Emission, Gravity and Signal rigs), then the speed groups. */
+const EXPLORE_GROUPS: readonly number[] = [538, 1223, 1238, 49, 1233, ...SPEED_GROUPS];
+
+/** The rigs Explore better swaps a surplus CPU or powergrid rig for: scanning and hacking rigs, and the navigation rigs that speed or align. */
+export const EXPLORE_RIG_GROUPS: readonly number[] = [1233, 782];
+
+/** Engineering rigs (Processor Overclocking Unit, Ancillary Current Router, capacitor rigs): the CPU, powergrid and capacitor rigs a fit may not need. A needed capacitor rig is held by the capacitor Guardrail. */
+export const RESOURCE_RIG_GROUPS: readonly number[] = [781];
+
 /** Cap Recharger, Capacitor Power Relay, Capacitor Flux Coil, capacitor rigs. */
 const CAP_GROUPS: readonly number[] = [43, 767, 768, 781];
 
@@ -80,6 +89,7 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   tackle: TACKLE_GROUPS,
   ewar: EWAR_GROUPS,
   command: COMMAND_GROUPS,
+  explore: EXPLORE_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -124,11 +134,13 @@ export type Job =
   | 'tractor'
   | 'cyno'
   | 'sphereLauncher'
-  | 'smartBomb';
+  | 'smartBomb'
+  | 'warpCore';
 
 /**
  * The groups that do a job no damage or EHP score notices when it is lost.
  * Each is its own job, so one goal's Rework never drops another's last module.
+ * Propulsion is the afterburners and MWDs (46) and the micro jump drives (1189).
  * SDE group ids beyond the combat ones: Data Analyzer and Relic Analyzer 538,
  * Scan Probe Launcher 481, Scan Rangefinding and Pinpointing Array 1223,
  * Scan Acquisition Array 1238, Survey Scanner 49, Salvager 1122, Tractor Beam
@@ -136,7 +148,7 @@ export type Job =
  * Smart Bomb 72.
  */
 const JOB_GROUPS: Record<Job, readonly number[]> = {
-  propulsion: [46],
+  propulsion: [46, 1189],
   scram: [52],
   web: [65],
   ewar: [201, 80, 208, 291, 379],
@@ -157,6 +169,8 @@ const JOB_GROUPS: Record<Job, readonly number[]> = {
   cyno: [658],
   sphereLauncher: [589],
   smartBomb: [72],
+  // No score sees warp strength, so a warp core stabilizer (what gets a ship away when pointed) is never dropped for one.
+  warpCore: [315],
 };
 
 const JOB_OF_GROUP = new Map<number, Job>(
@@ -180,6 +194,7 @@ export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'tackle') return ['scram', 'web'];
   if (goal === 'ewar') return ['ewar'];
   if (goal === 'command') return ['fleet'];
+  // Explore better scores no job: the score cannot see a lost probe launcher, so every explorer module stays guarded.
   return [];
 }
 

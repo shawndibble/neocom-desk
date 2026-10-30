@@ -99,9 +99,7 @@ export function WalletJournalPanel({
     >
       {showingBeyondActive && !allJournalsData ? (
         allJournalsLoading || !hasJournalSelection ? (
-          <div className="flex justify-center py-8">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="panel" label={t('common.loading')} />
         ) : (
           <LoadFailedState onRetry={onRetryAllJournals} className="py-8" />
         )

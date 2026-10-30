@@ -10,6 +10,7 @@
  */
 import { BOOT_IDLE_TIMEOUT_MS, scheduleIdle } from '@/lib/scheduleIdle';
 import type { PrefetchSignal } from './prefetch';
+import { MINUTE_MS } from '@/lib/age';
 
 /** Upper bound on the wait for an idle slot (and the timer fallback's delay). */
 export const BOOT_PREFETCH_IDLE_TIMEOUT_MS = BOOT_IDLE_TIMEOUT_MS;
@@ -45,7 +46,7 @@ export function scheduleBootPrefetch(characterId: number): () => void {
  * How long after mount the daily cache prune waits before even asking for an
  * idle slot: past boot, the warm-up and the first route's own reads.
  */
-export const CACHE_PRUNE_DELAY_MS = 60_000;
+export const CACHE_PRUNE_DELAY_MS = MINUTE_MS;
 
 /**
  * Schedules the once-a-day `esiCache` prune (`@/esi/cachePrune`) — after

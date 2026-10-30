@@ -16,6 +16,7 @@ import * as routeChunks from '@/app/routeChunks';
 import type { TypeMap } from '@/sde/types';
 import { REQUIRED_SCOPES } from '@/features/netWorth/recordSnapshots';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -768,21 +769,7 @@ describe('Wallet', () => {
    * pointer viewport.
    */
   function useNarrowViewport(): () => void {
-    const real = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    return () => {
-      window.matchMedia = real;
-    };
+    return stubViewport(NARROW_QUERY);
   }
 
   it('keeps the journal date range on one row inside the mobile filter sheet', async () => {

@@ -14,6 +14,7 @@ import {
   type BackupPayload,
   type EditableRow,
 } from './payload';
+import { utcDay } from '@/engine/localDay';
 
 /**
  * Dexie table names for every Editable Data table a Character owns — the
@@ -58,7 +59,7 @@ export async function exportBackup(
   const settings = allSettings.filter((s) => isAllowedSyncedSettingKey(s.key));
   const payload: BackupPayload = buildBackupPayload(characters, tokens, editableTables, settings);
   const file = await encryptExportPayload(payload, password);
-  const filename = `neocom-desk-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const filename = `neocom-desk-backup-${utcDay()}.json`;
   return { filename, contents: JSON.stringify(file, null, 2) };
 }
 

@@ -21,12 +21,13 @@ import {
   type SyncDeps,
   type SyncOutcome,
 } from './syncCorpTaxBook';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * A visit within this long of the last sync (by anyone) does not sync again:
  * the observer endpoints cache for an hour, so there is nothing newer to fetch.
  */
-export const AUTO_SYNC_MIN_AGE_MS = 15 * 60_000;
+export const AUTO_SYNC_MIN_AGE_MS = 15 * MINUTE_MS;
 
 export type SyncRun =
   | { phase: 'idle' }

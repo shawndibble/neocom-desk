@@ -11,6 +11,7 @@ import { median } from '../math';
 import { turretDamageMultiplier, turretHitChance, type DamageSplit } from './appliedDps';
 import type { CapBoosterFigures } from './capBoosterChoice';
 import type { CrystalFigures } from './mining';
+import { MINUTE_MS } from '@/lib/age';
 
 export type ChargeTier = 'tech1' | 'faction' | 'tech2';
 
@@ -90,8 +91,6 @@ export interface ChargeQuickPicks {
 
 /** "Best value" looks at charges doing at least this share of the top damage. */
 export const BEST_VALUE_SHARE = 0.9;
-/** With a target distance set, a type landing under this share of the best is dimmed. */
-export const WEAK_SHARE = 0.5;
 /** A faction charge costing more than this many times its Tech I per minute is flagged. */
 export const PRICEY_RATIO = 10;
 
@@ -352,7 +351,7 @@ export function chargesUsedPerMinute({
   crystal: CrystalWear | null;
 }): number | null {
   if (rateOfFireMs <= 0) return null;
-  const shots = (60_000 / rateOfFireMs) * guns;
+  const shots = (MINUTE_MS / rateOfFireMs) * guns;
   if (crystal === null) return shots;
   if (!crystal.takesDamage || crystal.hitpoints <= 0) return null;
   return (shots * crystal.volatility * crystal.volatilityDamage) / crystal.hitpoints;

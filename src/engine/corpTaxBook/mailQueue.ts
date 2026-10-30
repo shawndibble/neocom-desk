@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 /**
  * The Corp Tax Book send queue's rules (D16, issue #4064). Pure: the runner
  * (`features/corpTaxBook/mailQueueRunner.ts`) owns the clock, ESI and Dexie and
@@ -15,7 +16,7 @@ export const SEND_GAP_MIN_MS = 12_000;
 export const SEND_GAP_MAX_MS = 15_000;
 /** How long to hold the queue after a network failure before trying again. */
 export const OFFLINE_RETRY_MS = 30_000;
-const MAX_RATE_LIMIT_WAIT_MS = 10 * 60_000;
+const MAX_RATE_LIMIT_WAIT_MS = 10 * MINUTE_MS;
 
 /**
  * `rate-change` (#4515), `removal`/`removalCancelled` (#4520) and `payee-change` (#4653) are moon

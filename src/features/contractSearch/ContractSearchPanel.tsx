@@ -876,11 +876,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   };
 
   if (!hydrated || activeCharacterId === null) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
 
   return (
@@ -1140,9 +1136,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   // lands, so a typed query matches nothing yet. "No matches"
                   // would be a complete answer given mid-load; this says what
                   // is actually true.
-                  <div className="flex justify-center py-8">
-                    <Spinner label={t('contractSearch.namingTypes')} />
-                  </div>
+                  <Spinner block="panel" label={t('contractSearch.namingTypes')} />
                 ) : (
                   <EmptyState
                     title={t('contractSearch.noFilterMatches')}

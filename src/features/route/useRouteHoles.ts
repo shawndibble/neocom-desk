@@ -17,6 +17,7 @@ import {
   type TheraConnectionsResult,
 } from '@/lib/eveScout';
 import { useTicker } from '@/lib/ticker';
+import { MINUTE_MS } from '@/lib/age';
 
 export type RouteHolesState =
   | { kind: 'off' }
@@ -33,7 +34,7 @@ export type RouteHolesState =
     };
 
 /** Remaining life counts down in minutes, so the clock ticks once a minute. */
-const TICK_MS = 60_000;
+const TICK_MS = MINUTE_MS;
 
 export function useRouteHoles(query: RouteHoleQuery): RouteHolesState {
   const now = useTicker(TICK_MS);

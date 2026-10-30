@@ -15,11 +15,9 @@
  * browser instead.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 // Exactly `md` — the width at which `md:min-h-0` engages, so the one place a
 // breakpoint mismatch in this fix would surface.
 const MD_EDGE = { width: 768, height: 800 };
@@ -100,11 +98,7 @@ for (const viewport of [PHONE, DESKTOP]) {
   });
 }
 
-for (const size of [
-  { width: 1024, height: 768 },
-  { width: 1280, height: 800 },
-  { width: 1440, height: 900 },
-]) {
+for (const size of [{ width: 1024, height: 768 }, DESKTOP, { width: 1440, height: 900 }]) {
   test(`finder keeps the Quickbar in view with a search and a pinned item (${size.width}px)`, async ({
     page,
   }) => {

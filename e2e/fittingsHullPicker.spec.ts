@@ -3,14 +3,10 @@
  * vertically only — no class is stranded off the right edge of a
  * height-capped multi-column box.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
-const WIDTHS = [
-  { width: 1440, height: 900 },
-  { width: 1024, height: 768 },
-  { width: 390, height: 844 },
-];
+const WIDTHS = [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, PHONE];
 
 test.describe('Fittings — hull picker', () => {
   for (const viewport of WIDTHS) {

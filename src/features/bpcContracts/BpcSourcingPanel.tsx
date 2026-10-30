@@ -77,8 +77,7 @@ import { bpcActiveFilterChips, type BpcFilterChip, type BpcFilterState } from '.
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 
 /** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
-const SOURCING_GROUP_HEADER =
-  'pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const SOURCING_GROUP_HEADER = `pb-2 ${eyebrowClassName}`;
 
 /**
  * One card width for region and BPO cards alike from `sm`, so the groups
@@ -560,11 +559,7 @@ export function BpcSourcingPanel({
     // No redirect of its own: the Industry route this sits in already sends a
     // characterless visitor to /characters, and a second `Navigate` racing it
     // from inside a tab is how you get a redirect loop.
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
 
   const showsTable =
@@ -620,9 +615,7 @@ export function BpcSourcingPanel({
       </LiveStatus>
       <Panel padded={false}>
         {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : contractsResult === null && ownedBlueprints.length === 0 ? (
@@ -922,9 +915,7 @@ export function BpcSourcingPanel({
             {sources.size === 0 ? (
               <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
             ) : awaitingOffers ? (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
+              <Spinner block="page" label={t('common.loading')} />
             ) : displayRows.length === 0 ? (
               <EmptyState
                 title={t('bpcContracts.noFilterMatches')}

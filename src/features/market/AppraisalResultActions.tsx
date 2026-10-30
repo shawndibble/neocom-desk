@@ -1,7 +1,6 @@
 /** The Appraisal result Panel's header actions: Compare Hubs, columns, Share and the copy/export menu. */
-import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ColumnPickerMenu, IconButton, MenuItem, Modal, useOpenAfterMenu } from '@/components/ui';
+import { ColumnPickerMenu, IconButton, MenuItem, useOpenAfterMenu } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { ExternalMark } from '@/components/ui/ExternalLink';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -10,8 +9,6 @@ import { MAX_SNAPSHOT_ITEMS } from '@/engine/market/appraisalSnapshot';
 import type { AppraisalController } from './useAppraisal';
 import { useAppraisalColumns } from './useAppraisalColumns';
 import { useAppraisalCopyLists, COPY_LISTS } from './useAppraisalCopyLists';
-import { CargoPickerBody } from './HaulingCargoControl';
-import { useHaulingCargo, type HaulingCargo } from './haulingCargo';
 import { useAppraisalJanice } from './useAppraisalJanice';
 import { useAppraisalShare } from './useAppraisalShare';
 
@@ -29,12 +26,9 @@ interface AppraisalResultActionsProps {
     'availableColumns' | 'visibleColumns' | 'optionalColumnsById' | 'toggleColumn' | 'tableExport'
   >;
   share: Pick<Share, 'share' | 'handleShare' | 'shareItemCount'>;
-  copy: Pick<CopyLists, 'copied' | 'copyLists' | 'handleCopy'>;
+  copy: Pick<CopyLists, 'copied' | 'pending' | 'copyLists' | 'handleCopy'>;
   janice: Pick<Janice, 'janice' | 'handleOpenInJanice'> & { canOpen: boolean };
   characterId: number | null;
-  /** The hauling ship; "Pick hauling ship" shows only while it is null. */
-  cargo: HaulingCargo | null;
-  onCargoChange: (cargo: HaulingCargo | null) => void;
   rowCount: number;
 }
 
@@ -44,23 +38,12 @@ export function AppraisalResultActions({
   onToggleCompare,
   columns: { availableColumns, visibleColumns, optionalColumnsById, toggleColumn, tableExport },
   share: { share, handleShare, shareItemCount },
-  copy: { copied, copyLists, handleCopy },
+  copy: { copied, pending, copyLists, handleCopy },
   janice: { janice, handleOpenInJanice, canOpen },
   characterId,
-  cargo,
-  onCargoChange,
   rowCount,
 }: AppraisalResultActionsProps) {
   const { t } = useTranslation();
-  const [pickerOpen, setPickerOpen] = useState(false);
-  // Read by a pick that resolves after the dialog was dismissed: it must not save.
-  const pickerOpenRef = useRef(false);
-  function setPicker(open: boolean) {
-    pickerOpenRef.current = open;
-    setPickerOpen(open);
-  }
-  // Before hydration `cargo` is null too, which would offer a pick over a saved ship.
-  const hydrated = useHaulingCargo((state) => state.hydrated);
   const openAfterMenu = useOpenAfterMenu();
   return (
     <>
@@ -107,6 +90,11 @@ export function AppraisalResultActions({
         }
         onClick={() => void handleShare()}
       />
+      {pending !== null && (
+        <span role="status" className="text-[0.6875rem] text-text-dim">
+          {t('market.appraisal.copyWaiting', { list: t(`market.appraisal.copyList.${pending}`) })}
+        </span>
+      )}
       {copied !== null && (
         <span role="status" className="text-[0.6875rem] text-text-dim">
           {t('market.appraisal.copied', {
@@ -123,7 +111,7 @@ export function AppraisalResultActions({
         {COPY_LISTS.map((list) => (
           <MenuItem
             key={list}
-            disabled={copyLists[list].count === 0}
+            disabled={copyLists[list].count === 0 || pending !== null}
             onSelect={() => void handleCopy(list)}
           >
             {t(`market.appraisal.copyList.${list}`)}
@@ -139,31 +127,7 @@ export function AppraisalResultActions({
           {t('market.appraisal.openInJanice')}
           <ExternalMark />
         </MenuItem>
-        {hydrated && cargo === null && (
-          <MenuItem onSelect={() => openAfterMenu.run(() => setPicker(true))}>
-            {t('market.appraisal.pickHaulingShip')}
-          </MenuItem>
-        )}
       </TableActionsMenu>
-      <Modal
-        open={pickerOpen}
-        onClose={() => setPicker(false)}
-        title={t('market.appraisal.pickHaulingShip')}
-        placement="sheet"
-      >
-        {pickerOpen && (
-          <CargoPickerBody
-            characterId={characterId}
-            hasCargo={false}
-            onClear={() => setPicker(false)}
-            onPick={(next) => {
-              if (!pickerOpenRef.current) return;
-              onCargoChange(next);
-              setPicker(false);
-            }}
-          />
-        )}
-      </Modal>
     </>
   );
 }

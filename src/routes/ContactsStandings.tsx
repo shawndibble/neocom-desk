@@ -281,11 +281,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
         hint={t('contacts.standingsUnavailableHint')}
         onRetry={refresh}
         resetKey={characterId}
-        busy={
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        }
+        busy={<Spinner block="page" label={t('common.loading')} />}
       >
         {content}
       </DataGate>

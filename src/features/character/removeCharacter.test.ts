@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { useHubByCharacter } from '@/features/market/characterHubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { seedCharacter as seedCharacterRow, seedGrant as seedGrantFor } from '@/test/seed';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { removeCharacter, removeCharacterAfterSync } from './removeCharacter';
@@ -31,19 +33,8 @@ vi.mock('@/features/notifications/projectionUpload', () => ({
 }));
 
 async function seedCharacter(characterId: number): Promise<void> {
-  await db.characters.put({
-    characterId,
-    name: `Pilot ${characterId}`,
-    ownerHash: `hash-${characterId}`,
-    addedAt: 1,
-  });
-  await db.tokens.put({
-    characterId,
-    accessToken: 'a',
-    refreshToken: 'r',
-    expiresAt: Date.now() + 100_000,
-    scopes: [],
-  });
+  await seedCharacterRow(characterId);
+  await seedGrantFor(characterId, [], { expiresAt: Date.now() + 100_000 });
   await db.skillPlans.add({
     id: `plan-${characterId}`,
     characterId,
@@ -191,6 +182,13 @@ beforeEach(async () => {
 });
 
 describe('removeCharacter', () => {
+  it('drops the Character’s Trade Hub entry and keeps another device’s', async () => {
+    await seedCharacter(1);
+    useHubByCharacter.setState({ value: { 1: 'hek', 9: 'rens' }, hydrated: true });
+    await removeCharacter(1);
+    expect(useHubByCharacter.getState().value).toEqual({ 9: 'rens' });
+  });
+
   it('wipes the Character’s officer-only Corp Tax Book copy and no other Character’s', async () => {
     await seedCharacter(1);
     await seedCharacter(2);

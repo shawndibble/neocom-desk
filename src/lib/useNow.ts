@@ -1,6 +1,7 @@
 import { useTicker } from './ticker';
+import { MINUTE_MS } from '@/lib/age';
 
-const TICK_MS = 60_000;
+const TICK_MS = MINUTE_MS;
 
 /**
  * `Date.now()` is impure, so a live-ticking countdown reads it only through

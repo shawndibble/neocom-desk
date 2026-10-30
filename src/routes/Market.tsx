@@ -78,6 +78,8 @@ import { buttonClassName } from '@/components/ui/buttonClassName';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { AppraisalSettingsForm } from '@/features/market/AppraisalSettingsForm';
 import { usePageHeaderSlots } from '@/features/market/pageHeaderSlots';
 import { useAppraisalListUrl } from '@/features/market/useAppraisalListUrl';
 import { useAppraisal } from '@/features/market/useAppraisal';
@@ -941,6 +943,11 @@ export function Market() {
                     className="w-32 sm:w-44"
                   />
                 )}
+                {tab === 'appraisal' && (
+                  <PageSettingsButton pageName={t('market.sections.appraisal')} section="market">
+                    <AppraisalSettingsForm characterId={activeCharacterId} />
+                  </PageSettingsButton>
+                )}
                 <IconButton
                   icon={<Icon.Refresh />}
                   label={t('market.refresh')}
@@ -951,7 +958,7 @@ export function Market() {
                   // anything to do until there *is* something on screen.
                   disabled={
                     tab === 'appraisal'
-                      ? appraisal.result === null || appraisal.loading
+                      ? appraisal.result === null || appraisal.loading || appraisal.live.checking
                       : !catalogueError && (selectedTypeId === null || orderBookLoading)
                   }
                 />
@@ -1061,9 +1068,7 @@ export function Market() {
                     className="py-8"
                   />
                 ) : catalogueLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner label={t('common.loading')} />
-                  </div>
+                  <Spinner block="panel" label={t('common.loading')} />
                 ) : filterResult &&
                   filterResult.visibleGroupIds.size === 0 &&
                   !filterResult.bestMatch ? (
@@ -1234,9 +1239,7 @@ export function Market() {
                       ) : orderBookLoading &&
                         !regionsUnavailable &&
                         (!orderBookView || orderBookFailed) ? (
-                        <div className="flex justify-center py-8">
-                          <Spinner label={t('common.loading')} />
-                        </div>
+                        <Spinner block="panel" label={t('common.loading')} />
                       ) : orderBookFailed ? (
                         // Not the empty book: ESI didn't answer (a 420, or the Error
                         // Budget declining to send), which says nothing about who

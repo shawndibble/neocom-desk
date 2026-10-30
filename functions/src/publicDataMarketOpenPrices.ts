@@ -5,7 +5,7 @@
  * (`open-prices/<typeId>.json`). The shrink guard's last-run record, which the function
  * kept in Firestore, lives in an R2 object next to the output. Touches no Firestore.
  */
-import { ESI_USER_AGENT } from './esiNotifications.js';
+import { ESI_USER_AGENT } from './esiClient.js';
 import {
   OpenPriceFold,
   SNAPSHOT_HUBS,
@@ -87,7 +87,7 @@ export async function publishMarketOpenPrices(deps: PublicMarketOpenPricesDeps):
       `Market open prices: nothing published, snapshot shrank (${shrunk}); if the drop is real, delete ${MARKET_OPEN_PRICES_STATE_R2_KEY}`
     );
   }
-  const { written, failed, firstError } = await writeOpenPricesToR2(
+  const { written, skipped, failed, firstError } = await writeOpenPricesToR2(
     groupByDocument(new Map([[date, stations]])),
     mergeDays,
     { get: deps.get, put: deps.put }
@@ -95,7 +95,7 @@ export async function publishMarketOpenPrices(deps: PublicMarketOpenPricesDeps):
   if (failed > 0) {
     // The state is only recorded for a complete day; the merge is idempotent, so a later slot repeats it.
     throw new Error(
-      `Market open prices: ${failed} types failed to write to R2 (${written} written); first error: ${firstError}`
+      `Market open prices: ${failed} types failed to write to R2 (${written} written, ${skipped} unchanged); first error: ${firstError}`
     );
   }
   await deps.put(
@@ -103,7 +103,7 @@ export async function publishMarketOpenPrices(deps: PublicMarketOpenPricesDeps):
     JSON.stringify({ date, regions: regionCounts(fold) }),
     STATE_HEADERS
   );
-  console.info('Market open prices published', { date, written });
+  console.info('Market open prices published', { date, written, skipped });
   return true;
 }
 

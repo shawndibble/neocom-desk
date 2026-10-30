@@ -9,11 +9,8 @@
  * token, not a hard-coded colour.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 async function gotoCertificates(page: Page, size: { width: number; height: number }) {
   await signInAndGoto(page);

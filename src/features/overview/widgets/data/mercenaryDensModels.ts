@@ -23,14 +23,8 @@ import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import type { BoardDeadline } from '../nextDeadline';
-import type {
-  DetailTone,
-  NumberModel,
-  RowDetailModel,
-  TableCell,
-  TableColumn,
-  Translate,
-} from './types';
+import type { DetailTone, NumberModel, RowDetailModel, TableCell, TableColumn } from './types';
+import type { Translate } from '@/lib/translate';
 
 /**
  * This kind's copy key. A helper rather than `` `${W}.x` `` templates: the

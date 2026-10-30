@@ -1,6 +1,5 @@
 import { formatIsk } from '@/lib/isk';
-
-export type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** "N items · V ISK" — one string, so a row's metadata is one DOM text node rather than several. */
 export function formatBadge(

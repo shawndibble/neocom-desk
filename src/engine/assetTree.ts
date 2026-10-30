@@ -379,11 +379,6 @@ export function buildAssetGroups<Id>(
   return groups;
 }
 
-/** Every leaf `item_id` under a group, across all of its top-level children — the `buildAssetGroups` twin of `collectStationItemIds`. */
-export function collectGroupItemIds<Id>(group: AssetTreeGroup<Id>): number[] {
-  return group.children.flatMap(collectItemIds);
-}
-
 export function buildAssetTree(
   assets: readonly EngineAsset[],
   priceByTypeId: ReadonlyMap<number, number> = new Map(),

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 /**
  * EVE time is UTC — the clock every player, timer and killmail in New Eden
  * runs on. A job's end shown in the viewer's own zone would be the one number
@@ -36,7 +37,7 @@ export function eveTimeOfDay(ms: number): string {
   return EVE_TIME_OF_DAY.format(new Date(ms));
 }
 
-const WEEK_MS = 7 * 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
 
 /** `eveClock` while the weekday is unambiguous (under a week out), else `formatEveDateTime`'s "10-23 14:20". */
 export function eveWhen(ms: number, nowMs: number): string {

@@ -12,8 +12,8 @@ import { FILTER_STATES } from './extractionStates';
 import { extractionWindowLabel, shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
 import { StateWord } from './moonsParts';
+import { DAY_MS } from '@/lib/age';
 
-const DAY = 86_400_000;
 const BEFORE_DAYS = 20;
 const AFTER_DAYS = 27;
 
@@ -86,7 +86,7 @@ export function ExtractionTimeline({
   const { t } = useTranslation();
   const { view } = useBook();
   const now = Date.parse(view.input.now);
-  const from = now - BEFORE_DAYS * DAY;
+  const from = now - BEFORE_DAYS * DAY_MS;
   const inWindow = rows.filter(
     (r) => r.state !== 'cancelled' && Date.parse(r.expiresAt ?? r.chunkArrivalAt) >= from
   );
@@ -119,12 +119,12 @@ export function ExtractionTimeline({
 function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: number }) {
   const { t } = useTranslation();
   const { names } = useBook();
-  const from = now - BEFORE_DAYS * DAY;
-  const span = (BEFORE_DAYS + AFTER_DAYS) * DAY;
+  const from = now - BEFORE_DAYS * DAY_MS;
+  const span = (BEFORE_DAYS + AFTER_DAYS) * DAY_MS;
   const pct = (ms: number) => `${(Math.min(Math.max(ms - from, 0), span) / span) * 100}%`;
   const width = (a: number, b: number) =>
     `${((Math.min(Math.max(b, from), from + span) - Math.min(Math.max(a, from), from + span)) / span) * 100}%`;
-  const ticks = [-BEFORE_DAYS + 1, 0, 7, 14, 21].map((d) => now + d * DAY);
+  const ticks = [-BEFORE_DAYS + 1, 0, 7, 14, 21].map((d) => now + d * DAY_MS);
   return (
     <div className="space-y-3">
       <div
@@ -182,7 +182,7 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
                     className="absolute inset-y-0 min-w-1.5 rounded-xs bg-success"
                     style={{
                       left: pct(ready),
-                      width: width(ready, Math.max(fracture, ready + DAY / 24)),
+                      width: width(ready, Math.max(fracture, ready + DAY_MS / 24)),
                     }}
                   />
                   <span

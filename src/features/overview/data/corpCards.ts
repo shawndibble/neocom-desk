@@ -5,13 +5,13 @@
  * only counts them and picks which one may lead the summary strip.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
-import { DAY_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { buildCorpBoard, type CorpBoardItem } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { MoonChunksBoardData, StructuresBoardData, StructuresView } from './boardData';
 
 /** CCP caches the corp endpoints for about an hour — the Corp page's own window. */
-export const CORP_CACHE_WINDOW_MS = 3_600_000;
+export const CORP_CACHE_WINDOW_MS = HOUR_MS;
 
 /**
  * The structures' board items as of `nowMs`. Built per render, not at load:

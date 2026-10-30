@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fetchNotifications, isBudgetLow } from './esiNotifications.js';
+import { isBudgetLow } from './esiClient.js';
+import { fetchNotifications } from './esiNotifications.js';
 
 const respond = (status: number, body: unknown = [], headers: Record<string, string> = {}) =>
   vi.fn(

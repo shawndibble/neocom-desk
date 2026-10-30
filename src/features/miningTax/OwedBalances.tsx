@@ -6,13 +6,14 @@ import { focusRingClassName, interactiveClassName } from '@/components/ui/contro
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
+import { DAY_MS } from '@/lib/age';
 
 /** Whole EVE days between the oldest owed entry and today (UTC) — how long this Payee has been waiting. */
 function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
   const oldest = balance.members.map((m) => m.assignment.date).sort()[0];
   if (!oldest) return 0;
   const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  return Math.max(0, Math.round((todayUtc - Date.parse(`${oldest}T00:00:00Z`)) / 86_400_000));
+  return Math.max(0, Math.round((todayUtc - Date.parse(`${oldest}T00:00:00Z`)) / DAY_MS));
 }
 
 interface OwedBalancesProps {

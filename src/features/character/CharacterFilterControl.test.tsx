@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { seedCharacter } from '@/test/seed';
 import { IconButton, PageHeader } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { stubViewport } from '@/test/viewport';
 import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
 
 async function openMenu() {
@@ -171,33 +172,19 @@ describe('CharacterFilterControl', () => {
     });
 
     it('draws two faces and a larger "+N" below md', async () => {
-      const original = window.matchMedia;
-      window.matchMedia = ((media: string) => ({
-        media,
-        matches: media.includes('max-width: 47.999rem'),
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      })) as unknown as typeof window.matchMedia;
-      try {
-        for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
-        render(
-          <CharacterFilterControl
-            activeCharacterId={4}
-            value="all"
-            characterCount={5}
-            onChange={() => {}}
-          />
-        );
-        const trigger = screen.getByRole('button');
-        await waitFor(() => expect(faceIds(trigger)).toEqual(['4', '1']));
-        expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+3');
-      } finally {
-        window.matchMedia = original;
-      }
+      stubViewport((media) => media.includes('max-width: 47.999rem'));
+      for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
+      render(
+        <CharacterFilterControl
+          activeCharacterId={4}
+          value="all"
+          characterCount={5}
+          onChange={() => {}}
+        />
+      );
+      const trigger = screen.getByRole('button');
+      await waitFor(() => expect(faceIds(trigger)).toEqual(['4', '1']));
+      expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+3');
     });
 
     it('holds the stack width with empty circles until the roster loads, then shows the faces', async () => {

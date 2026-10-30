@@ -15,6 +15,8 @@ export interface OnHandOrder {
   location_id: number;
   volume_remain: number;
   is_buy_order?: boolean;
+  /** Whose order it is: only needed for the per-Character split. */
+  characterId?: number;
 }
 
 export interface MarketCount {
@@ -45,6 +47,70 @@ export function countAtMarket(
     if (count !== undefined) count.listed += order.volume_remain;
   }
   return counts;
+}
+
+/** One Character's share of a count. */
+export interface HolderCount {
+  characterId: number;
+  quantity: number;
+}
+
+export interface MarketHolders {
+  listedBy: HolderCount[];
+  inHangarBy: HolderCount[];
+}
+
+function addHolder(shares: Map<number, number>, characterId: number, quantity: number) {
+  shares.set(characterId, (shares.get(characterId) ?? 0) + quantity);
+}
+
+const biggestFirst = (shares: Map<number, number>): HolderCount[] =>
+  [...shares]
+    .map(([characterId, quantity]) => ({ characterId, quantity }))
+    .filter((share) => share.quantity > 0)
+    .sort((a, b) => b.quantity - a.quantity || a.characterId - b.characterId);
+
+/**
+ * Whose units make up `countAtMarket`'s two counts, per type: attribution, not a
+ * new count, so each list sums to its total. Biggest holder first.
+ */
+export function holdersAtMarket(
+  detected: DetectedOwnedStockMap,
+  orders: readonly OnHandOrder[],
+  locationId: number,
+  typeIds: readonly number[]
+): Map<number, MarketHolders> {
+  const listed = new Map<number, Map<number, number>>();
+  for (const order of orders) {
+    if (!isSellAt(order, locationId) || order.characterId === undefined) continue;
+    const shares = listed.get(order.type_id) ?? new Map<number, number>();
+    addHolder(shares, order.characterId, order.volume_remain);
+    listed.set(order.type_id, shares);
+  }
+  const result = new Map<number, MarketHolders>();
+  for (const typeId of typeIds) {
+    const hangar = new Map<number, number>();
+    for (const placement of detected.get(typeId)?.placements ?? []) {
+      if (placement.locationId === locationId) {
+        addHolder(hangar, placement.characterId, placement.quantity);
+      }
+    }
+    result.set(typeId, {
+      listedBy: biggestFirst(listed.get(typeId) ?? new Map()),
+      inHangarBy: biggestFirst(hangar),
+    });
+  }
+  return result;
+}
+
+/** Characters with a sell order at a market, most orders first: whose market it is. */
+export function sellersAtMarket(orders: readonly OnHandOrder[], locationId: number): number[] {
+  const orderCounts = new Map<number, number>();
+  for (const order of orders) {
+    if (!isSellAt(order, locationId) || order.characterId === undefined) continue;
+    addHolder(orderCounts, order.characterId, 1);
+  }
+  return biggestFirst(orderCounts).map((share) => share.characterId);
 }
 
 /**

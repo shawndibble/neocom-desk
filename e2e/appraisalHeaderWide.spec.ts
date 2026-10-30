@@ -17,7 +17,24 @@ const VELDSPAR = 1230;
 /** 12,500,000 units at 0.1 m³ is 1,250,000 m³; at ~5,377 ISK each, a 67.2B sell. */
 const PASTE = 'Veldspar\t12,500,000';
 
+const JITA_STATION = 60_003_760;
+
+/** The live book (#5591) the page prices from first: the same Jita prices as Fuzzwork's, one order each side. */
+async function mockLiveBook(page: Page): Promise<void> {
+  await page.route(/^https:\/\/esi\.evetech\.net\/(?:[^/]+\/)?markets\/\d+\/orders/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { order_id: 1, is_buy_order: false, location_id: JITA_STATION, price: 5377.12 },
+        { order_id: 2, is_buy_order: true, location_id: JITA_STATION, price: 4900.5 },
+      ]),
+    })
+  );
+}
+
 async function mockHubPrices(page: Page): Promise<void> {
+  await mockLiveBook(page);
   await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
     const types = new URL(route.request().url()).searchParams.get('types') ?? '';
     const body = Object.fromEntries(

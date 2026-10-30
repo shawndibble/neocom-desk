@@ -9,12 +9,10 @@
  * page's scrollWidth are layout a real engine has to compute.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
-
-const PHONE = { width: 390, height: 844 };
 
 function makeTransactions(count: number) {
   return Array.from({ length: count }, (_, i) => ({

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub } from '@/features/market/hub';
 import '@/i18n';
 import { db } from '@/db';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -33,6 +33,7 @@ import type { GlobalMarketEntry } from '@/sde/marketTypes';
 import type { LocalJumpDistances } from '@/features/route/localRoute';
 import { loadBlueprints } from '@/sde/loadSde';
 import { usePickedSystems } from '@/features/route/currentSystem';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -802,7 +803,7 @@ describe('BpcSourcingPanel', () => {
     });
 
     it("adds the pilot's market hub region, and says so when it has no offers", async () => {
-      useMarketHub.setState({ value: 'amarr', hydrated: true });
+      useDefaultMarketHub.setState({ value: 'amarr', hydrated: true });
       try {
         loadPublicBpcContracts.mockResolvedValue(
           cachedSnapshot([
@@ -817,7 +818,7 @@ describe('BpcSourcingPanel', () => {
         expect(domain).toHaveTextContent('Domain');
         expect(domain).toHaveTextContent('No offers');
       } finally {
-        useMarketHub.setState({ value: 'jita' });
+        useDefaultMarketHub.setState({ value: 'jita' });
       }
     });
 
@@ -1494,21 +1495,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
    * pointer viewport — flip it so the shared `FilterBar` renders its sheet.
    */
   function useNarrowViewport(): () => void {
-    const real = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    return () => {
-      window.matchMedia = real;
-    };
+    return stubViewport(NARROW_QUERY);
   }
 
   it('collapses the Source/Exclude/Space dropdowns behind the shared filter funnel on a narrow viewport, leaving ColumnPickerMenu in the row', async () => {

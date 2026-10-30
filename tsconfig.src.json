@@ -1,0 +1,33 @@
+{
+  // Production code only. Composite, so the tests project below checks against
+  // this project's emitted `.d.ts` instead of re-checking all of `src`; that
+  // split is what keeps tsc's peak heap near the size of one half (see
+  // docs/agents/testing-and-ci.md). Nothing here is shipped: the declarations
+  // land in the ignored `.cache` dir.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./.cache/tsc/src",
+    "tsBuildInfoFile": "./.cache/tsc/src.tsbuildinfo"
+  },
+  "include": [
+    "src",
+    "src/**/*.json",
+    // Imported across the boundary by `src` (the callable manifest and the
+    // Corp Tax Book engine are shared with the Cloud Functions).
+    "functions/src/callableManifest.ts",
+    "functions/src/corpTaxBookEngine.ts",
+    "functions/src/corpTaxBookMinerTotals.ts",
+    "functions/src/corpTaxBookReadModels.ts",
+    "functions/src/corpTaxBookVersionKeys.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**/*",
+    "src/**/test-helpers.ts",
+    "src/test/**/*",
+    "src/**/*.stories.tsx"
+  ]
+}

@@ -19,12 +19,13 @@ import {
 } from '@/features/contractSearch/r2Snapshot';
 import { readR2CourierSnapshot } from '@/features/contractSearch/r2CourierSnapshot';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
+import { HOUR_MS } from '@/lib/age';
 
 const SOURCE: R2SnapshotSource<PublicCourierContractRow> = {
   /** Its own key: one payload shape per entry. */
   cacheKey: 'publicCourierContracts',
   /** Published by the same job as the offers snapshot, so the same window. */
-  staleAfterMs: 60 * 60_000,
+  staleAfterMs: HOUR_MS,
   read: readR2CourierSnapshot,
 };
 

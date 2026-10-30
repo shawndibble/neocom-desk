@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
 import { resetMarketOpenPricesCache } from '@/features/market/marketOpenPrices';
 import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
@@ -60,12 +60,10 @@ function skillsFixture(trained: [number, number][]): CorrectedSkills {
   };
 }
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => server.use(...fallbackSourcesDown));
 afterEach(() => {
-  server.resetHandlers();
   resetMarketOpenPricesCache();
   clearMarketPriceCache();
   clearAppraisalCatalogue();
@@ -76,7 +74,6 @@ afterEach(() => {
   mockedFindLpOfferMatches.mockReset();
   mockedToLpOfferInputs.mockReset();
 });
-afterAll(() => server.close());
 
 function aggregates(body: Record<string, unknown>) {
   return http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.json(body));

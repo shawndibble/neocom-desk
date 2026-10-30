@@ -10,6 +10,7 @@
 import { useCallback, useMemo } from 'react';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { isPlainRecord } from '@/engine/guards';
 
 export const CORP_STOCK_TARGETS_KEY = 'sync.corpStockTargets';
 
@@ -17,9 +18,6 @@ export const CORP_STOCK_TARGETS_KEY = 'sync.corpStockTargets';
 export type TypeTargets = Record<string, number>;
 /** corporationId (as a string key) → that corporation's targets. */
 export type CorpStockTargets = Record<string, TypeTargets>;
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const isTarget = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0;
 
@@ -31,10 +29,10 @@ const isTarget = (v: unknown): v is number => typeof v === 'number' && Number.is
  * survives an edit made here.
  */
 export function parseCorpStockTargets(raw: unknown): CorpStockTargets | null {
-  if (!isRecord(raw)) return null;
+  if (!isPlainRecord(raw)) return null;
   const out: CorpStockTargets = {};
   for (const [corporationId, targets] of Object.entries(raw)) {
-    if (!isRecord(targets)) continue;
+    if (!isPlainRecord(targets)) continue;
     const kept: TypeTargets = {};
     for (const [typeId, target] of Object.entries(targets)) {
       if (/^[1-9]\d*$/.test(typeId) && isTarget(target)) kept[typeId] = target;

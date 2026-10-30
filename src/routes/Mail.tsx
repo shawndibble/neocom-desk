@@ -267,11 +267,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
   );
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
@@ -361,9 +357,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
           ))}
 
       {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="page" label={t('common.loading')} />
       ) : needsReauth && (!headersResult || rows.length === 0) ? (
         // A lapsed grant with no saved mail: the full banner. With saved mail
         // the list stays and a small note sits above it.
@@ -575,11 +569,7 @@ export function Mail() {
   const openTarget = useMailOpenParam();
 
   if (!scopeHydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   return (
     <MailView

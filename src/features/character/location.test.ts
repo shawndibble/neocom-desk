@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
@@ -8,18 +8,15 @@ import { loadCharacterSolarSystemId } from './location';
 
 const CHARACTER_ID = 42;
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 describe('loadCharacterSolarSystemId', () => {
   it('fetches and caches the current solar system id', async () => {

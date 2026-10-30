@@ -6,6 +6,7 @@ import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
 import { isSrpAuditAction } from '../srpAuditAction';
 import type { SrpAuditEntry } from '../srpClaimTypes';
+import { MINUTE_MS } from '@/lib/age';
 
 const num = (value: unknown): number | null => (typeof value === 'number' ? value : null);
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
@@ -51,7 +52,7 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
 }
 
 /** Saves by one officer this close together read as one line. */
-const SAVE_COLLAPSE_MS = 60_000;
+const SAVE_COLLAPSE_MS = MINUTE_MS;
 
 /**
  * Newest-first feed entries with a run of "Saved SRP settings" by the same officer, each within a

@@ -7,10 +7,9 @@
  * this one against a real browser instead.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
 
-const PHONE = { width: 390, height: 844 };
 const PLANET_ID = 40_000_002;
 const DAY_MS = 24 * 3_600_000;
 

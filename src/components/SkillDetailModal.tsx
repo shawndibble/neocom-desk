@@ -133,9 +133,7 @@ export function SkillDetailModal() {
     >
       <div ref={resultRef} tabIndex={-1} className="focus:outline-none">
         {state.status === 'loading' || state.status === 'idle' ? (
-          <div className="flex justify-center py-8">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="panel" label={t('common.loading')} />
         ) : state.status === 'error' ? (
           <EmptyState
             title={t('common.loadFailedTitle')}

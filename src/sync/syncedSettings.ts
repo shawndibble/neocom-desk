@@ -347,6 +347,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.itemContractFlagMultiple',
   'sync.loyaltyLpValue',
   'sync.marketHub',
+  'sync.marketHubByCharacter',
   'sync.marketPricePercent',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxCompressedOre',

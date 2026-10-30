@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { resetRevalidationState } from '@/esi/cache';
 import { db } from '@/db';
+import { seedGrant as seedGrantFor } from '@/test/seed';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -36,8 +37,7 @@ const EVENT: CalendarEventSummary = {
   event_response: 'accepted',
 };
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+const server = mswServer();
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -48,10 +48,8 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 describe('EventDetailModal', () => {
   it('shows the event title immediately and a loading state while the detail fetches', () => {
@@ -218,13 +216,7 @@ describe('EventDetailModal', () => {
     }
 
     async function seedGrant(scopes: readonly string[]) {
-      await db.tokens.put({
-        characterId: CHAR_ID,
-        accessToken: 'a',
-        refreshToken: 'r',
-        expiresAt: Date.now() + 3_600_000,
-        scopes: [...scopes],
-      });
+      await seedGrantFor(CHAR_ID, scopes, { expiresAt: Date.now() + 3_600_000 });
       await useActiveCharacter.getState().hydrate();
     }
 

@@ -26,6 +26,7 @@ import {
 } from './preferences';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useSnoozeStore, withoutSnoozed } from './snooze';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * The alerts the bell, panel and Danger banner all work from: the feed as the
@@ -36,7 +37,7 @@ import { useSnoozeStore, withoutSnoozed } from './snooze';
 export function useVisibleAlertEntries(): NotificationFeedRecord[] {
   const prefs = useNotificationPreferences((state) => state.value);
   const snoozed = useSnoozeStore((state) => state.value);
-  const now = useTicker(60_000);
+  const now = useTicker(MINUTE_MS);
 
   // Hydrated here, not relied on from elsewhere: the rail badge is on every route.
   useHydratedStore(useSnoozeStore);

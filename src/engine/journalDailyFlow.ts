@@ -2,6 +2,7 @@ import { utcDay } from './netWorth/snapshot';
 import type { JournalRow } from './journalNetting';
 import { parseInstant } from './esiInstant';
 import { DAY_MS } from '@/lib/age';
+import { shiftUtcDate } from './localDay';
 
 /** One EVE (UTC) day of the Journal: ISK in and out, both as non-negative sums. */
 export interface JournalDayFlow {
@@ -18,7 +19,6 @@ export const FLOW_DEFAULT_DAYS = 30;
 export const FLOW_MAX_DAYS = 92;
 
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
-const shiftDay = (day: string, by: number) => utcDay(dayMs(day) + by * DAY_MS);
 
 export interface JournalFlowWindow {
   from: string;
@@ -40,16 +40,16 @@ export function journalFlowWindow(
   const singleDay = startDate !== null && startDate === endDate;
   if (singleDay || (startDate === null && endDate === null)) {
     let to = today;
-    if (singleDay && shiftDay(today, -(FLOW_DEFAULT_DAYS - 1)) > startDate) {
-      to = shiftDay(startDate, FLOW_DEFAULT_DAYS - 2);
+    if (singleDay && shiftUtcDate(today, -(FLOW_DEFAULT_DAYS - 1)) > startDate) {
+      to = shiftUtcDate(startDate, FLOW_DEFAULT_DAYS - 2);
       if (to > today) to = today;
     }
-    return { from: shiftDay(to, -(FLOW_DEFAULT_DAYS - 1)), to, truncated: false };
+    return { from: shiftUtcDate(to, -(FLOW_DEFAULT_DAYS - 1)), to, truncated: false };
   }
   const to = endDate ?? today;
-  const from = startDate ?? shiftDay(to, -(FLOW_DEFAULT_DAYS - 1));
+  const from = startDate ?? shiftUtcDate(to, -(FLOW_DEFAULT_DAYS - 1));
   if (from > to) return { from: to, to, truncated: false };
-  const floor = shiftDay(to, -(FLOW_MAX_DAYS - 1));
+  const floor = shiftUtcDate(to, -(FLOW_MAX_DAYS - 1));
   return from < floor ? { from: floor, to, truncated: true } : { from, to, truncated: false };
 }
 

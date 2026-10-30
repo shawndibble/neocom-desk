@@ -299,9 +299,7 @@ export function FittingStartScreen({
         )}
 
         {loading && rows.length === 0 ? (
-          <div className="flex justify-center py-8">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="panel" label={t('common.loading')} />
         ) : rows.length === 0 ? (
           <EmptyState
             title={t('fittings.start.emptyTitle')}

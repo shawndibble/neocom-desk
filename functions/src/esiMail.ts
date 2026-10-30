@@ -1,17 +1,12 @@
 // `GET /characters/{id}/mail/` for the Alerts poller (issue #5143, ADR 0029): the
 // mail HEADERS only (scope `esi-mail.read_mail.v1`), never a body, a mailing list
-// or a label. Same etiquette as esiNotifications.ts: ESI's identification headers
-// (no email address), the stored ETag, and a classified result so the poller never
+// or a label. Same etiquette as the other poller reads (esiClient.ts): the shared
+// headers, the stored ETag, and a classified result so the poller never
 // reads a status code — 304 costs nothing, 403 is "this grant cannot read mail",
 // 420/429 stop the run, a low budget stops it after this call.
 
-import {
-  ESI_BASE,
-  ESI_COMPATIBILITY_DATE,
-  ESI_USER_AGENT,
-  isBudgetLow,
-  retryAfterMs,
-} from './esiNotifications.js';
+import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { isRecord } from './guards.js';
 import type { MailHeader } from './mailPush.js';
 
 export type MailHeadersResult =
@@ -22,9 +17,8 @@ export type MailHeadersResult =
   | { kind: 'error'; status: number };
 
 /** An entry without a numeric `mail_id` is unusable; the other fields are optional here. */
-function toHeader(value: unknown): MailHeader[] {
-  if (typeof value !== 'object' || value === null) return [];
-  const v = value as Record<string, unknown>;
+function toHeader(v: unknown): MailHeader[] {
+  if (!isRecord(v)) return [];
   if (typeof v.mail_id !== 'number' || !Number.isSafeInteger(v.mail_id)) return [];
   const sentMs = typeof v.timestamp === 'string' ? Date.parse(v.timestamp) : NaN;
   return [
@@ -44,14 +38,7 @@ export async function fetchMailHeaders(
   fetchImpl: typeof fetch = fetch
 ): Promise<MailHeadersResult> {
   const res = await fetchImpl(`${ESI_BASE}/characters/${characterId}/mail/`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'User-Agent': ESI_USER_AGENT,
-      'X-User-Agent': ESI_USER_AGENT,
-      'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-      Accept: 'application/json',
-      ...(etag ? { 'If-None-Match': etag } : {}),
-    },
+    headers: { ...esiHeaders(accessToken), ...(etag ? { 'If-None-Match': etag } : {}) },
     signal: AbortSignal.timeout(15_000),
   });
 

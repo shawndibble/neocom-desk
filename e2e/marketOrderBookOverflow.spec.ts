@@ -16,14 +16,14 @@
  * inside its own wrapper either.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
 import type { MarketOrder } from '../src/esi/endpoints';
 
 const WIDTHS: { width: number; height: number; bracket?: boolean }[] = [
   { width: 1024, height: 768 },
-  { width: 1280, height: 800 },
+  DESKTOP,
   // Around the cards/table switch (roughly 1365px here, measured on one
   // machine; the exact width varies with the font, so nothing below pins
   // which layout renders). Buy's ⋮ once scrolled out of its card just above

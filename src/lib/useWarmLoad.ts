@@ -14,9 +14,10 @@
  */
 import { useEffect, useState } from 'react';
 import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
+import { MINUTE_MS } from '@/lib/age';
 
 /** A load this recent is reused as is: page-to-page navigation, not a refresh. */
-export const WARM_LOAD_FRESH_MS = 60_000;
+export const WARM_LOAD_FRESH_MS = MINUTE_MS;
 
 interface Stamped<T> {
   value: T;

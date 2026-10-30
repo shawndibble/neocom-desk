@@ -10,8 +10,9 @@
 import type { Contract } from '@/esi/endpoints';
 import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { parseInstant } from '@/engine/esiInstant';
+import { HOUR_MS } from '@/lib/age';
 
-export const LISTING_WINDOW_MS = 24 * 3_600_000;
+export const LISTING_WINDOW_MS = 24 * HOUR_MS;
 
 export interface ContractDeadlineItem {
   contractId: number;

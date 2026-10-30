@@ -5,6 +5,7 @@ import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
 import type { EsiEndpointId } from '../registry';
+import { chunk } from '@/lib/chunk';
 
 // --- GET /universe/types/{type_id} (public) ---
 
@@ -339,12 +340,6 @@ export interface CharacterAffiliation {
 
 /** ESI's documented cap on ids per request (maxItems in the spec) — shared with `postUniverseNames`. */
 const AFFILIATION_BATCH_LIMIT = 1000;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
 
 /** Batches in flight at once: ESI bills errors against a shared budget, so stay small. */
 const POST_CHUNK_CONCURRENCY = 2;

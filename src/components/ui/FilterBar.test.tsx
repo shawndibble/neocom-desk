@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { stubViewport } from '@/test/viewport';
 import { FilterBar, FilterField } from './FilterBar';
 import { countActive } from './countActive';
 import { FilterChip } from './FilterChip';
@@ -23,30 +24,9 @@ const EMPTY: Filter = { text: '', unreadOnly: false, from: '' };
  * a pointer viewport — so the funnel box under the row is what every route
  * test sees by default. Narrow has to be asked for.
  */
-let restoreMatchMedia: (() => void) | undefined;
-
 function useNarrowViewport(): void {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  restoreMatchMedia = () => {
-    window.matchMedia = real;
-  };
+  stubViewport(NARROW_QUERY);
 }
-
-afterEach(() => {
-  restoreMatchMedia?.();
-  restoreMatchMedia = undefined;
-});
 
 function Harness({
   initial = EMPTY,

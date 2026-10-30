@@ -8,7 +8,7 @@
  * names it, so only the public sov reads and the planets are served here.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { ALLIANCE_ID } from './support/fixtureData';
 import { overviewLayoutSetting, signInAndGoto } from './support/authSeed';
 import { overflow } from './support/corpBoard';
@@ -137,7 +137,7 @@ test.describe('Skyhook raids widget', () => {
 
     await page.keyboard.press('Escape');
     await expect(modal).toHaveCount(0);
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(PHONE);
     await widget.getByRole('button', { name: 'Efa II' }).click();
     await expect(page.getByRole('dialog', { name: 'Efa II' })).toContainText('Test Alliance');
     await page.screenshot({ path: testInfo.outputPath('modal-390.png') });

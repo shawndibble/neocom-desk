@@ -555,9 +555,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     return (
       <>
         {headerChrome}
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="page" label={t('common.loading')} />
       </>
     );
   }
@@ -567,9 +565,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     return (
       <>
         {headerChrome}
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="page" label={t('common.loading')} />
       </>
     );
   }
@@ -577,9 +573,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     return (
       <>
         {headerChrome}
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="page" label={t('common.loading')} />
       </>
     );
   }

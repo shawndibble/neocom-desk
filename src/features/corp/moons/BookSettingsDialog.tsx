@@ -39,6 +39,7 @@ import { ReclaimBookSection } from './ReclaimBookSection';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useCorpAccess } from '../useCorpAccess';
 import { loadCorporationDivisions } from '../wallet';
+import { utcDay } from '@/engine/localDay';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
@@ -169,7 +170,7 @@ export function BookSettingsDialog({
   const [rateRefinery, setRateRefinery] = useState('');
   const [rateOwner, setRateOwner] = useState('');
   const [ratePct, setRatePct] = useState('');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = utcDay();
   const [rateFrom, setRateFrom] = useState(today);
 
   const structures = useMemo(

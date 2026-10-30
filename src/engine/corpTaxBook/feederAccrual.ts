@@ -3,6 +3,7 @@ import { dayClosesAt } from './billable';
 import { isDayCovered, type CoveragePeriod } from './coverage';
 import { effectiveOwnerRate, type OwnerRateEntry } from './ownerRate';
 import type { ObservedMiningEntry } from './types';
+import { utcDay } from '@/engine/localDay';
 
 /**
  * What the Collector owes a feeder for ore mined at the feeder's refineries.
@@ -67,8 +68,6 @@ export function feederBillableRule(
   return (day) =>
     lastReadWellAt !== undefined && lastReadWellAt >= Date.parse(dayClosesAt(day, graceHours));
 }
-
-const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** What a feeder record holds of its rates and mode (the book's and the server's records fit). */
 export interface FeederRulesRecord {

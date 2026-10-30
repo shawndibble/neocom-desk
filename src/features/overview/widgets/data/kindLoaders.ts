@@ -28,6 +28,7 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { hasWalletScope, loadWalletJournalWithStatus } from '@/features/character/wallet';
 import type { SovRaidsWidgetData } from './sovRaidsLoader';
+import { DAY_MS } from '@/lib/age';
 
 export type { ClonesWidgetData } from '@/features/character/cloneVerdictLoad';
 export type { JumpTimersWidgetData } from '@/features/character/jumpTimers';
@@ -106,7 +107,7 @@ export async function loadNetWorthWidget(): Promise<NetWorthWidgetData> {
     characters: [...byCharacter.entries()].map(([characterId, list]) => {
       const sorted = list.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
       const latest = sorted[sorted.length - 1]!;
-      const since = new Date(Date.parse(latest.day) - (NET_WORTH_HISTORY_DAYS - 1) * 86_400_000)
+      const since = new Date(Date.parse(latest.day) - (NET_WORTH_HISTORY_DAYS - 1) * DAY_MS)
         .toISOString()
         .slice(0, 10);
       return {

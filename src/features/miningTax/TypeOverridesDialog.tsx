@@ -13,6 +13,7 @@
  * create/edit/delete manager, just the missing inverse of two actions.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { InlineError } from '@/components/ui/InlineError';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Modal, Spinner } from '@/components/ui';
@@ -127,11 +128,7 @@ export function TypeOverridesDialog({ open, onClose, onChanged }: TypeOverridesD
     >
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('miningTax.oreTagsHint')}</p>
-        {error && (
-          <p role="alert" className="text-xs text-danger">
-            {error}
-          </p>
-        )}
+        {error && <InlineError>{error}</InlineError>}
         {loading ? (
           <Spinner />
         ) : isEmpty ? (

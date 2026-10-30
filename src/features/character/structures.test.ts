@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
@@ -11,19 +11,14 @@ import {
   loadStructureNameNoRoster,
   readCachedStructureNames,
 } from './structures';
-import { seedCharacter as seedCharacterRow } from '@/test/seed';
+import { seedCharacter } from '@/test/seed';
 
 const CHARACTER_ID = 42;
 const OTHER_CHARACTER_ID = 43;
 const THIRD_CHARACTER_ID = 44;
 
-function seedCharacter(characterId: number, name = `char-${characterId}`): Promise<unknown> {
-  return seedCharacterRow(characterId, name, { ownerHash: 'oh', addedAt: 0 });
-}
+const server = mswServer();
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
@@ -31,10 +26,8 @@ beforeEach(async () => {
   resetRevalidationState();
 });
 afterEach(() => {
-  server.resetHandlers();
   configureEsi({ getToken: null });
 });
-afterAll(() => server.close());
 
 describe('loadStructureName', () => {
   it('fetches and caches the structure name under both the character and the shared roster row', async () => {

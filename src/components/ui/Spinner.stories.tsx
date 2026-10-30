@@ -30,3 +30,9 @@ export const Large: Story = { args: { size: 'lg', label: 'Loading plan' } };
  * one; a same-size silent placeholder keeps the space.
  */
 export const Delayed: Story = { args: { delayMs: 200 } };
+
+/** @summary Loading cue (§6c): `block="page"` centres the arc with `py-16` for a view waiting on its only content. */
+export const PageBlock: Story = { args: { block: 'page' } };
+
+/** @summary Loading cue (§6c): `block="panel"` is the tighter `py-8` row inside a card or modal. */
+export const PanelBlock: Story = { args: { block: 'panel' } };

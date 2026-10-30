@@ -15,6 +15,7 @@
  *
  * Every other type renders nothing here.
  */
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,8 +45,7 @@ import { useMutaplasmidLookup } from './mutaplasmidData';
 import { mutationFromRecord } from './dynamicItems';
 import type { DynamicItemState } from './useDynamicItem';
 
-const SECTION_HEADING =
-  'border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const SECTION_HEADING = `border-b border-line pb-1 ${eyebrowClassName}`;
 
 const PERCENT = createNumberFormat({
   maximumFractionDigits: 1,

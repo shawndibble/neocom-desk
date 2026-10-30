@@ -306,9 +306,7 @@ export function CorpTransactionsPanel({
       }
     >
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="panel" label={t('common.loading')} />
       ) : transactionsResult === null ? (
         // No cache and the read didn't come back — offline, or a 403 the role
         // gate swallowed, which corp views hide rather than lock.

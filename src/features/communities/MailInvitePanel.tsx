@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -198,11 +199,7 @@ export function MailInvitePanel({
           {t('communities.mailInvite.sentTo', { name: lastSent })}
         </p>
       )}
-      {problem && (
-        <p role="alert" className="text-xs text-danger">
-          {t(`communities.mailInvite.problem.${problem}`)}
-        </p>
-      )}
+      {problem && <InlineError>{t(`communities.mailInvite.problem.${problem}`)}</InlineError>}
       {sent.length > 0 && (
         <ul
           className="divide-y divide-line text-xs"

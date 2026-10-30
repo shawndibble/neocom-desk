@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { db } from '@/db';
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
@@ -1154,23 +1155,9 @@ describe('OpenOrdersPanel — Corporation source', () => {
 });
 
 describe('OpenOrdersPanel — phone', () => {
-  const original = window.matchMedia;
   beforeEach(() => {
     // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-  });
-  afterEach(() => {
-    window.matchMedia = original;
+    stubViewport(() => true);
   });
 
   it('renders two-line tap-to-open cards, not a table: item and badge, then what to do', async () => {

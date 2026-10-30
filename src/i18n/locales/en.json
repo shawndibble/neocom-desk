@@ -710,7 +710,6 @@
       "losses_other": "{{count}} losses",
       "lastSeen": "last seen {{age}}",
       "value": "~<isk/> ISK",
-      "open": "Open",
       "fitName": "{{hullName}} popular fit {{rank}}",
       "sourceLabel": "Popular fits source",
       "tabZkillboard": "zKillboard",
@@ -720,19 +719,16 @@
       "seenOnZkillboardLastSeen_one": "Seen on zKillboard: {{count}} recent loss · last seen {{age}}",
       "seenOnZkillboardLastSeen_other": "Seen on zKillboard: {{count}} recent losses · last seen {{age}}",
       "workbench": {
-        "source": "Source:",
         "loading": "Loading fits from EVE Workbench…",
         "failed": "Couldn't reach the EVE Workbench fit list right now. Everything else still works.",
         "empty": "Nobody has published a fit for this hull on EVE Workbench yet.",
         "unnamed": "Unnamed fit",
-        "created": "Created: {{age}}",
+        "created": "created {{age}}",
         "loadFailed": "Couldn't load this fit.",
-        "priceNote": "Prices: {{hub}}, your default Trade Hub",
-        "price": "≈ <isk/> ISK",
+        "price": "~<isk/> ISK",
         "pricePartial": "≥ <isk/> ISK",
         "unpriced_one": "{{count}} item has no sell order at {{hub}}",
         "unpriced_other": "{{count}} items have no sell order at {{hub}}",
-        "pricing": "Pricing fits at {{hub}}…",
         "outOfDate": {
           "checking": "Checking fits against today's game…",
           "allOutOfDate_one": "This hull's only EVE Workbench fit is out of date with today's game.",
@@ -798,6 +794,7 @@
         "ammo": "Ammo",
         "speed": "Max speed",
         "capacitor": "Capacitor",
+        "speedValue": "{{value}} m/s",
         "capStable": "Stable at {{pct}}%",
         "capDepletes": "Empty in {{time}}",
         "signature": "Signature",
@@ -1313,8 +1310,8 @@
       "worse": "worse",
       "spoken": "{{before}} to {{after}}",
       "capacitor": "Capacitor {{value}}",
-      "stable": "stable at {{pct}}%",
-      "depletes": "depletes in {{time}}"
+      "stable": "{{pct}}%",
+      "depletes": "{{time}}"
     },
     "makeItFit": {
       "fix": {
@@ -1379,7 +1376,8 @@
         "transfer": "Transfer more",
         "tackle": "Hold tighter",
         "ewar": "Stronger EWAR",
-        "command": "Stronger fleet support"
+        "command": "Stronger fleet support",
+        "explore": "Explore better"
       },
       "unavailable": {
         "noWeapons": "Nothing on this fit deals damage",
@@ -1392,7 +1390,8 @@
         "noCapTransfer": "No remote capacitor transmitters on this fit",
         "noTackle": "No warp scramblers, disruptors or webs on this fit",
         "noEwar": "No electronic warfare modules on this fit",
-        "noCommand": "No command bursts, compressors or industrial core on this fit"
+        "noCommand": "No command bursts, compressors or industrial core on this fit",
+        "noExplore": "No analyzers, probe launchers, scan arrays or survey scanners on this fit"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
@@ -1457,7 +1456,8 @@
         "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails.",
         "tackle": "No variation of a fitted scrambler, disruptor or web holds tighter within the guardrails.",
         "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails.",
-        "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails."
+        "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails.",
+        "explore": "No variation of a fitted analyzer, scan array or rig helps this fit explore better within the guardrails."
       },
       "belowPrice": "Your budget ({{budget}}) is below this fit's price ({{price}}). Raise it to search.",
       "closest": "Closest swaps",
@@ -1479,7 +1479,7 @@
       "reachHint": {
         "upgrade": "Turns a fitted module into a variation of itself.",
         "rebalance": "Also tries a different module doing the same job.",
-        "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
+        "rework": "Tries any module that helps this goal."
       },
       "cap": "Total budget (ISK)",
       "defenseLabel": "Defense Choice",
@@ -1501,6 +1501,68 @@
       "summaryNoCap": "no budget",
       "summaryCap": "budget {{cap}}",
       "includeRigs": "Rigs",
+      "summaryRigsOn": "rigs on",
+      "checkingMakeover": "Looking for a Makeover · {{checked}} of up to {{total}} calculations…",
+      "checkingRound": "Round {{round}} of up to {{max}} · checking {{checked}} of {{total}} swaps…",
+      "reworkNudge": {
+        "text": "Rework tries any module that can move this goal, over several rounds, and can return a Makeover.",
+        "button": "Search with Rework",
+        "time": "Rework usually takes 10 to 15 seconds."
+      },
+      "community": {
+        "hint": "{{group}} on {{percent}}% of {{job}} {{hull}} fits",
+        "caution": "Removes {{group}}, which {{percent}}% of {{job}} {{hull}} fits keep"
+      },
+      "job": {
+        "label": "Job",
+        "pve": "PvE",
+        "pvp": "PvP",
+        "explore": "Explore",
+        "spaceLabel": "Where it flies",
+        "space": {
+          "dangerous": "Dangerous (wormholes, busy null)",
+          "safe": "Safe space (highsec, quiet low and null)"
+        },
+        "spaceHint": {
+          "dangerous": "Tank stays.",
+          "safe": "Tank may go; each drop says what it gives up."
+        },
+        "spaceShort": { "dangerous": "dangerous", "safe": "safe" },
+        "summaryExplore": "Explore, {{space}}",
+        "noPropulsion": "No propulsion needed"
+      },
+      "makeover": {
+        "heading": "Makeover",
+        "whole_one": "Makeover · {{count}} change",
+        "whole_other": "Whole Makeover · {{count}} changes",
+        "partTicked_one": "Makeover, {{ticked}} of {{count}} change ticked",
+        "partTicked_other": "Makeover, {{ticked}} of {{count}} changes ticked",
+        "rounds_one": "Found in {{count}} round.",
+        "rounds_other": "Found in {{count}} rounds.",
+        "addsPropulsion": "{{job}}: adds propulsion",
+        "wholeFit": "The figures are the whole Makeover, recalculated as one fit.",
+        "figure": {
+          "dps": "Total DPS",
+          "ehp": "EHP",
+          "speed": "Speed",
+          "capacitor": "Capacitor",
+          "cpu": "CPU",
+          "powergrid": "Powergrid"
+        },
+        "speedValue": "{{value}} m/s",
+        "capStable": "{{pct}}%",
+        "capEmptyIn": "{{time}}",
+        "become_one": "{{name}} becomes",
+        "become_other": "{{count}}× {{name}} become",
+        "splitInto_one": "{{name}} becomes",
+        "splitInto_other": "{{count}}× {{name}} split into",
+        "fills": "Empty slots filled with",
+        "rowName_one": "{{name}}",
+        "rowName_other": "{{count}}× {{name}}",
+        "onItsOwn": "On its own {{gain}}",
+        "costs": "Costs",
+        "rigFullPrice": "(full price: the old rigs are destroyed)"
+      },
       "includeOfficer": "Officer and Deadspace modules",
       "fill_one": "Add {{to}}",
       "fill_other": "Add {{count}}× {{to}}",
@@ -1572,14 +1634,25 @@
       "activeTankLine": "Active tank {{before}} → {{after}} HP/s",
       "repairLine": "Repairs {{before}} → {{after}} HP/s",
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
-      "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
-      "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
       "command": {
         "strength": "Burst strength {{before}} → {{after}}",
         "burstRange": "Burst reach {{before}} → {{after}} km",
         "compression": "Compression {{before}} → {{after}} km",
         "fuel": "Core fuel {{before}} → {{after}} per cycle"
       },
+      "figure": {
+        "points": "Points {{before}} → {{after}}",
+        "web": "Web {{before}} → {{after}}%",
+        "reach": "Reach {{before}} → {{after}} km",
+        "moduleStrength": "Module strength {{before}} → {{after}}",
+        "hackingStrength": "Hacking strength {{before}} → {{after}}",
+        "coherence": "Coherence {{before}} → {{after}}",
+        "cycle": "Cycle {{before}} → {{after}} s",
+        "scanStrength": "Scan strength {{before}}% → {{after}}%",
+        "scanTimeCut": "Scan time cut {{before}}% → {{after}}%",
+        "deviationCut": "Deviation cut {{before}}% → {{after}}%"
+      },
+      "ewarNote": "{{figures}} (not the effect on a target)",
       "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
       "hold": {
         "cargo": "Cargo hold",
@@ -1631,6 +1704,12 @@
         "totalDps": "Total DPS {{value}}",
         "totalVolley": "Total volley {{value}}",
         "appliedDps": "Applied DPS {{value}}",
+        "hackingStrength": "Hacking strength {{value}}",
+        "virusCoherence": "Coherence {{value}}",
+        "hackingCycle": "Cycle {{value}} s",
+        "scanStrength": "Scan strength {{value}}%",
+        "scanTimeCut": "Scan time cut {{value}}%",
+        "deviationCut": "Deviation cut {{value}}%",
         "droneDps": "Drone DPS {{value}}",
         "droneBandwidthUsed": "Drone bandwidth used {{value}} Mbit/s",
         "droneBandwidthTotal": "Drone bandwidth total {{value}} Mbit/s",
@@ -12087,6 +12166,19 @@
       }
     },
     "appraisal": {
+      "live": {
+        "barLabel": "Live prices checked",
+        "checking": "Checking live prices {{done}} / {{total}}",
+        "done": "Live prices",
+        "partial": "Live prices for {{live}} of {{total}} rows",
+        "announceChecking": "Checking live prices",
+        "checkedAgo": "checked {{age}}",
+        "ageSeconds_one": "{{count}} s ago",
+        "ageSeconds_other": "{{count}} s ago",
+        "markCached": "Cached price, live price still loading",
+        "markFailed": "Fuzzwork price, live price could not be fetched"
+      },
+      "copyWaiting": "{{list}}: waiting for live prices",
       "copied_one": "{{list}} copied · {{count}} item",
       "copied_other": "{{list}} copied · {{count}} items",
       "copyList": {
@@ -12096,7 +12188,9 @@
         "multibuy": "Multibuy"
       },
       "openInJanice": "Open in Janice",
-      "pickHaulingShip": "Pick hauling ship",
+      "settingsShipTitle": "Hauling ship",
+      "settingsShipNone": "No ship set. Pick one to see how the list fits its hold.",
+      "settingsShipCurrent": "{{ship}}, {{capacity}}",
       "janiceFetching": "Fetching your Janice URL…",
       "janiceFailed": {
         "failed": "Janice didn't answer, so no tab was opened. Try again in a moment.",
@@ -12168,7 +12262,8 @@
       "columnVolume": "Volume (m³)",
       "columnIskPerM3": "ISK/m³",
       "columnSalesTax": "Sales tax",
-      "columnSellAfterTax": "Sell after tax",
+      "columnBrokerFee": "Broker fee",
+      "columnSellAfterFees": "Sell after fees",
       "removeRow": "Remove",
       "minusOwnedEverywhere": "any location",
       "minusOwnedUnknownStation": "Station #{{id}}",
@@ -12856,7 +12951,7 @@
   },
   "fittingShare": {
     "title": "Shared fitting",
-    "banner": "Shown at every skill level V, with no clone — log in to see this fit under your own pilot.",
+    "banner": "Shown with skill level V - login to see with your skills.",
     "invalidTitle": "This link isn't valid",
     "invalidHint": "The link may be corrupted, incomplete, or built by a newer version of Neocom Desk. Ask whoever sent it to share it again.",
     "loadFailedTitle": "Could not load this fitting",
@@ -13253,7 +13348,7 @@
           "settings": "These preferences. Every other preference stays on this device:",
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
-            "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
+            "defaults": "Defaults: trade hub (the default, and the trade hub of each character), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
@@ -13724,7 +13819,14 @@
       "full": "Unpick one first — the bar holds four.",
       "reset": "Use the default four"
     },
-    "tradeHubLabel": "Default trade hub",
+    "tradeHubLabel": "Default Trade Hub for new characters",
+    "tradeHubSingleLabel": "Trade Hub",
+    "tradeHubMultiNote": "Prices and trades at each character’s own hub. {{summary}}.",
+    "tradeHubSummaryPart": "{{count}} on {{hub}}",
+    "tradeHubPerCharacter": "Set per character",
+    "tradeHubHidePerCharacter": "Hide per character",
+    "tradeHubFor": "Trade Hub for {{name}}",
+    "tradeHubApplyAll": "Apply default to all",
     "courierCollateralLabel": "Flag courier collateral at",
     "courierCollateralHint": "Warns High collateral when a courier contract's collateral reaches this many times its reward.",
     "courierCollateralOption": "{{count}}× reward",
@@ -13732,7 +13834,7 @@
     "itemContractFlagHint": "Flags an item contract asking this many times the hub sell price on the Items board. A blueprint copy is flagged when it asks more than the original, whatever this says.",
     "itemContractFlagOption": "{{count}}× hub sell",
     "bpcMarketHubLabel": "Market hub",
-    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the Market default trade hub.",
+    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the active character’s Trade Hub in Settings › Market defaults.",
     "bpcHideAuctionsLabel": "Hide auctions",
     "bpcHidePlexLabel": "Hide PLEX contracts",
     "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens.",
@@ -15837,7 +15939,15 @@
       "removedMany_one": "Removed {{count}} item",
       "removedMany_other": "Removed {{count}} items",
       "legendListed": "Listed (coloured by status)",
-      "legendHangar": "In hangar, ready to list"
+      "legendHangar": "In hangar, ready to list",
+      "fill": "Fill"
+    },
+    "holders": {
+      "characters_one": "{{count}} character",
+      "characters_other": "{{count}} characters",
+      "listedBy": "Listed by",
+      "readyWith": "Ready to list with",
+      "listingHere": "Listing here:"
     },
     "share": {
       "copy": "Copy share link",

@@ -64,13 +64,14 @@ import {
   type EditableCollection,
   type SyncedCollectionName,
 } from './syncedCollections';
+import { HOUR_MS } from '@/lib/age';
 
 /**
  * Smallest gap between two `lastSyncedAt` heartbeat writes for one uid. Its
  * one reader, `functions/src/purgeStaleAccounts.ts`, purges after 90 days
  * without one, so a day's granularity costs it nothing.
  */
-export const HEARTBEAT_INTERVAL_MS = 24 * 3_600_000;
+export const HEARTBEAT_INTERVAL_MS = 24 * HOUR_MS;
 
 // ---------------------------------------------------------------------------
 // Sync status. Re-exported so the driver stays a single import site; the store

@@ -33,8 +33,7 @@ import {
 import { OVER_BUDGET_TONE, type Figure } from './statFigures';
 import type { SectionBuilder } from './useSectionBuilder';
 import { fmt0, fmt1 } from './fixedFormat';
-
-type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 const CAPACITOR_TONE_CLASS = {
   success: 'text-success',

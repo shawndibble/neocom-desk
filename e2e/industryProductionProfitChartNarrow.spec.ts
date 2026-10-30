@@ -14,11 +14,9 @@
  * threshold #764 reproduced the clip at.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
 
 const PLAN_ID = 'e2e-profit-plan-1';
 const RUN_ID_SMALL = 'e2e-profit-run-small';

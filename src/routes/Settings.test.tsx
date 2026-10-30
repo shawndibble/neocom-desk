@@ -26,6 +26,8 @@ import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
 import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
+import { stubViewport } from '@/test/viewport';
+import { MD_UP_QUERY } from '@/lib/useMediaQuery';
 import * as routeChunks from '@/app/routeChunks';
 import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
 import { assignLocation } from '@/app/navigation';
@@ -1467,7 +1469,7 @@ describe('Settings defaults', () => {
     // The point of the control: the key existed but was only reachable from
     // inside one panel of one page. `findBy`, because the panel withholds
     // every control until its stores have hydrated.
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toHaveTextContent(
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toHaveTextContent(
       /jita/i
     );
   });
@@ -1699,26 +1701,7 @@ describe('Reset saved view preferences', () => {
 describe('Settings — phone tab bar', () => {
   // `NARROW_QUERY` is `md`'s max-width form, so the suite's never-matching
   // `matchMedia` stub reads as a laptop; these tests need the phone.
-  function setViewport(narrow: boolean): void {
-    const real = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: narrow && media === NARROW_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    onTestFinished(() => {
-      window.matchMedia = real;
-    });
-  }
-
   it('is absent from Display at md and up, where there is no bottom bar', async () => {
-    setViewport(false);
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
@@ -1727,7 +1710,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it("writes the pilot's four, device-local and in the rail's order", async () => {
-    setViewport(true);
+    stubViewport(NARROW_QUERY);
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
@@ -1751,7 +1734,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('holds the old bar until a replacement is picked, so it is never short', async () => {
-    setViewport(true);
+    stubViewport(NARROW_QUERY);
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
@@ -1766,7 +1749,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('goes inert at four rather than guessing which tab a fifth pick replaces', async () => {
-    setViewport(true);
+    stubViewport(NARROW_QUERY);
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
@@ -1801,7 +1784,7 @@ describe('Settings — phone tab bar', () => {
       key: MOBILE_TABS_KEY,
       value: ['/mail', '/wallet', '/overview', '/assets'],
     });
-    setViewport(true);
+    stubViewport(NARROW_QUERY);
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
@@ -1860,7 +1843,7 @@ describe('Settings — sections rail', () => {
     render(<App />);
     await openTab(user, /^market$/i);
 
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toBeInTheDocument();
     expect(within(settingsNav()).getByRole('link', { name: /^market$/i })).toHaveAttribute(
       'aria-current',
       'page'
@@ -1891,24 +1874,9 @@ describe('Settings — sections rail', () => {
   });
 });
 
-/** `(min-width: 48rem)` matches (or not), as `md` up does. */
-function stubViewport(desktop: boolean) {
-  vi.stubGlobal(
-    'matchMedia',
-    (media: string) =>
-      ({
-        matches: desktop && media === '(min-width: 48rem)',
-        media,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      }) as unknown as MediaQueryList
-  );
-}
-
 describe('Settings — phone list', () => {
   it('lists the sections at /settings, with a one-line summary where there is one', async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     render(<App />);
 
     const nav = await screen.findByRole('navigation', { name: /settings sections/i });
@@ -1937,7 +1905,6 @@ describe('Settings — phone list', () => {
   it('counts the stored Avoided Systems on the Travel row', async () => {
     await db.settings.put({ key: AVOIDED_SYSTEMS_KEY, value: [30045328, 30002813] });
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     render(<App />);
 
     const nav = await screen.findByRole('navigation', { name: /settings sections/i });
@@ -1951,12 +1918,11 @@ describe('Settings — phone list', () => {
   it('opens a section from its row, and the back link returns to the list', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     render(<App />);
 
     const nav = await screen.findByRole('navigation', { name: /settings sections/i });
     await user.click(within(nav).getByRole('link', { name: /^market/i }));
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/settings/market');
 
     const back = screen
@@ -1973,7 +1939,6 @@ describe('Settings — phone list', () => {
 
   it('still lands an old #shortcuts link on Shortcuts rather than the list', async () => {
     window.history.pushState({}, '', '/settings#shortcuts');
-    stubViewport(false);
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
@@ -1982,7 +1947,7 @@ describe('Settings — phone list', () => {
 
   it('keeps redirecting /settings to Display from md up', async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(true);
+    stubViewport(MD_UP_QUERY);
     render(<App />);
 
     await waitFor(() => expect(window.location.pathname).toBe('/settings/display'));
@@ -2061,7 +2026,7 @@ describe('Settings — review follow-ups', () => {
     window.history.pushState({}, '', '/settings/market#constructor');
     render(<App />);
 
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/settings/market');
   });
 
@@ -2111,7 +2076,6 @@ describe('Settings — update state', () => {
 
   it('phone index: a waiting build highlights the row and Update now applies it', async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     serviceWorker(registration({ waiting: {} }));
     vi.mocked(forceUpdate).mockResolvedValue('failed');
     render(<App />);
@@ -2127,7 +2091,6 @@ describe('Settings — update state', () => {
 
   it('phone index: says the update is still rolling out when no new worker came yet', async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     serviceWorker(registration({ waiting: {} }));
     vi.mocked(forceUpdate).mockResolvedValue('pending');
     render(<App />);
@@ -2140,7 +2103,6 @@ describe('Settings — update state', () => {
 
   it('phone index: checking, then no updates', async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     let finish!: () => void;
     const reg = registration({ update: vi.fn(() => new Promise<void>((r) => (finish = r))) });
     serviceWorker(reg);
@@ -2154,7 +2116,6 @@ describe('Settings — update state', () => {
 
   it("phone index: says so when the check can't run", async () => {
     window.history.pushState({}, '', '/settings');
-    stubViewport(false);
     serviceWorker(registration({ update: vi.fn().mockRejectedValue(new Error('offline')) }));
     render(<App />);
     expect((await screen.findAllByText("Offline, couldn't check")).length).toBeGreaterThan(0);

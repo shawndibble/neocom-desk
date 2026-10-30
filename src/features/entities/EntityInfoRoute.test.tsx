@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useEffect } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 
 vi.mock('@/lib/zkillboard', async (importOriginal) => ({
@@ -22,9 +22,7 @@ import { usePlaceInfoModalStore } from '@/stores/placeInfoModal';
 import { EntityInfoRoute } from './EntityInfoRoute';
 import { CharacterLink, FactionLink, PlaceLink, SkillLink, SystemLink } from './EntityLink';
 
-const server = setupServer();
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
+const server = mswServer();
 beforeEach(async () => {
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
@@ -35,7 +33,6 @@ beforeEach(async () => {
     http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.json([]))
   );
 });
-afterEach(() => server.resetHandlers());
 
 const probe: { navigate: ReturnType<typeof useNavigate>; search: string; pathname: string } = {
   navigate: () => Promise.resolve(),

@@ -1,19 +1,12 @@
 // `GET /characters/{id}/notifications/` for the Alerts poller (issue #3756,
-// ADR 0020). Sends ESI's required identification headers (no email address),
-// the stored ETag, and classifies the response so the poller never has to read
-// a status code: 304 costs nothing, 403 is a dead grant, 420/429 stop the whole
+// ADR 0020). Sends `esiHeaders` (esiClient.ts) and the stored ETag, then
+// classifies the response so the poller never has to read a status code:
+// 304 costs nothing, 403 is a dead grant, 420/429 stop the whole
 // run (the error budget is shared by every user of the client id).
 
+import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { isRecord } from './guards.js';
 import type { EsiNotification } from './eveNotificationSelection.js';
-
-export const ESI_BASE = 'https://esi.evetech.net/latest';
-export const ESI_COMPATIBILITY_DATE = '2026-08-01';
-export const ESI_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
-
-/** Stop polling for this run when fewer than this many errors remain in ESI's window. */
-const ERROR_LIMIT_FLOOR = 20;
-/** Stop polling for this run when the rate-limit group has this few tokens left. */
-const RATELIMIT_REMAINING_FLOOR = 2;
 
 export type NotificationsResult =
   | {
@@ -27,29 +20,8 @@ export type NotificationsResult =
   | { kind: 'backoff'; retryAfterMs: number | null }
   | { kind: 'error'; status: number };
 
-function numberHeader(headers: Headers, name: string): number | null {
-  const raw = headers.get(name);
-  if (raw === null || raw.trim() === '') return null;
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
-}
-
-/** True when ESI's own headers say the next call risks the shared budget. */
-export function isBudgetLow(headers: Headers): boolean {
-  const remaining = numberHeader(headers, 'X-Ratelimit-Remaining');
-  if (remaining !== null && remaining <= RATELIMIT_REMAINING_FLOOR) return true;
-  const errorsLeft = numberHeader(headers, 'X-ESI-Error-Limit-Remain');
-  return errorsLeft !== null && errorsLeft < ERROR_LIMIT_FLOOR;
-}
-
-export function retryAfterMs(headers: Headers): number | null {
-  const seconds = numberHeader(headers, 'Retry-After');
-  return seconds === null ? null : Math.max(0, seconds) * 1000;
-}
-
-function isNotification(value: unknown): value is EsiNotification {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
+function isNotification(v: unknown): v is EsiNotification {
+  if (!isRecord(v)) return false;
   return (
     typeof v.notification_id === 'number' &&
     typeof v.type === 'string' &&
@@ -65,14 +37,7 @@ export async function fetchNotifications(
   fetchImpl: typeof fetch = fetch
 ): Promise<NotificationsResult> {
   const res = await fetchImpl(`${ESI_BASE}/characters/${characterId}/notifications/`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'User-Agent': ESI_USER_AGENT,
-      'X-User-Agent': ESI_USER_AGENT,
-      'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-      Accept: 'application/json',
-      ...(etag ? { 'If-None-Match': etag } : {}),
-    },
+    headers: { ...esiHeaders(accessToken), ...(etag ? { 'If-None-Match': etag } : {}) },
     signal: AbortSignal.timeout(15_000),
   });
 

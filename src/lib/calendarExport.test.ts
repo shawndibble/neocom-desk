@@ -62,3 +62,23 @@ describe('googleCalendarUrl', () => {
     expect(new URL(url).searchParams.has('details')).toBe(false);
   });
 });
+
+describe('buildIcsFile line folding', () => {
+  const octets = (line: string) => new TextEncoder().encode(line).length;
+
+  it('folds content lines longer than 75 octets and unfolds back to the original', () => {
+    const description = 'Bring T2 fits and a spare logi. '.repeat(10).trim();
+    const ics = buildIcsFile({ ...EVENT, description });
+    const lines = ics.split('\r\n');
+    expect(lines.every((l) => octets(l) <= 75)).toBe(true);
+    const unfolded = ics.replace(/\r\n /g, '');
+    expect(unfolded).toContain(`DESCRIPTION:${description}`);
+  });
+
+  it('never splits a multibyte character across a fold', () => {
+    const description = 'Ünïcödé ✓ '.repeat(20);
+    const ics = buildIcsFile({ ...EVENT, description });
+    expect(ics.split('\r\n').every((l) => octets(l) <= 75)).toBe(true);
+    expect(ics.replace(/\r\n /g, '')).toContain(`DESCRIPTION:${description}`);
+  });
+});

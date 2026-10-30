@@ -24,12 +24,9 @@
  * objection.
  */
 import type { Locator, Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { expectNoPageOverflow } from './support/overflow';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /** Roots the variation group, and is itself included in the compared set (owner decision #2). */
 const ITEM = '1MN Afterburner I';

@@ -2,6 +2,7 @@ import type { SrpBackendOverride } from '@/features/corp/srpBackendOverride';
 import type { SrpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
 import type { DoctrineFit, SrpOfficerVerdict, SrpSettings } from '@/features/corp/srpTypes';
 import { SAMPLE_ACTIVE_CHARACTER } from './sampleData';
+import { DAY_MS } from '@/lib/age';
 
 export type SrpFixtureRole = 'director' | 'accountant' | 'ceo-not-owner';
 
@@ -49,7 +50,7 @@ export function sampleDoctrineFits(): DoctrineFit[] {
         rigs: [31055, 31059],
       },
       createdBy: by,
-      createdAt: NOW - 3 * 86_400_000,
+      createdAt: NOW - 3 * DAY_MS,
     },
     {
       id: 'd-hurricane-armour',
@@ -61,7 +62,7 @@ export function sampleDoctrineFits(): DoctrineFit[] {
         rigs: [31055, 31055],
       },
       createdBy: by,
-      createdAt: NOW - 2 * 86_400_000,
+      createdAt: NOW - 2 * DAY_MS,
     },
     {
       id: 'd-cerberus',
@@ -73,7 +74,7 @@ export function sampleDoctrineFits(): DoctrineFit[] {
         rigs: [31796],
       },
       createdBy: by,
-      createdAt: NOW - 86_400_000,
+      createdAt: NOW - DAY_MS,
     },
   ];
 }
@@ -118,7 +119,7 @@ export function createSrpFixture(
     canManage: true,
     srpEnabled: settings?.enabled === true,
     settingsExist: settings !== null,
-    expiresAt: NOW + 86_400_000,
+    expiresAt: NOW + DAY_MS,
   });
   return {
     verify: verdict,

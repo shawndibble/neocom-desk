@@ -594,9 +594,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       {tabBar}
       <TabPanel tabsId={tabsId} tabId="overview" className="space-y-4">
         {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
+          <Spinner block="page" label={t('common.loading')} />
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : (
@@ -735,9 +733,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                 <Suspense
                   fallback={
                     <Panel padded>
-                      <div className="flex justify-center py-8">
-                        <Spinner label={t('common.loading')} />
-                      </div>
+                      <Spinner block="panel" label={t('common.loading')} />
                     </Panel>
                   }
                 >

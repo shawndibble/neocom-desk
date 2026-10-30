@@ -13,6 +13,8 @@ const ALLOWED = new Set<string>([
   // wider gap left for a follow-up ticket.
   'src/features/miningTax/OverviewTab.tsx',
   'src/features/miningTax/TaxTab.tsx',
+  // Attention rows were part of TaxTab before it was split; same scope as above.
+  'src/features/miningTax/useTaxAttentionItems.tsx',
   'src/features/miningTax/useTaxColumns.tsx',
 ]);
 

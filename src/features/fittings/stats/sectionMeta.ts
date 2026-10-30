@@ -1,8 +1,7 @@
 import type { FittingStats } from '@/engine/fittings/types';
 import { kmValue } from '../rangeText';
 import { fmt1 } from './fixedFormat';
-
-type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** Support out's headline: remote repair handed out, else how many modules reach another ship. */
 export function supportMeta(s: FittingStats, t: Translate): string {

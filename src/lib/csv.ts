@@ -1,3 +1,4 @@
+import type { Translate } from './translate';
 import { formatDateTime, guardFormula, toCell, type ExportValue } from './exportCells';
 
 /**
@@ -11,7 +12,7 @@ import { formatDateTime, guardFormula, toCell, type ExportValue } from './export
  * structurally rather than as i18next's `TFunction` so a test can pass
  * `(k) => k` and pin key names without constructing a real translator.
  */
-export type CsvTranslate = (key: string, options?: Record<string, unknown>) => string;
+export type CsvTranslate = Translate;
 
 export interface CsvColumn<T> {
   header: string;

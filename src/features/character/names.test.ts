@@ -1,19 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { resolveCategories, resolveNames } from './names';
 import { deferred } from '@/test/deferred';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
 });
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 
 describe('resolveNames', () => {
   it('POSTs unique ids and caches each resolved name under the global sentinel', async () => {

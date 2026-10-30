@@ -6,15 +6,12 @@
  * "fitting" basis. Pulled out as its own pure-ish function, rather than
  * copied into the route, so it has its own unit test.
  */
-import { decodeFittingShare } from '@/engine/fittings/fittingShare';
+import { decodeFittingShare, type ShareDecodeError } from '@/engine/fittings/fittingShare';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { loadTypes, loadSkills } from '@/sde/loadSde';
 import { withCheckedMutations } from '@/features/abyssal/mutaplasmidData';
-
-/** Matches `decodeFittingShare`'s own `DecodeFittingShareResult['reason']`, which isn't exported on its own. */
-export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
 export type ResolveFittingShareViewResult =
   { ok: true; fitting: Fitting; profile: PilotProfile } | { ok: false; reason: ShareDecodeError };

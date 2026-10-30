@@ -12,6 +12,7 @@ import { characterPortraitUrl } from '@/lib/eveImages';
 import { installFixtureFetch, type FixtureRoute } from './fixtureFetch';
 import { walletFixtureRoutes } from './esiFixtureRoutes';
 import { SAMPLE_ACTIVE_CHARACTER, SAMPLE_CHARACTERS, samplePortraitDataUri } from './sampleData';
+import { HOUR_MS } from '@/lib/age';
 
 /** Scopes the sample Characters hold: enough for the wallet pages, nothing that makes the shell poll more. */
 const SAMPLE_SCOPES = ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'];
@@ -69,7 +70,7 @@ async function seedSampleAccount(
       characterId,
       accessToken: 'sample-access-token',
       refreshToken: 'sample-refresh-token',
-      expiresAt: Date.now() + 3_600_000,
+      expiresAt: Date.now() + HOUR_MS,
       scopes: [...scopes],
     }))
   );

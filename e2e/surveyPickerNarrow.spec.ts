@@ -9,10 +9,8 @@
  * `appraisalSharedNarrow.spec.ts`).
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-
-const PHONE = { width: 390, height: 844 };
 
 const IDS = ['abc123XYZ', 'def456UVW'];
 const ORE = 'Dark Ochre Of Extraordinary Lengt';

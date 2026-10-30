@@ -225,5 +225,3 @@ export type ChartModel =
   | SurveyChartModel
   | OmegaChartModel
   | LinesChartModel;
-
-export type ChartKind = ChartModel['kind'];

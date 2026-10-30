@@ -21,12 +21,13 @@ import {
   setStaleBuildRecovery,
   staleBuildRecoveryOutcome,
 } from './staleBuildState';
+import { MINUTE_MS } from '@/lib/age';
 
 export { isRecoveringFromStaleBuild, staleBuildRecoveryOutcome };
 
 const RELOAD_KEY = 'neocom:stale-build-purge-at';
 /** One purge per window, so an unreachable chunk (offline) cannot loop. */
-const PURGE_WINDOW_MS = 60_000;
+const PURGE_WINDOW_MS = MINUTE_MS;
 const STEP_TIMEOUT_MS = 3000;
 /** How long the pre-purge network probe may take before the recovery is abandoned. */
 const PROBE_TIMEOUT_MS = 5000;

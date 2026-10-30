@@ -1,4 +1,5 @@
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
+import { HOUR_MS } from '@/lib/age';
 
 /** Sample moon owner rows for stories; all names invented. */
 export const NAMES: Record<number, string> = {
@@ -10,7 +11,7 @@ export const NAMES: Record<number, string> = {
   6: 'Brinewater Guild',
 };
 export const NOW = Date.UTC(2026, 9, 20, 12);
-const synced = new Date(NOW - 2 * 3_600_000).toISOString();
+const synced = new Date(NOW - 2 * HOUR_MS).toISOString();
 
 const row = (over: Partial<MoonOwnerRow> & Pick<MoonOwnerRow, 'corporationId'>): MoonOwnerRow => ({
   id: String(over.corporationId),

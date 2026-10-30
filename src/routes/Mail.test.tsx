@@ -15,6 +15,7 @@ import { resetMailRefreshThrottle } from '@/features/character/mailAll';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { stubViewport } from '@/test/viewport';
 
 /**
  * jsdom's `matchMedia` stub (`vitest.setup.dom.ts`) never matches, which
@@ -22,24 +23,8 @@ import * as routeChunks from '@/app/routeChunks';
  * acceptance criteria (issue #2104) are asserted at desktop widths (1024px
  * and 1440px both satisfy `min-width: 64rem`), so force that here.
  */
-let restoreMatchMedia: (() => void) | undefined;
-
 function useDesktopViewport(): void {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === DESKTOP_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  restoreMatchMedia = () => {
-    window.matchMedia = real;
-  };
+  stubViewport(DESKTOP_QUERY);
 }
 
 // These tests are about the page, not the rich editor: its lazy chunk (Tiptap) is slow to load cold.
@@ -151,8 +136,6 @@ beforeAll(async () => {
 afterAll(() => server.close());
 afterEach(() => {
   server.resetHandlers();
-  restoreMatchMedia?.();
-  restoreMatchMedia = undefined;
   vi.useRealTimers();
 });
 async function seed() {

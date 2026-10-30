@@ -22,11 +22,6 @@ function loadPlaceIndex(): Promise<PlaceIndex | null> {
   return cached;
 }
 
-/** Test-only: drops the memoized index so tests can swap the snapshot between cases. */
-export function clearPlaceIndexCache(): void {
-  cached = null;
-}
-
 /** The place index, read once `enabled`. Shared by the compose picker and the distance filter. */
 export function usePlaceIndex(enabled = true): PlaceIndexState {
   const [state, setState] = useState<PlaceIndexState>({ status: 'loading' });

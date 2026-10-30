@@ -40,6 +40,8 @@ vi.mock('./stockTargetsData', () => ({
       oldestFetchedAt: null,
       groups: new Map(),
       place: { name: 'Efa VI - Corp Market', kind: 'structure', systemName: 'Efa', security: 0.4 },
+      characterNames: new Map(),
+      sellers: [],
     };
   }),
   loadStockMarkets: vi.fn(async (lists: StockList[]) => ({

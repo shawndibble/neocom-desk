@@ -11,7 +11,7 @@
  */
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import { computeFittingStats, fittingSkillSources, type StatsOptions } from './dogmaFittingEngine';
-import { ABORTED, sendToWorker } from './fittingWorker';
+import { ABORTED, sendToWorker, type WorkerSend } from './fittingWorker';
 import type { WorkerReply } from './hullFit.worker';
 import { yieldToEventLoop } from './yieldToEventLoop';
 
@@ -35,16 +35,17 @@ async function onPage<T>(signal: AbortSignal | undefined, run: () => Promise<T>)
   return run();
 }
 
-/** `fitting`'s stats under `pilot`, `damageProfile` and `options`. */
+/** `fitting`'s stats under `pilot`, `damageProfile` and `options`; `send` is a search's own worker pool. */
 export async function computeStatsOffThread(
   fitting: Fitting,
   pilot: PilotProfile,
   damageProfile: DamageProfile | undefined,
   options: StatsOptions,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  send: WorkerSend = sendToWorker
 ): Promise<FittingStats> {
   const reply = await viaWorker(
-    sendToWorker(
+    send(
       (id) => ({
         kind: 'stats',
         id,

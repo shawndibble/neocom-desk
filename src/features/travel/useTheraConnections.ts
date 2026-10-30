@@ -18,6 +18,7 @@ import {
 } from '@/lib/eveScout';
 import { useTicker } from '@/lib/ticker';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
+import { MINUTE_MS } from '@/lib/age';
 
 export type TheraConnectionsState =
   | { kind: 'loading' }
@@ -37,7 +38,7 @@ export type TheraConnectionsState =
     };
 
 /** Remaining life counts down in minutes, so the clock ticks once a minute. */
-const TICK_MS = 60_000;
+const TICK_MS = MINUTE_MS;
 
 const NO_SYSTEMS: ReadonlyMap<number, { security: number }> = new Map();
 

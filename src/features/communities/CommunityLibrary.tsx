@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { bpcSourcingCommunityHref } from '@/features/bpcContracts/bpcSourcingUrl';
@@ -338,11 +339,7 @@ export function CommunityLibrary({
   );
 
   if (membersFailed || (failed && !loaded)) {
-    return (
-      <p role="alert" className="text-xs text-danger">
-        {t('communities.library.loadFailed')}
-      </p>
-    );
+    return <InlineError>{t('communities.library.loadFailed')}</InlineError>;
   }
   if (!members || !loaded) return <Spinner size="sm" label={t('communities.loading')} />;
 

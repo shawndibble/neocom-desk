@@ -8,6 +8,7 @@
 import type { AppliedDpsInputs } from './appliedDps';
 import type { CapacitorBudget } from './tank';
 import type { SupportStats } from './support';
+import type { ExploreStats } from './explore';
 import type { MiningStats } from './mining';
 import type { FleetSupportStats } from './fleetSupport';
 
@@ -161,8 +162,6 @@ export interface ProjectedEffects {
   buffs: { id: number; value: number }[];
   effects: { typeId: number; effectId: number; attributes: Record<number, number> }[];
 }
-
-export const NO_PROJECTED_EFFECTS: ProjectedEffects = { buffs: [], effects: [] };
 
 export type CapacitorStatus =
   { stable: true; stablePercentage: number } | { stable: false; depletesInSeconds: number };
@@ -363,6 +362,8 @@ export interface FittingStats {
   support: SupportStats;
   /** Yield of the running miners and launched mining drones (`mining.ts`). */
   mining: MiningStats;
+  /** Hacking and scanning modules' figures (`explore.ts`). */
+  explore: ExploreStats;
   /** What the running bursts and industrial core give the fleet (`fleetSupport.ts`). */
   fleetSupport: FleetSupportStats;
   fighters: FighterStats;

@@ -64,6 +64,7 @@ import {
   StockListNameDialog,
 } from './StockListDialogs';
 import { StockBuilderView } from './StockBuilderView';
+import { ListingHereLine } from './StockHolders';
 import { StockManagerTable } from './StockManagerTable';
 import {
   loadListedAtMarket,
@@ -282,6 +283,11 @@ export function StockMarketPage({
   const nameOf = (typeId: number) =>
     data?.names.get(typeId) ?? t('common.unknownType', { id: typeId });
   const place = data?.place ?? null;
+  // With one Character the holder is always them: naming them says nothing.
+  const characterName =
+    data && data.characterNames.size > 1
+      ? (id: number) => data.characterNames.get(id) ?? `#${id}`
+      : undefined;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -309,6 +315,9 @@ export function StockMarketPage({
               {place.systemName && ` · ${place.systemName}`}
               {place.security !== null && <SecurityStatus security={place.security} />}
             </p>
+          )}
+          {characterName && data && (
+            <ListingHereLine characterIds={data.sellers} nameOf={characterName} />
           )}
         </div>
         <Button variant="primary" onClick={() => setDialog('add')}>
@@ -515,6 +524,7 @@ export function StockMarketPage({
                   rows={filteredRows}
                   nameOf={nameOf}
                   groupOf={groupOf}
+                  characterName={characterName}
                   onSetTarget={(typeId, target) =>
                     onSave(setStockTarget(lists, list.id, typeId, target))
                   }

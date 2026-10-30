@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -21,15 +21,12 @@ vi.mock('virtual:pwa-register/react', () => ({
 // surfaces. None of them is what these tests are about, so every ESI call
 // answers 500 — the routing decision has to hold with the network unavailable,
 // which is also the state a returning user's first frame is in.
-const server = setupServer(
+mswServer(
   http.get('https://esi.evetech.net/*', () =>
     HttpResponse.json({ error: 'offline' }, { status: 500 })
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();

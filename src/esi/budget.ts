@@ -101,6 +101,7 @@ import {
   type Release,
 } from '@/lib/concurrency';
 import { EsiBudgetError, type ThrottleStatus, type BudgetRefusal } from './errors';
+import { MINUTE_MS } from '@/lib/age';
 
 /**
  * Requests in flight to ESI across the whole app. Deliberately a little above
@@ -155,13 +156,13 @@ export const MAX_REQUEST_SPACING_MS = 2000;
 export const MAX_BUDGET_WAIT_MS = 5000;
 
 /** How long a 420 shuts the door for when it names no reset of its own. */
-export const DEFAULT_ERROR_WINDOW_MS = 60_000;
+export const DEFAULT_ERROR_WINDOW_MS = MINUTE_MS;
 
 /** How long a 429 shuts the door for when it names neither Retry-After nor a rate reset. */
 const DEFAULT_RATE_WINDOW_MS = 1000;
 
 /** Ceiling on a server-named reset, so one absurd header cannot wedge the app for a day. */
-export const MAX_CIRCUIT_MS = 5 * 60_000;
+export const MAX_CIRCUIT_MS = 5 * MINUTE_MS;
 
 export type { ThrottleStatus, BudgetRefusal } from './errors';
 export { EsiBudgetError } from './errors';

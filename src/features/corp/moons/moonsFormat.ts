@@ -3,6 +3,7 @@ import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { MONTHS } from '@/engine/corpTaxBook/monthNames';
 import { extractionWindowDays } from '@/engine/corpTaxBook/extractionWindow';
 import type { TFunction } from 'i18next';
+import { utcDay } from '@/engine/localDay';
 
 export const isk = (value: number) => formatIsk(Math.round(value));
 
@@ -57,7 +58,7 @@ export function periodLabel(start: string, end: string): string {
 
 export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+  return utcDay(Date.UTC(y, m - 1, d + days));
 }
 
 export function newId(prefix: string): string {

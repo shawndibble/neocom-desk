@@ -42,6 +42,7 @@ import type {
   VariationData,
 } from '@/sde/marketTypes';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
+import { stubViewport } from '@/test/viewport';
 
 // Rifter (typeId 587, the market TYPES fixture below) has a blueprint;
 // Tritanium (typeId 34) doesn't — exercises the item context menu's Build
@@ -2152,37 +2153,20 @@ describe('Market Browser narrow-screen layout (issue #4)', () => {
 
   it('keeps the desktop two-column layout unchanged, with no back control', async () => {
     server.use(ordersHandler({ count: 0 }));
-    const original = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
+    stubViewport(() => true);
 
-    try {
-      const user = userEvent.setup();
-      render(<App />);
+    const user = userEvent.setup();
+    render(<App />);
 
-      const searchBox = await screen.findByRole('searchbox');
-      const finderPanel = searchBox.closest('section');
-      await user.type(searchBox, 'rift');
-      await user.click(await screen.findByText('Rifter'));
+    const searchBox = await screen.findByRole('searchbox');
+    const finderPanel = searchBox.closest('section');
+    await user.type(searchBox, 'rift');
+    await user.click(await screen.findByText('Rifter'));
 
-      expect(finderPanel).not.toHaveClass('hidden');
-      const itemPanel = screen
-        .getByRole('heading', { name: 'Rifter', level: 2 })
-        .closest('section');
-      expect(itemPanel).not.toHaveClass('hidden');
-      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    } finally {
-      window.matchMedia = original;
-    }
+    expect(finderPanel).not.toHaveClass('hidden');
+    const itemPanel = screen.getByRole('heading', { name: 'Rifter', level: 2 }).closest('section');
+    expect(itemPanel).not.toHaveClass('hidden');
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 });
 

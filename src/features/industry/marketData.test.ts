@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { db } from '@/db';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
 import { ESI_BASE_URL } from '@/esi/client';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
@@ -9,16 +9,13 @@ import { clearMarketPriceCache } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketSnapshot, loadMarketSnapshots, clearCostIndexCache } from './marketData';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => server.use(...fallbackSourcesDown));
 afterEach(() => {
-  server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
 });
-afterAll(() => server.close());
 
 function fuzzworkHandler() {
   return http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {

@@ -269,9 +269,7 @@ function CorpDivisionsPanel({
       }
     >
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="panel" label={t('common.loading')} />
       ) : !walletsResult || divisions.length === 0 ? (
         <EmptyState title={t('wallet.corpBalanceEmpty')} className="py-4" />
       ) : (
@@ -393,9 +391,7 @@ function CorpJournalPanel({
       }
     >
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Spinner label={t('common.loading')} />
-        </div>
+        <Spinner block="panel" label={t('common.loading')} />
       ) : journalResult === null ? (
         // No cache and the read didn't come back — offline, or a 403 the role
         // gate swallowed (GLOSSARY.md's `/corp/assets` split, same axis here).

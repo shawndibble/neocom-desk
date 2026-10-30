@@ -21,12 +21,9 @@
  * `display: table-row` as a table and a block/flex card once `.dt-stacked`'s
  * stylesheet rule applies, which is what the phone assertion reads.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /**
  * Layout coordinates are fractional, and a device pixel ratio of 1 still

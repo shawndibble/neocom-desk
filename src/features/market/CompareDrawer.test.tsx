@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -49,7 +49,7 @@ const REGION_ID = 10000002;
 const ITEM_A = { typeId: 34, itemName: 'Tritanium' };
 const ITEM_B = { typeId: 35, itemName: 'Pyerite' };
 
-const server = setupServer(
+mswServer(
   http.get(`${ESI_BASE_URL}/markets/${REGION_ID}/orders`, ({ request }) => {
     const typeId = new URL(request.url).searchParams.get('type_id');
     const orders =
@@ -99,10 +99,7 @@ const server = setupServer(
   )
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
 afterEach(async () => {
-  server.resetHandlers();
   vi.clearAllMocks();
   await db.esiCache.clear();
 });

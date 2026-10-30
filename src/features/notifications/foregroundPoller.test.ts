@@ -10,6 +10,13 @@ vi.mock('@/features/character/typeNames', () => ({
     return new Map([...names].filter(([id]) => typeIds.includes(id)));
   }),
 }));
+// `universeTypeName` (industry/colony copy) goes through `loadUniverseType`,
+// which would otherwise attempt a real SDE fetch and an ESI fall-through; the
+// failed network round trips made the first firing test slow enough to flake.
+vi.mock('@/features/skills/data', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/skills/data')>()),
+  loadUniverseType: vi.fn(async () => null),
+}));
 import type {
   IndustryJob,
   MailHeader,

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { stubViewport } from '@/test/viewport';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -7,6 +8,7 @@ import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 import { db, type PlanBooster, type SkillPlanRecord } from '@/db';
+import { seedGrant } from '@/test/seed';
 import type { CachedResult } from '@/features/skills/data';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -257,25 +259,10 @@ function sectionFor(title: string): HTMLElement {
   return section as HTMLElement;
 }
 
-/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, then restores it. */
+/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, which lasts to the end of the test. */
 function withDesktopViewport(body: () => void) {
-  const realMatchMedia = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: true,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  try {
-    body();
-  } finally {
-    window.matchMedia = realMatchMedia;
-  }
+  stubViewport(() => true);
+  body();
 }
 describe('PlanEditor tools pane', () => {
   let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
@@ -1609,16 +1596,6 @@ describe('PlanEditor what-if implants', () => {
 describe('PlanEditor Character details assumption note (issue #1526)', () => {
   const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
 
-  async function seedGrant(scopes: readonly string[]): Promise<void> {
-    await db.tokens.put({
-      characterId: 1,
-      accessToken: 'access',
-      refreshToken: 'refresh',
-      expiresAt: Date.now() + 60_000,
-      scopes: [...scopes],
-    });
-  }
-
   beforeEach(() => {
     useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   });
@@ -1628,14 +1605,14 @@ describe('PlanEditor Character details assumption note (issue #1526)', () => {
   });
 
   it('shows the note when reading Current implants without the Character details scope', async () => {
-    await seedGrant([]);
+    await seedGrant(1, []);
     renderEditor(vi.fn(), { implants: FITTED });
 
     expect(await screen.findByText('Assumes no implants')).toBeInTheDocument();
   });
 
   it('hides the note once Character details is granted', async () => {
-    await seedGrant([IMPLANTS_SCOPE]);
+    await seedGrant(1, [IMPLANTS_SCOPE]);
     renderEditor(vi.fn(), { implants: FITTED });
 
     await waitFor(() => {
@@ -1644,7 +1621,7 @@ describe('PlanEditor Character details assumption note (issue #1526)', () => {
   });
 
   it('hides the note under What-If None — a deliberate choice, not a permission gap', async () => {
-    await seedGrant([]);
+    await seedGrant(1, []);
     const user = userEvent.setup();
     renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);

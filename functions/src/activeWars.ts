@@ -19,6 +19,8 @@
  * Alerts feed still catches a new declaration.
  */
 
+import { isFiniteNumber, isRecord } from './guards.js';
+
 /** How far back (in war ids, about 26 a day) the sweep looks for a war that is still open. */
 export const ACTIVE_WARS_HORIZON_IDS = 12_000;
 
@@ -55,12 +57,7 @@ export interface SweepState {
   floorId?: number;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-const num = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+const num = (value: unknown): number | undefined => (isFiniteNumber(value) ? value : undefined);
 
 function time(value: unknown): number | undefined {
   if (typeof value !== 'string') return undefined;

@@ -1,11 +1,11 @@
 import { fixed1 } from '@/lib/fixedFormat';
+import type { Translate } from '@/lib/translate';
 
 /**
  * How the stats column reads a distance, and a weapon's or module's reach:
  * the way the game's HUD tooltip says it, so a pilot sees the numbers they
  * already know from space.
  */
-type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** Metres as km to one decimal — the number alone, for a label to place. */
 export function kmValue(metres: number): string {

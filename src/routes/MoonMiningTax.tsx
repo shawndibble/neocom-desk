@@ -56,11 +56,7 @@ export function MoonMiningTax() {
   const tabsId = useTabsId();
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
@@ -77,13 +73,7 @@ export function MoonMiningTax() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        }
-      >
+      <Suspense fallback={<Spinner block="page" label={t('common.loading')} />}>
         {tab === 'overview' && <OverviewTab tabBar={tabBar} tabsId={tabsId} />}
         {tab === 'tax' && <TaxTab tabBar={tabBar} tabsId={tabsId} />}
         {tab === 'survey' && <SurveyTab tabBar={tabBar} tabsId={tabsId} />}

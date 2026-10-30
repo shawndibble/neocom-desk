@@ -4,6 +4,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { stubViewport } from '@/test/viewport';
 import { FilterBar } from './FilterBar';
 import { FilterChip } from './FilterChip';
 
@@ -13,12 +14,6 @@ interface Filter {
 
 const overlayEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.['__neocomOverlay'];
-
-/** jsdom's `matchMedia` never matches; the bottom sheet needs the narrow query to. */
-const realMatchMedia = window.matchMedia;
-afterEach(() => {
-  window.matchMedia = realMatchMedia;
-});
 
 function Harness() {
   const [filter, setFilter] = useState<Filter>({ unreadOnly: false });
@@ -39,17 +34,8 @@ function Harness() {
 }
 
 async function openSheet() {
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
+  // jsdom's `matchMedia` never matches; the bottom sheet needs the narrow query to.
+  stubViewport(NARROW_QUERY);
   const user = userEvent.setup();
   render(<Harness />);
   await user.click(screen.getByRole('button', { name: 'Filters' }));

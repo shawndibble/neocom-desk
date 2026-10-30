@@ -12,6 +12,7 @@ import {
 import { moonOwnerMailRecipients } from '@/engine/corpTaxBook/ownerRateMail';
 import { enqueueRateChangeMail } from '@/features/corpTaxBook/mailQueue';
 import { queueOfficerMail } from '@/features/corpTaxBook/officerMail';
+import { utcDay } from '@/engine/localDay';
 
 /** The change the agreed rate `pct` makes today, or undefined when the effective rate does not move. */
 export function agreedRateChange(
@@ -19,7 +20,7 @@ export function agreedRateChange(
   pct: number,
   now: Date
 ): OwnerRateChange | undefined {
-  const date = now.toISOString().slice(0, 10);
+  const date = utcDay(now.getTime());
   const after: OwnerRateEntry[] = [
     ...before,
     { kind: 'agreed', pct, effectiveFrom: date, recordedAt: now.toISOString() },

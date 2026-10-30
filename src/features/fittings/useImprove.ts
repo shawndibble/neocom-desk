@@ -24,7 +24,6 @@ import {
   type ImproveHold,
   type ImproveReach,
   type ImproveResult,
-  type ModulePool,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import {
@@ -32,7 +31,10 @@ import {
   HULL_ROLES,
   hullRoleOf,
   type GoalsByRole,
+  type HullRole,
   type HullRef,
+  type JobsByRole,
+  type SpacesByRole,
 } from '@/engine/fittings/improveRole';
 import {
   bestCrystalKey,
@@ -42,6 +44,26 @@ import {
   minerWithoutCrystal,
   unloadedMiners,
 } from '@/engine/fittings/improveMining';
+import {
+  DEFAULT_EXPLORE_SPACE,
+  DEFAULT_IMPROVE_JOB,
+  EXPLORE_SPACES,
+  IMPROVE_JOBS,
+  effectiveSpace,
+  jobSettingOf,
+  type ExploreSpace,
+  type ImproveJob,
+} from '@/engine/fittings/improveJob';
+import { targetShareOf, type JobCommonality } from '@/engine/fittings/hullCommonality';
+import { communityHintsOf, type CommunityHints } from './improveCommonHints';
+import { loadHullCommonality } from './hullCommonalityLoad';
+import {
+  makeoverMovesFor,
+  makeoverPropulsionFor,
+  runMakeoverPhase,
+  type MakeoverResult,
+} from './improveMakeoverPhase';
+import { modulePool } from './improveModulePool';
 import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
@@ -52,10 +74,12 @@ import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/t
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { loadFittingPrice } from './fittingPrice';
+import { createWorkerPool, searchPoolSize, type WorkerPool } from './fittingWorker';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
@@ -119,6 +143,67 @@ export const useImproveReach = createLocalSetting<ImproveReach>({
       : 'upgrade',
 });
 
+/** The Improve Job (PvE, PvP, Explore), remembered on this device like Reach; never part of the Fitting. */
+export const useImproveJob = createLocalSetting<ImproveJob>({
+  key: 'fittingsImproveJob',
+  defaultValue: DEFAULT_IMPROVE_JOB,
+  parse: (raw) =>
+    typeof raw === 'string' && (IMPROVE_JOBS as readonly string[]).includes(raw)
+      ? (raw as ImproveJob)
+      : DEFAULT_IMPROVE_JOB,
+});
+
+/** The last Improve Job per hull role, remembered on this device; the single `fittingsImproveJob` row only seeds a role (`rememberedJob`). */
+export const useImproveJobByRole = createLocalSetting<JobsByRole>({
+  key: 'fittingsImproveJobByRole',
+  defaultValue: {},
+  parse: (raw) => keepByRole(raw, IMPROVE_JOBS),
+});
+
+/** The last Explore space per hull role, remembered on this device; the single `fittingsImproveSpace` row only seeds a role. */
+export const useImproveSpaceByRole = createLocalSetting<SpacesByRole>({
+  key: 'fittingsImproveSpaceByRole',
+  defaultValue: {},
+  parse: (raw) => keepByRole(raw, EXPLORE_SPACES),
+});
+
+/** The entries of a stored role map whose role and value are both known; null for anything not a map. */
+function keepByRole<V extends string>(
+  raw: unknown,
+  allowed: readonly V[]
+): Partial<Record<HullRole, V>> | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const values = raw as Record<string, unknown>;
+  const kept: Partial<Record<HullRole, V>> = {};
+  for (const role of HULL_ROLES) {
+    const value = values[role];
+    if (typeof value === 'string' && (allowed as readonly string[]).includes(value))
+      kept[role] = value as V;
+  }
+  return kept;
+}
+
+/** Where an Explore fit flies (Safe or Dangerous), remembered on this device. */
+export const useImproveSpace = createLocalSetting<ExploreSpace>({
+  key: 'fittingsImproveSpace',
+  defaultValue: DEFAULT_EXPLORE_SPACE,
+  parse: (raw) =>
+    typeof raw === 'string' && (EXPLORE_SPACES as readonly string[]).includes(raw)
+      ? (raw as ExploreSpace)
+      : DEFAULT_EXPLORE_SPACE,
+});
+
+/**
+ * Whether rigs are searched: on until the pilot unticks it. The old drawer kept
+ * the tick for the session only and defaulted it off, so no stored row says "off"
+ * by default; this key is new and holds a value only once the pilot has chosen it.
+ */
+export const useImproveRigs = createLocalSetting<boolean>({
+  key: 'fittingsImproveRigs',
+  defaultValue: true,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
+});
+
 /** How Improve orders each section's rows, remembered on this device. */
 export const useImproveSort = createLocalSetting<ImproveSort>({
   key: 'fittingsImproveSort',
@@ -127,6 +212,16 @@ export const useImproveSort = createLocalSetting<ImproveSort>({
     typeof raw === 'string' && (IMPROVE_SORTS as readonly string[]).includes(raw)
       ? (raw as ImproveSort)
       : 'gain',
+});
+
+/**
+ * PvE needs a propulsion module, and a Makeover adds one when the fit has none; this opts out
+ * (a bastioned Marauder never moves). Off until the pilot ticks it, remembered on this device (#5578).
+ */
+export const useImproveNoPropulsion = createLocalSetting<boolean>({
+  key: 'fittingsImproveNoPropulsion',
+  defaultValue: false,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
 });
 
 /** The ore Mine more scores, as its crystal family; remembered on this device. */
@@ -158,6 +253,29 @@ export const useImproveBudget = createLocalSetting<number | null>({
   parse: parseCap,
 });
 
+/**
+ * Reads every remembered Improve setting back from this device; true once all
+ * have settled. Nothing else hydrates them, so without it each starts at its
+ * default after a reload and the stored row is never read.
+ */
+export function useImproveSettingsHydrated(): boolean {
+  return useHydratedStore(
+    useImproveGoal,
+    useImproveGoalByRole,
+    useImproveReach,
+    useImproveJob,
+    useImproveJobByRole,
+    useImproveSpace,
+    useImproveSpaceByRole,
+    useImproveRigs,
+    useImproveNoPropulsion,
+    useImproveSort,
+    useImproveOre,
+    useImproveHold,
+    useImproveBudget
+  );
+}
+
 /** Rows of the removed Refitting mode, dropped on the next start. */
 const RETIRED_KEYS = ['fittingsImproveMode', 'fittingsImproveRefitCap'];
 
@@ -184,6 +302,11 @@ export async function migrateSpendCap(): Promise<void> {
 
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
+  job: ImproveJob;
+  /** Explore only. */
+  space: ExploreSpace;
+  /** PvE only: no propulsion module is needed, so a Makeover adds none. */
+  noPropulsion: boolean;
   reach: ImproveReach;
   iskBudget: number | null;
   defense: DefenseChoice;
@@ -200,7 +323,14 @@ export const BEST_SO_FAR_AFTER_MS = 10_000;
 
 export type ImproveState =
   | { status: 'idle' }
-  | { status: 'searching'; checked: number; total: number; slow: boolean }
+  | {
+      status: 'searching';
+      checked: number;
+      total: number;
+      slow: boolean;
+      /** The Makeover search is running (after the single swaps): `checked` and `total` count its calculations. */
+      makeover?: boolean;
+    }
   | { status: 'cancelled' }
   /** The fit is over a budget: Improve hands over to Make it fit and searches nothing. */
   | { status: 'overBudget'; resources: Resource[] }
@@ -214,6 +344,10 @@ export type ImproveState =
       /** What the fit costs now at the hub, for the selection summary; null when not loaded. */
       fitTotal: number | null;
       elapsedMs: number;
+      /** Rework's whole-fit rework, when it beat the best single swap; its rows as options, ready to tick. */
+      makeover?: MakeoverResult;
+      /** What the hull's community fits say for the Job searched (#5581); absent: none loaded. Shown as hints, never scored. */
+      hints?: CommunityHints;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
       /** With `sides`: the options on neither side (Damage Control, hull), shown as "Either". */
@@ -251,42 +385,22 @@ export interface CompletionPool {
   priceOf: (typeId: number) => number | null;
 }
 
-/** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
-function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluator): ModulePool {
-  const listed = new Set(catalogue.marketTypes.map((entry) => entry.typeId));
-  const flyable = new Map<string, boolean>();
-  const skilled = new Map<string, boolean>();
-  return {
-    groupOf: (typeId) => catalogue.types[String(typeId)]?.groupID,
-    typeIdsInGroup: (groupId) => catalogue.typeIdsByGroup.get(groupId) ?? [],
-    published: (typeId) => listed.has(typeId),
-    // A fitted module the pilot lacks skills for is replaced; its hull fit is not asked again.
-    pilotCanFly: (slot, typeId) => {
-      const key = `${slot}:${typeId}`;
-      let ok = skilled.get(key);
-      if (ok === undefined) {
-        const check = variants.engine
-          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
-          .get(typeId);
-        ok = check ? check.canFly : true;
-        skilled.set(key, ok);
-      }
-      return ok;
-    },
-    // A candidate the pilot lacks skills for goes under Train instead.
-    flyable: (slot, typeId) => {
-      const key = `${slot}:${typeId}`;
-      let ok = flyable.get(key);
-      if (ok === undefined) {
-        const check = variants.engine
-          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
-          .get(typeId);
-        ok = check ? check.fitsHull && check.canFly : true;
-        flyable.set(key, ok);
-      }
-      return ok;
-    },
-  };
+/** Combat drones (Hobgoblin, Hammerhead, Ogre and the like); salvage, mining and EWAR drones are other groups. */
+const COMBAT_DRONE_GROUP = 100;
+
+/** Explore's space for the search: Safe still holds the tank of a fit that carries combat drones (it expects combat sites). Other jobs: as chosen. */
+function searchSpace(
+  job: ImproveJob,
+  space: ExploreSpace,
+  fitting: Fitting | undefined,
+  catalogue: FittingCatalogue | null
+): ExploreSpace {
+  if (job !== 'explore') return space;
+  const combat = (fitting?.drones ?? []).some(
+    (drone) =>
+      drone.quantity > 0 && catalogue?.types[String(drone.typeId)]?.groupID === COMBAT_DRONE_GROUP
+  );
+  return effectiveSpace(space, combat);
 }
 
 /** The candidates for one side of the search, the hull takes and the pilot can fly. */
@@ -295,7 +409,8 @@ function searchCandidates(
   catalogue: FittingCatalogue,
   goal: ImproveGoal,
   config: ImproveConfig,
-  slotCounts: FittingStats['slotCounts']
+  slotCounts: FittingStats['slotCounts'],
+  commonality: JobCommonality | null
 ): ImproveCandidate[] {
   const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
   return improveCandidates(variants.fitting.modules, index, catalogue.rackOf, {
@@ -304,6 +419,12 @@ function searchCandidates(
     defense: config.defense,
     includeRigs: config.includeRigs,
     includeOfficer: config.includeOfficer,
+    jobSetting: jobSettingOf(
+      config.job,
+      searchSpace(config.job, config.space, variants.fitting, catalogue),
+      config.noPropulsion
+    ),
+    commonality,
     slotCounts,
     pool: modulePool(catalogue, variants),
   });
@@ -438,9 +559,26 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
+  // The search's own workers: started with the first search, ended when the drawer closes.
+  const poolRef = useRef<WorkerPool | null>(null);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  const { reach, iskBudget, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
+  const {
+    job,
+    space,
+    noPropulsion,
+    reach,
+    iskBudget,
+    defense,
+    includeRigs,
+    includeOfficer,
+    oreFamily,
+    hold,
+  } = config;
+  const jobSetting = useMemo(
+    () => jobSettingOf(job, searchSpace(job, space, variants?.fitting, catalogue), noPropulsion),
+    [job, space, noPropulsion, variants?.fitting, catalogue]
+  );
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
     hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
@@ -451,6 +589,15 @@ export function useImprove(
         : undefined,
     [hullTypeId, hullGroupId]
   );
+
+  const closePool = useCallback(() => {
+    poolRef.current?.close();
+    poolRef.current = null;
+  }, []);
+  useEffect(() => {
+    if (!enabled) closePool();
+  }, [enabled, closePool]);
+  useEffect(() => closePool, [closePool]);
 
   useEffect(() => {
     if (!enabled || !variants || !catalogue) return;
@@ -488,6 +635,12 @@ export function useImprove(
         }
         // A remembered goal this fit cannot score (Longer reach on a drone boat) searches the role's default.
         const searched = searchableGoal(goal, own, hull);
+        // What the hull's community fits say for this Job; null (no fits, a failed load) leaves the search as it is.
+        const commonality =
+          (await loadHullCommonality(variants.fitting.shipTypeId, catalogue.types))?.[job] ?? null;
+        if (cancelled) return;
+        const groupOfType = (typeId: number) => catalogue.types[String(typeId)]?.groupID;
+        const targetShare = targetShareOf(commonality, groupOfType);
         // A tank goal under Shield or Armor runs both sides, the chosen one first, to compare them.
         const sides: DefenseChoice[] =
           defense !== 'keep' && reach !== 'upgrade' && TANK_GOALS.has(searched)
@@ -500,6 +653,9 @@ export function useImprove(
             catalogue,
             searched,
             {
+              job,
+              space,
+              noPropulsion,
               reach,
               iskBudget,
               defense: side,
@@ -508,7 +664,8 @@ export function useImprove(
               oreFamily,
               hold,
             },
-            own.slotCounts
+            own.slotCounts,
+            commonality
           ),
         }));
         const total = sets.reduce((sum, set) => sum + set.candidates.length, 0);
@@ -517,6 +674,27 @@ export function useImprove(
         );
         const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
         const candidates = sets.flatMap((set) => set.candidates);
+        // The Makeover is Rework's: it follows the single swaps, and the Cheaper goal has none. One search, for the chosen Defense side.
+        const wantMakeover = reach === 'rework' && searched !== 'cheaper';
+        const makeoverOptions = {
+          goal: searched,
+          defense: sets[0].side,
+          includeRigs,
+          jobSetting,
+          commonality,
+          slotCounts: own.slotCounts,
+        };
+        const movesFor = wantMakeover
+          ? makeoverMovesFor(variants, catalogue, makeoverOptions)
+          : null;
+        // The propulsion the Job needs is a forced first step of the Makeover (#5578).
+        const propulsion = wantMakeover
+          ? makeoverPropulsionFor(variants, catalogue, makeoverOptions)
+          : null;
+        const makeoverStart = [
+          ...(movesFor ? movesFor(variants.fitting) : []),
+          ...(propulsion?.tiers(variants.fitting).flat() ?? []),
+        ];
         const compensation = compensationSwaps(
           variants,
           catalogue,
@@ -525,6 +703,7 @@ export function useImprove(
         const typeIds = [
           ...new Set([
             ...candidateTypeIds(candidates),
+            ...candidateTypeIds(makeoverStart),
             ...compensation.flatMap((swap) => [swap.fromTypeId, swap.toTypeId]),
           ]),
         ];
@@ -562,13 +741,15 @@ export function useImprove(
         }
         if (searched !== 'mining' && charges.length > 0)
           scoredBefore = (await variants.compare(load(variants.fitting), controller.signal)).after;
+        const workers = (poolRef.current ??= createWorkerPool(searchPoolSize()));
         const stats = async (fitting: Fitting) => {
-          const { after } = await variants.compare(load(fitting), controller.signal);
+          const { after } = await variants.compare(load(fitting), controller.signal, workers.send);
           // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
           if (plan && minerWithoutCrystal(after.mining.rows, plan.crystalFor))
             throw new Error('A miner takes no crystal of this ore');
           return after;
         };
+        const priceOf = (typeId: number) => priceMap?.get(typeId)?.sellMin ?? null;
         const results: ImproveResult[] = [];
         let done = 0;
         for (const set of sets) {
@@ -579,7 +760,10 @@ export function useImprove(
             hold: effectiveHold(own.holds, hold),
             candidates: set.candidates,
             stats,
-            priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
+            concurrency: workers.size,
+            jobSetting,
+            ...(targetShare ? { targetShare } : {}),
+            priceOf,
             ...(target ? { target } : {}),
             iskBudget,
             fitTotal,
@@ -625,6 +809,43 @@ export function useImprove(
                 [sets[1].side]: sided[1],
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
+        // The Makeover: only after the single swaps ran to the end ("Show best so far" skips it), and only if it beats the best of them.
+        let makeover: MakeoverResult | undefined;
+        let makeoverStopped = false;
+        if (movesFor && !stopRef.current && results.length > 0) {
+          const search = await runMakeoverPhase({
+            variants,
+            catalogue,
+            moves: movesFor,
+            before: scoredBefore,
+            goal: searched,
+            stats,
+            priceOf,
+            target,
+            hold: effectiveHold(own.holds, hold),
+            jobSetting,
+            propulsion,
+            ...(targetShare ? { targetShare } : {}),
+            iskBudget,
+            fitTotal,
+            listed,
+            concurrency: workers.size,
+            onProgress: (checked, total) => {
+              if (!cancelled)
+                setState((current) =>
+                  current.status === 'searching'
+                    ? { ...current, checked, total, makeover: true }
+                    : current
+                );
+            },
+            isCancelled: () => cancelled,
+            shouldStop: () => stopRef.current,
+          });
+          if (cancelled || search === null) return;
+          // Only the pilot's "Show best so far" reads as stopped; the Makeover's own calculation cap is its normal end.
+          makeoverStopped = search.stopped && stopRef.current;
+          makeover = search.makeover ?? undefined;
+        }
         setRecalc(() => stats);
         let pool: Promise<CompletionPool> | null = null;
         setCompletion(
@@ -646,7 +867,24 @@ export function useImprove(
         );
         setState({
           status: 'done',
-          result: { ...listed, checked },
+          result: {
+            ...listed,
+            checked,
+            stopped: listed.stopped || makeoverStopped,
+          },
+          ...(makeover ? { makeover } : {}),
+          ...(commonality
+            ? {
+                hints: communityHintsOf(
+                  commonality,
+                  job,
+                  catalogue,
+                  variants.fitting.shipTypeId,
+                  variants.fitting.modules,
+                  makeover?.makeover.rows ?? []
+                ),
+              }
+            : {}),
           before: scoredBefore,
           ...(plan
             ? {
@@ -689,6 +927,10 @@ export function useImprove(
     includeOfficer,
     oreFamily,
     hold,
+    job,
+    space,
+    noPropulsion,
+    jobSetting,
     chargePlanKey,
   ]);
 

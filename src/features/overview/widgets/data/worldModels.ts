@@ -26,14 +26,8 @@ import { fractionBar, signedCell } from './cellKit';
 import { backwardBucketSums } from './chartSeries';
 import { profitBuckets, type SourceProfit } from './profitCombine';
 import { dayTitle, rollingTitles, signTone } from './chartTips';
-import type {
-  NumberModel,
-  NumberSecondary,
-  TableCell,
-  TableColumn,
-  TableModel,
-  Translate,
-} from './types';
+import type { NumberModel, NumberSecondary, TableCell, TableColumn, TableModel } from './types';
+import type { Translate } from '@/lib/translate';
 import { industry } from './industryModels';
 import { mercenaryDens } from './mercenaryDensModels';
 import { planetary } from './planetaryModels';

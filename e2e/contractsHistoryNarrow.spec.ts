@@ -7,12 +7,11 @@
  * the button now takes the touch tier below `md` and reverts to its one-line
  * height from `md` up. jsdom lays nothing out, so only a real render can pin it.
  */
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
 
-const PHONE = { width: 390, height: 844 };
 const TOUCH_TARGET_PX = 36;
 
 const DAY_MS = 24 * 60 * 60 * 1000;

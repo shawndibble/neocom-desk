@@ -206,9 +206,7 @@ export function AssetsList({
   })();
 
   return loading && !data ? (
-    <div className="flex justify-center py-16">
-      <Spinner label={t('common.loading')} />
-    </div>
+    <Spinner block="page" label={t('common.loading')} />
   ) : assetsNeedsReauth && !assetsResult ? (
     // A lapsed grant with nothing saved: the full banner. With a saved
     // copy the items stay and a small note sits above them.

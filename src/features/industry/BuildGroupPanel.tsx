@@ -14,6 +14,7 @@
  * question this view cannot answer and must not appear to.
  */
 import { useMemo, useState } from 'react';
+import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, IconButton, LiveStatus, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -285,9 +286,7 @@ export function BuildGroupPanel({
           is about the clipboard, not about which list, and it is a sentence
           long — it would not fit on any of the controls that can raise it. */}
       {copyState?.status === 'failed' && (
-        <p role="alert" className="text-xs text-danger">
-          {t('industry.copyShoppingListFailed')}
-        </p>
+        <InlineError>{t('industry.copyShoppingListFailed')}</InlineError>
       )}
 
       {/* A mixture is a shopping trip with two stops, not a dead end (issue

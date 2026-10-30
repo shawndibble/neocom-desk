@@ -11,6 +11,7 @@ import type {
   MarketOrder,
   WalletJournalEntry,
 } from '@/esi/endpoints';
+import { HOUR_MS, DAY_MS } from '@/lib/age';
 
 export interface SampleCharacter {
   characterId: number;
@@ -43,9 +44,6 @@ export const SAMPLE_REGION_ID = 10000002;
 
 export const SAMPLE_WALLET_BALANCE = 1_284_390_551.17;
 
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
-
 /** ISO timestamp `ms` before `now`, the way ESI formats dates (no fractional seconds). */
 export function sampleDate(ms: number, now = Date.now()): string {
   return new Date(now - ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -55,51 +53,51 @@ export function sampleDate(ms: number, now = Date.now()): string {
 export function sampleWalletJournal(now = Date.now()): WalletJournalEntry[] {
   const lines: Array<Omit<WalletJournalEntry, 'id' | 'date' | 'balance'> & { ago: number }> = [
     {
-      ago: 2 * HOUR,
+      ago: 2 * HOUR_MS,
       ref_type: 'market_transaction',
       description: 'Market: Kestrel Vane bought 40 x Tritanium from Orsa Tellemar',
       amount: -412_000,
     },
     {
-      ago: 5 * HOUR,
+      ago: 5 * HOUR_MS,
       ref_type: 'bounty_prizes',
       description: 'Bounty prizes for killing pirates in Hek',
       amount: 18_450_000,
       tax: 2_050_000,
     },
     {
-      ago: 9 * HOUR,
+      ago: 9 * HOUR_MS,
       ref_type: 'industry_job_tax',
       description: 'Industry job tax',
       amount: -1_212_345.5,
     },
     {
-      ago: 1 * DAY,
+      ago: 1 * DAY_MS,
       ref_type: 'market_escrow',
       description: 'Escrow for buy order',
       amount: -96_800_000,
     },
     {
-      ago: 1 * DAY + 4 * HOUR,
+      ago: 1 * DAY_MS + 4 * HOUR_MS,
       ref_type: 'player_donation',
       description: 'Orsa Tellemar donated cash to Kestrel Vane',
       amount: 250_000_000,
       reason: 'Fuel run split',
     },
     {
-      ago: 2 * DAY,
+      ago: 2 * DAY_MS,
       ref_type: 'brokers_fee',
       description: 'Broker fee for order #6120945871',
       amount: -1_904_212.4,
     },
     {
-      ago: 3 * DAY,
+      ago: 3 * DAY_MS,
       ref_type: 'contract_reward',
       description: 'Courier contract reward',
       amount: 42_000_000,
     },
     {
-      ago: 4 * DAY,
+      ago: 4 * DAY_MS,
       ref_type: 'planetary_import_tax',
       description: 'Planetary import tax',
       amount: -310_520.75,
@@ -141,7 +139,7 @@ export function sampleMarketOrders(now = Date.now()): MarketOrder[] {
       price: 4.12,
       volume_remain: 18_000_000,
       volume_total: 25_000_000,
-      issued: sampleDate(1 * DAY, now),
+      issued: sampleDate(1 * DAY_MS, now),
       duration: 90,
       range: 'region',
       min_volume: 1,
@@ -156,7 +154,7 @@ export function sampleMarketOrders(now = Date.now()): MarketOrder[] {
       price: 34_900_000,
       volume_remain: 3,
       volume_total: 5,
-      issued: sampleDate(6 * DAY, now),
+      issued: sampleDate(6 * DAY_MS, now),
       duration: 90,
       range: 'region',
     },
@@ -195,8 +193,8 @@ export function sampleIndustryJobs(now = Date.now()): IndustryJob[] {
       facility_id: 1_035_466_617_946,
       station_id: 1_035_466_617_946,
       runs: 10,
-      start_date: sampleDate(5 * HOUR, now),
-      end_date: new Date(now + 7 * HOUR).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      start_date: sampleDate(5 * HOUR_MS, now),
+      end_date: new Date(now + 7 * HOUR_MS).toISOString().replace(/\.\d{3}Z$/, 'Z'),
       status: 'active',
       cost: 1_240_500,
       licensed_runs: 10,

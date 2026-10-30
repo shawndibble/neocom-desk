@@ -633,6 +633,32 @@ describe('rankImproveOptions', () => {
   });
 });
 
+describe('rankImproveOptions with hull commonality (#5581)', () => {
+  const option = (score: number, iskDelta: number | null, toTypeId: number) =>
+    ({ score, iskDelta, candidate: candidate(1, toTypeId) }) as unknown as ImproveOption;
+  // Targets 2 and 3 are in a group on most fits; 4 is in a rare one.
+  const share = (c: ImproveCandidate) => (c.toTypeId === 4 ? 0.1 : 0.9);
+
+  it('puts the more common target group first within 1%, and a clear leader stays first', () => {
+    const near = rankImproveOptions([option(0.1005, 100, 4), option(0.1, 100, 2)], share);
+    expect(toIds(near)).toEqual([2, 4]);
+    const clear = rankImproveOptions([option(0.12, 100, 4), option(0.1, 100, 2)], share);
+    expect(toIds(clear)).toEqual([4, 2]);
+  });
+
+  it('never orders variants of one group by popularity, and without data is today’s order', () => {
+    const same = rankImproveOptions([option(0.1005, 100, 2), option(0.1, 100, 3)], share);
+    expect(toIds(same)).toEqual([2, 3]);
+    const list = [option(0.1005, 100, 4), option(0.1, 100, 2)];
+    expect(toIds(rankImproveOptions(list))).toEqual([4, 2]);
+  });
+
+  it('keeps an unpriced swap after every priced one', () => {
+    const ranked = rankImproveOptions([option(0.1, null, 2), option(0.1, 100, 4)], share);
+    expect(toIds(ranked)).toEqual([4, 2]);
+  });
+});
+
 describe('goalAvailability', () => {
   it('disables damage and reach on a fit that fires nothing, with a reason', () => {
     const unarmed = { ...stats([]), offense: { ...stats([]).offense, dps: 0, sustainedDps: 0 } };
@@ -674,6 +700,87 @@ describe('improveCandidates', () => {
       { slot: 'low', slotIndex: 0 },
       { slot: 'low', slotIndex: 1 },
     ]);
+  });
+});
+
+describe('improveCandidates Rework budget', () => {
+  const members = (base: number, n: number) => Array.from({ length: n }, (_, i) => base + i);
+  // Group id -> its members; every member sits in one rack.
+  const groups: Record<number, number[]> = {
+    213: members(1000, 8), // Tracking Computer
+    212: members(1100, 8), // Sensor Booster
+    46: members(1200, 8), // Propulsion
+    77: members(1300, 4), // Shield Hardener
+    59: members(2000, 30), // Gyrostabilizer
+    302: members(2100, 30), // Magnetic Field Stabilizer
+    60: members(2200, 3), // Damage Control
+  };
+  const rackOf: Record<string, string> = {};
+  for (const id of [...groups[213], ...groups[212], ...groups[46], ...groups[77]])
+    rackOf[id] = 'medium';
+  for (const id of [...groups[59], ...groups[302], ...groups[60]]) rackOf[id] = 'low';
+  const groupOf = new Map<number, number>();
+  for (const [g, ids] of Object.entries(groups)) for (const id of ids) groupOf.set(id, Number(g));
+  const pool = {
+    groupOf: (id: number) => groupOf.get(id),
+    typeIdsInGroup: (g: number) => groups[g] ?? [],
+    published: () => true,
+  };
+  const index = buildVariationIndex({}, {});
+  const opts = { goal: 'overall', reach: 'rework', defense: 'keep', pool } as const;
+  const at = (slot: 'medium' | 'low', typeIds: number[]) =>
+    typeIds.map((typeId, slotIndex) => ({ slot, slotIndex, typeId, state: 'online' as const }));
+
+  it('offers a tank group listed after many damage, reach and speed members', () => {
+    const modules = at('medium', [groups[213][0]]);
+    const targets = improveCandidates(modules, index, rackOf, opts).map((c) => c.toTypeId);
+    expect(targets.some((id) => groups[77].includes(id))).toBe(true);
+  });
+
+  describe('with hull commonality (#5581)', () => {
+    // Group 999 is in no goal's table groups; the community fits add it.
+    it('adds the community groups after every candidate it makes without them', () => {
+      groups[999] = [3000, 3001, 3002];
+      for (const id of groups[999]) {
+        groupOf.set(id, 999);
+        rackOf[id] = 'medium';
+      }
+      const modules = at('medium', [groups[213][0]]);
+      const base = improveCandidates(modules, index, rackOf, opts);
+      const common = {
+        fits: 20,
+        groupShare: new Map([[999, 0.4]]),
+        propulsion: { afterburner: 0, mwd: 0, mjd: 0 },
+      };
+      const withData = improveCandidates(modules, index, rackOf, { ...opts, commonality: common });
+      expect(withData.slice(0, base.length)).toEqual(base);
+      expect(withData.slice(base.length).map((c) => c.toTypeId)).toEqual([3000, 3001, 3002]);
+      const noData = improveCandidates(modules, index, rackOf, { ...opts, commonality: null });
+      expect(noData).toEqual(base);
+      delete groups[999];
+    });
+  });
+
+  it('offers a Damage Control to a low-slot non-tank module', () => {
+    const modules = at('low', [groups[59][0]]);
+    const targets = improveCandidates(modules, index, rackOf, opts).map((c) => c.toTypeId);
+    expect(targets.some((id) => groups[60].includes(id))).toBe(true);
+  });
+
+  it('prefers the members nearest the fitted module’s meta group', () => {
+    const typed = buildVariationIndex(
+      {
+        [groups[213][0]]: { parentTypeId: null, metaGroupId: 2 },
+        [groups[212][0]]: { parentTypeId: null, metaGroupId: 4 },
+        [groups[212][1]]: { parentTypeId: null, metaGroupId: 2 },
+      },
+      {}
+    );
+    const targets = improveCandidates(at('medium', [groups[213][0]]), typed, rackOf, {
+      ...opts,
+      limit: 100,
+    }).map((c) => c.toTypeId);
+    expect(targets.indexOf(groups[212][1])).toBeLessThan(targets.indexOf(groups[212][0]));
   });
 });
 
@@ -732,5 +839,77 @@ describe('overIskBudget', () => {
 
   it('still charges the implants of an unpriced change', () => {
     expect(overIskBudget(1000, 900, null, 150)).toBe(true);
+  });
+});
+
+describe('findImprovements concurrency', () => {
+  const table = { 2: { dps: 10 }, 3: { dps: 30 }, 4: { dps: 20 }, 5: { dps: 5 }, 6: { dps: 15 } };
+  const candidates = [2, 3, 4, 5, 6].map((to) => candidate(1, to));
+
+  /** Answers later swaps first: the calculation of the swap to type 2 finishes last. */
+  const outOfOrder = (inFlight: { now: number; max: number }) => async (f: Fitting) => {
+    const typeId = f.modules[0].typeId;
+    inFlight.now++;
+    inFlight.max = Math.max(inFlight.max, inFlight.now);
+    await new Promise((resolve) => setTimeout(resolve, (7 - typeId) * 3));
+    inFlight.now--;
+    return calc(table)(f);
+  };
+
+  const run = async (
+    stat: (f: Fitting) => Promise<FittingStats>,
+    extra: { concurrency?: number; isCancelled?: () => boolean; onProgress?: () => void } = {}
+  ) => {
+    const base = fit([1]);
+    return findImprovements({
+      fitting: base,
+      before: await calc(table)(base),
+      goal: 'damage',
+      candidates,
+      stats: stat,
+      priceOf: () => null,
+      ...extra,
+    });
+  };
+
+  it('returns the serial result when calculations finish out of order', async () => {
+    const serial = await run(calc(table));
+    const inFlight = { now: 0, max: 0 };
+    const parallel = await run(outOfOrder(inFlight), { concurrency: 4 });
+    expect(inFlight.max).toBe(4);
+    expect(parallel).toEqual(serial);
+  });
+
+  it('never has more calculations running than the concurrency', async () => {
+    const inFlight = { now: 0, max: 0 };
+    await run(outOfOrder(inFlight), { concurrency: 2 });
+    expect(inFlight.max).toBe(2);
+  });
+
+  it('reports progress in order and returns null when cancelled', async () => {
+    let cancelled = false;
+    const progress: number[] = [];
+    const result = await run(outOfOrder({ now: 0, max: 0 }), {
+      concurrency: 4,
+      isCancelled: () => cancelled,
+      onProgress: () => {
+        progress.push(progress.length + 1);
+        cancelled = true;
+      },
+    });
+    expect(result).toBeNull();
+    expect(progress).toEqual([1]);
+  });
+
+  it('leaves out a failed calculation without a loose rejection', async () => {
+    const result = await run(
+      async (f) => {
+        if (f.modules[0].typeId === 3) throw new Error('boom');
+        return calc(table)(f);
+      },
+      { concurrency: 4 }
+    );
+    expect(result?.checked).toBe(5);
+    expect(toIds(result?.noDownside ?? [])).not.toContain(3);
   });
 });

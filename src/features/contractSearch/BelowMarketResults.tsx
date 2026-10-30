@@ -242,9 +242,7 @@ export function BelowMarketResults({
         </p>
       )}
       {state.status === 'idle' || state.status === 'pricing' ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('contractSearch.belowMarket.pricing')} />
-        </div>
+        <Spinner block="page" label={t('contractSearch.belowMarket.pricing')} />
       ) : state.status === 'failed' ? (
         <EmptyState
           title={t('contractSearch.belowMarket.failedTitle')}

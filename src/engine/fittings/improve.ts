@@ -12,33 +12,38 @@ import type { VariationIndex } from '../market/variations';
 import { getVariations } from '../market/variations';
 import { addModule, removeModule, type ModuleAt } from './fittingEdit';
 import { peakAppliedDps } from './implantFinder';
+import { NO_EXPLORE, type ExploreStats } from './explore';
 import {
+  EXPLORE_RIG_GROUPS,
   jobOf,
   reworkGroups,
-  scoredJobs,
-  TANK_GOALS,
+  RESOURCE_RIG_GROUPS,
   TANK_GROUPS,
   UNIQUE_GROUPS,
   sideOf,
   type DefenseSide,
-  type Job,
 } from './improveGroups';
+import { breakTies, type JobCommonality } from './hullCommonality';
+import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
+import {
+  dropLimitsOf,
+  firstLimitBreach,
+  isTankStat,
+  overallWeightsOf,
+  swapLimitsOf,
+  type ImproveJob,
+  type JobSetting,
+  type LimitStat,
+} from './improveJob';
+import { coveringFreed, freedBy } from './improvePairSeed';
 import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
-import {
-  findFitSwaps,
-  overageOf,
-  PAIR_LIMIT,
-  RESOURCES,
-  usedOf,
-  type FitSwap,
-  type Resource,
-} from './makeItFit';
+import { findFitSwaps, PAIR_LIMIT, type FitSwap } from './makeItFit';
 import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
 import { changeVerdict } from './fittingStatFields';
-import { gainMetrics, roleChanges, type RoleChange } from './skillGains';
+import { gainMetrics, improveOverall, roleChanges, type RoleChange } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
 import { diffFittingStats, type StatChange } from './variationDelta';
@@ -47,7 +52,7 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats }
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, then command and fleet. */
+/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR, command and fleet, then Explore better. */
 export const IMPROVE_GOALS = [
   ...COMBAT_GOALS,
   'mining',
@@ -59,6 +64,7 @@ export const IMPROVE_GOALS = [
   'tackle',
   'ewar',
   'command',
+  'explore',
 ] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
@@ -94,8 +100,9 @@ export function heldHold(holds: HoldStats, preferred: ImproveHold): ImproveHold 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
  * powergrid or calibration; `capStable` a stable capacitor turned unstable;
- * `keepsTank` a tank conversion lost more than half of the sustained tank;
- * `keepsStats` Cheaper lost more than 10% of damage, tank or speed; `spend`
+ * `keepsTank` a tank conversion lost more than half of the sustained tank, or
+ * a job's tank limit broke (Explore Dangerous, every swap);
+ * `keepsStats` Cheaper, or a job's drop limit, lost too much of damage, tank or speed; `spend`
  * it costs more than the total budget or extra-spend cap allows.
  */
 export type Guardrail = 'budget' | 'capStable' | 'keepsTank' | 'keepsStats' | 'spend';
@@ -141,8 +148,12 @@ export interface ImproveCandidate {
   fixesUnflyable?: boolean;
   /** What the swaps chained behind a fix put right: the fit's budget, or its capacitor. */
   covers?: 'budget' | 'capacitor';
+  /** Swaps a CPU or powergrid rig away (Explore better): offered only while the fit still fits without it. */
+  dropsResourceRig?: boolean;
   /** Strips the other side's tank first; the candidate and its `pairedWith` chain then fill the chosen side's rack. */
   conversion?: TankConversion;
+  /** A Makeover row that adds the propulsion module this Improve Job needs (#5578): the row says why. */
+  addsPropulsionFor?: ImproveJob;
 }
 
 /** `fitting` with the candidate (and the downgrade paired with it) made. */
@@ -252,7 +263,7 @@ export const REJECTED_LIMIT = 5;
 const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
 
 /** A change smaller than this (a fraction) is rounding, not a gain or a loss. */
-const EPSILON = 1e-4;
+export const EPSILON = 1e-4;
 
 export type GoalAvailability =
   | { available: true }
@@ -269,7 +280,8 @@ export type GoalAvailability =
         | 'noCapTransfer'
         | 'noTackle'
         | 'noEwar'
-        | 'noCommand';
+        | 'noCommand'
+        | 'noExplore';
     };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
@@ -314,6 +326,8 @@ export function goalAvailability(
   if (goal === 'ewar' && ewarOf(before).strength <= 0)
     return { available: false, reason: 'noEwar' };
   if (goal === 'command' && !hasCommand(before)) return { available: false, reason: 'noCommand' };
+  if (goal === 'explore' && before.explore.modules <= 0)
+    return { available: false, reason: 'noExplore' };
   return { available: true };
 }
 
@@ -348,18 +362,55 @@ function meanGain(pairs: readonly (readonly [number, number])[]): number {
   );
 }
 
-function scoreOf(
+/** Cycles a second of an analyzer; 0 with no cycle. */
+const cycleRate = (seconds: number): number => (seconds > 0 ? 1 / seconds : 0);
+
+/**
+ * Explore's hacking and scanning families the fit has, each one's gain.
+ * Hacking adds up, over the fit's analyzers (paired by position; one the swap
+ * drops loses all three of its figures), the gains in strength, coherence and
+ * cycles a second: a rig lifts one figure of one analyzer, and averaging that
+ * with the figures it leaves alone would bury it under a speed rig. Scanning
+ * is the mean of the scan figures present.
+ */
+function exploreFamilyGains(before: ExploreStats, after: ExploreStats): number[] {
+  const families: number[] = [];
+  if (before.analyzers.length > 0) {
+    const gains = before.analyzers.flatMap((was, i) => {
+      const now = after.analyzers[i] ?? NO_EXPLORE.hacking;
+      return [
+        [was.strength, now.strength],
+        [was.coherence, now.coherence],
+        [cycleRate(was.cycleSeconds), cycleRate(now.cycleSeconds)],
+      ].flatMap(([figure, next]) => (figure! > 0 ? [relative(figure!, next!)] : []));
+    });
+    families.push(gains.reduce((sum, gain) => sum + gain, 0));
+  }
+  const [was, now] = [before.scanning, after.scanning];
+  if (was.strength > 0 || was.duration > 0 || was.deviation > 0)
+    families.push(
+      meanGain([
+        [was.strength, now.strength],
+        [was.duration, now.duration],
+        [was.deviation, now.deviation],
+      ])
+    );
+  return families;
+}
+
+export function scoreOf(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
   iskDelta: number | null,
   target: TargetProfile | undefined,
-  hold: ImproveHold
+  hold: ImproveHold,
+  job?: ImproveJob
 ): number | null {
   const metrics = gainMetrics(before, after);
   switch (goal) {
     case 'overall':
-      return metrics.overall;
+      return improveOverall(before, after, job && overallWeightsOf(job));
     case 'damage':
       return relative(damageOf(before, target), damageOf(after, target));
     case 'tank':
@@ -389,6 +440,12 @@ function scoreOf(
         [was.web, now.web],
         [was.range, now.range],
       ]);
+    }
+    case 'explore': {
+      // The mean of the families the fit has (hacking, scanning, mobility), each gained on its own so one strength rig is not diluted by the rest.
+      const families = exploreFamilyGains(before.explore, after.explore);
+      const all = [...families, (metrics.speed + metrics.align) / 2];
+      return all.reduce((sum, gain) => sum + gain, 0) / all.length;
     }
     case 'command':
       // From nothing there is no ratio: a bigger buff wins, a longer compression reach (km) breaks a tie.
@@ -426,13 +483,33 @@ const withTogglesOff = (fitting: Fitting): Fitting => ({
   ),
 });
 
+/** The figures an Improve Job's drop limits read. */
+function limitFigures(
+  s: FittingStats,
+  target: TargetProfile | undefined
+): Record<LimitStat, number> {
+  return {
+    damage: damageOf(s, target),
+    speed: s.navigation.maxVelocity,
+    ehp: s.ehp,
+    sustained: s.tank.sustainedEffective,
+  };
+}
+
+/** The Improve Job a check is made under; `makeover` holds the fit to every drop limit, not just a single swap's. */
+export interface JobGuard {
+  jobSetting?: JobSetting;
+  makeover?: boolean;
+}
+
 /** The first Guardrail `after` breaks, or null. */
-function brokenGuardrail(
+export function brokenGuardrail(
   goal: ImproveGoal,
   before: FittingStats,
   after: FittingStats,
   target: TargetProfile | undefined,
-  conversion?: TankConversion
+  conversion?: TankConversion,
+  guard?: JobGuard
 ): Guardrail | null {
   if (fitsResourceBudget(before) && !fitsResourceBudget(after)) return 'budget';
   if (before.capacitor.stable && !after.capacitor.stable) return 'capStable';
@@ -442,6 +519,17 @@ function brokenGuardrail(
     after.tank.sustainedEffective < before.tank.sustainedEffective * CONVERSION_KEEPS_SUSTAINED
   )
     return 'keepsTank';
+  if (guard?.jobSetting) {
+    const limits = guard.makeover
+      ? dropLimitsOf(goal, guard.jobSetting)
+      : swapLimitsOf(goal, guard.jobSetting);
+    const broke = firstLimitBreach(
+      limits,
+      limitFigures(before, target),
+      limitFigures(after, target)
+    );
+    if (broke) return isTankStat(broke) ? 'keepsTank' : 'keepsStats';
+  }
   if (goal === 'cheaper') {
     const kept: [number, number][] = [
       [damageOf(before, target), damageOf(after, target)],
@@ -463,6 +551,8 @@ export interface ModulePool {
   flyable?: (slot: FittingSlotKind, typeId: number) => boolean;
   /** Whether the pilot's skills alone allow the module, for a fitted one (its hull fit is not in question); absent: `flyable`. */
   pilotCanFly?: (slot: FittingSlotKind, typeId: number) => boolean;
+  /** A type's name; tells an afterburner from an MWD (one group) for the propulsion rules. Absent: those rules see micro jump drives only. */
+  nameOf?: (typeId: number) => string | undefined;
 }
 
 export interface CandidateOptions {
@@ -479,13 +569,21 @@ export interface CandidateOptions {
   pool?: ModulePool;
   /** The most candidates returned; the caller that filters afterwards (by hull, skills) lifts it and slices itself. */
   limit?: number;
+  /** The Improve Job and, for Explore, its space: its freed jobs may go, Dangerous keeps tank modules tank modules. Absent: today's guard. */
+  jobSetting?: JobSetting;
+  /**
+   * What the hull's community fits say for the job (#5581): the groups on enough
+   * of them join Rework's. They are tried after every candidate the table's groups
+   * make and never take their place. Absent: today's.
+   */
+  commonality?: JobCommonality | null;
 }
 
 const DEFAULT_OPTIONS: CandidateOptions = {
   goal: 'overall',
   reach: 'upgrade',
   defense: 'keep',
-  includeRigs: false,
+  includeRigs: true,
   includeOfficer: false,
 };
 
@@ -497,24 +595,8 @@ export const MAX_CANDIDATES = 400;
 
 /** Candidate tiers: Upgrade, Rebalance, Rework, then the empty-slot fills. */
 const FILL_TIER = 3;
-
-const FILL_RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig'];
-
-/** The side of the tank the fit already has; null when it has none (or an even split). */
-function fittedSide(
-  modules: readonly FittingModule[],
-  groupOf: (typeId: number) => number | undefined
-): DefenseSide | null {
-  let shield = 0;
-  let armor = 0;
-  for (const module of modules) {
-    const side = sideOf(groupOf(module.typeId) ?? -1);
-    if (side === 'shield') shield++;
-    else if (side === 'armor') armor++;
-  }
-  if (shield === armor) return null;
-  return shield > armor ? 'shield' : 'armor';
-}
+/** The groups the hull's community fits add: after every other candidate, so the cap never drops one for them. */
+const COMMON_TIER = 4;
 
 /** Conversions offered per search: each is a whole-fit calculation. */
 const CONVERSIONS_PER_SEARCH = 40;
@@ -769,26 +851,15 @@ export function improveCandidates(
 ): ImproveCandidate[] {
   const o: CandidateOptions = { ...DEFAULT_OPTIONS, ...options };
   const groupOf = o.pool?.groupOf ?? (() => undefined);
-  const side = fittedSide(modules, groupOf);
-  const sides: DefenseSide[] =
-    o.defense === 'keep' ? (side ? [side] : ['shield', 'armor']) : [o.defense];
+  const filter = candidateFilter(modules, groupOf, { ...o, nameOf: o.pool?.nameOf });
   // A chosen side frees the other side's tank modules; nothing else swaps into tank modules.
-  const freesTank = o.defense !== 'keep' && TANK_GOALS.has(o.goal);
-  const scored: readonly Job[] = scoredJobs(o.goal);
-
-  const jobsFitted = new Map<Job, number>();
-  const groupsFitted = new Map<number, number>();
-  for (const module of modules) {
-    const group = groupOf(module.typeId);
-    if (group === undefined) continue;
-    groupsFitted.set(group, (groupsFitted.get(group) ?? 0) + 1);
-    const job = jobOf(group);
-    if (job) jobsFitted.set(job, (jobsFitted.get(job) ?? 0) + 1);
-  }
+  const { freesTank, goalGroups } = filter;
+  // The table's own groups; the community's extras (`filter.commonGroups`) are tried after them.
+  const tableGroups = goalGroups.filter((group) => !filter.commonGroups.includes(group));
 
   const copies = new Map<number, ModuleAt[]>();
   for (const module of modules) {
-    if (module.slot === 'subsystem' || (module.slot === 'rig' && !o.includeRigs)) continue;
+    if (!filter.usesRack(module.slot)) continue;
     const at = copies.get(module.typeId);
     const where = { slot: module.slot, slotIndex: module.slotIndex };
     if (at) at.push(where);
@@ -806,46 +877,62 @@ export function improveCandidates(
     if (o.pool?.flyable && !o.pool.flyable(slot, typeId)) return false;
     if (!o.includeOfficer && EXCLUDED_META_GROUPS.has(index.types[typeId]?.metaGroupId ?? 0))
       return false;
-    const group = groupOf(typeId);
     // A second Damage Control (or cloak) is refused by the game.
-    if (group !== undefined && UNIQUE_GROUPS.has(group)) {
-      const others = (groupsFitted.get(group) ?? 0) - (removedGroup === group ? removed : 0);
-      if (others > 0) return false;
-    }
-    return true;
+    return !filter.uniqueBlocks(groupOf(typeId), removedGroup, removed);
   };
 
-  const tiers: ImproveCandidate[][] = Array.from({ length: FILL_TIER + 1 }, () => []);
+  const tiers: ImproveCandidate[][] = Array.from({ length: COMMON_TIER + 1 }, () => []);
   for (const [fromTypeId, at] of copies) {
     const slot = at[0].slot;
     // A fitted module the pilot cannot fly is replaced by one they can, whatever the Reach.
     const canFly = o.pool?.pilotCanFly ?? o.pool?.flyable;
     const unflyable = canFly ? !canFly(slot, fromTypeId) : false;
     const from = groupOf(fromTypeId);
-    const job = jobOf(from);
-    const guardsJob = job !== null && !scored.includes(job);
     const seen = new Set<number>([fromTypeId]);
     // Each tier has its own budget, and only an offered target spends it.
-    const taken = [0, 0, 0];
-    const offer = (tier: number, typeId: number, group: number | undefined) => {
-      if (taken[tier] >= TARGETS_PER_MODULE || seen.has(typeId)) return;
-      if (!allowed(typeId, slot, from, at.length)) return;
-      if (
-        freesTank &&
-        group !== undefined &&
-        TANK_GROUPS.has(group) &&
-        !TANK_GROUPS.has(from ?? -1)
-      )
-        return;
-      // Never the last module doing a job nobody scores.
-      if (guardsJob && jobOf(group) !== job && (jobsFitted.get(job) ?? 0) - at.length < 1) return;
+    const taken = [0, 0, 0, 0, 0];
+    const canOffer = (typeId: number, group: number | undefined) => {
+      if (seen.has(typeId) || !allowed(typeId, slot, from, at.length)) return false;
+      if (filter.tankBlocks(group, from) || filter.kindBlocks(typeId, fromTypeId)) return false;
+      // Never the last module doing a job nobody scores (every copy, for a job the pilot's Job holds whole).
+      return !filter.losesJob(group, from, at.length);
+    };
+    const offer = (
+      tier: number,
+      typeId: number,
+      group: number | undefined,
+      dropsResourceRig = false
+    ) => {
+      if (taken[tier] >= TARGETS_PER_MODULE || !canOffer(typeId, group)) return;
       seen.add(typeId);
       taken[tier]++;
-      tiers[tier].push(
-        unflyable
-          ? { fromTypeId, toTypeId: typeId, at, fixesUnflyable: true }
-          : { fromTypeId, toTypeId: typeId, at }
-      );
+      tiers[tier].push({
+        fromTypeId,
+        toTypeId: typeId,
+        at,
+        ...(unflyable ? { fixesUnflyable: true } : {}),
+        ...(dropsResourceRig ? { dropsResourceRig } : {}),
+      });
+    };
+    // Rework: one target per group in turn, so the groups listed first cannot use the whole budget.
+    // Within a group, the members nearest the fitted module's meta group come first.
+    const fromMeta = index.types[fromTypeId]?.metaGroupId ?? 0;
+    const offerRework = (groups: readonly number[], tier: number) => {
+      const lists = groups
+        .map((group) => ({
+          group,
+          typeIds: (o.pool?.typeIdsInGroup(group) ?? [])
+            .filter((typeId) => canOffer(typeId, group))
+            .sort(
+              (a, b) =>
+                Math.abs((index.types[a]?.metaGroupId ?? 0) - fromMeta) -
+                Math.abs((index.types[b]?.metaGroupId ?? 0) - fromMeta)
+            ),
+        }))
+        .filter((list) => list.typeIds.length > 0);
+      for (let i = 0; lists.some((list) => i < list.typeIds.length); i++)
+        for (const { group, typeIds } of lists)
+          if (i < typeIds.length) offer(tier, typeIds[i], group);
     };
     for (const member of getVariations(index, fromTypeId).members) {
       offer(0, member.typeId, groupOf(member.typeId));
@@ -853,24 +940,29 @@ export function improveCandidates(
     // The other side's tank modules are freed: they take the chosen side's modules whatever the Reach.
     const otherSide = from === undefined ? null : sideOf(from);
     if (o.pool && freesTank && otherSide !== null && otherSide !== o.defense) {
-      for (const group of reworkGroups(o.goal, sides))
+      for (const group of tableGroups)
         if (TANK_GROUPS.has(group))
           for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
     }
     if (o.pool && from !== undefined && o.reach !== 'upgrade') {
       for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
     }
+    // A CPU or powergrid rig the fit does not need becomes a hacking, scanning, speed or align rig, whatever the Reach.
+    const resourceRig =
+      o.pool && o.goal === 'explore' && slot === 'rig' && RESOURCE_RIG_GROUPS.includes(from ?? -1);
+    if (o.pool && resourceRig) {
+      for (const group of EXPLORE_RIG_GROUPS)
+        for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group, true);
+    }
     if (o.pool && o.reach === 'rework') {
-      for (const group of reworkGroups(o.goal, sides))
-        for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
+      offerRework(tableGroups, 2);
+      offerRework(filter.commonGroups, COMMON_TIER);
     }
     // Whatever the Reach found, an unflyable module is replaced: the same group when no variant was found, then the goal's groups.
     if (o.pool && unflyable) {
       if (taken[0] + taken[1] + taken[2] === 0 && from !== undefined)
         for (const typeId of o.pool.typeIdsInGroup(from)) offer(1, typeId, from);
-      if (taken[0] + taken[1] + taken[2] === 0)
-        for (const group of reworkGroups(o.goal, sides))
-          for (const typeId of o.pool.typeIdsInGroup(group)) offer(2, typeId, group);
+      if (taken[0] + taken[1] + taken[2] === 0) offerRework(tableGroups, 2);
     }
   }
 
@@ -884,20 +976,21 @@ export function improveCandidates(
   if (o.pool && o.slotCounts) {
     const pool = o.pool;
     for (const slot of FILL_RACKS) {
-      if (slot === 'rig' && !o.includeRigs) continue;
-      const taken = new Set(modules.filter((m) => m.slot === slot).map((m) => m.slotIndex));
-      let free = 0;
-      while (free < o.slotCounts[slot] && taken.has(free)) free++;
-      if (free >= o.slotCounts[slot]) continue;
+      if (!filter.usesRack(slot)) continue;
+      const free = filter.firstFreeSlot(slot, o.slotCounts);
+      if (free === null) continue;
       // Each group gets an equal share, so the first groups listed cannot use the whole rack's budget.
-      const groups = reworkGroups(o.goal, sides);
-      const share = Math.ceil(FILLS_PER_RACK / Math.max(1, groups.length));
-      for (const group of groups) {
+      const share = Math.ceil(
+        FILLS_PER_RACK / Math.max(1, goalGroups.length - filter.commonGroups.length)
+      );
+      for (const group of goalGroups) {
+        const tier = filter.commonGroups.includes(group) ? COMMON_TIER : FILL_TIER;
         let added = 0;
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
+          if (filter.kindBlocks(typeId, null)) continue;
           added++;
-          tiers[FILL_TIER].push({
+          tiers[tier].push({
             fromTypeId: null,
             toTypeId: typeId,
             at: [{ slot, slotIndex: free }],
@@ -915,9 +1008,16 @@ export function improveCandidates(
   );
 }
 
-/** Best score first; a tie goes to the cheaper swap; an unpriced swap sorts after every priced one. */
-export function rankImproveOptions<T extends ImproveOption>(options: readonly T[]): T[] {
-  return [...options].sort((a, b) => {
+/**
+ * Best score first; a tie goes to the cheaper swap; an unpriced swap sorts after every priced one.
+ * With `targetShare` (#5581), scores within 1% of each other order by how common the target's
+ * GROUP is on the hull for the job, most common first; a variant within a group is never ordered by it.
+ */
+export function rankImproveOptions<T extends ImproveOption>(
+  options: readonly T[],
+  targetShare?: (candidate: ImproveCandidate) => number
+): T[] {
+  const ranked = [...options].sort((a, b) => {
     const ap = a.iskDelta === null;
     const bp = b.iskDelta === null;
     const af = a.candidate.fixesUnflyable === true;
@@ -926,6 +1026,14 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
     if (Math.abs(a.score - b.score) > 1e-9) return b.score - a.score;
     return (a.iskDelta ?? 0) - (b.iskDelta ?? 0);
   });
+  return breakTies(
+    ranked,
+    (option) => option.score,
+    targetShare && ((option) => targetShare(option.candidate)),
+    (a, b) =>
+      (a.candidate.fixesUnflyable === true) === (b.candidate.fixesUnflyable === true) &&
+      (a.iskDelta === null) === (b.iskDelta === null)
+  );
 }
 
 /** Hub sell price of every part (`ImproveOption.iskDelta`). */
@@ -934,7 +1042,10 @@ export function iskDeltaOf(
   priceOf: (typeId: number) => number | null
 ): number | null {
   const to = priceOf(candidate.toTypeId);
-  const from = candidate.fromTypeId === null ? 0 : priceOf(candidate.fromTypeId);
+  // A fitted rig is destroyed when removed: a rig slot costs the full new rig, with no refund for the old one.
+  // A candidate's slots are one rack (a type fits only one), so "all rigs" is "the rack is the rig rack".
+  const rigSlot = candidate.at.length > 0 && candidate.at.every((where) => where.slot === 'rig');
+  const from = candidate.fromTypeId === null || rigSlot ? 0 : priceOf(candidate.fromTypeId);
   let isk: number | null = to === null || from === null ? null : (to - from) * candidate.at.length;
   // A conversion's removed modules (never rigs) are sold or dropped from the shopping list.
   for (const { typeId, at } of candidate.conversion?.removes ?? []) {
@@ -1013,6 +1124,8 @@ export interface FindImprovementsParams {
   target?: TargetProfile;
   /** Carry more: the hold scored (default the cargo hold). */
   hold?: ImproveHold;
+  /** The Improve Job and, for Explore, its space: Best overall's weights and the Explore Dangerous tank guard. Absent: today's. */
+  jobSetting?: JobSetting;
   /** The total fit price may not pass it. Null: no limit. */
   iskBudget?: number | null;
   /** What the fit costs now, for the total budget. */
@@ -1025,6 +1138,14 @@ export interface FindImprovementsParams {
   isCancelled?: () => boolean;
   /** "Show best so far": stop and rank what is done. */
   shouldStop?: () => boolean;
+  /**
+   * How many single swaps `stats` may work on at once (default 1). Their
+   * results are still scored in candidate order, so the result is the one a
+   * serial run gives, however the calculations finish.
+   */
+  concurrency?: number;
+  /** How common a swap's target group is on the hull for the job, 0..1: orders near-ties (#5581). Absent: today's order. */
+  targetShare?: (candidate: ImproveCandidate) => number;
 }
 
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
@@ -1106,12 +1227,15 @@ export async function findImprovements({
   priceOf,
   target,
   hold = DEFAULT_IMPROVE_HOLD,
+  jobSetting,
   iskBudget = null,
   fitTotal = null,
   compensators,
   onProgress,
   isCancelled,
   shouldStop,
+  concurrency = 1,
+  targetShare,
 }: FindImprovementsParams): Promise<ImproveResult | null> {
   const kept: ImproveOption[] = [];
   const rejected: RejectedOption[] = [];
@@ -1144,7 +1268,7 @@ export async function findImprovements({
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return false;
     const iskDelta = iskDeltaOf(candidate, priceOf);
-    const score = scoreOf(goal, before, after, iskDelta, target, hold);
+    const score = scoreOf(goal, before, after, iskDelta, target, hold, jobSetting?.job);
     const fix = candidate.fixesUnflyable === true;
     if (!fix && (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON))) return false;
     const option: ImproveOption = {
@@ -1157,7 +1281,11 @@ export async function findImprovements({
     };
     const overSpend = overIskBudget(iskBudget, fitTotal, iskDelta);
     // Flying it beats keeping the stats: only the fit's resources, a stable capacitor with nothing left to toggle on, and the spend still bind.
-    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion);
+    const broken = brokenGuardrail(goal, before, after, target, candidate.conversion, {
+      jobSetting,
+    });
+    // A CPU or powergrid rig the fit needs is not a swap to offer, not even a greyed one.
+    if (candidate.dropsResourceRig && broken === 'budget') return false;
     // A ship that is stable with its toggled modules off is fine to fix: the capacitor is then the pilot's to spend.
     const capStillBinds =
       fix && broken === 'capStable' && !(await stableWhenToggledOff(swapped, after));
@@ -1170,26 +1298,39 @@ export async function findImprovements({
     return true;
   }
 
-  for (const candidate of candidates) {
+  // Not `runPool`: results are scored in candidate order, so calculations run ahead of the one being scored, `concurrency` at once; a failure is kept as null, never a loose rejection.
+  const started = new Map<number, { swapped: Fitting; after: Promise<FittingStats | null> }>();
+  const window = Math.max(1, concurrency);
+  let nextToStart = 0;
+  const startUpTo = (last: number) => {
+    for (; nextToStart <= last && nextToStart < candidates.length; nextToStart++) {
+      const swapped = applyImproveCandidate(fitting, candidates[nextToStart]);
+      started.set(nextToStart, {
+        swapped,
+        after: Promise.resolve()
+          .then(() => stats(swapped))
+          .catch(() => null),
+      });
+    }
+  };
+  for (const [index, candidate] of candidates.entries()) {
     if (isCancelled?.()) return null;
     if (shouldStop?.()) {
       stopped = true;
       break;
     }
-    const swapped = applyImproveCandidate(fitting, candidate);
-    let after: FittingStats | null = null;
-    try {
-      after = await stats(swapped);
-    } catch {
-      // Left out: one variation's calculation failing must not end the search.
-      failed++;
-    }
+    startUpTo(index + window - 1);
+    const { swapped, after } = started.get(index)!;
+    started.delete(index);
+    const result = await after;
+    // Left out: one variation's calculation failing must not end the search.
+    if (result === null) failed++;
     if (isCancelled?.()) return null;
     checked++;
     onProgress?.(checked, candidates.length);
-    if (after === null) continue;
-    if (candidate.fromTypeId !== null) swaps.push({ candidate, after });
-    await take(candidate, swapped, after);
+    if (result === null) continue;
+    if (candidate.fromTypeId !== null) swaps.push({ candidate, after: result });
+    await take(candidate, swapped, result);
   }
   // Every calculation failed: the engine is broken, not the fit beyond improving.
   if (checked > 0 && failed === checked) throw new Error('Every Improve calculation failed');
@@ -1208,14 +1349,10 @@ export async function findImprovements({
     .slice(0, PAIR_SEEDS);
   const pairs: { candidate: ImproveCandidate; estimate: number }[] = [];
   for (const seed of seeds) {
-    const over = RESOURCES.filter((r) => overageOf(seed.after, r) > 0);
     for (const swap of swaps) {
-      const freed = (r: Resource) => usedOf(before, r) - usedOf(swap.after, r);
-      if (!over.every((r) => freed(r) >= overageOf(seed.after, r))) continue;
-      pairs.push({
-        candidate: { ...seed.candidate, pairedWith: swap.candidate },
-        estimate: over.reduce((sum, r) => sum + freed(r), 0),
-      });
+      const estimate = coveringFreed(seed.after, freedBy(before, swap.after));
+      if (estimate === null) continue;
+      pairs.push({ candidate: { ...seed.candidate, pairedWith: swap.candidate }, estimate });
     }
   }
   pairs.sort((a, b) => b.estimate - a.estimate);
@@ -1283,7 +1420,7 @@ export async function findImprovements({
     }
   }
 
-  const ranked = rankImproveOptions(kept);
+  const ranked = rankImproveOptions(kept, targetShare);
   return {
     makeFlyable: rankFlyable(flyable),
     flyableOverrun: overrun,

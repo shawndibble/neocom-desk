@@ -1,6 +1,6 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse, type JsonBodyType } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { db } from '@/db';
 import { ESI_BASE_URL } from '@/esi/client';
 import { resetEsiBudget } from '@/esi/budget';
@@ -11,19 +11,16 @@ vi.mock('@/sde/loadMarketSde', () => ({ loadMarketRegions: () => loadMarketRegio
 
 import { loadRouteRegionNames, loadSystemActivity } from './routeSafetyData';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   await db.esiCache.clear();
   loadMarketRegions.mockReset();
   loadMarketRegions.mockResolvedValue([{ id: 10000002, name: 'The Forge' }]);
 });
 afterEach(() => {
-  server.resetHandlers();
   resetEsiBudget();
 });
-afterAll(() => server.close());
 
 function publicJson(path: string, body: JsonBodyType) {
   return http.get(`${ESI_BASE_URL}${path}`, ({ request }) => {

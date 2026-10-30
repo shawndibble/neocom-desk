@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL } from '@/esi/client';
 import { rejectBadEsiHeaders } from '@/esi/test-helpers';
 import { db } from '@/db';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { resolveSolarSystem, clearSystemLookupCache } from './systemLookup';
 
-const server = setupServer();
+const server = mswServer();
 
 const found = (system: object) => ({ status: 'found', system });
 
@@ -21,9 +21,6 @@ vi.mock('@/sde/loadMarketSde', () => ({
   },
 }));
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
 beforeEach(async () => {
   localTable = 'down';
   clearSolarSystemIndex();

@@ -10,6 +10,8 @@
  * Times are epoch ms, converted from ESI's ISO strings by the writer.
  */
 
+import { isRecord } from './guards';
+
 export interface WarParty {
   corporationId?: number;
   allianceId?: number;
@@ -103,10 +105,6 @@ export function warsAgainst(
       Number(b.status.kind === 'active') - Number(a.status.kind === 'active') ||
       b.war.declared - a.war.declared
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 const isNum = (value: unknown): value is number =>

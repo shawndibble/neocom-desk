@@ -18,13 +18,10 @@
  * live call.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import { expectNoPageOverflow } from './support/overflow';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 /** Veldspar and Zeolites: both in `public/data/oreAndIceTypeIds.json`, both with a `reprocessing.json` entry, so each line gets a real refined value rather than an em dash. */
 const VELDSPAR = 1230;

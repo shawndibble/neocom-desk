@@ -10,6 +10,7 @@ import { TRADE_HUBS } from '@/market/hubs';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import type { BuildResult } from '@/engine/industry/types';
+import { stubViewport } from '@/test/viewport';
 
 const useLoyaltyStoreOffers = vi.fn();
 vi.mock('@/features/loyalty/useLoyaltyStoreOffers', () => ({
@@ -41,24 +42,8 @@ const { useLpBasis } = await import('@/features/loyalty/lpBasis');
  * Narrow, so the filters render inside the sheet. jsdom's stub never matches
  * (`vitest.setup.ts`), which `useIsNarrow` reads as a pointer viewport.
  */
-let restoreMatchMedia: (() => void) | undefined;
-
 function useNarrowViewport(): void {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === NARROW_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  restoreMatchMedia = () => {
-    window.matchMedia = real;
-  };
+  stubViewport(NARROW_QUERY);
 }
 
 const OTHER_HUB = TRADE_HUBS.find((hub) => hub.id !== 'jita')!;
@@ -66,21 +51,7 @@ const OTHER_HUB = TRADE_HUBS.find((hub) => hub.id !== 'jita')!;
 /** Opposite of `useNarrowViewport`: jsdom's stub never matches, so this is
  * what forces the desktop two-column layout in a test. */
 function useDesktopViewport(): void {
-  const real = window.matchMedia;
-  window.matchMedia = (media: string) =>
-    ({
-      media,
-      matches: media === DESKTOP_QUERY,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }) as unknown as MediaQueryList;
-  restoreMatchMedia = () => {
-    window.matchMedia = real;
-  };
+  stubViewport(DESKTOP_QUERY);
 }
 
 beforeEach(() => {
@@ -105,8 +76,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreMatchMedia?.();
-  restoreMatchMedia = undefined;
   vi.clearAllMocks();
 });
 

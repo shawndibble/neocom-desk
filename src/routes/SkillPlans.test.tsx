@@ -36,6 +36,7 @@ const subscribeSyncStatusMock = vi.fn((listener: (s: unknown) => void) => {
   return () => {};
 });
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
+import { stubViewport } from '@/test/viewport';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   markPlanDeleted: (characterId: number, id: string) => markPlanDeletedMock(characterId, id),
@@ -579,39 +580,22 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
   });
 
   it('keeps both panes visible on desktop, with no back control', async () => {
-    const original = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
+    stubViewport(() => true);
 
-    try {
-      const user = userEvent.setup();
-      await db.skillPlans.add(seedPlan());
-      render(<App />);
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
 
-      await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
-      await screen.findByText('Your entries');
+    await user.click(await screen.findByRole('link', { name: /^Test plan/ }));
+    await screen.findByText('Your entries');
 
-      // `find`, not `get`: 'Your entries' first renders on the very tick the
-      // catalog arrives and `PlanEditor` replaces the loading layout, which
-      // remounts `PlanListPane` in that slot — so the list is momentarily a
-      // spinner at exactly the moment the editor appears.
-      const listPanel = (await screen.findByRole('link', { name: /^Test plan/ })).closest(
-        'section'
-      );
-      expect(listPanel).not.toHaveClass('hidden');
-      expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
-    } finally {
-      window.matchMedia = original;
-    }
+    // `find`, not `get`: 'Your entries' first renders on the very tick the
+    // catalog arrives and `PlanEditor` replaces the loading layout, which
+    // remounts `PlanListPane` in that slot — so the list is momentarily a
+    // spinner at exactly the moment the editor appears.
+    const listPanel = (await screen.findByRole('link', { name: /^Test plan/ })).closest('section');
+    expect(listPanel).not.toHaveClass('hidden');
+    expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
   });
 });
 
@@ -637,22 +621,8 @@ describe('Skills opens on Plans', () => {
 
 describe('SkillPlans: current attributes beside the plan list', () => {
   // Full labels and the remap note are the desktop rail; a phone gets one short line.
-  const original = window.matchMedia;
   beforeEach(() => {
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-  });
-  afterEach(() => {
-    window.matchMedia = original;
+    stubViewport(() => true);
   });
   const attributesPanel = async () =>
     (await screen.findByRole('heading', { name: 'Attributes' })).closest('section')!;
@@ -814,51 +784,36 @@ describe('SkillPlans editor: add-skill picker', () => {
     goToPlanEditor();
     // Column headers (checked below) only render at desktop widths (#114) —
     // jsdom's matchMedia never matches by default, so mock it to desktop.
-    const realMatchMedia = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    try {
-      render(<App />);
+    stubViewport(() => true);
+    render(<App />);
 
-      const search = await screen.findByRole('searchbox', { name: 'Add skill' });
-      await user.type(search, 'Small Hybrid Turret');
-      await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
-      await user.click(await screen.findByRole('button', { name: 'Level I' }));
+    const search = await screen.findByRole('searchbox', { name: 'Add skill' });
+    await user.type(search, 'Small Hybrid Turret');
+    await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
+    await user.click(await screen.findByRole('button', { name: 'Level I' }));
 
-      const panel = screen.getByText('Your entries').closest('section')!;
-      const items = await within(panel).findAllByRole('listitem');
-      // No priority-band divider: every entry is Normal, a single band (#1415).
-      expect(items.map((li) => li.textContent)).toEqual([
-        expect.stringContaining('Gunnery I'),
-        expect.stringContaining('Gunnery II'),
-        expect.stringContaining('Gunnery III'),
-        expect.stringContaining('Small Hybrid Turret I'),
-      ]);
-      // The three Gunnery levels are prereqs the user didn't add directly —
-      // dimmed and tagged, positioned ahead of the one row for the entry
-      // they were needed by (#112: entry rows are one-per-entry, not
-      // one-per-level, so Small Hybrid Turret I is a single row here).
-      expect(items[0].textContent).toMatch(/prereq/i);
-      expect(items[1].textContent).toMatch(/prereq/i);
-      expect(items[2].textContent).toMatch(/prereq/i);
-      expect(items[3].textContent).not.toMatch(/prereq/i);
+    const panel = screen.getByText('Your entries').closest('section')!;
+    const items = await within(panel).findAllByRole('listitem');
+    // No priority-band divider: every entry is Normal, a single band (#1415).
+    expect(items.map((li) => li.textContent)).toEqual([
+      expect.stringContaining('Gunnery I'),
+      expect.stringContaining('Gunnery II'),
+      expect.stringContaining('Gunnery III'),
+      expect.stringContaining('Small Hybrid Turret I'),
+    ]);
+    // The three Gunnery levels are prereqs the user didn't add directly —
+    // dimmed and tagged, positioned ahead of the one row for the entry
+    // they were needed by (#112: entry rows are one-per-entry, not
+    // one-per-level, so Small Hybrid Turret I is a single row here).
+    expect(items[0].textContent).toMatch(/prereq/i);
+    expect(items[1].textContent).toMatch(/prereq/i);
+    expect(items[2].textContent).toMatch(/prereq/i);
+    expect(items[3].textContent).not.toMatch(/prereq/i);
 
-      // Column headers label the two time columns (UX-REVIEW #9), by what
-      // each one means rather than by the jargon they used to carry.
-      expect(within(panel).getByText('Takes')).toBeInTheDocument();
-      expect(within(panel).getByText('Done by')).toBeInTheDocument();
-    } finally {
-      window.matchMedia = realMatchMedia;
-    }
+    // Column headers label the two time columns (UX-REVIEW #9), by what
+    // each one means rather than by the jargon they used to carry.
+    expect(within(panel).getByText('Takes')).toBeInTheDocument();
+    expect(within(panel).getByText('Done by')).toBeInTheDocument();
 
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);

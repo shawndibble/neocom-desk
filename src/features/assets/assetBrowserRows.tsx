@@ -34,8 +34,7 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { PlaceJumpsLink } from '@/features/route/JumpsLink';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import type { BlueprintKind } from '@/engine/blueprintKind';
-
-export type Translate = (key: string, opts?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 /* ------------------------------------------------------------------ badges */
 

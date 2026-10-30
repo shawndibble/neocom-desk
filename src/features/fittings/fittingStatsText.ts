@@ -8,8 +8,7 @@
 import { formatSeconds } from '@/lib/duration';
 import { alignTimeSeconds, resistPct } from '@/engine/fittings/stats';
 import type { FittingStats, Resonances } from '@/engine/fittings/types';
-
-type Translate = (key: string, options?: Record<string, unknown>) => string;
+import type { Translate } from '@/lib/translate';
 
 function resists(layer: Resonances): string {
   return [

@@ -168,11 +168,7 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   );
 
   if (!hydrated) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner label={t('common.loading')} />
-      </div>
-    );
+    return <Spinner block="page" label={t('common.loading')} />;
   }
 
   return (

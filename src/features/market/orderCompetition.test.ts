@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { setupServer } from 'msw/node';
+import { mswServer } from '@/test/msw';
 import { ESI_BASE_URL, configureEsi } from '@/esi/client';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
@@ -16,15 +16,12 @@ import {
   loadStructureCompetition,
 } from './orderCompetition';
 
-const server = setupServer();
+const server = mswServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
-  server.resetHandlers();
   clearOrderBookCache();
   clearMarketPriceCache();
 });
-afterAll(() => server.close());
 
 const STATION_A = 60003760;
 const STATION_B = 60008494;

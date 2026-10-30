@@ -9,7 +9,7 @@
  * `appraisalSharedNarrow.spec.ts`.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE } from './support/testBase';
 
 const SHARE_ID = 'e2eSurvy1';
 
@@ -85,11 +85,7 @@ async function mockSurvey(page: Page): Promise<void> {
   });
 }
 
-for (const viewport of [
-  { width: 1440, height: 900 },
-  { width: 1024, height: 768 },
-  { width: 390, height: 844 },
-]) {
+for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, PHONE]) {
   test(`survey stat tiles never clip at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await mockSurvey(page);

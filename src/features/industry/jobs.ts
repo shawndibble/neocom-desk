@@ -20,6 +20,7 @@ import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import { isOpenJob } from './jobHistory';
 import { recordJobHistory } from './jobHistoryStore';
+import { HOUR_MS } from '@/lib/age';
 
 const KEY = 'industryJobs';
 const JOBS_SCOPE = ESI_REGISTRY.getCharacterIndustryJobs.scope;
@@ -162,7 +163,7 @@ export function isJobDone(job: Pick<IndustryJob, 'end_date'>, nowMs: number): bo
 /** Whether the job ends within the next hour (not already done) — "completing soon" highlight. */
 export function isCompletingSoon(job: Pick<IndustryJob, 'end_date'>, nowMs: number): boolean {
   const remainingMs = Date.parse(job.end_date) - nowMs;
-  return remainingMs > 0 && remainingMs <= 3_600_000;
+  return remainingMs > 0 && remainingMs <= HOUR_MS;
 }
 
 /** Seconds remaining until end_date, clamped >= 0 (feed to formatDuration for display). */

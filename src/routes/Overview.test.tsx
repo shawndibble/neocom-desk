@@ -23,6 +23,7 @@ import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
+import { stubViewport } from '@/test/viewport';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -465,23 +466,8 @@ describe('Overview widget grid', () => {
  * renders the wide grid; a phone has to be asked for.
  */
 describe('Overview widget grid on a phone', () => {
-  let real: typeof window.matchMedia;
   beforeEach(() => {
-    real = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: media === PHONE_QUERY,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-  });
-  afterEach(() => {
-    window.matchMedia = real;
+    stubViewport(PHONE_QUERY);
   });
 
   it('leaves out a widget set to Hide on phone, and keeps the rest', async () => {

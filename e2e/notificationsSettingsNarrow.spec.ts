@@ -15,12 +15,9 @@
  * Uses the default seeded character with no Dexie overrides.
  */
 import type { Page } from '@playwright/test';
-import { test, expect } from './support/testBase';
+import { test, expect, PHONE, DESKTOP } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_NAME } from './support/fixtureData';
-
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
 
 async function gotoNotificationSettings(page: Page) {
   await signInAndGoto(page, './settings/notifications');

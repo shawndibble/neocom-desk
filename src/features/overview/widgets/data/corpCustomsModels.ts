@@ -6,7 +6,8 @@
 import type { CorporationCustomsOffice } from '@/esi/endpoints';
 import { formatNumber } from '@/lib/numberLocale';
 import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
-import type { RowDetailModel, Translate } from './types';
+import type { RowDetailModel } from './types';
+import type { Translate } from '@/lib/translate';
 
 const K = 'overview.widgets.corpCustomsOffices';
 

@@ -14,13 +14,25 @@
  * **Not** the Market Browser page's own current hub, which is device-local —
  * see `browserHub.ts`'s doc comment for why the two are split.
  *
+ * Since issue #5593 there are two layers. `useDefaultMarketHub` is the
+ * account-wide default (`sync.marketHub`, Settings' "Default Trade Hub for new
+ * characters"); `useMarketHub` is the hub in force: the active Character's own
+ * (`characterHubs.ts`), else the default, and the default alone with no active
+ * Character. Every hub-reading surface reads `useMarketHub`, which keeps the
+ * `value` / `hydrated` / `hydrate` / `setValue` shape of any setting store.
+ * Its `setValue` writes the active Character's hub, or the default with none.
+ *
  * Lives here rather than in `src/stores/` because other features (Contracts,
  * LP Store, BPC Sourcing, notification polling) import it from here rather
  * than each holding a duplicate hub preference of their own, the same way
  * they already share `src/market/hubs.ts`'s `TradeHub` list.
  */
+import { create } from 'zustand';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import type { SettingState } from '@/lib/settingStore';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import { resolveTradeHub, setCharacterHub, useHubByCharacter } from './characterHubs';
 
 export const MARKET_HUB_SETTING_KEY = 'sync.marketHub';
 
@@ -34,9 +46,68 @@ export function parseMarketHub(raw: unknown): TradeHub['id'] | null {
     : null;
 }
 
-export const useMarketHub = createSyncedSetting<TradeHub['id']>({
+export const useDefaultMarketHub = createSyncedSetting<TradeHub['id']>({
   key: MARKET_HUB_SETTING_KEY,
   legacyKey: LEGACY_MARKET_HUB_SETTING_KEY,
   defaultValue: DEFAULT_TRADE_HUB.id,
   parse: parseMarketHub,
 });
+
+/** The hub `characterId` trades at (the account default when none), read from Dexie-backed stores. */
+export async function tradeHubIdFor(characterId: number | null): Promise<TradeHub['id']> {
+  await Promise.all([
+    useDefaultMarketHub.getState().hydrate(),
+    useHubByCharacter.getState().hydrate(),
+  ]);
+  return resolveTradeHub(
+    useHubByCharacter.getState().value,
+    characterId,
+    useDefaultMarketHub.getState().value
+  );
+}
+
+function inForce(): Pick<SettingState<TradeHub['id']>, 'value' | 'hydrated'> {
+  const base = useDefaultMarketHub.getState();
+  const byCharacter = useHubByCharacter.getState();
+  const active = useActiveCharacter.getState();
+  return {
+    value: resolveTradeHub(byCharacter.value, active.activeCharacterId, base.value),
+    hydrated: base.hydrated && byCharacter.hydrated && active.hydrated,
+  };
+}
+
+export const useMarketHub = create<SettingState<TradeHub['id']>>((set, get) => ({
+  ...inForce(),
+  hydrate: async () => {
+    if (get().hydrated) return;
+    await Promise.all([
+      useDefaultMarketHub.getState().hydrate(),
+      useHubByCharacter.getState().hydrate(),
+      // Never re-read a settled selection: the read would overwrite one already in force.
+      useActiveCharacter.getState().hydrated ? undefined : useActiveCharacter.getState().hydrate(),
+    ]);
+    set(inForce());
+  },
+  setValue: async (hub) => {
+    // Skipped when settled: the press must apply in the same tick, as every setting store's does.
+    if (!useHubByCharacter.getState().hydrated || !useActiveCharacter.getState().hydrated) {
+      await Promise.all([
+        useHubByCharacter.getState().hydrate(),
+        useActiveCharacter.getState().hydrated
+          ? undefined
+          : useActiveCharacter.getState().hydrate(),
+      ]);
+    }
+    const activeId = useActiveCharacter.getState().activeCharacterId;
+    if (activeId === null) return useDefaultMarketHub.getState().setValue(hub);
+    // Applied at once, as every setting store does; the writes follow.
+    set({ value: hub });
+    return useHubByCharacter
+      .getState()
+      .setValue(setCharacterHub(useHubByCharacter.getState().value, activeId, hub));
+  },
+}));
+
+for (const source of [useDefaultMarketHub, useHubByCharacter, useActiveCharacter]) {
+  source.subscribe(() => useMarketHub.setState(inForce()));
+}
