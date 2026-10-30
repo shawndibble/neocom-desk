@@ -381,6 +381,7 @@ function GoalPlanner({
       if (f.to === 'hub')
         soldPerDay.set(f.typeId, (soldPerDay.get(f.typeId) ?? 0) + f.unitsPerHour * HOURS_PER_DAY);
     }
+    const flaggedGoals = pickedTypeIds.filter((typeId) => isPriceFlagged(vs90d.get(typeId)));
     const thinGoals = [...trades.keys()].flatMap((typeId) => {
       const thin = thinSales(soldPerDay.get(typeId) ?? 0, trades.get(typeId));
       return thin ? [{ typeId, thin }] : [];
@@ -417,16 +418,14 @@ function GoalPlanner({
             ))}
           </ul>
         )}
-        {hasGoals && (
+        {hasGoals && flaggedGoals.length > 0 && (
           <ul className="space-y-1">
-            {pickedTypeIds
-              .filter((typeId) => isPriceFlagged(vs90d.get(typeId)))
-              .map((typeId) => (
-                <li key={typeId} className="flex flex-wrap items-center gap-x-2 text-xs">
-                  <b className="font-semibold">{commodityName(typeId, pi)}</b>
-                  <PriceVsMedianFlag pct={vs90d.get(typeId)} />
-                </li>
-              ))}
+            {flaggedGoals.map((typeId) => (
+              <li key={typeId} className="flex flex-wrap items-center gap-x-2 text-xs">
+                <b className="font-semibold">{commodityName(typeId, pi)}</b>
+                <PriceVsMedianFlag pct={vs90d.get(typeId)} />
+              </li>
+            ))}
           </ul>
         )}
         {hasGoals && (
