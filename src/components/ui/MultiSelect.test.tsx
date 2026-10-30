@@ -347,3 +347,37 @@ describe('MultiSelect', () => {
     expect(screen.getByRole('button', { name: 'Location: All locations' })).toBeInTheDocument();
   });
 });
+
+describe('MultiSelect tickable headings', () => {
+  function renderTickable(onToggleGroup = vi.fn(), onToggle = vi.fn()) {
+    render(
+      <MultiSelect
+        label="People"
+        triggerLabel="Open"
+        groups={GROUPS}
+        selected={new Set([1])}
+        onToggle={onToggle}
+        groupState={(group) => (group.label === 'Alpha team' ? 'mixed' : false)}
+        onToggleGroup={onToggleGroup}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+  }
+
+  it('ticks a whole group from its heading', async () => {
+    const onToggleGroup = vi.fn();
+    renderTickable(onToggleGroup);
+    const user = await openMenu();
+    await user.click(screen.getByRole('option', { name: 'Alpha team' }));
+    expect(onToggleGroup).toHaveBeenCalledWith(expect.objectContaining({ label: 'Alpha team' }));
+  });
+
+  it('keeps every row of a group whose heading matches the search', async () => {
+    renderTickable();
+    const user = await openMenu();
+    await user.type(screen.getByRole('combobox'), 'beta');
+    expect(screen.getByRole('option', { name: 'Carol' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Alice' })).not.toBeInTheDocument();
+  });
+});

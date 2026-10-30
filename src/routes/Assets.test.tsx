@@ -322,12 +322,12 @@ describe('Assets', () => {
 
   it('keeps the query string when switching tabs', async () => {
     const user = userEvent.setup();
-    window.history.replaceState({}, '', '/assets/items?chars=current&min=5');
+    window.history.replaceState({}, '', '/assets/items?chars=current&min=0');
     render(<App />);
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Ships' }));
     expect(window.location.pathname).toBe('/assets/ships');
-    expect(window.location.search).toBe('?chars=current&min=5');
+    expect(window.location.search).toBe('?chars=current&min=0');
   });
 
   it('keeps focus in the tab strip when arrowing from Ships onto Items (WCAG 2.4.3)', async () => {
@@ -350,11 +350,11 @@ describe('Assets', () => {
   });
 
   it('moves a pre-tabs drill-down link under the Items tab', async () => {
-    window.history.replaceState({}, '', '/assets/60003760?min=5');
+    window.history.replaceState({}, '', '/assets/60003760?min=0');
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/assets/items/60003760');
-    expect(window.location.search).toBe('?min=5');
+    expect(window.location.search).toBe('?min=0');
   });
 
   it('opens a pre-tabs ?view=ships link on the Ships tab', async () => {
@@ -1327,14 +1327,16 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
       release();
     });
 
-    it('exports the full list in the tree view even with min in the URL', async () => {
+    it('leaves out stacks below the minimum in the tree view too (issue #5601)', async () => {
       window.history.replaceState({}, '', '/assets?min=10000');
       render(<App />);
-      await screen.findByText(JITA);
+      await screen.findByText(STRUCTURE);
+      // Jita holds only the Tritanium stack, which is under the minimum.
+      expect(screen.queryByText(JITA)).not.toBeInTheDocument();
 
       const rows = await exportCsv();
       expect(rows).toContain('Pyerite');
-      expect(rows).toContain('Tritanium');
+      expect(rows).not.toContain('Tritanium');
     });
   });
 
@@ -2405,6 +2407,28 @@ describe('multi-select and bulk actions (issue #90)', () => {
   });
 });
 
+describe('Asset Category filter (issue #5601)', () => {
+  it('shows the empty state with Reset filters when no category is ticked, and Reset brings everything back', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets/items?cat=');
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(window.location.search).not.toContain('cat=');
+  });
+
+  it('lists the stations whose items are ticked', async () => {
+    // An empty catalogue puts every type under "Not on the market" (id -1).
+    window.history.replaceState({}, '', '/assets/items?cat=-1');
+    render(<App />);
+
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(screen.getByText(STRUCTURE)).toBeInTheDocument();
+  });
+});
+
 describe('view state in the URL (issue #1306)', () => {
   const CHAR_ID_2 = 92;
 
@@ -2494,18 +2518,18 @@ describe('view state in the URL (issue #1306)', () => {
 
   it('keeps the query string while drilling down, and the path still resolves', async () => {
     const user = userEvent.setup();
-    window.history.replaceState({}, '', '/assets?min=5');
+    window.history.replaceState({}, '', '/assets?min=0');
     render(<App />);
 
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/assets/items/60003760');
-    expect(window.location.search).toBe('?min=5');
+    expect(window.location.search).toBe('?min=0');
 
     await goBack(user);
     await screen.findByText(STRUCTURE);
     expect(window.location.pathname).toBe('/assets/items');
-    expect(window.location.search).toBe('?min=5');
+    expect(window.location.search).toBe('?min=0');
   });
 
   it('opens a drilled-in path with a query already on it', async () => {

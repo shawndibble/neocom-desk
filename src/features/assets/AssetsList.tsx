@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  IskInput,
   CachedNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -35,7 +34,6 @@ import { AbyssalValueNote } from '@/features/abyssal/AbyssalValueNote';
 import { formatIsk } from '@/lib/isk';
 import { collectItemIds, collectStationItemIds, type StationSortField } from '@/engine/assetTree';
 import { assetNodeSegment } from '@/engine/assetPath';
-import { type AssetSortField } from '@/features/assets/assetSortPreference';
 import { ItemColumnLabels, JumpsAwayText, SecurityValue } from '@/features/assets/assetBrowserRows';
 import { BrowseRowView } from '@/features/assets/AssetBrowseRows';
 import {
@@ -64,10 +62,10 @@ export function AssetsList({
     loading,
     activeCharacterId,
     refresh,
-    setView,
     setSearch,
     searchActive,
-    minValueInput,
+    activeFilterCount,
+    resetFilters,
     flatModeActive,
     activeCrossCharacterData,
     assetsResult,
@@ -96,8 +94,6 @@ export function AssetsList({
     routePreference,
     stationSortField,
     setStationSortField,
-    sortField,
-    setSortField,
     jumpsAwayOf,
     stationLabelFor,
     sortedTree,
@@ -258,28 +254,6 @@ export function AssetsList({
                 </span>
               )}
               <div className="ml-auto flex items-center gap-2">
-                <IskInput
-                  size="sm"
-                  echo={false}
-                  value={minValueInput}
-                  onChange={(min) => setView({ min })}
-                  placeholder={t('assets.minValue.placeholder')}
-                  aria-label={t('assets.minValue.label')}
-                  className="w-24"
-                />
-                <Select
-                  value={sortField}
-                  onValueChange={(value) => void setSortField(value as AssetSortField)}
-                >
-                  <SelectTrigger size="sm" aria-label={t('assets.sort.label')} className="w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
-                    <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
-                    <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
-                  </SelectContent>
-                </Select>
                 {searchActive && (
                   <IconButton
                     icon={<Icon.Close />}
@@ -477,6 +451,13 @@ export function AssetsList({
             <EmptyState
               title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
               className="py-8"
+              action={
+                activeFilterCount > 0 ? (
+                  <Button size="sm" onClick={resetFilters}>
+                    {t('common.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <div
