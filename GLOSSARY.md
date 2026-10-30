@@ -57,6 +57,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Owner rate**: What a **Feeder** is owed, kept as its own effective-dated history: the **Agreed rate** if one exists, else the **Requested rate**. Player-facing: "their rate" or "your rate".
 - **Payout**: ISK a **Collector** sent a **Feeder** for what it is owed. Distinct from a **Tax Payment**. Player-facing: "payment".
 - **Pending removal**: A **Collector**-started removal of a **Feeder** while it waits out its 24 hours. Player-facing: "Removal pending".
+- **Place Nickname**: The user's own short name for a station or structure ("Home market", "Staging"), shown on the Assets page beside the real name. Personal: it never replaces the real name anywhere another person, a share or an export would see it. Distinct from a **Station Pin**, which orders locations but does not rename them.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
