@@ -69,6 +69,21 @@ interface ModalProps {
 }
 
 /**
+ * How each placement arrives (`index.css` "Overlay motion"): a sheet rises from
+ * the bottom edge, a centred dialog fades and scales up, and `page` does the
+ * first on a phone (where it fills the screen) and the second from `md`.
+ */
+const PLACEMENT_MOTION: Record<ModalPlacement, string> = {
+  center: 'motion-dialog',
+  sheet: 'motion-sheet',
+  'sheet-full': 'motion-sheet',
+  medium: 'motion-dialog',
+  wide: 'motion-dialog',
+  page: 'motion-page',
+  media: 'motion-dialog',
+};
+
+/**
  * Per placement: the dialog's own box, and the height cap that box and its
  * inner column share — one entry, so the two can never disagree.
  */
@@ -104,6 +119,12 @@ const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightCla
  * closes. The `<dialog>` *is* the surface (docs/DESIGN.md §5 sanctions shadows
  * for modals), and stays content-sized rather than viewport-filling — otherwise
  * it would cover its own `::backdrop`.
+ *
+ * It animates in, never out: children render only while `open`, many callers
+ * unmount the whole Modal on close, and focus return runs in the close
+ * effect, so holding the dialog up for an exit would mean an empty shell or a
+ * late focus move. A swiped sheet is the exception: the gesture itself
+ * slides it off (`useSheetSwipe`).
  */
 export function Modal({
   open,
@@ -156,6 +177,9 @@ export function Modal({
     // focused at showModal() time; capture it so the guarantee holds under
     // unmount-while-open too.
     const trigger = document.activeElement;
+    // A swipe-dismissed sheet was left off screen (`useSheetSwipe`): open in place.
+    dialog.style.removeProperty('transform');
+    dialog.style.removeProperty('transition');
     if (!dialog.open) dialog.showModal();
     // After showModal(), whose own focusing steps land on the body: a child's
     // mount-time focus() would run first (child effects fire before this one)
@@ -204,7 +228,7 @@ export function Modal({
         // ones that landed on its ::backdrop.
         if (dismissOnOutsidePress && event.target === dialogRef.current) onClose();
       }}
-      className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
+      className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${PLACEMENT_MOTION[placement]} ${heightClass} ${dialogClass}`}
     >
       {open && (
         // The provider spans the header too, not just the body: a title can

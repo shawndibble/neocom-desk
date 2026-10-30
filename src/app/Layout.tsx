@@ -2,7 +2,7 @@ import { useNavBadges } from './navBadges';
 import { useRailSettingsNeedsAttention, useSettingsNeedsAttention } from './settingsAttention';
 import { RailUpgradeButton } from './RailUpgradeButton';
 import { UnreadAlertsContext } from '@/components/ui/unreadAlertsContext';
-import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
 import { useRouteFocus } from './routeFocus';
@@ -31,7 +31,8 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { MD_UP_QUERY, useMediaQuery, usePrefersReducedMotion } from '@/lib/useMediaQuery';
+import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
+import { useFadeOnChange } from '@/lib/useFadeOnChange';
 import { AlertCharacterSwitch } from './AlertCharacterSwitch';
 import { CharacterSwitcher } from './CharacterSwitcher';
 import { AuthFailureNotice } from './AuthFailureNotice';
@@ -223,42 +224,6 @@ function RailCharacterFooterLink({
 }
 
 /**
- * Fades the route outlet in whenever the page changes — `pageKeyFor`'s
- * pathname, in which a tab segment (`/contacts/across`) collapses to its page:
- * a tab switch is not a page change and does not fade (ADR 0015).
- *
- * Runs the animation on the live element rather than replaying a CSS one,
- * because the only way to restart a CSS animation is to remount — and the
- * outlet must keep its instance (see the call site). `useLayoutEffect`, so the
- * first frame at the new route is already at opacity 0; an effect after paint
- * would flash the content in at full opacity and then fade it.
- *
- * The `animate` guard is a real capability check, not a test shim: jsdom
- * implements no Web Animations API, so this must degrade to an instant swap
- * exactly as it does in a browser that lacks it.
- */
-function useRouteFade(pageKey: string) {
-  const ref = useRef<HTMLDivElement>(null);
-  const running = useRef<Animation | null>(null);
-  const reduced = usePrefersReducedMotion();
-
-  useLayoutEffect(() => {
-    const node = ref.current;
-    if (node === null || typeof node.animate !== 'function') return;
-    if (reduced) return;
-    // Navigating again mid-fade would otherwise leave two animations driving
-    // the same property, and the abandoned one still holds its own opacity.
-    running.current?.cancel();
-    running.current = node.animate([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 140,
-      easing: 'ease-out',
-    });
-  }, [pageKey, reduced]);
-
-  return ref;
-}
-
-/**
  * Records each view visited for the More sheet's Recent row. Renders nothing;
  * its own component because it reads the location, which `Layout` must not.
  */
@@ -294,7 +259,11 @@ function KeyboardShortcuts() {
 function RouteOutlet() {
   const { t } = useTranslation();
   const location = useLocation();
-  const outletRef = useRouteFade(pageKeyFor(location.pathname));
+  const outletRef = useRef<HTMLDivElement>(null);
+  // `pageKeyFor` collapses a tab segment (`/contacts/across`) to its page: a
+  // tab switch is not a page change and does not fade the outlet (ADR 0015);
+  // the tab panel fades on its own (`useTabPanelProps`).
+  useFadeOnChange(outletRef, pageKeyFor(location.pathname));
   useRouteFocus(outletRef, location.pathname, location.hash);
   return (
     /*

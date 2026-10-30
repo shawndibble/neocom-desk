@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { stubViewport } from '@/test/viewport';
 import { Modal, type ModalPlacement } from './Modal';
 
 const overlayEntry = () =>
@@ -79,7 +80,9 @@ describe('Modal bottom sheet', () => {
     render(<SheetHarness />);
     await user.click(screen.getByRole('button', { name: 'Open' }));
     swipe(dragZone(), 120, 1000);
-    expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument()
+    );
   });
 
   it('dismisses on a fast flick shorter than the distance threshold', async () => {
@@ -87,7 +90,46 @@ describe('Modal bottom sheet', () => {
     render(<SheetHarness />);
     await user.click(screen.getByRole('button', { name: 'Open' }));
     swipe(dragZone(), 40, 40);
-    expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('slides the sheet off the bottom before it closes', async () => {
+    const user = userEvent.setup();
+    render(<SheetHarness />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    swipe(dragZone(), 120, 1000);
+    expect(screen.getByRole('button', { name: 'Inside' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog').style.transform).toBe('translateY(100%)');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('closes at once under reduced motion', async () => {
+    const restore = stubViewport((query) => query.includes('prefers-reduced-motion'));
+    try {
+      const user = userEvent.setup();
+      render(<SheetHarness />);
+      await user.click(screen.getByRole('button', { name: 'Open' }));
+      swipe(dragZone(), 120, 1000);
+      expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('opens in place again after a swipe sent it off the bottom', async () => {
+    const user = userEvent.setup();
+    render(<SheetHarness />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    swipe(dragZone(), 120, 1000);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument()
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(screen.getByRole('dialog').style.transform).toBe('');
   });
 
   it('ignores velocity from a flick that was then held still', async () => {

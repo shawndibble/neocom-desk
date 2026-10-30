@@ -33,9 +33,10 @@ interface SlideOverProps {
   returnFocusFallback?: () => HTMLElement | null;
 }
 
+/** The edge it sits on, and slides in from and back out to (`index.css` "Overlay motion"). */
 const SIDE_CLASS = {
-  left: 'left-0 border-r',
-  right: 'right-0 border-l',
+  left: 'left-0 border-r motion-slide-left',
+  right: 'right-0 border-l motion-slide-right',
 } as const;
 
 /**

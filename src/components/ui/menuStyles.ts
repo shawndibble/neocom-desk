@@ -4,7 +4,8 @@ import { highlightedOptionClassName, interactiveClassName } from './controlStyle
 const menuSurfaceClassName =
   'z-50 rounded-xs border border-line bg-panel p-1 text-text shadow-lg shadow-black/50 outline-none';
 
-export const menuContentClassName = `${menuSurfaceClassName} min-w-40`;
+/** Pops in from its trigger (`index.css` "Overlay motion"); a submenu only fades. */
+export const menuContentClassName = `${menuSurfaceClassName} motion-pop min-w-40`;
 
 /**
  * A submenu never runs past the viewport: on a phone the parent menu already
@@ -14,7 +15,7 @@ export const menuContentClassName = `${menuSurfaceClassName} min-w-40`;
  * `MENU_COLLISION_PADDING`), with items wrapping instead; the usual 10rem
  * floor gives way to that room when there is less of it.
  */
-export const menuSubContentClassName = `${menuSurfaceClassName} min-w-[min(10rem,var(--radix-popper-available-width))] max-w-[var(--radix-popper-available-width)]`;
+export const menuSubContentClassName = `${menuSurfaceClassName} motion-fade min-w-[min(10rem,var(--radix-popper-available-width))] max-w-[var(--radix-popper-available-width)]`;
 
 /** The gap a menu or submenu keeps from the viewport's edges, px. */
 export const MENU_COLLISION_PADDING = 8;

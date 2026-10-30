@@ -191,6 +191,36 @@ describe('Tabs', () => {
     });
   });
 
+  describe('switching tabs', () => {
+    afterEach(() => {
+      // @ts-expect-error -- jsdom has no `animate` of its own to restore
+      delete Element.prototype.animate;
+    });
+
+    it('fades the panel in on a switch, but not as it first appears', () => {
+      // jsdom has no Web Animations API; the stub stands in for it.
+      const animate = vi.fn(() => ({ cancel: vi.fn() }));
+      Object.defineProperty(Element.prototype, 'animate', {
+        value: animate,
+        writable: true,
+        configurable: true,
+      });
+      const { rerender } = render(
+        <TabPanel tabsId="t" tabId="open">
+          open body
+        </TabPanel>
+      );
+      expect(animate).not.toHaveBeenCalled();
+      rerender(
+        <TabPanel tabsId="t" tabId="history">
+          history body
+        </TabPanel>
+      );
+      expect(animate).toHaveBeenCalledTimes(1);
+      expect(animate.mock.instances[0]).toBe(screen.getByRole('tabpanel'));
+    });
+  });
+
   /**
    * A pointer user has no swipe: a vertical wheel travels the bar and a
    * chevron appears at whichever end still has tabs beyond it. jsdom does no

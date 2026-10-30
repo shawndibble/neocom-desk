@@ -341,7 +341,7 @@ export function Tooltip({
               sideOffset={4}
               collisionPadding={8}
               onEscapeKeyDown={handleEscape}
-              className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
+              className="motion-fade pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
             >
               {content}
             </TooltipPrimitive.Content>

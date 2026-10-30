@@ -499,7 +499,7 @@ export function CompareDrawer({
             }
           }}
           style={fullScreen ? undefined : { height: mode === 'full' ? FULL_HEIGHT : heightPx }}
-          className={`flex flex-col border-line bg-panel ${fullScreen ? 'fixed inset-0 h-dvh pb-[env(safe-area-inset-bottom)]' : 'border border-b-0'}`}
+          className={`motion-rise flex flex-col border-line bg-panel ${fullScreen ? 'fixed inset-0 h-dvh pb-[env(safe-area-inset-bottom)]' : 'border border-b-0'}`}
         >
           {!fullScreen && (
             <div
