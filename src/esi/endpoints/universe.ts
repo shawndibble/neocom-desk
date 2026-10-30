@@ -1,11 +1,9 @@
 import type { SystemJumpsEntry, SystemKillsEntry } from '@/engine/route/routeSafety';
 import type { IncursionEntry } from '@/engine/incursions/incursionRows';
-import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import type { EndpointOptions } from './options';
-import type { EsiEndpointId } from '../registry';
-import { chunk } from '@/lib/chunk';
+import { postChunked } from './postChunked';
 
 // --- GET /universe/types/{type_id} (public) ---
 
@@ -336,36 +334,6 @@ export interface CharacterAffiliation {
   corporation_id: number;
   alliance_id?: number;
   faction_id?: number;
-}
-
-/** ESI's documented cap on ids per request (maxItems in the spec) — shared with `postUniverseNames`. */
-const AFFILIATION_BATCH_LIMIT = 1000;
-
-/** Batches in flight at once: ESI bills errors against a shared budget, so stay small. */
-const POST_CHUNK_CONCURRENCY = 2;
-
-/**
- * POSTs `ids` to a bulk-lookup endpoint in `AFFILIATION_BATCH_LIMIT`-sized
- * batches, a couple at a time, and returns the results in batch order.
- */
-async function postChunked<TIn, TOut>(
-  path: string,
-  endpointId: EsiEndpointId,
-  ids: TIn[],
-  signal: AbortSignal | undefined
-): Promise<TOut[]> {
-  const batches = chunk(ids, AFFILIATION_BATCH_LIMIT);
-  const results: TOut[][] = batches.map(() => []);
-  await mapWithConcurrencyLimit(batches, POST_CHUNK_CONCURRENCY, async (batch) => {
-    const result = await esiFetch<TOut[]>(path, {
-      method: 'POST',
-      body: batch,
-      signal,
-      endpointId,
-    });
-    results[batches.indexOf(batch)] = result.data ?? [];
-  });
-  return results.flat();
 }
 
 /**

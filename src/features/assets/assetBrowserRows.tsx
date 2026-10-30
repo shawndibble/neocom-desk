@@ -285,6 +285,8 @@ export function LocationRow({
 interface ContainerRowProps {
   href: string;
   label: string;
+  /** The player's in-game name: shown first, `label` (the type) dim beneath. */
+  gameName?: string;
   itemCount: number;
   estimatedValue: number;
   characterBadge: string | null;
@@ -300,6 +302,7 @@ interface ContainerRowProps {
 export function ContainerRow({
   href,
   label,
+  gameName,
   itemCount,
   estimatedValue,
   characterBadge,
@@ -327,7 +330,12 @@ export function ContainerRow({
       >
         <Icon.Container size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
         <span className="flex min-w-0 flex-1 items-center">
-          {named ? (
+          {gameName !== undefined ? (
+            <span className="flex min-w-0 flex-col">
+              <h3 className="truncate text-sm font-medium">{gameName}</h3>
+              <span className="truncate text-xs text-text-dim">{label}</span>
+            </span>
+          ) : named ? (
             <h3 className="truncate text-sm font-medium">{label}</h3>
           ) : (
             <span className="truncate text-sm text-text-dim">{label}</span>
@@ -395,6 +403,8 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
 
 interface ItemRowProps {
   name: string;
+  /** The player's in-game name: shown first, `name` (the type) dim beneath. */
+  gameName?: string;
   quantity: number;
   unitVolume: number | undefined;
   estimatedValue: number;
@@ -464,6 +474,7 @@ function ValueFigure({
  */
 export function ItemRow({
   name,
+  gameName,
   quantity,
   unitVolume,
   estimatedValue,
@@ -502,7 +513,14 @@ export function ItemRow({
             <span className={cx('flex min-w-0 items-center', ITEM_NAME_CELL)}>
               {typeId === undefined ? (
                 <Tooltip content={name}>
-                  <span className="truncate text-sm">{name}</span>
+                  {gameName === undefined ? (
+                    <span className="truncate text-sm">{name}</span>
+                  ) : (
+                    <span className="flex min-w-0 flex-col text-sm">
+                      <span className="truncate">{gameName}</span>
+                      <span className="truncate text-xs text-text-dim">{name}</span>
+                    </span>
+                  )}
                 </Tooltip>
               ) : (
                 <ItemInfoLink
@@ -515,7 +533,14 @@ export function ItemRow({
                   }}
                 >
                   <Tooltip content={name}>
-                    <span className="truncate">{name}</span>
+                    {gameName === undefined ? (
+                      <span className="truncate">{name}</span>
+                    ) : (
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">{gameName}</span>
+                        <span className="truncate text-xs text-text-dim">{name}</span>
+                      </span>
+                    )}
                   </Tooltip>
                 </ItemInfoLink>
               )}
@@ -554,6 +579,8 @@ export function ItemRow({
 
 interface SearchResultRowProps {
   name: string;
+  /** The player's in-game name: shown first, `name` (the type) dim beneath. */
+  gameName?: string;
   quantity: number;
   estimatedValue: number;
   /** Where this item lives, outermost first — the drill-down path it would take to reach it. */
@@ -580,6 +607,7 @@ interface SearchResultRowProps {
  */
 export function SearchResultRow({
   name,
+  gameName,
   quantity,
   estimatedValue,
   trail,
@@ -605,7 +633,14 @@ export function SearchResultRow({
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="flex min-w-0 items-baseline gap-2">
                 <span className="flex min-w-0 flex-1 items-center">
-                  <span className="truncate text-sm font-medium">{name}</span>
+                  {gameName === undefined ? (
+                    <span className="truncate text-sm font-medium">{name}</span>
+                  ) : (
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm font-medium">{gameName}</span>
+                      <span className="truncate text-xs font-normal text-text-dim">{name}</span>
+                    </span>
+                  )}
                   {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
                   {characterBadge && <CharacterBadge characterName={characterBadge} />}
                 </span>

@@ -26,6 +26,7 @@ import {
 } from '@/features/assets/assetBrowserRows';
 import type { Translate } from '@/lib/translate';
 import type { PlaceNicknamesValue } from '@/features/assets/placeNicknames';
+import type { AssetNameMap } from '@/engine/assetNames';
 import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
@@ -57,6 +58,7 @@ export function NodeContainerRow({
   node,
   href,
   label,
+  gameName,
   characterBadge,
   selectMode,
   selectedIds,
@@ -66,12 +68,15 @@ export function NodeContainerRow({
   node: Exclude<AssetTreeNode, { kind: 'item' }>;
   href: string;
   label: string;
+  /** The player's in-game name for this ship or container. */
+  gameName?: string;
   characterBadge: string | null;
 }) {
   return (
     <ContainerRow
       href={href}
       label={label}
+      gameName={gameName}
       itemCount={node.itemCount}
       estimatedValue={node.estimatedValue}
       characterBadge={characterBadge}
@@ -91,6 +96,7 @@ export function NodeContainerRow({
 export function NodeItemRow({
   asset,
   label,
+  gameName,
   unitVolume,
   estimatedValue,
   valueHint,
@@ -105,6 +111,8 @@ export function NodeItemRow({
 }: RowSelectionProps & {
   asset: Pick<CharacterAsset, 'item_id' | 'type_id' | 'quantity'>;
   label: string;
+  /** The player's in-game name for this ship or container. */
+  gameName?: string;
   unitVolume: number | undefined;
   estimatedValue: number;
   valueHint?: string;
@@ -117,6 +125,7 @@ export function NodeItemRow({
   return (
     <ItemRow
       name={label}
+      gameName={gameName}
       quantity={asset.quantity}
       unitVolume={unitVolume}
       estimatedValue={estimatedValue}
@@ -138,6 +147,8 @@ interface BrowseRowViewProps {
   row: BrowseRow;
   t: Translate;
   typeNames: ReadonlyMap<number, string>;
+  /** In-game ship/container names by item id: shown first, the type name beneath. */
+  assetNames: AssetNameMap;
   characterBadges: CharacterBadgeContext;
   selectMode: boolean;
   selectedIds: ReadonlySet<number>;
@@ -270,6 +281,7 @@ function SearchMatchRow({
   return (
     <SearchResultRow
       name={name}
+      gameName={match.gameName}
       quantity={asset.quantity}
       estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
       trail={trail}
@@ -320,6 +332,7 @@ function NodeRowView({
   onToggleSelection,
   nodeLabel,
   characterBadges,
+  assetNames,
   pathStationId,
   pathSegments,
   query,
@@ -327,6 +340,7 @@ function NodeRowView({
   const actions = useAssetItemActions();
   const pageActions = useItemActions();
   const label = nodeLabel(node);
+  const gameName = node.kind === 'bay' ? undefined : assetNames[node.asset.item_id];
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
   const valueHint = useAbyssalValueHint(
@@ -340,6 +354,7 @@ function NodeRowView({
         node={node}
         href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
+        gameName={gameName}
         characterBadge={badge}
         selectMode={selectMode}
         selectedIds={selectedIds}
@@ -367,6 +382,7 @@ function NodeRowView({
     <NodeItemRow
       asset={asset}
       label={label}
+      gameName={gameName}
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
