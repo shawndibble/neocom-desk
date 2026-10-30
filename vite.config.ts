@@ -742,6 +742,10 @@ export default defineConfig({
     // machine. CI runners are small enough (2-4 cores) that the default is
     // already fine there, so only cap it locally.
     ...(process.env.GITHUB_ACTIONS === 'true' ? {} : { maxWorkers: 2 }),
+    // Worker threads share one Node process, so they start faster and hold
+    // less memory than one forked process per worker. A fork-only failure
+    // (a native addon, `process.chdir`) would show up as a CI failure.
+    pool: 'threads',
     coverage: { reporter: ['text', 'html'], exclude: ['src/mockups/**', '**/*.stories.tsx'] },
     // Suppresses passing-test noise, keeps full detail on failures — cuts
     // `test:run` output (read by CI logs and every agent tool call alike)
