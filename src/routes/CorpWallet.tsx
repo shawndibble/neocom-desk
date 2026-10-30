@@ -582,11 +582,18 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   // URL just delivered. Reset on a real division switch — the rows change
   // wholesale, and the ref-type dropdown is built from that journal's values.
   const filterScope = `division:${division}`;
-  const [journalFilter, setJournalFilter, journalRowsFilter] = useUrlFilter<WalletJournalFilter>(
-    filterScope,
-    JOURNAL_FILTER_PARAMS,
-    JOURNAL_FIELD_TO_PARAM,
-    EMPTY_JOURNAL_FILTER_PARAMS
+  const [urlJournalFilter, setJournalFilter, urlJournalRowsFilter] =
+    useUrlFilter<WalletJournalFilter>(
+      filterScope,
+      JOURNAL_FILTER_PARAMS,
+      JOURNAL_FIELD_TO_PARAM,
+      EMPTY_JOURNAL_FILTER_PARAMS
+    );
+  // Party is a personal-journal filter: a stray `?journal.party=` must not hide corp rows.
+  const journalFilter = useMemo(() => ({ ...urlJournalFilter, party: null }), [urlJournalFilter]);
+  const journalRowsFilter = useMemo(
+    () => ({ ...urlJournalRowsFilter, party: null }),
+    [urlJournalRowsFilter]
   );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
 

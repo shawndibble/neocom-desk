@@ -26,6 +26,8 @@ export type JournalRow = WalletJournalEntry & {
   characterId?: number;
   /** The corp journal's Player: the character party of the line, when it has one. */
   playerId?: number;
+  /** The Journal Party: the other side of the line, never the pilot's own Character. */
+  partyId?: number;
   /** Both parties are the pilot's own Characters: left out of In, Out and the ref-type rows. */
   internal?: boolean;
   /** Replaces `ref_type` for grouping and filtering: PLEX bought or sold. */
@@ -59,19 +61,39 @@ function plexKey(
   return fill.is_buy ? PLEX_BOUGHT_KEY : PLEX_SOLD_KEY;
 }
 
+/**
+ * The other side of a line from `ownId`'s wallet: the one party that is not the
+ * Character. When neither is (a line ESI files under other ids), the payer of an
+ * income line or the payee of an expense one.
+ */
+export function journalPartyId(entry: WalletJournalEntry, ownId: number): number | undefined {
+  const others = [entry.first_party_id, entry.second_party_id].filter(
+    (id): id is number => id !== undefined && id !== ownId
+  );
+  if (others.length < 2) return others[0];
+  return (entry.amount ?? 0) >= 0 ? entry.first_party_id : entry.second_party_id;
+}
+
 export interface ClassifyContext {
   /** Wallet-scoped Characters; a party outside it is not "yours". */
   trackedIds: ReadonlySet<number>;
   linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined;
+  /** The Character a line without its own `characterId` belongs to: gives it a Journal Party. */
+  defaultCharacterId?: number;
 }
 
 export function classifyJournal(
   entries: readonly JournalLine[],
-  { trackedIds, linkFor }: ClassifyContext
+  { trackedIds, linkFor, defaultCharacterId }: ClassifyContext
 ): JournalRow[] {
   return entries.map((entry) => {
     const row: JournalRow = { ...entry };
     if (isInternalTransfer(entry, trackedIds)) row.internal = true;
+    else {
+      const ownId = entry.characterId ?? defaultCharacterId;
+      const partyId = ownId === undefined ? undefined : journalPartyId(entry, ownId);
+      if (partyId !== undefined) row.partyId = partyId;
+    }
     const refKey = plexKey(entry, linkFor);
     if (refKey) row.refKey = refKey;
     return row;

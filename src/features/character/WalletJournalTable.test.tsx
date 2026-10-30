@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { JournalRow } from '@/engine/journalNetting';
-import { JournalTable } from './WalletJournalTable';
+import { JournalTable, type JournalPartyView } from './WalletJournalTable';
 import { useJournalColumnsBuilder } from './walletJournal';
 import { EMPTY_WALLET_JOURNAL_FILTER, type WalletJournalFilter } from './walletJournalFilter';
 import { walletJournalCsvColumns } from './walletJournalCsv';
@@ -41,7 +41,9 @@ function Harness({
   onFilterChange = () => {},
   sort = { columnId: 'date', direction: 'desc' },
   playerOptions,
+  partyView,
 }: {
+  partyView?: JournalPartyView;
   playerOptions?: { id: string; name: string }[];
   sort?: { columnId: string; direction: 'asc' | 'desc' };
   filter?: WalletJournalFilter;
@@ -70,6 +72,7 @@ function Harness({
         onFilterChange={onFilterChange}
         refTypeOptions={['bounty_prize', 'market_escrow']}
         playerOptions={playerOptions}
+        partyView={partyView}
         filteredJournal={rows}
         breakdownJournal={rows}
         chartJournal={rows}
@@ -89,6 +92,14 @@ function Harness({
       />
     </MemoryRouter>
   );
+}
+
+function partyView(rows: JournalRow[]): JournalPartyView {
+  return {
+    options: [{ id: '77', name: 'CONCORD' }],
+    nameFor: (id) => (id === 77 ? 'CONCORD' : `#${id}`),
+    journal: rows,
+  };
 }
 
 describe('JournalTable', () => {
@@ -133,6 +144,27 @@ describe('JournalTable', () => {
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('menuitem', { name: 'Filter to this player' }));
     expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ player: '42' }));
+  });
+
+  it('gives a personal line with a Journal Party a ⋮ that filters to the party or its type', async () => {
+    const onFilterChange = vi.fn();
+    const rows: JournalRow[] = [{ ...journal[0]!, partyId: 77 }, journal[1]!];
+    render(<Harness rows={rows} partyView={partyView(rows)} onFilterChange={onFilterChange} />);
+    expect(screen.getAllByRole('button', { name: /More actions for/ })).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: /More actions for CONCORD/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Filter to CONCORD' }));
+    expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ party: '77' }));
+  });
+
+  it('lists By party rows and filters to the party that is clicked', async () => {
+    const onFilterChange = vi.fn();
+    const user = userEvent.setup();
+    const rows: JournalRow[] = [{ ...journal[0]!, partyId: 77 }, journal[1]!];
+    render(<Harness rows={rows} partyView={partyView(rows)} onFilterChange={onFilterChange} />);
+    await user.click(await screen.findByRole('button', { name: 'By party' }));
+    const list = await screen.findByRole('table', { name: 'By party' });
+    await user.click(within(list).getByText('CONCORD'));
+    expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ party: '77' }));
   });
 
   it('has no row menu on the personal journal', () => {

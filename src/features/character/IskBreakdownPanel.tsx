@@ -4,11 +4,12 @@
  * filtered In / Out / Net, and a ref type clicked here is the Journal's
  * ref-type filter. Non-modal (`SlideOver`): the Journal stays live behind it.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
   ProgressBar,
+  SegmentedControl,
   SlideOver,
   StatChip,
   StatChips,
@@ -17,10 +18,15 @@ import {
 import type { JournalCoverage } from '@/engine/journalNetting';
 import { netToneClass } from '@/features/character/format';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
-import type {
-  JournalBreakdown,
-  RefTypeBreakdownRow,
+import { useJournalBreakdownView } from '@/features/character/journalBreakdownViewPref';
+import {
+  MARKET_TRADES_KEY,
+  MARKET_TRADES_REF_TYPE,
+  type JournalBreakdown,
+  type PartyBreakdownRow,
+  type RefTypeBreakdownRow,
 } from '@/features/character/walletJournalFilter';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { signedIsk } from '@/lib/signedIsk';
 import { formatIsk } from '@/lib/isk';
 
@@ -37,6 +43,16 @@ interface IskBreakdownPanelProps {
   breakdown: JournalBreakdown;
   selectedRefType: string | null;
   onSelectRefType: (refType: string) => void;
+  /**
+   * The personal journal's By party list: every Journal Party in the rows without
+   * the party filter. Absent on the corp journal, which has no By party view.
+   */
+  parties?: {
+    rows: readonly PartyBreakdownRow[];
+    nameFor: (id: number) => string;
+    selected: string | null;
+    onSelect: (partyId: number) => void;
+  };
   /**
    * Own-Character netting data (coverage note, "Between your Characters"):
    * absent for the corp journal and a one-Character account, which net nothing.
@@ -58,10 +74,15 @@ export function IskBreakdownPanel({
   breakdown,
   selectedRefType,
   onSelectRefType,
+  parties,
   coverage,
   chart,
 }: IskBreakdownPanelProps) {
   const { t } = useTranslation();
+  const storedView = useJournalBreakdownView((state) => state.value);
+  const setView = useJournalBreakdownView((state) => state.setValue);
+  const hydrated = useHydratedStore(useJournalBreakdownView);
+  const view = parties && hydrated ? storedView : 'type';
   const maxNet = useMemo(
     () => Math.max(0, ...breakdown.rows.map((row) => Math.abs(row.net))),
     [breakdown.rows]
@@ -101,6 +122,66 @@ export function IskBreakdownPanel({
     ],
     [t, maxNet]
   );
+  const maxPartyNet = useMemo(
+    () => Math.max(0, ...(parties?.rows ?? []).map((row) => Math.abs(row.net))),
+    [parties?.rows]
+  );
+  const partyLabel = useCallback(
+    (row: PartyBreakdownRow) =>
+      row.partyId === null
+        ? t('wallet.journalMarketTrades')
+        : (parties?.nameFor(row.partyId) ?? ''),
+    [parties, t]
+  );
+  const partyColumns = useMemo<DataTableColumn<PartyBreakdownRow>[]>(
+    () => [
+      {
+        id: 'party',
+        stickyStart: true,
+        header: t('wallet.journalBreakdownParty'),
+        render: (row) => (
+          <span className="block min-w-0">
+            {partyLabel(row)}
+            <ProgressBar
+              label={t('wallet.journalBreakdownShare', { type: partyLabel(row) })}
+              value={Math.abs(row.net)}
+              max={maxPartyNet || 1}
+              size="xs"
+              tone={row.net >= 0 ? 'success' : 'danger'}
+              className="mt-1 w-full"
+            />
+          </span>
+        ),
+        sortValue: partyLabel,
+      },
+      {
+        id: 'in',
+        header: t('wallet.journalBreakdownIn'),
+        align: 'right',
+        className: 'tabular-nums text-isk-pos',
+        render: (row) => formatIsk(row.income),
+        sortValue: (row) => row.income,
+      },
+      {
+        id: 'out',
+        header: t('wallet.journalBreakdownOut'),
+        align: 'right',
+        className: 'tabular-nums text-isk-neg',
+        render: (row) => formatIsk(row.expense),
+        sortValue: (row) => row.expense,
+      },
+      {
+        id: 'net',
+        header: t('wallet.journalBreakdownNet'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (row) => netToneClass(row.net),
+        render: (row) => signedIsk(row.net, 0),
+        sortValue: (row) => row.net,
+      },
+    ],
+    [t, partyLabel, maxPartyNet]
+  );
   return (
     <SlideOver
       open={open}
@@ -125,7 +206,38 @@ export function IskBreakdownPanel({
           />
         </StatChips>
         {chart}
-        {breakdown.rows.length > 0 && (
+        {parties && (
+          <SegmentedControl
+            label={t('wallet.journalBreakdownViewLabel')}
+            size="sm"
+            options={[
+              { value: 'type', label: t('wallet.journalBreakdownByType') },
+              { value: 'party', label: t('wallet.journalBreakdownByParty') },
+            ]}
+            value={view}
+            onChange={(next) => void setView(next)}
+          />
+        )}
+        {parties && view === 'party' && parties.rows.length > 0 && (
+          <DataTable
+            label={t('wallet.journalBreakdownByParty')}
+            columns={partyColumns}
+            rows={parties.rows}
+            rowKey={(row) => row.key}
+            density="compact"
+            responsive="table"
+            defaultSort={{ columnId: 'net', direction: 'desc' }}
+            selectedRowKey={
+              selectedRefType === MARKET_TRADES_REF_TYPE ? MARKET_TRADES_KEY : parties.selected
+            }
+            onRowClick={(row) =>
+              row.partyId === null
+                ? onSelectRefType(MARKET_TRADES_REF_TYPE)
+                : parties.onSelect(row.partyId)
+            }
+          />
+        )}
+        {view === 'type' && breakdown.rows.length > 0 && (
           <DataTable
             label={t('wallet.journalBreakdownTitle')}
             columns={columns}

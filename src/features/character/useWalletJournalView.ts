@@ -17,6 +17,7 @@ import {
   loadWalletScopedCharacterIds,
   type AllJournalsSnapshot,
 } from '@/features/character/walletJournalAll';
+import { usePartyNames } from '@/features/character/usePartyNames';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
   EMPTY_JOURNAL_FILTER_PARAMS,
@@ -237,8 +238,13 @@ export function useWalletJournalView({
     journalNeedsReauth,
   ]);
   const classifiedJournal = useMemo(
-    () => classifyJournal(journalRows, { trackedIds, linkFor: personalLinkFor }),
-    [journalRows, trackedIds, personalLinkFor]
+    () =>
+      classifyJournal(journalRows, {
+        trackedIds,
+        linkFor: personalLinkFor,
+        defaultCharacterId: activeCharacterId ?? undefined,
+      }),
+    [journalRows, trackedIds, personalLinkFor, activeCharacterId]
   );
   const journalCoverageInfo = useMemo(() => {
     if (allCharacters.length < 2) return undefined;
@@ -249,8 +255,30 @@ export function useWalletJournalView({
           trackedIds
         );
   }, [allCharacters, allJournalsData, pickedCharacters, trackedIds]);
-  const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
+  const { filteredJournal, breakdownJournal, partyBreakdownJournal, chartJournal, refTypeOptions } =
     useJournalFilterResult(classifiedJournal, journalRowsFilter);
+  // Every Journal Party on the journal, named once ESI has: the Party select's options.
+  const partyIds = useMemo(
+    () => [
+      ...new Set(
+        classifiedJournal.flatMap((row) => (row.partyId === undefined ? [] : [row.partyId]))
+      ),
+    ],
+    [classifiedJournal]
+  );
+  const partyNames = usePartyNames(partyIds);
+  const partyNameFor = useCallback((id: number) => partyNames.get(id) ?? `#${id}`, [partyNames]);
+  const partyOptions = useMemo(
+    () =>
+      partyIds
+        .map((id) => ({ id: String(id), name: partyNameFor(id) }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [partyIds, partyNameFor]
+  );
+  const partyView = useMemo(
+    () => ({ options: partyOptions, nameFor: partyNameFor, journal: partyBreakdownJournal }),
+    [partyOptions, partyNameFor, partyBreakdownJournal]
+  );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
 
   // The title-bar export button and the row menus export the same rows, in
@@ -305,6 +333,7 @@ export function useWalletJournalView({
         filteredJournal,
         breakdownJournal,
         chartJournal,
+        partyView,
         journalColumns,
         sort: journalSortProps.sort,
         onSortChange: journalSortProps.onSortChange,
