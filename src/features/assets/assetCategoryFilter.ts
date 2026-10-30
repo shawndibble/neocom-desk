@@ -199,7 +199,9 @@ export function categoryPickParam(): UrlParamCodec<CategoryPick> {
       if (raw === null) return 'all';
       if (raw === '') return new Set<number>();
       const ids = raw.split(',').map(Number);
-      return ids.every(Number.isInteger) ? new Set(ids) : 'all';
+      return ids.every((id) => Number.isInteger(id) && (id >= 1 || id === NOT_ON_MARKET))
+        ? new Set(ids)
+        : 'all';
     },
     serialize: (value) => (value === 'all' ? null : [...value].sort((a, b) => a - b).join(',')),
   };

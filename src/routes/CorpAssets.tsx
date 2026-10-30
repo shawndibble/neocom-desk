@@ -135,12 +135,14 @@ import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumParam, optionalIntParam, textParam } from '@/lib/urlState';
 
+const CATEGORY_PARAM = categoryPickParam();
+
 const URL_PARAMS = {
   q: textParam(),
   group: enumParam(['item', 'location'] as const, 'item'),
   loc: optionalIntParam({ min: 1 }),
   div: optionalIntParam({ min: 1, max: 7 }),
-  cat: categoryPickParam(),
+  cat: CATEGORY_PARAM,
   bp: blueprintKindParam(),
   below: boolParam(),
 };
@@ -544,7 +546,7 @@ function CorpAssetsView({
     tab,
     params.loc,
     params.div,
-    params.cat,
+    CATEGORY_PARAM.serialize(params.cat),
     params.bp,
     params.below,
     params.group,
@@ -644,7 +646,7 @@ function CorpAssetsView({
   };
   const activeFilterCount =
     [params.loc, params.div].filter((v) => v !== null).length +
-    (pickIsAll(categoryPick) ? 0 : 1) +
+    (categoryIndex && !pickIsAll(categoryPick) ? 1 : 0) +
     (params.bp !== 'any' && showBlueprintSelect ? 1 : 0);
   const shownCount = byLocation ? locationRows.length : itemRows.length;
 

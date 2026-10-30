@@ -134,3 +134,10 @@ describe('expandLegacyCategoryIds', () => {
     expect(expandLegacyCategoryIds(index, 'all')).toBe('all');
   });
 });
+
+describe('categoryPickParam malformed ids', () => {
+  it('reads an empty segment or zero as all', () => {
+    expect(categoryPickParam().parse('1,')).toBe('all');
+    expect(categoryPickParam().parse('0')).toBe('all');
+  });
+});
