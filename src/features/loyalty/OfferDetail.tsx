@@ -205,8 +205,8 @@ export function OfferDetail({
             if (next !== undefined) setRedemptions(next);
           }}
         />
-        {walking && <span>{t('loyaltyStore.walkedLoading')}</span>}
       </label>
+      {walking && <p className="text-xs text-text-dim">{t('loyaltyStore.walkedLoading')}</p>}
 
       <div className="flex flex-wrap gap-6">
         <div>
@@ -248,6 +248,7 @@ export function OfferDetail({
             })}
           </dt>
           <dd className={`tabular-nums ${walked?.output.moved ? 'text-warning' : 'text-text'}`}>
+            {walked?.output.moved && `${t('loyaltyStore.walkedAverage')} `}
             {profit.revenue === null ? '—' : formatIsk(profit.revenue)}
           </dd>
         </div>
@@ -278,6 +279,11 @@ export function OfferDetail({
             <div className="flex flex-col gap-0.5 pl-3">
               {row.requiredItems.map((item, index) => {
                 const line = walked?.requiredLines[index];
+                const lineCost = line
+                  ? line.lineCost
+                  : item.unitPrice === null
+                    ? null
+                    : item.unitPrice * item.quantity;
                 return (
                   <div
                     key={item.typeId}
@@ -294,17 +300,14 @@ export function OfferDetail({
                         <span className="text-warning">
                           {t('loyaltyStore.unfilledUnits', { count: line.unfilled })}
                         </span>
-                      ) : (line
-                          ? line.lineCost
-                          : item.unitPrice === null
-                            ? null
-                            : item.unitPrice * item.quantity) === null ? (
+                      ) : lineCost === null ? (
                         <span className="text-warning">
                           {t('loyaltyStore.requiredItemsNotPriced')}
                         </span>
                       ) : (
                         <span className={line?.moved ? 'text-warning' : undefined}>
-                          {formatIsk(line ? line.lineCost! : item.unitPrice! * item.quantity)}
+                          {line?.moved && `${t('loyaltyStore.walkedAverage')} `}
+                          {formatIsk(lineCost)}
                         </span>
                       )}
                     </dd>

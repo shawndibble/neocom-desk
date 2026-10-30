@@ -11490,6 +11490,7 @@
     "unpriceableRequiredItem": "Can't be priced at this hub — a required item has no listed sell price.",
     "howMany": "How many",
     "iskPerLpAtN": "{{atN}} at {{n}} · {{at1}} at 1",
+    "walkedAverage": "avg",
     "walkedLoading": "Reading order books…",
     "unfilledUnits": "{{count}} not on the book",
     "unsoldUnits": "{{count}} units the buy orders cannot take",

@@ -6,7 +6,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { SkillLevels } from '@/engine/industry/types';
-import { buyOrderReaches, type ReachableBuyOrder } from '@/engine/market/buyReach';
+import type { ReachableBuyOrder } from '@/engine/market/buyReach';
+import { reachableBuyOrders } from '@/engine/market/liveBook';
 import type { HubOrder } from '@/engine/market/haulingMarket';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { priceRedemptions, type RedemptionsResult } from '@/engine/loyalty/redemptions';
@@ -29,7 +30,10 @@ interface Args {
   playerLp: number | null;
 }
 
-type Books = ReadonlyMap<number, LiveBook | 'failed'>;
+/** Keyed by `bookKey`, so a hub change never reads another hub's book. */
+type Books = ReadonlyMap<string, LiveBook | 'failed'>;
+
+const bookKey = (hub: TradeHub, typeId: number): string => `${hub.stationId}:${typeId}`;
 
 /** Units one redemption hands over: the offer's quantity, or a blueprint's product per run. */
 function outputUnitsOf(row: LoyaltyOfferRow, catalog: BlueprintCatalog | null): number | null {
@@ -56,30 +60,31 @@ export function useRedemptionPricing({
   const [books, setBooks] = useState<Books>(new Map());
   const jumps = useBuyJumps(redemptions > 1 && instant ? hub.systemId : 0);
 
+  const active = redemptions > 1;
   useEffect(() => {
-    if (redemptions <= 1 || typeIdsKey === '') return;
+    if (!active || typeIdsKey === '') return;
     let cancelled = false;
     for (const typeId of typeIdsKey.split(',').map(Number)) {
       getLiveBook({ hub, typeId }).then(
         (book) => {
-          if (!cancelled) setBooks((prev) => new Map(prev).set(typeId, book));
+          if (!cancelled) setBooks((prev) => new Map(prev).set(bookKey(hub, typeId), book));
         },
         () => {
-          if (!cancelled) setBooks((prev) => new Map(prev).set(typeId, 'failed'));
+          if (!cancelled) setBooks((prev) => new Map(prev).set(bookKey(hub, typeId), 'failed'));
         }
       );
     }
     return () => {
       cancelled = true;
     };
-  }, [redemptions > 1, typeIdsKey, hub]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, typeIdsKey, hub]);
 
   return useMemo(() => {
     if (redemptions <= 1) return { result: null, loading: false };
     const requiredTypeIds = row.requiredItems.map((item) => item.typeId);
     const sellBooks = new Map<number, readonly HubOrder[]>();
     for (const typeId of requiredTypeIds) {
-      const book = books.get(typeId);
+      const book = books.get(bookKey(hub, typeId));
       if (book === undefined || book === 'failed') continue;
       sellBooks.set(
         typeId,
@@ -91,28 +96,17 @@ export function useRedemptionPricing({
         }))
       );
     }
-    const outputBook = instant && outputTypeId !== null ? books.get(outputTypeId) : undefined;
+    const outputBook =
+      instant && outputTypeId !== null ? books.get(bookKey(hub, outputTypeId)) : undefined;
     let buyOrders: ReachableBuyOrder[] | undefined;
     if (outputBook !== undefined && outputBook !== 'failed') {
       const station = { locationId: hub.stationId, systemId: hub.systemId };
-      buyOrders = [];
-      for (const o of outputBook.orders) {
-        if (!o.is_buy_order) continue;
-        const candidate: ReachableBuyOrder = {
-          price: o.price,
-          volumeRemain: o.volume_remain ?? 0,
-          minVolume: o.min_volume,
-          range: o.range,
-          locationId: o.location_id,
-          systemId: o.system_id ?? 0,
-        };
-        if (buyOrderReaches(candidate, station, jumps)) buyOrders.push(candidate);
-      }
+      buyOrders = reachableBuyOrders(outputBook.orders, station, jumps);
     }
     const outputUnits = outputUnitsOf(row, catalog);
     const loading =
-      requiredTypeIds.some((id) => !books.has(id)) ||
-      (instant && outputTypeId !== null && !books.has(outputTypeId));
+      requiredTypeIds.some((id) => !books.has(bookKey(hub, id))) ||
+      (instant && outputTypeId !== null && !books.has(bookKey(hub, outputTypeId)));
     const result = priceRedemptions({
       redemptions,
       iskCost: row.offer.isk_cost,
