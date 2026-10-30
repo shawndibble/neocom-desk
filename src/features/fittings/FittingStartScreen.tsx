@@ -251,7 +251,7 @@ export function FittingStartScreen({
           title={pageTitle}
           meta={
             hasCharacter && inGame.granted === true && inGame.result ? (
-              <DataAgeBadge date={inGame.result.fetchedAt} />
+              <DataAgeBadge date={inGame.result.fetchedAt} expiresAt={inGame.result.expiresAt} />
             ) : undefined
           }
           actions={refreshInGameButton ?? undefined}

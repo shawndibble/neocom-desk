@@ -517,7 +517,14 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const headerChrome = (
     <PageHeaderPortals
       slots={headerSlots}
-      meta={transactionsResult && <DataAgeBadge date={transactionsResult.fetchedAt} />}
+      meta={
+        transactionsResult && (
+          <DataAgeBadge
+            date={transactionsResult.fetchedAt}
+            expiresAt={transactionsResult.expiresAt}
+          />
+        )
+      }
       scope={
         showCharacterFilter && (
           <CharacterFilterControl

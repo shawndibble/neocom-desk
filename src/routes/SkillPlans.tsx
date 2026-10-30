@@ -200,7 +200,11 @@ export function SkillPlans() {
   return (
     <div className="mx-auto max-w-page space-y-4">
       <SkillsPageHeader
-        meta={queueResult?.fetchedAt && <DataAgeBadge date={queueResult.fetchedAt} />}
+        meta={
+          queueResult?.fetchedAt && (
+            <DataAgeBadge date={queueResult.fetchedAt} expiresAt={queueResult.expiresAt} />
+          )
+        }
       />
       <SkillsSubNav />
 

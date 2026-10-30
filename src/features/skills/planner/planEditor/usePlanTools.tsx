@@ -129,7 +129,9 @@ export function usePlanTools({
       title: t('plans.toolsAttributes'),
       // Dated like every other ESI-derived view, and in the same place the
       // plan list's Attributes panel dates it.
-      actions: attributesResult?.fetchedAt && <DataAgeBadge date={attributesResult.fetchedAt} />,
+      actions: attributesResult?.fetchedAt && (
+        <DataAgeBadge date={attributesResult.fetchedAt} expiresAt={attributesResult.expiresAt} />
+      ),
       content: (
         <AttributesToolSection
           attributesResult={attributesResult}

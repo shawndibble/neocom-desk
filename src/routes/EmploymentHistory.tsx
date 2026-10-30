@@ -124,7 +124,11 @@ export function EmploymentHistory() {
           historyResult && (
             <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
               {t('employmentHistory.updated')}
-              <DataAgeBadge date={historyResult.fetchedAt} alwaysVisible />
+              <DataAgeBadge
+                date={historyResult.fetchedAt}
+                expiresAt={historyResult.expiresAt}
+                alwaysVisible
+              />
             </span>
           )
         }

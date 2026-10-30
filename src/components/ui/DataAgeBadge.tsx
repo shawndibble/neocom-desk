@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { formatAge, HOUR_MS, DAY_MS } from '@/lib/age';
-import { formatTimestamp } from '@/lib/timestamp';
+import { formatAge, HOUR_MS, DAY_MS, MINUTE_MS } from '@/lib/age';
+import { formatTimeOfDay, formatTimestamp } from '@/lib/timestamp';
 // A device-local display preference, the same class as `lib/fontScale.ts` —
 // not feature logic and not a Dexie call, both of which a primitive must stay
 // clear of. Read here rather than taken as a prop because every one of this
@@ -25,6 +25,13 @@ interface DataAgeBadgeProps {
    * rather than let the amber tone imply something is wrong (issue #296).
    */
   note?: string;
+  /**
+   * ESI's own `Expires` for the data, when the source stored one. Adds a
+   * tooltip line saying when ESI next updates it, because a refresh inside that
+   * window gets the same copy back and the age alone reads "just now". Facts
+   * only: the badge's age and text are unchanged, and omitting this adds nothing.
+   */
+  expiresAt?: Date;
   /**
    * Renders only the dot — no visible relative-age text — with the age
    * moved into the tooltip instead of dropped. For a spot where the text
@@ -70,6 +77,7 @@ function toneFor(ms: number): string {
 export function DataAgeBadge({
   date,
   note,
+  expiresAt,
   dotOnly = false,
   alwaysVisible = false,
   tooltip = true,
@@ -87,6 +95,23 @@ export function DataAgeBadge({
   const content = [dotOnly ? age : null, formatTimestamp(date, timeZone), note]
     .filter(Boolean)
     .join(' — ');
+  const expiry =
+    expiresAt === undefined
+      ? null
+      : expiresAt.getTime() > now
+        ? t('common.dataAge.esiUpdatesIn', {
+            count: Math.max(1, Math.ceil((expiresAt.getTime() - now) / MINUTE_MS)),
+            time: formatTimeOfDay(expiresAt, timeZone),
+          })
+        : t('common.dataAge.esiMayHaveNewer');
+  const tip = expiry ? (
+    <>
+      <span className="block">{content}</span>
+      <span className="block">{expiry}</span>
+    </>
+  ) : (
+    content
+  );
 
   const badge = (
     <time
@@ -103,7 +128,7 @@ export function DataAgeBadge({
   );
 
   return tooltip ? (
-    <Tooltip content={content} openOnTap>
+    <Tooltip content={tip} openOnTap>
       {badge}
     </Tooltip>
   ) : (

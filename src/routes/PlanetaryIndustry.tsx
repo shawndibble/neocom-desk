@@ -168,7 +168,14 @@ export function PlanetaryIndustry() {
             <div className="mx-auto max-w-page space-y-4">
               <PageHeader
                 title={t('pi.title')}
-                meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
+                meta={
+                  planetsResult && (
+                    <DataAgeBadge
+                      date={planetsResult.fetchedAt}
+                      expiresAt={planetsResult.expiresAt}
+                    />
+                  )
+                }
                 actions={
                   <>
                     <IconButton

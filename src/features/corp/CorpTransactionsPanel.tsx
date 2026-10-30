@@ -300,7 +300,10 @@ export function CorpTransactionsPanel({
         transactionsResult ? (
           <span className="flex items-center gap-2">
             <TableActionsMenu name={t('wallet.transactionsTab')} tableExport={tableExport} />
-            <DataAgeBadge date={transactionsResult.fetchedAt} />
+            <DataAgeBadge
+              date={transactionsResult.fetchedAt}
+              expiresAt={transactionsResult.expiresAt}
+            />
           </span>
         ) : undefined
       }

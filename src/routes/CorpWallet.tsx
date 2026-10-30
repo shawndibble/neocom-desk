@@ -385,7 +385,7 @@ function CorpJournalPanel({
         journalResult ? (
           <span className="flex items-center gap-2">
             <TableActionsMenu name={t('wallet.journalTab')} tableExport={journalExport} />
-            <DataAgeBadge date={journalResult.fetchedAt} />
+            <DataAgeBadge date={journalResult.fetchedAt} expiresAt={journalResult.expiresAt} />
           </span>
         ) : undefined
       }

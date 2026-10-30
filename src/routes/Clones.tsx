@@ -218,7 +218,9 @@ export function Clones() {
         title={t('clones.title')}
         actions={
           <span className="flex items-center gap-2">
-            {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
+            {clonesResult && (
+              <DataAgeBadge date={clonesResult.fetchedAt} expiresAt={clonesResult.expiresAt} />
+            )}
             <IconButton
               size="sm"
               icon={<Icon.Refresh />}
