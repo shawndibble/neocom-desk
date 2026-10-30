@@ -48,7 +48,7 @@ let secondTabEscapes: string[][] = [];
 async function openTab(context: BrowserContext, baseURL: string): Promise<Page> {
   const tab = await context.newPage();
   secondTabEscapes.push(await installMockedNetwork(tab, baseURL));
-  await tab.goto('./overview');
+  await tab.goto('./help');
   await layoutMounted(tab);
   return tab;
 }
@@ -150,7 +150,7 @@ async function setHidden(page: Page, hidden: boolean): Promise<void> {
 
 /** Two tabs, the first signed in and leading both jobs before the second opens. */
 async function twoTabs(page: Page, baseURL: string) {
-  await signInAndGoto(page);
+  await signInAndGoto(page, './help');
   await layoutMounted(page);
   await joinSweep(page);
   await expect.poll(() => leadership(page)).toEqual(LEADS);
@@ -172,6 +172,11 @@ test.use({
   launchOptions: { ignoreDefaultArgs: ['--disable-back-forward-cache'] },
 });
 
+// Slowness note: these stay on the dev server (`import()` of `/src/lib/tabLeader.ts`
+// names which tab holds a lock, which a production bundle cannot offer), and each
+// test cold-boots two app tabs there, so it may run past 10s on a CI shard. They
+// load the light `/help` route to keep that boot short. Do not move them to the
+// built project without another way to read `isLeader()`.
 // Each test boots the app twice and waits for both to settle, and the close
 // handoff alone may take 15s: the default 30s is too tight on a loaded shard.
 test.describe.configure({ timeout: 60_000 });
@@ -245,7 +250,7 @@ test.describe('Tab Leader across the back/forward cache', () => {
       w.__e2ePageShows = [];
       window.addEventListener('pageshow', (event) => w.__e2ePageShows.push(event.persisted));
     });
-    await signInAndGoto(page);
+    await signInAndGoto(page, './help');
     await layoutMounted(page);
     await joinSweep(page);
     await expect.poll(() => leadership(page)).toEqual(LEADS);
