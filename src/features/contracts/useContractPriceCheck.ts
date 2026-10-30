@@ -245,9 +245,9 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       // The ask below the hub is money kept, so the Saving is the diff turned over.
       const saving = -check.diff;
       const sentence = asBuyer
-        ? pick(check.diff, {
-            below: t('contractDetail.priceCheckSavingGain', { side: sideLower }),
-            above: t('contractDetail.priceCheckSavingLoss', { side: sideLower }),
+        ? pick(saving, {
+            below: t('contractDetail.priceCheckSavingLoss', { side: sideLower }),
+            above: t('contractDetail.priceCheckSavingGain', { side: sideLower }),
             level: t('contractDetail.priceCheckSavingLevel', { side: sideLower }),
           })
         : pick(check.diff, {

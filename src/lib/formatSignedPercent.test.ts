@@ -48,3 +48,11 @@ describe('savingTone', () => {
     expect(savingTone(-0.1)).toBe('bad');
   });
 });
+
+describe('a half-tenth saving', () => {
+  it('prints 0.0% and reads level, so words, figure and tone agree', () => {
+    expect(formatSignedPercent(-0.05)).toBe('0.0%');
+    expect(percentDirection(-0.05)).toBe('level');
+    expect(savingTone(-0.05)).toBe('good');
+  });
+});

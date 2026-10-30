@@ -249,6 +249,15 @@ describe('PublicContractDetailModal — price check', () => {
     expect(within(check).getByText('Below sell orders. You save.')).toBeInTheDocument();
   });
 
+  it('shows an overpay as a red negative Saving', async () => {
+    showItems([item({ record_id: 1, quantity: 5 })]);
+    renderModal(null, { askingIsk: 5_500_000_000 });
+
+    const check = await screen.findByRole('region', { name: 'Is it fair? · Jita 4-4 right now' });
+    expect(await within(check).findByText('−10.0%')).toHaveClass('text-isk-neg');
+    expect(within(check).getByText('Above sell orders. You overpay.')).toBeInTheDocument();
+  });
+
   it('flips to buy orders from the side label and the figures follow', async () => {
     showItems([item({ record_id: 1, quantity: 5 })]);
     renderModal(null, { askingIsk: 4_500_000_000 });

@@ -1320,6 +1320,8 @@ The cluster's order is fixed on every page: Character picker → text-labelled a
 
 A header action that opens a drawer for more input takes a plain label, no "…" (`Compare with` on Skills › Trained, a tier-2 `IconButton visibleLabel`): it opens a right `SlideOver` on desktop and a full-height sheet on a phone, and is the page's only compare entry, so it needs no ⋮.
 
+**A buyer's Saving** (the contract "Is it fair?" panel in Contract Search and BPC Sourcing) is a signed percent tinted by `savingTone`: `isk-pos` at 0.0% or above, `isk-neg` below, with a short note beside it in words ("You save", "You overpay"). A panel that does not know the reader's side (an own contract) stays neutral.
+
 **A figure measured against a baseline** (the Skills comparison drawer) reads as a signed number or a word, never colour alone: `+2` / `−3` beside the level, `missing` when the character has none of a skill the baseline has, `same` when equal. `isk-pos` / `isk-neg` tint the sign (§1) and the baseline column is labelled "Baseline", so a colour-blind reader loses nothing.
 
 The Fittings editor header applies tier 3: Compare and Copy stats sit in its ⋮ menu on desktop, and on a phone that menu also holds Rename, the Fittings menu's items, Export and the Alpha/Omega and Mastery badges as text (the icon badges stay in the header from `md` up). Its Save is the one primary control, and says where it saves.

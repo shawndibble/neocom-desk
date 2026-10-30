@@ -497,17 +497,18 @@ function BpcPriceCheck({ check }: { check: BpcPerRunCheck | null }) {
     },
   ];
   if (check.diff !== null) {
-    const direction = percentDirection(check.diff);
     // Under the median per run is money kept: the Saving is the diff turned over.
     const saving = -check.diff;
+    // Judged on the printed saving, so the words match the figure and its tone.
+    const direction = percentDirection(saving);
     rows.push({
       label: t('contractDetail.priceCheckSaving'),
       value: formatSignedPercent(saving),
       tone: savingTone(saving),
       note: t(
-        direction === 'below'
+        direction === 'above'
           ? 'contractDetail.priceCheckBpcBelow'
-          : direction === 'above'
+          : direction === 'below'
             ? 'contractDetail.priceCheckBpcAbove'
             : 'contractDetail.priceCheckBpcLevel'
       ),
