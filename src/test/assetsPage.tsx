@@ -150,7 +150,7 @@ export async function clickTool(
   await user.click(await screen.findByRole('menuitemcheckbox', { name }));
 }
 
-/** Tools ▸ Export table ▸ Download CSV. */
+/** Tools, then Export table, then Download CSV. */
 export async function downloadCsv(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Tools' }), {
     button: 0,
