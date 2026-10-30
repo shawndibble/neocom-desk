@@ -385,21 +385,25 @@ export interface CompletionPool {
   priceOf: (typeId: number) => number | null;
 }
 
-/** The candidates for one side of the search, the hull takes and the pilot can fly. */
 /** Combat drones (Hobgoblin, Hammerhead, Ogre and the like); salvage, mining and EWAR drones are other groups. */
 const COMBAT_DRONE_GROUP = 100;
 
-/** Whether the fit carries combat drones: an explorer that does expects combat sites (`effectiveSpace`). */
-function carriesCombatDrones(
+/** Explore's space for the search: Safe still holds the tank of a fit that carries combat drones (it expects combat sites). Other jobs: as chosen. */
+function searchSpace(
+  job: ImproveJob,
+  space: ExploreSpace,
   fitting: Fitting | undefined,
   catalogue: FittingCatalogue | null
-): boolean {
-  return (fitting?.drones ?? []).some(
+): ExploreSpace {
+  if (job !== 'explore') return space;
+  const combat = (fitting?.drones ?? []).some(
     (drone) =>
       drone.quantity > 0 && catalogue?.types[String(drone.typeId)]?.groupID === COMBAT_DRONE_GROUP
   );
+  return effectiveSpace(space, combat);
 }
 
+/** The candidates for one side of the search, the hull takes and the pilot can fly. */
 function searchCandidates(
   variants: VariantEvaluator,
   catalogue: FittingCatalogue,
@@ -417,7 +421,7 @@ function searchCandidates(
     includeOfficer: config.includeOfficer,
     jobSetting: jobSettingOf(
       config.job,
-      effectiveSpace(config.space ?? 'dangerous', carriesCombatDrones(variants.fitting, catalogue)),
+      searchSpace(config.job, config.space, variants.fitting, catalogue),
       config.noPropulsion
     ),
     commonality,
@@ -572,12 +576,7 @@ export function useImprove(
     hold,
   } = config;
   const jobSetting = useMemo(
-    () =>
-      jobSettingOf(
-        job,
-        effectiveSpace(space ?? 'dangerous', carriesCombatDrones(variants?.fitting, catalogue)),
-        noPropulsion
-      ),
+    () => jobSettingOf(job, searchSpace(job, space, variants?.fitting, catalogue), noPropulsion),
     [job, space, noPropulsion, variants?.fitting, catalogue]
   );
   const hullTypeId = variants?.fitting.shipTypeId;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickedDefense, shownDefense } from './improveSettings';
+import { defenseOptions, pickedDefense, shownDefense } from './improveSettings';
 
 describe('the Defense control shows the fit’s own tank side', () => {
   it('shows the fit’s side for Keep as is, and a chosen side as itself', () => {
@@ -14,5 +14,13 @@ describe('the Defense control shows the fit’s own tank side', () => {
     expect(pickedDefense('armor', 'armor')).toBe('keep');
     expect(pickedDefense('shield', 'armor')).toBe('shield');
     expect(pickedDefense('armor', null)).toBe('armor');
+  });
+});
+
+describe('a fit with no tank side', () => {
+  it('offers Either beside Shield and Armor, so the pilot can always go back to keeping it', () => {
+    expect(defenseOptions(null)).toEqual(['shield', 'armor', 'keep']);
+    expect(defenseOptions('armor')).toEqual(['shield', 'armor']);
+    expect(shownDefense('keep', null)).toBe('keep');
   });
 });

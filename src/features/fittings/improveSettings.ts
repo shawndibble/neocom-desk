@@ -41,6 +41,10 @@ export interface ImproveSettings {
 /** The two sides the Defense control offers; the fit's own one is Keep as is. */
 export const DEFENSE_SIDES: readonly DefenseSide[] = ['shield', 'armor'];
 
+/** The Defense control's options: Shield and Armor, the fit's own one meaning Keep as is; a fit with no side also gets Either (keep). */
+export const defenseOptions = (fitted: DefenseSide | null): readonly DefenseChoice[] =>
+  fitted ? DEFENSE_SIDES : [...DEFENSE_SIDES, 'keep'];
+
 /** The side the Defense control shows: a chosen side as itself, else the fit's own (Keep as is); 'keep' (nothing selected) when the fit has none. */
 export const shownDefense = (defense: DefenseChoice, fitted: DefenseSide | null): DefenseChoice =>
   defense === 'keep' ? (fitted ?? 'keep') : defense;

@@ -14,7 +14,7 @@ import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { formatIskCompact } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import {
-  DEFENSE_SIDES,
+  defenseOptions,
   pickedDefense,
   shownDefense,
   type ImproveSettings,
@@ -137,12 +137,14 @@ export function ImproveSettingsPanel({
             <>
               <SegmentedControl<DefenseChoice>
                 label={t('fittings.improve.defenseLabel')}
-                // The fit's own side shows selected (Keep as is); the other side converts.
-                options={DEFENSE_SIDES.map((value) => ({
+                // The fit's own side shows selected (Keep as is); the other side converts. A fit with no side also offers Either.
+                options={defenseOptions(settings.fittedSide ?? null).map((value) => ({
                   value,
-                  label: t(`fittings.improve.defense.${value}`),
+                  label: t(`fittings.improve.defense.${value === 'keep' ? 'either' : value}`),
                   // Upgrade swaps a module within its own type, so it can't change tank side.
-                  ...(value !== settings.fittedSide && settings.reach === 'upgrade'
+                  ...(value !== 'keep' &&
+                  value !== settings.fittedSide &&
+                  settings.reach === 'upgrade'
                     ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
                     : {}),
                 }))}

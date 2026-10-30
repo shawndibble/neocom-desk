@@ -118,10 +118,10 @@ export interface CandidateFilter {
   ) => number | null;
 }
 
-/** The shared candidate filter for `modules` under the goal, Defense Choice and job. */
 /** Data and Relic Analyzers (and the Integrated ones that hack both). */
 const ANALYZER_GROUP = 538;
 
+/** The shared candidate filter for `modules` under the goal, Defense Choice and job. */
 export function candidateFilter(
   modules: readonly FittingModule[],
   groupOf: (typeId: number) => number | undefined,
@@ -144,7 +144,7 @@ export function candidateFilter(
     if (/data/i.test(name)) return ['data'];
     return null;
   };
-  /** Whether the swap loses a site type the fitted analyzer could hack: a Data Analyzer never becomes a Relic one. */
+  /** Whether the swap loses a site type the fitted analyzer could hack: a Data Analyzer never becomes a Relic one, under any job. */
   const losesSiteType = (toTypeId: number, fromTypeId: number | null) => {
     const was = sitesOf(fromTypeId);
     if (!was) return false;

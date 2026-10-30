@@ -777,7 +777,10 @@ export async function findMakeover({
   const forcedRow =
     propulsion && forced
       ? rows.find(
-          (row) => row.at[0]?.slot === forced!.slot && propulsion.isPropulsion(row.toTypeId)
+          (row) =>
+            row.at[0]?.slot === forced!.slot &&
+            propulsion.isPropulsion(row.toTypeId) &&
+            (row.fromTypeId === null || !propulsion.isPropulsion(row.fromTypeId))
         )
       : undefined;
   if (forcedRow && propulsion) forcedRow.addsPropulsionFor = propulsion.job;
