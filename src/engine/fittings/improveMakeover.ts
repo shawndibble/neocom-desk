@@ -45,6 +45,7 @@ import { coveringFreed, freedBy, overrunBy } from './improvePairSeed';
 import type { Resource } from './makeItFit';
 import { newRuleBreaks } from './ruleBreaks';
 import { fitsResourceBudget } from './skillGaps';
+import type { ModuleAt } from './fittingEdit';
 import type { TargetProfile } from './targetProfile';
 import type { Fitting, FittingModule, FittingSlotKind, FittingStats } from './types';
 
@@ -177,7 +178,7 @@ export function makeoverMoves(
         for (const group of groups) {
           if (!allowed(group, undefined)) continue;
           for (const toTypeId of representatives(group, slot)) {
-            if (offered.has(toTypeId)) continue;
+            if (offered.has(toTypeId) || filter.kindBlocks(toTypeId, null)) continue;
             offered.add(toTypeId);
             into.push({ fromTypeId: null, toTypeId, at: [{ slot, slotIndex: free }] });
           }
@@ -337,8 +338,8 @@ export function makeoverBar(
   return scores.length > 0 ? Math.max(...scores) : null;
 }
 
-/** The most whole-fit calculations one Makeover search makes (the last confirms the result): about 9–16 s in the browser worker. */
-export const MAKEOVER_CALCS = 300;
+/** The most whole-fit calculations one Makeover search makes (the last confirms the result): about 5 s on the worker pool; room for a job's forced first step and a full first round. */
+export const MAKEOVER_CALCS = 600;
 /** A lazy round stops once its best fresh gain beats every remaining move's last gain by this much. */
 const LAZY_MARGIN = 0.01;
 /** Moves that gained but overran the fit's budget, tried with a move that frees what they need. */
@@ -772,16 +773,16 @@ export async function findMakeover({
   if (steps === 0) return { makeover: null, calcs, stopped };
   const rows = rowsBetween(original, fitting);
   // The row that holds the forced module says why it is there, whatever the search made of it since.
+  // Rows are the net change, so the module a slot gave up for it may show elsewhere in the rack.
   const forcedRow =
     propulsion && forced
       ? rows.find(
-          (row) =>
-            propulsion.isPropulsion(row.toTypeId) &&
-            row.at.some((at) => at.slot === forced!.slot && at.slotIndex === forced!.slotIndex)
+          (row) => row.at[0]?.slot === forced!.slot && propulsion.isPropulsion(row.toTypeId)
         )
       : undefined;
   if (forcedRow && propulsion) forcedRow.addsPropulsionFor = propulsion.job;
-  if (rows.length < 2) return { makeover: null, calcs, stopped };
+  // A Makeover that meets the job's need stands alone: no single swap adds propulsion.
+  if (rows.length < 2 && !forcedRow) return { makeover: null, calcs, stopped };
   // The figures shown are one recalculation of the rows, never the path's last step.
   const remade = rows.reduce(applyImproveCandidate, original);
   const after = await begin(remade);
@@ -794,10 +795,12 @@ export async function findMakeover({
   );
   const total = scoreAt(after, iskDelta);
   const single = givenSingle ?? firstRoundBest ?? 0;
+  // A Makeover that meets the job's need is shown even when a single swap scores more: only it can meet the need.
   const beats =
     total !== null &&
     passes(after, iskDelta) &&
-    total - single > Math.max(EPSILON, BEATS_SINGLE * Math.abs(single));
+    (forcedRow !== undefined ||
+      total - single > Math.max(EPSILON, BEATS_SINGLE * Math.abs(single)));
   return {
     makeover: beats
       ? { rows, fitting: remade, after, score: total, iskDelta, lost: lostStats(before, after) }
@@ -808,23 +811,50 @@ export async function findMakeover({
 }
 
 /**
- * The changes from `from` to `to`, slot by slot: a slot changed twice shows
- * once, first module to last, and the same change in several slots is one
- * row. Swaps and fills only: a slot `to` leaves empty gives no row (the
- * Makeover never empties one).
+ * The changes from `from` to `to`, as the net change in each rack: a slot
+ * changed twice shows once, a module that only moved slot is no row (an
+ * extender that became an afterburner while a guidance computer became an
+ * extender reads "guidance computer becomes afterburner"), and the same change
+ * in several slots is one row. Swaps and fills only: a slot `to` leaves empty
+ * gives no row (the Makeover never empties one).
  */
 export function rowsBetween(from: Fitting, to: Fitting): ImproveCandidate[] {
-  const at = (fitting: Fitting, slot: FittingSlotKind, slotIndex: number) =>
-    fitting.modules.find((m) => m.slot === slot && m.slotIndex === slotIndex)?.typeId ?? null;
   const rows = new Map<string, ImproveCandidate>();
-  for (const module of to.modules) {
-    const was = at(from, module.slot, module.slotIndex);
-    if (was === module.typeId) continue;
-    const key = `${was ?? '-'}>${module.typeId}`;
+  const add = (fromTypeId: number | null, toTypeId: number, where: ModuleAt) => {
+    const key = `${fromTypeId ?? '-'}>${toTypeId}`;
     const row = rows.get(key);
-    const where = { slot: module.slot, slotIndex: module.slotIndex };
     if (row) row.at.push(where);
-    else rows.set(key, { fromTypeId: was, toTypeId: module.typeId, at: [where] });
+    else rows.set(key, { fromTypeId, toTypeId, at: [where] });
+  };
+  const racks = new Set([...from.modules, ...to.modules].map((m) => m.slot));
+  for (const rack of racks) {
+    const typeAt = (fitting: Fitting) =>
+      new Map(fitting.modules.filter((m) => m.slot === rack).map((m) => [m.slotIndex, m.typeId]));
+    const was = typeAt(from);
+    const now = typeAt(to);
+    const changed = [...new Set([...was.keys(), ...now.keys()])]
+      .filter((index) => was.get(index) !== now.get(index))
+      .sort((a, b) => a - b);
+    // What the rack gained, as a multiset; a module that only moved slot cancels against it.
+    const gained = changed.flatMap((index) => (now.has(index) ? [now.get(index)!] : []));
+    const removed: number[] = [];
+    for (const index of changed) {
+      const typeId = was.get(index);
+      if (typeId === undefined) continue;
+      const moved = gained.indexOf(typeId);
+      if (moved >= 0) gained.splice(moved, 1);
+      else removed.push(index);
+    }
+    // Each module that left becomes one the rack gained, in slot order; the rest fill slots that were empty.
+    for (const index of removed) {
+      const toTypeId = gained.shift();
+      if (toTypeId !== undefined) add(was.get(index)!, toTypeId, { slot: rack, slotIndex: index });
+    }
+    const empty = changed.filter((index) => !was.has(index) && now.has(index));
+    for (const toTypeId of gained) {
+      const index = empty.shift();
+      if (index !== undefined) add(null, toTypeId, { slot: rack, slotIndex: index });
+    }
   }
   return [...rows.values()];
 }

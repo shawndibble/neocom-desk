@@ -988,6 +988,7 @@ export function improveCandidates(
         let added = 0;
         for (const typeId of pool.typeIdsInGroup(group)) {
           if (added >= share || !allowed(typeId, slot, undefined, 0)) continue;
+          if (filter.kindBlocks(typeId, null)) continue;
           added++;
           tiers[tier].push({
             fromTypeId: null,

@@ -472,6 +472,32 @@ describe('rowsBetween', () => {
     const twice = applyImproveCandidate(applyImproveCandidate(f, low0(11, 10)), low0(10, 12));
     expect(rowsBetween(f, twice).map(label)).toEqual(['11>12@l0']);
   });
+
+  it('shows the net change in a rack: a module that only moved slot is no row', () => {
+    // An extender became an afterburner and a guidance computer became an extender: net, the computer became the afterburner.
+    const f = fit([
+      ['medium', 0, 1],
+      ['medium', 1, 4],
+    ]);
+    const to = fit([
+      ['medium', 0, 20],
+      ['medium', 1, 1],
+    ]);
+    expect(rowsBetween(f, to).map(label)).toEqual(['4>20@m1']);
+  });
+
+  it('keeps a split and a fill readable in net form', () => {
+    const f = fit([
+      ['low', 0, 11],
+      ['low', 1, 11],
+    ]);
+    const to = fit([
+      ['low', 0, 10],
+      ['low', 1, 12],
+      ['low', 2, 13],
+    ]);
+    expect(rowsBetween(f, to).map(label).sort()).toEqual(['->13@l2', '11>10@l0', '11>12@l1']);
+  });
 });
 
 describe('makeoverBar', () => {
@@ -633,7 +659,8 @@ describe('the propulsion a job needs (#5578)', () => {
     fitting: Fitting,
     extra: Partial<MakeoverMoveOptions> = {},
     // A cruiser: no Large Micro Jump Drive.
-    flyable: (slot: FittingSlotKind, typeId: number) => boolean = (_slot, typeId) => typeId !== 22
+    flyable: (slot: FittingSlotKind, typeId: number) => boolean = (_slot, typeId) => typeId !== 22,
+    bestSingle = 0
   ) {
     const { index, rackOf, options } = catalogue(types);
     const base = options(extra);
@@ -647,7 +674,7 @@ describe('the propulsion a job needs (#5578)', () => {
         jobSetting: opts.jobSetting,
         moves: (f) => makeoverMoves(f.modules, index, rackOf, opts),
         propulsion: propulsionStart(index, rackOf, opts),
-        bestSingle: 0,
+        bestSingle,
       },
       types,
       {}
@@ -660,6 +687,26 @@ describe('the propulsion a job needs (#5578)', () => {
     const added = rows.find((row) => row.addsPropulsionFor);
     expect(added && label(added)).toBe('2>20@m0');
     expect(added?.addsPropulsionFor).toBe('pve');
+  });
+
+  it('shows a Makeover that meets the need even when a single swap scores higher, propulsion its only change', async () => {
+    // Nothing else gains: two extenders and a Damage Control. No single swap adds propulsion, so the Makeover is where the need is met.
+    const settled = fit([
+      ['medium', 0, 1],
+      ['medium', 1, 1],
+      ['low', 0, 10],
+    ]);
+    const rows = await run(
+      settled,
+      {
+        jobSetting: jobSettingOf('pve'),
+        slotCounts: { high: 0, medium: 2, low: 1, rig: 0, subsystem: 0 },
+      },
+      undefined,
+      100
+    );
+    expect(rows.map(label)).toEqual(['1>20@m0']);
+    expect(rows[0].addsPropulsionFor).toBe('pve');
   });
 
   it('fills a free medium slot before it costs a module', async () => {

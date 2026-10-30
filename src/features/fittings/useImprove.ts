@@ -819,7 +819,8 @@ export function useImprove(
             shouldStop: () => stopRef.current,
           });
           if (cancelled || search === null) return;
-          makeoverStopped = search.stopped;
+          // Only the pilot's "Show best so far" reads as stopped; the Makeover's own calculation cap is its normal end.
+          makeoverStopped = search.stopped && stopRef.current;
           makeover = search.makeover ?? undefined;
         }
         setRecalc(() => stats);

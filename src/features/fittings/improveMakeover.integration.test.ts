@@ -466,9 +466,9 @@ describe('Improve makeover on a PvE Dominix without propulsion (real WASM + real
     expect(propulsionOf(common)).toEqual(['Large Micro Jump Drive']);
   });
 
-  it('adds none with the opt-out, and none under PvP', () => {
+  it('adds none with the opt-out, and forces none under PvP (its score may still pick one)', () => {
     expect(propulsionOf(optOut)).toEqual([]);
-    expect(propulsionOf(pvp)).toEqual([]);
+    expect(pvp?.makeover?.rows.some((row) => row.addsPropulsionFor) ?? false).toBe(false);
   });
 
   it('never removes the micro jump drive it added, nor turns it into an afterburner', () => {

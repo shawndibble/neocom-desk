@@ -49,6 +49,36 @@ describe('candidateFilter', () => {
   });
 });
 
+describe('candidateFilter, propulsion kinds', () => {
+  // 1 a hardener (group 77); 20 an afterburner and 21 an MWD (group 46); 22 a micro jump drive (group 1189).
+  const groupOf = (typeId: number) => ({ 1: 77, 20: 46, 21: 46, 22: 1189 })[typeId];
+  const nameOf = (typeId: number) =>
+    ({ 20: '10MN Afterburner II', 21: '50MN Microwarpdrive II', 22: 'Large Micro Jump Drive' })[
+      typeId
+    ];
+  const filterFor = (jobSetting: ReturnType<typeof jobSettingOf>) =>
+    candidateFilter([mod('medium', 0, 1)], groupOf, {
+      goal: 'overall',
+      defense: 'keep',
+      includeRigs: false,
+      jobSetting,
+      nameOf,
+    });
+
+  it('with "No propulsion needed" never adds propulsion, as a swap or a fill', () => {
+    const optOut = filterFor(jobSettingOf('pve', 'dangerous', true));
+    expect(optOut.kindBlocks(21, 1)).toBe(true);
+    expect(optOut.kindBlocks(22, null)).toBe(true);
+    // A fitted propulsion module may still become another one.
+    expect(optOut.kindBlocks(21, 20)).toBe(false);
+  });
+
+  it('otherwise lets the score add propulsion, under PvE and PvP', () => {
+    expect(filterFor(jobSettingOf('pve')).kindBlocks(21, 1)).toBe(false);
+    expect(filterFor(jobSettingOf('pvp')).kindBlocks(20, null)).toBe(false);
+  });
+});
+
 describe('coveringFreed', () => {
   const over = (cpu: number) => ({
     ...baseFittingStats(),

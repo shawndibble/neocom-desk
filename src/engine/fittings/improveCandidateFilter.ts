@@ -170,7 +170,9 @@ export function candidateFilter(
       const from = kindOf(fromTypeId);
       return (
         (from === 'mjd' && kindOf(toTypeId) !== 'mjd') ||
-        (holdsMwd && from === 'mwd' && kindOf(toTypeId) !== 'mwd')
+        (holdsMwd && from === 'mwd' && kindOf(toTypeId) !== 'mwd') ||
+        // "No propulsion needed": the fit never moves, so nothing adds a propulsion module, not even on score.
+        (jobSetting?.noPropulsion === true && from === null && kindOf(toTypeId) !== null)
       );
     },
     firstFreeSlot: (slot, slotCounts) => {
