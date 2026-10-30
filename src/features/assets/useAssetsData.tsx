@@ -152,8 +152,6 @@ export function useAssetsData() {
     return filterIsOpen(filter) ? null : filter;
   }, [categoryIndex, categoryPick, blueprintKind]);
   const showBlueprintSelect = categoryIndex ? blueprintsTicked(categoryIndex, categoryPick) : false;
-  const kindFilterActive =
-    !pickIsAll(categoryPick) || (blueprintKind !== 'any' && showBlueprintSelect);
   const activeFilterCount =
     (pickIsAll(categoryPick) ? 0 : 1) +
     (blueprintKind !== 'any' && showBlueprintSelect ? 1 : 0) +
@@ -482,7 +480,6 @@ export function useAssetsData() {
     blueprintKind,
     kindFilter,
     showBlueprintSelect,
-    kindFilterActive,
     activeFilterCount,
     resetFilters,
     crossCharacterFilter,
