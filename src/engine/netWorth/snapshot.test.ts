@@ -138,6 +138,7 @@ describe('buildSnapshotRow contract stock', () => {
         {
           contract_id: 7,
           issuer_id: 1,
+          acceptor_id: 0,
           type: 'item_exchange' as const,
           status: 'outstanding' as const,
           for_corporation: false,
