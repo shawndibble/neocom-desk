@@ -15918,7 +15918,15 @@
       "removedMany_one": "Removed {{count}} item",
       "removedMany_other": "Removed {{count}} items",
       "legendListed": "Listed (coloured by status)",
-      "legendHangar": "In hangar, ready to list"
+      "legendHangar": "In hangar, ready to list",
+      "fill": "Fill"
+    },
+    "holders": {
+      "characters_one": "{{count}} character",
+      "characters_other": "{{count}} characters",
+      "listedBy": "Listed by",
+      "readyWith": "Ready to list with",
+      "listingHere": "Listing here:"
     },
     "share": {
       "copy": "Copy share link",
