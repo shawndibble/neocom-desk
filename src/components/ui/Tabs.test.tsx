@@ -214,6 +214,52 @@ describe('Tabs', () => {
       expect(stub.animate).toHaveBeenCalledTimes(2);
       expect(stub.animate.mock.contexts[1]).toBe(screen.getByRole('tabpanel'));
     });
+
+    it('rises the panel into place, so the switch reads as one', () => {
+      render(
+        <TabPanel tabsId="t" tabId="open">
+          open body
+        </TabPanel>
+      );
+      expect(stub.animate).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ translate: '0 8px' })]),
+        expect.anything()
+      );
+    });
+  });
+
+  describe('preloading a tab the pilot is about to pick', () => {
+    function renderBar(onPreload: (id: string) => void) {
+      render(
+        <Tabs
+          tabsId="t"
+          tabs={tabs}
+          value="open"
+          onChange={() => undefined}
+          onPreload={onPreload}
+          label="Orders"
+        />
+      );
+      return screen.getByRole('tab', { name: 'History' });
+    }
+
+    it('preloads on mouse hover', () => {
+      const onPreload = vi.fn();
+      fireEvent.pointerEnter(renderBar(onPreload), { pointerType: 'mouse' });
+      expect(onPreload).toHaveBeenCalledWith('history');
+    });
+
+    it('preloads on keyboard focus', () => {
+      const onPreload = vi.fn();
+      fireEvent.focus(renderBar(onPreload));
+      expect(onPreload).toHaveBeenCalledWith('history');
+    });
+
+    it('waits for the tap on touch, where hover is the tap itself', () => {
+      const onPreload = vi.fn();
+      fireEvent.pointerEnter(renderBar(onPreload), { pointerType: 'touch' });
+      expect(onPreload).not.toHaveBeenCalled();
+    });
   });
 
   /**

@@ -70,6 +70,12 @@ interface TabsProps {
    * `'automatic'` (default) would unmount this tablist mid-keypress.
    */
   activation?: 'automatic' | 'manual';
+  /**
+   * Called with a tab's id as the mouse rests on it or keyboard focus reaches
+   * it: start loading what it shows (a lazy tab's chunk), so the switch lands
+   * at once. Not on touch, where the first event is the tap itself.
+   */
+  onPreload?: (id: string) => void;
 }
 
 /**
@@ -91,6 +97,7 @@ export function Tabs({
   label,
   className = '',
   activation = 'automatic',
+  onPreload,
 }: TabsProps) {
   const { t } = useTranslation();
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -239,6 +246,10 @@ export function Tabs({
                   if (activation === 'manual') setManualFocusId(tab.id);
                   onChange(tab.id);
                 }}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'touch') onPreload?.(tab.id);
+                }}
+                onFocus={() => onPreload?.(tab.id)}
                 className={cx(
                   tabItemClassName,
                   active ? tabItemActiveClassName : tabItemIdleClassName

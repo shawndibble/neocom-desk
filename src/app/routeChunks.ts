@@ -250,7 +250,16 @@ const PRELOADERS: Record<AppRoutePath, () => Promise<RouteModule>> = {
  * `lazy()` render, which is where an error belongs.
  */
 export function preloadRouteChunk(path: AppRoutePath): void {
-  void PRELOADERS[path]().catch(() => {});
+  preloadChunk(PRELOADERS[path]);
+}
+
+/**
+ * Start fetching any lazy chunk (a page's lazy tab) on the same fire-and-forget
+ * contract as `preloadRouteChunk`. The module cache makes the later `lazy()`
+ * render reuse the fetch.
+ */
+export function preloadChunk(load: () => Promise<unknown>): void {
+  void load().catch(() => {});
 }
 
 /**

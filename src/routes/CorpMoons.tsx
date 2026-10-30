@@ -26,6 +26,7 @@ import {
   PageHeader,
   SlideOver,
   Spinner,
+  TabPanel,
   Tabs,
   Toast,
   useTabsId,
@@ -159,11 +160,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             </p>
           )}
           <BookHealthStrip sync={sync} />
-          {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
-          {tab === 'extractions' && <ExtractionsTab />}
-          {tab === 'miners' && <MinersTab />}
-          {tab === 'statements' && <StatementsTab />}
-          {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
+          <TabPanel tabsId={tabsId} tabId={tab}>
+            {tab === 'overview' && <OverviewTab showMoons={showExtractions} />}
+            {tab === 'extractions' && <ExtractionsTab />}
+            {tab === 'miners' && <MinersTab />}
+            {tab === 'statements' && <StatementsTab />}
+            {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
+          </TabPanel>
         </>
       )}
       {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}

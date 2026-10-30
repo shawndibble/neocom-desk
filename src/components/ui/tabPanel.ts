@@ -32,7 +32,7 @@ export function useTabPanelProps(
   const panel = useRef<HTMLElement | null>(null);
   // On mount too: a page that renders each tab as its own component mounts a
   // fresh panel per switch.
-  useFadeOnChange(panel, tabId);
+  useFadeOnChange(panel, tabId, { rise: true });
   const ref = useCallback((node: HTMLElement | null) => {
     panel.current = node;
   }, []);

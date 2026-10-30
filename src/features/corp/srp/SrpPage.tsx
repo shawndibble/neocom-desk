@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { PageHeader, Tabs, useTabsId } from '@/components/ui';
+import { PageHeader, TabPanel, Tabs, useTabsId } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
 import { SRP_TABS } from './srpTabs';
@@ -45,7 +45,13 @@ export function SrpPage({
           }))}
         />
       )}
-      <View />
+      {views.length > 1 ? (
+        <TabPanel tabsId={tabsId} tabId={view.id}>
+          <View />
+        </TabPanel>
+      ) : (
+        <View />
+      )}
     </div>
   );
 }

@@ -936,13 +936,23 @@ composing on hover and focus.
 - **The route outlet fades in. That is the whole effect.** Layout runs
   `useFadeOnChange` on the outlet, keyed on `pageKeyFor(pathname)`, skipping
   it under `prefers-reduced-motion: reduce`.
-- **A tab switch fades the tab panel, not the outlet.** `useTabPanelProps`
-  (so every `TabPanel`) fades the panel's content on a tab change with the
-  same 220ms opacity fade (`useFadeOnChange`), as it mounts too, since some
-  pages render each tab as its own component. The page header and tab bar
-  stay still: a tab is a view within the page, not a new page (ADR 0015).
-- **Opacity only — never a transform.** The outlet is the entire main content
-  area, so any movement reads as the whole app sliding rather than a page turn.
+- **A tab switch fades the tab panel, not the outlet, and rises it 8px into
+  place.** `useTabPanelProps` (so every `TabPanel`) runs `useFadeOnChange`
+  with `rise` on a tab change (240ms), as it mounts too, since some pages
+  render each tab as its own component. The deceleration curve has an opacity
+  fade mostly done in its first 70ms, which on its own reads as a cut; the
+  short rise is what the eye catches. The page header and tab bar stay still:
+  a tab is a view within the page, not a new page (ADR 0015).
+- **The outlet: opacity only — never a transform.** The outlet is the entire
+  main content area, so any movement reads as the whole app sliding rather
+  than a page turn. A transform would also make the outlet the containing
+  block for every `position: fixed` element inside it for the length of the
+  animation. A tab panel is smaller and holds no fixed bars.
+- **A switch lands on loaded content.** The router wraps navigations in
+  `startTransition`, so a tab whose lazy chunk is still loading keeps the old
+  tab on screen until it arrives, and the fade plays on the new tab. A page
+  with lazy tabs passes `onPreload` to `Tabs` so the chunk starts on hover or
+  focus (`preloadChunk`), the way nav links preload a route's chunk.
 - **Animate the element; never re-key the outlet to replay a CSS animation.**
   Restarting a CSS animation requires a new element, and six `ROUTE_ELEMENTS`
   entries in `app/App.tsx` match more than one pathname (`/corp/assets/*`,

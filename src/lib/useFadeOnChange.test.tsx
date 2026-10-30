@@ -5,9 +5,9 @@ import { stubAnimate } from '@/test/animate';
 import { stubViewport } from '@/test/viewport';
 import { useFadeOnChange } from './useFadeOnChange';
 
-function Harness({ value }: { value: string }) {
+function Harness({ value, rise }: { value: string; rise?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFadeOnChange(ref, value);
+  useFadeOnChange(ref, value, rise === undefined ? undefined : { rise });
   return <div ref={ref}>{value}</div>;
 }
 
@@ -39,6 +39,19 @@ describe('useFadeOnChange', () => {
       duration: 220,
       easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
     });
+  });
+
+  it('rises into place as it fades when asked to', () => {
+    const { rerender } = render(<Harness value="a" rise />);
+    animate.mockClear();
+    rerender(<Harness value="b" rise />);
+    expect(animate).toHaveBeenCalledWith(
+      [
+        { opacity: 0, translate: '0 8px' },
+        { opacity: 1, translate: '0 0' },
+      ],
+      { duration: 240, easing: 'cubic-bezier(0.33, 1, 0.68, 1)' }
+    );
   });
 
   it('stays still when the key is unchanged', () => {
