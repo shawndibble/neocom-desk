@@ -4,6 +4,7 @@ import i18n from '@/i18n';
 import type { ImproveOption } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
+import { NO_EXPLORE } from '@/engine/fittings/explore';
 import { leadLine } from './improveLeadLine';
 import { lostLine } from './improveChangeLines';
 
@@ -13,10 +14,12 @@ const explore = (strength: number, coherence: number) =>
   ({
     ...baseFittingStats(),
     explore: {
+      ...NO_EXPLORE,
       modules: 3,
+      // A Data Analyzer: its strength is the data sites' figure.
       hacking: { strength, coherence, cycleSeconds: 10 },
+      dataStrength: strength,
       scanning: { strength: 10, duration: 0, deviation: 0 },
-      analyzers: [],
     },
   }) as unknown as FittingStats;
 
@@ -27,7 +30,7 @@ describe('the Explore better lead', () => {
     render(<>{lead?.node}</>);
     const rows = screen.getAllByRole('listitem').map((row) => row.textContent ?? '');
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatch(/Hacking strength/);
+    expect(rows[0]).toMatch(/Data hacking strength/);
     expect(rows[1]).toMatch(/Coherence/);
     expect(rows.join()).not.toMatch(/Cycle|Scan strength|Scan time cut|Deviation cut/);
   });

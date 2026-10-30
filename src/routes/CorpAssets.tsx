@@ -9,8 +9,10 @@
  * URL (ADR 0015): the tab is the path (`/corp/assets/impounded`, the bare path
  * is All; `features/corp/corpAssetsTabs.ts`) and the view state is the query —
  * `q` search, `group=location` (absent: by item), `loc` a station/structure
- * id, `div` a hangar division 1–7, `cat` a top-level market group id (the
- * Category filter and Group column), `below=1` the Below target filter. The
+ * id, `div` a hangar division 1–7, `cat` the Asset Category picker's ticked
+ * option ids (absent: all; an old top-level market group id still opens on
+ * that category), `bp` the Blueprints select (the Group column shows the
+ * top-level Asset Category), `below=1` the Below target filter. The
  * Corp overview's Corp assets widget links to these. An unknown path under
  * `/corp/assets/*`, such as an old tree deep link, redirects to `/corp/assets`
  * keeping the query.
@@ -90,6 +92,20 @@ import {
 import { MovePlanTab } from '@/features/assets/MovePlanTab';
 import { NO_MOVE_PLAN } from '@/features/assets/movePlanUrl';
 import { loadTypeCategories, type AssetCategory } from '@/features/corp/assetCategories';
+import { AssetCategoryPicker, BlueprintKindSelect } from '@/features/assets/AssetCategoryPicker';
+import {
+  assetPassesKindFilter,
+  blueprintKindParam,
+  blueprintsTicked,
+  categoryPickParam,
+  expandLegacyCategoryIds,
+  filterIsOpen,
+  pickIsAll,
+  type AssetKindFilter,
+  type BlueprintKind,
+  type CategoryPick,
+} from '@/features/assets/assetCategoryFilter';
+import { useAssetCategoryIndex } from '@/features/assets/useAssetCategoryIndex';
 import {
   buildLocationRows,
   filterClassified,
@@ -119,12 +135,15 @@ import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumParam, optionalIntParam, textParam } from '@/lib/urlState';
 
+const CATEGORY_PARAM = categoryPickParam();
+
 const URL_PARAMS = {
   q: textParam(),
   group: enumParam(['item', 'location'] as const, 'item'),
   loc: optionalIntParam({ min: 1 }),
   div: optionalIntParam({ min: 1, max: 7 }),
-  cat: optionalIntParam({ min: 1 }),
+  cat: CATEGORY_PARAM,
+  bp: blueprintKindParam(),
   below: boolParam(),
 };
 
@@ -275,7 +294,8 @@ const rowKeyOf = (row: ItemLedgerRow) => `${row.typeId}:${row.isBlueprintCopy ? 
 interface PlaceFilter {
   loc: number | null;
   div: number | null;
-  cat: number | null;
+  cat: CategoryPick;
+  bp: BlueprintKind;
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -363,6 +383,35 @@ function CorpAssetsView({
     [data?.categoryByTypeId, targetInfo.categories]
   );
   const blueprintTypeIds = useBlueprintTypeIds(typeNames);
+  // Asset Category and Blueprints (issue #5607): null until the market tree
+  // loads, and while the filter keeps everything — it then stands down.
+  const categoryIndex = useAssetCategoryIndex(data !== undefined && data !== null);
+  const categoryPick = useMemo<CategoryPick>(
+    () => (categoryIndex ? expandLegacyCategoryIds(categoryIndex, params.cat) : params.cat),
+    [categoryIndex, params.cat]
+  );
+  const kindFilter = useMemo<AssetKindFilter | null>(() => {
+    if (!categoryIndex) return null;
+    const filter = {
+      index: categoryIndex,
+      pick: categoryPick,
+      blueprints: params.bp,
+      blueprintTypeIds,
+    };
+    return filterIsOpen(filter) ? null : filter;
+  }, [categoryIndex, categoryPick, params.bp, blueprintTypeIds]);
+  const keepKind = useMemo(
+    () =>
+      kindFilter
+        ? (asset: { typeId: number; isBlueprintCopy?: boolean }) =>
+            assetPassesKindFilter(
+              { type_id: asset.typeId, is_blueprint_copy: asset.isBlueprintCopy },
+              kindFilter
+            )
+        : null,
+    [kindFilter]
+  );
+  const showBlueprintSelect = categoryIndex ? blueprintsTicked(categoryIndex, categoryPick) : false;
   const labels = useMemo(
     () => makeLedgerLabels({ t, typeNames, locationNames, divisionNames }),
     [t, typeNames, locationNames, divisionNames]
@@ -410,9 +459,7 @@ function CorpAssetsView({
       .filter((row) => {
         if (params.below && !shortTypeIds.has(row.typeId)) return false;
         if (params.below && row.isBlueprintCopy) return false;
-        if (params.cat !== null && categoryByTypeId.get(row.typeId)?.id !== params.cat) {
-          return false;
-        }
+        if (keepKind && !keepKind(row)) return false;
         return query === '' || labels.typeName(row.typeId).toLowerCase().includes(query);
       })
       .map((row) => ({
@@ -429,7 +476,7 @@ function CorpAssetsView({
     params.loc,
     params.div,
     params.below,
-    params.cat,
+    keepKind,
     targetsApi.targets,
     stock,
     shortTypeIds,
@@ -448,8 +495,7 @@ function CorpAssetsView({
     if (!byLocation) return [];
     const items: ClassifiedAsset[] = filterClassified(classified.items, {
       query,
-      categoryId: params.cat,
-      categoryOf: (typeId) => categoryByTypeId.get(typeId)?.id ?? null,
+      kind: keepKind,
       onlyTypeIds: params.below ? shortTypeIds : null,
       typeName: labels.typeName,
     });
@@ -458,7 +504,7 @@ function CorpAssetsView({
       usage: officeUsageWhole,
       filtered:
         query !== '' ||
-        params.cat !== null ||
+        keepKind !== null ||
         params.below ||
         params.loc !== null ||
         params.div !== null,
@@ -475,9 +521,8 @@ function CorpAssetsView({
     params.loc,
     params.div,
     params.below,
-    params.cat,
+    keepKind,
     shortTypeIds,
-    categoryByTypeId,
     query,
     labels,
     officeUsageWhole,
@@ -493,16 +538,6 @@ function CorpAssetsView({
       .map((id) => ({ id, label: labels.placeName(id) }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [classified, labels]);
-  const categoryOptions = useMemo(() => {
-    const seen = new Map<number, string>();
-    for (const item of classified.items) {
-      const category = categoryByTypeId.get(item.input.typeId);
-      if (category) seen.set(category.id, category.name);
-    }
-    return [...seen]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [classified.items, categoryByTypeId]);
 
   // Multi-select + bulk actions (same shape as /assets' issue #90), by item only.
   const [selectMode, setSelectMode] = useState(false);
@@ -511,7 +546,8 @@ function CorpAssetsView({
     tab,
     params.loc,
     params.div,
-    params.cat,
+    CATEGORY_PARAM.serialize(params.cat),
+    params.bp,
     params.below,
     params.group,
     query,
@@ -602,8 +638,16 @@ function CorpAssetsView({
 
   if (!snapshot.hydrated) return <Spinner />;
 
-  const placeFilter: PlaceFilter = { loc: params.loc, div: params.div, cat: params.cat };
-  const activeFilterCount = [params.loc, params.div, params.cat].filter((v) => v !== null).length;
+  const placeFilter: PlaceFilter = {
+    loc: params.loc,
+    div: params.div,
+    cat: categoryPick,
+    bp: params.bp,
+  };
+  const activeFilterCount =
+    [params.loc, params.div].filter((v) => v !== null).length +
+    (categoryIndex && !pickIsAll(categoryPick) ? 1 : 0) +
+    (params.bp !== 'any' && showBlueprintSelect ? 1 : 0);
   const shownCount = byLocation ? locationRows.length : itemRows.length;
 
   const ledgerTabs = CORP_ASSET_TABS.filter(
@@ -635,7 +679,7 @@ function CorpAssetsView({
     <div className="space-y-2">
       <FilterBar<PlaceFilter>
         value={placeFilter}
-        onChange={(next) => setParams({ loc: next.loc, div: next.div, cat: next.cat })}
+        onChange={(next) => setParams({ loc: next.loc, div: next.div, cat: next.cat, bp: next.bp })}
         activeCount={activeFilterCount}
         title={t('corp.assets.filtersTitle')}
         search={
@@ -691,24 +735,23 @@ function CorpAssetsView({
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label={t('corp.assets.filter.category')}>
-              <Select
-                value={draft.cat === null ? ALL : String(draft.cat)}
-                onValueChange={(v) => setDraft({ ...draft, cat: v === ALL ? null : Number(v) })}
-              >
-                <SelectTrigger aria-label={t('corp.assets.filter.category')} className="w-52">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>{t('corp.assets.filter.anyCategory')}</SelectItem>
-                  {categoryOptions.map((o) => (
-                    <SelectItem key={o.id} value={String(o.id)}>
-                      {o.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
+            {categoryIndex && (
+              <FilterField label={t('corp.assets.filter.category')}>
+                <AssetCategoryPicker
+                  index={categoryIndex}
+                  pick={draft.cat}
+                  onChange={(cat) => setDraft({ ...draft, cat })}
+                />
+              </FilterField>
+            )}
+            {showBlueprintSelect && (
+              <FilterField label={t('assets.blueprints.label')}>
+                <BlueprintKindSelect
+                  value={draft.bp}
+                  onChange={(bp) => setDraft({ ...draft, bp })}
+                />
+              </FilterField>
+            )}
           </>
         )}
       </FilterBar>

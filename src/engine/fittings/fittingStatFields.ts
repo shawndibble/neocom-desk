@@ -5,6 +5,7 @@
  * Neutral home for `variationDelta.ts` (2-way before/after) and
  * `fittingCompare.ts` (N-way compare) to both import from.
  */
+import { isMobileDrone } from './appliedDps';
 import type { SupportKind, SupportRow } from './support';
 import { resistPct } from './stats';
 import type { FittingStats } from './types';
@@ -72,6 +73,29 @@ export type FittingStatKey =
   | 'capTransfer'
   | 'droneControlRange'
   | 'miningWaste'
+  | 'dataStrength'
+  | 'relicStrength'
+  | 'utilitySlots'
+  | 'probeStrength'
+  | 'probeLauncherBonus'
+  | 'probeLauncherCycle'
+  | 'cloakRecalibration'
+  | 'reactivationDelay'
+  | 'reloadTime'
+  | 'salvageChance'
+  | 'salvagerRange'
+  | 'tractorSpeed'
+  | 'tractorRange'
+  | 'cargoScanRange'
+  | 'shipScanRange'
+  | 'droneSpeed'
+  | 'droneTracking'
+  | 'missileExplosionVelocity'
+  | 'missileExplosionRadius'
+  | 'ecmRange'
+  | 'dampRange'
+  | 'disruptorRange'
+  | 'painterRange'
   | ImproveExploreKey;
 
 /** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below. */
@@ -86,12 +110,7 @@ export type ImproveDamageKey = 'appliedDps';
 
 /** Explore better's figures: the best analyzer's hacking figures and the arrays' scan bonuses. */
 export type ImproveExploreKey =
-  | 'hackingStrength'
-  | 'virusCoherence'
-  | 'hackingCycle'
-  | 'scanStrength'
-  | 'scanTimeCut'
-  | 'deviationCut';
+  'virusCoherence' | 'hackingCycle' | 'scanStrength' | 'scanTimeCut' | 'deviationCut';
 
 /** Which way a change is an improvement; `neutral` stats only move with the hull, so no change is good or bad. */
 export type StatDirection = 'higher' | 'lower' | 'neutral';
@@ -125,6 +144,34 @@ const supportMax = (
   kinds: readonly SupportKind[],
   pick: (row: SupportRow) => number
 ) => Math.max(0, ...s.support.rows.filter((row) => kinds.includes(row.kind)).map(pick));
+
+/** Reach of the longest `kinds` module, optimal plus falloff, km. */
+const supportReach = (s: FittingStats, kinds: readonly SupportKind[]) =>
+  supportMax(s, kinds, (row) => row.optimal + row.falloff) / 1000;
+
+/** The best figure among mobile combat drones (a sentry's speed is 0); 0 with none. */
+const fastestDroneFigure = (
+  s: FittingStats,
+  pick: (drone: { speed: number; tracking: number }) => number
+) =>
+  Math.max(
+    0,
+    ...s.applied.weapons.flatMap((weapon) =>
+      weapon.kind === 'drone' && isMobileDrone(weapon.speed) ? [pick(weapon)] : []
+    )
+  );
+
+/** A missile figure over every missile weapon, `worst` of them: a loss on any launcher shows. */
+const missileFigure = (
+  s: FittingStats,
+  pick: (missile: { explosionVelocity: number; explosionRadius: number }) => number,
+  worst: (...values: number[]) => number
+) => {
+  const values = s.applied.weapons.flatMap((weapon) =>
+    weapon.kind === 'missile' ? [pick(weapon)] : []
+  );
+  return values.length ? worst(...values) : 0;
+};
 
 export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'cpuUsed', direction: 'lower', digits: 1, value: (s) => s.cpuUsed },
@@ -395,11 +442,26 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.mining.wastePct,
     hideWhenNone: true,
   },
+  // Per site, so an Integrated → Data Analyzer swap names the relic sites it can no longer open.
   {
-    key: 'hackingStrength',
+    key: 'dataStrength',
     direction: 'higher',
     digits: 0,
-    value: (s) => s.explore.hacking.strength,
+    value: (s) => s.explore.dataStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'relicStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.relicStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'utilitySlots',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.utilitySlots,
     hideWhenNone: true,
   },
   {
@@ -436,6 +498,149 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.scanning.deviation,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.explore.probe.strength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherBonus',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.probe.launcherBonus,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherCycle',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.probe.cycleSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'cloakRecalibration',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.cloakRecalibrationSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'reactivationDelay',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => s.moduleFigures.reactivationSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'reloadTime',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => s.moduleFigures.reloadSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'salvageChance',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.salvageChance,
+    hideWhenNone: true,
+  },
+  {
+    key: 'salvagerRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.moduleFigures.salvagerRange / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'tractorSpeed',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.tractorVelocity,
+    hideWhenNone: true,
+  },
+  {
+    key: 'tractorRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.moduleFigures.tractorRange / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'cargoScanRange',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.cargoScanRange / 1000,
+    hideWhenNone: true,
+  },
+  {
+    key: 'shipScanRange',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.moduleFigures.shipScanRange / 1000,
+    hideWhenNone: true,
+  },
+  // The fastest mobile combat drone; a sentry's speed is 0, so it never counts.
+  {
+    key: 'droneSpeed',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => fastestDroneFigure(s, (drone) => drone.speed),
+    hideWhenNone: true,
+  },
+  {
+    key: 'droneTracking',
+    direction: 'higher',
+    digits: 3,
+    value: (s) => fastestDroneFigure(s, (drone) => drone.tracking),
+    hideWhenNone: true,
+  },
+  // Worst launcher, so one that gets worse reads as a loss.
+  {
+    key: 'missileExplosionVelocity',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => missileFigure(s, (missile) => missile.explosionVelocity, Math.min),
+    hideWhenNone: true,
+  },
+  {
+    key: 'missileExplosionRadius',
+    direction: 'lower',
+    digits: 0,
+    value: (s) => missileFigure(s, (missile) => missile.explosionRadius, Math.max),
+    hideWhenNone: true,
+  },
+  // Reach per EWAR kind, longest module: never one mean across kinds.
+  {
+    key: 'ecmRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['ecm']),
+    hideWhenNone: true,
+  },
+  {
+    key: 'dampRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['sensorDampener']),
+    hideWhenNone: true,
+  },
+  {
+    key: 'disruptorRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['trackingDisruptor', 'guidanceDisruptor']),
+    hideWhenNone: true,
+  },
+  {
+    key: 'painterRange',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => supportReach(s, ['targetPainter']),
     hideWhenNone: true,
   },
 ];

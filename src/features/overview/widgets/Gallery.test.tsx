@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -66,7 +66,7 @@ async function openGallery({
   wide = false,
 }: { initial?: OverviewLayout; isPhone?: boolean; board?: WidgetBoard; wide?: boolean } = {}) {
   phone.value = isPhone;
-  const user = userEvent.setup();
+  const user = userEvent.setup({ delay: null });
   render(<Host initial={initial} board={board} />);
   await user.click(screen.getByRole('button', { name: 'Add widget' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add a widget' });
@@ -76,10 +76,24 @@ async function openGallery({
   return { user, dialog };
 }
 
+// One input event for the whole string: `user.type` re-renders every card's
+// preview once per keystroke, which is the cost, not the thing under test.
+async function enter(user: ReturnType<typeof userEvent.setup>, field: HTMLElement, text: string) {
+  await user.click(field);
+  await user.paste(text);
+}
+
 const itemOf = (dialog: HTMLElement, title: string) =>
   within(dialog).getByText(title, { selector: 'div' }).closest('li') as HTMLElement;
 
 const SUBTITLE = `${OVERVIEW_KINDS.length} widgets · 3 on your Overview`;
+
+// The worker's first Gallery render is cold (lazy previews, i18n, React
+// warm-up) and would land on the first test; pay it once here.
+beforeAll(async () => {
+  await openGallery();
+  cleanup();
+});
 
 describe('Gallery', () => {
   it('says how many widgets there are and how many are on the Overview', async () => {
@@ -121,12 +135,12 @@ describe('Gallery', () => {
   it('searches, says when nothing matches, and clears the search', async () => {
     const { user, dialog } = await openGallery();
     const search = within(dialog).getByRole('searchbox', { name: 'Search widgets' });
-    await user.type(search, 'incursion');
+    await enter(user, search, 'incursion');
     expect(within(dialog).getByRole('button', { name: 'Add Incursions' })).toBeInTheDocument();
     expect(within(dialog).queryByText('Wallet')).toBeNull();
 
     await user.clear(search);
-    await user.type(search, 'zzzz');
+    await enter(user, search, 'zzzz');
     expect(within(dialog).getByText('No widget matches "zzzz".')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Clear search' }));
     expect(search).toHaveValue('');
@@ -184,7 +198,7 @@ describe('Gallery', () => {
 
   it('still finds Wallet flow, and adds the Wallet on its Flow as the old kind opened', async () => {
     const { user, dialog } = await openGallery();
-    await user.type(within(dialog).getByRole('searchbox'), 'wallet flow');
+    await enter(user, within(dialog).getByRole('searchbox'), 'wallet flow');
     await user.click(within(dialog).getByRole('button', { name: 'Add Wallet flow' }));
     const widgets = (JSON.parse(screen.getByTestId('layout').textContent!) as OverviewLayout)
       .widgets;
@@ -315,7 +329,7 @@ describe('Gallery Browse all', () => {
   it('narrows to the drawer and widens again, keeping the search text', async () => {
     const { user, dialog } = await openGallery();
     expect(dialog.className).toContain('max-w-[460px]');
-    await user.type(within(dialog).getByRole('searchbox'), 'wal');
+    await enter(user, within(dialog).getByRole('searchbox'), 'wal');
     await user.click(within(dialog).getByRole('button', { name: 'Browse all' }));
     const wide = screen.getByRole('dialog', { name: 'Add a widget' });
     expect(wide.className).toContain('max-w-[min(80vw,88rem)]');
@@ -383,7 +397,7 @@ describe('Gallery Browse all', () => {
 
   it('shows only the matching preset when a search names one', async () => {
     const { user, dialog } = await browse({});
-    await user.type(within(dialog).getByRole('searchbox'), 'injector');
+    await enter(user, within(dialog).getByRole('searchbox'), 'injector');
     expect(
       within(dialog).getByRole('button', { name: 'Add Large Skill Injector price' })
     ).toBeInTheDocument();
