@@ -58,7 +58,7 @@ const COMPACT_WIDTH = 'max-w-[460px]';
 const BROWSE_WIDTH = 'max-w-[min(80vw,88rem)]';
 
 /** How long the "Added" confirmation stays on a card. */
-const ADDED_MS = 2200;
+export const ADDED_MS = 2200;
 
 /** How wide the preview draws a kind's default size inside its frame: a share of a row would be a sliver at drawer width. */
 const PREVIEW_WIDTH: Record<WidgetSize, string> = {
