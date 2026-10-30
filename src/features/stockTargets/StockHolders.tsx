@@ -32,20 +32,20 @@ export function StockHolders({
   const { t } = useTranslation();
   if (holders.length === 0) return <>{formatNumber(total)}</>;
   return (
-    <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+    <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap max-xl:gap-1">
       {formatNumber(total)}
-      <span className="text-text-dim">·</span>
+      <span className="text-text-dim max-xl:hidden">·</span>
       {holders.length === 1 ? (
         <span className="inline-flex items-center gap-1 text-xs text-text-dim">
           <HolderPortrait characterId={holders[0].characterId} />
-          <span className="max-sm:sr-only">{nameOf(holders[0].characterId)}</span>
+          <span className="max-xl:sr-only">{nameOf(holders[0].characterId)}</span>
         </span>
       ) : (
         <Popover>
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex min-h-6 items-center gap-1 px-1 text-xs text-accent hover:underline"
+              className="inline-flex min-h-6 items-center gap-1 px-1 text-xs text-accent max-xl:px-0 hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
               <span className="inline-flex -space-x-1.5">
@@ -53,7 +53,7 @@ export function StockHolders({
                   <HolderPortrait key={holder.characterId} characterId={holder.characterId} />
                 ))}
               </span>
-              <span className="max-sm:sr-only">
+              <span className="max-xl:sr-only">
                 {t('stockTargets.holders.characters', { count: holders.length })}
               </span>
             </button>
