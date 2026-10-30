@@ -113,6 +113,7 @@ export function AssetsList({
     toggleNodeSelection,
     nodeLabel,
     trailFor,
+    nodePathFor,
     rootStationIdFor,
     securityForStation,
   } = assetsRows;
@@ -524,6 +525,7 @@ export function AssetsList({
                           pathStationId={pathStationId}
                           pathSegments={pathSegments}
                           trailFor={trailFor}
+                          nodePathFor={nodePathFor}
                           rootStationIdFor={rootStationIdFor}
                           query={query}
                         />

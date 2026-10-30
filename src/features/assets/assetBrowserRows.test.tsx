@@ -174,6 +174,7 @@ describe('blueprint badge', () => {
           href="/assets/60003760"
           characterBadge={null}
           blueprintKind="copy"
+          wrap={(children) => children}
           t={(key) => key}
         />
       </MemoryRouter>

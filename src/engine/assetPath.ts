@@ -97,6 +97,47 @@ export function resolveAssetPath(
   return { station, trail, children, unresolved };
 }
 
+export interface FoundAssetNode {
+  stationId: number;
+  node: AssetTreeNode;
+  /** Segments down to the node itself. */
+  segments: readonly string[];
+  /** Segments down to the level that lists the node. */
+  parentSegments: readonly string[];
+}
+
+/** Where an item sits in the tree — how a search hit reaches its place. Null when the tree does not hold it. */
+export function findAssetNodePath(
+  stations: readonly AssetTreeStation[],
+  itemId: number
+): FoundAssetNode | null {
+  const walk = (
+    nodes: readonly AssetTreeNode[],
+    parents: readonly string[]
+  ): { node: AssetTreeNode; parents: readonly string[] } | null => {
+    for (const node of nodes) {
+      if (node.kind !== 'bay' && node.asset.item_id === itemId) return { node, parents };
+      if (node.kind !== 'item') {
+        const deeper = walk(node.children, [...parents, assetNodeSegment(node)]);
+        if (deeper) return deeper;
+      }
+    }
+    return null;
+  };
+  for (const station of stations) {
+    const hit = walk(station.children, []);
+    if (hit) {
+      return {
+        stationId: station.locationId,
+        node: hit.node,
+        segments: [...hit.parents, assetNodeSegment(hit.node)],
+        parentSegments: hit.parents,
+      };
+    }
+  }
+  return null;
+}
+
 export interface ParsedAssetPath {
   stationId: number | null;
   segments: string[];

@@ -2518,6 +2518,30 @@ describe('view state in the URL (issue #1306)', () => {
     expect(window.location.pathname).toBe('/assets/items/60003760');
   });
 
+  it('leaves search when a hit is opened, so the place lists its contents', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets?q=trit&chars=current');
+    render(<App />);
+
+    await user.click(await screen.findByRole('link', { name: /Tritanium/ }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/assets/items/60003760'));
+    expect(window.location.search).toBe('?chars=current');
+    expect(await screen.findByRole('button', { name: /back one level/i })).toBeInTheDocument();
+    expect(screen.queryByText(/match/i)).not.toBeInTheDocument();
+  });
+
+  it('puts a More actions menu at the far right of a search hit', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets?q=trit');
+    render(<App />);
+    await screen.findByRole('link', { name: /Tritanium/ });
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
   it('uses the synced default character filter when the URL has none, without writing it to the URL', async () => {
     await seedSecondCharacter();
     await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });

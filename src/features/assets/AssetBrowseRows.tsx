@@ -1,4 +1,8 @@
 import { useEffect, type ComponentProps } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MenuItem } from '@/components/ui';
+import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
+import { useOpenInFittings } from '@/features/fittings/useOpenInFittings';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import {
   assetStackValue,
@@ -7,7 +11,7 @@ import {
   type AssetTreeNode,
   type AssetTreeStation,
 } from '@/engine/assetTree';
-import { assetNodeSegment } from '@/engine/assetPath';
+import { assetNodeSegment, type FoundAssetNode } from '@/engine/assetPath';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
@@ -29,6 +33,7 @@ import {
   assetHref,
   characterBadgeFor,
   isUnresolvedParent,
+  queryLeavingSearch,
   useAssetItemActions,
   type AssetMatch,
   type BrowseRow,
@@ -146,6 +151,7 @@ interface BrowseRowViewProps {
   pathStationId: number | null;
   pathSegments: readonly string[];
   trailFor: (asset: CharacterAsset) => string[];
+  nodePathFor: (asset: CharacterAsset) => FoundAssetNode | null;
   rootStationIdFor: (asset: CharacterAsset) => number | null;
   /** The page's query string, carried onto every drill-down link. */
   query: string;
@@ -218,13 +224,42 @@ function SearchMatchRow({
   characterBadges,
   securityForStation,
   trailFor,
+  nodePathFor,
   rootStationIdFor,
   query,
 }: BrowseRowViewProps & { match: AssetMatch }) {
   const actions = useAssetItemActions();
+  const openInFittings = useOpenInFittings();
+  const navigate = useNavigate();
   const { asset, name } = match;
   const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
   const rootStationId = rootStationIdFor(asset);
+  // Leaving search: the places below list their contents, not these matches again.
+  const nextQuery = queryLeavingSearch(query);
+  const stationHref = assetHref(rootStationId, [], nextQuery);
+  const found = nodePathFor(asset);
+  // A ship or container opens to its contents; anything else opens to where it sits.
+  const opensInside = found !== undefined && found !== null && found.node.kind !== 'item';
+  const href =
+    found === null || found === undefined
+      ? stationHref
+      : assetHref(found.stationId, opensInside ? found.segments : found.parentSegments, nextQuery);
+  const locationHref =
+    found === null || found === undefined
+      ? null
+      : assetHref(found.stationId, found.parentSegments, nextQuery);
+  // Each place once: not the row's own link, and not the same place twice.
+  const places = [
+    { key: 'location', href: locationHref },
+    { key: 'station', href: stationHref },
+  ].filter(
+    (place, index, all): place is { key: string; href: string } =>
+      place.href !== null &&
+      place.href !== href &&
+      all.findIndex((other) => other.href === place.href) === index
+  );
+  const ship = found?.node.kind === 'ship' ? found.node : null;
+  const itemId = actions.abyssal.isAbyssalType?.(asset.type_id) ? asset.item_id : undefined;
   return (
     <SearchResultRow
       name={name}
@@ -232,10 +267,38 @@ function SearchMatchRow({
       estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
       trail={trailFor(asset)}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
-      href={assetHref(rootStationId, [], query)}
+      href={href}
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       valueHint={valueHint}
+      wrap={(children) => (
+        <OreItemMenu
+          quantity={asset.quantity}
+          typeId={asset.type_id}
+          itemId={itemId}
+          itemName={name}
+          openHref={href}
+          extraItems={
+            <>
+              {places.map((place) => (
+                <MenuItem key={place.key} onSelect={() => void navigate(place.href)}>
+                  {t(`assets.search.menu.open_${place.key}`)}
+                </MenuItem>
+              ))}
+              {ship && (
+                <MenuItem
+                  disabled={openInFittings.pending}
+                  onSelect={() => openInFittings.open(() => assetShipEditLocation(ship, name))}
+                >
+                  {t('assets.openInFittings')}
+                </MenuItem>
+              )}
+            </>
+          }
+        >
+          {children}
+        </OreItemMenu>
+      )}
       t={t}
     />
   );

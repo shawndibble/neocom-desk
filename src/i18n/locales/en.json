@@ -8178,6 +8178,10 @@
       "rowHint": "Not among this character's own assets — likely inside a container you don't own (e.g. a corp hangar)"
     },
     "search": {
+      "menu": {
+        "open_location": "Open location",
+        "open_station": "Open station"
+      },
       "resultCount_one": "{{count}} match",
       "resultCount_other": "{{count}} matches",
       "clear": "Clear search"

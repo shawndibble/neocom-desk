@@ -20,7 +20,12 @@ import {
   type AssetTreeNode,
   type AssetTreeStation,
 } from '@/engine/assetTree';
-import { assetNodeSegment, parseAssetPath, resolveAssetPath } from '@/engine/assetPath';
+import {
+  assetNodeSegment,
+  findAssetNodePath,
+  parseAssetPath,
+  resolveAssetPath,
+} from '@/engine/assetPath';
 import { useStationSort } from '@/features/assets/stationSortPreference';
 import { useAssetSort } from '@/features/assets/assetSortPreference';
 import {
@@ -240,6 +245,11 @@ export function useAssetsRows(assetsData: AssetsData) {
   }
 
   /** The station a search hit belongs to, for the link back into the drill-down. */
+  /** Where a search hit sits in the tree; null for an item of another Character, which the tree does not hold. */
+  function nodePathFor(asset: CharacterAsset) {
+    return findAssetNodePath(sortedTree, asset.item_id);
+  }
+
   function rootStationIdFor(asset: CharacterAsset): number | null {
     let current = asset;
     const seen = new Set<number>([asset.item_id]);
@@ -568,6 +578,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     toggleNodeSelection,
     nodeLabel,
     trailFor,
+    nodePathFor,
     rootStationIdFor,
     securityForStation,
     handleBulkAddToQuickbar,

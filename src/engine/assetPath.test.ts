@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assetNodeSegment,
   assetPathHref,
+  findAssetNodePath,
   legacyAssetsLocation,
   parseAssetPath,
   resolveAssetPath,
@@ -193,5 +194,37 @@ describe('legacyAssetsLocation', () => {
     expect(legacyAssetsLocation('/assets', '?q=x')).toBeNull();
     expect(legacyAssetsLocation('/assets/nope', '')).toBeNull();
     expect(legacyAssetsLocation('/assets/items/1', '?view=ships')).toBeNull();
+  });
+});
+
+describe('findAssetNodePath', () => {
+  const station = (children: AssetTreeStation['children']): AssetTreeStation => ({
+    locationId: 60008494,
+    locationType: 'station',
+    children,
+    itemCount: 0,
+    estimatedValue: 0,
+  });
+
+  it('finds an item sitting directly in a station', () => {
+    const found = findAssetNodePath([station([item(1), item(2)])], 2);
+    expect(found).toMatchObject({ stationId: 60008494, segments: ['i:2'], parentSegments: [] });
+    expect(found?.node.kind).toBe('item');
+  });
+
+  it('walks through a ship and its bay, keeping the parent path separate', () => {
+    const found = findAssetNodePath([station([ship(5, [bay([item(9)])])])], 9);
+    expect(found?.segments).toEqual(['i:5', 'b:cargoHold', 'i:9']);
+    expect(found?.parentSegments).toEqual(['i:5', 'b:cargoHold']);
+  });
+
+  it('finds a ship itself', () => {
+    const found = findAssetNodePath([station([ship(5, [bay([item(9)])])])], 5);
+    expect(found?.segments).toEqual(['i:5']);
+    expect(found?.node.kind).toBe('ship');
+  });
+
+  it('returns null for an item the tree does not hold', () => {
+    expect(findAssetNodePath([station([item(1)])], 99)).toBeNull();
   });
 });

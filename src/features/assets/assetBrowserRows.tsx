@@ -556,6 +556,8 @@ interface SearchResultRowProps {
   blueprintKind?: BlueprintKind | null;
   /** Tooltip note on the value. */
   valueHint?: string;
+  /** Wraps the row in its item menu; its More actions button sits at the row's far right. */
+  wrap: (children: ReactElement) => ReactElement;
   t: Translate;
 }
 
@@ -564,8 +566,8 @@ interface SearchResultRowProps {
  * every location at once — filtering only the level you happen to be standing
  * in would make "Search all characters" meaningless — so each hit has to say
  * where it lives, and links straight to that place. The whole row is that
- * link, so its name stays plain text — a Show info button there would nest
- * one control inside another; the hit's own place has it one tap away.
+ * link, so its name stays plain text; Show info, and the places the hit can
+ * open, are in the row's menu at the far right.
  */
 export function SearchResultRow({
   name,
@@ -577,43 +579,52 @@ export function SearchResultRow({
   characterBadge,
   blueprintKind = null,
   valueHint,
+  wrap,
   t,
 }: SearchResultRowProps) {
   return (
     <div className="border-b border-line hover:bg-panel-2">
-      <Link
-        to={href}
-        className={cx(
-          'group flex min-h-16 items-center gap-2.5 px-3 py-2',
-          focusRingInsetClassName
-        )}
-      >
-        <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="flex min-w-0 flex-1 items-center">
-              <span className="truncate text-sm font-medium">{name}</span>
-              {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
-              {characterBadge && <CharacterBadge characterName={characterBadge} />}
+      {wrap(
+        <div className="flex items-center">
+          <Link
+            to={href}
+            className={cx(
+              'group flex min-h-16 min-w-0 flex-1 items-center gap-2.5 py-2 pl-3',
+              focusRingInsetClassName
+            )}
+          >
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="flex min-w-0 flex-1 items-center">
+                  <span className="truncate text-sm font-medium">{name}</span>
+                  {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
+                  {characterBadge && <CharacterBadge characterName={characterBadge} />}
+                </span>
+                <span className="shrink-0 text-sm tabular-nums">×{formatCount(quantity)}</span>
+              </span>
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                  <SecurityValue security={security} />
+                  <span className="truncate text-[0.6875rem] text-text-dim">
+                    {trail.join(' › ')}
+                  </span>
+                </span>
+                <span
+                  className={cx(
+                    'shrink-0 text-[0.6875rem] tabular-nums',
+                    estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
+                  )}
+                >
+                  <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
+                </span>
+              </span>
             </span>
-            <span className="shrink-0 text-sm tabular-nums">×{formatCount(quantity)}</span>
+          </Link>
+          <span className="shrink-0 px-2">
+            <RowMoreActions />
           </span>
-          <span className="flex min-w-0 items-baseline gap-2">
-            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-              <SecurityValue security={security} />
-              <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
-            </span>
-            <span
-              className={cx(
-                'shrink-0 text-[0.6875rem] tabular-nums',
-                estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
-              )}
-            >
-              <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
-            </span>
-          </span>
-        </span>
-        <Icon.Descend size={Icon.ICON_SIZE.sm} className={rowCaretClassName} />
-      </Link>
+        </div>
+      )}
     </div>
   );
 }
