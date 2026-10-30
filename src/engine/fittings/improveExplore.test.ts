@@ -76,7 +76,7 @@ function figures(fit: Fitting, cpu: Record<number, number> = {}): FittingStats {
       ...NO_EXPLORE,
       modules: 1,
       hacking: ANALYZER(analyzer, rig),
-      analyzers: [ANALYZER(analyzer, rig)],
+      analyzers: [{ ...ANALYZER(analyzer, rig), sites: [] }],
     },
   };
 }

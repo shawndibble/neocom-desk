@@ -114,14 +114,10 @@ describe('compareFittingStats', () => {
 
   it('drops a role row every Fitting is at zero, keeps it when one has the role', () => {
     const keys = (table: ReturnType<typeof compareFittingStats>) => table.rows.map((r) => r.key);
-    expect(keys(compareFittingStats([stats(), stats()]))).not.toContain('hackingStrength');
-    const analyzer = {
-      ...stats().explore,
-      modules: 1,
-      hacking: { strength: 30, coherence: 60, cycleSeconds: 10 },
-    };
+    expect(keys(compareFittingStats([stats(), stats()]))).not.toContain('dataStrength');
+    const analyzer = { ...stats().explore, modules: 1, dataStrength: 30 };
     const table = compareFittingStats([stats(), stats({ explore: analyzer })]);
-    const row = table.rows.find((r) => r.key === 'hackingStrength')!;
+    const row = table.rows.find((r) => r.key === 'dataStrength')!;
     expect(row.values).toEqual([0, 30]);
     expect(row.bestIndices).toEqual([1]);
   });

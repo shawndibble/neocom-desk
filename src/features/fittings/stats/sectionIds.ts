@@ -9,6 +9,7 @@ export type Section =
   | 'capacitor'
   | 'support'
   | 'mining'
+  | 'exploration'
   | 'fleetBoosts'
   | 'projected'
   | 'abyssal'
@@ -28,6 +29,7 @@ export const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   // Only there at all when the fit has something to show in it.
   'support',
   'mining',
+  'exploration',
   'fleetBoosts',
   'navigation',
   'drones',

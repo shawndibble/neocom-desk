@@ -15,7 +15,12 @@ function fit(analyzers: AnalyzerStats[], maxVelocity = 1000): FittingStats {
   return {
     ...base,
     navigation: { ...base.navigation, maxVelocity },
-    explore: { ...NO_EXPLORE, modules: analyzers.length, hacking: analyzers[0]!, analyzers },
+    explore: {
+      ...NO_EXPLORE,
+      modules: analyzers.length,
+      hacking: analyzers[0]!,
+      analyzers: analyzers.map((analyzer) => ({ ...analyzer, sites: [] })),
+    },
   };
 }
 

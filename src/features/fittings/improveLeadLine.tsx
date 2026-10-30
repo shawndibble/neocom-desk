@@ -201,7 +201,8 @@ export function leadLine(
       // One row per figure, like the stat rows under it, and only the figures the swap changes: none, no lead.
       const [was, now] = [own.explore, option.after.explore];
       const figures: { key: StatChangeKey; before: number; after: number }[] = [
-        { key: 'hackingStrength', before: was.hacking.strength, after: now.hacking.strength },
+        { key: 'dataStrength', before: was.dataStrength, after: now.dataStrength },
+        { key: 'relicStrength', before: was.relicStrength, after: now.relicStrength },
         { key: 'virusCoherence', before: was.hacking.coherence, after: now.hacking.coherence },
         { key: 'hackingCycle', before: was.hacking.cycleSeconds, after: now.hacking.cycleSeconds },
         { key: 'scanStrength', before: was.scanning.strength, after: now.scanning.strength },

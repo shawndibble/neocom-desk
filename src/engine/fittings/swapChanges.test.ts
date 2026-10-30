@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import en from '@/i18n/locales/en.json';
 import { changeVerdict, NUMERIC_FIELDS } from './fittingStatFields';
+import { NO_EXPLORE, type ExploreSite } from './explore';
 import { swapChanges } from './swapChanges';
 import { baseFittingStats } from './__fixtures__/fittingStats';
 import type { SupportRow } from './support';
@@ -26,25 +27,71 @@ const keys = (before: FittingStats, after: FittingStats) =>
   swapChanges(before, after).map((change) => change.change.key);
 
 describe('swapChanges', () => {
+  const analyzer = (
+    strength: number,
+    coherence: number,
+    sites: ExploreSite[]
+  ): FittingStats['explore'] => ({
+    ...NO_EXPLORE,
+    modules: 1,
+    hacking: { strength, coherence, cycleSeconds: 10 },
+    analyzers: [{ strength, coherence, cycleSeconds: 10, sites }],
+    dataStrength: sites.includes('data') ? strength : 0,
+    relicStrength: sites.includes('relic') ? strength : 0,
+  });
+
   it('names a hacking strength and coherence loss (Zeugma → Ligature)', () => {
     const before = baseFittingStats();
-    const analyzer = (strength: number, coherence: number): FittingStats['explore'] => ({
-      modules: 1,
-      hacking: { strength, coherence, cycleSeconds: 10 },
-      analyzers: [{ strength, coherence, cycleSeconds: 10 }],
-      scanning: { strength: 0, duration: 0, deviation: 0 },
-    });
     const changes = swapChanges(
-      { ...before, explore: analyzer(30, 30) },
-      { ...before, explore: analyzer(20, 20) }
+      { ...before, explore: analyzer(30, 30, ['data', 'relic']) },
+      { ...before, explore: analyzer(20, 20, ['data', 'relic']) }
     );
     expect(changes).toContainEqual({
       kind: 'stat',
-      change: { key: 'hackingStrength', before: 30, after: 20 },
+      change: { key: 'dataStrength', before: 30, after: 20 },
+    });
+    expect(changes).toContainEqual({
+      kind: 'stat',
+      change: { key: 'relicStrength', before: 30, after: 20 },
     });
     expect(changes).toContainEqual({
       kind: 'stat',
       change: { key: 'virusCoherence', before: 30, after: 20 },
+    });
+  });
+
+  it('names the relic hacking an Integrated → Data Analyzer swap gives up', () => {
+    const before = baseFittingStats();
+    const changes = swapChanges(
+      { ...before, explore: analyzer(30, 30, ['data', 'relic']) },
+      { ...before, explore: analyzer(30, 60, ['data']) }
+    );
+    expect(changes).toContainEqual({
+      kind: 'stat',
+      change: { key: 'relicStrength', before: 30, after: 0 },
+    });
+  });
+
+  it('names a probe launcher swap: strength bonus, probe strength and launch cycle', () => {
+    const before = baseFittingStats();
+    const probing = (strength: number, launcherBonus: number, cycleSeconds: number) => ({
+      ...before,
+      explore: { ...NO_EXPLORE, modules: 1, probe: { strength, launcherBonus, cycleSeconds } },
+    });
+    expect(keys(probing(104, 10, 1.5), probing(94.5, 0, 2))).toEqual(
+      expect.arrayContaining(['probeStrength', 'probeLauncherBonus', 'probeLauncherCycle'])
+    );
+  });
+
+  it('names a slower cloak relock', () => {
+    const before = baseFittingStats();
+    const cloaked = (seconds: number) => ({
+      ...before,
+      explore: { ...NO_EXPLORE, cloakRecalibrationSeconds: seconds },
+    });
+    expect(swapChanges(cloaked(10), cloaked(30))).toContainEqual({
+      kind: 'stat',
+      change: { key: 'cloakRecalibration', before: 10, after: 30 },
     });
   });
 

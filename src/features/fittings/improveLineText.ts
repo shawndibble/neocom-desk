@@ -151,7 +151,8 @@ export function moveLine(
       after: m3sFormat(a),
     });
     return changedFigures(t, [
-      f('hackingStrength', was.hacking.strength, now.hacking.strength),
+      f('dataStrength', was.dataStrength, now.dataStrength),
+      f('relicStrength', was.relicStrength, now.relicStrength),
       f('coherence', was.hacking.coherence, now.hacking.coherence),
       f('cycle', was.hacking.cycleSeconds, now.hacking.cycleSeconds),
       f('scanStrength', was.scanning.strength, now.scanning.strength),

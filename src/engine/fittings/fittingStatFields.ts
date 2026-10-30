@@ -72,6 +72,13 @@ export type FittingStatKey =
   | 'capTransfer'
   | 'droneControlRange'
   | 'miningWaste'
+  | 'dataStrength'
+  | 'relicStrength'
+  | 'utilitySlots'
+  | 'probeStrength'
+  | 'probeLauncherBonus'
+  | 'probeLauncherCycle'
+  | 'cloakRecalibration'
   | ImproveExploreKey;
 
 /** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below. */
@@ -86,12 +93,7 @@ export type ImproveDamageKey = 'appliedDps';
 
 /** Explore better's figures: the best analyzer's hacking figures and the arrays' scan bonuses. */
 export type ImproveExploreKey =
-  | 'hackingStrength'
-  | 'virusCoherence'
-  | 'hackingCycle'
-  | 'scanStrength'
-  | 'scanTimeCut'
-  | 'deviationCut';
+  'virusCoherence' | 'hackingCycle' | 'scanStrength' | 'scanTimeCut' | 'deviationCut';
 
 /** Which way a change is an improvement; `neutral` stats only move with the hull, so no change is good or bad. */
 export type StatDirection = 'higher' | 'lower' | 'neutral';
@@ -395,11 +397,26 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     value: (s) => s.mining.wastePct,
     hideWhenNone: true,
   },
+  // Per site, so an Integrated → Data Analyzer swap names the relic sites it can no longer open.
   {
-    key: 'hackingStrength',
+    key: 'dataStrength',
     direction: 'higher',
     digits: 0,
-    value: (s) => s.explore.hacking.strength,
+    value: (s) => s.explore.dataStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'relicStrength',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.relicStrength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'utilitySlots',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.utilitySlots,
     hideWhenNone: true,
   },
   {
@@ -436,6 +453,34 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
     direction: 'higher',
     digits: 0,
     value: (s) => s.explore.scanning.deviation,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeStrength',
+    direction: 'higher',
+    digits: 1,
+    value: (s) => s.explore.probe.strength,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherBonus',
+    direction: 'higher',
+    digits: 0,
+    value: (s) => s.explore.probe.launcherBonus,
+    hideWhenNone: true,
+  },
+  {
+    key: 'probeLauncherCycle',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.probe.cycleSeconds,
+    hideWhenNone: true,
+  },
+  {
+    key: 'cloakRecalibration',
+    direction: 'lower',
+    digits: 1,
+    value: (s) => s.explore.cloakRecalibrationSeconds,
     hideWhenNone: true,
   },
 ];

@@ -21,6 +21,9 @@ const readJson = async <T>(path: string): Promise<T> =>
 const PRICES: Record<string, number> = {
   'Zeugma Integrated Analyzer': 536_900_000,
   'Ligature Integrated Analyzer': 249_800_000,
+  // Illustrative: only the order matters.
+  'Sisters Core Probe Launcher': 20_000_000,
+  'Core Probe Launcher I': 30_000,
 };
 
 /** The Astero a pilot asked about: Cheaper offered nothing for its 537M Zeugma. */
@@ -47,7 +50,7 @@ const RACKS: Record<FittingSlotKind, string[]> = {
 };
 
 describe('Cheaper on an exploration Astero (real engine)', () => {
-  it('offers Ligature for the Zeugma as a trade-off that names the hacking strength lost', async () => {
+  it('offers Ligature for the Zeugma as a trade-off that names the data and relic strength lost', async () => {
     const engine = await loadRealDogmaEngine();
     const [types, rackOf, marketTypes, variations, skills] = await Promise.all([
       readJson<Record<string, { name: string; groupID: number }>>('types.json'),
@@ -114,10 +117,23 @@ describe('Cheaper on an exploration Astero (real engine)', () => {
       (option) => option.candidate.toTypeId === id('Ligature Integrated Analyzer')
     );
     expect(ligature?.iskDelta).toBe(-287_100_000);
-    const strength = ligature?.lost.find((lost) => lost.change.key === 'hackingStrength');
-    expect(strength?.change.before).toBeGreaterThan(strength?.change.after ?? Infinity);
+    // An Integrated Analyzer opens both sites, so both strengths drop.
+    for (const key of ['dataStrength', 'relicStrength']) {
+      const strength = ligature?.lost.find((lost) => lost.change.key === key);
+      expect(strength?.change.before).toBeGreaterThan(strength?.change.after ?? Infinity);
+    }
     expect(result?.noDownside.map((option) => option.candidate.toTypeId)).not.toContain(
       id('Ligature Integrated Analyzer')
     );
+
+    // The launcher is empty (the probes are in cargo), so its own bonus is what is lost.
+    const launcher = result?.tradeOffs.find(
+      (option) => option.candidate.toTypeId === id('Core Probe Launcher I')
+    );
+    expect(launcher?.lost.map((lost) => lost.change)).toContainEqual({
+      key: 'probeLauncherBonus',
+      before: 10,
+      after: 0,
+    });
   });
 });
