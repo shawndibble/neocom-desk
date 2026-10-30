@@ -10,6 +10,7 @@
 // a Character they still hold — there is no signal to detect it from, so it
 // needs its own explicit entry point.
 
+import { dropCharacterHubEntry } from '@/features/market/tradeHubActions';
 import { clearBookCache } from '@/features/corp/taxBook/bookCache';
 import { clearObservedCopies } from '@/features/corp/taxBook/observedStore';
 import { clearWalletArchive } from '@/features/character/walletArchive';
@@ -161,6 +162,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await deleteCommunitySnapshots(characterId);
     }
   );
+  // Its Trade Hub entry (issue #5593). After the transaction: the synced write loads Firebase lazily.
+  await dropCharacterHubEntry(characterId).catch(() => {});
   await forgetAlertsGrants([characterId]);
   // Its own Firebase app and persisted session go with it (issue #5074).
   if (isSyncConfigured()) await removeCharacterSession(characterId).catch(() => {});
