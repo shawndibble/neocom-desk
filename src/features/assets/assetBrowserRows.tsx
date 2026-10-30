@@ -17,6 +17,7 @@ import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { NicknamedName } from '@/features/assets/PlaceName';
 import { IconButton, IskAmount, RowMoreActions, Tooltip } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
@@ -169,6 +170,8 @@ export function BlueprintBadge({ kind, t }: BlueprintBadgeProps) {
 interface LocationRowProps {
   href: string;
   label: string;
+  /** The pilot's Place Nickname (personal Assets only): shown first, the real label dim beneath. */
+  nickname?: string;
   security: number | null | undefined;
   jumpsAway: JumpsAwayResult | undefined;
   itemCount: number;
@@ -193,6 +196,7 @@ interface LocationRowProps {
 export function LocationRow({
   href,
   label,
+  nickname,
   security,
   jumpsAway,
   itemCount,
@@ -234,7 +238,12 @@ export function LocationRow({
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{label}</span>
+          <NicknamedName
+            name={label}
+            nickname={nickname}
+            className="text-sm font-medium"
+            truncate
+          />
           <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim">
             {unresolvedParent ? (
               <span className="text-warning">{t('assets.unresolved.rowHint')}</span>

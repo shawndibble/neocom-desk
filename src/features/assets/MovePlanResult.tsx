@@ -18,6 +18,7 @@ import { PlanLine } from './MovePlanLine';
 import { PickupHaulList } from './MovePlanHauls';
 import { HaulerPicker } from './MovePlanHaulerPicker';
 import { MaxIskInput } from './MovePlanMaxIsk';
+import { PlaceName } from './PlaceName';
 
 /** "Don't remind me again" on the rig warning, ticked once for good. */
 const useSkipRigWarning = createLocalSetting<boolean>({
@@ -351,7 +352,7 @@ export function PlanResult({
                           className="m-0 flex min-w-0 flex-[1_1_12em] flex-wrap max-sm:contents items-baseline gap-x-3 gap-y-0.5 text-sm focus:outline-none"
                         >
                           <span className="min-w-0 flex-1 font-bold max-sm:basis-full [overflow-wrap:anywhere]">
-                            {placeLabel(p.locationId)}
+                            <PlaceName locationId={p.locationId} name={placeLabel(p.locationId)} />
                           </span>
                           <span className="font-bold tabular-nums">
                             {formatCubicMetres(p.totalM3)} m³

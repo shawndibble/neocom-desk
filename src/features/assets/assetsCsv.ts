@@ -5,6 +5,8 @@ export interface AssetCsvRow {
   location: string;
   name: string;
   quantity: number;
+  /** The Place Nickname for the location; empty where none is set. */
+  nickname: string;
 }
 
 /**
@@ -16,13 +18,18 @@ export interface AssetCsvRow {
  * silently drop rows the page merely chose not to paint.
  */
 export function assetCsvRows(
-  groups: readonly { label: string; entries: readonly { name: string; quantity: number }[] }[]
+  groups: readonly {
+    label: string;
+    nickname?: string;
+    entries: readonly { name: string; quantity: number }[];
+  }[]
 ): AssetCsvRow[] {
   return groups.flatMap((group) =>
     group.entries.map((entry) => ({
       location: group.label,
       name: entry.name,
       quantity: entry.quantity,
+      nickname: group.nickname ?? '',
     }))
   );
 }
@@ -32,5 +39,6 @@ export function assetsCsvColumns(t: CsvTranslate): CsvColumn<AssetCsvRow>[] {
     { header: t('assets.csvLocation'), value: (row) => row.location },
     { header: t('assets.csvItem'), value: (row) => row.name },
     { header: t('assets.csvQuantity'), value: (row) => row.quantity },
+    { header: t('assets.csvNickname'), value: (row) => row.nickname },
   ];
 }

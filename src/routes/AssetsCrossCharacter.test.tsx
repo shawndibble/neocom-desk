@@ -611,7 +611,8 @@ describe('jumps-away distance (issue #87)', () => {
         const heading = screen.getByRole('heading', { level: 2 });
         const facts = jumps.closest('span.flex-wrap') as HTMLElement;
         // Name on its own line; the facts line follows it inside the same column.
-        expect(heading.parentElement).toContainElement(facts);
+        // The heading sits in a row with its rename pencil; the column holds the facts line.
+        expect(heading.closest('div.flex-col')).toContainElement(facts);
         expect(facts).not.toContainElement(heading);
         // One dot between each pair of items, none leading or trailing.
         expect(facts.querySelectorAll('[aria-hidden="true"]')).toHaveLength(

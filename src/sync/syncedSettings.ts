@@ -137,6 +137,11 @@
 // its entry and the key is never deleted, so the tombstone-expiry edge does not
 // bite it. See features/character/cloneNicknames.ts.
 //
+// sync.placeNicknames (issue #5605): the pilot's own name for a station or
+// structure, shown on the Assets page only. A `Record<locationId, name>` blob
+// for the same exact-match reason; clearing a name drops its entry and the key
+// is never deleted. See features/assets/placeNicknames.ts.
+//
 // sync.miningTaxSurveyConnections (issue #4684): the moon Surveys the pilot
 // connected with "Assign Taxes", as {surveyId, characterId, payeeId,
 // payeeName, taxPct, systemId, typeIds, fromDate, untilMs, expiresAt,
@@ -365,6 +370,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpStockTargets',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.placeNicknames',
   'sync.podKillThreshold',
   'sync.reprocessingTaxRate',
   'sync.routeHoleHubs',

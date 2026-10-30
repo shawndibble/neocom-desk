@@ -55,6 +55,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
+import { usePlaceNicknameMap } from './placeNicknames';
 import { PlanResult, type PlanState } from './MovePlanResult';
 import {
   MOVE_PLAN_URL_SCHEMA,
@@ -406,6 +407,7 @@ function MovePlanTabBody({
     return [...seen].sort(([, a], [, b]) => a.localeCompare(b));
   }, [loaded]);
 
+  const placeNicknames = usePlaceNicknameMap();
   const stationLabels = useMemo(
     () => shortStationLabels(ownStations.map(([, name]) => name)),
     [ownStations]
@@ -906,7 +908,8 @@ function MovePlanTabBody({
                   placeholder={t('assets.movePlan.destinationSystem')}
                   triggerLabel={
                     destStation !== null
-                      ? (stationLabels[ownStations.findIndex(([id]) => id === destStation)] ??
+                      ? (placeNicknames[destStation] ??
+                        stationLabels[ownStations.findIndex(([id]) => id === destStation)] ??
                         searchedStation?.name ??
                         placeLabel(destStation))
                       : undefined
@@ -924,8 +927,12 @@ function MovePlanTabBody({
                     {ownStations.map(([id, fullName], i) => (
                       <FilterChip
                         key={id}
-                        label={stationLabels[i]}
-                        tooltip={stationLabels[i] !== fullName ? fullName : undefined}
+                        label={placeNicknames[id] ?? stationLabels[i]}
+                        tooltip={
+                          placeNicknames[id] !== undefined || stationLabels[i] !== fullName
+                            ? fullName
+                            : undefined
+                        }
                         selected={destStation === id}
                         onToggle={() =>
                           destStation === id

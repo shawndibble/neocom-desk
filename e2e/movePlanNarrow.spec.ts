@@ -93,8 +93,8 @@ test('pickup heading gives the name a row on a phone and stays one row on deskto
   await dialog.getByRole('button', { name: 'Show plan' }).click();
 
   const heading = dialog.getByRole('heading', { name: /Caldari Navy Assembly Plant/ });
-  const name = heading.locator('span').first();
-  const total = heading.locator('span').nth(1);
+  const name = heading.locator(':scope > span').first();
+  const total = heading.locator(':scope > span').nth(1);
   const card = heading.locator('xpath=ancestor::section[1]');
 
   const box = async (l: typeof name) => (await l.boundingBox())!;

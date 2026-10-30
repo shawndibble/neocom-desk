@@ -25,6 +25,7 @@ import {
   SectionHeading,
 } from '@/features/assets/assetBrowserRows';
 import type { Translate } from '@/lib/translate';
+import type { PlaceNicknamesValue } from '@/features/assets/placeNicknames';
 import { selectionStateForIds } from '@/features/assets/assetSelection';
 import type { PinState } from '@/features/assets/stationPins';
 import { planTargetForItem } from '@/features/industry/blueprintCatalog';
@@ -142,6 +143,8 @@ interface BrowseRowViewProps {
   selectedIds: ReadonlySet<number>;
   onToggleSelection: (ids: readonly number[]) => void;
   stationLabelFor: (station: AssetTreeStation) => string;
+  /** Place Nicknames by location id: the personal Assets display only. */
+  placeNicknames: PlaceNicknamesValue;
   nodeLabel: (node: AssetTreeNode) => string;
   locationNames: ReadonlyMap<number, string>;
   securityForStation: (locationId: number) => number | null | undefined;
@@ -172,6 +175,7 @@ export function BrowseRowView(props: BrowseRowViewProps) {
       <LocationRow
         href={assetHref(station.locationId, [], props.query)}
         label={props.stationLabelFor(station)}
+        nickname={props.placeNicknames[station.locationId]}
         security={orphan ? undefined : props.securityForStation(station.locationId)}
         jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
         itemCount={station.itemCount}
@@ -226,6 +230,7 @@ function SearchMatchRow({
   trailFor,
   nodePathFor,
   rootStationIdFor,
+  placeNicknames,
   query,
 }: BrowseRowViewProps & { match: AssetMatch }) {
   const actions = useAssetItemActions();
@@ -234,6 +239,10 @@ function SearchMatchRow({
   const { asset, name } = match;
   const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
   const rootStationId = rootStationIdFor(asset);
+  // The trail's first segment is the station: its Place Nickname, display only.
+  const trail = trailFor(asset);
+  const stationNickname = rootStationId === null ? undefined : placeNicknames[rootStationId];
+  if (stationNickname !== undefined && trail.length > 0) trail[0] = stationNickname;
   // Leaving search: the places below list their contents, not these matches again.
   const nextQuery = queryLeavingSearch(query);
   const stationHref = assetHref(rootStationId, [], nextQuery);
@@ -263,7 +272,7 @@ function SearchMatchRow({
       name={name}
       quantity={asset.quantity}
       estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
-      trail={trailFor(asset)}
+      trail={trail}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
       href={href}
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
