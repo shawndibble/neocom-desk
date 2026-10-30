@@ -4598,6 +4598,8 @@
     "column": {
       "name": "Name",
       "corp": "Corp",
+      "dockedAt": "Docked at",
+      "ship": "Ship",
       "group": "Group",
       "spTotal": "SP",
       "wallet": "Wallet",
@@ -4615,6 +4617,9 @@
       "reaction": "Rxn"
     },
     "openJobsTooltip": "{{used}}/{{max}} slots used",
+    "inSpace": "in space",
+    "structure": "structure",
+    "needsPermission": "{{name}} has not granted {{permission}}. Grant it from Permissions.",
     "spReadyYes": "Ready",
     "extractionTotal": "Ready extractions net {{isk}} ISK across characters, {{each}} each ({{hub}}: sell injector − buy extractor, before fees)",
     "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}",

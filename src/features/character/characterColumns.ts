@@ -15,6 +15,8 @@ export const CHARACTER_COLUMN_IDS = [
   'name',
   'achievement',
   'corp',
+  'dockedAt',
+  'ship',
   'group',
   'spTotal',
   'wallet',
