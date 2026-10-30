@@ -35,6 +35,7 @@ function row(overrides: Partial<CharacterCsvRow> = {}): CharacterCsvRow {
     totalSp: 52_000_000,
     alertCount: 3,
     starred: true,
+    spFarm: true,
     ...overrides,
   } as CharacterCsvRow;
 }
@@ -70,6 +71,7 @@ describe('charactersCsvColumns', () => {
       'characters.jobSlotCategory.reaction',
       'characters.column.pi',
       'characters.csvPiExpires',
+      'characters.column.spFarm',
       'characters.column.spReady',
       'characters.column.alerts',
       'characters.column.starred',

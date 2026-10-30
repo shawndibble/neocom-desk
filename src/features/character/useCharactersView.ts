@@ -102,6 +102,8 @@ interface CharactersViewInput {
   attentionById: ReadonlyMap<number, AttentionEntry>;
   groups: readonly CharacterGroup[];
   starred: readonly number[];
+  /** Character ids marked SP Farm: the only ones SP extraction readiness applies to. */
+  spFarm: readonly number[];
   alertCounts: ReadonlyMap<number, number>;
   notTrainingAlertEnabledFor: (characterId: number) => boolean;
   visibleColumns: readonly CharacterColumnId[];
@@ -124,6 +126,7 @@ export function useCharactersView(input: CharactersViewInput) {
     attentionById,
     groups,
     starred,
+    spFarm,
     alertCounts,
     notTrainingAlertEnabledFor,
     visibleColumns,
@@ -260,6 +263,7 @@ export function useCharactersView(input: CharactersViewInput) {
         jobSlotSkills: core?.jobSlotSkills,
         totalSp: core?.totalSp,
         starred: isCharacterStarred(starred, character.characterId),
+        spFarm: isCharacterStarred(spFarm, character.characterId),
         groupId: groupIdByCharacterId.get(character.characterId) ?? null,
         whereabouts: whereabouts.of(character.characterId),
         locationGranted: whereabouts.hasLocationGrant(character.characterId),

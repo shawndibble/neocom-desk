@@ -30,6 +30,7 @@ import {
   DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
+  useSpFarmCharacters,
 } from '@/features/character/spExtractionSettings';
 import * as rosterModule from '@/features/character/roster';
 import type { RosterEntry } from '@/features/character/roster';
@@ -98,6 +99,7 @@ beforeEach(async () => {
   // Defaults already include `group`/`remove` — no migration needed in tests.
   useCharacterColumnsMigrated.setState({ value: true, hydrated: false });
   useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
+  useSpFarmCharacters.setState({ value: [], hydrated: false });
   useSpExtractionThresholdSp.setState({
     value: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
     hydrated: false,
@@ -1282,6 +1284,25 @@ describe('Characters table view', () => {
 
     expect(await screen.findByRole('table')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+  });
+
+  it('the SP Farm column toggles a mark, and a hint asks for one while none is set', async () => {
+    await useSpExtractionMonitoringEnabled.getState().setValue(true);
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'SP Farm' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'SP ready' }));
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByText(/Mark characters as SP Farm/)).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Mark Pilot One as SP Farm' }));
+
+    const unmark = await screen.findByRole('button', { name: 'Unmark Pilot One as SP Farm' });
+    expect(unmark).toHaveAttribute('aria-pressed', 'true');
+    expect(useSpFarmCharacters.getState().value).toHaveLength(1);
+    expect(screen.queryByText(/Mark characters as SP Farm/)).not.toBeInTheDocument();
   });
 
   it('Refresh all triggers a live pull for the whole roster, not just the active character', async () => {

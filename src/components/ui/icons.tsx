@@ -119,6 +119,7 @@ import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
 import { SquaresFour } from '@phosphor-icons/react/dist/csr/SquaresFour';
 import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
+import { Plant } from '@phosphor-icons/react/dist/csr/Plant';
 import { Star } from '@phosphor-icons/react/dist/csr/Star';
 import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { TextB } from '@phosphor-icons/react/dist/csr/TextB';
@@ -215,6 +216,8 @@ export const Search = withWeight(MagnifyingGlass);
 export const Select = withWeight(Check);
 /** Pin — filled when pinned, outline when not (pass `weight="fill"`). */
 export const Pin = withWeight(Star);
+/** SP Farm mark — filled when the character is marked, outline when not (pass `weight="fill"`). */
+export const SpFarm = withWeight(Plant);
 /** Search across every character on the account. */
 /** Signs another character in to the roster. */
 export const AddCharacter = withWeight(UserPlus);
