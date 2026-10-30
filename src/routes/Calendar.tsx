@@ -387,7 +387,7 @@ export function Calendar() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-3">
+    <div className="mx-auto max-w-page space-y-3">
       <PageHeader
         title={t('calendar.title')}
         meta={data?.oldestFetchedAt ? <DataAgeBadge date={data.oldestFetchedAt} /> : undefined}

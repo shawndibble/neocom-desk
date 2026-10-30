@@ -621,7 +621,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     <ItemActionsProvider page={itemActions}>
       <div
         className={cx(
-          'mx-auto max-w-6xl space-y-4',
+          'mx-auto max-w-page space-y-4',
           // Same shift as `/wallet`: 26rem = SlideOver's 25rem max width plus a 1rem gutter.
           view === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
         )}
@@ -704,7 +704,7 @@ export function CorpWallet() {
 
   const content =
     gate.status === 'denied' ? (
-      <div className="mx-auto max-w-6xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <PageHeader title={t('corp.wallet.title')} />
         <CorpDenied
           reason={gate.reason}

@@ -829,7 +829,7 @@ export function Industry() {
   const opportunitiesPanels = [marketWidePanel, ownedRankingPanel];
   return (
     <ItemActionsProvider page={itemActions}>
-      <div className="mx-auto max-w-7xl space-y-4">
+      <div className="mx-auto max-w-page space-y-4">
         <IndustryHeader
           activeCharacterId={activeCharacterId}
           activeTab={tab}

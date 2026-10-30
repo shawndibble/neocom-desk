@@ -135,7 +135,7 @@ export function SkillPlanEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       {/* Same title as the other two Skills views: the editor is a third view
           of the same section, and dropping the <h1> when a plan opens made the
           page look like it had navigated somewhere else. */}

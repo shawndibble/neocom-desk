@@ -10,7 +10,7 @@ export const SIZES: readonly WidgetSize[] = ['S', 'M', 'L', 'F'];
 /**
  * `basis` is the fraction of the row (S four across, M three, L two, Full one);
  * `minWidth` (px) is where it wraps: four S, three M and two L all fit the
- * 1152 px content column of a 1440 px desktop with the rail open.
+ * 1200 px content column of a 1440 px desktop with the rail open.
  */
 export const SIZE_LAYOUT: Record<WidgetSize, { basis: number; minWidth: number }> = {
   S: { basis: 1 / 4, minWidth: 220 },
