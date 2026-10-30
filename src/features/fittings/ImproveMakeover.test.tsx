@@ -88,6 +88,32 @@ describe('ImproveMakeover', () => {
     expect(screen.queryByText(/old rigs are destroyed/)).not.toBeInTheDocument();
   });
 
+  it('shows how long the capacitor lasts, so running dry later reads as better', () => {
+    const dry = (seconds: number) =>
+      ({
+        ...BEFORE,
+        capacitor: { stable: false, stablePercentage: 0, depletesInSeconds: seconds },
+      }) as typeof BEFORE;
+    render(
+      <ImproveMakeover
+        makeover={{ ...MAKEOVER, after: dry(675) }}
+        before={dry(236)}
+        ticked={new Set(MAKEOVER_KEYS)}
+        onToggle={() => {}}
+        typeName={typeNameOf}
+        rowCost={rowCostOf}
+      />
+    );
+    expect(screen.getByText('Empty in 3m 56s')).toBeInTheDocument();
+    const after = screen.getByText('Empty in 11m 15s');
+    expect(after.className).toMatch(/text-success/);
+  });
+
+  it('shows a stable capacitor with its level', () => {
+    render(<Harness />);
+    expect(screen.getAllByText('Stable at 60%').length).toBeGreaterThan(0);
+  });
+
   it("hides each row's own gain while the whole group is ticked", () => {
     render(<Harness />);
     expect(screen.queryByText(/On its own/)).toBeNull();

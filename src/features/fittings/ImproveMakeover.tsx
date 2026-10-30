@@ -6,6 +6,7 @@
  * come from the owner.
  */
 import type { TFunction } from 'i18next';
+import { formatSeconds } from '@/lib/duration';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, IskAmount, TypeIcon } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -57,15 +58,26 @@ const toneClass: Record<Tone, string> = {
 
 const higher = (before: number, after: number): Tone =>
   after > before ? 'up' : after < before ? 'over' : 'same';
+/** Stable beats running dry; a higher stable level, or a longer time to empty, is better. */
+function capacitorTone(before: FittingStats, after: FittingStats): Tone {
+  const was = before.capacitor;
+  const now = after.capacitor;
+  if (was.stable && now.stable) return higher(was.stablePercentage, now.stablePercentage);
+  if (!was.stable && !now.stable) return higher(was.depletesInSeconds, now.depletesInSeconds);
+  return now.stable ? 'up' : 'over';
+}
 const resourceTone = (used: number, total: number): Tone =>
   used > total ? 'over' : total > 0 && used / total >= 0.98 ? 'tight' : 'same';
 
 /** The whole-fit figures: DPS, EHP, speed, capacitor, CPU, powergrid. */
 function figuresOf(t: TFunction, before: FittingStats, after: FittingStats): Figure[] {
+  // How long it lasts, not only whether it lasts: running dry later is a gain the pilot can see.
   const cap = (s: FittingStats) =>
     s.capacitor.stable
-      ? t('fittings.improve.makeover.capStable')
-      : t('fittings.improve.makeover.capUnstable');
+      ? t('fittings.improve.makeover.capStable', { pct: Math.round(s.capacitor.stablePercentage) })
+      : t('fittings.improve.makeover.capEmptyIn', {
+          time: formatSeconds(s.capacitor.depletesInSeconds),
+        });
   const pair = (b: number, a: number) => ({ before: formatCount(b), after: formatCount(a) });
   return [
     {
@@ -88,7 +100,7 @@ function figuresOf(t: TFunction, before: FittingStats, after: FittingStats): Fig
       id: 'capacitor',
       before: cap(before),
       after: cap(after),
-      tone: after.capacitor.stable ? 'same' : 'over',
+      tone: capacitorTone(before, after),
     },
     {
       id: 'cpu',
