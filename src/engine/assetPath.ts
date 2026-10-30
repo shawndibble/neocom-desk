@@ -106,36 +106,31 @@ export interface FoundAssetNode {
   parentSegments: readonly string[];
 }
 
-/** Where an item sits in the tree — how a search hit reaches its place. Null when the tree does not hold it. */
-export function findAssetNodePath(
-  stations: readonly AssetTreeStation[],
-  itemId: number
-): FoundAssetNode | null {
+/** Every item and container in the tree by item id — how a search hit finds its place in one lookup. */
+export function indexAssetNodes(
+  stations: readonly AssetTreeStation[]
+): ReadonlyMap<number, FoundAssetNode> {
+  const index = new Map<number, FoundAssetNode>();
   const walk = (
+    stationId: number,
     nodes: readonly AssetTreeNode[],
-    parents: readonly string[]
-  ): { node: AssetTreeNode; parents: readonly string[] } | null => {
+    parentSegments: readonly string[]
+  ): void => {
     for (const node of nodes) {
-      if (node.kind !== 'bay' && node.asset.item_id === itemId) return { node, parents };
-      if (node.kind !== 'item') {
-        const deeper = walk(node.children, [...parents, assetNodeSegment(node)]);
-        if (deeper) return deeper;
+      const segment = assetNodeSegment(node);
+      if (node.kind !== 'bay') {
+        index.set(node.asset.item_id, {
+          stationId,
+          node,
+          segments: [...parentSegments, segment],
+          parentSegments,
+        });
       }
+      if (node.kind !== 'item') walk(stationId, node.children, [...parentSegments, segment]);
     }
-    return null;
   };
-  for (const station of stations) {
-    const hit = walk(station.children, []);
-    if (hit) {
-      return {
-        stationId: station.locationId,
-        node: hit.node,
-        segments: [...hit.parents, assetNodeSegment(hit.node)],
-        parentSegments: hit.parents,
-      };
-    }
-  }
-  return null;
+  for (const station of stations) walk(station.locationId, station.children, []);
+  return index;
 }
 
 export interface ParsedAssetPath {

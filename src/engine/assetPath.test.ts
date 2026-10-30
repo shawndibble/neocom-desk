@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assetNodeSegment,
   assetPathHref,
-  findAssetNodePath,
+  indexAssetNodes,
   legacyAssetsLocation,
   parseAssetPath,
   resolveAssetPath,
@@ -193,11 +193,11 @@ describe('legacyAssetsLocation', () => {
     expect(legacyAssetsLocation('/assets', '')).toBeNull();
     expect(legacyAssetsLocation('/assets', '?q=x')).toBeNull();
     expect(legacyAssetsLocation('/assets/nope', '')).toBeNull();
-    expect(legacyAssetsLocation('/assets/items/1', '?view=ships')).toBeNull();
+    expect(legacyAssetsLocation('/assets/items/1', '?view=ships')).toBeUndefined();
   });
 });
 
-describe('findAssetNodePath', () => {
+describe('indexAssetNodes', () => {
   const station = (children: AssetTreeStation['children']): AssetTreeStation => ({
     locationId: 60008494,
     locationType: 'station',
@@ -207,24 +207,24 @@ describe('findAssetNodePath', () => {
   });
 
   it('finds an item sitting directly in a station', () => {
-    const found = findAssetNodePath([station([item(1), item(2)])], 2);
+    const found = indexAssetNodes([station([item(1), item(2)])]).get(2);
     expect(found).toMatchObject({ stationId: 60008494, segments: ['i:2'], parentSegments: [] });
     expect(found?.node.kind).toBe('item');
   });
 
   it('walks through a ship and its bay, keeping the parent path separate', () => {
-    const found = findAssetNodePath([station([ship(5, [bay([item(9)])])])], 9);
+    const found = indexAssetNodes([station([ship(5, [bay([item(9)])])])]).get(9);
     expect(found?.segments).toEqual(['i:5', 'b:cargoHold', 'i:9']);
     expect(found?.parentSegments).toEqual(['i:5', 'b:cargoHold']);
   });
 
   it('finds a ship itself', () => {
-    const found = findAssetNodePath([station([ship(5, [bay([item(9)])])])], 5);
+    const found = indexAssetNodes([station([ship(5, [bay([item(9)])])])]).get(5);
     expect(found?.segments).toEqual(['i:5']);
     expect(found?.node.kind).toBe('ship');
   });
 
   it('returns null for an item the tree does not hold', () => {
-    expect(findAssetNodePath([station([item(1)])], 99)).toBeNull();
+    expect(indexAssetNodes([station([item(1)])]).get(99)).toBeUndefined();
   });
 });

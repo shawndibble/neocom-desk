@@ -239,15 +239,13 @@ function SearchMatchRow({
   const stationHref = assetHref(rootStationId, [], nextQuery);
   const found = nodePathFor(asset);
   // A ship or container opens to its contents; anything else opens to where it sits.
-  const opensInside = found !== undefined && found !== null && found.node.kind !== 'item';
+  const opensInside = found !== null && found.node.kind !== 'item';
   const href =
-    found === null || found === undefined
+    found === null
       ? stationHref
       : assetHref(found.stationId, opensInside ? found.segments : found.parentSegments, nextQuery);
   const locationHref =
-    found === null || found === undefined
-      ? null
-      : assetHref(found.stationId, found.parentSegments, nextQuery);
+    found === null ? null : assetHref(found.stationId, found.parentSegments, nextQuery);
   // Each place once: not the row's own link, and not the same place twice.
   const places = [
     { key: 'location', href: locationHref },

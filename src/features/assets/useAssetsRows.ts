@@ -22,7 +22,7 @@ import {
 } from '@/engine/assetTree';
 import {
   assetNodeSegment,
-  findAssetNodePath,
+  indexAssetNodes,
   parseAssetPath,
   resolveAssetPath,
 } from '@/engine/assetPath';
@@ -196,6 +196,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     ]
   );
 
+  const nodeIndex = useMemo(() => indexAssetNodes(sortedTree), [sortedTree]);
   const totalValue = useMemo(() => totalEstimatedValue(sortedTree), [sortedTree]);
   // Root location list only: drilled-in views keep their own node totals, and
   // flat search/all-items mode sums matches rather than the tree. Hidden with no
@@ -244,12 +245,12 @@ export function useAssetsRows(assetsData: AssetsData) {
     return labels;
   }
 
-  /** The station a search hit belongs to, for the link back into the drill-down. */
-  /** Where a search hit sits in the tree; null for an item of another Character, which the tree does not hold. */
+  /** Where a search hit sits in the drill-down tree; null when the tree does not hold it. */
   function nodePathFor(asset: CharacterAsset) {
-    return findAssetNodePath(sortedTree, asset.item_id);
+    return nodeIndex.get(asset.item_id) ?? null;
   }
 
+  /** The station a search hit belongs to, for the link back into the drill-down. */
   function rootStationIdFor(asset: CharacterAsset): number | null {
     let current = asset;
     const seen = new Set<number>([asset.item_id]);
