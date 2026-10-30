@@ -40,7 +40,7 @@ import {
 } from './improve';
 import { candidateFilter, FILL_RACKS } from './improveCandidateFilter';
 import { jobOf } from './improveGroups';
-import { propulsionNeedOf, type JobSetting } from './improveJob';
+import { propulsionNeedOf, type ImproveJob, type JobSetting } from './improveJob';
 import { coveringFreed, freedBy, overrunBy } from './improvePairSeed';
 import type { Resource } from './makeItFit';
 import { newRuleBreaks } from './ruleBreaks';
@@ -204,7 +204,7 @@ export interface PropulsionStart {
   /** Whether the type is a propulsion module (any kind). */
   isPropulsion: (typeId: number) => boolean;
   /** The Improve Job whose need it answers, for the row's reason. */
-  job: NonNullable<JobSetting['job']>;
+  job: ImproveJob;
 }
 
 /**
@@ -720,6 +720,8 @@ export async function findMakeover({
     steps++;
   }
 
+  let forced: { slot: FittingSlotKind; slotIndex: number } | null = null;
+
   /** The forced propulsion step: the best passing move of the first tier that has one. */
   async function addPropulsion() {
     for (const tier of propulsion?.tiers(fitting) ?? []) {
@@ -739,7 +741,6 @@ export async function findMakeover({
       }
     }
   }
-  let forced: { slot: FittingSlotKind; slotIndex: number } | null = null;
 
   try {
     await addPropulsion();
