@@ -322,6 +322,11 @@ export const ESI_REGISTRY = {
     scope: 'esi-assets.read_assets.v1',
     group: 'assets',
   },
+  postCharacterAssetNames: {
+    route: '/characters/{character_id}/assets/names',
+    scope: 'esi-assets.read_assets.v1',
+    group: 'assets',
+  },
   getCharacterMailHeaders: {
     route: '/characters/{character_id}/mail',
     scope: 'esi-mail.read_mail.v1',
@@ -868,6 +873,12 @@ export const ESI_REGISTRY = {
    */
   getCorporationAssets: {
     route: '/corporations/{corporation_id}/assets',
+    scope: 'esi-assets.read_corporation_assets.v1',
+    group: 'corp',
+  },
+  /** In-game names of a corp's singleton assets; same Director gate as `getCorporationAssets`. */
+  postCorporationAssetNames: {
+    route: '/corporations/{corporation_id}/assets/names',
     scope: 'esi-assets.read_corporation_assets.v1',
     group: 'corp',
   },

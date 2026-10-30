@@ -12,6 +12,8 @@ import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { NO_ASSET_NAMES, type AssetNameMap } from '@/engine/assetNames';
+import { loadCharacterAssetNames } from '@/features/assets/assetNames';
 import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { getAveragePriceByType } from '@/market/prices';
@@ -32,6 +34,8 @@ export interface Snapshot {
   pricesReady: boolean;
   /** m3 per unit, from the slim SDE snapshot only — best-effort, missing for market/asset-only types it doesn't cover. */
   volumeByTypeId: Map<number, number>;
+  /** In-game ship/container names by item id (issue #5652); empty until read, and when ESI cannot name anything. */
+  assetNames: AssetNameMap;
 }
 
 /** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
@@ -68,6 +72,7 @@ export async function loadAssetsSnapshot(
     pricesReady: false,
     copyValueByItemId: new Map(),
     volumeByTypeId: new Map(),
+    assetNames: NO_ASSET_NAMES,
   };
   const show = (patch: Partial<Snapshot>) => {
     shown = { ...shown, ...patch };
@@ -85,6 +90,11 @@ export async function loadAssetsSnapshot(
     (copyValueByItemId) => show({ copyValueByItemId }),
     () => {}
   );
+  // Names fill in behind the rows, like prices; a failed read leaves type names.
+  const assetNamesPromise = signal.cancelled
+    ? Promise.resolve(NO_ASSET_NAMES)
+    : loadCharacterAssetNames(characterId, assets);
+  void assetNamesPromise.then((assetNames) => show({ assetNames }));
   const [typeNames, volumeByTypeId] = await Promise.all([
     loadTypeNames(typeIds),
     loadTypeVolumes(typeIds),
@@ -153,7 +163,11 @@ export async function loadAssetsSnapshot(
   });
 
   show({ locationNames });
-  const [copyValueByItemId, priceByTypeId] = await Promise.all([copyValuesPromise, pricesPromise]);
+  const [copyValueByItemId, priceByTypeId, assetNames] = await Promise.all([
+    copyValuesPromise,
+    pricesPromise,
+    assetNamesPromise,
+  ]);
 
   return {
     assetsResult,
@@ -165,6 +179,7 @@ export async function loadAssetsSnapshot(
     pricesReady: true,
     copyValueByItemId,
     volumeByTypeId,
+    assetNames,
   };
 }
 

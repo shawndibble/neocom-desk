@@ -36,6 +36,9 @@ import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { loadGroupCategories, loadTypes } from '@/sde/loadSde';
 import { loadOtherCharactersAssetsDetailed, type SkippedCharacterAssets } from './assets';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { loadCharacterAssetNames } from './assetNames';
+import type { AssetNameMap } from '@/engine/assetNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { placeKey, usePlaceDetails } from '@/features/places';
 import { loadGroupNames } from '@/features/market/groupNames';
@@ -49,6 +52,8 @@ const SHIP_CATEGORY_ID = 6;
 interface ShipData {
   rows: ShipRow[];
   typeNames: ReadonlyMap<number, string>;
+  /** In-game names the players gave their ships, by item id (issue #5652). */
+  gameNames: AssetNameMap;
   /** SDE group (the ship class) by type id. */
   groupIdByType: ReadonlyMap<number, number>;
   characterNames: ReadonlyMap<number, string>;
@@ -82,6 +87,11 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
     entry.assets.map((asset) => ({ ...asset, characterId: entry.characterId }))
   );
   const rows = findShips(owned, isShip);
+  // Best-effort and per Character; the read swallows its own failures.
+  const gameNames: Record<number, string> = {};
+  await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
+    Object.assign(gameNames, await loadCharacterAssetNames(entry.characterId, entry.assets));
+  });
   const typeNames = new Map<number, string>();
   const groupIdByType = new Map<number, number>();
   for (const typeId of new Set(rows.map((r) => r.typeId))) {
@@ -111,6 +121,7 @@ async function loadShipData(characterIds: readonly number[]): Promise<ShipData> 
   return {
     rows,
     typeNames,
+    gameNames,
     groupIdByType,
     characterNames: new Map(entries.map((e) => [e.characterId, e.name])),
     holderNames,
@@ -262,6 +273,7 @@ function ShipRowView({
     (row.locationType === 'station'
       ? t('assets.stationLabel', { id: row.locationId })
       : t('assets.structureLabel', { id: row.locationId }));
+  const gameName = row.packaged ? undefined : data.gameNames[row.itemId];
   const trail = holderTrail(row, data.holderNames, t);
   const openInFittings = useOpenInFittings();
   const openFitting = () =>
@@ -308,8 +320,11 @@ function ShipRowView({
               }}
               className={`text-left font-semibold text-accent after:absolute after:inset-0 ${focusRingInsetClassName}`}
             >
-              {shipName}
+              {gameName ?? shipName}
             </button>
+            {gameName !== undefined && (
+              <span className="block text-xs font-normal text-text-dim">{shipName}</span>
+            )}
             {row.quantity > 1 && (
               <span className="ml-1.5 text-xs text-text-dim tabular-nums">
                 {t('assets.myShips.quantity', { count: row.quantity })}
@@ -432,6 +447,7 @@ export function MyShipsView({
     return rows.map((row) => ({
       row,
       ship: data.typeNames.get(row.typeId) ?? '',
+      gameName: (!row.packaged && data.gameNames[row.itemId]) || '',
       shipClass: shipClasses.get(data.groupIdByType.get(row.typeId) ?? -1) ?? '',
       character: data.characterNames.get(row.characterId) ?? '',
       trail: row.trail.map((id) => data.holderNames.get(id) ?? '').join(' '),
@@ -441,11 +457,12 @@ export function MyShipsView({
   const sorted = useMemo(() => {
     const describe = (
       base: (typeof staticKeys)[number]
-    ): SortKeys & { shipClass: string; trail: string; packaged: string } => {
+    ): SortKeys & { shipClass: string; trail: string; packaged: string; gameName: string } => {
       const place = places.get(placeKey(base.row));
       const jumps = place?.jumps;
       return {
         ship: base.ship,
+        gameName: base.gameName,
         shipClass: base.shipClass,
         character: base.character,
         location: place?.name ?? '',
@@ -461,7 +478,7 @@ export function MyShipsView({
       .filter(
         ({ d }) =>
           needle === '' ||
-          [d.ship, d.shipClass, d.location, d.trail, d.packaged].some((v) =>
+          [d.ship, d.gameName, d.shipClass, d.location, d.trail, d.packaged].some((v) =>
             v.toLowerCase().includes(needle)
           )
       );

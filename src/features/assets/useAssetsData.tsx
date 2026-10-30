@@ -54,6 +54,7 @@ import {
   loadCrossCharacterData,
 } from './assetsSnapshot';
 import { locationLabel, matchAssets } from './assetsLogic';
+import { NO_ASSET_NAMES } from '@/engine/assetNames';
 
 /**
  * Query-string view state (ADR 0015), beside the drill-down path. The
@@ -299,6 +300,7 @@ export function useAssetsData() {
   const typePrices = data?.priceByTypeId ?? NO_NUMBERS;
   const ownCopyValues = data?.copyValueByItemId ?? NO_NUMBERS;
   const volumeByTypeId = data?.volumeByTypeId ?? NO_NUMBERS;
+  const assetNames = data?.assetNames ?? NO_ASSET_NAMES;
 
   // CSV export always stays scoped to the active Character's own assets,
   // regardless of the cross-character toggle — exporting another Character's
@@ -311,7 +313,7 @@ export function useAssetsData() {
     const csvAssetsByItemId = new Map(
       (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
     );
-    const searched = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
+    const searched = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch, assetNames);
     // The export follows the on-screen filters: Category, Blueprints, min value.
     const matches =
       kindFilter || minValueThreshold > 0
@@ -519,6 +521,7 @@ export function useAssetsData() {
     typePrices,
     ownCopyValues,
     volumeByTypeId,
+    assetNames,
     mergedAssets,
     abyssal,
     priceByTypeId,
