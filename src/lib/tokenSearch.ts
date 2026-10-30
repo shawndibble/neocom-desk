@@ -39,3 +39,13 @@ export function tokenPrefixMatch(words: readonly string[], tokens: readonly stri
 export function compactKey(lower: string): string {
   return wordsOf(lower).join('');
 }
+
+/**
+ * `tokenPrefixMatch` on a raw lowercased name. A non-numeral token that is a
+ * word prefix is also a substring, so a cheap `includes` rules most names out
+ * before any splitting — `rankedSearch` has no precomputed words to lean on.
+ */
+export function tokenPrefixMatchText(lower: string, tokens: readonly string[]): boolean {
+  if (!tokens.every((token) => NUMERAL_PAIRS.has(token) || lower.includes(token))) return false;
+  return tokenPrefixMatch(wordsOf(lower), tokens);
+}

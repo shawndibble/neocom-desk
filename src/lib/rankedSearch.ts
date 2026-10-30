@@ -11,7 +11,7 @@
  * numeral ("gyro 2" finds "Gyrostabilizer II"); and, with `ignoreSeparators`,
  * dashes and spaces ignored on both sides ("ttp2b" finds "TTP-2B").
  */
-import { compactKey, queryTokens, tokenPrefixMatch, wordsOf } from './tokenSearch';
+import { compactKey, queryTokens, tokenPrefixMatchText } from './tokenSearch';
 
 export interface RankedSearchOptions<T> {
   primary: (item: T) => string;
@@ -48,7 +48,7 @@ function rankOf<T>(
   if (options.secondary?.some((field) => field(item).toLowerCase().includes(q))) {
     return SECONDARY_ONLY;
   }
-  if (tokens && tokenPrefixMatch(wordsOf(primaryLower), tokens)) return TOKEN_PREFIX;
+  if (tokens && tokenPrefixMatchText(primaryLower, tokens)) return TOKEN_PREFIX;
   if (qCompact && compactKey(primaryLower).includes(qCompact)) return SEPARATOR_INSENSITIVE;
   return NO_MATCH;
 }
