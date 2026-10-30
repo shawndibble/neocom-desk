@@ -99,14 +99,15 @@ export function useAssetsRows(assetsData: AssetsData) {
     setSelectedIds((prev) => toggleSelection(prev, ids));
   }
 
-  // Opens on the pilot's Travel default; the picker here changes this view only.
-  const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
-  const assetsRoute = useJumpBasis(routeOverride);
-  const routePreference = assetsRoute.rules.preference;
-
   const stationSortField = useStationSort((state) => state.value);
   const setStationSortField = useStationSort((state) => state.setValue);
   useHydratedStore(useStationSort);
+
+  // Opens on the pilot's Travel default; the picker here changes this view only.
+  // It shows only under the Jumps away sort, so a hidden pick never moves a jump count.
+  const [routeOverride, setRouteOverride] = useState<RoutePreferenceKind | null>(null);
+  const assetsRoute = useJumpBasis(stationSortField === 'jumpsAway' ? routeOverride : null);
+  const routePreference = assetsRoute.rules.preference;
 
   // The flat (search / All Items) list's own sort, remembered the same way the
   // station list's is. Ungated on `hydrated`: this only reorders a list that is
