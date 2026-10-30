@@ -214,6 +214,14 @@ export interface DataTableGroupBy<T> {
    * where a month with one entry still reads as that month.
    */
   minSize?: number;
+  /**
+   * Orders the groups, given each group's rows, independent of the column
+   * sort: rows inside a group keep the table's sort, only the groups move
+   * (the Market History station view ranks stations by net while its rows
+   * stay newest first). Rows without a key stay at their slot; ties keep the
+   * sorted order. Omitted, a group sits where its first member sorted.
+   */
+  groupCompare?: (a: readonly T[], b: readonly T[]) => number;
 }
 
 export interface DataTableProps<T> {

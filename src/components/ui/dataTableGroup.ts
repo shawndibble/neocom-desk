@@ -38,3 +38,22 @@ export function groupSortedRows<T>(
   }
   return groups;
 }
+
+/**
+ * Reorders the keyed groups by `compare` while every `null`-key singleton
+ * stays at the slot it held: those rows have no group identity, so only the
+ * groups that read as a section move. Members keep their incoming (sorted)
+ * order and ties keep the incoming group order, so a group order never
+ * disturbs the row sort inside a group.
+ */
+export function orderGroups<T>(
+  groups: DataTableRowGroup<T>[],
+  compare: ((a: readonly T[], b: readonly T[]) => number) | undefined
+): DataTableRowGroup<T>[] {
+  if (!compare) return groups;
+  const keyed = groups
+    .filter((group) => group.key !== null)
+    .sort((a, b) => compare(a.rows, b.rows));
+  let next = 0;
+  return groups.map((group) => (group.key === null ? group : keyed[next++]!));
+}

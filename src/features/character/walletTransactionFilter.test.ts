@@ -108,7 +108,37 @@ describe('activeWalletTransactionFilterCount', () => {
     ).toBe(3);
   });
 
+  it('counts a station pick as one filter, however many stations', () => {
+    expect(activeWalletTransactionFilterCount(filter({ stations: [1, 2] }))).toBe(1);
+  });
+
+  it('leaves the view and station order out, because they arrange rather than narrow', () => {
+    expect(
+      activeWalletTransactionFilterCount(filter({ view: 'station', stationsBy: 'name' }))
+    ).toBe(0);
+  });
+
   it('leaves the text out, because its box never hides', () => {
     expect(activeWalletTransactionFilterCount(filter({ text: 'tritanium' }))).toBe(0);
+  });
+});
+
+describe('filterWalletTransactions by station', () => {
+  const at = (id: number, location_id: number): WalletTransactionCommon => ({
+    ...txn(id, '2026-09-01T10:00:00Z', 34, true),
+    location_id,
+  });
+  const rows = [at(1, 10), at(2, 20), at(3, 30)];
+
+  it('keeps only the picked stations', () => {
+    expect(ids(filterWalletTransactions(rows, filter({ stations: [10, 30] }), nameFor))).toEqual([
+      1, 3,
+    ]);
+  });
+
+  it('keeps every row when no station is picked', () => {
+    expect(ids(filterWalletTransactions(rows, filter({ stations: [] }), nameFor))).toEqual([
+      1, 2, 3,
+    ]);
   });
 });
