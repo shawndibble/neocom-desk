@@ -1550,8 +1550,8 @@
           "powergrid": "Powergrid"
         },
         "speedValue": "{{value}} m/s",
-        "capStable": "Stable at {{pct}}%",
-        "capEmptyIn": "Empty in {{time}}",
+        "capStable": "{{pct}}%",
+        "capEmptyIn": "{{time}}",
         "become_one": "{{name}} becomes",
         "become_other": "{{count}}× {{name}} become",
         "splitInto_one": "{{name}} becomes",

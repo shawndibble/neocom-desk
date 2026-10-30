@@ -104,14 +104,14 @@ describe('ImproveMakeover', () => {
         rowCost={rowCostOf}
       />
     );
-    expect(screen.getByText('Empty in 3m 56s')).toBeInTheDocument();
-    const after = screen.getByText('Empty in 11m 15s');
+    expect(screen.getByText('3m 56s')).toBeInTheDocument();
+    const after = screen.getByText('11m 15s');
     expect(after.className).toMatch(/text-success/);
   });
 
-  it('shows a stable capacitor with its level', () => {
+  it('shows a stable capacitor as its level', () => {
     render(<Harness />);
-    expect(screen.getAllByText('Stable at 60%').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('60%').length).toBeGreaterThan(0);
   });
 
   it("hides each row's own gain while the whole group is ticked", () => {
