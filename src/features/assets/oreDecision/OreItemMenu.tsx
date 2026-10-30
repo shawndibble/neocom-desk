@@ -49,9 +49,12 @@ export function OreItemMenu({
       <ItemContextMenu
         {...menuProps}
         extraItems={
-          isOre ? (
-            <MenuItem onSelect={() => setOpen(true)}>{t('assets.oreDecision.menu')}</MenuItem>
-          ) : undefined
+          <>
+            {isOre && (
+              <MenuItem onSelect={() => setOpen(true)}>{t('assets.oreDecision.menu')}</MenuItem>
+            )}
+            {menuProps.extraItems}
+          </>
         }
       >
         {children}

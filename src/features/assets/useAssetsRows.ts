@@ -20,7 +20,12 @@ import {
   type AssetTreeNode,
   type AssetTreeStation,
 } from '@/engine/assetTree';
-import { assetNodeSegment, parseAssetPath, resolveAssetPath } from '@/engine/assetPath';
+import {
+  assetNodeSegment,
+  indexAssetNodes,
+  parseAssetPath,
+  resolveAssetPath,
+} from '@/engine/assetPath';
 import { useStationSort } from '@/features/assets/stationSortPreference';
 import { useAssetSort } from '@/features/assets/assetSortPreference';
 import {
@@ -191,6 +196,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     ]
   );
 
+  const nodeIndex = useMemo(() => indexAssetNodes(sortedTree), [sortedTree]);
   const totalValue = useMemo(() => totalEstimatedValue(sortedTree), [sortedTree]);
   // Root location list only: drilled-in views keep their own node totals, and
   // flat search/all-items mode sums matches rather than the tree. Hidden with no
@@ -237,6 +243,11 @@ export function useAssetsRows(assetsData: AssetsData) {
       )
     );
     return labels;
+  }
+
+  /** Where a search hit sits in the drill-down tree; null when the tree does not hold it. */
+  function nodePathFor(asset: CharacterAsset) {
+    return nodeIndex.get(asset.item_id) ?? null;
   }
 
   /** The station a search hit belongs to, for the link back into the drill-down. */
@@ -568,6 +579,7 @@ export function useAssetsRows(assetsData: AssetsData) {
     toggleNodeSelection,
     nodeLabel,
     trailFor,
+    nodePathFor,
     rootStationIdFor,
     securityForStation,
     handleBulkAddToQuickbar,
