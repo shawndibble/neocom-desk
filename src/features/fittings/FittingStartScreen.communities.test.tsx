@@ -21,6 +21,7 @@ vi.mock('./inGameFittings', () => ({ loadInGameFittings: vi.fn() }));
 vi.mock('./popularFits', () => ({ usePopularFits: () => ({ ok: true, fits: [] }) }));
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({ '587': { name: 'Rifter' } })),
+  loadTypeEffects: vi.fn(async () => ({})),
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 const phone = vi.hoisted(() => ({ value: false }));
