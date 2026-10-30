@@ -268,6 +268,13 @@ beforeAll(async () => {
   await db.buildPlans.add(seedPlan());
   const { unmount } = render(<App />);
   await screen.findByRole('heading', { name: 'Rifter' }, { timeout: 25_000 });
+  // Also the setup panel and the facility picker, which the first test to
+  // open them would otherwise pay for (~1s of lazy chunks and list builds).
+  const warmUser = userEvent.setup({ delay: null });
+  await warmUser.click(await screen.findByRole('button', { name: 'Edit setup' }));
+  await warmUser.click(screen.getByRole('button', { name: /Override/ }));
+  await warmUser.click(screen.getByRole('combobox', { name: 'Facility' }));
+  await screen.findByRole('option', { name: 'Raitaru' });
   unmount();
   server.resetHandlers();
   clearMarketPriceCache();
@@ -277,8 +284,11 @@ beforeAll(async () => {
 beforeEach(resetSession);
 
 describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
+  // ~1s locally and not a cold-start cost (the warm-up above opens the same
+  // picker): it walks Edit setup, Override, the Facility combobox and a Dexie
+  // read-modify-write on a full plan page, each step re-rendering the plan.
   it('gives the facility tax input an accessible tooltip without polluting its label', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
@@ -304,7 +314,7 @@ describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
 
 describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
   it('keeps Runs in the hero and the rest under Location & market', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
@@ -494,7 +504,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
       '',
       '/industry/plans/bp-1'
     );
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Log Production' });
@@ -690,7 +700,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
 
 describe('IndustryPlanPage: owned-stock scope (#454)', () => {
   it('defaults to Everywhere, and persists Selected locations to the plan', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const plan = seedPlan();
     await db.buildPlans.add(plan);
     render(<App />);
