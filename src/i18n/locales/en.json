@@ -1095,6 +1095,7 @@
       },
       "unit": {
         "gj": "{{value}} GJ",
+        "percent": "{{value}}%",
         "seconds": "{{value}} s",
         "km": "{{value}} km",
         "mm": "{{value}} mm",
@@ -1206,10 +1207,9 @@
         "scanTimeCut": "Scan time cut",
         "deviationCut": "Deviation cut",
         "cloakRelock": "Cloak relock delay",
-        "seconds": "{{value}} s",
-        "percent": "{{value}}%",
         "strengthMeta": "Strength {{value}}",
-        "probeMeta": "Probes {{value}}"
+        "probeMeta": "Probes {{value}}",
+        "scanMeta": "Scan bonus {{value}}%"
       },
       "mining": {
         "perCycle": "{{value}} m³ / {{seconds}} s",
@@ -1666,7 +1666,8 @@
         "web": "Web {{before}} → {{after}}%",
         "reach": "Reach {{before}} → {{after}} km",
         "moduleStrength": "Module strength {{before}} → {{after}}",
-        "hackingStrength": "Hacking strength {{before}} → {{after}}",
+        "dataStrength": "Data hacking strength {{before}} → {{after}}",
+        "relicStrength": "Relic hacking strength {{before}} → {{after}}",
         "coherence": "Coherence {{before}} → {{after}}",
         "cycle": "Cycle {{before}} → {{after}} s",
         "scanStrength": "Scan strength {{before}}% → {{after}}%",

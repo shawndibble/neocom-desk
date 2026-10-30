@@ -151,7 +151,7 @@ export function extractExplore(
           return site ? [site] : [];
         }
       );
-      // A Data or Relic Analyzer's skill comes first; an Integrated one needs both.
+      // Data before relic, whichever skill slot carries it (an Integrated Analyzer has both).
       sites.sort();
       explore.analyzers.push({ strength, coherence, cycleSeconds: cycle, sites });
       const { hacking } = explore;

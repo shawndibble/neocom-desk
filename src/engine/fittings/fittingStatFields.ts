@@ -93,12 +93,7 @@ export type ImproveDamageKey = 'appliedDps';
 
 /** Explore better's figures: the best analyzer's hacking figures and the arrays' scan bonuses. */
 export type ImproveExploreKey =
-  | 'hackingStrength'
-  | 'virusCoherence'
-  | 'hackingCycle'
-  | 'scanStrength'
-  | 'scanTimeCut'
-  | 'deviationCut';
+  'virusCoherence' | 'hackingCycle' | 'scanStrength' | 'scanTimeCut' | 'deviationCut';
 
 /** Which way a change is an improvement; `neutral` stats only move with the hull, so no change is good or bad. */
 export type StatDirection = 'higher' | 'lower' | 'neutral';
@@ -484,7 +479,7 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   {
     key: 'cloakRecalibration',
     direction: 'lower',
-    digits: 0,
+    digits: 1,
     value: (s) => s.explore.cloakRecalibrationSeconds,
     hideWhenNone: true,
   },
@@ -495,8 +490,6 @@ export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
   capacitor: 0,
   appliedDps: 1,
-  // Explore's lead figure: the best analyzer, whatever site it opens.
-  hackingStrength: 0,
 } as Readonly<Record<StatChangeKey, number>>;
 
 export function round(value: number, digits: number): number {
@@ -513,7 +506,6 @@ export const STAT_DIRECTION: Readonly<Record<StatChangeKey, StatDirection>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.direction])),
   capacitor: 'higher',
   appliedDps: 'higher',
-  hackingStrength: 'higher',
 } as Readonly<Record<StatChangeKey, StatDirection>>;
 
 /** Role stats (`skillGains`) where less is better: a reload, a fuel bill. Absent: higher. */

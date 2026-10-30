@@ -268,7 +268,7 @@ export function shipSections({
         <MiningFacts stats={stats} typeName={typeName} />
       ),
     stats &&
-      (stats.explore.modules > 0 || stats.explore.cloakRecalibrationSeconds > 0) &&
+      stats.explore.modules > 0 &&
       section(
         'exploration',
         // The figure an explorer reads first: what the analyzer hacks at, else what the probes scan at.
@@ -279,7 +279,11 @@ export function shipSections({
               })
             : s.explore.probe.strength > 0
               ? t('fittings.stats.exploration.probeMeta', { value: fmt1(s.explore.probe.strength) })
-              : ''
+              : s.explore.scanning.strength > 0
+                ? t('fittings.stats.exploration.scanMeta', {
+                    value: fmt0(s.explore.scanning.strength),
+                  })
+                : ''
         ),
         <ExploreFacts stats={stats} />
       ),

@@ -13,10 +13,8 @@ export function ExploreFacts({ stats }: { stats: FittingStats }) {
   const { explore } = stats;
   const { hacking, probe, scanning } = explore;
   const label = (key: string) => t(`fittings.stats.exploration.${key}`);
-  const seconds = (value: number) =>
-    t('fittings.stats.exploration.seconds', { value: fixed1(value) });
-  const percent = (value: number) =>
-    t('fittings.stats.exploration.percent', { value: fixed0(value) });
+  const seconds = (value: number) => t('fittings.stats.unit.seconds', { value: fixed1(value) });
+  const percent = (value: number) => t('fittings.stats.unit.percent', { value: fixed0(value) });
   const fact = (key: string, value: number, format: (n: number) => string) =>
     value !== 0 ? [{ label: label(key), value: format(value) }] : [];
   const hasLauncher = probe.cycleSeconds > 0;
