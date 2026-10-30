@@ -41,6 +41,35 @@ export const DefaultSorted: Story = {
   args: { defaultSort: { columnId: 'quantity', direction: 'desc' } },
 };
 
+const groupedRows: Row[] = [
+  { name: 'Tritanium', quantity: 120000 },
+  { name: 'Tritanium', quantity: 3000 },
+  { name: 'Pyerite', quantity: 45000 },
+  { name: 'Mexallon', quantity: 8200 },
+  { name: 'Mexallon', quantity: 700 },
+  { name: 'Mexallon', quantity: 50 },
+];
+
+/**
+ * @summary Groups ranked by `groupCompare` (most rows first) while the rows inside each stay in the column sort.
+ */
+export const GroupsOrderedByCompare: Story = {
+  args: {
+    rows: groupedRows,
+    rowKey: (r: unknown) => `${(r as Row).name}:${(r as Row).quantity}`,
+    defaultSort: { columnId: 'quantity', direction: 'desc' },
+    groupBy: {
+      key: (r: unknown) => (r as Row).name,
+      renderHeader: (group: readonly unknown[]) =>
+        `${(group[0] as Row | undefined)?.name} · ${group.length} rows`,
+      defaultExpanded: () => true,
+      allWidths: true,
+      minSize: 1,
+      groupCompare: (a: readonly unknown[], b: readonly unknown[]) => b.length - a.length,
+    },
+  },
+};
+
 const denseColumns = [
   { id: 'name', header: 'Item', render: (r: Row) => r.name, primary: true },
   {

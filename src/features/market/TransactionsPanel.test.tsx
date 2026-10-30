@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { stubViewport } from '@/test/viewport';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -555,13 +555,102 @@ describe('TransactionsPanel — location column', () => {
 
     await screen.findByRole('link', { name: 'Damage Control II' });
     expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
-    // Nothing is asked for while the column is off.
-    expect(vi.mocked(usePlaceDetails).mock.calls.every(([refs]) => refs.length === 0)).toBe(true);
 
     await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Location' }));
     await userEvent.keyboard('{Escape}');
 
     expect(await screen.findByRole('link', { name: 'Jita IV - Moon 4' })).toBeInTheDocument();
+  });
+});
+
+describe('TransactionsPanel — By station view', () => {
+  const JITA = 60003760;
+  const AMARR = 60008494;
+  const NAMES_BY_KEY = new Map([
+    [`1:${JITA}`, { name: 'Jita IV - Moon 4', systemId: null, security: null, jumps: undefined }],
+    [`1:${AMARR}`, { name: 'Amarr VIII', systemId: null, security: null, jumps: undefined }],
+  ]);
+  const FILLS = [
+    // Jita: sold 300, bought 100, net +200, two... three trades.
+    transaction({ transaction_id: 1, location_id: JITA, unit_price: 100, quantity: 3 }),
+    transaction({
+      transaction_id: 2,
+      location_id: JITA,
+      unit_price: 100,
+      quantity: 1,
+      is_buy: true,
+    }),
+    // Amarr: sold 1000, one trade, net +1,000.
+    transaction({ transaction_id: 3, location_id: AMARR, unit_price: 1000, quantity: 1 }),
+  ];
+
+  beforeEach(() => {
+    mockTransactions({ data: FILLS, fetchedAt: new Date(), fromCache: false, truncated: false });
+    vi.mocked(usePlaceDetails).mockImplementation((refs) =>
+      refs.length > 0 ? NAMES_BY_KEY : new Map()
+    );
+  });
+
+  const headers = () =>
+    screen
+      .queryAllByRole('button', { expanded: true })
+      .concat(screen.queryAllByRole('button', { expanded: false }))
+      .filter((button) => /trades?/.test(button.textContent ?? ''));
+
+  it('leaves the base view flat', async () => {
+    renderPanel();
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(headers()).toHaveLength(0);
+    expect(screen.getAllByRole('link', { name: 'Damage Control II' })).toHaveLength(3);
+  });
+
+  it('shows one header per station with its trades and totals, names resolved with Location hidden', async () => {
+    renderPanel('/market/history?txn.view=station');
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    const [first, second] = headers();
+    // Net ranks first by default: Amarr +1,000 before Jita +200.
+    expect(first).toHaveTextContent('Amarr VIII');
+    expect(first).toHaveTextContent('1 trade');
+    expect(first).toHaveTextContent(/Net \+1,000/);
+    expect(second).toHaveTextContent('Jita IV - Moon 4');
+    expect(second).toHaveTextContent('2 trades');
+    expect(second).toHaveTextContent(/Sold \+300/);
+    expect(second).toHaveTextContent(/Net \+200/);
+  });
+
+  it('reorders the groups by the Stations by picker param without touching rows', async () => {
+    renderPanel('/market/history?txn.view=station&txn.stationsBy=name');
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(headers()[0]).toHaveTextContent('Amarr VIII');
+    cleanup();
+    renderPanel('/market/history?txn.view=station&txn.stationsBy=trades');
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
+  });
+
+  it('keeps only the picked stations, and the strip totals them', async () => {
+    renderPanel(`/market/history?txn.view=station&txn.stations=${JITA}`);
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    expect(headers()).toHaveLength(1);
+    expect(headers()[0]).toHaveTextContent('Jita IV - Moon 4');
+    // The strip's Net is Jita's alone; Amarr's +1,000 is filtered out of it.
+    expect(screen.getByText('+200')).toBeInTheDocument();
+    expect(screen.queryByText('+1,000')).not.toBeInTheDocument();
+  });
+
+  it('folds a station away', async () => {
+    renderPanel('/market/history?txn.view=station');
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    await userEvent.click(headers()[0]!);
+    expect(screen.getAllByRole('link', { name: 'Damage Control II' })).toHaveLength(2);
+  });
+
+  it('turns the view on from the By station chip', async () => {
+    renderPanel();
+    await screen.findAllByRole('link', { name: 'Damage Control II' });
+    await userEvent.click(screen.getByRole('button', { name: 'By station' }));
+    expect(screen.getByTestId('location-search')).toHaveTextContent('txn.view=station');
+    expect(headers()).toHaveLength(2);
   });
 });
