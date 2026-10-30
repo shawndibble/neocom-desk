@@ -483,6 +483,9 @@ export async function findMakeover({
   isCancelled,
   shouldStop,
 }: FindMakeoverParams): Promise<MakeoverSearch | null> {
+  // A fit that doesn't fit has nothing to improve yet (`20261019-144736`): the budget
+  // Guardrail binds only from a fit within budget, so searching one past it is unguarded.
+  if (!fitsResourceBudget(before)) return { makeover: null, calcs: 0, stopped: false };
   let calcs = 0;
   let stopped = false;
   const minGain = goal === 'cheaper' ? 0 : EPSILON;

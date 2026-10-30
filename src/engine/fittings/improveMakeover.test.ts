@@ -401,6 +401,20 @@ describe('findMakeover', () => {
     );
   });
 
+  it('an open fit over its budget gets no Makeover and no calculation: Make it fit comes first', async () => {
+    // Type 15 uses 40 CPU each: three of them overrun the 100 CPU.
+    const over = fit([
+      ['low', 0, 15],
+      ['low', 1, 15],
+      ['low', 2, 15],
+    ]);
+    const { result, calls } = await search(over, {}, TYPES, {
+      slotCounts: { high: 0, medium: 2, low: 3, rig: 0, subsystem: 0 },
+    });
+    expect(result?.makeover).toBeNull();
+    expect(calls).toBe(0);
+  });
+
   it('Cancel returns null', async () => {
     const { result } = await search(fit([['low', 0, 11]]), { isCancelled: () => true });
     expect(result).toBeNull();
