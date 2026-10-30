@@ -1170,3 +1170,19 @@ export interface CorpBookObservedMetaRecord {
   /** The book's `createdAt` when read; another one means the book was recreated. */
   bookCreatedAt?: number;
 }
+
+/**
+ * One view's last rendered snapshot, so the first visit after a reload opens
+ * on it (`lib/routeSnapshotCache.ts`). Device-local, never synced.
+ */
+export interface RouteSnapshotRecord {
+  /** The Character, or 0 for a value pooled across the account. */
+  characterId: number;
+  /** The view's `cacheKey`. */
+  name: string;
+  data: unknown;
+  /** When it was written, ms. */
+  savedAt: number;
+  /** The build that wrote it: another build's snapshot may have another shape. */
+  appVersion: string;
+}
