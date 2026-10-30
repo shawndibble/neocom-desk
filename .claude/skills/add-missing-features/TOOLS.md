@@ -20,7 +20,7 @@ Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
 0020), EVE Nexus (mobile; EVE Empire/Pod-shaped, cleared item by item),
 Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#4022), EVE Appraisal, Iron Whales Appraiser, Fuzzwork, EVE Ref, EveLens
-(#5006), jEveAssets, Evernus, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
+(#5006), jEveAssets, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
 EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6.2 read in full; #5601, #5602, #5605), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043).
 
@@ -47,7 +47,7 @@ Weak gaps noted, never filed: J-space class/effect/statics in Place Info
 wallet journal. Nothing in our code models it; verify the ESI journal ref type
 before pitching.
 
-**Dead or unreachable:** EVE Panel, EVE GURU / Production Ledger,
+**Dead or unreachable:** Evernus (archived 2019), EVE Panel, EVE GURU / Production Ledger,
 EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro (HTTP
 530), scan.eveonline.it (503). Reddit returns 403.
 
@@ -204,6 +204,13 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
 `SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
+- Small/UI re-sweep of RIFT, jEveAssets, EVE Farm, Omnitool, MoMa, EveLens,
+  Adam4EVE, Janice, EVE Tycoon (ready-for-agent, owner-reviewed): #5652 in-game
+  asset names; #5653 Dump/Appraisal walk reachable buy orders (range,
+  min_volume); #5655 contracts kept a year; #5656 acceptor courier collateral in
+  net worth; #5658 SP Farm mark; #5659 LP Redeem ×N; #5660 History By station;
+  #5661 PI vs 90d spike/drop; #5663 data age "ESI updates in N min"; #5664 order
+  book units/ISK listed.
 - EVE Empire 1.6.3: #5642 NARROW PI plans cap sold units at 10% of hub daily
   volume (account-plan candidates sort by price alone). #5643 NARROW Route Safety
   kills-ahead alert (desktop, foreground, spike first). #5644 NARROW search: any-
@@ -361,6 +368,14 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   needs an alias table that rots); extra-BPC advice (`20261020-081407`). Already
   covered: side-by-side routes, snooze, widget reorder, per-page pilot filter,
   journal↔transaction link, skill bars, refresh buttons, history chart.
+- **Small/UI re-sweep leftovers:** implants net-worth layer (destroyed on
+  removal; Clones shows value); net-worth change/share (Overview widget has it);
+  contract buys in Open Orders cost basis (breaks wallet buy/sell symmetry, 41);
+  hide-ISK streamer mode (427 formatter sites, leaks; 19); Build Plan spare-run
+  value (25, 47); PI Colonies export (17, 47); order-modify countdown (orders
+  cache 1200s); region sells/day in book heading (scope mismatch); Janice
+  shipping/collateral (47); A4E crawls (1, 14). Lead, unverified: FW industry
+  bonus (EVE Tycoon calculator field); check the current mechanic first.
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
 - **RIFT ratting rollup** (kills by faction/system, ISK per kill): per-line `BountyFactionSummary`/`killsByFaction` exists; a bounty line's ISK is shared across NPC types, so per-class ISK is an estimate. RIFT daily-goals tab: ref-type breakdown + `dailyGoalMessageIdOf` cover it. "Open ship in Fittings" from Assets: shipped (`assetShipLocation.ts`).
 - **RIFT What's new leftovers:** freelance jobs (#4609), cost indices (`cheaperNearbySystems`), skyhooks, clones, LP totals = covered; PI time seek = kill-tests 3/17; intel, overlay, chat, combat/log alerts, settings copying, map markers = kill-test 2 (client-reading).
