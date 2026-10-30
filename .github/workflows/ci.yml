@@ -194,6 +194,8 @@ jobs:
     # Docs-only PRs skip the four shards; the `test` job below still reports.
     if: needs.tests-needed.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
+    # A hung test fails here with a readable log instead of holding a runner for GitHub's 6-hour default (a shard runs ~4–7 min).
+    timeout-minutes: 15
     # Sharded for the same reason `e2e-shard` is, and with the same shape.
     # Vitest's own summary says where the time goes: of 1250s of worker time,
     # only 40% is test callbacks — the rest is `import` (33%), `environment`
@@ -252,6 +254,8 @@ jobs:
     # scripts/lib/e2eRelevance.mjs); the `e2e` job below still reports.
     if: needs.build.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
+    # A hung test fails here with a readable log instead of holding a runner for GitHub's 6-hour default (a shard runs ~4–7 min).
+    timeout-minutes: 15
     # Sharded because one runner could not get under the time budget. The
     # suite is ~91 specs at ~15s each — that is 21 minutes of test time, and
     # a single 4-vCPU runner spent 10.6 of them on it. The cost is almost
