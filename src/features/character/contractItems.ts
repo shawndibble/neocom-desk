@@ -11,6 +11,7 @@ import {
   type ContractItem,
 } from '@/esi/endpoints';
 import { EsiError } from '@/esi/errors';
+import { archiveContractItems } from './contractArchive';
 import {
   conditionalFetch,
   corpCacheKey,
@@ -68,6 +69,10 @@ export async function loadContractItemsDetailed(
     staleAfterMs: STALE_AFTER.static,
     conditional,
   });
+  // The Character's own contracts only; ESI forgets a finished contract's items after 30 days.
+  if (result && corporationId === undefined) {
+    await archiveContractItems(characterId, contractId, result.data);
+  }
   return {
     result,
     networkRead,

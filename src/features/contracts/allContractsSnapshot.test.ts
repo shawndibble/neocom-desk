@@ -11,7 +11,9 @@ import {
 
 const loadContracts = vi.hoisted(() => vi.fn());
 const loadContacts = vi.hoisted(() => vi.fn());
-vi.mock('@/features/character/contracts', () => ({ loadContracts }));
+vi.mock('@/features/character/contracts', () => ({
+  loadContractsWithArchive: loadContracts,
+}));
 vi.mock('@/features/character/contacts', () => ({ loadContacts }));
 vi.mock('@/features/character/names', () => ({
   resolveNames: vi.fn(async () => new Map()),

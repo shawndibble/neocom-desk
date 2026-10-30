@@ -6,6 +6,7 @@ import {
   loadPaginatedWithCacheStatus,
   type StatusResult,
 } from '@/esi/cache';
+import { archiveContracts, contractsWithArchive } from './contractArchive';
 
 export const KEY = 'contracts';
 
@@ -21,14 +22,36 @@ export function loadContracts(characterId: number): Promise<StatusResult<Contrac
   );
   // Mapped after the cache read, not before the write: a 304 keeps the stored rows as they were.
   return loadPaginatedWithCacheStatus(characterId, KEY, fetchLive, { conditional }).then(
-    (result) => ({
-      ...result,
-      cached: result.cached && {
-        ...result.cached,
-        data: result.cached.data.map(withAcceptedCourierInProgress),
-      },
-    })
+    async (result) => {
+      // Raw rows, before the status mapping below: the archive keeps what ESI said.
+      await archiveContracts(characterId, result.cached);
+      return {
+        ...result,
+        cached: result.cached && {
+          ...result.cached,
+          data: result.cached.data.map(withAcceptedCourierInProgress),
+        },
+      };
+    }
   );
+}
+
+/**
+ * `loadContracts` with the one-year archive folded in, for Contracts › History only: the
+ * other readers (pollers, boards) want what is live, not a year of finished contracts.
+ */
+export async function loadContractsWithArchive(
+  characterId: number
+): Promise<StatusResult<Contract[]>> {
+  const result = await loadContracts(characterId);
+  const merged = await contractsWithArchive(characterId, result.cached);
+  return {
+    ...result,
+    cached: merged && {
+      ...merged,
+      data: merged.data.map(withAcceptedCourierInProgress),
+    },
+  };
 }
 
 // Re-exported rather than defined here: the predicate is pure and now lives

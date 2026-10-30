@@ -40,6 +40,7 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { DataGate } from '@/components/DataGate';
 import { loadContractItemsDetailed } from './contractItems';
+import { archivedContractItems, pastEsiWindow } from './contractArchive';
 import { contractItemsCsvColumns } from './contractItemsCsv';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
@@ -172,6 +173,8 @@ export function ContractDetailModal({
    */
   const [itemsFailed, setItemsFailed] = useState(false);
   const [itemsAttempt, setItemsAttempt] = useState(0);
+  /** ESI no longer has this old contract's items and none were kept when it was opened. */
+  const [itemsNotKept, setItemsNotKept] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -203,19 +206,32 @@ export function ContractDetailModal({
     };
   }, [characterId, contract.type, contract.start_location_id, contract.end_location_id]);
 
+  const pastEsi = pastEsiWindow(contract);
   useEffect(() => {
     if (!HAS_ITEMS.has(contract.type)) return;
     let cancelled = false;
     void (async () => {
       setItems(undefined);
       setItemsFailed(false);
+      setItemsNotKept(false);
       const outcome = await loadContractItemsDetailed(
         characterId,
         contract.contract_id,
         corporationId
       );
       if (outcome.result === null) {
+        // Kept when the pilot opened it while ESI still had it (own contracts only).
+        const kept =
+          corporationId === undefined
+            ? await archivedContractItems(characterId, contract.contract_id)
+            : null;
         if (cancelled) return;
+        if (kept) {
+          const typeNames = await loadTypeNames(kept.map((item) => item.type_id));
+          if (!cancelled) setItems({ list: kept, typeNames });
+          return;
+        }
+        if (outcome.failureStatus === 404 && pastEsi) setItemsNotKept(true);
         // ESI answered 404: this contract has no item lines (it is gone, or never had
         // any), a definite answer that Retry cannot change. Anything else — no
         // answer, a 5xx, a 403 — is "couldn't load" and keeps Retry.
@@ -230,7 +246,7 @@ export function ContractDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, contract.type, contract.contract_id, itemsAttempt]);
+  }, [characterId, corporationId, contract.type, contract.contract_id, pastEsi, itemsAttempt]);
 
   const priceCheck = useOwnContractPriceCheck({
     contract,
@@ -435,7 +451,12 @@ export function ContractDetailModal({
           >
             {items !== undefined &&
               (items.list.length === 0 ? (
-                <EmptyState title={t('contracts.detailNoItems')} className="py-4" />
+                <EmptyState
+                  title={
+                    itemsNotKept ? t('contracts.detailItemsNotKept') : t('contracts.detailNoItems')
+                  }
+                  className="py-4"
+                />
               ) : (
                 <>
                   {itemColumns && (

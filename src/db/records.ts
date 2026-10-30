@@ -13,7 +13,13 @@ import type {
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
-import type { IndustryJob, WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
+import type {
+  Contract,
+  ContractItem,
+  IndustryJob,
+  WalletJournalEntry,
+  WalletTransaction,
+} from '@/esi/endpoints';
 
 export interface CharacterRecord {
   characterId: number;
@@ -1169,4 +1175,18 @@ export interface CorpBookObservedMetaRecord {
   watermark: number | null;
   /** The book's `createdAt` when read; another one means the book was recreated. */
   bookCreatedAt?: number;
+}
+
+/**
+ * One of a Character's own contracts, kept after ESI stops returning it (a finished contract
+ * drops after 30 days). `archiveDate` is the contract's last date, which the 365-day prune
+ * reads. Device-local, not synced, not in the backup (decision 20261030-173142-contracts-kept-a-year-on-this-device).
+ */
+export type ContractArchiveRecord = Contract & { characterId: number; archiveDate: string };
+
+/** A contract's item lines, kept only when the pilot opened that contract. Pruned with its header. */
+export interface ContractItemArchiveRecord {
+  characterId: number;
+  contract_id: number;
+  items: ContractItem[];
 }

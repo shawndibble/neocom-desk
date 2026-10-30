@@ -273,6 +273,13 @@ export function Contracts() {
     highlightedContractId !== null && !paramOpenDismissed
       ? (contracts.find((c) => c.contract_id === highlightedContractId) ?? null)
       : null;
+  // A linked contract in neither ESI's window nor the archive: say so, rather than open nothing.
+  const highlightGone =
+    tab === 'history' &&
+    source === 'current' &&
+    highlightParamId !== null &&
+    contractsResult !== null &&
+    !contracts.some((c) => c.contract_id === highlightParamId);
   const selectedContract = picked?.scope === selectionScope ? picked.contract : paramContract;
 
   const statusOptions = useMemo(() => contractStatusOptions(contracts), [contracts]);
@@ -396,6 +403,7 @@ export function Contracts() {
       />
 
       <TabPanel tabsId={tabsId} tabId={tabId} className="space-y-2 sm:space-y-4">
+        {highlightGone && <p className="text-sm text-text-dim">{t('contracts.highlightGone')}</p>}
         {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}

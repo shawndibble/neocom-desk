@@ -14,6 +14,7 @@ import { dropCharacterHubEntry } from '@/features/market/tradeHubActions';
 import { clearBookCache } from '@/features/corp/taxBook/bookCache';
 import { clearObservedCopies } from '@/features/corp/taxBook/observedStore';
 import { clearWalletArchive } from '@/features/character/walletArchive';
+import { clearContractArchive } from '@/features/character/contractArchive';
 import { deleteCommunitySnapshots } from '@/features/communities/communityCache';
 import { deleteShareSelections } from '@/features/communities/shareSelection';
 import { db } from '@/db';
@@ -129,6 +130,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       db.walletJournalArchive,
       db.walletTransactionArchive,
       db.walletArchiveCoverage,
+      db.contractArchive,
+      db.contractItemArchive,
       db.corpMailQueue,
       db.corpBookObserved,
       db.corpBookObservedMeta,
@@ -149,6 +152,7 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       // Mail queued from this Character can no longer be sent.
       await db.corpMailQueue.where('senderCharacterId').equals(characterId).delete();
       await clearWalletArchive(characterId);
+      await clearContractArchive(characterId);
       // Officer-only rows (ADR 0031) leave with the Character.
       await clearObservedCopies(characterId);
       // This tab's own copies of those books, which a matching stamp would otherwise still serve.

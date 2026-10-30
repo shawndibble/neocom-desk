@@ -67,6 +67,13 @@ const HISTORY: [number, Record<string, string | null>][] = [
       corpBookParts: '[characterId+corporationId+slot], [characterId+corporationId], characterId',
     },
   ],
+  [
+    30,
+    {
+      contractArchive: '[characterId+contract_id], characterId, [characterId+archiveDate]',
+      contractItemArchive: '[characterId+contract_id], characterId',
+    },
+  ],
 ];
 
 /** The complete schema at `version`: every delta up to it, drops removed. */

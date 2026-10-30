@@ -209,6 +209,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
       { id: 'market', labelKey: 'settings.faq.store.local.market' },
       { id: 'miningHistory', labelKey: 'settings.faq.store.local.miningHistory' },
       { id: 'walletHistory', labelKey: 'settings.faq.store.local.walletHistory' },
+      { id: 'contractHistory', labelKey: 'settings.faq.store.local.contractHistory' },
       { id: 'jobHistory', labelKey: 'settings.faq.store.local.jobHistory' },
       {
         id: 'login',
@@ -269,6 +270,7 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
       'moonTax',
       'ledger',
       'wallet',
+      'contracts',
       'netWorth',
       'jobs',
       'alerts',
