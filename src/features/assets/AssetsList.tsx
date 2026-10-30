@@ -128,10 +128,16 @@ export function AssetsList({
       : [
           {
             label: placeNicknames[resolved.station.locationId] ?? stationLabelFor(resolved.station),
+            // The real name, for a nicknamed station (screen readers and hover).
+            title:
+              placeNicknames[resolved.station.locationId] !== undefined
+                ? stationLabelFor(resolved.station)
+                : undefined,
             href: assetHref(pathStationId, [], query),
           },
           ...resolved.trail.map((node, index) => ({
             label: nodeLabel(node),
+            title: undefined,
             href: assetHref(
               pathStationId,
               resolved.trail.slice(0, index + 1).map(assetNodeSegment),
@@ -301,6 +307,7 @@ export function AssetsList({
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 {stationHeading ? (
                   <StationHeading
+                    key={stationHeading.locationId}
                     locationId={stationHeading.locationId}
                     name={stationHeading.name}
                     nickname={placeNicknames[stationHeading.locationId]}
@@ -330,7 +337,12 @@ export function AssetsList({
                     {crumbs.slice(0, -1).map((crumb, index) => (
                       <span key={crumb.href} className="flex min-w-0 items-center gap-1">
                         {index > 0 && <span aria-hidden="true">›</span>}
-                        <Link to={crumb.href} className="truncate hover:text-accent">
+                        <Link
+                          to={crumb.href}
+                          title={crumb.title}
+                          aria-label={crumb.title ? `${crumb.label} (${crumb.title})` : undefined}
+                          className="truncate hover:text-accent"
+                        >
                           {crumb.label}
                         </Link>
                       </span>
