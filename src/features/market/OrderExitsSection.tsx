@@ -14,7 +14,8 @@ import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import type { RegionCompetition } from './orderCompetition';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderDetailView } from './orderDetailView';
-import { orderExits, hubHaulGaps, type OrderExitKind } from './orderExits';
+import { orderExits, hubHaulGaps, stationSystemId, type OrderExitKind } from './orderExits';
+import { useBuyJumps } from './useBuyJumps';
 import { computeSellThrough } from './orderScopeState';
 import { CopyablePrice } from './CopyablePrice';
 import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
@@ -49,9 +50,11 @@ export function OrderExitsSection({
 }) {
   const { t } = useTranslation();
   const { setup: refiningSetup } = useRefiningSetup();
+  const buyJumps = useBuyJumps(deep ? stationSystemId(row, deep.competitors) : 0);
   const exits = orderExits({
     row,
     competitors: deep?.competitors,
+    buyJumps,
     reprocessing: reprocessing && { ...reprocessing, refining: refiningSetup },
   });
   // Named only when it moved the number: never on scrap (f4b5a3f5).
@@ -89,9 +92,22 @@ export function OrderExitsSection({
                       price: formatMarketIsk(exit.price),
                       days: sell.daysToClear,
                     })
-                  : t(`market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`, {
-                      price: formatMarketIsk(exit.price),
-                    });
+                  : exit.dump?.movedPrice || exit.dump?.unsold
+                    ? t(
+                        exit.dump.unsold > 0
+                          ? 'market.orders.exitDumpWalkedUnsold'
+                          : 'market.orders.exitDumpWalked',
+                        {
+                          price: formatMarketIsk(exit.price),
+                          topBid: formatMarketIsk(exit.dump.topBid),
+                          takes: exit.dump.topBidTakes,
+                          units: exit.dump.units + exit.dump.unsold,
+                          unsold: exit.dump.unsold,
+                        }
+                      )
+                    : t(`market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`, {
+                        price: formatMarketIsk(exit.price),
+                      });
               return (
                 <p key={exit.kind} className="flex items-baseline justify-between gap-3">
                   <span className="text-text-dim">

@@ -219,6 +219,8 @@ describe('loadRegionCompetition', () => {
         systemId: 1,
         volumeRemain: 100,
         isBuyOrder: false,
+        range: 'region',
+        minVolume: 1,
       },
       {
         orderId: 2,
@@ -227,6 +229,8 @@ describe('loadRegionCompetition', () => {
         systemId: 2,
         volumeRemain: 100,
         isBuyOrder: true,
+        range: 'region',
+        minVolume: 1,
       },
     ]);
   });
