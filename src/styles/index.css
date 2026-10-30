@@ -1400,9 +1400,19 @@
   }
 
   /* Menus, Select and Popover: a short fade and scale out of the trigger,
-     nudged 4px from the side they open on. Radix sets the origin. */
+     nudged 4px from the side they open on. Radix sets each one's origin. */
+  .motion-pop,
+  .motion-pop-exit {
+    transform-origin: var(
+      --radix-dropdown-menu-content-transform-origin,
+      var(
+        --radix-context-menu-content-transform-origin,
+        var(--radix-popover-content-transform-origin, var(--radix-select-content-transform-origin))
+      )
+    );
+  }
+
   .motion-pop[data-state='open'] {
-    transform-origin: var(--radix-popper-transform-origin);
     animation: motion-pop-in 150ms var(--motion-ease-out) backwards;
   }
 
@@ -1425,7 +1435,6 @@
   /* Popover only: a menu or Select closes at once, since the item picked
      usually opens the next thing and a fade would delay it. */
   .motion-pop-exit[data-state='closed'] {
-    transform-origin: var(--radix-popper-transform-origin);
     animation: motion-pop-out 100ms var(--motion-ease-in) forwards;
   }
 
@@ -1447,7 +1456,8 @@
   /* Submenus and tooltips: opacity only. A submenu that moved would trail
      the pointer sweeping across items. A tooltip fades only after its hover
      delay (`delayed-open`); moving between triggers (`instant-open`) stays
-     crisp. */
+     crisp. A hand-rolled card with no `data-state` fades as it mounts. */
+  .motion-fade:not([data-state]),
   .motion-fade[data-state='open'],
   .motion-fade[data-state='delayed-open'] {
     animation: motion-fade-in 120ms ease-out backwards;
@@ -1545,10 +1555,15 @@
   }
 
   /* A docked drawer that opens above its own handle (Market's Compare
-     drawer): a short rise, not its full height, which would cross the
-     handle. */
+     drawer), or a floating prompt: a short rise, not its full height, which
+     would cross the handle. Full screen on a phone, the drawer rises from the
+     bottom edge like a sheet instead (`motion-rise-full`). */
   .motion-rise {
     animation: motion-rise-in 200ms var(--motion-ease-out) backwards;
+  }
+
+  .motion-rise-full {
+    animation: motion-sheet-in 260ms var(--motion-ease-out) backwards;
   }
 
   @keyframes motion-rise-in {
@@ -1561,7 +1576,7 @@
   @media (prefers-reduced-motion: reduce) {
     .motion-pop[data-state],
     .motion-pop-exit[data-state],
-    .motion-fade[data-state],
+    .motion-fade,
     .motion-dialog[open],
     .motion-dialog[open]::backdrop,
     .motion-sheet[open],
@@ -1570,7 +1585,8 @@
     .motion-page[open]::backdrop,
     .motion-slide-right[data-state],
     .motion-slide-left[data-state],
-    .motion-rise {
+    .motion-rise,
+    .motion-rise-full {
       animation: none;
     }
   }

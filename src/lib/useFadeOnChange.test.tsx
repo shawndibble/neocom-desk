@@ -1,31 +1,26 @@
 import { useRef } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
+import { stubAnimate } from '@/test/animate';
 import { stubViewport } from '@/test/viewport';
 import { useFadeOnChange } from './useFadeOnChange';
 
-function Harness({ value, onFirstRender }: { value: string; onFirstRender?: boolean }) {
+function Harness({ value }: { value: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFadeOnChange(ref, value, { onFirstRender });
+  useFadeOnChange(ref, value);
   return <div ref={ref}>{value}</div>;
 }
 
-/** jsdom has no Web Animations API: `animate` is stubbed, as in Layout's route fade tests. */
 describe('useFadeOnChange', () => {
-  let animate: ReturnType<typeof vi.fn>;
-  let cancel: ReturnType<typeof vi.fn>;
+  let animate: ReturnType<typeof stubAnimate>['animate'];
+  let cancel: ReturnType<typeof stubAnimate>['cancel'];
+  let restoreAnimate: () => void;
   let reduceMotion: boolean;
   let restoreViewport: () => void;
 
   beforeEach(() => {
     reduceMotion = false;
-    cancel = vi.fn();
-    animate = vi.fn(() => ({ cancel }));
-    Object.defineProperty(Element.prototype, 'animate', {
-      value: animate,
-      writable: true,
-      configurable: true,
-    });
+    ({ animate, cancel, restore: restoreAnimate } = stubAnimate());
     restoreViewport = stubViewport((media) =>
       media.includes('prefers-reduced-motion') ? reduceMotion : false
     );
@@ -33,8 +28,7 @@ describe('useFadeOnChange', () => {
 
   afterEach(() => {
     restoreViewport();
-    // @ts-expect-error -- jsdom has no `animate` of its own to restore
-    delete Element.prototype.animate;
+    restoreAnimate();
   });
 
   it('fades the element in when the key changes', () => {
@@ -54,15 +48,8 @@ describe('useFadeOnChange', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
-  it('fades on the first render by default', () => {
+  it('fades on the first render', () => {
     render(<Harness value="a" />);
-    expect(animate).toHaveBeenCalledTimes(1);
-  });
-
-  it('skips the first render when asked', () => {
-    const { rerender } = render(<Harness value="a" onFirstRender={false} />);
-    expect(animate).not.toHaveBeenCalled();
-    rerender(<Harness value="b" onFirstRender={false} />);
     expect(animate).toHaveBeenCalledTimes(1);
   });
 
@@ -76,6 +63,16 @@ describe('useFadeOnChange', () => {
     reduceMotion = true;
     const { rerender } = render(<Harness value="a" />);
     rerender(<Harness value="b" />);
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it('does not fade an unchanged view when reduced motion is turned off', () => {
+    reduceMotion = true;
+    const { rerender } = render(<Harness value="a" />);
+    reduceMotion = false;
+    restoreViewport();
+    restoreViewport = stubViewport(() => false);
+    rerender(<Harness value="a" />);
     expect(animate).not.toHaveBeenCalled();
   });
 });

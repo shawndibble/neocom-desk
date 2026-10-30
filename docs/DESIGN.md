@@ -936,13 +936,13 @@ route ad hoc.
 
 ## 6b. Route transitions
 
-- **The route outlet fades in. That is the whole effect.** Layout's
-  `useRouteFade` animates the outlet on every pathname change, skipping it
-  under `prefers-reduced-motion: reduce`.
+- **The route outlet fades in. That is the whole effect.** Layout runs
+  `useFadeOnChange` on the outlet, keyed on `pageKeyFor(pathname)`, skipping
+  it under `prefers-reduced-motion: reduce`.
 - **A tab switch fades the tab panel, not the outlet.** `useTabPanelProps`
   (so every `TabPanel`) fades the panel's content on a tab change with the
-  same 140ms opacity fade (`useFadeOnChange`), skipping the panel's first
-  render, which arrives with its page's own fade. The page header and tab bar
+  same 140ms opacity fade (`useFadeOnChange`), as it mounts too, since some
+  pages render each tab as its own component. The page header and tab bar
   stay still: a tab is a view within the page, not a new page (ADR 0015).
 - **Opacity only — never a transform.** The outlet is the entire main content
   area, so any movement reads as the whole app sliding rather than a page turn.
@@ -1470,20 +1470,23 @@ Every interactive element takes its states from one shared recipe in
   plus the `scale`/`translate` properties only. Entering decelerates, leaving
   accelerates and is shorter. Never a bounce, never past 300ms.
 
-  | Overlay                            | In                                                   | Out                           |
-  | ---------------------------------- | ---------------------------------------------------- | ----------------------------- |
-  | Menu, `Select` (`motion-pop`)      | 150ms: fade, scale from 0.97, 4px from its side      | none: closes at once          |
-  | `Popover` (adds `motion-pop-exit`) | as a menu                                            | 100ms fade + scale            |
-  | Submenu, `Tooltip` (`motion-fade`) | 120ms fade (a tooltip only after its hover delay)    | none                          |
-  | `Modal` centred (`motion-dialog`)  | 200ms: fade, scale from 0.96; backdrop fades         | none (see `Modal`)            |
-  | `Modal` sheet (`motion-sheet`)     | 260ms: rises from the bottom edge; backdrop fades    | a swipe slides it off (180ms) |
-  | `Modal` `page` (`motion-page`)     | as a sheet below `md`, as a centred dialog from `md` | none                          |
-  | `SlideOver` (`motion-slide-*`)     | 240ms in from its edge                               | 180ms back out                |
-  | Docked drawer (`motion-rise`)      | 200ms: fade, 12px rise                               | none                          |
+  | Overlay                                           | In                                                   | Out                           |
+  | ------------------------------------------------- | ---------------------------------------------------- | ----------------------------- |
+  | Menu, `Select` (`motion-pop`)                     | 150ms: fade, scale from 0.97, 4px from its side      | none: closes at once          |
+  | `Popover` (adds `motion-pop-exit`)                | as a menu                                            | 100ms fade + scale            |
+  | Submenu, `Tooltip` (`motion-fade`)                | 120ms fade (a tooltip only after its hover delay)    | none                          |
+  | `Modal` centred (`motion-dialog`)                 | 200ms: fade, scale from 0.96; backdrop fades         | none (see `Modal`)            |
+  | `Modal` sheet (`motion-sheet`)                    | 260ms: rises from the bottom edge; backdrop fades    | a swipe slides it off (180ms) |
+  | `Modal` `page` (`motion-page`)                    | as a sheet below `md`, as a centred dialog from `md` | none                          |
+  | `SlideOver` (`motion-slide-*`)                    | 240ms in from its edge                               | 180ms back out                |
+  | Docked drawer, floating prompt (`motion-rise`)    | 200ms: fade, 12px rise                               | none                          |
+  | Phone full-screen drawer (`motion-rise-full`)     | as a sheet                                           | none                          |
+  | Hand-rolled card (`motion-fade`, no `data-state`) | 120ms fade as it mounts                              | none                          |
 
   A menu closes at once because the item picked usually opens the next thing;
-  a fade would hold it up. A new overlay primitive takes one of these classes,
-  never its own keyframes.
+  a fade would hold it up. A new overlay takes one of these classes rather
+  than keyframes of its own; `toast-in`, `slide-in-left` and
+  `grant-selected-in` are older arrival cues, not overlays.
 
 - **Hover:** one step brighter. Rows and ghost controls use the `panel-2`
   fill and no other. Raw CSS `:hover` goes inside `@media (hover: hover)` so

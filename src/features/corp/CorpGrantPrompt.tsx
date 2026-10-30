@@ -101,7 +101,7 @@ export function CorpGrantPrompt() {
       // Director on a fresh device can plausibly meet all three at once, so
       // they share one slot instead of stacking up the viewport (issue
       // #1124) — hence a single offset clear of the phone tab bar.
-      className="fixed inset-x-4 bottom-16 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
+      className="motion-rise fixed inset-x-4 bottom-16 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
     >
       <p className={eyebrowClassName}>{t('corp.grantPromptTitle')}</p>
       <p>

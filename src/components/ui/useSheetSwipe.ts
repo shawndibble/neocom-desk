@@ -1,5 +1,11 @@
 import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
-import { useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 
 /** Distance past which a release dismisses, in px. */
 export const SWIPE_DISMISS_DISTANCE = 80;
@@ -26,7 +32,7 @@ function applyOffset(el: HTMLElement | null, px: number, animate: boolean, reduc
 /** Sends a released sheet off the bottom edge. */
 function slideOff(el: HTMLElement | null) {
   if (!el) return;
-  el.style.transition = `transform ${DISMISS_SLIDE_MS}ms ease-in`;
+  el.style.transition = `transform ${DISMISS_SLIDE_MS}ms var(--motion-ease-in)`;
   el.style.transform = 'translateY(100%)';
 }
 
@@ -35,15 +41,13 @@ function slideOff(el: HTMLElement | null) {
  * returned handlers on the drag zone (the grabber and header, never the
  * scrolled body); the `target` element follows the finger, then either slides
  * off the bottom and goes (`onDismiss`) or snaps back. Under reduced motion it
- * goes, or snaps back, at once.
- *
- * The slide leaves the sheet's inline transform off screen: `Modal` clears it
- * before the next `showModal()`.
+ * goes, or snaps back, at once. Each `open` starts the sheet back in place.
  */
 export function useSheetSwipe(
   target: RefObject<HTMLElement | null>,
   onDismiss: () => void,
-  enabled: boolean
+  enabled: boolean,
+  open: boolean
 ) {
   const gesture = useRef<{
     startY: number;
@@ -57,6 +61,18 @@ export function useSheetSwipe(
   const reduced = usePrefersReducedMotion();
   const setOffset = (px: number, animate: boolean) =>
     applyOffset(target.current, px, animate, reduced);
+
+  // Layout effect: runs before `Modal`'s `showModal()`, so a sheet a swipe
+  // left off screen never opens there.
+  useLayoutEffect(() => {
+    if (open) applyOffset(target.current, 0, false, true);
+  }, [open, target]);
+
+  const timers = useRef<number[]>([]);
+  useEffect(() => {
+    const pending = timers.current;
+    return () => pending.forEach((id) => window.clearTimeout(id));
+  }, []);
 
   if (!enabled) return {};
 
@@ -103,17 +119,23 @@ export function useSheetSwipe(
         // Finish the gesture: off the bottom, then close. Closing first would
         // hide the dialog (`display: none`) before the slide could be seen.
         const sheet = target.current;
+        const stillOpen = () => sheet?.isConnected === true && sheet.hasAttribute('open');
         slideOff(sheet);
-        window.setTimeout(() => {
-          onDismiss();
-          // A parent may keep the sheet open (it asks to confirm first):
-          // bring it back rather than leave it parked off screen.
+        timers.current.push(
           window.setTimeout(() => {
-            if (sheet?.isConnected && sheet.hasAttribute('open')) {
-              applyOffset(sheet, 0, true, false);
-            }
-          }, KEPT_OPEN_CHECK_MS);
-        }, DISMISS_SLIDE_MS);
+            // Escape, Back or a backdrop tap during the slide already closed
+            // it: a second close could run a parent's navigate(-1) twice.
+            if (!stillOpen()) return;
+            onDismiss();
+            // A parent may keep the sheet open (it asks to confirm first):
+            // bring it back rather than leave it parked off screen.
+            timers.current.push(
+              window.setTimeout(() => {
+                if (stillOpen()) applyOffset(sheet, 0, true, false);
+              }, KEPT_OPEN_CHECK_MS)
+            );
+          }, DISMISS_SLIDE_MS)
+        );
       } else {
         setOffset(0, true);
       }

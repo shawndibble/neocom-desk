@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubAnimate } from '@/test/animate';
 import { TabPanel, Tabs } from './Tabs';
 
 const tabs = [
@@ -192,32 +193,26 @@ describe('Tabs', () => {
   });
 
   describe('switching tabs', () => {
-    afterEach(() => {
-      // @ts-expect-error -- jsdom has no `animate` of its own to restore
-      delete Element.prototype.animate;
+    let stub: ReturnType<typeof stubAnimate>;
+    beforeEach(() => {
+      stub = stubAnimate();
     });
+    afterEach(() => stub.restore());
 
-    it('fades the panel in on a switch, but not as it first appears', () => {
-      // jsdom has no Web Animations API; the stub stands in for it.
-      const animate = vi.fn(() => ({ cancel: vi.fn() }));
-      Object.defineProperty(Element.prototype, 'animate', {
-        value: animate,
-        writable: true,
-        configurable: true,
-      });
+    it('fades the panel in as it appears and on each switch', () => {
       const { rerender } = render(
         <TabPanel tabsId="t" tabId="open">
           open body
         </TabPanel>
       );
-      expect(animate).not.toHaveBeenCalled();
+      expect(stub.animate).toHaveBeenCalledTimes(1);
       rerender(
         <TabPanel tabsId="t" tabId="history">
           history body
         </TabPanel>
       );
-      expect(animate).toHaveBeenCalledTimes(1);
-      expect(animate.mock.instances[0]).toBe(screen.getByRole('tabpanel'));
+      expect(stub.animate).toHaveBeenCalledTimes(2);
+      expect(stub.animate.mock.contexts[1]).toBe(screen.getByRole('tabpanel'));
     });
   });
 

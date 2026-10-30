@@ -107,6 +107,33 @@ describe('Modal bottom sheet', () => {
     );
   });
 
+  it('does not close a second time when a close lands during the slide', async () => {
+    const closes = vi.fn();
+    function Counting() {
+      const [open, setOpen] = useState(true);
+      return (
+        <Modal
+          open={open}
+          onClose={() => {
+            closes();
+            setOpen(false);
+          }}
+          title="Filters"
+          placement="sheet"
+        >
+          <button type="button">Inside</button>
+        </Modal>
+      );
+    }
+    render(<Counting />);
+    swipe(dragZone(), 120, 1000);
+    // Escape (or a tap on the backdrop) while the sheet is still sliding off.
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
+    expect(closes).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(closes).toHaveBeenCalledTimes(1);
+  });
+
   it('closes at once under reduced motion', async () => {
     const restore = stubViewport((query) => query.includes('prefers-reduced-motion'));
     try {

@@ -69,44 +69,42 @@ interface ModalProps {
 }
 
 /**
- * How each placement arrives (`index.css` "Overlay motion"): a sheet rises from
- * the bottom edge, a centred dialog fades and scales up, and `page` does the
- * first on a phone (where it fills the screen) and the second from `md`.
- */
-const PLACEMENT_MOTION: Record<ModalPlacement, string> = {
-  center: 'motion-dialog',
-  sheet: 'motion-sheet',
-  'sheet-full': 'motion-sheet',
-  medium: 'motion-dialog',
-  wide: 'motion-dialog',
-  page: 'motion-page',
-  media: 'motion-dialog',
-};
-
-/**
- * Per placement: the dialog's own box, and the height cap that box and its
- * inner column share — one entry, so the two can never disagree.
+ * Per placement: the dialog's own box (with how it arrives, `index.css`
+ * "Overlay motion"), and the height cap that box and its inner column share —
+ * one entry, so the two can never disagree. A sheet rises from the bottom
+ * edge, a centred dialog fades and scales up, and `page` does the first on a
+ * phone (where it fills the screen) and the second from `md`.
  */
 const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
-  center: { dialogClass: 'm-auto w-full max-w-lg', heightClass: 'h-fit max-h-[85vh]' },
+  center: {
+    dialogClass: 'motion-dialog m-auto w-full max-w-lg',
+    heightClass: 'h-fit max-h-[85vh]',
+  },
   sheet: {
-    dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
+    dialogClass: 'motion-sheet mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
     heightClass: 'h-fit max-h-[85vh]',
   },
   'sheet-full': {
-    dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
+    dialogClass: 'motion-sheet mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
     heightClass: 'h-dvh max-h-dvh',
   },
-  medium: { dialogClass: 'm-auto w-full max-w-3xl', heightClass: 'h-fit max-h-[85vh]' },
+  medium: {
+    dialogClass: 'motion-dialog m-auto w-full max-w-3xl',
+    heightClass: 'h-fit max-h-[85vh]',
+  },
   wide: {
-    dialogClass: 'm-auto w-full max-w-[min(64rem,100vw)]',
+    dialogClass: 'motion-dialog m-auto w-full max-w-[min(64rem,100vw)]',
     heightClass: 'h-fit max-h-[85vh]',
   },
   page: {
-    dialogClass: 'm-0 w-full max-w-none max-md:rounded-none md:m-auto md:w-[min(72rem,95vw)]',
+    dialogClass:
+      'motion-page m-0 w-full max-w-none max-md:rounded-none md:m-auto md:w-[min(72rem,95vw)]',
     heightClass: 'h-dvh max-h-dvh md:h-[90dvh] md:max-h-[90dvh]',
   },
-  media: { dialogClass: 'm-auto w-fit max-w-[95vw]', heightClass: 'h-fit max-h-[95vh]' },
+  media: {
+    dialogClass: 'motion-dialog m-auto w-fit max-w-[95vw]',
+    heightClass: 'h-fit max-h-[95vh]',
+  },
 };
 
 /**
@@ -144,7 +142,7 @@ export function Modal({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const isSheet = placement.startsWith('sheet');
   useOverlayHistory(open, onClose, closeOnBack);
-  const swipe = useSheetSwipe(dialogRef, onClose, isSheet);
+  const swipe = useSheetSwipe(dialogRef, onClose, isSheet, open);
   const titleId = useId();
   // State, not a ref: a Radix portal needs to re-render once the node exists,
   // and a ref assignment alone would not schedule that render.
@@ -177,9 +175,6 @@ export function Modal({
     // focused at showModal() time; capture it so the guarantee holds under
     // unmount-while-open too.
     const trigger = document.activeElement;
-    // A swipe-dismissed sheet was left off screen (`useSheetSwipe`): open in place.
-    dialog.style.removeProperty('transform');
-    dialog.style.removeProperty('transition');
     if (!dialog.open) dialog.showModal();
     // After showModal(), whose own focusing steps land on the body: a child's
     // mount-time focus() would run first (child effects fire before this one)
@@ -228,7 +223,7 @@ export function Modal({
         // ones that landed on its ::backdrop.
         if (dismissOnOutsidePress && event.target === dialogRef.current) onClose();
       }}
-      className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${PLACEMENT_MOTION[placement]} ${heightClass} ${dialogClass}`}
+      className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
     >
       {open && (
         // The provider spans the header too, not just the body: a title can

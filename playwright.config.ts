@@ -128,6 +128,9 @@ export default defineConfig({
     // Fixed desktop size so the left-rail nav (not the mobile tab bar) is
     // the one actually visible/interactable in the accessibility tree.
     viewport: { width: 1280, height: 800 },
+    // Overlays animate in (DESIGN.md §6c "Overlay motion"): a box measured
+    // mid-scale reads a few px short. Reduced motion lands them at once.
+    contextOptions: { reducedMotion: 'reduce' },
   },
   projects: [
     {
