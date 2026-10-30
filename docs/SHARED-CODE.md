@@ -53,12 +53,13 @@ asserts the copies agree, so a change to one side that skips the other fails
 there. Mirrored so far: the guards below, and `esiClient.ts`'s compatibility
 date and User-Agent against `src/esi/`.
 
-| Need                                               | Use                                                                                                             | Not                                                  |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Narrow `unknown` to an object                      | `functions/src/guards.ts` — the same three names as `src/engine/guards.ts`                                      | a local `isRecord`; importing `src/engine`           |
-| Anything an ESI call puts on the wire              | `esiHeaders(accessToken?)`, `ESI_ROOT`/`ESI_BASE`, `isBudgetLow`, `retryAfterMs` — `functions/src/esiClient.ts` | spelling out `X-Compatibility-Date` / `X-User-Agent` |
-| A Firestore-emulator suite's set-up                | `emulatorSuite`, `emulatorDb`, `clearEmulator` — `functions/src/testSupport/emulator.ts`                        | a per-file `runnable` probe and `clearEmulator`      |
-| A yes/no fit stat (`FLAG_STATS`) as the word shown | `flagWord` — `src/features/fittings/flagWord.ts`                                                                | a local `t(x ? 'yes' : 'no')`                        |
+| Need                                                                  | Use                                                                                                             | Not                                                  |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Narrow `unknown` to an object                                         | `functions/src/guards.ts` — the same three names as `src/engine/guards.ts`                                      | a local `isRecord`; importing `src/engine`           |
+| Anything an ESI call puts on the wire                                 | `esiHeaders(accessToken?)`, `ESI_ROOT`/`ESI_BASE`, `isBudgetLow`, `retryAfterMs` — `functions/src/esiClient.ts` | spelling out `X-Compatibility-Date` / `X-User-Agent` |
+| A Firestore-emulator suite's set-up                                   | `emulatorSuite`, `emulatorDb`, `clearEmulator` — `functions/src/testSupport/emulator.ts`                        | a per-file `runnable` probe and `clearEmulator`      |
+| A yes/no fit stat (`FLAG_STATS`) as the word shown                    | `flagWord` — `src/features/fittings/flagWord.ts`                                                                | a local `t(x ? 'yes' : 'no')`                        |
+| Oldest date a one-year archive keeps (`…Z` string for index compares) | `archiveCutoffIso` — `src/engine/wallet/archiveCoverage.ts`                                                     | a private `cutoffIso`                                |
 
 Two carve-outs, both marked in their own docblocks: `costIndicesSnapshot.ts` and
 `r2Client.ts` take no relative _runtime_ imports, because

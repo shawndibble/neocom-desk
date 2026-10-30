@@ -1,4 +1,4 @@
-import { loadContracts } from '@/features/character/contracts';
+import { loadContractsWithArchive } from '@/features/character/contracts';
 import { contractIssuer, contractReceiver } from '@/features/character/contractCounterparty';
 import { loadContacts } from '@/features/character/contacts';
 import {
@@ -97,7 +97,7 @@ export async function loadContractsSnapshot(
   signal: RouteSnapshotSignal
 ): Promise<ContractsSnapshot> {
   const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
-    await loadContracts(characterId);
+    await loadContractsWithArchive(characterId);
   const contractsTruncated = contractsResult?.truncated ?? false;
   const { issuerNames, receiverCategories, standingIndexByOwner, issuerAffiliations } =
     await resolveContractLookups(

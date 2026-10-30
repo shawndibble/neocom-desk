@@ -11,6 +11,8 @@ import type {
   ArchiveKind,
   BuildPlanRecord,
   CharacterRecord,
+  ContractArchiveRecord,
+  ContractItemArchiveRecord,
   DynamicItemRecord,
   EsiCacheMetaRecord,
   EsiCacheRecord,
@@ -67,6 +69,8 @@ export const db = new Dexie('neocom') as Dexie & {
   walletJournalArchive: Dexie.Table<WalletJournalArchiveRecord, [number, number]>;
   walletTransactionArchive: Dexie.Table<WalletTransactionArchiveRecord, [number, number]>;
   walletArchiveCoverage: Dexie.Table<WalletArchiveCoverageRecord, [number, ArchiveKind]>;
+  contractArchive: Dexie.Table<ContractArchiveRecord, [number, number]>;
+  contractItemArchive: Dexie.Table<ContractItemArchiveRecord, [number, number]>;
   industryJobHistory: EntityTable<IndustryJobHistoryRecord, 'characterId'>;
   netWorthSnapshots: EntityTable<NetWorthSnapshotRecord, 'id'>;
   hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
@@ -312,4 +316,12 @@ db.version(29).stores({
 // never synced; purged with the in-memory copy (`lib/routeSnapshotCache.ts`).
 db.version(30).stores({
   routeSnapshots: '[characterId+name], characterId',
+});
+
+// Adds the contract archive: the Character's own contracts kept a year, longer than the 30 days
+// ESI returns, and the item lines of the ones the pilot opened. Device-local, never synced,
+// wiped with the Character (features/character/removeCharacter.ts).
+db.version(31).stores({
+  contractArchive: '[characterId+contract_id], characterId, [characterId+archiveDate]',
+  contractItemArchive: '[characterId+contract_id], characterId',
 });
