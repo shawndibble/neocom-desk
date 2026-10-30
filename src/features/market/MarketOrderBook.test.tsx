@@ -250,4 +250,76 @@ describe('OrderSideCard', () => {
     expect(screen.getByText('qty 100')).toBeInTheDocument();
     expect(screen.queryByText('qty 900')).not.toBeInTheDocument();
   });
+
+  describe('heading figures', () => {
+    const make = (id: number, price: number, volume_remain: number) => ({
+      duration: 90,
+      is_buy_order: false,
+      issued: '2026-01-01T00:00:00Z',
+      location_id: 60003760,
+      min_volume: 1,
+      order_id: id,
+      price,
+      range: 'region',
+      system_id: 30000142,
+      type_id: 34,
+      volume_remain,
+      volume_total: 10,
+    });
+    function Harness({ orders }: { orders: ReturnType<typeof make>[] }) {
+      const tableExport = useTableExport({
+        surface: 'market-appraisal',
+        rows: orders,
+        columns: [],
+      });
+      return (
+        <OrderSideCard
+          side="sell"
+          rows={orders}
+          total={orders.length}
+          best={1000}
+          columns={[]}
+          availableColumns={[]}
+          visibleColumns={[]}
+          columnsById={{} as never}
+          onToggleColumn={vi.fn()}
+          tableExport={tableExport}
+          empty={null}
+          onShowAll={null}
+          renderDetail={() => <div>detail</div>}
+          rowContextMenu={(_o, tr) => tr}
+          rowClassName={() => undefined}
+          hiddenOnPhone={false}
+          cards={false}
+        />
+      );
+    }
+    const renderHarness = (orders: ReturnType<typeof make>[]) =>
+      render(
+        withItemActions(
+          <MemoryRouter>
+            <Harness orders={orders} />
+          </MemoryRouter>,
+          fakeItemActions()
+        )
+      );
+
+    it('shows units by default, the ISK value only once ticked in Columns', async () => {
+      renderHarness([make(1, 1000, 1_000), make(2, 2000, 1_500)]);
+      expect(await screen.findByText('2,500 units')).toBeInTheDocument();
+      expect(screen.queryByText(/ISK/)).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'ISK value listed' }));
+      expect(await screen.findByText('≈ 4M ISK')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Units listed' }));
+      expect(screen.queryByText('2,500 units')).not.toBeInTheDocument();
+      // The pick is a stored preference; put it back for the next test.
+      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Units listed' }));
+    });
+
+    it('says "1 unit" for a single unit', async () => {
+      renderHarness([make(1, 1000, 1)]);
+      expect(await screen.findByText('1 unit')).toBeInTheDocument();
+    });
+  });
 });

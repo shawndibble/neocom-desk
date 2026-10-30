@@ -83,6 +83,25 @@ export const useVisibleMarketOrderColumns = createColumnVisibilitySetting({
   dropUnknown: true,
 });
 
+/** Figures a side heading can carry beyond its order count and best price. */
+export const ORDER_HEADING_FIGURE_IDS = ['units', 'value'] as const;
+export type OrderHeadingFigureId = (typeof ORDER_HEADING_FIGURE_IDS)[number];
+
+/** Units on by default; ISK value is there to tick. Empty is a real pick (neither). */
+export const DEFAULT_ORDER_HEADING_FIGURES: readonly OrderHeadingFigureId[] = ['units'];
+
+export const ORDER_HEADING_FIGURES_KEY = 'marketOrderHeadingFigures';
+
+// Its own preference, not two more column ids: existing stored column picks
+// would otherwise lack "units" and silently turn the default off.
+export const useOrderHeadingFigures = createColumnVisibilitySetting({
+  key: ORDER_HEADING_FIGURES_KEY,
+  ids: ORDER_HEADING_FIGURE_IDS,
+  defaultVisible: DEFAULT_ORDER_HEADING_FIGURES,
+  allowEmpty: true,
+  dropUnknown: true,
+});
+
 /**
  * Location's width cap in a table row: `roomy` while the book has room, then
  * `squeezed` (still truncated, the full name in the tooltip and expanded row)

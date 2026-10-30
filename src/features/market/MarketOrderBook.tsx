@@ -32,12 +32,21 @@ import {
   interactiveClassName,
   toggleChipStateClassName,
 } from '@/components/ui/controlStyles';
-import { formatMarketIsk } from '@/lib/isk';
-import type { MarketOrderColumnId } from './marketOrderColumns';
+import { formatIskCompact, formatMarketIsk } from '@/lib/isk';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatVolume } from './format';
+import {
+  ORDER_HEADING_FIGURE_IDS,
+  useOrderHeadingFigures,
+  type MarketOrderColumnId,
+  type OrderHeadingFigureId,
+} from './marketOrderColumns';
 import { PlaceJumpsLink } from '@/features/route/JumpsLink';
 import { formatCount } from '@/lib/formatCount';
 
 export type BookSide = 'sell' | 'buy';
+
+const SEPARATOR = ' · ';
 
 /**
  * "−35%" / "+4.2%": a signed share, the sign never left to colour alone. Past
@@ -297,6 +306,33 @@ export function OrderSideCard({
     columnId: 'price',
     direction: side === 'sell' ? 'asc' : 'desc',
   });
+  const headingFigures = useOrderHeadingFigures((state) => state.value);
+  const setHeadingFigures = useOrderHeadingFigures((state) => state.setValue);
+  useHydratedStore(useOrderHeadingFigures);
+  // Sums the whole side on screen (scope and filters already applied), not the capped page.
+  const { units, value } = useMemo(() => {
+    let u = 0;
+    let v = 0;
+    for (const o of rows) {
+      u += o.volume_remain;
+      v += o.volume_remain * o.price;
+    }
+    return { units: u, value: v };
+  }, [rows]);
+  const figureTexts = [
+    headingFigures.includes('units')
+      ? t('market.sideSummary.units', { count: units, formatted: formatVolume(units) })
+      : null,
+    headingFigures.includes('value')
+      ? t('market.sideSummary.value', { amount: formatIskCompact(value) })
+      : null,
+  ].filter((text): text is string => text !== null);
+  const toggleHeadingFigure = (id: OrderHeadingFigureId) =>
+    void setHeadingFigures(
+      headingFigures.includes(id)
+        ? headingFigures.filter((existing) => existing !== id)
+        : [...headingFigures, id]
+    );
   const shownRows = useMemo(() => {
     // Sorted here, before the cap, so a sort reaches the whole book; the table sorts the slice again (a no-op).
     const column = columns.find((c) => c.id === sort.columnId);
@@ -321,13 +357,25 @@ export function OrderSideCard({
           >
             {name}
           </h2>
-          <span className="text-xs text-text-dim tabular-nums max-sm:hidden">
-            {best === null
-              ? t('market.sideSummary.none', { count: total })
-              : t(side === 'sell' ? 'market.sideSummary.sell' : 'market.sideSummary.buy', {
-                  count: total,
+          <span className="text-xs text-text-dim tabular-nums">
+            {/* A phone's side toggle already carries the count and best price; the figures stay. */}
+            <span className="max-sm:hidden">
+              {t('market.sideSummary.orders', { count: total })}
+            </span>
+            {figureTexts.map((text, i) => (
+              <span key={text}>
+                <span className={i === 0 ? 'max-sm:hidden' : undefined}>{SEPARATOR}</span>
+                {text}
+              </span>
+            ))}
+            {best !== null && (
+              <span className="max-sm:hidden">
+                {SEPARATOR}
+                {t(side === 'sell' ? 'market.sideSummary.lowest' : 'market.sideSummary.highest', {
                   price: formatMarketIsk(best),
                 })}
+              </span>
+            )}
           </span>
           {/* Every width, unlike the summary: a phone loses the rows too. */}
           {hiddenBaitCount > 0 && (
@@ -346,6 +394,12 @@ export function OrderSideCard({
             buttonLabel={t('market.columnsButton')}
             menuTitle={t('market.columnsMenuTitle')}
             size="sm"
+            extraItems={ORDER_HEADING_FIGURE_IDS.map((id) => ({
+              id,
+              label: t(`market.headingFigure.${id}`),
+              checked: headingFigures.includes(id),
+              onToggle: () => toggleHeadingFigure(id),
+            }))}
           />
           <TableActionsMenu name={name} tableExport={tableExport} />
         </span>
