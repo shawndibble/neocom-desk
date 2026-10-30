@@ -7,7 +7,7 @@ import { isQueuePaused } from '@/engine/skills/queueStatus';
 import type { SkillCatalog } from '../skillMap';
 import { CURRENT_QUEUE_HASH } from './currentQueueHash';
 import { NowTrainingCard } from './NowTrainingCard';
-import { QueueLooseRows, QueuePeriodGroup } from './QueuePeriodGroup';
+import { QueueFinishedRows, QueueLooseRows, QueuePeriodGroup } from './QueuePeriodGroup';
 import type { QueueView } from './queueView';
 
 interface CurrentQueuePanelProps {
@@ -84,14 +84,10 @@ export function CurrentQueuePanel({ result, view, catalog, nowMs }: CurrentQueue
         <EmptyState title={t('plans.currentQueueEmpty')} className="py-4" />
       ) : (
         <>
-          {view.finished.length > 0 && (
-            // ESI keeps finished entries until the character next logs in, and
-            // says /skills is wrong until then. Surfacing them is the fix it
-            // documents, not a workaround.
-            <p className="text-[0.6875rem] text-success uppercase">
-              {t('plans.queueCompletedNote', { count: view.finished.length })}
-            </p>
-          )}
+          {/* ESI keeps finished entries until the character next logs in, and
+              says /skills is wrong until then. Surfacing them is the fix it
+              documents, not a workaround. */}
+          <QueueFinishedRows rows={view.finished} catalog={catalog} />
           {paused && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('plans.queuePausedNote')}</p>
           )}
@@ -101,12 +97,6 @@ export function CurrentQueuePanel({ result, view, catalog, nowMs }: CurrentQueue
           {view.groups.map((group) => (
             <QueuePeriodGroup key={group.id} group={group} catalog={catalog} nowMs={nowMs} />
           ))}
-          <QueueLooseRows
-            title={t('plans.queueFinishedGroup')}
-            rows={view.finished}
-            catalog={catalog}
-            nowMs={nowMs}
-          />
           <QueueLooseRows
             title={t('plans.queuePausedGroup')}
             rows={view.undated}

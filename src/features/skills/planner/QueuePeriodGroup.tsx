@@ -150,3 +150,42 @@ export function QueueLooseRows({
     </section>
   );
 }
+
+/** Finished-but-unapplied levels: one narrow line each, clumped, no header. */
+export function QueueFinishedRows({
+  rows,
+  catalog,
+}: {
+  rows: RowProps['row'][];
+  catalog: SkillCatalog;
+}) {
+  const { t } = useTranslation();
+  if (rows.length === 0) return null;
+  return (
+    <ul className="rounded-xs border border-line bg-panel">
+      {rows.map((row) => {
+        const { entry } = row;
+        const skill = catalog.bySkillTypeID.get(entry.skill_id);
+        return (
+          <li
+            key={`${entry.skill_id}-${entry.finished_level}-${entry.queue_position}`}
+            className="flex items-center gap-2 border-t border-line px-3 py-1 first:border-t-0"
+          >
+            <span aria-hidden className="shrink-0 text-text-dim">
+              {skillGroupIcon(skill?.groupName ?? '')}
+            </span>
+            <div className="min-w-0 flex-1 truncate text-sm">
+              <SkillLink typeId={entry.skill_id}>{skill?.name ?? `#${entry.skill_id}`}</SkillLink>{' '}
+              {romanLevel(entry.finished_level)}
+            </div>
+            <span
+              className={`rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${BADGE_STYLE.completed}`}
+            >
+              {t(BADGE_KEY.completed as string)}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

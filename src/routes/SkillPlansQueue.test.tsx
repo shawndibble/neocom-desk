@@ -209,7 +209,7 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
   const queuePanel = async () =>
     (await screen.findByText('Current skill queue')).closest('section')!;
 
-  it('keeps a finished entry visible and tells the user to log in to apply it', async () => {
+  it('keeps a finished entry visible as a compact Done row', async () => {
     // ESI holds completed entries until the character next logs in, and says
     // /skills is out of date until then. Hiding them would discard exactly
     // the information the queue exists to carry.
@@ -229,9 +229,8 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
 
     const panel = await queuePanel();
     expect(await within(panel).findByText('Done')).toBeInTheDocument();
-    expect(
-      within(panel).getByText(/1 skill finished training\. Log in to EVE to apply it\./i)
-    ).toBeInTheDocument();
+    expect(within(panel).queryByText(/Log in to EVE/i)).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('heading', { name: 'Finished' })).not.toBeInTheDocument();
   });
 
   it("shows the training skill's remaining time from ESI's finish_date", async () => {
