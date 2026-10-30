@@ -12,11 +12,14 @@
  */
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpStockTargetsStore } from '@/features/corp/stockTargets';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
+  useSpFarmCharacters,
+  isSpFarmCharacter,
 } from '@/features/character/spExtractionSettings';
 import { useExtractionPrices } from '@/features/character/useExtractionPrices';
 import {
@@ -161,9 +164,18 @@ function IncursionsSource() {
 
 /** The synced SP Extraction settings and the hub price, which are hooks, not loads. */
 function SpExtrasSource() {
-  const monitoring = useSpExtractionMonitoringEnabled((state) => state.value);
+  const enabled = useSpExtractionMonitoringEnabled((state) => state.value);
+  const farm = useSpFarmCharacters((state) => state.value);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  // Only a character marked SP Farm is ever flagged ready (#5658).
+  const monitoring =
+    enabled && activeCharacterId !== null && isSpFarmCharacter(farm, activeCharacterId);
   const thresholdSp = useSpExtractionThresholdSp((state) => state.value);
-  const hydrated = useHydratedStore(useSpExtractionMonitoringEnabled, useSpExtractionThresholdSp);
+  const hydrated = useHydratedStore(
+    useSpExtractionMonitoringEnabled,
+    useSpExtractionThresholdSp,
+    useSpFarmCharacters
+  );
   const price = useExtractionPrices();
 
   const { hubName, loaded, net } = price;

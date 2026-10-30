@@ -29,9 +29,10 @@ describe('availableCharacterColumns', () => {
     expect(availableCharacterColumns(true, true)).toContain('spReady');
   });
 
-  it('excludes spReady when monitoring is off', () => {
+  it('excludes spReady and spFarm when monitoring is off', () => {
     expect(availableCharacterColumns(false, true)).not.toContain('spReady');
-    expect(availableCharacterColumns(false, true)).toHaveLength(CHARACTER_COLUMN_IDS.length - 1);
+    expect(availableCharacterColumns(false, true)).not.toContain('spFarm');
+    expect(availableCharacterColumns(false, true)).toHaveLength(CHARACTER_COLUMN_IDS.length - 2);
   });
 
   it('includes group when at least one Group exists', () => {

@@ -54,6 +54,8 @@ export interface CharacterRow {
   /** Raw `total_sp` (not `correctedTotalSp`) — see `rosterView.ts`'s doc comment. */
   totalSp: number | undefined;
   starred: boolean;
+  /** Marked SP Farm: the only characters SP extraction readiness applies to. */
+  spFarm: boolean;
   /** Null when ungrouped — same as the card's `groupId` prop. */
   groupId: string | null;
   /** Undefined until read (and never read while neither column shows). */
@@ -140,6 +142,7 @@ export function buildColumns(
   spExtractionThresholdSp: number,
   extractionNet: number | null,
   onToggleStarred: (characterId: number) => void,
+  onToggleSpFarm: (characterId: number) => void,
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
   onMoveToGroup: (characterId: number, groupId: string | null) => void,
@@ -343,15 +346,33 @@ export function buildColumns(
         );
       },
     },
+    spFarm: {
+      id: 'spFarm',
+      header: t('characters.column.spFarm'),
+      sortValue: (row) => Number(row.spFarm),
+      render: (row) => (
+        <IconButton
+          size="sm"
+          icon={<Icon.SpFarm weight={row.spFarm ? 'fill' : 'light'} />}
+          label={t(row.spFarm ? 'characters.unmarkSpFarm' : 'characters.markSpFarm', {
+            name: row.character.name,
+          })}
+          pressed={row.spFarm}
+          onClick={() => onToggleSpFarm(row.character.characterId)}
+        />
+      ),
+    },
     spReady: {
       id: 'spReady',
       header: t('characters.column.spReady'),
       sortValue: (row) =>
-        row.totalSp === undefined
+        row.totalSp === undefined || !row.spFarm
           ? undefined
           : Number(isSpExtractionReady(row.totalSp, spExtractionThresholdSp)),
       render: (row) =>
-        row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThresholdSp) ? (
+        row.spFarm &&
+        row.totalSp !== undefined &&
+        isSpExtractionReady(row.totalSp, spExtractionThresholdSp) ? (
           <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>
             {t('characters.spReadyYes')}
             {extractionNet !== null && (

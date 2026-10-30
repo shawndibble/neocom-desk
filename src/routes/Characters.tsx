@@ -51,6 +51,8 @@ import {
 import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
+  useSpFarmCharacters,
+  withToggledSpFarm,
 } from '@/features/character/spExtractionSettings';
 import { extractorCount, isSpExtractionReady } from '@/engine/skills/spExtraction';
 import { formatIskCompact } from '@/lib/isk';
@@ -134,6 +136,9 @@ export function Characters() {
   useHydratedStore(useSpExtractionMonitoringEnabled);
   const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
   useHydratedStore(useSpExtractionThresholdSp);
+  const spFarm = useSpFarmCharacters((state) => state.value);
+  const setSpFarm = useSpFarmCharacters((state) => state.setValue);
+  const spFarmHydrated = useHydratedStore(useSpFarmCharacters);
 
   const extractionPrices = useExtractionPrices();
   const alertCounts = useAlertCountsByCharacter();
@@ -201,6 +206,7 @@ export function Characters() {
     attentionById,
     groups: groupsValue.groups,
     starred,
+    spFarm,
     alertCounts,
     notTrainingAlertEnabledFor,
     visibleColumns,
@@ -223,6 +229,7 @@ export function Characters() {
     spExtractionThreshold,
     extractionPrices.net,
     (id) => void handleToggleStar(id),
+    (id) => void handleToggleSpFarm(id),
     timeZone,
     groupsValue.groups,
     (id, groupId) => void handleMoveToGroup(id, groupId),
@@ -270,6 +277,10 @@ export function Characters() {
     void setVisibleColumns(next);
   }
 
+  async function handleToggleSpFarm(characterId: number) {
+    await setSpFarm(withToggledSpFarm(spFarm, characterId));
+  }
+
   async function handleToggleStar(characterId: number) {
     await setStarred(withToggledStar(starred, characterId));
   }
@@ -297,21 +308,28 @@ export function Characters() {
 
   const extractorsReady = tableRows.reduce(
     (sum, row) =>
-      row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThreshold)
+      row.spFarm &&
+      row.totalSp !== undefined &&
+      isSpExtractionReady(row.totalSp, spExtractionThreshold)
         ? sum + extractorCount(row.totalSp)
         : sum,
     0
   );
   const extractionSummary =
-    !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
-      ? null
-      : extractionPrices.net === null
-        ? t('characters.extractionUnpriced', { hub: extractionPrices.hubName })
-        : t('characters.extractionTotal', {
-            isk: formatIskCompact(extractionPrices.net * extractorsReady),
-            each: formatIskCompact(extractionPrices.net),
-            hub: extractionPrices.hubName,
-          });
+    spExtractionEnabled &&
+    spFarmHydrated &&
+    spFarm.length === 0 &&
+    activeColumnIds.includes('spReady')
+      ? t('characters.spFarmHint')
+      : !spExtractionEnabled || !extractionPrices.loaded || extractorsReady === 0
+        ? null
+        : extractionPrices.net === null
+          ? t('characters.extractionUnpriced', { hub: extractionPrices.hubName })
+          : t('characters.extractionTotal', {
+              isk: formatIskCompact(extractionPrices.net * extractorsReady),
+              each: formatIskCompact(extractionPrices.net),
+              hub: extractionPrices.hubName,
+            });
 
   if (!characters) {
     return <Spinner block="page" label={t('common.loading')} />;
@@ -517,6 +535,8 @@ export function Characters() {
               rows={tableRows}
               columns={activeColumnIds.map((id) => columnsById[id])}
               extractionSummary={extractionSummary}
+              spExtractionEnabled={spExtractionEnabled}
+              onToggleSpFarm={(id) => void handleToggleSpFarm(id)}
               tableProps={charactersExport.tableProps}
               sort={tableSort}
               onSortChange={setTableSort}

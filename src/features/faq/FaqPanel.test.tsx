@@ -62,6 +62,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.defaultCharacterFilter': /default characters shown/i,
   'sync.spExtractionMonitoringEnabled': /SP Extraction monitoring/i,
   'sync.spExtractionThresholdSp': /SP Extraction monitoring and its threshold/i,
+  'sync.spFarmCharacters': /marked as SP Farm/i,
   'sync.loyaltyLpValue': /ISK-per-LP value/i,
   'sync.fittingDamageProfiles': /damage and target profiles/i,
   'sync.fittingDamageProfileId': /which ones are active/i,

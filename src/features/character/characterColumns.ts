@@ -26,6 +26,7 @@ export const CHARACTER_COLUMN_IDS = [
   'openJobsScience',
   'openJobsReaction',
   'pi',
+  'spFarm',
   'spReady',
   'alerts',
   // Last, always — GLOSSARY.md's glossary reserves "pinned" for a planetary
@@ -103,7 +104,7 @@ export const useCharacterViewMode = createLocalSetting<CharacterViewMode>({
 });
 
 /**
- * `spReady` only when the pilot has opted into SP extraction monitoring
+ * `spReady` and `spFarm` only when the pilot has opted into SP extraction monitoring
  * (`spExtractionSettings.ts`) — a column for a feature that's off would show
  * every row as unknown, which is worse than not offering it. `group`
  * likewise only when at least one Group exists — with none, the column's
@@ -115,7 +116,7 @@ export function availableCharacterColumns(
   hasGroups: boolean
 ): readonly CharacterColumnId[] {
   return CHARACTER_COLUMN_IDS.filter((id) => {
-    if (id === 'spReady') return spExtractionEnabled;
+    if (id === 'spReady' || id === 'spFarm') return spExtractionEnabled;
     if (id === 'group') return hasGroups;
     return true;
   });

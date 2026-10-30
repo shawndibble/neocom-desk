@@ -105,6 +105,12 @@
 // both are new, with no device-local life to seed from. See
 // features/character/spExtractionSettings.ts.
 //
+// sync.spFarmCharacters (issue #5658): the Character ids marked "SP Farm",
+// the only ones SP extraction readiness, its column and its alert apply to.
+// Its own key so a mark merges independently of the threshold. An emptied
+// list is stored as `[]`, never unset, so the tombstone-expiry edge does not
+// bite. No `legacyKey`: new.
+//
 // sync.industryBuildGroups (issue #626): a blob like the two above, and for
 // the same reason — the key space is unbounded (one entry per Build Group, per
 // Character), so one key per group is not expressible against an exact-match
@@ -382,6 +388,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
+  'sync.spFarmCharacters',
   'sync.structureBrokerFees',
   'sync.stockLists',
   'sync.surveyHistory',

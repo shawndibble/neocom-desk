@@ -21,6 +21,7 @@ function view(url: string, starred: number[] = []) {
         attentionById: new Map(),
         groups: [{ id: 'g', name: 'Mining', characterIds: [2] }],
         starred,
+        spFarm: [],
         alertCounts: new Map(),
         notTrainingAlertEnabledFor: () => true,
         visibleColumns: ['name'],
