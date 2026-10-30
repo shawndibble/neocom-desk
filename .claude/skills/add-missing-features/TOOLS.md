@@ -21,7 +21,7 @@ Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
 Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#4022), EVE Appraisal, Iron Whales Appraiser, Fuzzwork, EVE Ref, EveLens
 (#5006), jEveAssets, Evernus, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
-EVE-HUB, EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
+EVE-HUB, RIFT (desktop; wallet Insights, asset filters; #5601, #5602), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
@@ -203,6 +203,7 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
 `SHIP` and was closed). Check `gh api repos/shawndibble/neocom-desk/issues/<n>`.
 
+- #5601 NARROW Assets Items: Category/Group filter + Blueprint copies toggle (RIFT's All/Any builder, saved filters, meta/tech/volume dropped). #5602 NARROW Wallet Journal: counterparty filter from a line (RIFT's top-counterparties rollup left as a human decision; the drill is the interesting part).
 - #5327 NARROW Build Plan "input costs moved in 7d" line (EveBoosters
   Material Influence Explorer, Build Plan only).
 - #5134 NARROW Build Plans "Buy ore instead": compressed ore bought and
@@ -345,3 +346,4 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   stops); gate-camp check, D-Scan, live map (intel, kill-test 2).
 - **IntelParser leftover:** per-pilot cyno/hot-drop/bait/FC chips on Local rows from zKillboard stats (non-ISK, thin; only revive if intel gets asked for).
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
+- **RIFT ratting rollup** (kills by faction/system, ISK per kill): per-line `BountyFactionSummary`/`killsByFaction` exists; a bounty line's ISK is shared across NPC types, so per-class ISK is an estimate. RIFT daily-goals tab: ref-type breakdown + `dailyGoalMessageIdOf` cover it. "Open ship in Fittings" from Assets: shipped (`assetShipLocation.ts`).
