@@ -10,6 +10,7 @@ import { DamageProfilePicker } from '../DamageProfilePicker';
 import type { DamageProfiles } from '../damageProfiles';
 import { CapacitorFacts, TankFacts } from '../FittingTankStats';
 import { FleetBoostFacts } from '../FittingFleetBoostStats';
+import { ExploreFacts } from '../FittingExploreStats';
 import { MiningFacts } from '../FittingMiningStats';
 import { SupportFacts } from '../FittingSupportStats';
 import { kmValue } from '../rangeText';
@@ -265,6 +266,22 @@ export function shipSections({
           })
         ),
         <MiningFacts stats={stats} typeName={typeName} />
+      ),
+    stats &&
+      (stats.explore.modules > 0 || stats.explore.cloakRecalibrationSeconds > 0) &&
+      section(
+        'exploration',
+        // The figure an explorer reads first: what the analyzer hacks at, else what the probes scan at.
+        figure((s) =>
+          s.explore.hacking.strength > 0
+            ? t('fittings.stats.exploration.strengthMeta', {
+                value: fmt0(s.explore.hacking.strength),
+              })
+            : s.explore.probe.strength > 0
+              ? t('fittings.stats.exploration.probeMeta', { value: fmt1(s.explore.probe.strength) })
+              : ''
+        ),
+        <ExploreFacts stats={stats} />
       ),
     stats &&
       hasFleetSupport(stats.fleetSupport) &&

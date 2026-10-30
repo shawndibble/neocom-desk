@@ -971,6 +971,7 @@
         "support": "Support out",
         "fleetBoosts": "Fleet boosts",
         "mining": "Mining",
+        "exploration": "Exploration",
         "projected": "Projected effects",
         "abyssal": "Abyssal",
         "fighters": "Fighters"
@@ -1190,6 +1191,25 @@
           "jamMagnetometric": "{{value}} magnetometric",
           "jamRadar": "{{value}} radar"
         }
+      },
+      "exploration": {
+        "dataStrength": "Data hacking strength",
+        "relicStrength": "Relic hacking strength",
+        "coherence": "Coherence",
+        "utilitySlots": "Utility slots",
+        "analyzerCycle": "Analyzer cycle",
+        "probeStrength": "Probe strength",
+        "noProbe": "No probe loaded",
+        "launcherBonus": "Launcher probe bonus",
+        "launchCycle": "Probe launch cycle",
+        "scanStrength": "Scan strength bonus",
+        "scanTimeCut": "Scan time cut",
+        "deviationCut": "Deviation cut",
+        "cloakRelock": "Cloak relock delay",
+        "seconds": "{{value}} s",
+        "percent": "{{value}}%",
+        "strengthMeta": "Strength {{value}}",
+        "probeMeta": "Probes {{value}}"
       },
       "mining": {
         "perCycle": "{{value}} m³ / {{seconds}} s",

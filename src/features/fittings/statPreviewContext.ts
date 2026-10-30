@@ -21,6 +21,20 @@ export function useChangedKeys(keys: readonly StatChangeKey[] | undefined): Stat
 
 /** The stats each collapsible section shows, so its header can say a change is inside it. */
 const SECTION_KEYS: Partial<Record<Section, readonly StatChangeKey[]>> = {
+  exploration: [
+    'dataStrength',
+    'relicStrength',
+    'virusCoherence',
+    'utilitySlots',
+    'hackingCycle',
+    'probeStrength',
+    'probeLauncherBonus',
+    'probeLauncherCycle',
+    'scanStrength',
+    'scanTimeCut',
+    'deviationCut',
+    'cloakRecalibration',
+  ],
   offense: ['totalDps', 'totalVolley', 'sustainedDps'],
   drones: ['droneDps', 'droneBandwidthUsed', 'droneBandwidthTotal', 'droneCapacity'],
   defense: [
