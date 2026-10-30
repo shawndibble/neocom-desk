@@ -882,6 +882,7 @@ describe('freshness window', () => {
     expect(result.cached).toEqual({
       data: 'live-value',
       fetchedAt: new Date(1_000_000),
+      expiresAt: new Date(1_060_000),
       fromCache: false,
       truncated: false,
     });

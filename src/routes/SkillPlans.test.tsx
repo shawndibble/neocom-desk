@@ -197,7 +197,7 @@ describe('SkillPlans CRUD', () => {
       await within(plans).findByRole('button', { name: 'More actions for Test plan' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
-    const input = screen.getByRole('textbox', { name: 'Rename' });
+    const input = await screen.findByRole('textbox', { name: 'Rename' });
     await user.clear(input);
     await user.type(input, 'PvP Fit{Enter}');
 

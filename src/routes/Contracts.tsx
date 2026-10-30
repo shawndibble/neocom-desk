@@ -346,7 +346,10 @@ export function Contracts() {
         meta={
           tab === 'history' ? (
             contractsResult && !sourceHeld ? (
-              <DataAgeBadge date={contractsResult.fetchedAt} />
+              <DataAgeBadge
+                date={contractsResult.fetchedAt}
+                expiresAt={contractsResult.expiresAt}
+              />
             ) : undefined
           ) : searchStatus?.lastSyncedAt != null ? (
             <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />

@@ -267,7 +267,12 @@ export function Contacts() {
         meta={
           tab === 'standings'
             ? standings.meta
-            : contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />
+            : contactsResult && (
+                <DataAgeBadge
+                  date={contactsResult.fetchedAt}
+                  expiresAt={contactsResult.expiresAt}
+                />
+              )
         }
         // Not on Standings: that tab reads the active Character's standings only.
         // Always the control otherwise, so the header's one-line lock never flips:

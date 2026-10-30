@@ -99,7 +99,9 @@ export function AttributesPane({
       <Panel
         title={t('skills.attributes')}
         className={className}
-        actions={result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} />}
+        actions={
+          result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} expiresAt={result.expiresAt} />
+        }
       >
         {chips()}
         {/* Same live remap read the plan editor costs against (#1726) — a

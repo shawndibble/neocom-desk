@@ -6785,6 +6785,10 @@
       "hours": "{{count}}h ago",
       "days": "{{count}}d ago"
     },
+    "dataAge": {
+      "esiUpdatesIn": "ESI updates this in {{count}} min ({{time}})",
+      "esiMayHaveNewer": "ESI may have newer data; refresh"
+    },
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
     "couldntLoad": "Couldn't load",
