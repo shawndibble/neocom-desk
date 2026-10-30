@@ -9194,6 +9194,7 @@
     }
   },
   "piPlan": {
+    "thinSales": "Plan sells {{plan}}/day · {{region}} trades {{trades}}/day ({{pct}}%) · counted at {{counted}}/day",
     "account": {
       "title": "Best use of all your planets",
       "meta": "Every planet, together · Est.",

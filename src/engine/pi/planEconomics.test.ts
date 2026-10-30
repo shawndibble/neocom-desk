@@ -97,6 +97,32 @@ function coolantColonies(hostTax: number): PlannerColony[] {
 const perDay = (perHour: number) => perHour * 24;
 
 describe('planEconomics', () => {
+  it('counts units over a sales cap as unsold: no revenue, no sales tax', () => {
+    const colonies = coolantColonies(0.3);
+    const { plan, baseline } = cost([{ typeId: COOLANT, unitsPerDay: perDay(5) }], colonies);
+    const capped = planEconomics(plan, colonies, baseline, BOOKS, new Map([[COOLANT, 2 * 24]]));
+    const open = planEconomics(plan, colonies, baseline, BOOKS);
+    if (capped.status !== 'costed' || open.status !== 'costed') throw new Error('costed');
+    // 5 Coolant an hour made, 2 an hour counted.
+    expect(open.revenue - capped.revenue).toBeCloseTo(3 * 20_000);
+    expect(open.salesTax - capped.salesTax).toBeCloseTo(3 * 20_000 * 0.04);
+    // Customs still paid on every unit shipped.
+    expect(capped.customs.exportFromHost).toBeCloseTo(open.customs.exportFromHost);
+    expect(open.netPerHour - capped.netPerHour).toBeCloseTo(3 * 20_000 * 0.96);
+  });
+
+  it('leaves a type with no cap, and a cap above the output, untouched', () => {
+    const colonies = coolantColonies(0.3);
+    const { plan, baseline, economics } = cost(
+      [{ typeId: COOLANT, unitsPerDay: perDay(5) }],
+      colonies
+    );
+    const loose = planEconomics(plan, colonies, baseline, BOOKS, new Map([[COOLANT, 10_000]]));
+    const other = planEconomics(plan, colonies, baseline, BOOKS, new Map([[BIOFUELS + 1, 1]]));
+    expect(loose).toEqual(economics);
+    expect(other).toEqual(economics);
+  });
+
   it('gives a plan that is exactly the Baseline a Lift of zero', () => {
     const colonies = [
       colony(1, 'barren', { rates: [BASE_METALS], taxRate: 0.05 }),
