@@ -66,6 +66,7 @@ import { Code } from '@phosphor-icons/react/dist/csr/Code';
 import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
 import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
 import { Backpack } from '@phosphor-icons/react/dist/csr/Backpack';
+import { Bridge } from '@phosphor-icons/react/dist/csr/Bridge';
 import { CaretUp } from '@phosphor-icons/react/dist/csr/CaretUp';
 import { Crosshair } from '@phosphor-icons/react/dist/csr/Crosshair';
 import { SketchLogo } from '@phosphor-icons/react/dist/csr/SketchLogo';
@@ -114,6 +115,7 @@ import { Receipt } from '@phosphor-icons/react/dist/csr/Receipt';
 import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
 import { RocketLaunch } from '@phosphor-icons/react/dist/csr/RocketLaunch';
 import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
+import { Spiral } from '@phosphor-icons/react/dist/csr/Spiral';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
@@ -250,6 +252,10 @@ export const Compare = withWeight(Scales);
 export const SwapEnds = withWeight(ArrowRight);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
+/** A route hop over an Ansiblex jump bridge: a span between two systems. Not `Route`'s arrows, which mean "pick one of two". */
+export const BridgeHop = withWeight(Bridge);
+/** A route hop through a wormhole (Thera / Turnur): a spiral, the hole itself. Distinct from `BridgeHop`'s span at 1rem. */
+export const WormholeHop = withWeight(Spiral);
 /** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `PriceAlert` uses, for retargeting a group. */
 export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */

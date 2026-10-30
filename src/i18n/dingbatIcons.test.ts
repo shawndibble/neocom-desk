@@ -6,9 +6,6 @@ import en from './locales/en.json';
 /** DESIGN.md §5: a typed dingbat is never an icon — use an `Icon.*` glyph. */
 const DINGBATS = /[●▲⇉⤳✓☑☐]/;
 
-/** Travel's bridge/wormhole markers still need their own glyph aliases; the follow-up removes this. */
-const ALLOWED = ['src/features/travel/'];
-
 function walk(dir: string, out: string[]) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -29,7 +26,7 @@ describe('typed dingbats', () => {
     const files: string[] = [];
     walk('src/features', files);
     const bad = files
-      .filter((f) => !f.startsWith('src/features/pi/') && !ALLOWED.some((a) => f.startsWith(a)))
+      .filter((f) => !f.startsWith('src/features/pi/'))
       .filter((f) => DINGBATS.test(readFileSync(f, 'utf8')));
     expect(bad).toEqual([]);
   });
