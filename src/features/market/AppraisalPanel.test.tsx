@@ -56,6 +56,10 @@ function controller(overrides: Partial<AppraisalController> = {}): AppraisalCont
     appraise: vi.fn(),
     clear: vi.fn(),
     refresh: vi.fn(),
+    live: { checking: false, done: 0, total: 0, failed: 0, checkedAt: null },
+    compareLive: { checking: false, done: 0, total: 0, failed: 0, checkedAt: null },
+    setCompareOpen: vi.fn(),
+    settleLive: vi.fn(async () => null),
     ...overrides,
   };
 }

@@ -43,6 +43,7 @@ import {
   computeAppraisalRefine,
   type Appraisal,
   type AppraisalItem,
+  type PriceState,
 } from '@/engine/market/appraisal';
 import { cheapestLpOffer } from '@/engine/market/lpAcquisition';
 import {
@@ -294,6 +295,10 @@ export interface HubComparisonRow {
   sell: number | null;
   /** This hub's prices could not be fetched, so the dashes mean "unknown", not "no orders". */
   unreachable: boolean;
+  /** The pasted rows at this hub's cached prices, which live books replace per row (issue #5591). */
+  items?: readonly AppraisalItem[];
+  /** Whether the totals are this hub's live books, still cached, or live with a failed row. */
+  priceState?: PriceState;
 }
 
 /**
@@ -329,7 +334,7 @@ export async function compareHubs(
         };
       });
       const { buy, sell } = buildHubComparison(items, pricePercent);
-      return { hub, buy, sell, unreachable };
+      return { hub, buy, sell, unreachable, items };
     })
   );
 }

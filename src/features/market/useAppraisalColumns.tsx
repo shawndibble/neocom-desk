@@ -30,6 +30,7 @@ import { appraisalCsvColumns } from './appraisalCsv';
 import { appraisalIskPerM3Column, appraisalVolumeColumn } from './appraisalVolume';
 import { formatVolume } from './format';
 import { ItemContextMenu } from './ItemContextMenu';
+import { PriceMark } from './LivePriceStatus';
 import { MarketItemLink } from './MarketItemLink';
 import type { AppraisalController } from './useAppraisal';
 
@@ -158,7 +159,12 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnBuyEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(row.buyEach),
+      render: (row) => (
+        <>
+          <PriceMark state={row.priceState} />
+          {eachCell(row.buyEach)}
+        </>
+      ),
       sortValue: (row) => row.buyEach ?? undefined,
     },
     sellEach: {
@@ -166,7 +172,12 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnSellEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(row.sellEach),
+      render: (row) => (
+        <>
+          <PriceMark state={row.priceState} />
+          {eachCell(row.sellEach)}
+        </>
+      ),
       sortValue: (row) => row.sellEach ?? undefined,
     },
     splitEach: {
@@ -186,7 +197,9 @@ export function useAppraisalColumns({
       render: (row) =>
         comparisonCell(
           totalCell(row.buyTotal),
-          row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
+          row.refineTotal !== undefined && !refineBeatsSellAsIs(row),
+          undefined,
+          <PriceMark state={row.priceState} />
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
     },
@@ -195,7 +208,12 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.sellTotal),
+      render: (row) => (
+        <>
+          <PriceMark state={row.priceState} />
+          {totalCell(row.sellTotal)}
+        </>
+      ),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
     refineTotal: {

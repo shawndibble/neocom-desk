@@ -54,6 +54,7 @@ import { PastedLinesNote } from './PastedLinesNote';
 import { AppraisalPasteCard } from './AppraisalPasteCard';
 import { AppraisalResultActions } from './AppraisalResultActions';
 import { AppraisalSummary } from './AppraisalSummary';
+import { LivePriceBar, LivePriceStatus } from './LivePriceStatus';
 import { useAppraisalColumns } from './useAppraisalColumns';
 import { useAppraisalCopyLists } from './useAppraisalCopyLists';
 import { useAppraisalJanice } from './useAppraisalJanice';
@@ -88,6 +89,9 @@ export function AppraisalPanel({
   const { t } = useTranslation();
   const { text, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
+  const { setCompareOpen } = controller;
+  // The other four hubs' live books are fetched only once Compare Hubs is open.
+  useEffect(() => setCompareOpen(compareExpanded), [compareExpanded, setCompareOpen]);
   // Phone only: the pilot opened the folded paste card to edit the list. The
   // result of an Appraise (or a Recent pick) from the open form folds it
   // again, adjusted during render like the idioms below. A re-price from a
@@ -177,7 +181,11 @@ export function AppraisalPanel({
     pricePercent,
     characterId,
   });
-  const { copied, copyLists, handleCopy } = useAppraisalCopyLists({ result, owned });
+  const { copied, copyLists, handleCopy } = useAppraisalCopyLists({
+    result,
+    owned,
+    settleLive: controller.settleLive,
+  });
   const { janice, handleOpenInJanice, dismissJanice } = useAppraisalJanice({
     text,
     hub,
@@ -265,6 +273,7 @@ export function AppraisalPanel({
       ? t('market.appraisal.minusOwnedChipEverywhere')
       : t('market.appraisal.minusOwnedChip', { station: placeLabel(ownedStationId) });
 
+  const resultReady = !failed && result !== null && rows.length > 0;
   const summaryReady =
     !(loading && result === null) &&
     !failed &&
@@ -336,104 +345,115 @@ export function AppraisalPanel({
             characterId={characterId}
             hubId={hub.id}
             onHubChange={onHubChange}
+            compareLive={controller.compareLive}
           />
         )}
 
-        <Panel
-          title={t('market.appraisal.resultTitle')}
-          headingRef={resultHeadingRef}
-          padded={result === null}
-          meta={
-            result !== null ? (
-              // The paste bar above already says hub and percent on a phone.
-              <span className="max-md:hidden">
-                <StatChip
-                  label={hubName}
-                  value={t('market.appraisal.atPercent', { pricePercent })}
-                />
-              </span>
-            ) : undefined
-          }
-          actions={
-            result === null || failed || rows.length === 0 ? undefined : (
-              <AppraisalResultActions
-                compare={compare}
-                compareExpanded={compareExpanded}
-                onToggleCompare={() => setCompareExpanded((open) => !open)}
-                columns={{
-                  availableColumns,
-                  visibleColumns,
-                  optionalColumnsById,
-                  toggleColumn,
-                  tableExport,
-                }}
-                share={{ share, handleShare, shareItemCount }}
-                copy={{ copied, copyLists, handleCopy }}
-                janice={{ janice, handleOpenInJanice, canOpen: text.trim() !== '' }}
-                characterId={characterId}
-                rowCount={rows.length}
-              />
-            )
-          }
-        >
-          {loading && result === null ? (
-            <Spinner block="panel" label={t('common.loading')} />
-          ) : failed ? (
-            <EmptyState
-              title={t('market.loadFailedTitle')}
-              hint={t('market.loadFailedHint')}
-              className="py-8"
-            />
-          ) : result === null || totals === undefined ? (
-            <EmptyState
-              title={t('market.appraisal.emptyTitle')}
-              hint={t('market.appraisal.emptyHint')}
-              className="py-8"
-            />
-          ) : rows.length === 0 ? (
-            <EmptyState
-              title={t('market.appraisal.noMatchesTitle')}
-              hint={t('market.appraisal.noMatchesHint')}
-              className="py-8"
-            />
-          ) : (
-            <>
-              {share.status === 'manual' && (
-                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                  <label htmlFor="market-appraisal-share-url" className={eyebrowClassName}>
-                    {t('market.appraisal.shareReady')}
-                  </label>
-                  <TextInput
-                    id="market-appraisal-share-url"
-                    size="sm"
-                    readOnly
-                    value={share.url}
-                    onFocus={(event) => event.currentTarget.select()}
-                    className="min-w-0 flex-1 font-mono"
-                  />
-                  <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
-                    {t('market.appraisal.shareCopy')}
-                  </Button>
-                </div>
-              )}
-              {/* A card a little narrower than the table's own minimum scrolls here instead of pushing past its column (#2949). */}
-              <div className="min-w-0 overflow-x-auto">
-                <DataTable
-                  {...tableExport.tableProps}
-                  columns={columns}
-                  rows={tableRows}
-                  rowKey={(row) => row.typeId}
-                  label={t('market.appraisal.resultTitle')}
-                  className="pb-1"
-                  rowContextMenu={rowContextMenu}
-                  rowMoreActions
-                  // A phone keeps the table: Item, Buy, Sell, each header sorts.
-                  responsive="table"
-                />
-              </div>
-            </>
+        {/* The live-price bar is this card's top border: no row of its own, so the table never shifts as rows go live. */}
+        <div className="relative">
+          {resultReady && controller.live.checking && (
+            <LivePriceBar live={controller.live} className="absolute inset-x-0 top-0 z-10" />
           )}
-        </Panel>
+          <Panel
+            title={t('market.appraisal.resultTitle')}
+            headingRef={resultHeadingRef}
+            padded={result === null}
+            wrapMeta
+            meta={
+              result !== null ? (
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {/* The paste bar above already says hub and percent on a phone. */}
+                  <span className="max-md:hidden">
+                    <StatChip
+                      label={hubName}
+                      value={t('market.appraisal.atPercent', { pricePercent })}
+                    />
+                  </span>
+                  <LivePriceStatus live={controller.live} />
+                </span>
+              ) : undefined
+            }
+            actions={
+              result === null || failed || rows.length === 0 ? undefined : (
+                <AppraisalResultActions
+                  compare={compare}
+                  compareExpanded={compareExpanded}
+                  onToggleCompare={() => setCompareExpanded((open) => !open)}
+                  columns={{
+                    availableColumns,
+                    visibleColumns,
+                    optionalColumnsById,
+                    toggleColumn,
+                    tableExport,
+                  }}
+                  share={{ share, handleShare, shareItemCount }}
+                  copy={{ copied, copyLists, handleCopy }}
+                  janice={{ janice, handleOpenInJanice, canOpen: text.trim() !== '' }}
+                  characterId={characterId}
+                  rowCount={rows.length}
+                />
+              )
+            }
+          >
+            {loading && result === null ? (
+              <Spinner block="panel" label={t('common.loading')} />
+            ) : failed ? (
+              <EmptyState
+                title={t('market.loadFailedTitle')}
+                hint={t('market.loadFailedHint')}
+                className="py-8"
+              />
+            ) : result === null || totals === undefined ? (
+              <EmptyState
+                title={t('market.appraisal.emptyTitle')}
+                hint={t('market.appraisal.emptyHint')}
+                className="py-8"
+              />
+            ) : rows.length === 0 ? (
+              <EmptyState
+                title={t('market.appraisal.noMatchesTitle')}
+                hint={t('market.appraisal.noMatchesHint')}
+                className="py-8"
+              />
+            ) : (
+              <>
+                {share.status === 'manual' && (
+                  <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                    <label htmlFor="market-appraisal-share-url" className={eyebrowClassName}>
+                      {t('market.appraisal.shareReady')}
+                    </label>
+                    <TextInput
+                      id="market-appraisal-share-url"
+                      size="sm"
+                      readOnly
+                      value={share.url}
+                      onFocus={(event) => event.currentTarget.select()}
+                      className="min-w-0 flex-1 font-mono"
+                    />
+                    <Button size="sm" onClick={() => void handleCopyShareUrl(share.url)}>
+                      {t('market.appraisal.shareCopy')}
+                    </Button>
+                  </div>
+                )}
+                {/* A card a little narrower than the table's own minimum scrolls here instead of pushing past its column (#2949). */}
+                <div className="min-w-0 overflow-x-auto">
+                  <DataTable
+                    {...tableExport.tableProps}
+                    columns={columns}
+                    rows={tableRows}
+                    rowKey={(row) => row.typeId}
+                    label={t('market.appraisal.resultTitle')}
+                    className="pb-1"
+                    rowContextMenu={rowContextMenu}
+                    rowMoreActions
+                    // A phone keeps the table: Item, Buy, Sell, each header sorts.
+                    responsive="table"
+                  />
+                </div>
+              </>
+            )}
+          </Panel>
+        </div>
       </div>
       {janice.status === 'fetching' && <Toast message={t('market.appraisal.janiceFetching')} />}
       {janice.status === 'failed' && (
