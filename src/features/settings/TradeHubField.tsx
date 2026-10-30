@@ -41,7 +41,7 @@ function HubSelect({
 }) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as HubId)}>
-      <SelectTrigger id={id} aria-label={label} size={size}>
+      <SelectTrigger id={id} aria-label={label} size={size} className="max-w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -90,7 +90,7 @@ export function TradeHubField() {
       htmlFor="settings-hub"
       note={single ? t('settings.tradeHubHint') : t('settings.tradeHubMultiNote', { summary })}
     >
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <HubSelect
           id="settings-hub"
           value={shown}
