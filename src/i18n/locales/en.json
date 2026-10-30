@@ -1310,8 +1310,8 @@
       "worse": "worse",
       "spoken": "{{before}} to {{after}}",
       "capacitor": "Capacitor {{value}}",
-      "stable": "stable at {{pct}}%",
-      "depletes": "depletes in {{time}}"
+      "stable": "{{pct}}%",
+      "depletes": "{{time}}"
     },
     "makeItFit": {
       "fix": {
@@ -1634,15 +1634,25 @@
       "activeTankLine": "Active tank {{before}} → {{after}} HP/s",
       "repairLine": "Repairs {{before}} → {{after}} HP/s",
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
-      "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
-      "exploreLine": "Hacking strength {{strengthBefore}} → {{strengthAfter}} · Coherence {{coherenceBefore}} → {{coherenceAfter}} · Cycle {{cycleBefore}} → {{cycleAfter}} s · Scan strength {{scanBefore}}% → {{scanAfter}}% · Scan time cut {{durationBefore}}% → {{durationAfter}}% · Deviation cut {{deviationBefore}}% → {{deviationAfter}}%",
-      "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
       "command": {
         "strength": "Burst strength {{before}} → {{after}}",
         "burstRange": "Burst reach {{before}} → {{after}} km",
         "compression": "Compression {{before}} → {{after}} km",
         "fuel": "Core fuel {{before}} → {{after}} per cycle"
       },
+      "figure": {
+        "points": "Points {{before}} → {{after}}",
+        "web": "Web {{before}} → {{after}}%",
+        "reach": "Reach {{before}} → {{after}} km",
+        "moduleStrength": "Module strength {{before}} → {{after}}",
+        "hackingStrength": "Hacking strength {{before}} → {{after}}",
+        "coherence": "Coherence {{before}} → {{after}}",
+        "cycle": "Cycle {{before}} → {{after}} s",
+        "scanStrength": "Scan strength {{before}}% → {{after}}%",
+        "scanTimeCut": "Scan time cut {{before}}% → {{after}}%",
+        "deviationCut": "Deviation cut {{before}}% → {{after}}%"
+      },
+      "ewarNote": "{{figures}} (not the effect on a target)",
       "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
       "hold": {
         "cargo": "Cargo hold",
@@ -1694,6 +1704,12 @@
         "totalDps": "Total DPS {{value}}",
         "totalVolley": "Total volley {{value}}",
         "appliedDps": "Applied DPS {{value}}",
+        "hackingStrength": "Hacking strength {{value}}",
+        "virusCoherence": "Coherence {{value}}",
+        "hackingCycle": "Cycle {{value}} s",
+        "scanStrength": "Scan strength {{value}}%",
+        "scanTimeCut": "Scan time cut {{value}}%",
+        "deviationCut": "Deviation cut {{value}}%",
         "droneDps": "Drone DPS {{value}}",
         "droneBandwidthUsed": "Drone bandwidth used {{value}} Mbit/s",
         "droneBandwidthTotal": "Drone bandwidth total {{value}} Mbit/s",

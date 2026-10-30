@@ -386,6 +386,16 @@ describe('ImprovePanel', () => {
   const applied = (dps: number) => ({ weapons: [missile(dps)], droneControlRange: 20000 });
   const frigate: TargetProfile = { signatureRadius: 40, velocity: 400 };
 
+  /** The first row's stat rows, as the visible text of each (the screen-reader copy left out). */
+  const statRows = () =>
+    [...screen.getByRole('checkbox').closest('li')!.querySelectorAll('[role="listitem"]')].map(
+      (item) =>
+        [...item.children]
+          .filter((child) => !child.classList.contains('sr-only'))
+          .map((child) => child.textContent?.trim() ?? '')
+          .join(' ')
+    );
+
   it('labels a damage lead Applied DPS against a Target Profile, apart from Sustained DPS', () => {
     const own = {
       ...before,
@@ -399,21 +409,19 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
       target: frigate,
     });
-    const row = screen.getByRole('checkbox').closest('li')!;
-    const [lead, detail] = row.querySelectorAll('span.block.text-xs');
-    expect(lead).toHaveTextContent('Applied DPS');
-    expect(lead).not.toHaveTextContent('Sustained DPS');
-    expect(detail).toHaveTextContent(/Sustained DPS\s*90.7 → 128/);
+    // The goal's figure is the first stat row, in the same list (columns, tone) as the others.
+    const rows = statRows();
+    expect(rows[0]).toMatch(/^Applied DPS/);
+    expect(rows.slice(1).join('|')).toMatch(/Sustained DPS\s*90.7 → 128/);
   });
 
   it("never shows the same stat in a row's lead line and its detail line", () => {
     const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
     const gain = option(11, { offense: { ...before.offense, sustainedDps: 128 } });
     renderPanel(search(done({ noDownside: [gain] }, own), own));
-    const row = screen.getByRole('checkbox').closest('li')!;
-    const [lead, detail] = row.querySelectorAll('span.block.text-xs');
-    expect(lead).toHaveTextContent('Sustained DPS');
-    expect(detail).not.toHaveTextContent('Sustained DPS');
+    const rows = statRows();
+    expect(rows[0]).toMatch(/^Sustained DPS/);
+    expect(rows.filter((row) => row.startsWith('Sustained DPS'))).toHaveLength(1);
   });
 
   it('leads Best overall with what changed, not DPS and EHP that stood still', () => {
@@ -421,14 +429,12 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ noDownside: [gain] })), vi.fn(), vi.fn(), settings(), {
       goal: 'overall',
     });
-    const [lead] = screen
-      .getByRole('checkbox')
-      .closest('li')!
-      .querySelectorAll('span.block.text-xs');
-    expect(lead).toHaveTextContent('Capacitor');
-    expect(lead).toHaveTextContent('stable at 70%');
-    expect(lead).not.toHaveTextContent('DPS');
-    expect(lead).not.toHaveTextContent('EHP');
+    const rows = statRows();
+    expect(rows[0]).toMatch(/^Capacitor/);
+    // Just the level: the Capacitor label already says what it is.
+    expect(rows[0]).toMatch(/70%/);
+    expect(rows[0]).not.toMatch(/stable at/i);
+    expect(rows.join('|')).not.toMatch(/DPS|EHP/);
   });
 
   it('heads the results with the goal figure now → best found, hidden with no result', () => {

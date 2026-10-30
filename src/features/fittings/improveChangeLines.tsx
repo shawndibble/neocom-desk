@@ -9,10 +9,36 @@ import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { ImproveOption, RejectedOption } from '@/engine/fittings/improve';
 import { isResource } from '@/engine/fittings/improveFigures';
 import type { FittingStats } from '@/engine/fittings/types';
-import { diffFittingStats } from '@/engine/fittings/variationDelta';
+import {
+  diffFittingStats,
+  type StatChange as StatChangeValue,
+} from '@/engine/fittings/variationDelta';
 
 /** How many stat changes a row spells out before counting the rest. */
 const CHANGES_SHOWN = 4;
+
+/** The swap's other changes, what the row prints first; the CPU, powergrid and calibration it takes after. */
+function otherChanges(
+  option: ImproveOption | RejectedOption,
+  own: FittingStats,
+  omit: readonly string[]
+) {
+  return diffFittingStats(own, option.after)
+    .changes.filter((change) => !omit.includes(change.key))
+    .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
+}
+
+/** The stats `changeLine` prints as rows (not those behind "N other stats"), so Gives up need not repeat them. */
+export function shownChangeKeys(
+  option: ImproveOption | RejectedOption,
+  own: FittingStats,
+  all = false,
+  omit: readonly string[] = []
+): string[] {
+  return otherChanges(option, own, omit)
+    .slice(0, all ? undefined : CHANGES_SHOWN)
+    .map((change) => change.key);
+}
 
 /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
 export function changeLine(
@@ -21,20 +47,19 @@ export function changeLine(
   own: FittingStats,
   all = false,
   onOpen?: () => void,
-  omit: readonly string[] = []
+  omit: readonly string[] = [],
+  /** The goal's own stat changes, listed first in the same columns. */
+  leading: readonly StatChangeValue[] = []
 ): ReactNode {
-  // What the swap does first; the CPU, powergrid and calibration it takes after.
-  const changes = diffFittingStats(own, option.after)
-    .changes.filter((change) => !omit.includes(change.key))
-    .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
-  if (changes.length === 0) return t('fittings.variations.noChanges');
+  const changes = otherChanges(option, own, omit);
+  if (changes.length === 0 && leading.length === 0) return t('fittings.variations.noChanges');
   // One stat per row, so a long list reads down instead of running on as a sentence.
   const shown = changes.slice(0, all ? undefined : CHANGES_SHOWN);
   const rest = changes.length - shown.length;
   const label = rest > 0 ? t('fittings.makeItFit.otherStats', { count: rest }) : null;
   return (
     <>
-      <StatChangeList changes={shown} />
+      <StatChangeList changes={[...leading, ...shown]} />
       {label !== null &&
         (onOpen ? (
           <button type="button" className={textActionClassName()} onClick={onOpen}>
@@ -47,13 +72,23 @@ export function changeLine(
   );
 }
 
-/** Each stat the swap makes worse, with its before → after, so the loss has a size: one per row. */
-export function lostLine(t: TFunction, option: ImproveOption): ReactNode {
-  const stats = option.lost.flatMap((lost) => (lost.kind === 'stat' ? [lost.change] : []));
+/** What the swap gives up that the rows above do not already show (`shown`): nothing left, nothing to say. */
+export function unshownLosses(option: ImproveOption, shown: readonly string[]) {
+  return option.lost.filter((lost) => lost.kind !== 'stat' || !shown.includes(lost.change.key));
+}
+
+/** Each stat the swap makes worse that the rows above do not show, with its before → after, so the loss has a size: one per row. */
+export function lostLine(
+  t: TFunction,
+  option: ImproveOption,
+  shown: readonly string[] = []
+): ReactNode {
+  const lost = unshownLosses(option, shown);
+  const stats = lost.flatMap((loss) => (loss.kind === 'stat' ? [loss.change] : []));
   return (
     <>
       {stats.length > 0 && <StatChangeList changes={stats} />}
-      {option.lost.map((lost) =>
+      {lost.map((lost) =>
         lost.kind === 'stat' ? null : (
           <span key={lost.change.key} className="block">
             {t(`fittings.whatToTrain.role.${lost.change.key}`, {
