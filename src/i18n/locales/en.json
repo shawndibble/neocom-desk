@@ -2739,6 +2739,7 @@
     "periodSummary_one": "{{count}} skill · {{duration}}",
     "periodSummary_other": "{{count}} skills · {{duration}}",
     "queuePausedGroup": "Paused",
+    "queueFinishedLabel": "Finished skills",
     "planCardTitle": "Skill plan",
     "planCardMeta": "{{duration}} · finishes {{date}}",
     "planCardEmpty": "No skill plans yet.",

@@ -22,6 +22,10 @@ describe('notificationUrlFor', () => {
     expect(notificationUrlFor('somethingRetired')).toBe(NOTIFICATION_FALLBACK_ROUTE);
   });
 
+  it('opens the plans page when a skill level completes', () => {
+    expect(notificationUrlFor('skillLevelComplete')).toBe('/skills/plans');
+  });
+
   it('routes wallet alerts to the wallet journal tab', () => {
     expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet/journal');
   });
