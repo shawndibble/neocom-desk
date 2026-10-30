@@ -147,6 +147,8 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
   });
 
   it('still reloads a genuine settle that arrives well after a previous chain ended', async () => {
+    // Fake timers: the chain's follow-ups wait out REVALIDATION_COALESCE_MS each.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     // The discriminating case a lifetime-per-mount cap would fail: once a
     // chain settles cleanly (no signal arrives while that reload is
     // running) the budget resets, so a later, unrelated signal — a
@@ -169,11 +171,19 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
 
     // The chain: initial load emits -> reload #2 emits -> reload #3 settles
     // clean (no more auto-emits), resetting the budget.
-    await waitFor(() => expect(result.current.data).toBe('data-3'), { timeout: 8000 });
+    for (let i = 0; i < 5 && result.current.data !== 'data-3'; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(REVALIDATION_COALESCE_MS + 50);
+      });
+    }
+    expect(result.current.data).toBe('data-3');
 
     // Long after that chain ended, one isolated, unrelated signal arrives.
     act(() => cache.__emit());
-    await waitFor(() => expect(result.current.data).toBe('data-4'), { timeout: 8000 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(REVALIDATION_COALESCE_MS + 50);
+    });
+    expect(result.current.data).toBe('data-4');
   });
 
   it('collapses settles that arrive between loads into one trailing reload per window', async () => {

@@ -32,6 +32,12 @@ const pushMock = vi.hoisted(() => ({
   scheduleProjectionRebuild: Object.assign(vi.fn(), { cancel: vi.fn() }),
   unregisterProjectionRegistration: vi.fn(async () => {}),
 }));
+// The real one reaches Firebase, whose heartbeat database then stays open and
+// blocks the next test's delete until DATABASE_DELETE_TIMEOUT_MS.
+const alertsGrantMock = vi.hoisted(() => ({
+  deleteAlertGrantsBestEffort: vi.fn<(characterIds: number[]) => Promise<void>>(async () => {}),
+}));
+vi.mock('@/features/notifications/alertsGrant', () => alertsGrantMock);
 vi.mock('@/features/notifications/projectionRebuildScheduler', () => ({
   scheduleProjectionRebuild: pushMock.scheduleProjectionRebuild,
 }));
@@ -83,6 +89,7 @@ describe('purgeAllRemoteCharacterData', () => {
 
     expect(syncMock.purgeCharacterRemoteData.mock.calls.map(([id]) => id)).toEqual([1, 2]);
     expect(unpurged).toEqual([]);
+    expect(alertsGrantMock.deleteAlertGrantsBestEffort.mock.calls).toEqual([[[1]], [[2]]]);
   });
 
   it('returns the characters whose purge failed, keeps going, and deletes nothing locally', async () => {

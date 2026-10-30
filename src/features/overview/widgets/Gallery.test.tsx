@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { createFeedStore } from './data/feedStore';
 import { FeedStoreContext } from './data/feedStoreContext';
-import { Gallery } from './Gallery';
+import { ADDED_MS, Gallery } from './Gallery';
 import { boardKinds } from './kinds';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import { corpWidgetBoard } from '@/features/corp/grid/corpGrid';
@@ -231,13 +231,20 @@ describe('Gallery', () => {
   });
 
   it('counts a kind added again once the confirmation fades', async () => {
-    const { user, dialog } = await openGallery();
-    await user.click(within(dialog).getByRole('button', { name: 'Add another Mail' }));
-    const status = () => within(itemOf(dialog, 'Mail')).getByRole('status');
-    expect(status()).toHaveTextContent('Added');
-    await waitFor(() => expect(status()).toHaveTextContent('On your Overview ×2'), {
-      timeout: 4000,
-    });
+    const { dialog } = await openGallery();
+    // Only the confirmation's timer is faked, and installed after the dialog is open.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Add another Mail' }));
+      const status = () => within(itemOf(dialog, 'Mail')).getByRole('status');
+      expect(status()).toHaveTextContent('Added');
+      act(() => {
+        vi.advanceTimersByTime(ADDED_MS);
+      });
+      expect(status()).toHaveTextContent('On your Overview ×2');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('says Limit reached at 30 widgets', async () => {
