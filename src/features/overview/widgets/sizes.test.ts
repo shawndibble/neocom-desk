@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SIZE_LAYOUT, chartHeight } from './sizes';
 import { GRID_GAP } from './gridStyle';
 
-/** The Overview's content column on a 1440 px desktop with the rail open (`max-w-6xl`). */
-const DESKTOP_CONTENT_WIDTH = 1152;
+/** The Overview's content column on a 1440 px desktop with the rail open: 1440 − 208 rail − 32 padding, under `max-w-page`. */
+const DESKTOP_CONTENT_WIDTH = 1200;
 
 /** How many widgets of one Size a row of this width holds, by the grid's own wrap rule. */
 function perRow(size: keyof typeof SIZE_LAYOUT, width: number): number {

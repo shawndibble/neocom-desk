@@ -14,7 +14,7 @@ function MoonsPage({ showExtractions }: { showExtractions: boolean }) {
   const { t } = useTranslation();
   const tabs = tabBarTabs(MOONS_TABS).filter((x) => showExtractions || x.id !== 'extractions');
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader
         title={t('corp.moons.title')}
         meta={<span className="text-xs text-text-dim">Synced 2 hours ago by Kestrel Vane</span>}

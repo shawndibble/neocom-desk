@@ -404,6 +404,12 @@ shape has to be carried into them by hand.
   choice, and the mismatch is more visible than the few extra millimeters of
   target size. Prefer this only where the controls sit in the same visual
   row and the sibling's own size wasn't itself an oversight.
+- **Page width: `mx-auto max-w-page` (96rem, `--container-page`).** Every
+  app page's root uses it, on every tab, so switching tabs or pages never
+  changes the width. Never a `max-w-5xl`/`6xl`/`7xl` or a per-tab width on a
+  page root. The exceptions are prose (Help `max-w-3xl`, Communities
+  `max-w-4xl`), public pages (landing, shared links) and the open Fitting
+  editor (`max-w-[120rem]`, its Ring and stats side by side).
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
   The one exception: the landing page's phone-capture frames (`QuestionGrid`) keep

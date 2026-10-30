@@ -34,7 +34,6 @@ import { ColoniesTab } from '@/features/pi/colonies/ColoniesTab';
 import { loadPiSnapshot } from '@/features/pi/colonies/coloniesSnapshot';
 import { PiMapTab } from '@/features/pi/map/PiMapTab';
 import { useAuthFailure } from '@/stores/authFailure';
-import { cx } from '@/lib/cx';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
 import { usePopScrollRestore } from '@/lib/usePopScrollRestore';
@@ -166,7 +165,7 @@ export function PlanetaryIndustry() {
       <PiSnapshotProvider characterId={activeCharacterId} reloadKey={data?.loadedAt ?? 0}>
         <PiAdviceInputsProvider characterId={activeCharacterId} reloadKey={data?.loadedAt ?? 0}>
           <ItemActionsProvider page={itemActions}>
-            <div className={cx('mx-auto space-y-4', tab !== 'map' && 'max-w-6xl')}>
+            <div className="mx-auto max-w-page space-y-4">
               <PageHeader
                 title={t('pi.title')}
                 meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}

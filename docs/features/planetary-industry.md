@@ -32,7 +32,7 @@ Sources read: `GLOSSARY.md` (Goal Plan, Baseline, Lift, Quick win, Bigger chain,
 - Hydrates `useExpiringWindowHours` once for the page (not per row).
 - `usePageItemActions({ lazyBlueprints: true })` + `ItemActionsProvider`: Show info / Market for every item name on all 3 tabs.
 - `usePopScrollRestore` restores scroll on Back.
-- Layout: `max-w-6xl` except Map (full width).
+- Layout: `max-w-page` (96rem) on every tab; the Map's detail panel docks beside the map once the layout reaches 1500px.
 - Map-only params (`MAP_ONLY_PARAMS`: `product`, `planet`, …) are stripped by a `replace` navigate when leaving Map (`:101-106`).
 - URL params (`PI_URL_PARAMS`): `type` (seeds a goal once, Plan tab only, only for a plannable type, then cleared; from Industry/Market "PI Plan" action), `goals`, `off` (switched-off colony ids), `colony` (opens a colony row on Colonies). Plan adds `q`, `fb.filter`, `fb.mode`, `#customs`, `#plan-<slug>`; Map adds `product`, `planet`. Unknown tab segment goes to default (Plan).
 - Data source: ESI `getCharacterPlanets` (list), `getCharacterPlanet` (per-colony pins; `char-industry` rate-limit bucket shared with Industry Jobs, fan-out capped at 3: `src/features/pi/data.ts:34`), public `getUniversePlanet` and `getUniverseSchematic` for names (global static cache, `src/features/pi/names.ts`), SDE `pi.json` (infrastructure block, planet-type map, schematics; ADR 0011), Fuzzwork hub prices through `loadMarketSnapshot` (`src/features/pi/planPrices.ts`), jump graph for routes (`src/sde/jumpGraph`). Warm-up: `src/app/prefetch.ts:186` prefetches planets list + detail fan-out in the background lane.

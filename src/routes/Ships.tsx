@@ -26,7 +26,7 @@ export function Ships() {
   const [tab] = usePageTab(SHIPS_TABS);
   if (tab !== 'tree') return <Fittings />;
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-page space-y-3">
       <PageHeader title={t('nav.ships')} />
       <ShipsTabBar />
       <TabPanel tabsId={SHIPS_TABS_ID} tabId={tab}>

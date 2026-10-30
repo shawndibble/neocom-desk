@@ -283,7 +283,7 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
   const shownHistory = showOlder ? [...history.recent, ...history.older] : history.recent;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-page space-y-4">
       <PageHeader
         title={t('corp.members.title')}
         meta={

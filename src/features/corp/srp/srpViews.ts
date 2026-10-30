@@ -13,8 +13,6 @@ export interface SrpView {
   /** Doubles as the tab id and URL segment (`srpTabs.ts`). */
   id: SrpTabId;
   component: ComponentType;
-  /** A table-wide view takes the wide page column; a form keeps the narrow one. */
-  wide?: boolean;
   /**
    * Who sees it. `srpOn`: the pilot's corporation has SRP on (`useSrpNavVisible`). `isDirector`:
    * holds the Director role (the CEO has it in game); the server's verdict still decides.
@@ -26,7 +24,6 @@ export const SRP_VIEWS: readonly SrpView[] = [
   {
     id: 'queue',
     component: SrpOfficerView,
-    wide: true,
     // Director or Accountant (the page's own gate) in an SRP corp; the server re-checks the roles
     // on every action. Where SRP is off, an officer goes straight to Settings to turn it on.
     visible: ({ canManageSrp, srpOn }) => canManageSrp && srpOn,
