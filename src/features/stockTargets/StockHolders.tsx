@@ -4,6 +4,7 @@
  * the per-Character split. Attribution only, the counts are unchanged.
  */
 import { useTranslation } from 'react-i18next';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import { CharacterAvatar, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { HolderCount } from '@/engine/stockTargets/onHand';
 import { formatNumber } from '@/lib/numberLocale';
@@ -45,7 +46,7 @@ export function StockHolders({
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex min-h-6 items-center gap-1 px-1 text-xs text-accent max-xl:px-0 hover:underline"
+              className={`inline-flex min-h-6 items-center gap-1 px-1 text-xs text-accent max-xl:px-0 hover:underline ${focusRingClassName}`}
               onClick={(e) => e.stopPropagation()}
             >
               <span className="inline-flex -space-x-1.5">

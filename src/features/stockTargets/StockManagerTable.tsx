@@ -293,6 +293,9 @@ export function StockManagerTable({
     {
       id: 'restock',
       header: t('stockTargets.table.restock'),
+      // Between `sm` and `xl` every pixel counts (see the fill column): tighter side padding.
+      headerClassName: 'max-xl:sm:px-2',
+      className: 'max-xl:sm:px-2',
       render: (row) =>
         row.shortfall === 0 ? (
           <span data-dense-omit className="text-text-dim">
@@ -342,6 +345,9 @@ export function StockManagerTable({
       id: 'status',
       header: t('stockTargets.table.status'),
       headerCellClassName: 'sm:w-24',
+      // The sort glyph widened this header; tighter side padding between `sm` and `xl` keeps the table inside 1024px.
+      headerClassName: 'max-xl:sm:px-2',
+      className: 'max-xl:sm:px-2',
       cardCorner: true,
       render: (row) => <StockStatusPill status={row.status} />,
       // Worst first on the first click, like the page's own order.
