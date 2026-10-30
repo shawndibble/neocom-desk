@@ -6,6 +6,7 @@ import type {
   CorpBookObservedMetaRecord,
   CorpBookObservedRecord,
   CorpBookPartRecord,
+  RouteSnapshotRecord,
   AnsiblexGateRecord,
   ArchiveKind,
   BuildPlanRecord,
@@ -75,6 +76,7 @@ export const db = new Dexie('neocom') as Dexie & {
   corpBookObserved: Dexie.Table<CorpBookObservedRecord, [number, number, string]>;
   corpBookObservedMeta: Dexie.Table<CorpBookObservedMetaRecord, [number, number]>;
   corpBookParts: Dexie.Table<CorpBookPartRecord, [number, number, string]>;
+  routeSnapshots: Dexie.Table<RouteSnapshotRecord, [number, string]>;
 };
 
 /**
@@ -303,4 +305,11 @@ db.version(28).stores({
 // synced, officer-only: wiped with the `observed` copy.
 db.version(29).stores({
   corpBookParts: '[characterId+corporationId+slot], [characterId+corporationId], characterId',
+});
+
+// Adds `routeSnapshots`, each view's last rendered snapshot, so the first
+// visit after a reload opens on it (decision 20261030-170439). Device-local,
+// never synced; purged with the in-memory copy (`lib/routeSnapshotCache.ts`).
+db.version(30).stores({
+  routeSnapshots: '[characterId+name], characterId',
 });

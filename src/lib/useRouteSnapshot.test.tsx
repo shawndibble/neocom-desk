@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useRouteSnapshot, type RouteSnapshotSignal } from './useRouteSnapshot';
-import { forgetRouteSnapshots, resetRouteSnapshots } from './routeSnapshotCache';
+import { db } from '@/db';
+import {
+  flushRouteSnapshotWrites,
+  forgetRouteSnapshots,
+  resetRouteSnapshots,
+  setRouteSnapshotPersistence,
+} from './routeSnapshotCache';
 
 const CHAR_A = 91;
 const CHAR_B = 92;
@@ -399,6 +405,29 @@ describe('useRouteSnapshot cacheKey', () => {
 
     act(() => calls[0].resolve('data-a2'));
     await waitFor(() => expect(second.result.current.data).toBe('data-a2'));
+  });
+
+  it('renders the stored snapshot on the first visit after a reload', async () => {
+    setRouteSnapshotPersistence(true);
+    try {
+      await db.routeSnapshots.clear();
+      setCharacter(CHAR_A);
+      const first = renderHook(() =>
+        useRouteSnapshot(async () => 'data-a', undefined, { cacheKey: 'demo' })
+      );
+      await waitFor(() => expect(first.result.current.data).toBe('data-a'));
+      first.unmount();
+      await flushRouteSnapshotWrites();
+      resetRouteSnapshots(); // the reload: memory gone, Dexie kept
+
+      const { load: parked } = deferredLoader();
+      const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
+      await waitFor(() => expect(second.result.current.data).toBe('data-a'));
+      expect(second.result.current.loading).toBe(true);
+    } finally {
+      setRouteSnapshotPersistence(false);
+      await db.routeSnapshots.clear();
+    }
   });
 
   it('does not retain anything without a cacheKey', async () => {

@@ -908,11 +908,13 @@ first one that applies wins.
   drawn on the first frame, whatever the data is doing. A route must never
   collapse to a bare centered spinner once the active Character is known — the
   spinner belongs in the content region below the chrome, never in place of it.
-- **A route already viewed this session renders its last content immediately,
-  with no spinner.** `useRouteSnapshot`'s `cacheKey` option retains the view's
-  last composed snapshot in `lib/routeSnapshotCache.ts` and returns it on the
+- **A route viewed before renders its last content immediately, with no
+  spinner — this session or after a reload.** `useRouteSnapshot`'s `cacheKey`
+  option retains the view's last composed snapshot in
+  `lib/routeSnapshotCache.ts` (memory, mirrored to Dexie) and returns it on the
   next visit's first frame, while the loader re-reads behind it. Every
-  read-only Character route passes a `cacheKey`; a new one must too.
+  read-only Character route passes a `cacheKey`; a new one must too, and its
+  snapshot must be plain data (no class instances) to survive a reload.
 - **Spin only when there is genuinely nothing to show.** Gate on
   `loading && !data`, never on `loading` alone — `loading` is also true during a
   refresh and during a background revalidation, both of which already have rows
@@ -921,18 +923,13 @@ first one that applies wins.
 - **Prefer a spinner to a skeleton** (§4, `Spinner`), paired with the
   `DataAgeBadge` of whatever is cached.
 
-Known limit, deliberately not papered over: retention is in-memory and
-session-lived, so the **first** visit to a route after an app load still spins
-while the view composes its snapshot. `app/prefetch.ts` warms the Dexie
-`esiCache` at boot, so that work is local rather than network-bound, but it
-warms endpoints, not composed view snapshots. `app/routeWarm.ts` narrows the
-window where it can — a rail link composes its route on hover and on focus, so
-the click often lands warm — but only for the routes listed in
-`ROUTE_WARMERS`, and it buys the pointer's travel time rather than guaranteeing
-anything. Making a first visit reliably instant means either warming route
-loaders at boot or persisting snapshots across reloads — both are real projects
-with their own burst and schema-drift tradeoffs, not something to add to a
-route ad hoc.
+Retention survives a reload (decision 20261030-170439): the first visit after
+an app load renders the stored snapshot once the Character's rows are read
+into memory (one Dexie query), then refreshes behind it. What still spins is a
+route never viewed on this device, one whose stored snapshot is older than a
+week or from another build, and one whose snapshot holds non-plain data.
+`app/routeWarm.ts` narrows that window for the routes in `ROUTE_WARMERS` by
+composing on hover and focus.
 
 ## 6b. Route transitions
 

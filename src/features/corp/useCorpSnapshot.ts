@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invalidateFreshness } from '@/esi/cache';
 import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
+import { useRouteSnapshotHydration } from '@/lib/useRouteSnapshotHydration';
 
 export interface CorpSnapshotOptions {
   /**
@@ -114,6 +115,10 @@ export function useCorpSnapshot<T>(
   // spinner frame this exists to remove.
   const retained =
     retainAs !== null && characterId !== null ? readRouteSnapshot<T>(retainAs, characterId) : null;
+  useRouteSnapshotHydration(
+    characterId,
+    retainAs !== null && retained === null && current === null
+  );
 
   return {
     data: current?.data ?? retained,

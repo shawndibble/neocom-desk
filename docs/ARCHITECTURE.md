@@ -208,7 +208,9 @@ snapshots render last cycle's rows while this cycle's arrive (#963).
 not keep them _rendered_. `useRouteSnapshot` holds its result in `useState`,
 which React Router discards when it unmounts a route, so every tab visit
 restarted at `data === null` with `loading` true. `lib/routeSnapshotCache.ts`
-is the in-memory, session-only store that closes that gap: pass
+is the store that closes that gap — in memory for reads during render,
+mirrored to Dexie (`routeSnapshots`) so it survives a reload
+(decision 20261030-170439): pass
 `{ cacheKey: '<view>' }` and the hook writes each successful snapshot under
 `` `${cacheKey}:${characterId}` `` and reads it back _during render_, so the
 first frame after a navigation already has rows. Views spin on
@@ -258,13 +260,10 @@ loader lives outside its own component file, because exporting one from a
 Today that is `/calendar` alone; moving the other loaders into `features/` —
 where `docs/ARCHITECTURE.md` puts loading anyway — is what adds the rest.
 
-Fully closing the window would mean running route loaders at boot (a burst of
-exactly the kind `prefetch.ts` is written to avoid) or persisting snapshots
-across reloads — which `routeSnapshotCache.ts`'s own header already argues
-against on the grounds that `esiCache` is the durable copy and a second
-persisted one would need its own purge and freshness rules, and which would
-additionally have to survive a stored snapshot's shape drifting across
-deploys. What a view may show in the meantime is `docs/DESIGN.md` §6a.
+Persisting snapshots across reloads now closes most of the rest: a stored
+snapshot is dropped when another build wrote it or it is over a week old,
+purged with the memory copy, and only plain data is stored.
+What a view may show in the meantime is `docs/DESIGN.md` §6a.
 
 **Name lookups are cache-first.** `features/character/names.ts`
 (`resolveNames`) and `typeNames.ts` (`resolveViaEsi`) both used to POST

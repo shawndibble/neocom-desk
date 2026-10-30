@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
+import { useRouteSnapshotHydration } from './useRouteSnapshotHydration';
 import { MINUTE_MS } from '@/lib/age';
 
 /** A load this recent is reused as is: page-to-page navigation, not a refresh. */
@@ -60,7 +61,10 @@ export function useWarmLoad<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `load` must close over nothing but its argument (see above); keying on it would reload every render for an inline arrow.
   }, [name, ownerId]);
 
+  const current = loaded && loaded.name === name && loaded.ownerId === ownerId ? loaded : null;
+  const retained = ownerId === null ? null : readRouteSnapshot<Stamped<T>>(name, ownerId);
+  useRouteSnapshotHydration(ownerId, current === null && retained === null);
+
   if (ownerId === null) return empty;
-  if (loaded && loaded.name === name && loaded.ownerId === ownerId) return loaded.value;
-  return readRouteSnapshot<Stamped<T>>(name, ownerId)?.value ?? empty;
+  return current?.value ?? retained?.value ?? empty;
 }

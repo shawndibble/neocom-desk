@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { invalidateFreshness, onCacheRevalidated } from '@/esi/cache';
 import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
+import { useRouteSnapshotHydration } from './useRouteSnapshotHydration';
 
 /**
  * Flipped by the effect cleanup when the character changes, a refresh starts,
@@ -342,6 +343,11 @@ export function useRouteSnapshot<T>(
     cacheKey !== undefined && activeCharacterId !== null
       ? readRouteSnapshot<T>(cacheKey, activeCharacterId)
       : null;
+  // First visit after a reload: the stored snapshot, once it is in memory.
+  useRouteSnapshotHydration(
+    activeCharacterId,
+    cacheKey !== undefined && retained === null && current === null
+  );
 
   return {
     data: current?.data ?? (staleWhileRevalidate ? lastGoodData : null) ?? retained,
