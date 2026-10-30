@@ -21,12 +21,12 @@ import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap, CalendarPastHint } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
+import { CalendarReauthNotice } from '@/features/character/CalendarReauthNotice';
 import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
 import {
   useCalendarSkillPlans,
   withCalendarSkillPlan,
 } from '@/features/character/calendarSkillPlan';
-import { KIND_LABEL } from '@/features/character/calendarKindLabels';
 import { useCalendarDensity } from '@/features/character/calendarViewPref';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import {
@@ -436,11 +436,7 @@ export function Calendar() {
             open.
           */}
           {(data?.reauthKinds.length ?? 0) > 0 && (
-            <p className="text-xs text-warning">
-              {t('calendar.sourcesNeedLogin', {
-                sources: data?.reauthKinds.map((kind) => t(KIND_LABEL[kind])).join(', '),
-              })}
-            </p>
+            <CalendarReauthNotice characterId={activeCharacterId} kinds={data?.reauthKinds ?? []} />
           )}
           <div className="flex flex-col gap-3 md:flex-row md:items-start">
             {isNarrow ? (
