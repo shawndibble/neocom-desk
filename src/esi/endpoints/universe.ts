@@ -3,6 +3,7 @@ import type { IncursionEntry } from '@/engine/incursions/incursionRows';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
 import { chunk } from '@/lib/chunk';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { EndpointOptions } from './options';
 import { postChunked } from './postChunked';
 
@@ -382,15 +383,21 @@ export async function postUniverseIds(
   names: string[],
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseIds> {
-  const merged: UniverseIds = {};
-  for (const batch of chunk(names, UNIVERSE_IDS_BATCH)) {
+  const batches = chunk(names, UNIVERSE_IDS_BATCH);
+  const answers: UniverseIds[] = batches.map(() => ({}));
+  // Two in flight, as `postChunked`: ESI bills errors against a shared budget.
+  await mapWithConcurrencyLimit(batches, 2, async (batch) => {
     const result = await esiFetch<UniverseIds>('/universe/ids', {
       method: 'POST',
       body: batch,
       signal: options.signal,
       endpointId: 'postUniverseIds',
     });
-    for (const [bucket, entries] of Object.entries(result.data ?? {})) {
+    answers[batches.indexOf(batch)] = result.data ?? {};
+  });
+  const merged: UniverseIds = {};
+  for (const answer of answers) {
+    for (const [bucket, entries] of Object.entries(answer)) {
       const key = bucket as keyof UniverseIds;
       merged[key] = [...(merged[key] ?? []), ...(entries as { id: number; name: string }[])];
     }

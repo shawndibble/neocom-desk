@@ -23,12 +23,12 @@ describe('resolveFleetRoster', () => {
     ]);
   });
 
-  it('chunks past 500 names', async () => {
+  it('hands every name to one lookup, which does its own batching', async () => {
     universe.postUniverseIds.mockResolvedValue({});
     const names = Array.from({ length: 501 }, (_, i) => `P${i}`);
     const rows = await resolveFleetRoster(names, []);
-    expect(universe.postUniverseIds).toHaveBeenCalledTimes(2);
-    expect(universe.postUniverseIds.mock.calls[1][0]).toHaveLength(1);
+    expect(universe.postUniverseIds).toHaveBeenCalledTimes(1);
+    expect(universe.postUniverseIds.mock.calls[0][0]).toHaveLength(501);
     expect(rows).toHaveLength(501);
   });
 });

@@ -2,7 +2,8 @@
  * What a pasted Local list or D-Scan becomes in Pilot Lookup (issue #2863 and
  * the intel rework): a Local list is grouped by what each pilot means to the
  * Character (contacts, kills in the space they are in, kills elsewhere,
- * quiet, friendly), with kills split by space and dated; a D-Scan is its
+ * quiet, friendly) or by alliance and corporation (issue #5668), with kills
+ * split by space and dated; a D-Scan is its
  * ships counted by class. A pilot's name opens Show Info, whose Character tab
  * has the six-month picture.
  *
@@ -31,7 +32,12 @@ import {
   dscanSnapshotReuseKey,
   MAX_DSCAN_SNAPSHOT_CHARS,
 } from '@/engine/pilotList/dscanSnapshot';
-import { groupOf, PILOT_GROUP_ORDER, type PilotGroupId } from '@/engine/pilotList/grouping';
+import {
+  groupOf,
+  isFriendly,
+  PILOT_GROUP_ORDER,
+  type PilotGroupId,
+} from '@/engine/pilotList/grouping';
 import {
   ageTone,
   shownLastKill,
@@ -138,14 +144,30 @@ function LocalList({ paste }: { paste: LocalPaste }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    // One render per frame however many pilots settle in it: a 2,000-name
+    // Local re-renders every row on each update.
+    let frame = 0;
+    let latest: PilotListRow[] = [];
+    const onRows = (next: PilotListRow[]) => {
+      latest = next;
+      if (frame === 0) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          setRows(latest);
+        });
+      }
+    };
     loadPilotList(paste.names, {
       signal: controller.signal,
-      onRows: setRows,
+      onRows,
       viewer: loadViewerContext(characterId),
     }).catch(() => {
       if (!controller.signal.aborted) setFailed(true);
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      cancelAnimationFrame(frame);
+    };
   }, [paste, characterId]);
 
   const hullIds = useMemo(() => {
@@ -174,6 +196,9 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     };
   }, [hullKey]);
 
+  const found = useMemo(() => rows.filter((row) => !row.notFound), [rows]);
+  const strangers = useMemo(() => found.filter((row) => !isFriendly(row)), [found]);
+
   if (failed) {
     return (
       <EmptyState
@@ -183,14 +208,16 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     );
   }
 
-  const found = rows.filter((row) => !row.notFound);
-  const lookups = found.filter((row) => row.kills.kind !== 'notLookedUp');
-  const settled = lookups.filter((row) => row.kills.kind !== 'loading').length;
-  const notFound = rows.filter((row) => row.notFound).map((row) => row.name);
+  const byOrganization = groupMode === 'organization';
+  // The Kills view names only the misses among the names it lists.
+  const notFound = (byOrganization ? rows : rows.slice(0, MAX_LIST_PILOTS))
+    .filter((row) => row.notFound)
+    .map((row) => row.name);
   // The Kills view lists the names zKillboard was asked about; the rest are
   // only placed by organization (issue #5668).
   const checked = rows.slice(0, MAX_LIST_PILOTS).filter((row) => !row.notFound);
   const unchecked = Math.max(0, paste.names.length - MAX_LIST_PILOTS);
+  const settled = checked.filter((row) => row.kills.kind !== 'loading').length;
 
   const groups = new Map<PilotGroupId, PilotListRow[]>(PILOT_GROUP_ORDER.map((id) => [id, []]));
   for (const row of checked) {
@@ -204,7 +231,6 @@ function LocalList({ paste }: { paste: LocalPaste }) {
     );
     groups.get(id)?.push(row);
   }
-  for (const list of groups.values()) list.sort(byRecentActivity);
 
   const wormholeSeen =
     here.space === 'wormhole' ||
@@ -338,8 +364,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
       </section>
     );
 
-  const byOrganization = groupMode === 'organization';
-  const friendly = found.filter(isFriendlyRow);
+  const friendly = found.filter(isFriendly);
 
   return (
     <Panel>
@@ -353,16 +378,16 @@ function LocalList({ paste }: { paste: LocalPaste }) {
             {t('travel.pilot.list.newSinceLastPaste', { count: arrivals.size })}
           </p>
         )}
-        {settled < lookups.length && (
+        {settled < checked.length && (
           <p role="status" className="flex items-center gap-2 text-xs text-text-dim">
             <Spinner label={t('common.loading')} />
-            {t('travel.pilot.list.progress', { done: settled, total: lookups.length })}
+            {t('travel.pilot.list.progress', { done: settled, total: checked.length })}
           </p>
         )}
         {byOrganization ? (
           <>
             <LocalOrgGroups
-              rows={found.filter((row) => !isFriendlyRow(row))}
+              rows={strangers}
               threatOf={(row) => rowThreat(row, now)}
               renderRows={table}
             />
@@ -401,7 +426,7 @@ function LocalList({ paste }: { paste: LocalPaste }) {
           : unchecked + paste.overflow > 0 && (
               <p className="text-xs text-text-dim">
                 {t('travel.pilot.list.overflow', {
-                  shown: Math.min(paste.names.length, MAX_LIST_PILOTS),
+                  shown: MAX_LIST_PILOTS,
                   count: unchecked + paste.overflow,
                 })}
               </p>
@@ -419,15 +444,10 @@ function LocalList({ paste }: { paste: LocalPaste }) {
   );
 }
 
-/** Your own corporation or alliance, or a blue contact: the Friendly group in either view. */
-function isFriendlyRow(row: PilotListRow): boolean {
-  return row.ownOrganization !== null || row.standing?.band === 'blue';
-}
-
-/** "Group by Kills | Organization", remembered on this device (issue #5668). */
 function GroupModeControl({ value }: { value: LocalGroupMode }) {
   const { t } = useTranslation();
   const label = t('travel.pilot.list.groupBy');
+  const setMode = useLocalGroupMode((state) => state.setValue);
   return (
     <span className="flex items-center gap-2">
       <span aria-hidden className="text-xs text-text-dim">
@@ -437,7 +457,7 @@ function GroupModeControl({ value }: { value: LocalGroupMode }) {
         label={label}
         size="sm"
         value={value}
-        onChange={(mode) => void useLocalGroupMode.getState().setValue(mode)}
+        onChange={(mode) => void setMode(mode)}
         options={[
           { value: 'kills', label: t('travel.pilot.list.groupByKills') },
           { value: 'organization', label: t('travel.pilot.list.groupByOrganization') },

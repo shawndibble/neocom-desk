@@ -37,8 +37,8 @@ describe('groupByOrganization', () => {
     ]);
     expect(sections).toHaveLength(1);
     const [lotus] = sections;
-    expect(lotus).toMatchObject({ kind: 'alliance', id: LOTUS[0], name: 'Black Lotus' });
-    expect(lotus.alliance).toBeNull();
+    if (lotus.kind !== 'alliance') throw new Error('expected an alliance section');
+    expect(lotus).toMatchObject({ id: LOTUS[0], name: 'Black Lotus' });
     expect(names(lotus.rows)).toEqual(['a', 'b', 'c']);
     expect(lotus.corporations.map((c) => [c.id, names(c.rows)])).toEqual([
       [VANGUARD[0], ['a', 'c']],
@@ -55,7 +55,6 @@ describe('groupByOrganization', () => {
       name: 'Pact Salvage',
       alliance: { id: PACT[0], name: 'Frontier Pact' },
     });
-    expect(sections[0].corporations).toHaveLength(1);
   });
 
   it('heads a corporation with no alliance by itself', () => {
@@ -95,7 +94,9 @@ describe('groupByOrganization', () => {
       row('v2', VANGUARD, LOTUS),
     ]);
     expect(sections.map((s) => s.name)).toEqual(['Black Lotus', 'Drifting Ember', 'Pact Salvage']);
-    expect(sections[0].corporations.map((c) => c.name)).toEqual(['Lotus Vanguard', 'Night Harbor']);
+    const [lotus] = sections;
+    if (lotus.kind !== 'alliance') throw new Error('expected an alliance section');
+    expect(lotus.corporations.map((c) => c.name)).toEqual(['Lotus Vanguard', 'Night Harbor']);
   });
 
   it('sorts a group whose name has not loaded yet by id, after named ones of its size', () => {

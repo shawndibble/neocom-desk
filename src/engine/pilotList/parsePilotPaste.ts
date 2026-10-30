@@ -11,11 +11,7 @@ import { parseLocalizedNumber } from '@/engine/numbers/parseLocalizedNumber';
 /** Names looked up on zKillboard per paste; the rest are placed by organization only. */
 export const MAX_LIST_PILOTS = 40;
 
-/**
- * Names a Local paste keeps (issue #5668): every one is placed by corporation
- * and alliance, a few bulk ESI requests in all. The rest are counted, never
- * silently dropped; a Jita Local can pass this.
- */
+/** Names a Local paste keeps; the rest are counted, never silently dropped (issue #5668). */
 export const MAX_LOCAL_NAMES = 2000;
 
 /** EVE character names are at most 37 characters. */

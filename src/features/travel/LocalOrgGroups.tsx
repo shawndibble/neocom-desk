@@ -1,19 +1,11 @@
 /**
- * The Local list grouped by Organization (issue #5668): who owns this Local.
- * Alliance headings, a corporation sub-heading per corporation when two or
- * more of an alliance's are here, then "On their own" and anyone whose
- * corporation is not known. The grouping itself is `groupByOrganization`;
- * the rows under each heading are the Kills view's rows, passed in.
- *
- * A heading carries the logo, the name (Show Info), the pilot count, how many
- * read Dangerous or Active, and the Character's standing toward that
- * organization. On a phone each organization folds behind its heading, the
- * largest open, so the headings alone read as the roll call.
+ * The Local list's Organization view (issue #5668): `groupByOrganization`'s
+ * headings over the Kills view's own rows, passed in as `renderRows`. On a
+ * phone each organization folds, the largest open, so the headings read as the roll call.
  */
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { Caret, IconButton } from '@/components/ui';
 import {
   groupByOrganization,
   type CorporationGroup,
@@ -33,7 +25,7 @@ type Threat = ThreatLevel | 'pending' | null;
 export type RenderPilotRows = (
   label: string,
   rows: PilotListRow[],
-  /** Off under an organization heading, which already names it. */
+  /** Off where the heading names it, or nothing is known. */
   showAffiliation: boolean
 ) => ReactNode;
 
@@ -50,18 +42,26 @@ export function LocalOrgGroups({
   renderRows: RenderPilotRows;
 }) {
   const { t } = useTranslation();
-  const { sections, alone, unplaced } = groupByOrganization(rows);
+  const { sections, alone, unplaced } = useMemo(() => groupByOrganization(rows), [rows]);
+  // Keyed by organization, not position: the largest stays open by default even
+  // when names arriving re-sort equal-sized groups.
+  const [folds, setFolds] = useState<ReadonlyMap<string, boolean>>(new Map());
   return (
     <>
-      {sections.map((section, i) => (
-        <OrgSectionView
-          key={`${section.kind}-${section.id}`}
-          section={section}
-          startOpen={i === 0}
-          threatOf={threatOf}
-          renderRows={renderRows}
-        />
-      ))}
+      {sections.map((section, i) => {
+        const key = `${section.kind}-${section.id}`;
+        const open = folds.get(key) ?? i === 0;
+        return (
+          <OrgSectionView
+            key={key}
+            section={section}
+            open={open}
+            onToggle={() => setFolds((prev) => new Map(prev).set(key, !open))}
+            threatOf={threatOf}
+            renderRows={renderRows}
+          />
+        );
+      })}
       {alone.length > 0 && (
         <section className="space-y-2">
           <h3 className={SECTION_TITLE}>
@@ -91,25 +91,26 @@ export function LocalOrgGroups({
 
 function OrgSectionView({
   section,
-  startOpen,
+  open,
+  onToggle,
   threatOf,
   renderRows,
 }: {
   section: OrgSection<PilotListRow>;
-  startOpen: boolean;
+  /** Phone only: desktop never folds. */
+  open: boolean;
+  onToggle: () => void;
   threatOf: (row: PilotListRow) => Threat;
   renderRows: RenderPilotRows;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const [open, setOpen] = useState(startOpen);
   const name = section.name ?? t('travel.pilot.list.org.unnamed');
   const shown = !isPhone || open;
+  // An alliance heading shows only an alliance contact: one corporation's contact is not the alliance's.
   const standing =
-    standingVia(
-      section.rows,
-      section.kind === 'alliance' || section.alliance ? 'alliance' : null
-    ) ?? standingVia(section.rows, 'corporation');
+    standingVia(section.rows, 'alliance') ??
+    (section.kind === 'corporation' ? standingVia(section.rows, 'corporation') : null);
   return (
     <section className="space-y-2">
       <h3 className={SECTION_TITLE}>
@@ -117,9 +118,9 @@ function OrgSectionView({
         <OrgLink kind={section.kind} id={section.id}>
           {name}
         </OrgLink>
-        {section.alliance !== null && (
+        {section.kind === 'corporation' && section.alliance !== null && (
           <span className="text-xs font-normal">
-            <AllianceLink id={section.alliance.id}>
+            <AllianceLink id={section.alliance.id} className="text-text-dim">
               {section.alliance.name ?? t('travel.pilot.list.org.unnamed')}
             </AllianceLink>
           </span>
@@ -130,12 +131,12 @@ function OrgSectionView({
           <IconButton
             className="ml-auto"
             size="sm"
-            icon={open ? <Icon.Expanded /> : <Icon.Descend />}
+            icon={<Caret expanded={open} />}
             label={t(open ? 'travel.pilot.list.org.fold' : 'travel.pilot.list.org.unfold', {
               name,
             })}
             aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
+            onClick={onToggle}
           />
         )}
       </h3>
@@ -186,9 +187,8 @@ function CorporationView({
 /** The standing every pilot of the group shares through that organization's contact, if any. */
 function standingVia(
   rows: readonly PilotListRow[],
-  via: ContactStanding['via'] | null
+  via: ContactStanding['via']
 ): ContactStanding | null {
-  if (via === null) return null;
   return rows.find((row) => row.standing?.via === via)?.standing ?? null;
 }
 

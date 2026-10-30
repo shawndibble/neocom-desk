@@ -34,7 +34,7 @@ vi.mock('./useHereSpace', () => ({
 }));
 
 import { DscanShareControl, PilotListView } from './PilotListView';
-import { useLocalGroupMode } from './localGroupMode';
+import { LOCAL_GROUP_MODE_KEY, useLocalGroupMode } from './localGroupMode';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -327,7 +327,7 @@ describe('PilotListView (new since last paste)', () => {
     await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
     paste([...PREVIOUS, 'Eve']);
     expect(await screen.findByText('1 new since last paste')).toBeTruthy();
-    const tags = screen.getAllByText('New');
+    const tags = await screen.findAllByText('New');
     expect(tags).toHaveLength(1);
     expect(tags[0].parentElement?.textContent).toContain('Eve');
   });
@@ -353,7 +353,7 @@ describe('PilotListView (new since last paste)', () => {
     await db.settings.put({ key: 'local.lastPaste', value: PREVIOUS });
     paste([...PREVIOUS, 'Eve']);
     expect(await screen.findByText('1 new since last paste')).toBeTruthy();
-    expect(screen.getAllByText('New')).toHaveLength(1);
+    expect(await screen.findAllByText('New')).toHaveLength(1);
   });
 });
 
@@ -374,6 +374,7 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     }),
     row('Bram', { ...lotus, corporationId: 602, corporationName: 'Harbor', kills: ready() }),
     row('Wren', { corporationId: 701, corporationName: 'Ember', kills: ready() }),
+    // Stands in for a name past the 40-name zKillboard cap.
     row('Imre', { corporationId: 701, corporationName: 'Ember', kills: { kind: 'notLookedUp' } }),
     row('Varek', { corporationId: 801, corporationName: 'Quiet Orbit', kills: ready() }),
     row('Corpmate', { corporationId: 901, ownOrganization: 'corporation' }),
@@ -394,7 +395,6 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
   });
 
   function renderOrgList() {
-    // The fifth name is past the zKillboard cap in the real list; here the row says so.
     return render(
       <MemoryRouter>
         <PilotListView paste={{ kind: 'local', names: ORG_ROWS.map((r) => r.name), overflow: 0 }} />
@@ -414,12 +414,12 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
 
     expect(await screen.findByRole('link', { name: 'Black Lotus' })).toBeInTheDocument();
     await waitFor(async () =>
-      expect((await db.settings.get('pilotLookupLocalGrouping'))?.value).toBe('organization')
+      expect((await db.settings.get(LOCAL_GROUP_MODE_KEY))?.value).toBe('organization')
     );
   });
 
   it('heads an alliance with a group per corporation, a lone corporation by itself, and lone pilots apart', async () => {
-    await db.settings.put({ key: 'pilotLookupLocalGrouping', value: 'organization' });
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
     renderOrgList();
 
     const alliance = (await screen.findByRole('link', { name: 'Black Lotus' })).closest('h3');
@@ -433,8 +433,24 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
     expect(screen.queryByText('Corpmate')).toBeNull();
   });
 
+  it("shows a corporation's contact on that corporation, never on its alliance's heading", async () => {
+    const red = { band: 'red' as const, value: -10, via: 'corporation' as const };
+    mocks.loadPilotList.mockImplementation(
+      (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
+        onRows(ORG_ROWS.map((r) => (r.corporationId === 602 ? { ...r, standing: red } : r)));
+        return Promise.resolve();
+      }
+    );
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
+    renderOrgList();
+    const alliance = (await screen.findByRole('link', { name: 'Black Lotus' })).closest('h3');
+    expect(within(alliance as HTMLElement).queryByRole('img')).toBeNull();
+    const harbor = screen.getByRole('link', { name: 'Harbor' }).closest('h4');
+    expect(within(harbor as HTMLElement).getByRole('img')).toBeInTheDocument();
+  });
+
   it('places a pilot past the zKillboard cap by organization, saying the kills were not looked up', async () => {
-    await db.settings.put({ key: 'pilotLookupLocalGrouping', value: 'organization' });
+    await db.settings.put({ key: LOCAL_GROUP_MODE_KEY, value: 'organization' });
     renderOrgList();
     const ember = await screen.findByRole('table', { name: 'Ember' });
     const imre = within(ember).getByText('Imre').closest('tr');

@@ -30,17 +30,26 @@ export interface CorporationGroup<T> {
   rows: T[];
 }
 
-export interface OrgSection<T> {
-  /** `alliance` when two or more of its corporations are here. */
-  kind: 'alliance' | 'corporation';
+/** An alliance with two or more of its corporations here. */
+export interface AllianceSection<T> {
+  kind: 'alliance';
+  id: number;
+  name: string | null;
+  rows: T[];
+  /** Largest first. */
+  corporations: CorporationGroup<T>[];
+}
+
+export interface CorporationSection<T> {
+  kind: 'corporation';
   id: number;
   name: string | null;
   /** A one-corporation alliance's name, shown beside its corporation. */
   alliance: { id: number; name: string | null } | null;
   rows: T[];
-  /** Largest first; one entry for a `corporation` section. */
-  corporations: CorporationGroup<T>[];
 }
+
+export type OrgSection<T> = AllianceSection<T> | CorporationSection<T>;
 
 export interface OrgGrouping<T> {
   sections: OrgSection<T>[];
@@ -99,21 +108,13 @@ export function groupByOrganization<T extends OrgMember>(rows: readonly T[]): Or
     const allianceName = members[0].allianceName;
     sections.push(
       corps.length > 1
-        ? {
-            kind: 'alliance',
-            id,
-            name: allianceName,
-            alliance: null,
-            rows: members,
-            corporations: corps,
-          }
+        ? { kind: 'alliance', id, name: allianceName, rows: members, corporations: corps }
         : {
             kind: 'corporation',
             id: corps[0].id,
             name: corps[0].name,
             alliance: { id, name: allianceName },
             rows: members,
-            corporations: corps,
           }
     );
   }
@@ -128,12 +129,10 @@ export function groupByOrganization<T extends OrgMember>(rows: readonly T[]): Or
       name: members[0].corporationName,
       alliance: null,
       rows: members,
-      corporations: corporationsOf(members),
     });
   }
   sections.sort(bySizeThenName);
   // Back in pasted order, whichever map they came out of.
-  const order = new Map(rows.map((row, i) => [row, i]));
-  alone.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
-  return { sections, alone, unplaced };
+  const lone = new Set(alone);
+  return { sections, alone: rows.filter((row) => lone.has(row)), unplaced };
 }
