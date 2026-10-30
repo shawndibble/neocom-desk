@@ -14,7 +14,13 @@ import { optionKey } from '@/engine/fittings/improveKeys';
 import { groupByModule, type ImproveSort } from '@/engine/fittings/improveRows';
 import type { FittingStats } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
-import { changeLine, iskLine, lostLine } from './improveChangeLines';
+import {
+  changeLine,
+  iskLine,
+  lostLine,
+  shownChangeKeys,
+  unshownLosses,
+} from './improveChangeLines';
 import { leadLine, type LeadContext } from './improveLeadLine';
 import { m3sFormat } from './improveLineText';
 import type { ImproveLabels } from './useImproveLabels';
@@ -132,6 +138,11 @@ function ImproveOptionRow({
   const id = `improve-${section}-${key}`;
   const statsKey = `stats:${id}`;
   const lead = leadLine(t, leadContext, option, own);
+  // The stats the row already prints, so Gives up names only the losses it does not.
+  const shown = [
+    ...(lead?.keys ?? []),
+    ...shownChangeKeys(option, own, expanded.has(statsKey), lead?.keys),
+  ];
   const hint =
     option.candidate.fixesUnflyable || option.candidate.conversion
       ? null
@@ -190,15 +201,23 @@ function ImproveOptionRow({
               {labels.conversionLine(option.candidate)}
             </span>
           )}
-          {lead && <span className="block text-xs">{lead.node}</span>}
+          {lead?.worded && <span className="block text-xs">{lead.worded}</span>}
           {hint && <span className="text-text-dim block text-xs">{hint}</span>}
           <span className="text-text-dim block text-xs">
-            {changeLine(t, option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
+            {changeLine(
+              t,
+              option,
+              own,
+              expanded.has(statsKey),
+              () => flip(statsKey),
+              lead?.keys,
+              lead?.rows
+            )}
           </span>
-          {option.lost.length > 0 && (
+          {unshownLosses(option, shown).length > 0 && (
             <span className="text-warning block text-xs">
               <span className="block">{t('fittings.improve.givesUp')}</span>
-              {lostLine(t, option)}
+              {lostLine(t, option, shown)}
             </span>
           )}
           <span className="block text-xs">{iskLine(t, option)}</span>

@@ -51,6 +51,22 @@ export function oreLine(
   });
 }
 
+/** One figure a line compares: its i18n key and the two values, already formatted. */
+interface Figure {
+  key: string;
+  before: string;
+  after: string;
+}
+
+/** The figures joined with " · ", only those that change; null when none does. */
+function changedFigures(t: TFunction, figures: readonly Figure[]): string | null {
+  const changed = figures.filter((figure) => figure.before !== figure.after);
+  if (changed.length === 0) return null;
+  return changed
+    .map((figure) => t(figure.key, { before: figure.before, after: figure.after }))
+    .join(' · ');
+}
+
 /** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR, Stronger fleet support: the figure the goal scores, before and after. */
 export function moveLine(
   t: TFunction,
@@ -84,53 +100,64 @@ export function moveLine(
     });
   if (goal === 'tackle') {
     const [was, now] = [tackleOf(own), tackleOf(option.after)];
-    return t('fittings.improve.tackleLine', {
-      pointsBefore: m3sFormat(was.points),
-      pointsAfter: m3sFormat(now.points),
-      webBefore: m3sFormat(was.web),
-      webAfter: m3sFormat(now.web),
-      rangeBefore: m3sFormat(was.range / 1000),
-      rangeAfter: m3sFormat(now.range / 1000),
+    const f = (key: string, b: number, a: number): Figure => ({
+      key: `fittings.improve.figure.${key}`,
+      before: m3sFormat(b),
+      after: m3sFormat(a),
     });
+    return changedFigures(t, [
+      f('points', was.points, now.points),
+      f('web', was.web, now.web),
+      f('reach', was.range / 1000, now.range / 1000),
+    ]);
   }
   if (goal === 'command') {
     const [was, now] = [commandOf(own), commandOf(option.after)];
-    return (['strength', 'burstRange', 'compression', 'fuel'] as const)
-      .filter((key) => was[key] > 0)
-      .map((key) => {
-        const km = key === 'burstRange' || key === 'compression' ? 1000 : 1;
-        return t(`fittings.improve.command.${key}`, {
-          before: m3sFormat(was[key] / km),
-          after: m3sFormat(now[key] / km),
-        });
-      })
-      .join(' · ');
+    return changedFigures(
+      t,
+      (['strength', 'burstRange', 'compression', 'fuel'] as const)
+        .filter((key) => was[key] > 0)
+        .map((key) => {
+          const km = key === 'burstRange' || key === 'compression' ? 1000 : 1;
+          return {
+            key: `fittings.improve.command.${key}`,
+            before: m3sFormat(was[key] / km),
+            after: m3sFormat(now[key] / km),
+          };
+        })
+    );
   }
   if (goal === 'ewar') {
     const [was, now] = [ewarOf(own), ewarOf(option.after)];
-    return t('fittings.improve.ewarLine', {
-      strengthBefore: m3sFormat(was.strength),
-      strengthAfter: m3sFormat(now.strength),
-      rangeBefore: m3sFormat(was.range / 1000),
-      rangeAfter: m3sFormat(now.range / 1000),
-    });
+    const figures = changedFigures(t, [
+      {
+        key: 'fittings.improve.figure.moduleStrength',
+        before: m3sFormat(was.strength),
+        after: m3sFormat(now.strength),
+      },
+      {
+        key: 'fittings.improve.figure.reach',
+        before: m3sFormat(was.range / 1000),
+        after: m3sFormat(now.range / 1000),
+      },
+    ]);
+    return figures === null ? null : t('fittings.improve.ewarNote', { figures });
   }
   if (goal === 'explore') {
     const [was, now] = [own.explore, option.after.explore];
-    return t('fittings.improve.exploreLine', {
-      strengthBefore: m3sFormat(was.hacking.strength),
-      strengthAfter: m3sFormat(now.hacking.strength),
-      coherenceBefore: m3sFormat(was.hacking.coherence),
-      coherenceAfter: m3sFormat(now.hacking.coherence),
-      cycleBefore: m3sFormat(was.hacking.cycleSeconds),
-      cycleAfter: m3sFormat(now.hacking.cycleSeconds),
-      scanBefore: m3sFormat(was.scanning.strength),
-      scanAfter: m3sFormat(now.scanning.strength),
-      durationBefore: m3sFormat(was.scanning.duration),
-      durationAfter: m3sFormat(now.scanning.duration),
-      deviationBefore: m3sFormat(was.scanning.deviation),
-      deviationAfter: m3sFormat(now.scanning.deviation),
+    const f = (key: string, b: number, a: number): Figure => ({
+      key: `fittings.improve.figure.${key}`,
+      before: m3sFormat(b),
+      after: m3sFormat(a),
     });
+    return changedFigures(t, [
+      f('hackingStrength', was.hacking.strength, now.hacking.strength),
+      f('coherence', was.hacking.coherence, now.hacking.coherence),
+      f('cycle', was.hacking.cycleSeconds, now.hacking.cycleSeconds),
+      f('scanStrength', was.scanning.strength, now.scanning.strength),
+      f('scanTimeCut', was.scanning.duration, now.scanning.duration),
+      f('deviationCut', was.scanning.deviation, now.scanning.deviation),
+    ]);
   }
   if (goal === 'align') return align();
   if (goal === 'warp')
