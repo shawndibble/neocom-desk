@@ -26,7 +26,7 @@ interface AppraisalResultActionsProps {
     'availableColumns' | 'visibleColumns' | 'optionalColumnsById' | 'toggleColumn' | 'tableExport'
   >;
   share: Pick<Share, 'share' | 'handleShare' | 'shareItemCount'>;
-  copy: Pick<CopyLists, 'copied' | 'copyLists' | 'handleCopy'>;
+  copy: Pick<CopyLists, 'copied' | 'pending' | 'copyLists' | 'handleCopy'>;
   janice: Pick<Janice, 'janice' | 'handleOpenInJanice'> & { canOpen: boolean };
   characterId: number | null;
   rowCount: number;
@@ -38,7 +38,7 @@ export function AppraisalResultActions({
   onToggleCompare,
   columns: { availableColumns, visibleColumns, optionalColumnsById, toggleColumn, tableExport },
   share: { share, handleShare, shareItemCount },
-  copy: { copied, copyLists, handleCopy },
+  copy: { copied, pending, copyLists, handleCopy },
   janice: { janice, handleOpenInJanice, canOpen },
   characterId,
   rowCount,
@@ -90,6 +90,11 @@ export function AppraisalResultActions({
         }
         onClick={() => void handleShare()}
       />
+      {pending !== null && (
+        <span role="status" className="text-[0.6875rem] text-text-dim">
+          {t('market.appraisal.copyWaiting', { list: t(`market.appraisal.copyList.${pending}`) })}
+        </span>
+      )}
       {copied !== null && (
         <span role="status" className="text-[0.6875rem] text-text-dim">
           {t('market.appraisal.copied', {
@@ -106,7 +111,7 @@ export function AppraisalResultActions({
         {COPY_LISTS.map((list) => (
           <MenuItem
             key={list}
-            disabled={copyLists[list].count === 0}
+            disabled={copyLists[list].count === 0 || pending !== null}
             onSelect={() => void handleCopy(list)}
           >
             {t(`market.appraisal.copyList.${list}`)}

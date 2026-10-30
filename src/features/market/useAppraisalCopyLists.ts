@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { subtractOwned } from '@/engine/market/appraisalOwned';
 import { appraisalSellGroups } from '@/engine/market/appraisalSellGroups';
 import { writeToClipboardLater } from '@/lib/clipboard';
@@ -46,6 +46,9 @@ export function useAppraisalCopyLists({
   settleLive: AppraisalController['settleLive'];
 }) {
   const [copied, setCopied] = useState<{ list: CopyList; count: number } | null>(null);
+  // The list whose copy is waiting on the live fetch: a second click meanwhile is ignored.
+  const [pending, setPending] = useState<CopyList | null>(null);
+  const busy = useRef(false);
   useEffect(() => {
     if (copied === null) return;
     const timer = setTimeout(() => setCopied(null), 2500);
@@ -55,7 +58,9 @@ export function useAppraisalCopyLists({
   const copyLists = useMemo(() => listsFor(result, owned), [result, owned]);
 
   async function handleCopy(list: CopyList) {
-    if (copyLists[list].text === '') return;
+    if (copyLists[list].text === '' || busy.current) return;
+    busy.current = true;
+    setPending(list);
     setCopied(null);
     try {
       // A row still on its cached price is not copied: the text waits for the
@@ -73,8 +78,11 @@ export function useAppraisalCopyLists({
       setCopied({ list, count });
     } catch {
       // Nothing was copied, so no confirmation either.
+    } finally {
+      busy.current = false;
+      setPending(null);
     }
   }
 
-  return { copied, copyLists, handleCopy };
+  return { copied, pending, copyLists, handleCopy };
 }

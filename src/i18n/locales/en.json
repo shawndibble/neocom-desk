@@ -12178,6 +12178,7 @@
         "markCached": "Cached price, live price still loading",
         "markFailed": "Fuzzwork price, live price could not be fetched"
       },
+      "copyWaiting": "{{list}}: waiting for live prices",
       "copied_one": "{{list}} copied · {{count}} item",
       "copied_other": "{{list}} copied · {{count}} items",
       "copyList": {

@@ -45,4 +45,31 @@ describe('useAppraisalCopyLists with live prices', () => {
     await act(async () => result.current.handleCopy('list'));
     expect(write).toHaveBeenCalledWith('Tritanium\t800');
   });
+  it('marks the copy pending while waiting for live prices and ignores a repeat click', async () => {
+    const write = vi.fn(async () => {});
+    configureClipboard(write);
+    const cached = outcome({ priceState: 'cached', sell: 1_000 });
+    const live = outcome({ priceState: 'live', sell: 800 });
+    let release: (value: AppraisalOutcome) => void = () => {};
+    const settleLive = vi.fn(() => new Promise<AppraisalOutcome>((resolve) => (release = resolve)));
+    const { result } = renderHook(() =>
+      useAppraisalCopyLists({ result: cached, owned: null, settleLive })
+    );
+
+    let first: Promise<void> = Promise.resolve();
+    act(() => {
+      first = result.current.handleCopy('list');
+    });
+    expect(result.current.pending).toBe('list');
+    await act(async () => result.current.handleCopy('sellNow'));
+    expect(settleLive).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      release(live);
+      await first;
+    });
+    expect(result.current.pending).toBeNull();
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(result.current.copied?.list).toBe('list');
+  });
 });

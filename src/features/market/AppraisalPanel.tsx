@@ -181,7 +181,7 @@ export function AppraisalPanel({
     pricePercent,
     characterId,
   });
-  const { copied, copyLists, handleCopy } = useAppraisalCopyLists({
+  const { copied, pending, copyLists, handleCopy } = useAppraisalCopyLists({
     result,
     owned,
     settleLive: controller.settleLive,
@@ -387,7 +387,7 @@ export function AppraisalPanel({
                     tableExport,
                   }}
                   share={{ share, handleShare, shareItemCount }}
-                  copy={{ copied, copyLists, handleCopy }}
+                  copy={{ copied, pending, copyLists, handleCopy }}
                   janice={{ janice, handleOpenInJanice, canOpen: text.trim() !== '' }}
                   characterId={characterId}
                   rowCount={rows.length}

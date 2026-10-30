@@ -10,3 +10,6 @@ _Recorded 2026-10-29 · issue #5591. Amends `20260924-124701-appraisal-undercut-
 - **A failed row stays on its Fuzzwork price and is marked.** A book ESI returns truncated counts as failed, since a partial book gives a wrong best price. The header never says "live" for a list with a cached row ("Live prices for 59 of 60 rows").
 - **Copy waits for live.** A copy action waits for any row still loading before it reads the prices.
 - **Presentation is mockup variant B:** the thin bar is the top border of the result card, the status text sits in its title bar, and a cached or failed price wears a clock or warning mark. Compare Hubs shows the same bar and text above the cards.
+- **Accepted while checking: the result totals mix live and cached rows.** Compare cards wait for every row of a hub, the table totals do not. Each row's mark shows which is which.
+- **Accepted: the `books` state is never pruned.** It is bounded by the session (one entry per hub and type pasted).
+- **Accepted: Refresh pressed while Compare Hubs is closed does not force the other four hubs later.** They load from the 10-minute cache when Compare is next opened.
