@@ -614,6 +614,9 @@ exactly the markup above.
   members indented on the `panel` fill. Groups keep the table's sort: each
   sits where its best-ranked member did (`groupSortedRows`). Phone only —
   desktop has the width to compare those rows side by side.
+  `groupCompare` orders the groups apart from that sort (Market History's
+  By station view ranks stations by net while rows stay newest first): only
+  groups move, rows inside keep the sort. `allWidths` groups at every width.
 
 Skills › Certificates is a third: below `sm` its sort `Select` is replaced by an
 icon-only `IconButton` + radio `DropdownMenu` (`Icon.Sort`), so the group select,

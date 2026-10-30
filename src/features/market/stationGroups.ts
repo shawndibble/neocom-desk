@@ -9,7 +9,6 @@ import type { WalletTransactionCommon } from '@/esi/endpoints';
 import type { StationOrder } from '@/features/character/walletTransactionFilter';
 import { summarizeTransactions } from './transactionDays';
 
-export type { StationOrder };
 type StationFill = Pick<
   WalletTransactionCommon,
   'transaction_id' | 'date' | 'is_buy' | 'quantity' | 'unit_price' | 'location_id'
