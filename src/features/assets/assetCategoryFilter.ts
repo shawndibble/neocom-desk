@@ -212,3 +212,25 @@ export function blueprintKindParam(): UrlParamCodec<BlueprintKind> {
     serialize: (value) => (value === 'any' ? null : value),
   };
 }
+
+/**
+ * Corp Assets' old `cat` held one Asset Category (a root market group id). An
+ * id that names a heading with no row of its own id now means all its rows, so
+ * an old link still opens on that category; any other id is a picker option.
+ */
+export function expandLegacyCategoryIds(
+  index: AssetCategoryIndex,
+  pick: CategoryPick
+): CategoryPick {
+  if (pick === 'all') return pick;
+  const next = new Set<number>();
+  for (const id of pick) {
+    const heading = index.headings.find((h) => h.id === id && id !== NOT_ON_MARKET);
+    if (heading && !heading.options.some((option) => option.id === id)) {
+      for (const option of heading.options) next.add(option.id);
+    } else {
+      next.add(id);
+    }
+  }
+  return normalizePick(index, next);
+}

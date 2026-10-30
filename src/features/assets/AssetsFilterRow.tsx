@@ -1,29 +1,16 @@
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   FilterBar,
   IskInput,
-  MultiSelect,
   SearchInput,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  type MultiSelectGroup,
 } from '@/components/ui';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import {
-  BLUEPRINT_KINDS,
-  allOptionIds,
-  headingState,
-  pickIsAll,
-  toggleHeading,
-  toggleOption,
-  type BlueprintKind,
-  type CategoryHeading,
-} from './assetCategoryFilter';
+import { AssetCategoryPicker, BlueprintKindSelect } from './AssetCategoryPicker';
 import type { AssetSortField } from './assetSortPreference';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
@@ -56,84 +43,16 @@ export function AssetsFilterRow({
   } = assetsData;
   const { searchRef, sortField, setSortField } = assetsRows;
 
-  const headingByLabel = useMemo(() => {
-    const map = new Map<string, CategoryHeading>();
-    for (const heading of categoryIndex?.headings ?? []) map.set(heading.name, heading);
-    return map;
-  }, [categoryIndex]);
-  // A heading holding one row of its own name ("Not on the market") is just that row.
-  const groups = useMemo<readonly MultiSelectGroup<number>[]>(
-    () =>
-      (categoryIndex?.headings ?? []).map((heading) => ({
-        label:
-          heading.options.length === 1 && heading.options[0].name === heading.name
-            ? ''
-            : heading.name,
-        options: heading.options.map((option) => ({ id: option.id, label: option.name })),
-      })),
-    [categoryIndex]
-  );
-
-  const selected = useMemo<ReadonlySet<number>>(
-    () =>
-      pickIsAll(categoryPick)
-        ? new Set(categoryIndex ? allOptionIds(categoryIndex) : [])
-        : categoryPick,
-    [categoryPick, categoryIndex]
-  );
-  const total = categoryIndex ? allOptionIds(categoryIndex).length : 0;
-  const summary = pickIsAll(categoryPick)
-    ? t('assets.category.all')
-    : categoryPick.size === 0
-      ? t('assets.category.none')
-      : `${categoryPick.size} / ${total}`;
-
   const category = categoryIndex && (
-    <MultiSelect<number>
-      className="w-full md:w-52"
-      label={t('assets.category.label')}
-      triggerLabel={t('assets.category.label')}
-      summary={summary}
-      triggerAriaLabel={`${t('assets.category.label')}, ${summary}`}
-      groups={groups}
-      selected={selected}
-      onToggle={(id) => setView({ cat: toggleOption(categoryIndex, categoryPick, id) })}
-      groupState={(group) => {
-        const heading = headingByLabel.get(group.label);
-        return heading ? headingState(categoryPick, heading) : false;
-      }}
-      onToggleGroup={(group) => {
-        const heading = headingByLabel.get(group.label);
-        if (heading) setView({ cat: toggleHeading(categoryIndex, categoryPick, heading) });
-      }}
-      searchPlaceholder={t('assets.category.search')}
-      noResultsLabel={t('assets.category.noResults')}
-      extraContent={
-        <div className="flex gap-2 border-b border-line p-1">
-          <Button size="sm" onClick={() => setView({ cat: 'all' })}>
-            {t('assets.category.selectAll')}
-          </Button>
-          <Button size="sm" onClick={() => setView({ cat: new Set() })}>
-            {t('assets.category.selectNone')}
-          </Button>
-        </div>
-      }
+    <AssetCategoryPicker
+      index={categoryIndex}
+      pick={categoryPick}
+      onChange={(cat) => setView({ cat })}
     />
   );
 
   const blueprints = showBlueprintSelect && (
-    <Select value={blueprintKind} onValueChange={(bp) => setView({ bp: bp as BlueprintKind })}>
-      <SelectTrigger aria-label={t('assets.blueprints.label')} className="w-full md:w-40">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {BLUEPRINT_KINDS.map((kind) => (
-          <SelectItem key={kind} value={kind}>
-            {t(`assets.blueprints.${kind}`)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <BlueprintKindSelect value={blueprintKind} onChange={(bp) => setView({ bp })} />
   );
 
   const minValue = (

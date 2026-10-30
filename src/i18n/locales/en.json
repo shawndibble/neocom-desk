@@ -14339,8 +14339,7 @@
         "division": "Division",
         "category": "Category",
         "anyLocation": "Any location",
-        "anyDivision": "Any division",
-        "anyCategory": "Any category"
+        "anyDivision": "Any division"
       },
       "groupBy": {
         "label": "Group by",
