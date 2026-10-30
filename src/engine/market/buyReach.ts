@@ -75,8 +75,10 @@ export interface BuyWalk {
 }
 
 /**
- * Sells `units` into `orders` (already filtered to those that reach), dearest
- * first. An order whose `minVolume` exceeds the units still to sell at that
+ * Sells `units` into `orders`. Not Hauling's `walkInstant`: that pairs a buy
+ * ladder with a sell ladder and has no per-order `minVolume`; only the
+ * per-level fill is shared (`walkLadder`). `orders` are already filtered to
+ * those that reach; they fill dearest first. An order whose `minVolume` exceeds the units still to sell at that
  * point is skipped.
  */
 export function walkSellIntoBuys(orders: readonly ReachableBuyOrder[], units: number): BuyWalk {

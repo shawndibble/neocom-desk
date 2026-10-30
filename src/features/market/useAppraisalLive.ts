@@ -218,7 +218,9 @@ export function useAppraisalLive({
       const jumpsPromise = loadHubJumps(hub.systemId);
       void jumpsPromise.then((jumps) => {
         if (!cancelled && jumps)
-          setHubJumps((previous) => new Map(previous).set(hub.systemId, jumps));
+          setHubJumps((previous) =>
+            previous.has(hub.systemId) ? previous : new Map(previous).set(hub.systemId, jumps)
+          );
       });
       const [ownIds, jumps] = await Promise.all([
         ownPromise,
@@ -263,7 +265,9 @@ export function useAppraisalLive({
     for (const other of TRADE_HUBS) {
       void loadHubJumps(other.systemId).then((jumps) => {
         if (!cancelled && jumps)
-          setHubJumps((previous) => new Map(previous).set(other.systemId, jumps));
+          setHubJumps((previous) =>
+            previous.has(other.systemId) ? previous : new Map(previous).set(other.systemId, jumps)
+          );
       });
     }
     void (async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { localJumpDistances } from '@/features/route/localRoute';
+import { loadHubJumps } from './hubJumps';
 
 /**
  * Plain stargate jumps from one system to every other, for deciding which buy
@@ -13,8 +13,8 @@ export function useBuyJumps(systemId: number): ReadonlyMap<number, number> | und
   useEffect(() => {
     if (systemId === 0) return;
     let cancelled = false;
-    void localJumpDistances(systemId).then((result) => {
-      if (!cancelled && result.kind === 'known') setLoaded({ systemId, jumps: result.jumps });
+    void loadHubJumps(systemId).then((jumps) => {
+      if (!cancelled && jumps) setLoaded({ systemId, jumps });
     });
     return () => {
       cancelled = true;
