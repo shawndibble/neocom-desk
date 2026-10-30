@@ -48,6 +48,9 @@ export function useMaterialModals({
    */
   const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
 
+  /** The bought material whose "Used by" dialog is open, as a typeID. */
+  const [usedByTypeId, setUsedByTypeId] = useState<number | null>(null);
+
   /** "Buy ore instead", offered only while the plan still buys a mineral. */
   const [buyOreOpen, setBuyOreOpen] = useState(false);
   const shortfall = useMemo(() => mineralShortfall(visibleMaterials), [visibleMaterials]);
@@ -93,8 +96,16 @@ export function useMaterialModals({
     return row ? buildRecipe(row) : null;
   }, [visibleMaterials, recipeTypeId]);
 
+  const usedByTotal = useMemo(
+    () => visibleMaterials.find((material) => material.typeID === usedByTypeId)?.quantity ?? null,
+    [visibleMaterials, usedByTypeId]
+  );
+
   return {
     setRecipeTypeId,
+    usedByTotal,
+    usedByTypeId,
+    setUsedByTypeId,
     openRecipe,
     buyOreOpen,
     setBuyOreOpen,

@@ -170,6 +170,7 @@ export function PlanMaterialsPanel({
               ownedForSale?.lines.find((line) => line.typeID === typeID)?.net
             }
             onShowRecipe={modals.setRecipeTypeId}
+            onShowUsedBy={anySubBuilds ? modals.setUsedByTypeId : undefined}
             onOpenAcquisitionPicker={modals.setAcquisitionPickerTypeId}
             skillGates={ownedStock.skillGates}
             characterNameFor={ownedStock.detection.characterNameFor}
@@ -177,6 +178,7 @@ export function PlanMaterialsPanel({
           />
           <PlanMaterialModals
             modals={modals}
+            result={result}
             plan={plan}
             catalog={catalog}
             hub={hub}

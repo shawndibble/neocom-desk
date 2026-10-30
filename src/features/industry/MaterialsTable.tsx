@@ -9,6 +9,7 @@ import {
   useState,
   type FocusEvent,
   type ReactElement,
+  type ReactNode,
   type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +19,7 @@ import {
   EditableValue,
   IconButton,
   IskAmount,
+  MenuItem,
   NativeSelect,
   Toast,
   textActionClassName,
@@ -147,7 +149,13 @@ interface MaterialsTableProps {
   /** The page's item menu (`buildItemMenuProps`): Show info, View in Market and the rest, ahead of the export items. Omitted, rows have no item menu. */
   itemMenuFor?: ItemMenuFor;
   /** The same menu as a visible button, for the phone card (which has no right-click). */
-  itemActionsFor?: (typeId: number) => ReactElement;
+  itemActionsFor?: (typeId: number, bordered?: boolean, extraItems?: ReactNode) => ReactElement;
+  /**
+   * Opens the "Used by" dialog: the jobs that consume a bought material. Given
+   * only when the plan builds something, so a bought row's menu offers it
+   * only where more than the plan's own job could be the consumer.
+   */
+  onShowUsedBy?: (typeID: number) => void;
 }
 
 /**
@@ -225,6 +233,7 @@ export function MaterialsTable({
   sellValueFor,
   onShowRecipe,
   onOpenAcquisitionPicker,
+  onShowUsedBy,
   skillGates,
   characterNameFor,
   exportProps,
@@ -260,12 +269,22 @@ export function MaterialsTable({
   // it remounts (§6c, `useInPlaceEdit`'s contract), keyed "have-34" / "price-34".
   const [refocus, setRefocus] = useState<string | null>(null);
   // Stable across the keystrokes of a Have/Price edit: `DataTable` memoizes its rows on it.
+  const usedByItem = useCallback(
+    (material: MaterialTableRow) =>
+      onShowUsedBy && !isBuilt(material) && material.acquisitionTier === undefined ? (
+        <MenuItem onSelect={() => onShowUsedBy(material.typeID)}>
+          {t('industry.usedBy.menuItem')}
+        </MenuItem>
+      ) : undefined,
+    [onShowUsedBy, t]
+  );
   const rowContextMenu = useMemo(
     () =>
       itemMenuFor
-        ? (material: MaterialTableRow, tr: ReactElement) => itemMenuFor(material.typeID, tr)
+        ? (material: MaterialTableRow, tr: ReactElement) =>
+            itemMenuFor(material.typeID, tr, usedByItem(material))
         : undefined,
-    [itemMenuFor]
+    [itemMenuFor, usedByItem]
   );
   const clearRefocus = useCallback(() => setRefocus(null), []);
   const settleHave = (typeID: number) => () => {
@@ -998,7 +1017,7 @@ export function MaterialsTable({
                         total={renderTotal(material)}
                         ownedHint={renderOwnedHint(material)}
                         action={renderAction(material, false)}
-                        menu={itemActionsFor?.(material.typeID)}
+                        menu={itemActionsFor?.(material.typeID, false, usedByItem(material))}
                         haveField={
                           editingHave === material.typeID
                             ? renderHave(

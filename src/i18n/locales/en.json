@@ -3390,6 +3390,16 @@
     "subBuildSummaryComparison": "Buying them ready-made instead would cost {{planned}}.",
     "subBuildTimeNote": "The sub-jobs take {{time}} of job time in total.",
     "assumesNoImplantsHint": "Job time is calculated without this character's fitted implants, so a manufacturing time implant isn't counted. Grant Character details for an accurate estimate.",
+    "usedBy": {
+      "menuItem": "Used by",
+      "title_other": "{{material}} · used by {{count}} jobs",
+      "title_one": "{{material}} · used by {{count}} job",
+      "job": "Job",
+      "runs": "Runs",
+      "quantity": "Quantity",
+      "total": "Table total {{total}} · jobs need {{jobs}}",
+      "totalRoundUp": "Table total {{total}} · jobs need {{jobs}} (each job rounds its quantities up)"
+    },
     "buildRecipe": {
       "action": "Build it",
       "title": "How to build {{material}}",

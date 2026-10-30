@@ -7,6 +7,7 @@ import { resolveMaterial } from '@/engine/industry/materialResolution';
 import {
   buildRecipe,
   hasSubBuilds,
+  materialConsumers,
   materialTableRows,
   shoppingListMaterials,
   subBuildSeconds,
@@ -463,5 +464,48 @@ describe('shoppingListMaterials — leaves only, whatever the table shows', () =
 
     expect(materialTableRows(resolved).map((r) => r.typeID)).toEqual([SEAL, FIBRE]);
     expect(shoppingListMaterials(resolved).map((m) => m.typeID)).toEqual([FIBRE]);
+  });
+});
+
+describe('materialConsumers', () => {
+  const PRODUCT = 99999;
+  const mainJob = { typeID: PRODUCT, runs: 5 };
+
+  it('lists the plan’s own job first, then each built job that eats the material', () => {
+    const materials = resolve(
+      [
+        { typeID: SEAL, quantity: 3 },
+        { typeID: FIBRE, quantity: 2 },
+      ],
+      [SEAL]
+    );
+    const seal = materials[0]!.subBuild!;
+    const consumers = materialConsumers(materials, FIBRE, mainJob);
+    expect(consumers).toEqual([
+      { typeID: PRODUCT, runs: 5, quantity: 2 },
+      { typeID: SEAL, runs: seal.runs, quantity: 10 * seal.runs },
+    ]);
+  });
+
+  it('leaves out the plan’s own job when it does not use the material', () => {
+    const materials = resolve([{ typeID: SEAL, quantity: 3 }], [SEAL]);
+    const consumers = materialConsumers(materials, FIBRE, mainJob);
+    expect(consumers.map((c) => c.typeID)).toEqual([SEAL]);
+  });
+
+  it('sums to the merged table row quantity', () => {
+    const materials = resolve(
+      [
+        { typeID: SEAL, quantity: 3 },
+        { typeID: FIBRE, quantity: 2 },
+      ],
+      [SEAL]
+    );
+    const row = materialTableRows(materials).find((r) => r.typeID === FIBRE)!;
+    const total = materialConsumers(materials, FIBRE, mainJob).reduce(
+      (sum, c) => sum + c.quantity,
+      0
+    );
+    expect(total).toBe(row.quantity);
   });
 });
