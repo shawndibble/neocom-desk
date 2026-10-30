@@ -413,10 +413,9 @@ export function AssetsList({
                   )}
                 </h2>
                 {/* Route only matters to the Jumps away sort, so it shows only
-                        then, left of Sort. flex-wrap-reverse (issue #415): when both
-                        can't fit beside the label, Sort keeps the top row and Route
-                        drops below it. */}
-                <div className="ml-auto flex flex-wrap-reverse items-center justify-end gap-2">
+                        then, left of Sort. flex-wrap: on a narrow phone the two wrap
+                        in DOM order, so focus order matches what's on screen. */}
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                   {stationSortField === 'jumpsAway' && (
                     <Select
                       value={routePreference}

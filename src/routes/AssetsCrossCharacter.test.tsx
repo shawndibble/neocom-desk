@@ -600,6 +600,11 @@ describe('jumps-away distance (issue #87)', () => {
     await user.click(await screen.findByRole('option', { name: 'Prefer shorter' }));
 
     expect(await screen.findByText('2 jumps')).toBeInTheDocument();
+
+    // Leaving Jumps away hides Route, so its pick stops counting.
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(await screen.findByRole('option', { name: 'Name' }));
+    expect(await screen.findByText('3 jumps')).toBeInTheDocument();
   });
 
   describe('station header on a phone (#2989)', () => {
