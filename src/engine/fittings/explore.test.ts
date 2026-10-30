@@ -12,10 +12,11 @@ describe('extractExplore', () => {
     expect(extractExplore([item()], [result({ 73: 5000 })])).toEqual(NO_EXPLORE);
   });
 
+  // SDE names: 1910 is Virus Strength, 1909 is Virus Coherence (a Data Analyzer II: 30 and 60).
   it('reads the best analyzer: strength, coherence, fastest cycle', () => {
     const explore = extractExplore(
       [item(1), item(2)],
-      [result({ 1909: 60, 1910: 40, 73: 10_000 }), result({ 1909: 70, 1910: 30, 73: 8_000 })]
+      [result({ 1910: 60, 1909: 40, 73: 10_000 }), result({ 1910: 70, 1909: 30, 73: 8_000 })]
     );
     expect(explore.modules).toBe(2);
     expect(explore.hacking).toEqual({ strength: 70, coherence: 40, cycleSeconds: 8 });
@@ -40,8 +41,18 @@ describe('extractExplore', () => {
     expect(explore.analyzers).toEqual([]);
   });
 
+  it('reads strength off Virus Strength, not Virus Coherence', () => {
+    // A Data Analyzer II on a hull with no hacking bonus.
+    const explore = extractExplore([item()], [result({ 1910: 30, 1909: 60, 73: 10_000 })]);
+    expect(explore.hacking).toEqual({ strength: 30, coherence: 60, cycleSeconds: 10 });
+  });
+
+  it('does not count a Mining Survey Chipset (its crit bonus is not a survey range)', () => {
+    expect(extractExplore([item()], [result({ 6050: 0.05 })])).toEqual(NO_EXPLORE);
+  });
+
   it('ignores drones and offline modules', () => {
-    expect(extractExplore([item(1, 'drone_bay')], [result({ 1909: 60 })]).modules).toBe(0);
-    expect(extractExplore([item()], [result({ 1909: 60 }, 'offline')]).modules).toBe(0);
+    expect(extractExplore([item(1, 'drone_bay')], [result({ 1910: 60 })]).modules).toBe(0);
+    expect(extractExplore([item()], [result({ 1910: 60 }, 'offline')]).modules).toBe(0);
   });
 });
