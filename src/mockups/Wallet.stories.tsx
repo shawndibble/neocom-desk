@@ -16,7 +16,7 @@ const meta = {
   parameters: { layout: 'fullscreen', shell: { path: '/wallet/balance' } },
   render: () => (
     <>
-      <div className="mx-auto max-w-5xl px-4 pt-4">
+      <div className="mx-auto max-w-page px-4 pt-4">
         <NewComponent name="BalanceTrend">
           <Panel title="Balance, last 30 days">
             <StatChips>

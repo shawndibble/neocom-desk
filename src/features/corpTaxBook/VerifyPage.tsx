@@ -86,7 +86,7 @@ export function VerifyPage({ token }: { token: string }) {
           {t('corpTaxBook.verify.readOnly')}
         </span>
       </div>
-      <main className="mx-auto max-w-page space-y-4 px-4 py-6">
+      <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
         {state.status === 'loading' && (
           <div className="flex justify-center py-10">
             <Spinner label={t('common.loading')} />
