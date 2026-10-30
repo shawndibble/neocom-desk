@@ -1,18 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { StructureFeesList } from '@/features/market/StructureFeesList';
-import {
-  Field,
-  Fields,
-  Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui';
+import { Fields, Panel } from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub } from '@/features/market/hub';
+import { useHubByCharacter } from '@/features/market/characterHubs';
+import { TradeHubField } from '@/features/settings/TradeHubField';
 import {
   COLLATERAL_RATIO_OPTIONS,
   useCourierCollateralRatio,
@@ -32,9 +24,7 @@ import {
 
 export function MarketDefaultsPanel() {
   const { t } = useTranslation();
-  const hub = useMarketHub((state) => state.value);
-  const setHub = useMarketHub((state) => state.setValue);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const hubHydrated = useHydratedStore(useDefaultMarketHub, useHubByCharacter);
   const collateralRatio = useCourierCollateralRatio((state) => state.value);
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
@@ -51,24 +41,7 @@ export function MarketDefaultsPanel() {
       <div className="space-y-4">
         <DefaultsSyncHint />
         <Fields variant="form">
-          <Field
-            label={t('settings.tradeHubLabel')}
-            htmlFor="settings-hub"
-            note={t('settings.tradeHubHint')}
-          >
-            <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-              <SelectTrigger id="settings-hub" aria-label={t('settings.tradeHubLabel')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRADE_HUBS.map((tradeHub) => (
-                  <SelectItem key={tradeHub.id} value={tradeHub.id}>
-                    {tradeHub.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <TradeHubField />
 
           <RefiningSetupFields refining={refining} />
 

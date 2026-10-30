@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub } from '@/features/market/hub';
 import '@/i18n';
 import { db } from '@/db';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
@@ -803,7 +803,7 @@ describe('BpcSourcingPanel', () => {
     });
 
     it("adds the pilot's market hub region, and says so when it has no offers", async () => {
-      useMarketHub.setState({ value: 'amarr', hydrated: true });
+      useDefaultMarketHub.setState({ value: 'amarr', hydrated: true });
       try {
         loadPublicBpcContracts.mockResolvedValue(
           cachedSnapshot([
@@ -818,7 +818,7 @@ describe('BpcSourcingPanel', () => {
         expect(domain).toHaveTextContent('Domain');
         expect(domain).toHaveTextContent('No offers');
       } finally {
-        useMarketHub.setState({ value: 'jita' });
+        useDefaultMarketHub.setState({ value: 'jita' });
       }
     });
 

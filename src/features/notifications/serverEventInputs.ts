@@ -24,7 +24,7 @@ export async function readServerInputs(
       .filter((item) => Number.isFinite(item.targetPrice) && item.targetPrice >= 0)
       .slice(0, MAX_PRICE_ALERTS);
     if (targeted.length > 0) {
-      inputs.priceStationId = (await currentHub()).stationId;
+      inputs.priceStationId = (await currentHub(characterId)).stationId;
       inputs.priceAlerts = targeted.map((item) => ({
         typeId: item.typeId,
         name: item.name.slice(0, MAX_NAME_LENGTH),

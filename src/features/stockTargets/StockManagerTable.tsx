@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  ColumnPickerMenu,
   DataTable,
   EditableValue,
   IskAmount,
@@ -17,13 +18,16 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
-import type { StockRow } from '@/engine/stockTargets/stockRows';
+import { stockStatusRank, type StockRow } from '@/engine/stockTargets/stockRows';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRowSelection } from '@/lib/useRowSelection';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 import { formatNumber } from '@/lib/numberLocale';
+import { StockHolders } from './StockHolders';
+import { STOCK_COLUMN_IDS, useVisibleStockColumns, type StockColumnId } from './stockColumns';
 
 function TargetCell({
   row,
@@ -117,6 +121,7 @@ export function StockManagerTable({
   rows,
   nameOf,
   groupOf,
+  characterName,
   selectionKey,
   onSetTarget,
   onRemove,
@@ -126,6 +131,8 @@ export function StockManagerTable({
   nameOf: (typeId: number) => string;
   /** The item's top-level Market Group, under its name on desktop. */
   groupOf: (typeId: number) => string | undefined;
+  /** Names the Character holding a count; undefined while only one Character has data, when naming them says nothing. */
+  characterName: ((characterId: number) => string) | undefined;
   /** Names what the ticks were made in (Character, list, filters): a change drops them. */
   selectionKey: string;
   onSetTarget: (typeId: number, target: number) => void;
@@ -228,7 +235,17 @@ export function StockManagerTable({
       headerCellClassName: 'sm:w-24',
       className: 'tabular-nums',
       stackAffix: { after: ` ${t('stockTargets.table.listedAffix')}` },
-      render: (row) => formatNumber(row.listed),
+      render: (row) =>
+        characterName && row.listedBy ? (
+          <StockHolders
+            total={row.listed}
+            holders={row.listedBy}
+            heading={t('stockTargets.holders.listedBy')}
+            nameOf={characterName}
+          />
+        ) : (
+          formatNumber(row.listed)
+        ),
       sortValue: (row) => row.listed,
     },
     {
@@ -240,7 +257,16 @@ export function StockManagerTable({
       stackAffix: { after: ` ${t('stockTargets.table.inHangarAffix')}` },
       render: (row) =>
         row.inHangar > 0 ? (
-          formatNumber(row.inHangar)
+          characterName && row.inHangarBy ? (
+            <StockHolders
+              total={row.inHangar}
+              holders={row.inHangarBy}
+              heading={t('stockTargets.holders.readyWith')}
+              nameOf={characterName}
+            />
+          ) : (
+            formatNumber(row.inHangar)
+          )
         ) : (
           <span data-dense-omit className="text-text-dim">
             0
@@ -250,7 +276,7 @@ export function StockManagerTable({
     },
     {
       id: 'fill',
-      header: '',
+      header: t('stockTargets.table.fill'),
       // Between `sm` and `xl` the table is wider than its panel: the Status pill carries the bar's reading there (the card keeps it below `sm`).
       headerCellClassName: 'sm:w-28 max-xl:sm:hidden',
       className: 'max-xl:sm:hidden',
@@ -262,10 +288,14 @@ export function StockManagerTable({
           hangarFill={row.fromHangar / row.target}
         />
       ),
+      sortValue: (row) => row.fill,
     },
     {
       id: 'restock',
       header: t('stockTargets.table.restock'),
+      // Between `sm` and `xl` every pixel counts (see the fill column): tighter side padding.
+      headerClassName: 'max-xl:sm:px-2',
+      className: 'max-xl:sm:px-2',
       render: (row) =>
         row.shortfall === 0 ? (
           <span data-dense-omit className="text-text-dim">
@@ -315,10 +345,29 @@ export function StockManagerTable({
       id: 'status',
       header: t('stockTargets.table.status'),
       headerCellClassName: 'sm:w-24',
+      // The sort glyph widened this header; tighter side padding between `sm` and `xl` keeps the table inside 1024px.
+      headerClassName: 'max-xl:sm:px-2',
+      className: 'max-xl:sm:px-2',
       cardCorner: true,
       render: (row) => <StockStatusPill status={row.status} />,
+      // Worst first on the first click, like the page's own order.
+      sortValue: (row) => stockStatusRank(row.status),
+      sortFirst: 'asc',
     },
   ];
+
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleStockColumns,
+    STOCK_COLUMN_IDS
+  );
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    StockColumnId,
+    DataTableColumn<StockRow>
+  >;
+  const shownColumns = columns.filter(
+    (column) =>
+      column.id === 'select' || column.id === 'item' || isVisible(column.id as StockColumnId)
+  );
 
   return (
     <>
@@ -334,10 +383,23 @@ export function StockManagerTable({
             {t('stockTargets.table.removeSelected', { count: selection.selected.size })}
           </Button>
         )}
+        <span className="ml-auto">
+          <ColumnPickerMenu
+            available={STOCK_COLUMN_IDS}
+            visible={visible}
+            columnsById={columnsById}
+            onToggle={toggle}
+            onReset={reset}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            resetLabel={t('common.resetColumns')}
+          />
+        </span>
       </div>
       <DataTable
-        columns={columns}
+        columns={shownColumns}
         rows={rows}
+        mobileSort
         rowKey={(row) => row.typeId}
         label={t('stockTargets.table.label')}
         stackLayout="dense"

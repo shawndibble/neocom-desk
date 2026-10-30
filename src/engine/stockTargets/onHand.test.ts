@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
-import { countAtMarket, listedAtMarket } from './onHand';
+import { countAtMarket, holdersAtMarket, listedAtMarket, sellersAtMarket } from './onHand';
 
 const JITA = 60003760;
 const EFA = 1035466617946;
@@ -63,5 +63,66 @@ describe('listedAtMarket', () => {
       { typeId: 34, target: 75 },
       { typeId: 35, target: 7 },
     ]);
+  });
+});
+
+describe('holdersAtMarket', () => {
+  const stock: DetectedOwnedStockMap = new Map([
+    [
+      34,
+      {
+        quantity: 900,
+        placements: [
+          { characterId: 1, locationId: EFA, locationType: 'other', quantity: 100 },
+          { characterId: 2, locationId: EFA, locationType: 'other', quantity: 300 },
+          { characterId: 1, locationId: EFA, locationType: 'other', quantity: 50 },
+          { characterId: 3, locationId: JITA, locationType: 'station', quantity: 450 },
+        ],
+      },
+    ],
+  ]);
+  const sell = (characterId: number, qty: number, over = {}) => ({
+    ...order({ volume_remain: qty, ...over }),
+    characterId,
+  });
+
+  it('splits hangar stock and listings per character, biggest first, merging a character', () => {
+    const holders = holdersAtMarket(stock, [sell(2, 5), sell(1, 20), sell(1, 10)], EFA, [34]);
+    expect(holders.get(34)).toEqual({
+      listedBy: [
+        { characterId: 1, quantity: 30 },
+        { characterId: 2, quantity: 5 },
+      ],
+      inHangarBy: [
+        { characterId: 2, quantity: 300 },
+        { characterId: 1, quantity: 150 },
+      ],
+    });
+  });
+
+  it('sums to the countAtMarket totals', () => {
+    const orders = [sell(2, 5), sell(1, 20), sell(1, 10, { is_buy_order: true })];
+    const total = (list: { quantity: number }[]) => list.reduce((n, h) => n + h.quantity, 0);
+    const holders = holdersAtMarket(stock, orders, EFA, [34]).get(34)!;
+    const counts = countAtMarket(stock, orders, EFA, [34]).get(34)!;
+    expect(total(holders.listedBy)).toBe(counts.listed);
+    expect(total(holders.inHangarBy)).toBe(counts.inHangar);
+  });
+
+  it('is empty for an item nobody holds there', () => {
+    expect(holdersAtMarket(stock, [], EFA, [99]).get(99)).toEqual({ listedBy: [], inHangarBy: [] });
+  });
+});
+
+describe('sellersAtMarket', () => {
+  it('lists characters with sell orders at the market, most orders first', () => {
+    const orders = [
+      { ...order(), characterId: 2 },
+      { ...order(), characterId: 1 },
+      { ...order(), characterId: 1 },
+      { ...order({ is_buy_order: true }), characterId: 4 },
+      { ...order({ location_id: JITA }), characterId: 3 },
+    ];
+    expect(sellersAtMarket(orders, EFA)).toEqual([1, 2]);
   });
 });

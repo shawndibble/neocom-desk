@@ -8,6 +8,8 @@
  * below-target alert without any of them disagreeing about what "low" means.
  */
 
+import type { HolderCount } from './onHand';
+
 /** Below this share of its Stock Target an item reads as Low. */
 export const LOW_FILL_RATIO = 0.5;
 
@@ -25,6 +27,10 @@ export interface StockRowInput {
   inHangar: number;
   /** ISK per unit, or null when no price is known. */
   price: number | null;
+  /** Whose sell orders make up `listed`, biggest first. Attribution only: no status or total reads it. */
+  listedBy?: readonly HolderCount[];
+  /** Whose hangars make up `inHangar`, biggest first. */
+  inHangarBy?: readonly HolderCount[];
 }
 
 export interface StockRow extends StockRowInput {
@@ -143,3 +149,6 @@ export function splitForBuilders(
   }
   return split;
 }
+
+/** Worst first, as `compareRows` ranks: the Status column sorts by this. */
+export const stockStatusRank = (status: StockStatus): number => STATUS_RANK[status];

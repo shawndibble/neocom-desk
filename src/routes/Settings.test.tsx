@@ -1469,7 +1469,7 @@ describe('Settings defaults', () => {
     // The point of the control: the key existed but was only reachable from
     // inside one panel of one page. `findBy`, because the panel withholds
     // every control until its stores have hydrated.
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toHaveTextContent(
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toHaveTextContent(
       /jita/i
     );
   });
@@ -1843,7 +1843,7 @@ describe('Settings — sections rail', () => {
     render(<App />);
     await openTab(user, /^market$/i);
 
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toBeInTheDocument();
     expect(within(settingsNav()).getByRole('link', { name: /^market$/i })).toHaveAttribute(
       'aria-current',
       'page'
@@ -1922,7 +1922,7 @@ describe('Settings — phone list', () => {
 
     const nav = await screen.findByRole('navigation', { name: /settings sections/i });
     await user.click(within(nav).getByRole('link', { name: /^market/i }));
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/settings/market');
 
     const back = screen
@@ -2026,7 +2026,7 @@ describe('Settings — review follow-ups', () => {
     window.history.pushState({}, '', '/settings/market#constructor');
     render(<App />);
 
-    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: /^trade hub$/i })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/settings/market');
   });
 

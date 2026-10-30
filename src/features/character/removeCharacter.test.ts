@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { useHubByCharacter } from '@/features/market/characterHubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedCharacter as seedCharacterRow, seedGrant as seedGrantFor } from '@/test/seed';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
@@ -181,6 +182,13 @@ beforeEach(async () => {
 });
 
 describe('removeCharacter', () => {
+  it('drops the Character’s Trade Hub entry and keeps another device’s', async () => {
+    await seedCharacter(1);
+    useHubByCharacter.setState({ value: { 1: 'hek', 9: 'rens' }, hydrated: true });
+    await removeCharacter(1);
+    expect(useHubByCharacter.getState().value).toEqual({ 9: 'rens' });
+  });
+
   it('wipes the Character’s officer-only Corp Tax Book copy and no other Character’s', async () => {
     await seedCharacter(1);
     await seedCharacter(2);

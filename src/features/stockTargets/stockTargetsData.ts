@@ -6,7 +6,12 @@
  */
 import { detectOwnedStock, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import { rankMarkets, type MarketSummary } from '@/engine/stockTargets/markets';
-import { countAtMarket, listedAtMarket } from '@/engine/stockTargets/onHand';
+import {
+  countAtMarket,
+  holdersAtMarket,
+  listedAtMarket,
+  sellersAtMarket,
+} from '@/engine/stockTargets/onHand';
 import type { StockAlertEntry } from '@/engine/stockTargets/stockAlert';
 import { buildStockRows, summarizeStock, type StockRow } from '@/engine/stockTargets/stockRows';
 import type { StockList, StockTarget } from '@/engine/stockTargets/stockLists';
@@ -41,6 +46,8 @@ interface Holdings {
   /** The oldest asset read behind the counts, or null when none was read. */
   oldestFetchedAt: Date | null;
   characterIds: number[];
+  /** Every Character an asset or order read named. */
+  characterNames: Map<number, string>;
 }
 
 /** `'all'` places every type the pilot holds, for "where are my things" rather than "where is this item". */
@@ -70,6 +77,10 @@ async function readHoldings(typeIds: readonly number[] | 'all'): Promise<Holding
       ...orders.skipped.map((character) => character.name),
     ]),
   ].sort((a, b) => a.localeCompare(b));
+  const characterNames = new Map<number, string>([
+    ...assets.entries.map((entry): [number, string] => [entry.characterId, entry.name]),
+    ...orders.entries.map((entry): [number, string] => [entry.characterId, entry.characterName]),
+  ]);
   const fetchTimes = assets.entries
     .map((entry) => entry.fetchedAt?.getTime())
     .filter((time): time is number => time !== undefined);
@@ -79,6 +90,7 @@ async function readHoldings(typeIds: readonly number[] | 'all'): Promise<Holding
     incompleteCharacters,
     oldestFetchedAt: fetchTimes.length > 0 ? new Date(Math.min(...fetchTimes)) : null,
     characterIds: assets.entries.map((entry) => entry.characterId),
+    characterNames,
   };
 }
 
@@ -131,12 +143,9 @@ function rowsFor(
   holdings: Holdings,
   prices: ReadonlyMap<number, { sellMin: number | null }>
 ): StockRow[] {
-  const counts = countAtMarket(
-    holdings.detected,
-    holdings.sellOrders,
-    list.locationId,
-    list.items.map((item) => item.typeId)
-  );
+  const typeIds = list.items.map((item) => item.typeId);
+  const counts = countAtMarket(holdings.detected, holdings.sellOrders, list.locationId, typeIds);
+  const holders = holdersAtMarket(holdings.detected, holdings.sellOrders, list.locationId, typeIds);
   return buildStockRows(
     list.items.map((item) => ({
       typeId: item.typeId,
@@ -144,6 +153,8 @@ function rowsFor(
       listed: counts.get(item.typeId)?.listed ?? 0,
       inHangar: counts.get(item.typeId)?.inHangar ?? 0,
       price: prices.get(item.typeId)?.sellMin ?? null,
+      listedBy: holders.get(item.typeId)?.listedBy,
+      inHangarBy: holders.get(item.typeId)?.inHangarBy,
     }))
   );
 }
@@ -158,6 +169,10 @@ export interface StockTargetsData {
   /** Each item's top-level Market Group ("Ships", "Ammunition & Charges"), when the catalogue has it. */
   groups: Map<number, string>;
   place: MarketPlace | null;
+  /** Names for the Characters the rows' holder splits point at. */
+  characterNames: Map<number, string>;
+  /** Characters with a sell order at the market, most orders first. */
+  sellers: number[];
 }
 
 export async function loadStockTargetsData(
@@ -179,6 +194,8 @@ export async function loadStockTargetsData(
     oldestFetchedAt: holdings.oldestFetchedAt,
     groups,
     place,
+    characterNames: holdings.characterNames,
+    sellers: sellersAtMarket(holdings.sellOrders, list.locationId),
   };
 }
 

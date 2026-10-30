@@ -24,7 +24,7 @@ import { loadContracts } from '@/features/character/contracts';
 import { loadContractItemsDetailed } from '@/features/character/contractItems';
 import { loadOrders } from '@/features/character/orders';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
-import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';
+import { tradeHubIdFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getAveragePriceByType, getHubPrices } from '@/market/prices';
 import { scheduleSync } from '@/sync';
@@ -83,11 +83,6 @@ export interface SnapshotSources {
 /** Tail of each Character's write chain, so overlapping runs can't both pass the once-a-day check. */
 const writeChains = new Map<number, Promise<unknown>>();
 
-async function hubIdSetting(): Promise<string> {
-  const stored = (await db.settings.get(MARKET_HUB_SETTING_KEY))?.value;
-  return typeof stored === 'string' && getTradeHub(stored) ? stored : DEFAULT_TRADE_HUB.id;
-}
-
 /** Not today's number: served from the cache after a failed call, or older than the loaders' window. */
 function isStale(cached: { fromCache: boolean; fetchedAt: Date } | null): boolean {
   if (!cached) return false;
@@ -116,7 +111,7 @@ export const liveSources: SnapshotSources = {
     // copy `fromCache`; a call that merely hangs (lie-fi) is answered with the expired
     // row after the stale grace, unflagged, so its age is checked as well.
     if ([wallet, assets, orders].some((source) => isStale(source.cached))) return null;
-    const hubId = await hubIdSetting();
+    const hubId = await tradeHubIdFor(characterId);
     const assetList = assets.cached?.data ?? null;
     // An abyssal module counts at its last known MutaMarket estimate, cached on
     // this device; never a type price, never a lookup from here.
