@@ -16,6 +16,9 @@ import type { LiveProgress } from './useAppraisalLive';
 
 const AGE_TICK_MS = 5_000;
 
+/** Both lines claim the done line's width, so the title bar wraps the same way while checking and when done: no layout shift when the text swaps. */
+const STATUS_LINE = 'inline-block min-w-[19rem]';
+
 /** The bar alone, for the caller to lay along a card's top edge. */
 export function LivePriceBar({ live, className }: { live: LiveProgress; className?: string }) {
   const { t } = useTranslation();
@@ -39,7 +42,7 @@ function CheckedAgo({ summary, checkedAt }: { summary: string; checkedAt: number
       ? t('market.appraisal.live.ageSeconds', { count: Math.floor(ms / 1000) })
       : formatAge(ms, t);
   return (
-    <span className="text-xs text-text-dim">
+    <span className={cx(STATUS_LINE, 'text-xs text-text-dim')}>
       {summary} · {t('market.appraisal.live.checkedAgo', { age })}
     </span>
   );
@@ -77,7 +80,7 @@ export function LivePriceStatus({
         {announcement}
       </span>
       {live.total > 0 && live.checking && (
-        <span className="text-xs text-text-dim tabular-nums" aria-hidden="true">
+        <span className={cx(STATUS_LINE, 'text-xs text-text-dim tabular-nums')} aria-hidden="true">
           {t('market.appraisal.live.checking', { done: live.done, total: live.total })}
         </span>
       )}
