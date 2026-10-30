@@ -165,13 +165,33 @@ export function sellSalesTax(
   return salesTax(row.sellTotal, accountingLevel);
 }
 
-/** The row's sell total less its sales tax; null where nothing sells. */
-export function sellAfterTax(
+/**
+ * Broker fee in ISK for listing the row's sell total as one sell order, at the
+ * character's Broker Relations and hub standings (100 ISK minimum). Null where
+ * nothing sells.
+ */
+export function sellBrokerFee(
   row: Pick<AppraisalRow, 'sellTotal'>,
-  accountingLevel: number
+  brokerRelationsLevel: number,
+  standing: ResolvedStandings
+): number | null {
+  if (row.sellTotal === null) return null;
+  return brokerFee(
+    row.sellTotal,
+    brokerRelationsLevel,
+    standing.factionStanding,
+    standing.corpStanding
+  );
+}
+
+/** The row's sell total less sales tax and broker fee; null where nothing sells. */
+export function sellAfterFees(
+  row: Pick<AppraisalRow, 'sellTotal'>,
+  { accountingLevel, brokerRelationsLevel, standing }: AppraisalNetFees
 ): number | null {
   const tax = sellSalesTax(row, accountingLevel);
-  return tax === null || row.sellTotal === null ? null : row.sellTotal - tax;
+  const fee = sellBrokerFee(row, brokerRelationsLevel, standing);
+  return tax === null || fee === null || row.sellTotal === null ? null : row.sellTotal - tax - fee;
 }
 
 export interface AppraisalTotals {

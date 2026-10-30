@@ -174,7 +174,7 @@ export function AppraisalPanel({
     rowContextMenu,
     hasRefine,
     hasLpOption,
-  } = useAppraisalColumns({ controller, owned });
+  } = useAppraisalColumns({ controller, owned, standing });
   const { share, handleShare, handleCopyShareUrl, shareItemCount } = useAppraisalShare({
     result,
     hub,

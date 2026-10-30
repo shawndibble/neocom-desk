@@ -19,7 +19,8 @@ export const APPRAISAL_COLUMN_IDS = [
   'volume',
   'iskPerM3',
   'salesTax',
-  'sellAfterTax',
+  'brokerFee',
+  'sellAfterFees',
 ] as const;
 
 export type AppraisalColumnId = (typeof APPRAISAL_COLUMN_IDS)[number];
@@ -29,7 +30,8 @@ const OFF_BY_DEFAULT: readonly AppraisalColumnId[] = [
   'splitEach',
   'iskPerM3',
   'salesTax',
-  'sellAfterTax',
+  'brokerFee',
+  'sellAfterFees',
 ];
 
 /** Every column shown before the opt-in ones existed, so adding one changes nothing on its own. */
