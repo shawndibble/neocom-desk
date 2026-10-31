@@ -38,7 +38,13 @@ import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { buildMaterialsColumns } from './MaterialsColumns';
 import { NotApplicable } from './NotApplicable';
 import { whenFocusLeaves } from './focusLeaves';
-import { materialRowState } from './materialRow';
+import {
+  buildSavings,
+  isBuilt,
+  materialPriceTag,
+  materialRowState,
+  shownDepth,
+} from './materialRow';
 import { DepthPriceLine } from './DepthPriceLine';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import {
@@ -175,11 +181,6 @@ const BESIDE_COSTS_QUERY = '(min-width: 78.125rem) and (max-width: 95.999rem)';
 /** The phone list's own sort — the header sort buttons are a table's, and a phone gets no table. */
 type PhoneSort = 'plan' | 'total' | 'toBuy' | 'name';
 const PHONE_SORTS: readonly PhoneSort[] = ['plan', 'total', 'toBuy', 'name'];
-
-/** A material being built here rather than bought. */
-function isBuilt(material: MaterialTableRow): boolean {
-  return material.subBuilds.length > 0;
-}
 
 /**
  * Materials, as a shopping list: one section per errand — To buy, Building,
@@ -411,11 +412,8 @@ export function MaterialsTable({
   }
 
   /** What building saves over buying, when the advice says building is cheaper. */
-  function buildSavings(material: MaterialTableRow): number | null {
-    const { advice } = buildChoice(material);
-    return advice?.verdict === 'build' && advice.savings > 0 && material.remainingQuantity > 0
-      ? advice.savings
-      : null;
+  function buildSavingsOf(material: MaterialTableRow): number | null {
+    return buildSavings(material, buildChoice(material).advice);
   }
 
   /** The name, any advice/skill marker, and — unless the caller places it itself — the row's text action. */
@@ -465,7 +463,7 @@ export function MaterialsTable({
     }
     const { advice, toggleable } = buildChoice(material);
     if (isBuilt(material)) {
-      const savings = withSavings ? buildSavings(material) : null;
+      const savings = withSavings ? buildSavingsOf(material) : null;
       if (!onShowRecipe && !toggleable && savings === null) return null;
       return (
         <span className="inline-flex flex-wrap items-center gap-x-2">
@@ -627,10 +625,6 @@ export function MaterialsTable({
     );
   }
 
-  function depthOf(material: MaterialTableRow): DepthPrice | undefined {
-    return material.subBuilds.length > 0 ? undefined : depthFor?.(material.typeID);
-  }
-
   /**
    * The price field and what kind of price it holds. A built row has no
    * purchase price at all. `inline` is the phone row's form: "@ [field]" on
@@ -639,10 +633,11 @@ export function MaterialsTable({
    */
   function renderPrice(material: MaterialTableRow, inline = false, autoFocus = false) {
     const name = nameFor(material.typeID);
-    if (material.subBuilds.length > 0) {
+    const priceTag = materialPriceTag(material, sourcing, pricesReady);
+    if (isBuilt(material)) {
       // "Something under this has no price" is a warning about the plan's
       // totals, not a price — hiding it would quietly understate the cost.
-      return material.unpriced ? (
+      return priceTag === 'unpriced' ? (
         <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
       ) : (
         <NotApplicable />
@@ -650,17 +645,18 @@ export function MaterialsTable({
     }
     const state = materialRowState(material, sourcing, pricesReady);
     const overridden = state.priceSource === 'override';
-    const depth = inline || overridden ? undefined : depthOf(material);
-    const unpriced = !overridden && state.unitPrice === null && !state.fullyOwned;
+    const depth = inline ? undefined : shownDepth(material, sourcing, depthFor);
+    const unpriced = priceTag === 'unpriced';
     // No tag on a plain hub price — that is what every row is unless
     // something says otherwise.
-    const tag = overridden
-      ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
-      : state.unitPrice !== null
-        ? null
-        : state.fullyOwned
+    const tag =
+      priceTag === 'override'
+        ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
+        : priceTag === 'owned'
           ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
-          : { text: t('industry.unpriced'), tone: 'text-warning' };
+          : priceTag === 'unpriced'
+            ? { text: t('industry.unpriced'), tone: 'text-warning' }
+            : null;
     // Only once prices have landed: before then every row reads as unpriced.
     const onFindBlueprint =
       unpriced && pricesReady && material.acquisitionTier && onOpenAcquisitionPicker
@@ -793,7 +789,7 @@ export function MaterialsTable({
   // Rebuilt every render, deliberately: the cell renderers close over the
   // hold and toggle machinery above, and a stale closure there would commit
   // an edit through an outdated sourcing map.
-  const anyDepth = materials.some((m) => depthOf(m) !== undefined);
+  const anyDepth = materials.some((m) => shownDepth(m, sourcing, depthFor) !== undefined);
   const columns = buildMaterialsColumns({
     t,
     nameFor,
@@ -829,17 +825,17 @@ export function MaterialsTable({
         ? errandSubtotal(rows, sourcing, pricesReady)
         : null;
     const saved =
-      errand === 'building' ? rows.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0) : 0;
+      errand === 'building' ? rows.reduce((sum, row) => sum + (buildSavingsOf(row) ?? 0), 0) : 0;
     // Bought rows that would be cheaper built: one link for all of them, so the
     // suggestion is a line of the heading rather than a banner competing with
     // the verdict. One row keeps only its own Build instead.
     const cheaperBuilt =
       errand === 'toBuy' && onBuildAll
         ? rows.filter(
-            (row) => !isBuilt(row) && buildSavings(row) !== null && buildChoice(row).toggleable
+            (row) => !isBuilt(row) && buildSavingsOf(row) !== null && buildChoice(row).toggleable
           )
         : [];
-    const cheaperSaves = cheaperBuilt.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0);
+    const cheaperSaves = cheaperBuilt.reduce((sum, row) => sum + (buildSavingsOf(row) ?? 0), 0);
     const title = (
       <span className="inline-flex items-center gap-1.5">
         {Glyph && <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
@@ -1002,8 +998,8 @@ export function MaterialsTable({
                         sourcing={sourcing}
                         pricesReady={pricesReady}
                         nameFor={nameFor}
-                        depth={depthOf(material)}
-                        savings={isBuilt(material) ? buildSavings(material) : null}
+                        depth={shownDepth(material, sourcing, depthFor)}
+                        savings={isBuilt(material) ? buildSavingsOf(material) : null}
                         editingHave={editingHave === material.typeID}
                         editingPrice={editingPrice === material.typeID}
                         onEditHave={(seed) => editHave(material.typeID, seed)}

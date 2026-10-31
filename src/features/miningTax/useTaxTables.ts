@@ -5,6 +5,7 @@ import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlSort } from '@/lib/useUrlState';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import { statusColumnWidthClass } from '@/features/miningTax/statusColumnWidth';
+import { expandCombinedRows } from '@/features/miningTax/groupRows';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
 import { dateLabel, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { statusLabel, useTaxColumns } from '@/features/miningTax/useTaxColumns';
@@ -91,7 +92,8 @@ export function useTaxTables({
   const csvColumns = useMemo(
     () =>
       taxCsvColumns(t, {
-        showCharacter: showCharacterColumn,
+        oreName: (typeId) => columnInput.typeNames?.get(typeId) ?? `#${typeId}`,
+        securityOf: (dr) => columnInput.systemSecurity?.get(dr.row.entry.solarSystemId),
         dateLabel,
         systemName,
         payeeName: (dr) => (dr.assignment ? payeeDisplayName(dr) : null),
@@ -102,9 +104,17 @@ export function useTaxTables({
             : null,
         statusLabel: (dr) => (dr.corp ? corpStateLabel(dr.corp) : undefined),
       }),
-    [t, showCharacterColumn, systemName, payeeDisplayName, estimatedValueOf, corpStateLabel]
+    [
+      t,
+      columnInput.typeNames,
+      columnInput.systemSecurity,
+      systemName,
+      payeeDisplayName,
+      estimatedValueOf,
+      corpStateLabel,
+    ]
   );
-  const taxExport = useTableExport({
+  const baseExport = useTableExport({
     surface: 'mining-tax',
     rows: visibleRows,
     columns: csvColumns,
@@ -112,6 +122,18 @@ export function useTaxTables({
     // Open one, so the file would drop every settled record.
     source: 'sorted-rows',
   });
+  // Combined rows are split into their days when the export reads them, not on every render.
+  const taxExport = useMemo(() => {
+    const getRows = () => expandCombinedRows(baseExport.getRows());
+    return {
+      ...baseExport,
+      getRows,
+      tableProps: {
+        ...baseExport.tableProps,
+        exportable: { ...baseExport.tableProps.exportable, getRows },
+      },
+    };
+  }, [baseExport]);
 
   return {
     showCharacterColumn,

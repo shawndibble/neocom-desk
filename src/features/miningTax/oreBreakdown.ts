@@ -5,6 +5,7 @@
  * unit-testable without React Testing Library.
  */
 import type { OreLine } from '@/engine/miningTax/types';
+import { joined } from '@/lib/exportSheets';
 
 /** Total units mined across every ore line in a row, regardless of type. */
 export function sumUnits(oreLines: readonly OreLine[]): number {
@@ -26,4 +27,17 @@ export function oreBreakdownSummary(
   const shown = names.slice(0, 2);
   const remaining = names.length - shown.length;
   return remaining > 0 ? `${shown.join(', ')} +${remaining}` : shown.join(', ');
+}
+
+/** Every ore as "Name × units", most units first, for an export cell; null with no lines. */
+export function oreLinesText(
+  oreLines: readonly OreLine[],
+  nameOf: (typeId: number) => string
+): string | null {
+  if (oreLines.length === 0) return null;
+  return joined(
+    [...oreLines]
+      .sort((a, b) => b.quantity - a.quantity)
+      .map((line) => `${nameOf(line.typeId)} × ${line.quantity}`)
+  );
 }

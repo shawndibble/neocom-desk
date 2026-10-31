@@ -49,9 +49,9 @@ function yieldRow(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
 }
 
 const context: YieldOverviewCsvContext = {
-  showCharacter: true,
   showRefining: true,
   systemNames: new Map([[30000142, 'Jita']]),
+  systemSecurity: new Map([[30000142, 0.9]]),
   typeNames: new Map([
     [1230, 'Veldspar'],
     [1228, 'Scordite'],
@@ -68,23 +68,77 @@ describe('yieldOverviewCsvColumns', () => {
       'miningTax.dateColumn',
       'miningTax.characterColumn',
       'miningTax.systemColumn',
+      'miningTax.csvSecurity',
       'miningTax.overview.volumeColumn',
+      'miningTax.csvVolumeUnknownFor',
       'miningTax.overview.rawSellValue',
       'miningTax.overview.refineValue',
+      'miningTax.csvUnpricedOres',
       'miningTax.overview.oreBreakdownColumn',
       'miningTax.overview.unitsColumn',
       'miningTax.overview.pricingColumn',
     ]);
   });
 
-  it('drops Character and Refined value when the table would not offer them', () => {
-    const headers = yieldOverviewCsvColumns(t, {
-      ...context,
-      showCharacter: false,
-      showRefining: false,
-    }).map((c) => c.header);
-    expect(headers).not.toContain('miningTax.characterColumn');
+  it('drops Refined value when refining is off, but always keeps Character', () => {
+    const headers = yieldOverviewCsvColumns(t, { ...context, showRefining: false }).map(
+      (c) => c.header
+    );
+    expect(headers).toContain('miningTax.characterColumn');
     expect(headers).not.toContain('miningTax.overview.refineValue');
+  });
+
+  it('exports security, every ore with its units, and no volume gap when all sizes are known', () => {
+    const byHeader = Object.fromEntries(
+      yieldOverviewCsvColumns(t, context).map((c) => [c.header, c.value(yieldRow())])
+    );
+    expect(byHeader['miningTax.csvSecurity']).toBe(0.9);
+    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe(
+      'Veldspar × 1000; Scordite × 500'
+    );
+    expect(byHeader['miningTax.csvVolumeUnknownFor']).toBeNull();
+  });
+
+  it('names the ores whose volume is unknown, so a partial m3 is not read as complete', () => {
+    const columns = yieldOverviewCsvColumns(t, {
+      ...context,
+      typeVolumes: new Map([[1230, 0.1]]),
+    });
+    const byHeader = Object.fromEntries(columns.map((c) => [c.header, c.value(yieldRow())]));
+    expect(byHeader['miningTax.overview.volumeColumn']).toBeCloseTo(100);
+    expect(byHeader['miningTax.csvVolumeUnknownFor']).toBe('Scordite');
+  });
+
+  it('blanks raw and refined value when no ore line was priced', () => {
+    const row = yieldRow({
+      valuation: {
+        rawValue: 0,
+        refineValue: 0,
+        pricedAll: false,
+        lines: [oreLine(1230, 10, 0, 0)],
+      },
+    } as unknown as Partial<MiningYieldRow>);
+    const byHeader = Object.fromEntries(
+      yieldOverviewCsvColumns(t, context).map((c) => [c.header, c.value(row)])
+    );
+    expect(byHeader['miningTax.overview.rawSellValue']).toBeNull();
+    expect(byHeader['miningTax.overview.refineValue']).toBeNull();
+  });
+
+  it('names the unpriced ores of a partly priced row, so its values read as floors', () => {
+    const row = yieldRow({
+      valuation: {
+        rawValue: 50,
+        refineValue: 60,
+        pricedAll: false,
+        lines: [oreLine(1230, 10, 50, 60), oreLine(1228, 5, 0, 0)],
+      },
+    } as unknown as Partial<MiningYieldRow>);
+    const byHeader = Object.fromEntries(
+      yieldOverviewCsvColumns(t, context).map((c) => [c.header, c.value(row)])
+    );
+    expect(byHeader['miningTax.csvUnpricedOres']).toBe('Scordite');
+    expect(byHeader['miningTax.overview.rawSellValue']).toBe(50);
   });
 
   it('exports raw numbers for volume, values and units', () => {
@@ -97,7 +151,9 @@ describe('yieldOverviewCsvColumns', () => {
     expect(byHeader['miningTax.overview.volumeColumn']).toBeCloseTo(175);
     expect(byHeader['miningTax.overview.rawSellValue']).toBe(123456.5);
     expect(byHeader['miningTax.overview.refineValue']).toBe(150000);
-    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe('Veldspar, Scordite');
+    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe(
+      'Veldspar × 1000; Scordite × 500'
+    );
     expect(byHeader['miningTax.overview.unitsColumn']).toBe(1500);
     expect(byHeader['miningTax.overview.pricingColumn']).toBe('miningTax.overview.pricingFull');
   });
@@ -138,6 +194,8 @@ describe('yieldOreCsvColumns', () => {
       'miningTax.overview.detail.m3Column',
       'miningTax.overview.rawSellValue',
       'miningTax.overview.refineValue',
+      'miningTax.overview.detail.batchesColumn',
+      'miningTax.overview.detail.leftOverColumn',
     ]);
     expect(yieldOreCsvColumns(t, typeNames, typeVolumes, false).map((c) => c.header)).not.toContain(
       'miningTax.overview.refineValue'
@@ -152,9 +210,22 @@ describe('yieldOreCsvColumns', () => {
       100,
       5000,
       null,
+      null,
+      null,
     ]);
     const csv = toCsv([oreLine(1230, 10, 0, 0)], columns);
-    expect(csv.split('\r\n')[1]).toBe('"Veldspar",10,1,,');
+    expect(csv.split('\r\n')[1]).toBe('"Veldspar",10,1,,,,');
+  });
+
+  it('exports whole batches and units left over, blank for a type with no reprocessing data', () => {
+    const columns = yieldOreCsvColumns(t, typeNames, typeVolumes, true);
+    const refinable = {
+      ...oreLine(1230, 250, 1, 1),
+      batches: 2,
+      unitsLeftOver: 50,
+    } as unknown as OreLineValuation;
+    expect(columns.slice(-2).map((c) => c.value(refinable))).toEqual([2, 50]);
+    expect(columns.slice(-2).map((c) => c.value(oreLine(1230, 250, 1, 1)))).toEqual([null, null]);
   });
 
   it('blanks m³ for a type with no known volume', () => {

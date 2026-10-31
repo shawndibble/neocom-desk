@@ -113,8 +113,26 @@ describe('ExportBookSection', () => {
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
     // 2 mining lines + 17 settings rows + 1 log entry.
     expect(done).toHaveTextContent(
-      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 16 sheets, 20 rows$/
+      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 17 sheets, 20 rows$/
     );
+  });
+
+  it('marks the file partial when the log read came back at its cap', async () => {
+    const save = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {});
+    readAudit.mockResolvedValue(
+      Array.from({ length: 2000 }, (_, i) => ({
+        id: `a${i}`,
+        at: i,
+        by: ME,
+        byName: 'Me',
+        action: 'turnOn',
+        detail: {},
+      }))
+    );
+    renderIn(<ExportBookSection />);
+    await userEvent.click(button());
+    await screen.findByRole('status');
+    expect(save.mock.calls[0][0]).toMatch(/-partial\.xlsx$/);
   });
 
   it('says so when the book cannot be read, and downloads nothing', async () => {

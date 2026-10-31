@@ -1,6 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
 import type { CsvColumn } from './csv';
-import { toCell, type ExportCell, type ExportValue } from './exportCells';
+import { MAX_CELL_TEXT, toCell, type ExportCell, type ExportValue } from './exportCells';
 import { DAY_MS } from '@/lib/age';
 
 /**
@@ -74,9 +74,6 @@ function uniqueSheetNames(names: readonly string[]): string[] {
     return name;
   });
 }
-
-/** Excel's limit for one cell's text; past it the file opens only through a repair prompt. */
-const MAX_CELL_TEXT = 32_767;
 
 function cellXml(ref: string, cell: ExportCell, style?: number): string {
   const s = style ? ` s="${style}"` : '';
