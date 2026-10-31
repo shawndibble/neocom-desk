@@ -95,7 +95,8 @@ export function pendingColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
       id: 'amount',
       header: ctx.t('srp.officer.columns.amount'),
       align: 'right',
-      className: 'min-w-36 wrap-anywhere',
+      // Capped so a long basis line wraps here, leaving the room to Pilot and Hull.
+      className: 'min-w-36 max-w-44 wrap-anywhere',
       render: (row) => <PendingAmount claim={row} ctx={ctx} />,
     },
     {
