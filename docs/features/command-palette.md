@@ -57,15 +57,15 @@ Code: `src/features/commandPalette/` (`CommandPaletteHost.tsx`, `CommandPalette.
 
 ## Groups
 
-| Order | Group        | Min chars | Matches                                                                 | On select                                                | Source                                                              |
-| ----- | ------------ | --------- | ----------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
-| 0     | Pages        | 0         | label (primary), breadcrumb and translated keywords (secondary)         | `navigate(path)`                                         | `listNavDestinations`                                               |
-| 1     | Commands     | 1         | label                                                                   | run command                                              | `PALETTE_COMMANDS`                                                  |
-| 2     | Characters   | 1         | Character name; "Active" hint on the current one                        | `setActiveCharacter(id)`                                 | Dexie `characters` live query                                       |
-| 3     | Assets       | 2         | item name; sublabel "Char xN" per holder, hint total "xN"               | navigate `/assets?q=<name>[&chars=all]`                  | cached assets of all Characters whose token has the assets scope    |
-| 4     | Market items | 3         | name: exact, prefix, substring (own scan, alphabetical per rank)        | Item Detail modal over current page (`showOpenInMarket`) | SDE market catalogue (~19.5k types, lazy ~1.5 MB, outside precache) |
-| 5     | LP Stores    | 2         | NPC corp name; hint "N LP" for corps the active Character holds LP with | navigate `/market/lp-store/<corpId>`                     | SDE `loadLpCorporations` + cached loyalty balances                  |
-| 6     | Contacts     | 1         | contact name; sublabel type + "+standing Character" per holder          | open Public Info modal                                   | cached contacts across Characters whose token has contacts scope    |
+| Order | Group        | Min chars | Matches                                                                 | On select                                                             | Source                                                              |
+| ----- | ------------ | --------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 0     | Pages        | 0         | label (primary), breadcrumb and translated keywords (secondary)         | `navigate(path)`                                                      | `listNavDestinations`                                               |
+| 1     | Commands     | 1         | label                                                                   | run command                                                           | `PALETTE_COMMANDS`                                                  |
+| 2     | Characters   | 1         | Character name; "Active" hint on the current one                        | `setActiveCharacter(id)`                                              | Dexie `characters` live query                                       |
+| 3     | Assets       | 2         | item name; sublabel "Char xN" per holder, hint total "xN"               | navigate `/assets?q=<name>[&chars=all]`                               | cached assets of all Characters whose token has the assets scope    |
+| 4     | Market items | 3         | name: exact, prefix, substring (own scan, alphabetical per rank)        | navigate `/market/browser?type=<id>` (keeps the browser's hub/region) | SDE market catalogue (~19.5k types, lazy ~1.5 MB, outside precache) |
+| 5     | LP Stores    | 2         | NPC corp name; hint "N LP" for corps the active Character holds LP with | navigate `/market/lp-store/<corpId>`                                  | SDE `loadLpCorporations` + cached loyalty balances                  |
+| 6     | Contacts     | 1         | contact name; sublabel type + "+standing Character" per holder          | open Public Info modal                                                | cached contacts across Characters whose token has contacts scope    |
 
 - Pages: empty query lists pages only (kind `page`), uncapped, as a quick navigator; with a query, tabs and sub-views are included, capped to 6 (`providers.ts:34-53`). Corp pages are listed only while the Corp entry is visible (hidden, never locked); other scope-gated pages are marked locked, never hidden. Contacts lists Standings but not its character-filter views (`controlTabs`: no `/contacts/across` entry).
 - Commands (`PALETTE_COMMANDS`, `providers.ts:70-95`): Open settings (`/settings`), Keyboard shortcuts (`/help/shortcuts`), Add character (`beginAddCharacterLogin()`), Open notification feed (`/alerts`).
@@ -80,7 +80,7 @@ Nothing persisted: query and highlight are component state; no recents, no histo
 
 ## Test-covered behaviours (`CommandPalette.test.tsx`, `providers.test.ts`, `usePaletteSearch.test.tsx`, provider tests)
 
-Ctrl+K from a text field (:120), no stacking over dialogs (:137), empty query lists pages (:152), "opp" finds Industry > Opportunities (:161), history replace on navigate (:177), fixed group order and cross-group arrows (:199), locked page marked but navigable (:223), Character switch (:233), catalogue load on open (:243), catalogue failure scoped to its group (:268), Item Detail focus return (:290), Add character (:310), contacts never fetch and need scope (:350, :365), LP store open and balance hint (:381, :393), LP list loading does not block typing (:412).
+Ctrl+K from a text field (:120), no stacking over dialogs (:137), empty query lists pages (:152), "opp" finds Industry > Opportunities (:161), history replace on navigate (:177), fixed group order and cross-group arrows (:199), locked page marked but navigable (:223), Character switch (:233), catalogue load on open (:243), catalogue failure scoped to its group (:268), Market items pick opens the Market Browser, Add character (:310), contacts never fetch and need scope (:350, :365), LP store open and balance hint (:381, :393), LP list loading does not block typing (:412).
 
 ## Interview Q&A
 

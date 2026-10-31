@@ -72,7 +72,7 @@ Reads the SDE skill catalog and, if a Character is active, trained skills via `l
 
 ## Item Detail host (`src/features/entities/ItemInfoModal.tsx`)
 
-Mounted while `?info=type-<id>` is set; lazy-loads `ItemDetailModal` (guarded chunk). Supplies page-less Item Actions (`usePageItemActions`, `lazyBlueprints: true`) so "Used in" menus work with no page. Passes `showOpenInMarket`: header "Open in Market". Item Detail contents: see `docs/features/assets.md` ("Item Detail (Show info) as reached from Assets"); `market.md` only mentions it. The palette's Market items pick opens the same modal without a URL change (`src/features/commandPalette/CommandPaletteHost.tsx`).
+Mounted while `?info=type-<id>` is set; lazy-loads `ItemDetailModal` (guarded chunk). Supplies page-less Item Actions (`usePageItemActions`, `lazyBlueprints: true`) so "Used in" menus work with no page. Passes `showOpenInMarket`: header "Open in Market". Item Detail contents: see `docs/features/assets.md` ("Item Detail (Show info) as reached from Assets"); `market.md` only mentions it.
 
 ## Stored Share Links
 

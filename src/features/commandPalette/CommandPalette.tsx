@@ -1,4 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
+import { marketItemUrl } from '@/engine/market/urlState';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   useEffect,
@@ -48,11 +49,7 @@ import {
   type PaletteAsset,
 } from './assetsProvider';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
-import {
-  createMarketItemsProvider,
-  marketItemCatalogue,
-  type ShownMarketItem,
-} from './marketItems';
+import { createMarketItemsProvider, marketItemCatalogue } from './marketItems';
 import { loadLpCorporations, loadSolarSystems } from '@/sde/loadMarketSde';
 import { loadShipTree } from '@/sde/loadSde';
 import { ENTITY_INFO_PUSHED_STATE } from '@/features/entities/entityInfoState';
@@ -87,7 +84,7 @@ function signedStanding(standing: number): string {
 }
 
 /** The live reads behind the shipped groups, turned into providers. */
-function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
+function useShippedProviders(): {
   providers: PaletteProvider[];
   destinations: NavDestination[];
 } {
@@ -252,11 +249,16 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
       places,
       lpStores,
       ships,
-      createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),
+      createMarketItemsProvider({
+        catalogue: marketItemCatalogue,
+        // The Market Browser, carrying the hub or region it is already on.
+        onSelect: ({ typeId }) => void navigate(marketItemUrl(typeId, location.search)),
+      }),
     ],
     [
       destinations,
       navigate,
+      location.search,
       t,
       characters,
       activeCharacterId,
@@ -267,7 +269,6 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
       places,
       lpStores,
       ships,
-      onShowItem,
     ]
   );
   return { providers, destinations };
@@ -275,8 +276,6 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): {
 
 interface CommandPaletteProps {
   onClose: () => void;
-  /** A Market Items pick: Item Detail over the current page, owned by the host so it outlives the palette. */
-  onShowItem: (item: ShownMarketItem) => void;
 }
 
 /**
@@ -294,12 +293,12 @@ interface CommandPaletteProps {
  * Rendered only while open (`CommandPaletteHost`), so each opening starts
  * with an empty query and the first result highlighted.
  */
-export function CommandPalette({ onClose, onShowItem }: CommandPaletteProps) {
+export function CommandPalette({ onClose }: CommandPaletteProps) {
   const { t } = useTranslation();
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement>(null);
-  const { providers, destinations } = useShippedProviders(onShowItem);
+  const { providers, destinations } = useShippedProviders();
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
   // Only the latest paste may navigate, whichever classifies first.

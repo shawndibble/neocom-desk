@@ -44,29 +44,6 @@ function lateCatalogue() {
   return { load, resolve: (catalogue: MarketTypeEntry[]) => resolve(catalogue) };
 }
 
-// The real modal reads ESI; this stand-in is a real `Modal`, so focus
-// hand-back is the real thing.
-vi.mock('@/features/market/ItemDetailModal', async () => {
-  const { Modal } = await import('@/components/ui');
-  return {
-    ItemDetailModal: ({
-      typeId,
-      itemName,
-      onClose,
-      showOpenInMarket,
-    }: {
-      typeId: number;
-      itemName: string;
-      onClose: () => void;
-      showOpenInMarket?: boolean;
-    }) => (
-      <Modal open onClose={onClose} title={itemName}>
-        <p>{`Item Detail ${typeId}${showOpenInMarket ? ' with market link' : ''}`}</p>
-      </Modal>
-    ),
-  };
-});
-
 // One Set, as the real hook memoises it: a fresh one per render would be a
 // fresh search per render, and a failing async group would never settle.
 const LOCKED = new Set(['/assets']);
@@ -471,24 +448,17 @@ describe('CommandPalette', () => {
     expect(list).not.toContainElement(input);
   });
 
-  it('opens Item Detail over the current page and hands focus back on close', async () => {
+  it('opens the Market Browser on a picked item', async () => {
     const user = userEvent.setup();
     renderShell();
-    const pageSearch = screen.getByRole('textbox', { name: 'Page search' });
-    await user.click(pageSearch);
     await user.keyboard('{Control>}k{/Control}');
     await user.type(await screen.findByRole('combobox'), 'rifter');
     const items = await screen.findByRole('group', { name: 'Market items' });
     await user.click(within(items).getByRole('option', { name: 'Rifter' }));
 
-    const detail = await screen.findByRole('dialog', { name: 'Rifter' });
-    expect(within(detail).getByText('Item Detail 587 with market link')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
-
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog', { name: 'Rifter' })).not.toBeInTheDocument();
-    expect(pageSearch).toHaveFocus();
+    expect(screen.getByTestId('where')).toHaveTextContent('/market/browser');
+    expect(screen.getByTestId('search')).toHaveTextContent('type=587');
   });
 
   it('runs the Add character command through the login flow', async () => {
