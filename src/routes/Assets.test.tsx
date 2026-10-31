@@ -374,7 +374,7 @@ describe('Assets', () => {
     await screen.findByText(JITA);
 
     const search = screen.getByPlaceholderText(/search items/i);
-    const pinButton = new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`);
+    const pinButton = new RegExp(`More actions for ${escapeRegExp(JITA)}`);
     await user.type(search, 'tritanium');
     // A search result links to its location too, so its own text legitimately
     // includes "Jita IV…" — the root list's pin button is what only the root
@@ -664,8 +664,11 @@ describe('Assets', () => {
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
-    // The ship row carries no ⋮ or menu; "Open in Fittings" lives in the opened ship's header.
-    expect(screen.queryByRole('button', { name: /^More actions/ })).not.toBeInTheDocument();
+    // The ship row's menu offers where it sits (Set waypoint) and its name; "Open in Fittings" lives in the opened ship's header.
+    await user.click(screen.getByRole('button', { name: 'More actions for Drake' }));
+    expect(await screen.findByRole('menuitem', { name: /set waypoint/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
     expect(screen.queryByRole('button', { name: 'Open in Fittings' })).not.toBeInTheDocument();
 
     await openLocation(user, 'Drake');
@@ -754,15 +757,23 @@ describe('abyssal modules', () => {
   });
 });
 
+/** Opens a location row's ⋮ menu and picks its pin item (the pin lives in the row menu). */
+async function pinViaMenu(user: ReturnType<typeof userEvent.setup>, place: string, item: RegExp) {
+  await user.click(
+    await screen.findByRole('button', {
+      name: new RegExp(`More actions for ${escapeRegExp(place)}`),
+    })
+  );
+  await user.click(await screen.findByRole('menuitem', { name: item }));
+}
+
 describe('station pins (issue #84)', () => {
   it('cycles a location pin unpinned -> character -> account -> unpinned, persisting to Dexie', async () => {
     const user = userEvent.setup({ delay: null });
     render(<App />);
-    const pinButton = await screen.findByRole('button', {
-      name: new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`),
-    });
+    await screen.findByText(JITA);
 
-    await user.click(pinButton);
+    await pinViaMenu(user, JITA, /pin for this character/i);
     await waitFor(async () => {
       expect(await db.stationPins.get(`${CHAR_ID}:60003760`)).toMatchObject({
         characterId: CHAR_ID,
@@ -771,12 +782,12 @@ describe('station pins (issue #84)', () => {
       });
     });
 
-    await user.click(pinButton);
+    await pinViaMenu(user, JITA, /pin for all characters/i);
     await waitFor(async () => {
       expect((await db.stationPins.get(`${CHAR_ID}:60003760`))?.scope).toBe('account');
     });
 
-    await user.click(pinButton);
+    await pinViaMenu(user, JITA, /^unpin$/i);
     await waitFor(async () => {
       expect(await db.stationPins.get(`${CHAR_ID}:60003760`)).toBeUndefined();
     });
@@ -788,10 +799,7 @@ describe('station pins (issue #84)', () => {
     await screen.findByText(JITA);
     expect(locationOrder()).toEqual([JITA, STRUCTURE]);
 
-    const pinButton = screen.getByRole('button', {
-      name: new RegExp(`Pin toggle for ${escapeRegExp(STRUCTURE)}`),
-    });
-    await user.click(pinButton);
+    await pinViaMenu(user, STRUCTURE, /pin for this character/i);
 
     await waitFor(() => {
       expect(locationOrder()).toEqual([STRUCTURE, JITA]);
