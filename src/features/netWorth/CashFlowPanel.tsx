@@ -1,15 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
-import {
-  Eyebrow,
-  IskDelta,
-  Panel,
-  SegmentedControl,
-  Spinner,
-  textActionClassName,
-} from '@/components/ui';
+import { Eyebrow, IskDelta, Panel, SegmentedControl, Spinner } from '@/components/ui';
 import { classifyJournal, type JournalRow } from '@/engine/journalNetting';
 import { utcDay } from '@/engine/localDay';
 import { useNow } from '@/lib/useNow';
@@ -113,14 +106,12 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
       }
     >
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Figure label={t('wallet.cashFlow.earned')}>{formatIsk(flow.earned)} ISK</Figure>
-        <Figure label={t('wallet.cashFlow.spent')}>{formatIsk(flow.spent)} ISK</Figure>
+        <Figure label={t('wallet.cashFlow.earned')}>{formatIsk(flow.earned)}</Figure>
+        <Figure label={t('wallet.cashFlow.spent')}>{formatIsk(flow.spent)}</Figure>
         <Figure label={t('wallet.cashFlow.net')}>
-          <IskDelta amount={flow.net} decimals={0} /> ISK
+          <IskDelta amount={flow.net} decimals={0} />
         </Figure>
-        <Figure label={t('wallet.cashFlow.perDay')}>
-          {formatIsk(Math.round(flow.perDay))} ISK
-        </Figure>
+        <Figure label={t('wallet.cashFlow.perDay')}>{formatIsk(Math.round(flow.perDay))}</Figure>
       </div>
       {delta !== null && (
         <p className="mt-2 text-xs text-text-dim">
@@ -164,7 +155,7 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
           <span aria-hidden className="mr-1 inline-block size-2 rounded-xs bg-isk-neg" />
           {t('wallet.journalFlowLegendOut')}
         </span>
-        <span>{t('wallet.cashFlow.clickHint', { context: touch ? 'touch' : undefined })}</span>
+        {!touch && <span>{t('wallet.cashFlow.clickHint')}</span>}
       </p>
       <p className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-text-dim">
         <span>
@@ -175,9 +166,6 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
           {snapshot.skipped.length > 0 &&
             ` ${t('wallet.cashFlow.skipped', { count: snapshot.skipped.length })}`}
         </span>
-        <Link to="/wallet/journal" className={textActionClassName()}>
-          {t('wallet.waiting.openJournal')}
-        </Link>
       </p>
     </Panel>
   );
