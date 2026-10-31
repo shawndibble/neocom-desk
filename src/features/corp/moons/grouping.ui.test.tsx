@@ -212,4 +212,15 @@ describe('MinerCharacters', () => {
     );
     expect(readGroupingSources).toHaveBeenCalledWith(7, CORP);
   });
+
+  it('says so when the other Miners could not be read', async () => {
+    readGroupingSources.mockRejectedValue(new Error('offline'));
+    renderPanel([], 'solo:1', (r) => <MinerCharacters miner={r} />, [], {
+      entries: [entry(1)],
+      data: { scopedMiner: 'solo:1' },
+    });
+    await openCharacters();
+    await userEvent.click(screen.getByRole('button', { name: 'Group with' }));
+    expect(await screen.findByText(/Couldn't load the other Miners/)).toBeInTheDocument();
+  });
 });

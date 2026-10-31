@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import { minerChoices, type MinerChoice } from '@/engine/corpTaxBook/grouping';
 import { resolveNames } from '@/features/character/names';
@@ -7,7 +7,8 @@ import { readGroupingSources } from '../taxBook/bookClient';
 import { useBook } from './useBook';
 
 export interface MinerChoices {
-  /** Every Miner the book knows, as the Miners tab lists them. */
+  status: 'loading' | 'ready' | 'failed';
+  /** Every stored group, and every ungrouped character mining since the start date. */
   choices: readonly MinerChoice[];
   /** The stored groups, which `planRegroup` needs whole. */
   stored: readonly Miner[];
@@ -15,17 +16,19 @@ export interface MinerChoices {
   name: (characterId: number) => string;
 }
 
-interface Fetched {
-  key: string;
-  choices: MinerChoice[];
-  stored: Miner[];
-  names: Map<number, string>;
-}
+type Fetched =
+  | { key: string; status: 'failed' }
+  | {
+      key: string;
+      status: 'ready';
+      choices: MinerChoice[];
+      stored: Miner[];
+      names: Map<number, string>;
+    };
 
 /**
- * The Miners a dialog can pick from (#5704). The whole book already holds them. A one-Miner
- * read (`data.scopedMiner`) holds only its own, so the groups and ledger rows are read here,
- * once per open, through the device's copies; until then the list is empty.
+ * The Miners a dialog can pick from. A one-Miner read (`data.scopedMiner`) holds only its
+ * own, so the groups and ledger rows are read here, once per open, through the device's copies.
  */
 export function useMinerChoices(): MinerChoices {
   const { characterId, corporationId, view, data, names, settings } = useBook();
@@ -39,7 +42,7 @@ export function useMinerChoices(): MinerChoices {
     let cancelled = false;
     (async () => {
       const sources = await readGroupingSources(characterId, corporationId);
-      if (!sources) return;
+      if (!sources) throw new Error('no book');
       const base = { corporationId, startDate, miners: sources.miners, entries: sources.observed };
       const ids = minerChoices(base).flatMap((c) => c.characterIds);
       const [memberIds, resolved] = await Promise.all([
@@ -49,21 +52,34 @@ export function useMinerChoices(): MinerChoices {
       if (cancelled) return;
       setFetched({
         key,
+        status: 'ready',
         choices: minerChoices({ ...base, ...(memberIds ? { memberIds } : {}) }),
         stored: sources.miners,
         names: resolved,
       });
-    })().catch(() => undefined);
+    })().catch(() => {
+      if (!cancelled) setFetched({ key, status: 'failed' });
+    });
     return () => {
       cancelled = true;
     };
   }, [scoped, key, characterId, corporationId, startDate]);
 
-  if (!scoped) return { choices: view.miners, stored: data.state.miners, name: names.character };
-  const held = fetched?.key === key ? fetched : null;
-  return {
-    choices: held?.choices ?? [],
-    stored: held?.stored ?? data.state.miners,
-    name: (id) => held?.names.get(id) ?? names.character(id),
-  };
+  return useMemo(() => {
+    if (!scoped)
+      return {
+        status: 'ready',
+        choices: view.miners,
+        stored: data.state.miners,
+        name: names.character,
+      };
+    const held = fetched?.key === key ? fetched : null;
+    const ready = held?.status === 'ready' ? held : null;
+    return {
+      status: held?.status ?? 'loading',
+      choices: ready?.choices ?? [],
+      stored: ready?.stored ?? data.state.miners,
+      name: (id: number) => ready?.names.get(id) ?? names.character(id),
+    };
+  }, [scoped, view.miners, data.state.miners, names, fetched, key]);
 }

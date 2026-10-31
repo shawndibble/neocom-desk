@@ -109,7 +109,11 @@ async function load(db: Firestore, corporationId: number, minerIds: readonly str
   return { records, existing };
 }
 
-async function apply(db: Firestore, corporationId: number, plan: TotalsPlan): Promise<void> {
+async function apply(
+  db: Firestore,
+  corporationId: number,
+  plan: Pick<TotalsPlan, 'writes' | 'deletes'>
+): Promise<void> {
   const ops: { ref: DocumentReference; data?: Data }[] = [
     ...plan.writes.map((t) => ({
       ref: sub(db, corporationId, MINER_TOTALS).doc(t.minerId),
@@ -195,9 +199,11 @@ export async function refreshAfterEvent(
   const full: Scope = Array.isArray(scope)
     ? { minerIds: [...scope], statementIds: [], paymentIds: [], all: false }
     : (scope as Scope);
-  let minerIds: readonly string[] | 'all' = full.all ? 'all' : full.minerIds;
+  // Until a Statement's or payment's Miner is looked up, any Miner may be the stale one.
+  const unresolved = full.statementIds.length > 0 || full.paymentIds.length > 0;
+  let minerIds: readonly string[] | 'all' = full.all || unresolved ? 'all' : full.minerIds;
   try {
-    if (minerIds === 'all') {
+    if (full.all) {
       await reconcileMinerTotals(db, corporationId, 'all');
       return;
     }
@@ -205,7 +211,9 @@ export async function refreshAfterEvent(
     if (minerIds.length > 0) await reconcileMinerTotals(db, corporationId, minerIds);
   } catch (e) {
     console.error('miner totals refresh failed', e instanceof Error ? e.message : e);
-    await invalidateMinerTotals(db, corporationId, minerIds).catch(() => undefined);
+    await invalidateMinerTotals(db, corporationId, minerIds).catch((err) =>
+      console.error('miner totals invalidate failed', err instanceof Error ? err.message : err)
+    );
   }
 }
 
@@ -218,12 +226,7 @@ async function invalidateMinerTotals(
   const totals = sub(db, corporationId, MINER_TOTALS);
   const refs =
     minerIds === 'all' ? await totals.listDocuments() : minerIds.map((id) => totals.doc(id));
-  await apply(db, corporationId, {
-    writes: [],
-    deletes: refs.map((r) => r.id),
-    mismatches: [],
-    checked: 0,
-  });
+  await apply(db, corporationId, { writes: [], deletes: refs.map((r) => r.id) });
 }
 
 // --- The scheduled verifier ---------------------------------------------------

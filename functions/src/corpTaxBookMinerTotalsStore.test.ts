@@ -11,7 +11,14 @@ function fakeDb(failReads: boolean) {
       if (failReads) throw new Error('boom');
       return empty;
     },
-    doc: (id: string) => ({ id, path: `${path}/${id}`, get: async () => empty }),
+    doc: (id: string) => ({
+      id,
+      path: `${path}/${id}`,
+      get: async () => {
+        if (failReads) throw new Error('boom');
+        return empty;
+      },
+    }),
     where: () => col(path),
     listDocuments: async () => ['m1', 'm2'].map((id) => ({ id, path: `${path}/${id}` })),
   });
@@ -44,6 +51,18 @@ describe('refreshAfterEvent', () => {
     const { db, deleted } = fakeDb(true);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await refreshAfterEvent(db, 1, { minerIds: [], statementIds: [], paymentIds: [], all: true });
+    expect(deleted.sort()).toEqual(['corps/1/minerTotals/m1', 'corps/1/minerTotals/m2']);
+  });
+
+  it("deletes every totals doc when a Statement's Miner could not be looked up", async () => {
+    const { db, deleted } = fakeDb(true);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await refreshAfterEvent(db, 1, {
+      minerIds: [],
+      statementIds: ['s1'],
+      paymentIds: [],
+      all: false,
+    });
     expect(deleted.sort()).toEqual(['corps/1/minerTotals/m1', 'corps/1/minerTotals/m2']);
   });
 

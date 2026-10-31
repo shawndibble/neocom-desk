@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Checkbox, SearchInput, SegmentedControl } from '@/components/ui';
+import { Checkbox, SearchInput, SegmentedControl, Spinner } from '@/components/ui';
+import { InlineError } from '@/components/ui/InlineError';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { planRegroup } from '@/engine/corpTaxBook/grouping';
@@ -25,7 +26,7 @@ export function GroupMinersDialog({
 }) {
   const { t } = useTranslation();
   const { names, edit } = useBook();
-  const { choices, stored, name } = useMinerChoices();
+  const { status, choices, stored, name } = useMinerChoices();
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [main, setMain] = useState(String(miner.mainCharacterId));
@@ -70,6 +71,10 @@ export function GroupMinersDialog({
         placeholder={t('corpTaxBook.moons.miners.search')}
         aria-label={t('corpTaxBook.moons.miners.searchLabel')}
       />
+      {status === 'loading' && <Spinner block="panel" delayMs={200} label={t('common.loading')} />}
+      {status === 'failed' && (
+        <InlineError>{t('corpTaxBook.moons.grouping.listFailed')}</InlineError>
+      )}
       <ul className="max-h-56 space-y-1 overflow-auto">
         {others.map((m) => (
           <li key={m.id}>
