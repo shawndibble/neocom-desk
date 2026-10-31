@@ -33,6 +33,8 @@ function context(assets: readonly CharacterAsset[], over: Partial<AssetCsvContex
     itemValueByItemId: new Map(),
     volumeByTypeId: new Map([[34, 0.01]]),
     blueprintTypeIds: null,
+    placeNicknames: {} as Readonly<Record<number, string>>,
+    characterNameOf: () => 'Rixx Javix',
     t,
     ...over,
   } satisfies AssetCsvContext;
@@ -47,15 +49,15 @@ describe('assetCsvRows', () => {
         { label: 'Jita IV - Moon 4', entries: [{ asset: a, name: 'Tritanium' }] },
         {
           label: 'Jita IV - Moon 4',
-          nickname: 'Home market',
           entries: [{ asset: b, name: 'Badger', gameName: 'Hauler 1' }],
         },
       ],
-      context([a, b])
+      context([a, b], { placeNicknames: { 60003760: 'Home market' } })
     );
-    expect(rows.map((r) => [r.name, r.nickname, r.gameName])).toEqual([
-      ['Tritanium', '', ''],
-      ['Badger', 'Home market', 'Hauler 1'],
+    // The nickname belongs to the root station, whatever holds the item.
+    expect(rows.map((r) => [r.name, r.nickname, r.gameName, r.character])).toEqual([
+      ['Tritanium', 'Home market', '', 'Rixx Javix'],
+      ['Badger', 'Home market', 'Hauler 1', 'Rixx Javix'],
     ]);
   });
 
@@ -186,6 +188,7 @@ describe('assetsCsvColumns', () => {
       'assets.csvLocationPath',
       'assets.csvPlace',
       'assets.csvSystem',
+      'assets.csvCharacter',
       'assets.csvItem',
       'assets.csvGameName',
       'assets.csvQuantity',
@@ -208,6 +211,6 @@ describe('assetsCsvColumns', () => {
       context([a])
     );
     const csv = toCsv(rows, assetsCsvColumns(t));
-    expect(csv.split('\r\n')[1].split(',')[6]).toBe('12345');
+    expect(csv.split('\r\n')[1].split(',')[7]).toBe('12345');
   });
 });

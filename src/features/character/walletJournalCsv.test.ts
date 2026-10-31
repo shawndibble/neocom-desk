@@ -120,7 +120,7 @@ describe('walletJournalCsvColumns', () => {
   });
 
   it('adds a Character column after the date in the multi-Character view', () => {
-    const columns = walletJournalCsvColumns(t, (id) => `Pilot ${id}`);
+    const columns = walletJournalCsvColumns(t, { characterName: (id) => `Pilot ${id}` });
     expect(columns.slice(0, 3).map((c) => c.header)).toEqual([
       'wallet.date',
       'wallet.balanceCharacterColumn',
@@ -155,9 +155,11 @@ describe('walletJournalCsvColumns', () => {
       quantity: 12,
       unit_price: 5.5,
     } as WalletTransactionCommon;
-    const columns = walletJournalCsvColumns(t, undefined, undefined, {
-      linkFor: (line) => (line.id === 1 ? fill : undefined),
-      nameFor: () => 'Tritanium',
+    const columns = walletJournalCsvColumns(t, {
+      fills: {
+        linkFor: (line) => (line.id === 1 ? fill : undefined),
+        nameFor: () => 'Tritanium',
+      },
     });
     const values = (row: WalletJournalEntry) =>
       Object.fromEntries(columns.map((c) => [c.header + '#' + columns.indexOf(c), c.value(row)]));

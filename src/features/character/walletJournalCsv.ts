@@ -23,12 +23,18 @@ import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
  */
 export function walletJournalCsvColumns(
   t: CsvTranslate,
-  characterName?: (characterId: number) => string,
-  playerName?: (entry: JournalRow) => string,
-  fills?: {
-    linkFor: (entry: JournalRow) => WalletTransactionCommon | undefined;
-    nameFor: (typeId: number) => string;
-  }
+  {
+    characterName,
+    playerName,
+    fills,
+  }: {
+    characterName?: (characterId: number) => string;
+    playerName?: (entry: JournalRow) => string;
+    fills?: {
+      linkFor: (entry: JournalRow) => WalletTransactionCommon | undefined;
+      nameFor: (typeId: number) => string;
+    };
+  } = {}
 ): CsvColumn<JournalRow>[] {
   const fillColumns: CsvColumn<JournalRow>[] = fills
     ? [

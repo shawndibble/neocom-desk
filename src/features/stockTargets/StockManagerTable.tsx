@@ -3,7 +3,7 @@
  * in place (§6c's faint pencil); a row opens Show Info; the row's ⋮ is the
  * item menu every other item row has, plus "Remove from list".
  */
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -373,10 +373,14 @@ export function StockManagerTable({
   );
 
   // Every column, whatever the picker shows; the rows are the table's own, in its sort.
+  const stockColumns = useMemo(
+    () => stockCsvColumns(t, { nameOf, groupOf, characterName }),
+    [t, nameOf, groupOf, characterName]
+  );
   const stockExport = useTableExport({
     surface: 'stock-targets',
     rows,
-    columns: stockCsvColumns(t, { nameOf, groupOf, characterName }),
+    columns: stockColumns,
   });
 
   return (
@@ -394,7 +398,6 @@ export function StockManagerTable({
           </Button>
         )}
         <span className="ml-auto flex items-center gap-2">
-          <TableActionsMenu name={t('stockTargets.table.label')} tableExport={stockExport} />
           <ColumnPickerMenu
             available={STOCK_COLUMN_IDS}
             visible={visible}
@@ -405,6 +408,7 @@ export function StockManagerTable({
             menuTitle={t('common.columnsMenuTitle')}
             resetLabel={t('common.resetColumns')}
           />
+          <TableActionsMenu name={t('stockTargets.table.label')} tableExport={stockExport} />
         </span>
       </div>
       <DataTable

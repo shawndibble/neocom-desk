@@ -302,51 +302,6 @@ export function useAssetsData() {
   const volumeByTypeId = data?.volumeByTypeId ?? NO_NUMBERS;
   const assetNames = data?.assetNames ?? NO_ASSET_NAMES;
 
-  // CSV export always stays scoped to the active Character's own assets,
-  // regardless of the cross-character toggle — exporting another Character's
-  // items without a character column would misattribute them.
-  //
-  // The grouped/sorted rows are built only when the export actually runs
-  // (`assetsExport.getRows` below) — matching every asset and locale-sorting
-  // on each data/search change was waste for a menu that is rarely opened.
-  function buildCsvGroups() {
-    const csvAssetsByItemId = new Map(
-      (assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])
-    );
-    const searched = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch, assetNames);
-    // The export follows the on-screen filters: Category, Blueprints, min value.
-    const matches =
-      kindFilter || minValueThreshold > 0
-        ? searched.filter(
-            (m) =>
-              (!kindFilter || assetPassesKindFilter(m.asset, kindFilter)) &&
-              (minValueThreshold <= 0 ||
-                assetStackValue(m.asset, priceByTypeId, itemValueByItemId) >= minValueThreshold)
-          )
-        : searched;
-
-    const byLocation = new Map<number, AssetMatch[]>();
-    for (const entry of matches) {
-      const list = byLocation.get(entry.asset.location_id) ?? [];
-      list.push(entry);
-      byLocation.set(entry.asset.location_id, list);
-    }
-    return [...byLocation.entries()]
-      .map(([locationId, locationEntries]) => ({
-        locationId,
-        label: locationLabel(
-          locationId,
-          locationEntries[0].asset.location_type,
-          locationNames,
-          csvAssetsByItemId,
-          typeNames,
-          t
-        ),
-        entries: locationEntries.sort((a, b) => a.name.localeCompare(b.name)),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }
-
   // On-screen matching: the active Character's own assets, plus every other
   // Character's when the cross-character toggle is on and a search is active
   // (see `activeCrossCharacterData` above) — merging is safe because asset
@@ -365,7 +320,7 @@ export function useAssetsData() {
   );
   // The React Compiler is not enabled in this build; it only objects to these
   // two memos' dependency shape, which the hand-written deps get right.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+
   const priceByTypeId = useMemo(
     () =>
       abyssal.isAbyssalType
@@ -373,7 +328,7 @@ export function useAssetsData() {
         : typePrices,
     [typePrices, abyssal.isAbyssalType]
   );
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+
   const itemValueByItemId = useMemo(() => {
     if (!activeCrossCharacterData && abyssal.values.size === 0) return ownCopyValues;
     return new Map([
@@ -391,7 +346,7 @@ export function useAssetsData() {
     return merged;
   }, [typeNames, activeCrossCharacterData]);
   const blueprintTypeIds = useBlueprintTypeIds(mergedTypeNames);
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+
   const kindFilter = useMemo<AssetKindFilter | null>(() => {
     if (!categoryIndex) return null;
     const filter = {
@@ -420,6 +375,51 @@ export function useAssetsData() {
     () => new Map(mergedAssets.map((asset) => [asset.item_id, asset])),
     [mergedAssets]
   );
+  const ownSystemNames = data?.systemNameByLocationId ?? NO_NAMES;
+  const mergedSystemNames = useMemo(() => {
+    if (!activeCrossCharacterData) return ownSystemNames;
+    return new Map([...activeCrossCharacterData.systemNameByLocationId, ...ownSystemNames]);
+  }, [ownSystemNames, activeCrossCharacterData]);
+
+  // The export follows the page: what the search, Category, Blueprints and min value leave on
+  // screen, including other Characters' assets while a search runs (a Character column says whose).
+  //
+  // The grouped/sorted rows are built only when the export actually runs
+  // (`assetsExport.getRows` below) — matching every asset and locale-sorting
+  // on each data/search change was waste for a menu that is rarely opened.
+  function buildCsvGroups() {
+    const searched = matchAssets(mergedAssets, mergedTypeNames, debouncedSearch, assetNames);
+    const matches =
+      kindFilter || minValueThreshold > 0
+        ? searched.filter(
+            (m) =>
+              (!kindFilter || assetPassesKindFilter(m.asset, kindFilter)) &&
+              (minValueThreshold <= 0 ||
+                assetStackValue(m.asset, priceByTypeId, itemValueByItemId) >= minValueThreshold)
+          )
+        : searched;
+
+    const byLocation = new Map<number, AssetMatch[]>();
+    for (const entry of matches) {
+      const list = byLocation.get(entry.asset.location_id) ?? [];
+      list.push(entry);
+      byLocation.set(entry.asset.location_id, list);
+    }
+    return [...byLocation.entries()]
+      .map(([locationId, locationEntries]) => ({
+        locationId,
+        label: locationLabel(
+          locationId,
+          locationEntries[0].asset.location_type,
+          mergedLocationNames,
+          assetsByItemId,
+          mergedTypeNames,
+          t
+        ),
+        entries: locationEntries.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
 
   // Not `useTableExport`: this list isn't a DataTable, and `getRows` builds
   // the grouped rows lazily, only when an export actually runs.
@@ -431,22 +431,24 @@ export function useAssetsData() {
     truncated: assetsTruncated,
     getRows: () =>
       assetCsvRows(
-        buildCsvGroups().map((group) => ({
-          label: group.label,
-          nickname: placeNicknames[group.locationId],
-          entries: group.entries,
-        })),
+        buildCsvGroups().map((group) => ({ label: group.label, entries: group.entries })),
         {
-          // The active Character's own assets, as the groups above are.
-          assetsByItemId: new Map((assetsResult?.data ?? []).map((a) => [a.item_id, a])),
-          typeNames,
+          assetsByItemId,
+          typeNames: mergedTypeNames,
           gameNames: assetNames,
-          locationNames,
-          systemNameByLocationId: data?.systemNameByLocationId ?? NO_NAMES,
+          locationNames: mergedLocationNames,
+          systemNameByLocationId: mergedSystemNames,
           priceByTypeId,
           itemValueByItemId,
           volumeByTypeId,
           blueprintTypeIds,
+          placeNicknames,
+          characterNameOf: (itemId) => {
+            const ownerId = characterBadges.idByItemId.get(itemId) ?? activeCharacterId;
+            return (
+              crossCharacterCandidates.find((c) => c.characterId === ownerId)?.characterName ?? ''
+            );
+          },
           t,
         }
       ),

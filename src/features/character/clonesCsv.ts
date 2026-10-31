@@ -62,7 +62,8 @@ export function clonesCsvColumns(
     bestCloneId: string | number | null;
   }
 ): CsvColumn<CloneCsvRow>[] {
-  const nameOf = (id: number) => implantNames.get(id) ?? `Type #${id}`;
+  const nameOf = (id: number) => implantNames.get(id) ?? t('common.unknownType', { id });
+  const slotOf = (id: number) => implantDetails.get(id)?.slot ?? Number.POSITIVE_INFINITY;
   const value = (row: CloneCsvRow) => (prices ? sumImplantValue(row.implants, prices) : null);
   return [
     {
@@ -92,6 +93,16 @@ export function clonesCsvColumns(
       },
     },
     {
+      // Why the count is unknown, as the card's tooltip says it.
+      header: t('clones.csvJumpsNote'),
+      value: (row) => {
+        const jumps = jumpsOf(row);
+        return jumps?.kind === 'unknown'
+          ? t(`assets.jumpsAway.unknownReason.${jumps.reason}`)
+          : undefined;
+      },
+    },
+    {
       header: t('clones.implants'),
       value: (row) => row.implants.map(nameOf).join('; '),
     },
@@ -99,14 +110,33 @@ export function clonesCsvColumns(
       header: t('clones.csvImplantsBySlot'),
       value: (row) =>
         [...row.implants]
-          .sort(
-            (a, b) =>
-              (implantDetails.get(a)?.slot ?? Number.POSITIVE_INFINITY) -
-              (implantDetails.get(b)?.slot ?? Number.POSITIVE_INFINITY)
-          )
+          .sort((a, b) => slotOf(a) - slotOf(b))
           .map((id) => {
             const slot = implantDetails.get(id)?.slot;
             return slot === undefined ? nameOf(id) : `${slot}: ${nameOf(id)}`;
+          })
+          .join('; '),
+    },
+    {
+      // Slot, name, what it adds and its price: the card's implant lines, joined.
+      header: t('clones.csvImplantDetails'),
+      value: (row) =>
+        [...row.implants]
+          .sort((a, b) => slotOf(a) - slotOf(b))
+          .map((id) => {
+            const detail = implantDetails.get(id);
+            const bonuses = Object.entries(detail?.bonuses ?? {}).map(([attribute, value]) =>
+              t('clones.implantBonus', {
+                value,
+                attribute: t(`clones.verdict.attribute.${attribute}`),
+              })
+            );
+            const price = prices?.get(id);
+            const parts = [
+              ...(bonuses.length > 0 ? [bonuses.join(', ')] : []),
+              ...(price == null ? [] : [t('clones.csvImplantPrice', { price })]),
+            ];
+            return `${nameOf(id)}${parts.length > 0 ? ` (${parts.join('; ')})` : ''}`;
           })
           .join('; '),
     },

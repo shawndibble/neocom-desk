@@ -210,14 +210,21 @@ export async function loadAssetsSnapshot(
   });
 
   show({ locationNames });
-  const systemNameByLocationId = signal.cancelled
-    ? new Map<number, string>()
-    : await loadLocationSystemNames(characterId, stationIds, [...structureIds, ...orphanParentIds]);
-  show({ systemNameByLocationId });
-  const [copyValueByItemId, priceByTypeId, assetNames] = await Promise.all([
+  // Behind the rows like prices: only for places whose name resolved, so the read is served from the
+  // cache that name filled and a place that 404s or 5xxs is never asked a second time.
+  const systemNamesPromise = signal.cancelled
+    ? Promise.resolve(new Map<number, string>())
+    : loadLocationSystemNames(
+        characterId,
+        stationIds.filter((id) => locationNames.has(id)),
+        [...structureIds, ...orphanParentIds].filter((id) => locationNames.has(id))
+      );
+  void systemNamesPromise.then((systemNameByLocationId) => show({ systemNameByLocationId }));
+  const [copyValueByItemId, priceByTypeId, assetNames, systemNameByLocationId] = await Promise.all([
     copyValuesPromise,
     pricesPromise,
     assetNamesPromise,
+    systemNamesPromise,
   ]);
 
   return {
@@ -240,6 +247,8 @@ export interface CrossCharacterData {
   entries: OtherCharacterAssets[];
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
+  /** System name by station or structure id, as the active Character's snapshot carries it. */
+  systemNameByLocationId: Map<number, string>;
   /** Owning Character per asset item_id — item ids are globally unique, so this is safe to merge flat across Characters. */
   characterIdByItemId: Map<number, number>;
   characterNameById: Map<number, string>;
@@ -256,9 +265,11 @@ export interface CrossCharacterData {
  * so a structure must resolve under the Character whose asset actually sits
  * in it, not the active Character running the search.
  */
-async function loadCrossCharacterNames(
-  entries: readonly OtherCharacterAssets[]
-): Promise<{ typeNames: Map<number, string>; locationNames: Map<number, string> }> {
+async function loadCrossCharacterNames(entries: readonly OtherCharacterAssets[]): Promise<{
+  typeNames: Map<number, string>;
+  locationNames: Map<number, string>;
+  systemNameByLocationId: Map<number, string>;
+}> {
   const allAssets = entries.flatMap((entry) => entry.assets);
   const typeNames = await loadTypeNames(allAssets.map((a) => a.type_id));
 
@@ -314,7 +325,22 @@ async function loadCrossCharacterNames(
     );
   });
 
-  return { typeNames, locationNames };
+  // Behind the names, and only for places that resolved (see `loadAssetsSnapshot`).
+  const systemNameByLocationId = new Map<number, string>();
+  const resolvedStationIds = stationIds.filter((id) => locationNames.has(id));
+  await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
+    const placeIds = entry.assets
+      .filter((a) => a.location_type === 'other' || a.location_type === 'item')
+      .map((a) => a.location_id);
+    const resolved = await loadLocationSystemNames(
+      entry.characterId,
+      resolvedStationIds,
+      [...new Set(placeIds)].filter((id) => locationNames.has(id))
+    );
+    for (const [id, name] of resolved) systemNameByLocationId.set(id, name);
+  });
+
+  return { typeNames, locationNames, systemNameByLocationId };
 }
 
 /** Fetches + resolves everything the cross-character Character filter needs, once per resolved id set. */
@@ -323,7 +349,7 @@ export async function loadCrossCharacterData(
 ): Promise<CrossCharacterData> {
   const { entries, skipped } = await loadOtherCharactersAssetsDetailed(otherCharacterIds);
   const copyValueByItemId = new Map<number, number>();
-  const [{ typeNames, locationNames }] = await Promise.all([
+  const [{ typeNames, locationNames, systemNameByLocationId }] = await Promise.all([
     loadCrossCharacterNames(entries),
     mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
       for (const [itemId, value] of await loadOwnCopyValues(entry.characterId, entry.assets))
@@ -342,6 +368,7 @@ export async function loadCrossCharacterData(
     entries,
     typeNames,
     locationNames,
+    systemNameByLocationId,
     characterIdByItemId,
     characterNameById,
     copyValueByItemId,

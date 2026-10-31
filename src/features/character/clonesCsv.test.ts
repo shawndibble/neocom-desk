@@ -60,8 +60,10 @@ describe('clonesCsvColumns', () => {
       'clones.location',
       'clones.csvSecurity',
       'clones.csvJumpsAway',
+      'clones.csvJumpsNote',
       'clones.implants',
       'clones.csvImplantsBySlot',
+      'clones.csvImplantDetails',
       'clones.csvImplantValue',
       'clones.csvImplantsUnpriced',
       'clones.csvQueueSeconds',
@@ -102,7 +104,7 @@ describe('clonesCsvColumns', () => {
     const implants = new Map([[9941, 'Memory Augmentation - Basic']]);
     expect(
       valuesOf(jumpRow(clone({ implants: [9941, 9942] })), { implants })['clones.implants']
-    ).toBe('Memory Augmentation - Basic; Type #9942');
+    ).toBe('Memory Augmentation - Basic; common.unknownType:{"id":9942}');
     expect(valuesOf(jumpRow(clone()))['clones.implants']).toBe('');
   });
 
@@ -130,6 +132,26 @@ describe('clonesCsvColumns', () => {
     expect(values['clones.csvImplantValue']).toBe(150);
     expect(values['clones.csvImplantsUnpriced']).toBe(1);
     expect(valuesOf(row)['clones.csvImplantValue']).toBeUndefined();
+  });
+
+  it('explains an unknown jump count, and lists each implant with its bonus and price', () => {
+    expect(
+      valuesOf(jumpRow(clone()), { jumps: { kind: 'unknown', reason: 'noRoute' } })
+    ).toMatchObject({
+      'clones.csvJumpsAway': undefined,
+      'clones.csvJumpsNote': 'assets.jumpsAway.unknownReason.noRoute',
+    });
+    const values = valuesOf(jumpRow(clone({ implants: [1, 2] })), {
+      implants: new Map([[1, 'Alpha']]),
+      details: new Map([[1, { slot: 1, bonuses: { intelligence: 3 } }]]),
+      prices: new Map([
+        [1, 100],
+        [2, null],
+      ]),
+    });
+    expect(values['clones.csvImplantDetails']).toBe(
+      'Alpha (clones.implantBonus:{"value":3,"attribute":"clones.verdict.attribute.intelligence"}; clones.csvImplantPrice:{"price":100}); common.unknownType:{"id":2}'
+    );
   });
 
   it('carries security, jumps away, queue time, delta and the best flag', () => {

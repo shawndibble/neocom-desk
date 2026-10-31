@@ -13,11 +13,13 @@ export interface AssetCsvRow {
   place: string;
   /** The solar system, when it could be read. */
   system: string;
+  /** The Character who owns the item: the page lists other Characters' assets while a search runs. */
+  character: string;
   name: string;
   /** The in-game name the player gave this ship or container; blank when it has none. */
   gameName: string;
   quantity: number;
-  /** The Place Nickname for the location; empty where none is set. */
+  /** The Place Nickname for the root station or structure; empty where none is set. */
   nickname: string;
   /** ISK per unit; null when no price is known (a blueprint copy has its own value). */
   unitPrice: number | null;
@@ -34,7 +36,6 @@ export interface AssetCsvRow {
 
 export interface AssetCsvGroup {
   label: string;
-  nickname?: string;
   entries: readonly { asset: CharacterAsset; name: string; gameName?: string }[];
 }
 
@@ -53,6 +54,10 @@ export interface AssetCsvContext {
   volumeByTypeId: ReadonlyMap<number, number>;
   /** Null until the blueprint type list is read. */
   blueprintTypeIds: ReadonlySet<number> | null;
+  /** Place Nicknames by station or structure id. */
+  placeNicknames: Readonly<Record<number, string>>;
+  /** The owning Character's name, by item id. */
+  characterNameOf: (itemId: number) => string;
   t: CsvTranslate;
 }
 
@@ -70,7 +75,9 @@ export function assetCsvRows(
 ): AssetCsvRow[] {
   const { t, typeNames, gameNames, assetsByItemId } = ctx;
   const holderName = (asset: CharacterAsset) =>
-    gameNames[asset.item_id] ?? typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
+    gameNames[asset.item_id] ??
+    typeNames.get(asset.type_id) ??
+    t('common.unknownType', { id: asset.type_id });
   return groups.flatMap((group) =>
     group.entries.map(({ asset, name, gameName }) => {
       const { chain, rootLocationId, rootLocationType } = assetHolderChain(asset, assetsByItemId);
@@ -98,10 +105,11 @@ export function assetCsvRows(
         system: inSpace
           ? (ctx.locationNames.get(rootLocationId) ?? '')
           : (ctx.systemNameByLocationId.get(rootLocationId) ?? ''),
+        character: ctx.characterNameOf(asset.item_id),
         name,
         gameName: gameName ?? '',
         quantity: asset.quantity,
-        nickname: group.nickname ?? '',
+        nickname: ctx.placeNicknames[rootLocationId] ?? '',
         unitPrice: totalValue === null || asset.quantity <= 0 ? null : totalValue / asset.quantity,
         totalValue,
         unitVolume,
@@ -125,6 +133,7 @@ export function assetsCsvColumns(t: CsvTranslate): CsvColumn<AssetCsvRow>[] {
     { header: t('assets.csvLocationPath'), value: (row) => row.locationPath },
     { header: t('assets.csvPlace'), value: (row) => row.place },
     { header: t('assets.csvSystem'), value: (row) => row.system },
+    { header: t('assets.csvCharacter'), value: (row) => row.character },
     { header: t('assets.csvItem'), value: (row) => row.name },
     { header: t('assets.csvGameName'), value: (row) => row.gameName },
     { header: t('assets.csvQuantity'), value: (row) => row.quantity },

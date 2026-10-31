@@ -370,7 +370,7 @@ function CorpJournalPanel({
   const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
     useJournalFilterResult(journal, rowsFilter);
   const journalCsvColumns = useMemo(
-    () => walletJournalCsvColumns(t, undefined, playerNameFor, { linkFor, nameFor }),
+    () => walletJournalCsvColumns(t, { playerName: playerNameFor, fills: { linkFor, nameFor } }),
     [t, playerNameFor, linkFor, nameFor]
   );
   // Named after the division, so exporting two divisions never overwrites the

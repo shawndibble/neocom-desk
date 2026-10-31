@@ -156,27 +156,45 @@ export function Clones() {
     () => (clonesBlocked ? [] : cloneCsvRows(hasWorn ? wornIds : null, sortedClones)),
     [clonesBlocked, hasWorn, wornIds, sortedClones]
   );
-  const csvColumns = clonesCsvColumns(t, {
-    locationNames,
-    implantNames,
-    implantDetails,
-    nicknames,
-    prices,
-    wornPlaceName: characterSystemName,
-    securityOf: (row: CloneCsvRow) =>
-      row.clone === null
-        ? characterSystemId === null
-          ? undefined
-          : securities.get(characterSystemId)
-        : securityOf(row.clone.location_id),
-    jumpsOf: (row) =>
-      row.clone === null ? undefined : jumpsByLocation?.get(row.clone.location_id),
-    trainingOf: (row) =>
-      showTraining
-        ? rowOf(row.clone === null ? WORN_CLONE_ID : row.clone.jump_clone_id)
-        : undefined,
-    bestCloneId,
-  });
+  const csvColumns = useMemo(
+    () =>
+      clonesCsvColumns(t, {
+        locationNames,
+        implantNames,
+        implantDetails,
+        nicknames,
+        prices,
+        wornPlaceName: characterSystemName,
+        securityOf: (row: CloneCsvRow) => {
+          const systemId =
+            row.clone === null ? characterSystemId : (systemIds.get(row.clone.location_id) ?? null);
+          return systemId === null ? undefined : securities.get(systemId);
+        },
+        jumpsOf: (row) =>
+          row.clone === null ? undefined : jumpsByLocation?.get(row.clone.location_id),
+        trainingOf: (row) =>
+          showTraining
+            ? rowOf(row.clone === null ? WORN_CLONE_ID : row.clone.jump_clone_id)
+            : undefined,
+        bestCloneId,
+      }),
+    [
+      t,
+      locationNames,
+      implantNames,
+      implantDetails,
+      nicknames,
+      prices,
+      characterSystemName,
+      characterSystemId,
+      systemIds,
+      securities,
+      jumpsByLocation,
+      showTraining,
+      rowOf,
+      bestCloneId,
+    ]
+  );
   const clonesExport = useTableExport({
     surface: 'clones',
     // No table is mounted, so `rows` carries the reader's sort.

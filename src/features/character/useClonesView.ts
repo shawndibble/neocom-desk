@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { JumpClone } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/clone/jumpsAway';
@@ -119,7 +119,10 @@ export function useClonesView({
     };
   })();
   const showTraining = verdictCard !== null && verdictCard.kind !== 'note';
-  const rowOf = (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id);
+  const rowOf = useCallback(
+    (id: string | number) => verdictResult?.rows.find((r) => r.cloneId === id),
+    [verdictResult]
+  );
   const sortedClones = sortClones(
     clones.map((clone) => {
       const implantValue = prices ? sumImplantValue(clone.implants, prices) : null;

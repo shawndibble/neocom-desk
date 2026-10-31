@@ -285,9 +285,9 @@ export function useWalletJournalView({
   // the order the table shows them.
   const journalCsvColumns = useMemo(
     () =>
-      walletJournalCsvColumns(t, showingBeyondActive ? characterNameFor : undefined, undefined, {
-        linkFor: personalLinkFor,
-        nameFor: personalNameFor,
+      walletJournalCsvColumns(t, {
+        characterName: showingBeyondActive ? characterNameFor : undefined,
+        fills: { linkFor: personalLinkFor, nameFor: personalNameFor },
       }),
     [t, showingBeyondActive, characterNameFor, personalLinkFor, personalNameFor]
   );
