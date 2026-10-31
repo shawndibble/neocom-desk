@@ -52,6 +52,37 @@ export function locationLabel(
 }
 
 /**
+ * What an asset sits in, outermost first: the owned containers and ships between
+ * it and its station, structure or solar system, and that root place. A parent
+ * ESI never returned as an asset (a structure the list has no row for) ends the
+ * walk with the root left as an `item` location; so does a loop.
+ */
+export function assetHolderChain(
+  asset: CharacterAsset,
+  assetsByItemId: ReadonlyMap<number, CharacterAsset>
+): {
+  chain: CharacterAsset[];
+  rootLocationId: number;
+  rootLocationType: CharacterAsset['location_type'];
+} {
+  const chain: CharacterAsset[] = [];
+  const seen = new Set([asset.item_id]);
+  let current = asset;
+  while (current.location_type === 'item') {
+    const parent = assetsByItemId.get(current.location_id);
+    if (!parent || seen.has(parent.item_id)) break;
+    chain.unshift(parent);
+    seen.add(parent.item_id);
+    current = parent;
+  }
+  return {
+    chain,
+    rootLocationId: current.location_id,
+    rootLocationType: current.location_type,
+  };
+}
+
+/**
  * Name-substring search over a flat asset list, shared by the CSV export path
  * and the on-screen results path. Matches the type name or, for a ship or
  * container the player named, its in-game name (issue #5652).

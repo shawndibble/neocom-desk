@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchAssets } from './assetsLogic';
+import { assetHolderChain, matchAssets } from './assetsLogic';
 import type { CharacterAsset } from '@/esi/endpoints';
 
 const asset = (item_id: number, type_id: number): CharacterAsset => ({
@@ -34,5 +34,36 @@ describe('matchAssets', () => {
 
   it('returns everything for an empty query', () => {
     expect(matchAssets(assets, typeNames, '')).toHaveLength(3);
+  });
+});
+
+describe('assetHolderChain', () => {
+  const inItem = (item_id: number, location_id: number): CharacterAsset => ({
+    ...asset(item_id, 10),
+    location_id,
+    location_type: 'item',
+  });
+
+  it('walks up to the station, outermost holder first', () => {
+    const ship = asset(1, 10);
+    const box = inItem(2, 1);
+    const ore = inItem(3, 2);
+    const result = assetHolderChain(ore, new Map([ship, box, ore].map((a) => [a.item_id, a])));
+    expect(result.chain.map((a) => a.item_id)).toEqual([1, 2]);
+    expect(result).toMatchObject({ rootLocationId: 60003760, rootLocationType: 'station' });
+  });
+
+  it('stops at a parent the list has no row for, and at a loop', () => {
+    const orphan = inItem(5, 999);
+    expect(assetHolderChain(orphan, new Map([[5, orphan]]))).toMatchObject({
+      chain: [],
+      rootLocationId: 999,
+      rootLocationType: 'item',
+    });
+    const a = inItem(6, 7);
+    const b = inItem(7, 6);
+    expect(
+      assetHolderChain(a, new Map([a, b].map((x) => [x.item_id, x]))).chain.map((x) => x.item_id)
+    ).toEqual([7]);
   });
 });

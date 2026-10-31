@@ -434,11 +434,21 @@ export function useAssetsData() {
         buildCsvGroups().map((group) => ({
           label: group.label,
           nickname: placeNicknames[group.locationId],
-          entries: group.entries.map((entry) => ({
-            name: entry.name,
-            quantity: entry.asset.quantity,
-          })),
-        }))
+          entries: group.entries,
+        })),
+        {
+          // The active Character's own assets, as the groups above are.
+          assetsByItemId: new Map((assetsResult?.data ?? []).map((a) => [a.item_id, a])),
+          typeNames,
+          gameNames: assetNames,
+          locationNames,
+          systemNameByLocationId: data?.systemNameByLocationId ?? NO_NAMES,
+          priceByTypeId,
+          itemValueByItemId,
+          volumeByTypeId,
+          blueprintTypeIds,
+          t,
+        }
       ),
   };
 

@@ -5,8 +5,8 @@ import {
   type OtherCharacterAssets,
 } from '@/features/assets/assets';
 import type { CachedResult } from '@/esi/cache';
-import { loadStationName } from '@/features/character/stations';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStationName, loadStationSystemId } from '@/features/character/stations';
+import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadSystemName } from '@/features/character/systemSecurity';
 import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
 import { type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -26,6 +26,11 @@ export interface Snapshot {
   assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
+  /**
+   * The solar system name of each station and structure the assets sit in, by location id: the
+   * export's System column. A place whose system could not be read (a structure off the ACL) is absent.
+   */
+  systemNameByLocationId: Map<number, string>;
   /** Global average market price per type, used for the tree's estimated-value badges. */
   priceByTypeId: Map<number, number>;
   /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
@@ -50,6 +55,47 @@ function loadOwnCopyValues(
   );
 }
 
+/** A failed read is a gap in the column, never a failed snapshot. */
+function settled<T>(read: () => Promise<T | null>): Promise<T | null> {
+  return Promise.resolve()
+    .then(read)
+    .catch(() => null);
+}
+
+/**
+ * The system name of each station (a baked-snapshot lookup, no request) and
+ * structure (the same cached read that named it), for the export's System column.
+ */
+async function loadLocationSystemNames(
+  characterId: number,
+  stationIds: readonly number[],
+  structureIds: readonly number[]
+): Promise<Map<number, string>> {
+  const systemIdByLocation = new Map<number, number>();
+  await Promise.all([
+    ...stationIds.map(async (id) => {
+      const systemId = await settled(() => loadStationSystemId(id));
+      if (systemId !== null) systemIdByLocation.set(id, systemId);
+    }),
+    ...structureIds.map(async (id) => {
+      const systemId = await settled(() => loadStructureSystemId(characterId, id));
+      if (systemId !== null) systemIdByLocation.set(id, systemId);
+    }),
+  ]);
+  const names = new Map<number, string>();
+  const systemNames = new Map<number, string | null>();
+  await Promise.all(
+    [...new Set(systemIdByLocation.values())].map(async (systemId) => {
+      systemNames.set(systemId, await settled(() => loadSystemName(systemId)));
+    })
+  );
+  for (const [locationId, systemId] of systemIdByLocation) {
+    const name = systemNames.get(systemId);
+    if (name) names.set(locationId, name);
+  }
+  return names;
+}
+
 export async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal<Snapshot>
@@ -68,6 +114,7 @@ export async function loadAssetsSnapshot(
     assetsNeedsReauth,
     typeNames: new Map(),
     locationNames: new Map(),
+    systemNameByLocationId: new Map(),
     priceByTypeId: new Map(),
     pricesReady: false,
     copyValueByItemId: new Map(),
@@ -163,6 +210,10 @@ export async function loadAssetsSnapshot(
   });
 
   show({ locationNames });
+  const systemNameByLocationId = signal.cancelled
+    ? new Map<number, string>()
+    : await loadLocationSystemNames(characterId, stationIds, [...structureIds, ...orphanParentIds]);
+  show({ systemNameByLocationId });
   const [copyValueByItemId, priceByTypeId, assetNames] = await Promise.all([
     copyValuesPromise,
     pricesPromise,
@@ -175,6 +226,7 @@ export async function loadAssetsSnapshot(
     assetsNeedsReauth,
     typeNames,
     locationNames,
+    systemNameByLocationId,
     priceByTypeId,
     pricesReady: true,
     copyValueByItemId,
