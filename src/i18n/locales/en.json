@@ -5283,8 +5283,6 @@
         "skillLevel": "{{name}} {{level}}",
         "now": "Training now",
         "next": "Next",
-        "more_one": "+{{count}} more",
-        "more_other": "+{{count}} more",
         "idle": "Idle",
         "col": {
           "skill": "Skill",

@@ -46,7 +46,7 @@ Layout order: `CharacterHeader`, `OverviewSubNav`, `SummaryStrip`, "all cards hi
 Summary strip (`SummaryStrip.tsx`):
 
 - Next deadline (largest type): soonest clock across visible cards plus skill-training finish; links to the owning page. Empty: "Nothing on a clock". Hidden cards contribute none (`soonestDeadline`).
-- Training now (the `training` widget): active skill and time left; its Number view lists up to three queued skills behind it with their time left, then "+N more" linking `/skills/plans` (`selectUpcomingEntries`; owner request 2026-10-11). Links `/skills/plans`. Queue scope lapsed: warning "unavailable". Idle queue: warning link unless `characterNotTraining` is muted for that Character (then dim; issue #1731).
+- Training now: active skill, time left, queued count; links `/skills/plans`. Queue scope lapsed: warning "unavailable". Idle queue: warning link unless `characterNotTraining` is muted for that Character (then dim; issue #1731).
 - Wallet: balance, links `/wallet`; scope lapsed or load error show warning text.
 - Data age badge (stalest of wallet, queue, visible-card reads), Edit cards, Refresh (reloads all 12 snapshots incl. hidden; disabled while a visible card loads).
 - Phone only (`md:hidden`): offline line when any read came from cache or is older than 1 h.
@@ -132,7 +132,9 @@ Page ungated; see card table. Missing scope: that card goes warning with a re-lo
 - SP extraction card has `loading: false` always.
 - Board omits `deepCompetition`/`structureCompetition` the Orders page uses (`Overview.tsx:338-345`), so its counts come from narrower input.
 - One Refresh for all 12 snapshots; no per-card refresh.
+- Training now shows only the active skill, its time left and a queued count (`SummaryStrip.tsx`); the next skills and their finish dates are not shown, though the owner wants the current skill "and maybe the next couple in the coming days" here (owner, 2026-10-11).
 
 ## Improvement ideas
 
+- Training now: list the next two or three queued skills with finish dates under the active one (owner, 2026-10-11).
 - Per-card refresh and age; skip fetching hidden cards; inline "show N more"; label or scope the Mining tax card; loading state and deep links for SP/Mining/Contracts tiles.

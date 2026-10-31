@@ -155,23 +155,6 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           {note}
         </p>
       ))}
-      {model.upcoming && (
-        <ul className="grid gap-0.5 text-xs text-text-dim">
-          {model.upcoming.rows.map((row) => (
-            <li key={row.key} className="flex items-baseline justify-between gap-2">
-              <span className="min-w-0 truncate">{row.title}</span>
-              <span className="shrink-0 tabular-nums">{row.value}</span>
-            </li>
-          ))}
-          {model.upcoming.more && (
-            <li>
-              <Link to={model.upcoming.more.to} className={entityLinkClassName('w-fit text-xs')}>
-                {model.upcoming.more.label}
-              </Link>
-            </li>
-          )}
-        </ul>
-      )}
       {model.link && (
         <Link
           to={model.link.to}
