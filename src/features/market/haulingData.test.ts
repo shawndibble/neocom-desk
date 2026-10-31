@@ -1017,6 +1017,29 @@ describe('runHaulingScan, order books from the R2 snapshot', () => {
     expect(scan.capped).toBeUndefined();
   });
 
+  it('retries a station whose books read failed once before falling back to the capped ESI path', async () => {
+    const asOf = Date.now() - 20 * 60_000;
+    const failedOnce = new Set<number>();
+    loadHaulingBooks.mockImplementation(async (stationId: number) => {
+      if (stationId === TO.stationId && !failedOnce.has(stationId)) {
+        failedOnce.add(stationId);
+        return null;
+      }
+      return snapshot(stationId, asOf);
+    });
+    const scan = await runHaulingScan({
+      from: FROM,
+      to: TO,
+      typeIds,
+      scope: 'snap-retry',
+      types: typesFor(typeIds),
+      today: TODAY,
+    });
+    expect(getOrderBook).not.toHaveBeenCalled();
+    expect(scan.booksSource).toBe('snapshot');
+    expect(scan.capped).toBeUndefined();
+  });
+
   it('instant mode books every price-pass survivor from the snapshot', async () => {
     loadHaulingBooks.mockImplementation(async (stationId: number) =>
       snapshot(stationId, Date.now())
