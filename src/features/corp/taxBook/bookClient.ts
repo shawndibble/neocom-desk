@@ -28,12 +28,13 @@ import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement, StatementCadence } from '@/engine/corpTaxBook/statements';
-import type {
-  JournalDonation,
-  LastSync,
-  SettlePayment,
-  SyncExtraction,
-  SyncGap,
+import {
+  extractionId as extractionIdOf,
+  type JournalDonation,
+  type LastSync,
+  type SettlePayment,
+  type SyncExtraction,
+  type SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type {
@@ -58,6 +59,8 @@ import {
 } from '@/engine/corpTaxBook/minerScope';
 import { forgetObservedCopy } from './observedStore';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
+import { moonDocUsable, planMoonScope } from '@/engine/corpTaxBook/pullFigures';
+import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import { callRouted } from '@/sync/routedCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -798,6 +801,131 @@ export async function readMinerBookData(
       scheduledSync: scheduledSyncFrom(scheduled),
       parts: ALL_BOOK_PART_SET,
       scopedMiner: minerId,
+    },
+  };
+}
+
+// --- One moon's page from the moon docs (issue #5716, ADR 0032) ----------------
+
+/** What a moon page reads, scoped to one pull and its moon's cycles. */
+export interface MoonBookRead {
+  /** A whole-book shape without the ledger: the rows are the planned pulls' windows only. */
+  data: BookData;
+  /** The moon docs of the shown pull's refinery, by extraction id. */
+  docs: ReadonlyMap<string, MoonDoc>;
+  /** Cycles whose figures come from their docs, not from rows. */
+  fromDocs: ReadonlySet<string>;
+}
+
+const isPermissionDenied = (error: unknown) =>
+  String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied');
+
+/**
+ * A moon page: the book's records without the ledger, the refinery's moon docs, and the
+ * rows of the shown pull's window (plus any earlier cycle of the moon that can still have an
+ * open day; pullFigures.ts). `'fallback'` when a doc the page needs is missing, on another
+ * schema or unreadable: the caller then reads the whole book. A missing composite index
+ * (observed: structureId + date) reads the window's days at every refinery and filters here,
+ * so an undeployed index costs reads, not the page. Officer-only.
+ */
+export async function readMoonBookData(
+  characterId: number,
+  corporationId: number,
+  extractionId: string
+): Promise<MoonBookRead | 'fallback' | null> {
+  const book = await openBook(characterId, corporationId);
+  if (!book) return null;
+  const settings = settingsFrom(book.data);
+  const { db, list, part } = book;
+  const under = (name: string) => collection(db, 'corps', String(corporationId), name);
+  const meta = (id: string) => getDoc(doc(db, 'corps', String(corporationId), 'meta', id));
+  const none: never[] = [];
+  const [miners, statements, extractions, scheduled, feeders] = await Promise.all([
+    list<Miner>('miners'),
+    list<Statement>('statements'),
+    list<SyncExtraction>('extractions'),
+    part('meta', async () => (await meta('scheduledSync')).data(), 'meta:schedule'),
+    feedersOf(book, characterId, corporationId),
+  ] as const);
+  const [payments, dismissals, declarations, adjustments, writeOffs, paidStatementIds] =
+    await Promise.all([
+      list<SettlePayment>('payments'),
+      list<Dismissal>('dismissals'),
+      list<BookDeclaration>('declarations'),
+      list<Adjustment>('adjustments'),
+      list<RecordedWriteOff>('writeOffs'),
+      book.paidStatementIds(),
+    ] as const);
+
+  const shown = extractions.find((x) => extractionIdOf(x) === extractionId);
+  const docList = shown
+    ? await part(
+        'moonDocs',
+        async () =>
+          (
+            await getDocs(query(under('moonDocs'), where('structureId', '==', shown.structureId)))
+          ).docs.map((d) => {
+            // The server's timestamp is not part of the figures, and a class instance does not clone into the copy.
+            const fields = { ...d.data() };
+            delete fields.updatedAt;
+            return fields as unknown as MoonDoc;
+          }),
+        `moonDocs:s:${shown.structureId}`
+      ).catch((error) => {
+        if (isPermissionDenied(error)) throw error;
+        return undefined;
+      })
+    : [];
+  if (!docList) return 'fallback';
+  const docs = new Map(docList.filter(moonDocUsable).map((d) => [d.extractionId, d]));
+  const scope = planMoonScope({
+    extractionId,
+    extractions,
+    docs,
+    statements,
+    startDate: settings.startDate,
+    expiryHours: settings.structureExpiryHours,
+  });
+  if (!scope.ok) return 'fallback';
+
+  const windowRows = async (w: { structureId: number; from: string; to: string }) => {
+    const days = [where('date', '>=', w.from), where('date', '<=', w.to)] as const;
+    try {
+      const snap = await getDocs(
+        query(under('observed'), where('structureId', '==', w.structureId), ...days)
+      );
+      return snap.docs.map((d) => d.data() as ObservedRow);
+    } catch (error) {
+      if (!isMissingIndex(error)) throw error;
+      const snap = await getDocs(query(under('observed'), ...days));
+      return snap.docs
+        .map((d) => d.data() as ObservedRow)
+        .filter((r) => r.structureId === w.structureId);
+    }
+  };
+  const observed = (await Promise.all(scope.rows.map(windowRows))).flat();
+  return {
+    docs,
+    fromDocs: scope.fromDocs,
+    data: {
+      settings,
+      state: {
+        book: settings,
+        miners,
+        statements,
+        payments,
+        dismissals,
+        extractions,
+        paidStatementIds,
+        writeOffs,
+      },
+      observed,
+      declarations,
+      adjustments,
+      feeders,
+      groupingAnswers: none,
+      scheduledSync: scheduledSyncFrom(scheduled),
+      parts: new Set<BookPart>(['core', 'ledger']),
     },
   };
 }
