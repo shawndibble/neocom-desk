@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { fittingEditLocationFor } from '@/features/fittings/fittingEditLink';
+import { fittingEditLocation, type FittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { loadFittingPrice, unpricedSellRows } from '@/features/fittings/fittingPrice';
 import type { FittingChoices } from '@/features/fittings/useFittingChoices';
 import type { TradeHub } from '@/market/hubs';
@@ -12,20 +14,29 @@ export type GoalPrice =
 export const goalPriceKey = (goal: Pick<WalletGoal, 'id' | 'fittingId'>) =>
   JSON.stringify([goal.id, goal.fittingId]);
 
+export interface GoalPrices {
+  /** Keyed by `goalPriceKey`; absent while loading. */
+  prices: ReadonlyMap<string, GoalPrice>;
+  /** Where each Fitting-priced Goal's Fitting opens, keyed by `goalPriceKey`; absent until it resolves or when it is too large to share. */
+  links: ReadonlyMap<string, FittingEditLocation>;
+}
+
+const NONE: GoalPrices = { prices: new Map(), links: new Map() };
+
 /**
  * The target of each Fitting-priced Goal: the Fitting's sell price at `hub`
  * (what buying it off the hub costs), read again on each visit so it follows
- * the market. Keyed by `goalPriceKey`.
+ * the market, and the editor location that opens that Fitting.
  */
 export function useGoalPrices(
   goals: readonly WalletGoal[],
   hub: TradeHub,
   resolve: FittingChoices['resolve'],
   ready: boolean
-): ReadonlyMap<string, GoalPrice> {
-  const [loaded, setLoaded] = useState<{ key: string; prices: ReadonlyMap<string, GoalPrice> }>({
+): GoalPrices {
+  const [loaded, setLoaded] = useState<{ key: string; result: GoalPrices }>({
     key: '',
-    prices: new Map(),
+    result: NONE,
   });
   const wantedKey = JSON.stringify(
     goals.filter((goal) => goal.fittingId !== null).map((goal) => [goal.id, goal.fittingId])
@@ -37,25 +48,41 @@ export function useGoalPrices(
     if (!ready || wanted.length === 0) return;
     let cancelled = false;
     void Promise.all(
-      wanted.map(async ([id, fittingId]): Promise<[string, GoalPrice]> => {
+      wanted.map(async ([id, fittingId]) => {
         const key = goalPriceKey({ id, fittingId });
+        const failed = { key, price: { status: 'failed' } as GoalPrice, link: null };
         try {
           const picked = await resolve(fittingId);
-          if (!picked) return [key, { status: 'failed' }];
+          if (!picked) return failed;
+          // A saved Fitting opens by its own code; an In-game one is encoded. A failed
+          // encode costs the link, never the price.
+          const link = picked.code
+            ? fittingEditLocation(picked.code)
+            : await fittingEditLocationFor(picked.fitting);
           const price = await loadFittingPrice(picked.fitting, hub);
-          if (unpricedSellRows(price.rows).length > 0) return [key, { status: 'partial' }];
-          return [
+          if (unpricedSellRows(price.rows).length > 0) {
+            return { key, price: { status: 'partial' } as GoalPrice, link };
+          }
+          return {
             key,
-            price.totals.sell > 0
+            price: (price.totals.sell > 0
               ? { status: 'ready', sell: price.totals.sell }
-              : { status: 'failed' },
-          ];
+              : { status: 'failed' }) as GoalPrice,
+            link,
+          };
         } catch {
-          return [key, { status: 'failed' }];
+          return failed;
         }
       })
     ).then((entries) => {
-      if (!cancelled) setLoaded({ key: effectKey, prices: new Map(entries) });
+      if (cancelled) return;
+      setLoaded({
+        key: effectKey,
+        result: {
+          prices: new Map(entries.map((e) => [e.key, e.price])),
+          links: new Map(entries.flatMap((e) => (e.link ? [[e.key, e.link] as const] : []))),
+        },
+      });
     });
     return () => {
       cancelled = true;
@@ -65,5 +92,5 @@ export function useGoalPrices(
   }, [effectKey, resolve, ready]);
 
   // A load for another hub or Goal set is not this one's answer.
-  return useMemo(() => (loaded.key === effectKey ? loaded.prices : new Map()), [loaded, effectKey]);
+  return useMemo(() => (loaded.key === effectKey ? loaded.result : NONE), [loaded, effectKey]);
 }

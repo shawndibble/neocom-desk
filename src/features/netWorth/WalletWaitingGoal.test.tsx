@@ -22,6 +22,10 @@ vi.mock('@/features/fittings/fittingPrice', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/fittings/fittingPrice')>()),
   loadFittingPrice: vi.fn(),
 }));
+vi.mock('@/engine/fittings/shareMapper', () => ({ fittingToShareInput: vi.fn(() => ({})) }));
+vi.mock('@/engine/fittings/fittingShare', () => ({
+  encodeFittingShare: vi.fn(async () => ({ ok: true, payload: 'CODE' })),
+}));
 vi.mock('@/features/fittings/useFittingChoices', () => {
   const resolve = vi.fn(async (id: string) => ({ name: id, fitting: {} }));
   const choices = {
@@ -87,10 +91,12 @@ async function addGoal(
 ) {
   await user.click(await screen.findByRole('button', { name: 'Add goal' }));
   if (name) await user.type(screen.getByLabelText('Name (optional)'), name);
-  if (amount) await user.type(screen.getByLabelText('Target'), amount);
   if (fitting) {
-    await user.click(screen.getByRole('combobox', { name: 'Or aim at a fitting' }));
+    await user.click(screen.getByRole('button', { name: 'Fitting price' }));
+    await user.click(screen.getByRole('combobox', { name: 'Fitting' }));
     await user.click(await screen.findByRole('option', { name: fitting }));
+  } else if (amount) {
+    await user.type(screen.getByLabelText('Amount'), amount);
   }
   await user.click(screen.getByRole('button', { name: 'Save' }));
 }
@@ -171,14 +177,26 @@ describe('WalletWaitingGoal', () => {
     expect(await screen.findByText(/have no sell order/)).toBeInTheDocument();
   });
 
-  it('turns the fitting pick off while a target is typed, and needs one or the other to save', async () => {
+  it('shows the amount or the fitting pick by the target choice, and needs a value to save', async () => {
     const user = userEvent.setup();
     renderPanels();
     await user.click(await screen.findByRole('button', { name: 'Add goal' }));
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-    await user.type(screen.getByLabelText('Target'), '5');
-    expect(screen.getByRole('combobox', { name: 'Or aim at a fitting' })).toBeDisabled();
+    expect(screen.getByLabelText('Amount')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Fitting' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Amount'), '5');
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Fitting price' }));
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Fitting' })).toBeInTheDocument();
+  });
+
+  it("links a fitting goal's name to the fitting", async () => {
+    const user = userEvent.setup();
+    renderPanels();
+    await addGoal(user, { name: 'Raven fund', fitting: 'Raven PvE' });
+    const link = await screen.findByRole('link', { name: 'Raven fund' });
+    expect(link.getAttribute('href')).toContain('/ships/fittings/edit?f=');
   });
 
   it('removes a goal from its edit dialog', async () => {

@@ -1,12 +1,17 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Button,
+  entityLinkClassName,
+  Field,
+  Fields,
   IskAmount,
   IskInput,
   Modal,
   Panel,
   ProgressBar,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -17,6 +22,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import { GOAL_MAX_TARGET, goalProgress } from '@/engine/netWorth/waiting';
+import type { FittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { useFittingChoices } from '@/features/fittings/useFittingChoices';
 import { useMarketHub } from '@/features/market/hub';
 import { parseIskAmount } from '@/lib/isk';
@@ -35,13 +41,14 @@ interface WalletGoalsPanelProps {
 interface Draft {
   id: string | null;
   name: string;
+  /** What sets the target: a typed amount, or a Fitting's price. */
+  mode: 'amount' | 'fitting';
   amount: string;
-  /** `NO_FITTING` for none: the select cannot hold an empty value. */
+  /** '' until a Fitting is picked. */
   fittingId: string;
 }
 
-const NO_FITTING = 'none';
-const NEW_DRAFT: Draft = { id: null, name: '', amount: '', fittingId: NO_FITTING };
+const NEW_DRAFT: Draft = { id: null, name: '', mode: 'amount', amount: '', fittingId: '' };
 
 /**
  * The wallet Goals: each a name and a target, either typed or the price of a
@@ -56,7 +63,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const choices = useFittingChoices(characterId);
   const hub = getTradeHub(useMarketHub((s) => s.value)) ?? DEFAULT_TRADE_HUB;
-  const prices = useGoalPrices(goals, hub, choices.resolve, choices.ready);
+  const { prices, links } = useGoalPrices(goals, hub, choices.resolve, choices.ready);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [removing, setRemoving] = useState<WalletGoal | null>(null);
 
@@ -69,19 +76,21 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
     }).format(new Date(`${day}T00:00:00Z`));
 
   const amount = draft ? parseIskAmount(draft.amount) : null;
-  const typed = draft !== null && draft.amount.trim() !== '';
   const amountOk = amount !== null && amount > 0 && amount <= GOAL_MAX_TARGET;
-  const canSave = draft !== null && (typed ? amountOk : draft.fittingId !== NO_FITTING);
+  const byFitting = draft?.mode === 'fitting';
+  const canSave = draft !== null && (byFitting ? draft.fittingId !== '' : amountOk);
 
   const save = () => {
     if (!draft || !canSave) return;
     const picked = choices.all.find((choice) => choice.id === draft.fittingId);
+    // A Fitting that is gone from the lists keeps the name it was picked under.
+    const kept = goals.find((g) => g.id === draft.id && g.fittingId === draft.fittingId);
     const goal: WalletGoal = {
       id: draft.id ?? crypto.randomUUID(),
       name: draft.name.trim(),
-      target: typed ? amount : null,
-      fittingId: typed ? null : draft.fittingId,
-      fittingName: typed ? null : (picked?.name ?? null),
+      target: byFitting ? null : amount,
+      fittingId: byFitting ? draft.fittingId : null,
+      fittingName: byFitting ? (picked?.name ?? kept?.fittingName ?? null) : null,
     };
     setGoals(
       draft.id === null ? [...goals, goal] : goals.map((g) => (g.id === goal.id ? goal : g))
@@ -93,8 +102,9 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
     setDraft({
       id: goal.id,
       name: goal.name,
+      mode: goal.fittingId === null ? 'amount' : 'fitting',
       amount: goal.target === null ? '' : String(goal.target),
-      fittingId: goal.fittingId ?? NO_FITTING,
+      fittingId: goal.fittingId ?? '',
     });
 
   return (
@@ -118,6 +128,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
               today={today}
               hubName={hub.name}
               price={prices.get(goalPriceKey(goal))}
+              fittingLink={links.get(goalPriceKey(goal))}
               formatDay={formatDay}
               onEdit={() => edit(goal)}
             />
@@ -133,6 +144,7 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
             {draft?.id != null && (
               <Button
                 variant="danger"
+                className="mr-auto"
                 onClick={() => setRemoving(goals.find((g) => g.id === draft.id) ?? null)}
               >
                 {t('wallet.goal.remove')}
@@ -148,51 +160,66 @@ export function WalletGoalsPanel({ rows, today }: WalletGoalsPanelProps) {
         }
       >
         {draft && (
-          <div className="space-y-3">
-            <label className="block text-sm">
-              {t('wallet.goal.nameLabel')}
+          <Fields variant="form">
+            <Field label={t('wallet.goal.nameLabel')} htmlFor="goal-name">
               <TextInput
+                id="goal-name"
                 value={draft.name}
                 maxLength={40}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                className="mt-1 w-full"
+                className="w-full"
               />
-            </label>
-            <label className="block text-sm">
-              {t('wallet.goal.targetLabel')}
-              <IskInput
-                mask
-                value={draft.amount}
-                onChange={(amountText) => setDraft({ ...draft, amount: amountText })}
-                className="mt-1 w-full"
+            </Field>
+            <Field label={t('wallet.goal.targetLabel')}>
+              <SegmentedControl
+                label={t('wallet.goal.targetLabel')}
+                options={[
+                  { value: 'amount', label: t('wallet.goal.modeAmount') },
+                  { value: 'fitting', label: t('wallet.goal.modeFitting') },
+                ]}
+                value={draft.mode}
+                onChange={(mode) => setDraft({ ...draft, mode })}
+                uppercase={false}
               />
-            </label>
-            <div className="text-sm">
-              <span id="goal-fitting-label">{t('wallet.goal.fittingLabel')}</span>
-              <Select
-                value={draft.fittingId}
-                disabled={typed || choices.all.length === 0}
-                onValueChange={(fittingId) => setDraft({ ...draft, fittingId })}
+            </Field>
+            {byFitting ? (
+              <Field
+                label={t('wallet.goal.fittingLabel')}
+                note={
+                  choices.all.length === 0
+                    ? t('wallet.goal.noFittings')
+                    : t('wallet.goal.fittingHint', { hub: hub.name })
+                }
               >
-                <SelectTrigger aria-labelledby="goal-fitting-label" className="mt-1 w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_FITTING}>{t('wallet.goal.fittingNone')}</SelectItem>
-                  {choices.all.map((choice) => (
-                    <SelectItem key={choice.id} value={choice.id}>
-                      {choice.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-text-dim">
-              {typed
-                ? t('wallet.goal.fittingNeedsBlank')
-                : t('wallet.goal.fittingHint', { hub: hub.name })}
-            </p>
-          </div>
+                <Select
+                  value={draft.fittingId}
+                  disabled={choices.all.length === 0}
+                  onValueChange={(fittingId) => setDraft({ ...draft, fittingId })}
+                >
+                  <SelectTrigger aria-label={t('wallet.goal.fittingLabel')} className="w-full">
+                    <SelectValue placeholder={t('wallet.goal.fittingPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {choices.all.map((choice) => (
+                      <SelectItem key={choice.id} value={choice.id}>
+                        {choice.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : (
+              <Field label={t('wallet.goal.amountLabel')} htmlFor="goal-amount">
+                <IskInput
+                  id="goal-amount"
+                  mask
+                  value={draft.amount}
+                  onChange={(amountText) => setDraft({ ...draft, amount: amountText })}
+                  className="w-full"
+                />
+              </Field>
+            )}
+          </Fields>
         )}
       </Modal>
       <ConfirmDialog
@@ -218,11 +245,22 @@ interface GoalRowProps {
   today: string;
   hubName: string;
   price: GoalPrice | undefined;
+  /** Where the goal's Fitting opens, once known. */
+  fittingLink: FittingEditLocation | undefined;
   formatDay: (day: string) => string;
   onEdit: () => void;
 }
 
-function GoalRow({ goal, rows, today, hubName, price, formatDay, onEdit }: GoalRowProps) {
+function GoalRow({
+  goal,
+  rows,
+  today,
+  hubName,
+  price,
+  fittingLink,
+  formatDay,
+  onEdit,
+}: GoalRowProps) {
   const { t } = useTranslation();
   const target = goal.target ?? (price?.status === 'ready' ? price.sell : null);
   const progress = useMemo(
@@ -234,7 +272,13 @@ function GoalRow({ goal, rows, today, hubName, price, formatDay, onEdit }: GoalR
   return (
     <li className="space-y-1">
       <div className="flex items-baseline justify-between gap-3">
-        <p className="min-w-0 truncate font-medium">{title}</p>
+        {fittingLink ? (
+          <Link to={fittingLink} className={entityLinkClassName('min-w-0 truncate font-medium')}>
+            {title}
+          </Link>
+        ) : (
+          <p className="min-w-0 truncate font-medium">{title}</p>
+        )}
         <Button
           size="sm"
           variant="ghost"

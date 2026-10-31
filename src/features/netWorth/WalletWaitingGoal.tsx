@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Eyebrow, IskAmount, Panel, textActionClassName } from '@/components/ui';
+import {
+  Eyebrow,
+  IskAmount,
+  Panel,
+  textActionClassName,
+  ValueList,
+  ValueRow,
+} from '@/components/ui';
 import { utcDay } from '@/engine/localDay';
 import { iskWaiting, walletChange } from '@/engine/netWorth/waiting';
 import { netToneClass } from '@/features/character/format';
@@ -45,39 +52,33 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
     <div className="grid gap-4 lg:grid-cols-2">
       {rows.length > 0 && (
         <Panel title={t('wallet.waiting.title')}>
-          <ul className="divide-y divide-line text-sm">
+          <ValueList>
             {waitingRows.map(([key, isk]) => (
-              <li key={key} className="flex justify-between py-2">
-                <span>{t(`wallet.waiting.${key}`)}</span>
-                <span className="tabular-nums">
-                  <IskAmount value={isk} decimals={0} />
-                </span>
-              </li>
+              <ValueRow
+                key={key}
+                label={t(`wallet.waiting.${key}`)}
+                value={<IskAmount value={isk} decimals={0} />}
+              />
             ))}
-          </ul>
+          </ValueList>
           {health && health.total.orders > 0 && (
             <div className="mt-3 border-t border-line pt-3 text-sm">
               <Eyebrow>
                 {t('wallet.waiting.healthTitle')}:{' '}
                 <IskAmount value={health.total.isk} decimals={0} />
               </Eyebrow>
-              <ul className="mt-1 space-y-1">
+              <ValueList variant="plain" className="mt-1">
                 {(['healthy', 'needsYou', 'watch', 'notChecked'] as const)
                   .filter((key) => health[key].orders > 0)
                   .map((key) => (
-                    <li key={key} className="flex justify-between gap-3">
-                      <span>
-                        {t(`wallet.waiting.health.${key}`)}{' '}
-                        <span className="text-text-dim">
-                          {t('wallet.waiting.orderCount', { count: health[key].orders })}
-                        </span>
-                      </span>
-                      <span className="tabular-nums">
-                        <IskAmount value={health[key].isk} decimals={0} />
-                      </span>
-                    </li>
+                    <ValueRow
+                      key={key}
+                      label={t(`wallet.waiting.health.${key}`)}
+                      note={t('wallet.waiting.orderCount', { count: health[key].orders })}
+                      value={<IskAmount value={health[key].isk} decimals={0} />}
+                    />
                   ))}
-              </ul>
+              </ValueList>
               {health.needsYou.orders > 0 && (
                 <Link
                   to={openOrdersHref({

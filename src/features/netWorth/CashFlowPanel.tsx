@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { guarded } from '@/app/routeChunks';
-import { Eyebrow, IskDelta, Panel, SegmentedControl, Spinner } from '@/components/ui';
+import { IskDelta, Panel, SegmentedControl, Spinner, StatChip, StatChips } from '@/components/ui';
 import { classifyJournal, type JournalRow } from '@/engine/journalNetting';
 import { utcDay } from '@/engine/localDay';
 import { useNow } from '@/lib/useNow';
@@ -13,6 +13,7 @@ import {
 } from '@/features/character/walletJournalAll';
 import type { FanOutCharacter } from '@/features/character/allCharactersFanOut';
 import { JOURNAL_FIELD_TO_PARAM } from '@/features/character/walletJournalFilter';
+import { IskFlowLegend } from '@/features/character/IskFlowLegend';
 import { formatIsk } from '@/lib/isk';
 import { COARSE_POINTER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 
@@ -105,14 +106,16 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
         />
       }
     >
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Figure label={t('wallet.cashFlow.earned')}>{formatIsk(flow.earned)}</Figure>
-        <Figure label={t('wallet.cashFlow.spent')}>{formatIsk(flow.spent)}</Figure>
-        <Figure label={t('wallet.cashFlow.net')}>
-          <IskDelta amount={flow.net} decimals={0} />
-        </Figure>
-        <Figure label={t('wallet.cashFlow.perDay')}>{formatIsk(Math.round(flow.perDay))}</Figure>
-      </div>
+      <StatChips>
+        <StatChip label={t('wallet.cashFlow.earned')} value={formatIsk(flow.earned)} />
+        <StatChip label={t('wallet.cashFlow.spent')} value={formatIsk(flow.spent)} />
+        <StatChip
+          label={t('wallet.cashFlow.net')}
+          value={<IskDelta amount={flow.net} decimals={0} />}
+          emphasis
+        />
+        <StatChip label={t('wallet.cashFlow.perDay')} value={formatIsk(Math.round(flow.perDay))} />
+      </StatChips>
       {delta !== null && (
         <p className="mt-2 text-xs text-text-dim">
           {t('wallet.cashFlow.versusBefore', {
@@ -146,17 +149,9 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
           />
         </Suspense>
       </div>
-      <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-text-dim">
-        <span>
-          <span aria-hidden className="mr-1 inline-block size-2 rounded-xs bg-isk-pos" />
-          {t('wallet.journalFlowLegendIn')}
-        </span>
-        <span>
-          <span aria-hidden className="mr-1 inline-block size-2 rounded-xs bg-isk-neg" />
-          {t('wallet.journalFlowLegendOut')}
-        </span>
-        {!touch && <span>{t('wallet.cashFlow.clickHint')}</span>}
-      </p>
+      <div className="mt-2">
+        <IskFlowLegend>{!touch && <span>{t('wallet.cashFlow.clickHint')}</span>}</IskFlowLegend>
+      </div>
       <p className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-text-dim">
         <span>
           {flow.partial && flow.coveredFrom
@@ -168,14 +163,5 @@ export function CashFlowPanel({ characters }: CashFlowPanelProps) {
         </span>
       </p>
     </Panel>
-  );
-}
-
-function Figure({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <Eyebrow>{label}</Eyebrow>
-      <p className="text-xl font-medium tabular-nums">{children}</p>
-    </div>
   );
 }
