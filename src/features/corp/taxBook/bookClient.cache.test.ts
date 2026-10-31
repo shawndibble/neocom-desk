@@ -2,6 +2,9 @@
 // re-opening a book costs, and what an edit makes it re-read.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// The read counts below are the whole-book path's; the read-models path passes `true` itself.
+vi.mock('./readModelSwitch', () => ({ CORP_BOOK_READ_MODELS: false }));
+
 type Data = Record<string, unknown>;
 const store = vi.hoisted(() => ({
   docs: new Map<string, Data>(),
@@ -306,7 +309,7 @@ describe('readBookData and the Overview/Miners read models (#5259)', () => {
     store.docs.set(`${BOOK}/readModels/overview`, MODELS.overview);
   });
 
-  it('never touches readModels with the switch off, the default', async () => {
+  it('never touches readModels with the switch off', async () => {
     const data = await readBookData(7, CORP);
     expect(store.reads.some((p) => p.includes('/readModels'))).toBe(false);
     expect(data?.readModels).toBeUndefined();
@@ -326,5 +329,17 @@ describe('readBookData and the Overview/Miners read models (#5259)', () => {
     store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
     await readBookData(7, CORP, undefined, true);
     expect(store.reads.filter((p) => p.includes('/readModels'))).toHaveLength(2);
+  });
+
+  it('opens the book without them, wiping nothing, when the rules refuse the docs', async () => {
+    await readBookData(7, CORP);
+    clearBookCache();
+    store.denied.add(`${BOOK}/readModels/minerList`);
+    store.denied.add(`${BOOK}/readModels/overview`);
+
+    const data = await readBookData(7, CORP, undefined, true);
+    expect(data?.readModels).toBeUndefined();
+    expect(data?.state.miners).toBeDefined();
+    expect(await db.corpBookParts.count()).toBeGreaterThan(0);
   });
 });

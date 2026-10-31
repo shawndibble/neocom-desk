@@ -597,7 +597,9 @@ export async function readBookData(
       undefined
     ),
     book.paidStatementIds(),
-    // Two docs, one stamp (ADR 0032). Off: not a single read.
+    // Two docs, one stamp (ADR 0032). Off: not a single read. Best effort, even on a refusal
+    // (rules not deployed): the screens fall back to the whole-book view, and the book's own
+    // reads above already surface a lost role.
     withReadModels
       ? part('readModels', async () => {
           const docs = async (id: string) =>
@@ -608,7 +610,7 @@ export async function readBookData(
             ).data();
           const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
           return { minerList, overview } as ReadModelDocs;
-        })
+        }).catch(() => undefined)
       : Promise.resolve(undefined),
   ]);
   return {

@@ -1,4 +1,4 @@
-// The Miner page's read path follows CORP_BOOK_READ_MODELS (issue #5258): off, the whole-book
+// The Miner page's read path follows CORP_BOOK_MINER_SCOPED_READ (issue #5258): off, the whole-book
 // read it always made; on, one Miner's read-model slice.
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +7,9 @@ import type { BookData } from '../taxBook/bookClient';
 const flag = vi.hoisted(() => ({ on: false }));
 vi.mock('../taxBook/readModelSwitch', () => ({
   get CORP_BOOK_READ_MODELS() {
+    return flag.on;
+  },
+  get CORP_BOOK_MINER_SCOPED_READ() {
     return flag.on;
   },
 }));
