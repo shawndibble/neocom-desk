@@ -37,10 +37,9 @@ export function selectUpcomingEntries(
   nowMs: number,
   limit = 3
 ): { upcoming: SkillQueueEntry[]; more: number } {
-  const at = active ? ordered.indexOf(active) : -1;
-  if (at < 0) return { upcoming: [], more: 0 };
+  if (!active) return { upcoming: [], more: 0 };
   const behind = ordered
-    .slice(at + 1)
+    .slice(ordered.indexOf(active) + 1)
     .filter((e) => !e.finish_date || Date.parse(e.finish_date) > nowMs);
   return { upcoming: behind.slice(0, limit), more: Math.max(0, behind.length - limit) };
 }

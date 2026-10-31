@@ -165,12 +165,8 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           ))}
           {model.upcoming.more && (
             <li>
-              <Link
-                to={model.upcoming.more.to}
-                className={entityLinkClassName('flex w-fit items-center gap-0.5 text-xs')}
-              >
+              <Link to={model.upcoming.more.to} className={entityLinkClassName('w-fit text-xs')}>
                 {model.upcoming.more.label}
-                <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
               </Link>
             </li>
           )}
@@ -209,13 +205,7 @@ function TableViewBody({
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
       <NumberBody
-        model={{
-          ...view.number,
-          secondary: undefined,
-          notes: undefined,
-          upcoming: undefined,
-          link: undefined,
-        }}
+        model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
       />
       <TableBody
         table={
@@ -252,9 +242,7 @@ function ChartBody({
   const beside = table !== null && table.rows.length > 0;
   return (
     <div>
-      <NumberBody
-        model={{ ...view.number, notes: undefined, upcoming: undefined, link: undefined }}
-      />
+      <NumberBody model={{ ...view.number, notes: undefined, link: undefined }} />
       <div className={cx(beside && 'md:flex md:items-start')}>
         <Chart
           model={view.chart}

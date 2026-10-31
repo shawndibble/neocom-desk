@@ -99,7 +99,7 @@ export interface NumberModel {
   /** The skills queued behind the active one (Training): plain text rows, the Number view only. */
   upcoming?: {
     rows: { key: string; title: string; value: string }[];
-    /** Ends the list when more are queued than shown; opens Skills › Plans, where the queue shows. */
+    /** Ends the list when more are queued than shown; opens the queue. */
     more?: { label: string; to: string };
   };
   /** The severity ladder's tone; `clear` draws plain. */
