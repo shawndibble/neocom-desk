@@ -155,27 +155,6 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           {note}
         </p>
       ))}
-      {model.upcoming && (
-        <ul className="grid gap-0.5 text-xs text-text-dim">
-          {model.upcoming.rows.map((row) => (
-            <li key={row.key} className="flex items-baseline justify-between gap-2">
-              <span className="min-w-0 truncate">{row.title}</span>
-              <span className="shrink-0 tabular-nums">{row.value}</span>
-            </li>
-          ))}
-          {model.upcoming.more && (
-            <li>
-              <Link
-                to={model.upcoming.more.to}
-                className={entityLinkClassName('flex w-fit items-center gap-0.5 text-xs')}
-              >
-                {model.upcoming.more.label}
-                <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-              </Link>
-            </li>
-          )}
-        </ul>
-      )}
       {model.link && (
         <Link
           to={model.link.to}
@@ -209,13 +188,7 @@ function TableViewBody({
     <div>
       {/* The headline stays on screen in every view; its secondary line is the table's job here. */}
       <NumberBody
-        model={{
-          ...view.number,
-          secondary: undefined,
-          notes: undefined,
-          upcoming: undefined,
-          link: undefined,
-        }}
+        model={{ ...view.number, secondary: undefined, notes: undefined, link: undefined }}
       />
       <TableBody
         table={
@@ -252,9 +225,7 @@ function ChartBody({
   const beside = table !== null && table.rows.length > 0;
   return (
     <div>
-      <NumberBody
-        model={{ ...view.number, notes: undefined, upcoming: undefined, link: undefined }}
-      />
+      <NumberBody model={{ ...view.number, notes: undefined, link: undefined }} />
       <div className={cx(beside && 'md:flex md:items-start')}>
         <Chart
           model={view.chart}
