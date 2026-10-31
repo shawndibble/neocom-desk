@@ -1,7 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { isApplePlatform, isCommandPaletteShortcut } from '@/lib/shortcuts';
-import type { ShownMarketItem } from './marketItems';
 import { useCommandPalette } from './store';
 
 const APPLE = isApplePlatform();
@@ -11,14 +10,6 @@ const APPLE = isApplePlatform();
 const loadCommandPalette = () => guarded(() => import('./CommandPalette'));
 const CommandPalette = lazy(() =>
   loadCommandPalette().then((module) => ({ default: module.CommandPalette }))
-);
-
-// Lazy: Item Detail brings ESI, SDE and skills code the shell chunk should not
-// carry until an item is picked.
-const ItemDetailModal = lazy(() =>
-  guarded(() => import('@/features/market/ItemDetailModal')).then((module) => ({
-    default: module.ItemDetailModal,
-  }))
 );
 
 /**
@@ -38,14 +29,11 @@ const ItemDetailModal = lazy(() =>
  *
  * The palette mounts only while open, so its live reads (Characters, corp
  * access) cost nothing the rest of the time and every opening starts clean.
- * A Market Items pick opens Item Detail here rather than in the palette,
- * which closes as it is picked: the modal sits over the current page — no
- * navigation — and hands focus back to it on close.
+ * A Market Items pick navigates to the Market Browser on that item.
  */
 export function CommandPaletteHost() {
   const open = useCommandPalette((state) => state.open);
   const hide = useCommandPalette((state) => state.hide);
-  const [shownItem, setShownItem] = useState<ShownMarketItem | null>(null);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -69,17 +57,7 @@ export function CommandPaletteHost() {
     <>
       {open && (
         <Suspense fallback={null}>
-          <CommandPalette onClose={hide} onShowItem={setShownItem} />
-        </Suspense>
-      )}
-      {shownItem && (
-        <Suspense fallback={null}>
-          <ItemDetailModal
-            typeId={shownItem.typeId}
-            itemName={shownItem.name}
-            showOpenInMarket
-            onClose={() => setShownItem(null)}
-          />
+          <CommandPalette onClose={hide} />
         </Suspense>
       )}
     </>
