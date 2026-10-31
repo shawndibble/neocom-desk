@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useCloneNicknames } from '@/features/character/cloneNicknames';
 
@@ -528,7 +529,7 @@ describe('Clones', () => {
       true
     );
     const system = await screen.findByRole('link', { name: 'Jita' });
-    expect(system.getAttribute('href')).toContain('30000142');
+    expect(system.getAttribute('href')).toBe(routeToHref(30000142));
   });
 
   it('links the place under a nicknamed jump clone, but not its unresolved structure fallback', async () => {
@@ -564,6 +565,20 @@ describe('Clones', () => {
     const beta = screen.getByText('Beta').closest('li') as HTMLElement;
     expect(within(beta).getByText('Structure #1000000000002')).toBeInTheDocument();
     expect(within(beta).queryByRole('link', { name: /Structure #/ })).not.toBeInTheDocument();
+  });
+
+  it('leaves an unresolved respawn structure as plain text', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () =>
+        HttpResponse.json({
+          home_location: { location_id: 1000000000002, location_type: 'structure' },
+          jump_clones: [],
+        })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Structure #1000000000002')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Structure #/ })).not.toBeInTheDocument();
   });
 
   it('lists the clone being worn first, its implants linking to Show info, with count and value', async () => {
