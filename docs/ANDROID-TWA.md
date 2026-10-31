@@ -78,6 +78,12 @@ as Chrome:
   silhouette the web notifications use, also listed in the web manifest as a
   `monochrome` icon so `bubblewrap merge` (which re-reads the web manifest)
   keeps it.
+- **`shortcuts`** — the long-press app shortcuts (Route planner, Pilot lookup,
+  Alerts, Open orders). The web manifest's `shortcuts`
+  (`src/app/pwaShortcuts.ts`) is the source; `twa-manifest.json` mirrors it with
+  absolute `https://neocomdesk.com/...` urls, and `bubblewrap merge` re-reads
+  the web manifest. Change both together. Do not bump `appVersionCode` until
+  release time.
 
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in

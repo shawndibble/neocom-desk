@@ -1,7 +1,13 @@
 {
   "app": {
     "name": "Neocom Desk",
-    "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, all in one place."
+    "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, all in one place.",
+    "shortcuts": {
+      "route": "Route planner",
+      "pilot": "Pilot lookup",
+      "alerts": "Alerts",
+      "orders": "Open orders"
+    }
   },
   "boot": {
     "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
