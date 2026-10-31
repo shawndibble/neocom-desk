@@ -7,6 +7,7 @@ export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
 export { buttonClassName } from './buttonClassName';
 export { StatChip, StatChips } from './StatChip';
+export { ValueList, ValueRow } from './ValueList';
 export { STAT_CHIP_TONE_TEXT_CLASS } from './statChipTone';
 export type { StatChipTone } from './statChipTone';
 export { DataAgeBadge } from './DataAgeBadge';
