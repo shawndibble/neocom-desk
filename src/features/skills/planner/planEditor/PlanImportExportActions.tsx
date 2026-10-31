@@ -9,6 +9,8 @@ import {
 } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
 import * as Icon from '@/components/ui/icons';
+import { ExportTableSub } from '@/components/ui/TableExport';
+import { MenuKindContext } from '@/components/ui/rowActionsContext';
 import { PlanConfirmation } from './PlanConfirmation';
 import type { usePlanExport } from './usePlanExport';
 import type { usePlanImport } from './usePlanImport';
@@ -45,8 +47,8 @@ export function PlanImportExportActions({
     exportMenuOpen,
     setExportMenuOpen,
     handleExport,
-    handleExportQueue,
-    queueRowCount,
+    handleTableDone,
+    tableExport,
   } = exporter;
   return createPortal(
     <>
@@ -106,24 +108,9 @@ export function PlanImportExportActions({
           >
             {t('plans.exportClipboard')}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => void handleExportQueue('csv')}
-            disabled={queueRowCount === 0}
-          >
-            {t('plans.exportCsvQueue')}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => void handleExportQueue('xlsx')}
-            disabled={queueRowCount === 0}
-          >
-            {t('plans.exportXlsxQueue')}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => void handleExportQueue('clipboard')}
-            disabled={queueRowCount === 0}
-          >
-            {t('plans.exportSheetsQueue')}
-          </DropdownMenuItem>
+          <MenuKindContext.Provider value="dropdown">
+            <ExportTableSub tableExport={tableExport} onDone={handleTableDone} />
+          </MenuKindContext.Provider>
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Beside the buttons that produced them, not down in the entries

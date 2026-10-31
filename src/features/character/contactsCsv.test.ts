@@ -133,6 +133,21 @@ describe('contactsCsvColumns', () => {
     });
   });
 
+  it('leaves own-corp/alliance blank unless a character has a loaded affiliation', () => {
+    const rows = new Map([
+      [1001, affiliationRow({ corporationId: 2001, inOwnCorporation: true })],
+      [1002, affiliationRow()],
+      [2001, affiliationRow({ corporationId: 2001 })],
+    ]);
+    const columns = contactsCsvColumns(t, new Map(), rows, NO_LABELS, NO_ACHIEVEMENTS);
+    const own = (c: CharacterContact) =>
+      columns.find((col) => col.header === 'contacts.ownCorporation')!.value(c);
+    expect(own(contact())).toBe('contacts.csvYes');
+    expect(own(contact({ contact_id: 1002 }))).toBeNull();
+    expect(own(contact({ contact_id: 2001, contact_type: 'corporation' }))).toBeNull();
+    expect(own(contact({ contact_id: 5 }))).toBeNull();
+  });
+
   it('round-trips through toCsv with exactly one BOM', () => {
     const columns = contactsCsvColumns(t, new Map(), new Map(), NO_LABELS, NO_ACHIEVEMENTS);
     const csv = toCsv([contact()], columns);

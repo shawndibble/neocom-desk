@@ -180,7 +180,7 @@ describe('charactersCsvColumns', () => {
       'characters.csvAchievementScore': 1200,
       'characters.csvDockedAt': 'Jita IV - Moon 4',
       'characters.csvSystem': 'Jita',
-      'characters.csvPlaceKind': 'characters.csvPlaceStation',
+      'characters.csvPlaceKind': 'characters.csvPlaceDocked',
       'characters.column.ship': 'Rifter',
       // 52M SP fills 94 extractors at 100 net each.
       'characters.csvSpReadyValue': 9400,
@@ -195,6 +195,15 @@ describe('charactersCsvColumns', () => {
     );
     expect(inSpace['characters.csvDockedAt']).toBeUndefined();
     expect(inSpace['characters.csvPlaceKind']).toBe('characters.inSpace');
+    const unnamed = valuesOf(
+      row({
+        whereabouts: {
+          place: { systemName: 'Amarr', dockedKind: 'structure', dockedName: null },
+          shipName: null,
+        },
+      })
+    );
+    expect(unnamed['characters.csvPlaceKind']).toBe('characters.structure');
     expect(valuesOf(row({ whereabouts: undefined }))['characters.csvSystem']).toBeUndefined();
     expect(valuesOf(row(), { extractionNet: null })['characters.csvSpReadyValue']).toBeNull();
   });

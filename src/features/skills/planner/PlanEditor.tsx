@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import type { SkillQueueEntry } from '@/esi/endpoints';
+import type { PlanMilestone } from '@/engine/types';
 import { useMilestones } from './useMilestones';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
@@ -39,6 +40,7 @@ import { useSplitLegacyEntries } from './planEditor/useSplitLegacyEntries';
 export type { PlanPatch } from './planEditor/types';
 
 const NO_QUEUE: readonly SkillQueueEntry[] = [];
+const NO_MILESTONES: readonly PlanMilestone[] = [];
 
 export function PlanEditor({
   characterId,
@@ -218,6 +220,9 @@ export function PlanEditor({
   const exporter = usePlanExport({
     schedule,
     entries: plan.entries,
+    milestones: plan.milestones ?? NO_MILESTONES,
+    pinnedInProgress,
+    loadedAtMs,
     trainedSkills,
     engineSkills: catalog.engineSkills,
     nameFor,

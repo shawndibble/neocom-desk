@@ -128,10 +128,13 @@ export function Contacts() {
   const acrossLists = data?.acrossLists ?? NO_LISTS;
   const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
 
+  // Set on the first open of the export menu: Title / Score are read only once asked for.
+  const [exportArmed, setExportArmed] = useState(false);
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
   const {
     affiliationRows,
     achievements,
+    achievementsPending,
     optionalCharacterColumns,
     availableCharacterColumnIds,
     columns,
@@ -143,6 +146,7 @@ export function Contacts() {
     contactLabels,
     affiliations,
     ownAffiliation,
+    exportArmed,
   });
 
   const counts = useMemo(
@@ -228,7 +232,7 @@ export function Contacts() {
     surface: 'contacts',
     rows: filteredContacts,
     columns: characterCsvColumns,
-    truncated: contactsTruncated,
+    truncated: contactsTruncated || achievementsPending,
   });
   const acrossCsvColumns = useMemo(
     () => contactsAcrossCsvColumns(t, contactNames),
@@ -302,6 +306,7 @@ export function Contacts() {
               ) : (
                 <TableActionsMenu
                   name={t('contacts.title')}
+                  onOpenChange={(open) => open && setExportArmed(true)}
                   tableExport={characterExport}
                   size="md"
                 />

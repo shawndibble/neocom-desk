@@ -1,17 +1,28 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
+import type {
+  EngineSkill,
+  PlanEntry,
+  PlanMilestone,
+  ScheduledStep,
+  TrainedSkill,
+} from '@/engine/types';
 import type { SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { stepFinish } from '@/lib/duration';
 import { priorityLabelKey } from './entryList/rowChrome';
+import { entrySlices } from './entrySlices';
+import { entryId } from './reorder';
+import type { PinnedInProgressEntry } from './queueRows';
 
-/** Why a plan entry has no scheduled time of its own. */
-export type QueueEntryStatus = 'scheduled' | 'trained' | 'unknown' | 'queued';
+/** Why a plan row is listed: a scheduled step, or what keeps its entry out of the schedule. */
+export type QueueEntryStatus =
+  'scheduled' | 'trained' | 'unknown' | 'queued' | 'training' | 'unscheduled' | 'orphanMilestone';
 
 /**
  * One exported plan row: a scheduled training step, or a plan entry the
- * schedule leaves out (already trained, ahead of the plan in the live queue,
- * or a skill this SDE snapshot does not know), so the file lists every entry
- * the plan holds.
+ * schedule leaves out (already trained, in training or ahead of the plan in the
+ * live queue, unknown to this SDE snapshot, or left unscheduled by a plan
+ * error), so the file lists every entry the plan holds, in plan position.
+ * A Plan Milestone with no row to sit on is a row of its own.
  */
 export interface QueueCsvRow {
   status: QueueEntryStatus;
@@ -21,6 +32,11 @@ export interface QueueCsvRow {
   step?: ScheduledStep;
   /** The step's index in the schedule, for the marker, Booster and Alpha lookups. */
   stepIndex?: number;
+  /** The level in training in the live queue: its real time left, and the instant that ends. */
+  remainingSeconds?: number;
+  doneByMs?: number;
+  /** Names of the Plan Milestones anchored at this skill level. */
+  milestone?: string;
 }
 
 /** What the rows are read against: the costed schedule and the plan's own entries. */
@@ -38,33 +54,85 @@ export interface QueueCsvContext {
 }
 
 /**
- * The scheduled steps in training order, then the plan entries that have none:
- * already trained, ahead of the plan in the live queue, or unknown to the catalog.
+ * The plan in plan position: each entry's scheduled steps (its prerequisites
+ * first), then a status row when the entry has no step of its own.
  */
-export function queueCsvRows(
-  schedule: Pick<SkillPlanSchedule, 'scheduled' | 'isKnownSkill'>,
-  entries: readonly PlanEntry[],
-  trainedSkills: ReadonlyMap<number, TrainedSkill>
-): QueueCsvRow[] {
-  const rows: QueueCsvRow[] = schedule.scheduled.map((step, stepIndex) => ({
+export function queueCsvRows({
+  schedule,
+  entries,
+  trainedSkills,
+  pinned,
+  nowMs,
+  milestones,
+}: {
+  schedule: Pick<SkillPlanSchedule, 'scheduled' | 'isKnownSkill' | 'entryBoundaries' | 'error'>;
+  entries: readonly PlanEntry[];
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  /** The entry that is the in-game queue's level in training, with its real seconds left. */
+  pinned: PinnedInProgressEntry | null;
+  nowMs: number;
+  milestones: readonly PlanMilestone[];
+}): QueueCsvRow[] {
+  const { scheduled } = schedule;
+  const stepRow = (stepIndex: number): QueueCsvRow => ({
     status: 'scheduled',
-    skillTypeID: step.skillTypeID,
-    level: step.level,
-    step,
+    skillTypeID: scheduled[stepIndex].skillTypeID,
+    level: scheduled[stepIndex].level,
+    step: scheduled[stepIndex],
     stepIndex,
-  }));
-  const scheduledLevels = new Set(schedule.scheduled.map((s) => `${s.skillTypeID}:${s.level}`));
-  for (const entry of entries) {
+  });
+  const scheduledLevels = new Set(scheduled.map((s) => `${s.skillTypeID}:${s.level}`));
+  // A rejected plan has no schedule, so no boundaries to read.
+  const slices =
+    schedule.error === null
+      ? entrySlices(entries, schedule.entryBoundaries, scheduled, schedule.isKnownSkill)
+      : entries.map(() => ({ start: 0, ownStart: -1, end: 0 }));
+  const rows: QueueCsvRow[] = [];
+  entries.forEach((entry, i) => {
+    for (let stepIndex = slices[i].start; stepIndex < slices[i].end; stepIndex++) {
+      rows.push(stepRow(stepIndex));
+    }
+    if (scheduledLevels.has(`${entry.skillTypeID}:${entry.targetLevel}`)) return;
     const base = { skillTypeID: entry.skillTypeID, level: entry.targetLevel };
     if (!schedule.isKnownSkill(entry.skillTypeID)) {
       rows.push({ ...base, status: 'unknown' });
-    } else if (scheduledLevels.has(`${entry.skillTypeID}:${entry.targetLevel}`)) {
-      continue;
     } else if ((trainedSkills.get(entry.skillTypeID)?.level ?? 0) >= entry.targetLevel) {
       rows.push({ ...base, status: 'trained' });
+    } else if (pinned !== null && pinned.id === entryId(entry)) {
+      rows.push({
+        ...base,
+        status: 'training',
+        remainingSeconds: pinned.seconds,
+        doneByMs: nowMs + pinned.seconds * 1000,
+      });
     } else {
-      rows.push({ ...base, status: 'queued' });
+      // A plan the normalizer rejected has no schedule at all: say so rather than "queued".
+      rows.push({ ...base, status: schedule.error === null ? 'queued' : 'unscheduled' });
     }
+  });
+  const namesAt = new Map<string, string[]>();
+  for (const milestone of milestones) {
+    const key = `${milestone.skillTypeID}:${milestone.level}`;
+    namesAt.set(key, [...(namesAt.get(key) ?? []), milestone.name]);
+  }
+  const placed = new Set<string>();
+  for (const row of rows) {
+    const key = `${row.skillTypeID}:${row.level}`;
+    const names = namesAt.get(key);
+    if (names) {
+      row.milestone = names.join('; ');
+      placed.add(key);
+    }
+  }
+  for (const milestone of milestones) {
+    const key = `${milestone.skillTypeID}:${milestone.level}`;
+    if (placed.has(key)) continue;
+    rows.push({
+      status: 'orphanMilestone',
+      skillTypeID: milestone.skillTypeID,
+      level: milestone.level,
+      milestone: milestone.name,
+    });
   }
   return rows;
 }
@@ -74,6 +142,9 @@ const STATUS_KEY: Record<QueueEntryStatus, string> = {
   trained: 'plans.csvStatusTrained',
   unknown: 'plans.csvStatusUnknown',
   queued: 'plans.csvStatusQueued',
+  training: 'plans.csvStatusTraining',
+  unscheduled: 'plans.csvStatusUnscheduled',
+  orphanMilestone: 'plans.csvStatusOrphanMilestone',
 };
 
 /**
@@ -100,7 +171,7 @@ export function queueCsvColumns(
     { header: t('plans.csvSkill'), value: (row) => nameFor(row.skillTypeID) },
     { header: t('plans.csvLevel'), value: (row) => row.level },
     { header: t('plans.csvStatus'), value: (row) => t(STATUS_KEY[row.status]) },
-    { header: t('plans.csvSeconds'), value: stepOnly((step) => step.seconds) },
+    { header: t('plans.csvSeconds'), value: (row) => row.step?.seconds ?? row.remainingSeconds },
     { header: t('plans.csvCumulativeSeconds'), value: stepOnly((step) => step.cumulativeSeconds) },
     {
       header: t('plans.csvStart'),
@@ -110,10 +181,14 @@ export function queueCsvColumns(
     },
     {
       header: t('plans.csvDoneBy'),
-      value: stepOnly((step) =>
-        stepFinish(step.cumulativeSeconds, schedule.startDate).toISOString()
-      ),
+      value: (row) =>
+        row.step
+          ? stepFinish(row.step.cumulativeSeconds, schedule.startDate).toISOString()
+          : row.doneByMs === undefined
+            ? undefined
+            : new Date(row.doneByMs).toISOString(),
     },
+    { header: t('plans.csvMilestone'), value: (row) => row.milestone },
     { header: t('plans.csvSp'), value: stepOnly((step) => step.sp) },
     {
       header: t('plans.csvPriority'),

@@ -48,7 +48,7 @@ describe('npcStandingsCsvColumns', () => {
       'contacts.standings.columnEffective': 6.1,
       'contacts.standings.columnBase': 5.5,
       'contacts.standings.columnAccess': 4,
-      'contacts.standings.csvAgentAccess': undefined,
+      'contacts.standings.csvAgentAccess': null,
       'contacts.standings.columnJumps': 3,
       'contacts.standings.columnFees': 'contacts.standings.fees',
     });
@@ -73,6 +73,22 @@ describe('npcStandingsCsvColumns', () => {
       'contacts.standings.columnJumps': undefined,
       'contacts.standings.columnFees': undefined,
     });
+  });
+
+  it('never invents an access value: unknown level or needed standing is blank', () => {
+    const values = valuesOf(
+      row({
+        kind: 'agent',
+        belongsTo: { name: 'Caldari Navy' },
+        accessLevel: null,
+        agentAccess: { open: true, blockedBy: null, needs: null, short: 0 },
+      })
+    );
+    expect(values['contacts.standings.columnAccess']).toBeNull();
+    const noNeed = valuesOf(
+      row({ kind: 'agent', agentAccess: { open: false, blockedBy: null, needs: null, short: 0 } })
+    );
+    expect(noNeed['contacts.standings.csvAgentAccess']).toBeNull();
   });
 
   it('leaves standing blank when skills could not be read', () => {

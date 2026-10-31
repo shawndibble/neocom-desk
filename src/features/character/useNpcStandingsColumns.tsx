@@ -12,7 +12,11 @@ import {
   type NpcStandingsColumnId,
 } from '@/features/character/contactsColumns';
 import { EmptyCell } from '@/features/character/ContactCells';
-import type { NpcStandingRow } from '@/features/character/npcStandingsRows';
+import {
+  npcAccessLevel,
+  npcAgentAccessState,
+  type NpcStandingRow,
+} from '@/features/character/npcStandingsRows';
 import { AccessPips } from '@/features/standings/table/AccessPips';
 
 /** The number the game shows, or Base when the pilot's skills could not be read. */
@@ -123,29 +127,22 @@ export function useNpcStandingsColumns(skillsKnown: boolean) {
         // show how far up the levels their chain reaches.
         render: (row) => {
           if (row.kind === 'agent') {
-            const access = row.agentAccess;
+            const access = npcAgentAccessState(row);
             if (access === null) return <EmptyCell />;
-            if (access.open)
+            if (access.state === 'open')
               return <span className="text-success">{t('contacts.standings.accessOpen')}</span>;
             return (
               <span className="text-text-dim">
-                {access.blockedBy
+                {access.state === 'blocked'
                   ? t('contacts.standings.accessBlocked')
-                  : t('contacts.standings.accessNeeds', { standing: fixed2(access.needs ?? 0) })}
+                  : t('contacts.standings.accessNeeds', { standing: fixed2(access.standing) })}
               </span>
             );
           }
           return row.accessLevel === null ? <EmptyCell /> : <AccessPips level={row.accessLevel} />;
         },
         // One scale for every kind: the agent level you can use (0 when you cannot).
-        sortValue: (row) =>
-          row.kind === 'agent'
-            ? row.agentAccess
-              ? row.agentAccess.open
-                ? (row.belongsTo?.level ?? 1)
-                : 0
-              : undefined
-            : (row.accessLevel ?? undefined),
+        sortValue: (row) => npcAccessLevel(row) ?? undefined,
         stackAffix: { before: `${t('contacts.standings.columnAccess')} ` },
       },
       fees: {

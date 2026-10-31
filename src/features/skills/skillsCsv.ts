@@ -17,6 +17,8 @@ export interface SkillGroup {
     injected: boolean;
     /** The highest level waiting in the queue, only when above `level`. */
     queuedLevel: number | null;
+    /** The highest level any Skill Plan of this Character asks for; null when no plan lists the skill. */
+    plannedLevel: number | null;
   }[];
 }
 
@@ -29,6 +31,8 @@ export interface SkillCsvRow {
   rank: number;
   injected: boolean;
   queuedLevel: number | null;
+  plannedLevel: number | null;
+  description: string;
 }
 
 /** One row per skill (injected or not), preserving the incoming group order and within-group order. */
@@ -43,6 +47,8 @@ export function skillCsvRows(groups: readonly SkillGroup[]): SkillCsvRow[] {
       rank: skill.rank,
       injected: skill.injected,
       queuedLevel: skill.queuedLevel,
+      plannedLevel: skill.plannedLevel,
+      description: skill.description ?? '',
     }))
   );
 }
@@ -59,6 +65,8 @@ export function skillCsvColumns(t: CsvTranslate): CsvColumn<SkillCsvRow>[] {
       value: (row) => t(row.injected ? 'skills.csvYes' : 'skills.csvNo'),
     },
     { header: t('skills.csvQueuedLevel'), value: (row) => row.queuedLevel },
+    { header: t('skills.csvPlannedLevel'), value: (row) => row.plannedLevel },
     { header: t('skills.csvTypeId'), value: (row) => row.skillTypeId },
+    { header: t('skills.csvDescription'), value: (row) => row.description },
   ];
 }

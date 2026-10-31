@@ -32,6 +32,7 @@ describe('calendarCsvColumns', () => {
       'calendar.csvDetail',
       'calendar.csvResponse',
       'calendar.csvImportant',
+      'calendar.csvProjected',
       'calendar.csvId',
     ]);
   });
@@ -44,7 +45,8 @@ describe('calendarCsvColumns', () => {
       'calendar.csvDetail': undefined,
       'calendar.csvResponse': 'calendar.responseDeclined',
       'calendar.csvImportant': 'calendar.csvYes',
-      'calendar.csvId': '9001',
+      'calendar.csvProjected': 'calendar.csvNo',
+      'calendar.csvId': 9001,
     });
   });
 
@@ -62,10 +64,10 @@ describe('calendarCsvColumns', () => {
       )
     ).toMatchObject({
       'calendar.csvKind': 'calendar.kind.industryJob',
-      'calendar.csvDetail': 'Jita IV',
+      'calendar.csvDetail': 'calendar.detail.industryJob.Jita IV',
       'calendar.csvResponse': undefined,
       'calendar.csvImportant': undefined,
-      'calendar.csvId': '42',
+      'calendar.csvId': 42,
     });
   });
 });

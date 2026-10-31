@@ -91,14 +91,16 @@ export function charactersCsvColumns(
     },
     { header: t('characters.csvSystem'), value: (row) => row.whereabouts?.place?.systemName },
     {
+      // The screen's wording: a named station or structure needs no word; an unnamed
+      // structure reads "structure", an item in space "in space".
       header: t('characters.csvPlaceKind'),
       value: (row) => {
         const place = row.whereabouts?.place;
         if (!place) return undefined;
-        if (place.dockedKind === null) return t('characters.inSpace');
-        return place.dockedKind === 'structure'
-          ? t('characters.structure')
-          : t('characters.csvPlaceStation');
+        const label = placeLabel(place);
+        return label.kind === 'docked'
+          ? t('characters.csvPlaceDocked')
+          : t(label.kind === 'inSpace' ? 'characters.inSpace' : 'characters.structure');
       },
     },
     { header: t('characters.column.ship'), value: (row) => row.whereabouts?.shipName },

@@ -275,3 +275,26 @@ export function countNpcStandingRows(
   for (const row of rows) counts[row.kind] += 1;
   return counts;
 }
+
+/**
+ * The one access scale the Access column sorts and exports on: the agent level
+ * an agent row opens (0 when you cannot use them), the chain's highest agent
+ * level otherwise. Null when unknown (skills unread, an agent with no known level).
+ */
+export function npcAccessLevel(row: NpcStandingRow): number | null {
+  if (row.kind !== 'agent') return row.accessLevel;
+  if (!row.agentAccess) return null;
+  return row.agentAccess.open ? (row.belongsTo?.level ?? null) : 0;
+}
+
+/** What an agent row says about using that agent; null for other kinds and when it cannot be told. */
+export type NpcAgentAccessState =
+  { state: 'open' } | { state: 'blocked' } | { state: 'needs'; standing: number };
+
+export function npcAgentAccessState(row: NpcStandingRow): NpcAgentAccessState | null {
+  const access = row.kind === 'agent' ? row.agentAccess : null;
+  if (!access) return null;
+  if (access.open) return { state: 'open' };
+  if (access.blockedBy) return { state: 'blocked' };
+  return access.needs === null ? null : { state: 'needs', standing: access.needs };
+}

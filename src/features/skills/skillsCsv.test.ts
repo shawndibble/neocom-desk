@@ -16,6 +16,7 @@ const groups: SkillGroup[] = [
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
       },
       {
         skillTypeID: 2,
@@ -25,6 +26,7 @@ const groups: SkillGroup[] = [
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
       },
     ],
   },
@@ -39,6 +41,7 @@ const groups: SkillGroup[] = [
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
       },
     ],
   },
@@ -56,6 +59,8 @@ describe('skillCsvRows', () => {
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
+        description: '',
       },
       {
         groupName: 'Gunnery',
@@ -66,6 +71,8 @@ describe('skillCsvRows', () => {
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
+        description: '',
       },
       {
         groupName: 'Navigation',
@@ -76,6 +83,8 @@ describe('skillCsvRows', () => {
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
+        description: '',
       },
     ]);
   });
@@ -100,7 +109,9 @@ describe('skillCsvColumns', () => {
       'skills.csvRank',
       'skills.csvInjected',
       'skills.csvQueuedLevel',
+      'skills.csvPlannedLevel',
       'skills.csvTypeId',
+      'skills.csvDescription',
     ]);
   });
 
@@ -131,6 +142,7 @@ describe('skillCsvColumns', () => {
             rank: 3,
             injected: false,
             queuedLevel: 2,
+            plannedLevel: 4,
           },
         ],
       },
@@ -142,6 +154,8 @@ describe('skillCsvColumns', () => {
       'skills.csvInjected': 'skills.csvNo',
       'skills.csvRank': 3,
       'skills.csvQueuedLevel': 2,
+      'skills.csvPlannedLevel': 4,
+      'skills.csvDescription': '',
       'skills.csvTypeId': 9,
       'skills.csvSp': null,
     });

@@ -96,6 +96,23 @@ describe('TableActionsMenu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Export table' })).not.toBeInTheDocument();
   });
 
+  it('tells onOpenChange when the menu opens', async () => {
+    const onOpenChange = vi.fn();
+    function Armed() {
+      const tableExport = useTableExport({ surface: 'market-sell', rows, columns: csvColumns });
+      return (
+        <TableActionsMenu
+          name="Sell orders"
+          tableExport={tableExport}
+          onOpenChange={onOpenChange}
+        />
+      );
+    }
+    render(<Armed />);
+    await userEvent.click(screen.getByRole('button', { name: /Sell orders/ }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
   it('becomes a ⋯ menu with Export in a submenu once it has other actions', async () => {
     const user = userEvent.setup();
     function WithActions() {

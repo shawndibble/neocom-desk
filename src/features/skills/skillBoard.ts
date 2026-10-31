@@ -105,7 +105,10 @@ export function buildSkillBoard({
  * the board shows the whole catalog, so the file does too, with `injected`
  * telling an owned skill from a book still to buy.
  */
-export function boardCsvGroups(groups: readonly BoardGroup[]): SkillGroup[] {
+export function boardCsvGroups(
+  groups: readonly BoardGroup[],
+  plannedLevels: ReadonlyMap<number, number> = new Map()
+): SkillGroup[] {
   return groups
     .map((group) => ({
       groupName: group.groupName,
@@ -118,6 +121,7 @@ export function boardCsvGroups(groups: readonly BoardGroup[]): SkillGroup[] {
         rank: skill.rank,
         injected: skill.injected,
         queuedLevel: skill.queuedLevel,
+        plannedLevel: plannedLevels.get(skill.skillTypeID) ?? null,
       })),
     }))
     .filter((group) => group.skills.length > 0);

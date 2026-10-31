@@ -174,10 +174,11 @@ export function Characters() {
   }, [removeFailedName]);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
-  // Read only while the table shows one of the two optional columns.
+  // Always read (a small roster, cached): the table's Docked at and Ship columns and the export,
+  // which carries them in either view.
   const whereabouts = useCharacterWhereabouts(
     useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
-    viewMode === 'table' && (visibleColumns.includes('dockedAt') || visibleColumns.includes('ship'))
+    true
   );
 
   const {

@@ -15,6 +15,16 @@ function yesNo(t: CsvTranslate, value: boolean): string {
   return value ? t('contacts.csvYes') : t('contacts.csvNo');
 }
 
+/** Own-corporation and own-alliance are only known for a character whose affiliation has loaded. */
+function ownable(
+  contact: CharacterContact,
+  affiliationRows: ReadonlyMap<number, ContactAffiliationRow>
+): ContactAffiliationRow | undefined {
+  if (contact.contact_type !== 'character') return undefined;
+  const row = affiliationRows.get(contact.contact_id);
+  return row && row.corporationId !== null ? row : undefined;
+}
+
 /**
  * CSV columns for the Character tab (issue #2164): name, type, corporation and
  * alliance, whether either is the pilot's own, title and score, standing,
@@ -54,12 +64,17 @@ export function contactsCsvColumns(
     },
     {
       header: t('contacts.ownCorporation'),
-      value: (contact) =>
-        yesNo(t, affiliationRows.get(contact.contact_id)?.inOwnCorporation === true),
+      value: (contact) => {
+        const row = ownable(contact, affiliationRows);
+        return row ? yesNo(t, row.inOwnCorporation) : null;
+      },
     },
     {
       header: t('contacts.ownAlliance'),
-      value: (contact) => yesNo(t, affiliationRows.get(contact.contact_id)?.inOwnAlliance === true),
+      value: (contact) => {
+        const row = ownable(contact, affiliationRows);
+        return row ? yesNo(t, row.inOwnAlliance) : null;
+      },
     },
     ...achievementCsvColumns<CharacterContact>(t, (contact) => contact.contact_id, achievements),
     { header: t('contacts.standing'), value: (contact) => contact.standing },

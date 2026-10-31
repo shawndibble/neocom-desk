@@ -279,7 +279,7 @@ export function Skills() {
   // skills scope needs re-auth — the old export button was disabled then too.
   const csvRows = useMemo(() => {
     if (skillsBlocked) return [];
-    if (!searching) return skillCsvRows(boardCsvGroups(groups));
+    if (!searching) return skillCsvRows(boardCsvGroups(groups, plannedLevels));
     return skillCsvRows(
       boardCsvGroups(
         groups
@@ -287,10 +287,11 @@ export function Skills() {
           .map((group) => ({
             ...group,
             skills: filterResult.matchedSkillsByGroup.get(group.groupName) ?? [],
-          }))
+          })),
+        plannedLevels
       )
     );
-  }, [groups, skillsBlocked, searching, filterResult]);
+  }, [groups, skillsBlocked, searching, filterResult, plannedLevels]);
   const csvColumns = useMemo(() => skillCsvColumns(t), [t]);
   const skillsExport = useTableExport({
     surface: 'skills',

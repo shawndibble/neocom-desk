@@ -14,6 +14,7 @@ const GROUPS: SkillGroup[] = [
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
       },
       {
         skillTypeID: 2,
@@ -23,6 +24,7 @@ const GROUPS: SkillGroup[] = [
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
       },
     ],
   },
@@ -37,6 +39,7 @@ const GROUPS: SkillGroup[] = [
         rank: 1,
         injected: true,
         queuedLevel: null,
+        plannedLevel: null,
       },
     ],
   },

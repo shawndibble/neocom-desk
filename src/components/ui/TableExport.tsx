@@ -140,6 +140,7 @@ export function TableActionsMenu<T>({
   label: labelOverride,
   triggerText,
   onCloseAutoFocus,
+  onOpenChange,
 }: {
   /** What the table is, for the button's accessible name ("Export Open orders"). */
   name: string;
@@ -152,6 +153,8 @@ export function TableActionsMenu<T>({
   triggerText?: string;
   /** From `useOpenAfterMenu`, for a child item that opens a dialog. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** Hears the menu open and close: a table whose export needs data it loads lazily starts that load on first open. */
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState<number | null>(null);
@@ -181,7 +184,7 @@ export function TableActionsMenu<T>({
       <LiveStatus announceKey={copyCount}>
         {copied !== null && t('common.tableExport.copied', { count: copied })}
       </LiveStatus>
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           {triggerText ? (
             <Button

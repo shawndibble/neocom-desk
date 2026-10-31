@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { queueCsvColumns, queueCsvRows, type QueueCsvContext } from './queueCsv';
 import { toCsv } from '@/lib/csv';
-import type { EngineSkill, ScheduledStep } from '@/engine/types';
+import type { EngineSkill, PlanMilestone, ScheduledStep } from '@/engine/types';
+import { entryId } from './reorder';
 
 const identityT = (k: string) => k;
 const nameFor = (skillTypeID: number) => `Skill #${skillTypeID}`;
@@ -36,7 +37,22 @@ const context: QueueCsvContext = {
   ]),
 };
 
-const rows = queueCsvRows({ scheduled: steps, isKnownSkill: (id) => id !== 99 }, [], new Map());
+const rows = queueCsvRows({
+  schedule: {
+    scheduled: steps,
+    isKnownSkill: (id) => id !== 99,
+    entryBoundaries: [1, 2],
+    error: null,
+  },
+  entries: [
+    { skillTypeID: 1, targetLevel: 4 },
+    { skillTypeID: 2, targetLevel: 1 },
+  ],
+  trainedSkills: new Map(),
+  pinned: null,
+  nowMs: 0,
+  milestones: [],
+});
 
 function valuesOf(row: (typeof rows)[number], user: ReadonlySet<number> = new Set()) {
   return Object.fromEntries(
@@ -45,23 +61,88 @@ function valuesOf(row: (typeof rows)[number], user: ReadonlySet<number> = new Se
 }
 
 describe('queueCsvRows', () => {
-  it('lists the scheduled steps, then entries the schedule leaves out with a status', () => {
-    const result = queueCsvRows(
-      { scheduled: steps, isKnownSkill: (id) => id !== 99 },
-      [
-        { skillTypeID: 1, targetLevel: 4 }, // scheduled already
+  const base = {
+    trainedSkills: new Map([[5, { level: 4, sp: 1 }]]),
+    pinned: null,
+    nowMs: 0,
+    milestones: [] as PlanMilestone[],
+  };
+  const schedule = {
+    scheduled: steps,
+    isKnownSkill: (id: number) => id !== 99,
+    entryBoundaries: [1, 1, 2, 2],
+    error: null as string | null,
+  };
+
+  it('lists entries in plan position, with a status row where an entry has no step', () => {
+    const result = queueCsvRows({
+      ...base,
+      schedule,
+      entries: [
+        { skillTypeID: 1, targetLevel: 4 },
         { skillTypeID: 5, targetLevel: 3 }, // trained
+        { skillTypeID: 2, targetLevel: 1 },
         { skillTypeID: 6, targetLevel: 2 }, // ahead in the live queue
         { skillTypeID: 99, targetLevel: 1 }, // unknown
       ],
-      new Map([[5, { level: 4, sp: 1 }]])
-    );
+    });
     expect(result.map((r) => [r.skillTypeID, r.level, r.status])).toEqual([
       [1, 4, 'scheduled'],
-      [2, 1, 'scheduled'],
       [5, 3, 'trained'],
+      [2, 1, 'scheduled'],
       [6, 2, 'queued'],
       [99, 1, 'unknown'],
+    ]);
+  });
+
+  it('gives the level in training its real time left and done-by', () => {
+    const [row] = queueCsvRows({
+      ...base,
+      schedule: { ...schedule, scheduled: [], entryBoundaries: [0] },
+      entries: [{ skillTypeID: 6, targetLevel: 2 }],
+      pinned: { id: entryId({ skillTypeID: 6, targetLevel: 2 }), seconds: 600 },
+      nowMs: Date.parse('2026-10-01T00:00:00Z'),
+    });
+    expect(row).toMatchObject({ status: 'training', remainingSeconds: 600 });
+    const values = Object.fromEntries(
+      queueCsvColumns(identityT, nameFor, new Set(), context).map((c) => [c.header, c.value(row)])
+    );
+    expect(values).toMatchObject({
+      'plans.csvSeconds': 600,
+      'plans.csvDoneBy': '2026-10-01T00:10:00.000Z',
+      'plans.csvStatus': 'plans.csvStatusTraining',
+    });
+  });
+
+  it('marks entries unscheduled, not queued, when the plan has an error', () => {
+    const result = queueCsvRows({
+      ...base,
+      schedule: { scheduled: [], isKnownSkill: () => true, entryBoundaries: [], error: 'cycle' },
+      entries: [{ skillTypeID: 6, targetLevel: 2 }],
+    });
+    expect(result.map((r) => r.status)).toEqual(['unscheduled']);
+  });
+
+  it('puts a milestone on its row, and an orphaned one on a row of its own', () => {
+    const milestone = (id: string, skillTypeID: number, level: number): PlanMilestone => ({
+      id,
+      name: `Goal ${id}`,
+      skillTypeID,
+      level,
+    });
+    const result = queueCsvRows({
+      ...base,
+      schedule: { ...schedule, entryBoundaries: [1, 2] },
+      entries: [
+        { skillTypeID: 1, targetLevel: 4 },
+        { skillTypeID: 2, targetLevel: 1 },
+      ],
+      milestones: [milestone('a', 1, 4), milestone('b', 7, 3)],
+    });
+    expect(result.map((r) => [r.status, r.milestone])).toEqual([
+      ['scheduled', 'Goal a'],
+      ['scheduled', undefined],
+      ['orphanMilestone', 'Goal b'],
     ]);
   });
 });
@@ -76,6 +157,7 @@ describe('queueCsvColumns', () => {
       'plans.csvCumulativeSeconds',
       'plans.csvStart',
       'plans.csvDoneBy',
+      'plans.csvMilestone',
       'plans.csvSp',
       'plans.csvPriority',
       'plans.csvPrimaryAttribute',
@@ -127,11 +209,14 @@ describe('queueCsvColumns', () => {
   });
 
   it('leaves time and flags blank for an entry with no step, and marks it by status', () => {
-    const [unknown] = queueCsvRows(
-      { scheduled: [], isKnownSkill: () => false },
-      [{ skillTypeID: 99, targetLevel: 2 }],
-      new Map()
-    );
+    const [unknown] = queueCsvRows({
+      schedule: { scheduled: [], isKnownSkill: () => false, entryBoundaries: [], error: null },
+      entries: [{ skillTypeID: 99, targetLevel: 2 }],
+      trainedSkills: new Map(),
+      pinned: null,
+      nowMs: 0,
+      milestones: [],
+    });
     expect(valuesOf(unknown)).toMatchObject({
       'plans.csvStatus': 'plans.csvStatusUnknown',
       'plans.csvSeconds': undefined,
