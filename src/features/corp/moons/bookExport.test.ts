@@ -198,6 +198,7 @@ describe('bookExportSheets', () => {
     expect(bookExportSheets(input, names, t).map((s) => s.name)).toEqual([
       'corpTaxBook.export.sheets.miningLines',
       'corpTaxBook.export.sheets.statements',
+      'corpTaxBook.export.sheets.statementLines',
       'corpTaxBook.export.sheets.payments',
       'corpTaxBook.export.sheets.adjustments',
       'corpTaxBook.export.sheets.writeOffs',
@@ -239,6 +240,70 @@ describe('bookExportSheets', () => {
     expect(at('settled')).toBe('corpTaxBook.export.yes');
     expect(at('amount')).toBe(1000);
     expect(at('issued')).toBe('2026-04-01T00:00:00Z');
+  });
+
+  it('writes every Statement line with its ore, price, rate and tax, and the mail facts on the Statement', () => {
+    const withLines: BookExportInput = {
+      ...input,
+      statements: [
+        {
+          ...input.statements[0],
+          mailsSent: 2,
+          lastMailedAt: '2026-04-02T00:00:00Z',
+          issuedBy: 7,
+          remindersStopped: true,
+          manualRemindersSent: 1,
+          minerName: 'Pilot',
+          lines: [
+            {
+              kind: 'mined',
+              date: '2026-03-01',
+              characterId: 3,
+              structureId: 900,
+              oreLines: [{ typeId: 45490, quantity: 10 }],
+              unitPrices: { 45490: 5.5 },
+              priceSources: { 45490: 'live' },
+              taxPct: 10,
+              rateEffectiveFrom: '2026-01-01',
+              estimatedValue: 55,
+              tax: 5.5,
+            },
+            {
+              kind: 'correction',
+              date: '2026-03-02',
+              oreLines: [],
+              estimatedValue: 0,
+              tax: -1,
+              reason: 'fix',
+            },
+          ],
+        },
+      ],
+    };
+    const [lh, first, second] = sheet('corpTaxBook.export.sheets.statementLines', withLines);
+    const line = (row: unknown[], col: string) => row[lh.indexOf(`corpTaxBook.export.cols.${col}`)];
+    expect(line(first, 'statementId')).toBe('s1');
+    expect(line(first, 'character')).toBe('Char 3');
+    expect(line(first, 'refinery')).toBe('Refinery 900');
+    expect(line(first, 'ore')).toBe('Ore 45490 × 10');
+    expect(line(first, 'unitPrices')).toBe('Ore 45490: 5.5');
+    expect(line(first, 'priceSources')).toBe('Ore 45490: corpTaxBook.export.priceSource.live');
+    expect([line(first, 'taxPct'), line(first, 'estimatedValue'), line(first, 'tax')]).toEqual([
+      10, 55, 5.5,
+    ]);
+    expect(line(second, 'kind')).toBe('corpTaxBook.export.lineKind.correction');
+    expect(line(second, 'reason')).toBe('fix');
+    expect(line(second, 'character')).toBeNull();
+    const [sh, srow] = sheet('corpTaxBook.export.sheets.statements', withLines);
+    const at = (col: string) => srow[sh.indexOf(`corpTaxBook.export.cols.${col}`)];
+    expect([
+      at('mailsSent'),
+      at('lastMailed'),
+      at('issuedBy'),
+      at('manualReminders'),
+      at('storedMinerName'),
+    ]).toEqual([2, '2026-04-02T00:00:00Z', 'Char 7', 1, 'Pilot']);
+    expect(at('remindersStopped')).toBe('corpTaxBook.export.yes');
   });
 
   it('lists a Miner with every character it groups', () => {

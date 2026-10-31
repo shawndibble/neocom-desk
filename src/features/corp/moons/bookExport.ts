@@ -11,7 +11,7 @@ import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { deriveModeChanges, deriveOwnerRateHistory } from '@/engine/corpTaxBook/feederAccrual';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment, Statement, StatementLine } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { CsvTranslate } from '@/lib/csv';
@@ -162,6 +162,19 @@ export function bookExportSheets(
   const minerOf = (characterId: number) => minerIdOf.get(characterId) ?? `solo:${characterId}`;
   const character = (id: number | null | undefined) =>
     typeof id === 'number' ? names.character(id) : null;
+  const statementLines = [...input.statements]
+    .sort(
+      byKey(
+        (s) => s.issuedAt,
+        (s) => s.id
+      )
+    )
+    .flatMap((statement) =>
+      statement.lines.map((line): { statement: Statement; line: StatementLine } => ({
+        statement,
+        line,
+      }))
+    );
   const statementMiner = new Map(input.statements.map((s) => [s.id, s.minerId]));
   const payouts = input.feeders.flatMap((f) =>
     f.payouts.map((payout) => ({ feeder: f.corporationId, payout }))
@@ -231,8 +244,62 @@ export function bookExportSheets(
         ['lines', (s) => s.lines.length],
         ['amount', (s) => s.amount],
         ['settled', (s) => (input.paidStatementIds.has(s.id) ? yes : no)],
+        ['mailsSent', (s) => s.mailsSent],
+        ['lastMailed', (s) => s.lastMailedAt],
+        ['issuedBy', (s) => character(s.issuedBy)],
+        ['issuedById', (s) => s.issuedBy],
+        [
+          'remindersStopped',
+          (s) => (s.remindersStopped === undefined ? null : s.remindersStopped ? yes : no),
+        ],
+        ['manualReminders', (s) => s.manualRemindersSent],
+        ['storedMinerName', (s) => s.minerName],
       ]
     ),
+    // Every line of every Statement: the Statements sheet only counts them.
+    sheet(t, 'statementLines', statementLines, [
+      ['statementId', (l) => l.statement.id],
+      ['miner', (l) => minerName(l.statement.minerId)],
+      ['minerId', (l) => l.statement.minerId],
+      ['date', (l) => l.line.date],
+      ['character', (l) => character(l.line.characterId)],
+      ['characterId', (l) => l.line.characterId],
+      [
+        'refinery',
+        (l) => (l.line.structureId === undefined ? null : names.refinery(l.line.structureId)),
+      ],
+      ['refineryId', (l) => l.line.structureId],
+      ['ore', (l) => joined(l.line.oreLines.map((o) => `${names.ore(o.typeId)} × ${o.quantity}`))],
+      [
+        'unitPrices',
+        (l) =>
+          joined(
+            l.line.oreLines.flatMap((o) => {
+              const price = l.line.unitPrices?.[o.typeId];
+              return price === undefined ? [] : [`${names.ore(o.typeId)}: ${price}`];
+            })
+          ),
+      ],
+      [
+        'priceSources',
+        (l) =>
+          joined(
+            l.line.oreLines.flatMap((o) => {
+              const source = l.line.priceSources?.[o.typeId];
+              return source === undefined
+                ? []
+                : [`${names.ore(o.typeId)}: ${t(`corpTaxBook.export.priceSource.${source}`)}`];
+            })
+          ),
+      ],
+      ['taxPct', (l) => l.line.taxPct],
+      ['rateEffectiveFrom', (l) => l.line.rateEffectiveFrom],
+      ['estimatedValue', (l) => l.line.estimatedValue],
+      ['tax', (l) => l.line.tax],
+      ['reason', (l) => l.line.reason],
+      ['kind', (l) => t(`corpTaxBook.export.lineKind.${l.line.kind}`)],
+      ['adjustmentId', (l) => l.line.adjustmentId],
+    ]),
     sheet(
       t,
       'payments',

@@ -45,6 +45,11 @@ function counted(typeIds: readonly number[], names: SrpExportNames): string {
   return joined([...counts].map(([id, n]) => `${n}x ${names.type(id)}`));
 }
 
+/** A Doctrine diff's side as counted types; blank when the claim has none (not checked, or a clean match). */
+function diffText(typeIds: readonly number[] | undefined, names: SrpExportNames): string | null {
+  return typeIds && typeIds.length > 0 ? counted(typeIds, names) : null;
+}
+
 function basisText(basis: SrpClaimBasis | null, t: CsvTranslate): string | null {
   if (!basis) return null;
   return t(`srp.export.basis.${basis.step}`, 'percent' in basis ? { percent: basis.percent } : {});
@@ -111,6 +116,7 @@ export function srpExportSheets(
       [...input.claims].sort((a, b) => a.filedAt - b.filedAt || a.killmailId - b.killmailId),
       [
         ['killmailId', (c) => c.killmailId],
+        ['killmailHash', (c) => c.killmailHash],
         ['state', (c) => t(`srp.export.state.${c.state}`)],
         ['pilot', (c) => c.characterName],
         ['pilotId', (c) => c.characterId],
@@ -132,8 +138,17 @@ export function srpExportSheets(
           (c) => t(`srp.export.doctrine.${c.doctrineCheck?.status ?? 'not-checked'}`),
         ],
         ['doctrineFit', (c) => c.doctrineCheck?.doctrineName],
+        ['missingModules', (c) => diffText(c.doctrineCheck?.diff?.missingModules, names)],
+        ['extraModules', (c) => diffText(c.doctrineCheck?.diff?.extraModules, names)],
+        ['missingRigs', (c) => diffText(c.doctrineCheck?.diff?.missingRigs, names)],
+        ['extraRigs', (c) => diffText(c.doctrineCheck?.diff?.extraRigs, names)],
+        [
+          'amountSource',
+          (c) => (c.amountSource ? t(`srp.export.amountSource.${c.amountSource}`) : null),
+        ],
         ['overrideReason', (c) => c.overrideReason],
         ['overrideBy', (c) => c.overrideByName],
+        ['overrideAt', (c) => isoTime(c.overrideAt)],
         ['decided', (c) => isoTime(c.decidedAt)],
         ['decidedBy', (c) => c.decidedByName],
         ['rejectionReason', (c) => c.rejectionReason ?? c.previousRejectionReason],

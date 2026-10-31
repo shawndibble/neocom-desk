@@ -14,7 +14,7 @@ import { corpTickerOrId } from '../corpTicker';
 import { useActiveCorporationId } from '../owner';
 import { readSrpSettings } from '../srpClient';
 import { readSrpDoctrines } from '../srpDoctrineClient';
-import { readAllSrpClaims, readSrpActivity } from '../srpOfficerClient';
+import { readAllSrpClaims, readSrpActivity, SRP_READ_CAP } from '../srpOfficerClient';
 import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { auditText } from './srpAuditText';
 import { srpExportSheets } from './srpExport';
@@ -44,7 +44,11 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
       },
       t
     );
-    return downloadWorkbook('corp-srp', sheets, { qualifier: ticker });
+    // Each read stops at the cap with no sign of what lies past it, so a full read may be cut short.
+    return downloadWorkbook('corp-srp', sheets, {
+      qualifier: ticker,
+      truncated: claims.length >= SRP_READ_CAP || audit.length >= SRP_READ_CAP,
+    });
   }, [characterId, corporationId, t]);
 }
 

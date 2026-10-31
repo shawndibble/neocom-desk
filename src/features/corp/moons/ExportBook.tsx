@@ -52,7 +52,11 @@ function useExportBook(): () => Promise<WorkbookDownload> {
       names,
       t
     );
-    return downloadWorkbook('corp-tax-book', sheets, { qualifier: ticker });
+    // The audit read stops at the cap with no sign of what lies past it, so a full read is "may be cut short".
+    return downloadWorkbook('corp-tax-book', sheets, {
+      qualifier: ticker,
+      truncated: audit.length >= EXPORT_AUDIT_LIMIT,
+    });
   }, [characterId, corporationId, names, t]);
 }
 
