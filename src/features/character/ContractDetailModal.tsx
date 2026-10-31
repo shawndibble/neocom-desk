@@ -37,7 +37,7 @@ import {
 } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { TableActionsMenu } from '@/components/ui/TableExport';
-import { useTableExport } from '@/components/ui/useTableExport';
+import { useTableExport, type UseTableExport } from '@/components/ui/useTableExport';
 import { DataGate } from '@/components/DataGate';
 import { loadContractItemsDetailed } from './contractItems';
 import { archivedContractItems, pastEsiWindow } from './contractArchive';
@@ -459,28 +459,16 @@ export function ContractDetailModal({
                   className="py-4"
                 />
               ) : (
-                <>
-                  {itemColumns && (
-                    <ItemSection
-                      contractId={contract.contract_id}
-                      title={t('contracts.detailItemsIncluded')}
-                      columns={itemColumns}
-                      items={included}
-                      allItems={items.list}
-                      typeNames={items.typeNames}
-                    />
-                  )}
-                  {itemColumns && (
-                    <ItemSection
-                      contractId={contract.contract_id}
-                      title={t('contracts.detailItemsRequested')}
-                      columns={itemColumns}
-                      items={requested}
-                      allItems={items.list}
-                      typeNames={items.typeNames}
-                    />
-                  )}
-                </>
+                itemColumns && (
+                  <ContractItems
+                    contractId={contract.contract_id}
+                    columns={itemColumns}
+                    included={included}
+                    requested={requested}
+                    allItems={items.list}
+                    typeNames={items.typeNames}
+                  />
+                )
               ))}
           </DataGate>
         )}
@@ -553,27 +541,25 @@ export function ContractDetailModal({
  * rather than the block being written out twice — the right-click menu and
  * the narrow-screen wrapper had to stay in step across both.
  */
-function ItemSection({
+function ContractItems({
   contractId,
-  title,
   columns,
-  items,
+  included,
+  requested,
   allItems,
   typeNames,
 }: {
   contractId: number;
-  title: string;
   columns: DataTableColumn<ContractItem>[];
-  items: ContractItem[];
-  /** Every item of the contract: each section's export holds them all, with a Side column. */
+  included: ContractItem[];
+  requested: ContractItem[];
   allItems: ContractItem[];
   typeNames: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   const csvColumns = useMemo(() => contractItemsCsvColumns(t, typeNames), [t, typeNames]);
-  // Both sections export the whole contract (Included and Requested, told
-  // apart by the Side column), so `source: 'rows'`, not this section's table.
-  // The contract id in the filename: two contracts in a row never overwrite one file.
+  // One export for both tables: every item, told apart by the Side column, so `source: 'rows'`.
+  // The contract id in the filename keeps two contracts from overwriting one file.
   const tableExport = useTableExport({
     surface: 'contract-items',
     rows: allItems,
@@ -581,12 +567,47 @@ function ItemSection({
     qualifier: String(contractId),
     source: 'rows',
   });
+  return (
+    <>
+      <div className="flex justify-end">
+        <TableActionsMenu name={t('contracts.detailItemsAll')} tableExport={tableExport} />
+      </div>
+      <ItemSection
+        title={t('contracts.detailItemsIncluded')}
+        columns={columns}
+        items={included}
+        typeNames={typeNames}
+        tableExport={tableExport}
+      />
+      <ItemSection
+        title={t('contracts.detailItemsRequested')}
+        columns={columns}
+        items={requested}
+        typeNames={typeNames}
+        tableExport={tableExport}
+      />
+    </>
+  );
+}
+
+function ItemSection({
+  title,
+  columns,
+  items,
+  typeNames,
+  tableExport,
+}: {
+  title: string;
+  columns: DataTableColumn<ContractItem>[];
+  items: ContractItem[];
+  typeNames: ReadonlyMap<number, string>;
+  tableExport: UseTableExport<ContractItem>;
+}) {
   if (items.length === 0) return null;
   return (
     <div>
       <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
         <h3 className={cx(eyebrowClassName, 'flex items-center gap-1.5')}>{title}</h3>
-        <TableActionsMenu name={title} tableExport={tableExport} />
       </div>
       <div className="overflow-x-auto">
         <DataTable

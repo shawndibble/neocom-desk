@@ -46,7 +46,7 @@ import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CsvColumn } from '@/lib/csv';
-import { ordersCsvColumns } from '@/features/character/ordersCsv';
+import { ordersCsvColumns } from './ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -355,8 +355,7 @@ export function OpenOrdersPanel({
     [fixList.matching, sortColumn, tableSort]
   );
 
-  // Every row the funnel matched, whichever segment shows, with every fact
-  // the fix list holds (`OpenOrderRow`), not only the raw ESI order.
+  // Every row the funnel matched, whichever segment shows, so `rows` as given.
   const csvColumns = useMemo<CsvColumn<OpenOrderRow>[]>(() => ordersCsvColumns(t), [t]);
   const ordersExport = useTableExport({
     surface: 'orders-open',

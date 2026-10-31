@@ -290,10 +290,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       cancelled = true;
     };
   }, []);
-  const categoryName = (id: number) =>
-    id === EVERYTHING_CATEGORY_ID
-      ? t('market.hauling.categoryAll')
-      : (groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id }));
+  const categoryName = useCallback(
+    (id: number) =>
+      id === EVERYTHING_CATEGORY_ID
+        ? t('market.hauling.categoryAll')
+        : (groups?.find((g) => g.id === id)?.name ?? t('market.hauling.categoryFallback', { id })),
+    [t, groups]
+  );
 
   const cargo = useHaulingCargo((s) => s.value);
   const setCargo = useHaulingCargo((s) => s.setValue);
@@ -517,15 +520,21 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return `${unit}${holdsText}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
+  /** The category a row was added from by the fill, or null for a row the scan found. */
+  const addedFromOf = useCallback(
+    (typeId: number): string | null => {
+      const category = fill.addedIds.has(typeId) ? fill.categoryOf?.get(typeId) : undefined;
+      return category === undefined ? null : categoryName(category);
+    },
+    [fill.addedIds, fill.categoryOf, categoryName]
+  );
   const tableExport = useHaulingExport({
     mode,
     anyEnd,
     tableRows,
     lineOf,
     overrides,
-    addedIds: fill.addedIds,
-    addedCategoryOf: fill.categoryOf,
-    categoryName,
+    addedFromOf,
   });
 
   const { columnVisibility, hideableColumnsById, availableColumnIds, visibleColumns } =
@@ -539,9 +548,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
       suggestedProfitOf,
       overrides,
       patchOverride,
-      addedIds: fill.addedIds,
-      addedCategoryOf: fill.categoryOf,
-      categoryName,
+      addedFromOf,
       limitTextOf,
     });
 

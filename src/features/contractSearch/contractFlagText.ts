@@ -9,6 +9,11 @@ import { CONTRACT_ISK_CENTS_BELOW, formatContractIsk, formatIskAuto } from '@/li
 import type { TradeHub } from '@/market/hubs';
 import type { Translate } from '@/lib/translate';
 
+/** An auction's price is a starting bid unless the seller set a (non-zero) buyout. */
+export function auctionKindLabel(t: Translate, buyout: number | undefined): string {
+  return t(buyout ? 'contractSearch.buyoutShort' : 'contractSearch.startingBidShort');
+}
+
 /** The short name of the flag: the Price cell mark's accessible name, and the export's Price flag cell. */
 export function flagLabel(flag: ContractFlag, t: Translate): string {
   return t(

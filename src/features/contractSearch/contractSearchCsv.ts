@@ -1,7 +1,8 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
-import { flagLabel, flagMultiple, flagReferencePrice } from './contractFlagText';
+import { memoByRow } from '@/lib/memoByRow';
+import { auctionKindLabel, flagLabel, flagMultiple, flagReferencePrice } from './contractFlagText';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
 
 /** The panel's own spellings, so the export names things the way the table does. */
@@ -34,6 +35,7 @@ export function contractSearchCsvColumns(
   t: CsvTranslate,
   lookups: ContractSearchCsvLookups
 ): CsvColumn<PublicContractOfferRow>[] {
+  const flagOf = memoByRow(lookups.flagFor);
   return [
     { header: t('contractSearch.itemColumn'), value: (row) => lookups.typeName(row.typeId) },
     { header: t('contractSearch.qtyColumn'), value: (row) => row.quantity },
@@ -52,33 +54,28 @@ export function contractSearchCsvColumns(
     },
     {
       // An auction's price is a starting bid unless the seller set a buyout.
-      header: t('contractSearch.auctionKindColumn'),
-      value: (row) =>
-        !row.isAuction
-          ? null
-          : row.buyout
-            ? t('contractSearch.buyoutShort')
-            : t('contractSearch.startingBidShort'),
+      header: t('contracts.typeAuction'),
+      value: (row) => (row.isAuction ? auctionKindLabel(t, row.buyout) : null),
     },
-    { header: t('contractSearch.securityColumn'), value: (row) => lookups.security(row) },
+    { header: t('market.securityColumn'), value: (row) => lookups.security(row) },
     {
       header: t('contractSearch.priceFlagColumn'),
       value: (row) => {
-        const flag = lookups.flagFor(row);
+        const flag = flagOf(row);
         return flag ? flagLabel(flag, t) : null;
       },
     },
     {
       header: t('contractSearch.priceFlagMultipleColumn'),
       value: (row) => {
-        const flag = lookups.flagFor(row);
+        const flag = flagOf(row);
         return flag ? flagMultiple(flag) : null;
       },
     },
     {
       header: t('contractSearch.priceFlagReferenceColumn'),
       value: (row) => {
-        const flag = lookups.flagFor(row);
+        const flag = flagOf(row);
         return flag ? flagReferencePrice(flag) : null;
       },
     },

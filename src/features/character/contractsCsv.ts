@@ -3,6 +3,7 @@ import type { Contract } from '@/esi/endpoints';
 import type { EffectiveStanding } from './contactStandings';
 import { standingLabel } from './standingLabel';
 import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
+import { isoTime } from '@/lib/exportSheets';
 import { contractIssuer, contractReceiver } from './contractCounterparty';
 import { contractAmount } from './contractAmount';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from './contractLabels';
@@ -22,14 +23,9 @@ export interface ContractsCsvOptions {
 }
 
 /**
- * CSV columns for contracts, every fact the History table holds whichever
- * columns the picker shows: type (the table's label, not the ESI slug), title,
- * character, status (the table's label), issuer and receiver with their
- * standing tags, price, issued, expires, collateral, the buyback cue, and for
- * a courier its start and end (names where resolved, and ids) and its delivery
- * deadline (an accepted courier's own clock, distinct from the accept-by
- * Expires). Dates pass through as raw ISO strings; `price` is the type-aware
- * `contractAmount` like the table, blank when neither price nor reward is present.
+ * CSV columns for the History table, every column whichever the picker shows, plus the
+ * facts it keeps in cells and cues. Dates are raw ISO; a courier's delivery deadline is its
+ * own clock, distinct from the accept-by Expires; location names fill in as they resolve.
  */
 export function contractsCsvColumns(
   t: CsvTranslate,
@@ -39,8 +35,17 @@ export function contractsCsvColumns(
     const self = typeof selfId === 'function' ? selfId(contract) : selfId;
     return self === undefined ? null : contractReceiver(contract, self);
   };
+  /** The standing tag's words for a party; only a character carries one. */
+  const standingOf = (contract: Contract, party: { id: number; kind: string } | null) =>
+    party?.kind === 'character' && standingFor
+      ? standingLabel(t, standingFor(contract, party.id))
+      : null;
   const courierPlace = (contract: Contract, id: number | undefined) =>
     contract.type === 'courier' && id ? id : null;
+  const placeNameOf = (contract: Contract, id: number | undefined) => {
+    const place = courierPlace(contract, id);
+    return place === null ? null : (locationName?.(place) ?? null);
+  };
   return [
     { header: t('contracts.type'), value: (contract) => t(CONTRACT_TYPE_KEY[contract.type]) },
     { header: t('contracts.csvTitle'), value: (contract) => contract.title || null },
@@ -51,12 +56,7 @@ export function contractsCsvColumns(
     { header: t('contracts.issuer'), value: (contract) => nameFor(contractIssuer(contract).id) },
     {
       header: t('contracts.csvIssuerStanding'),
-      value: (contract) => {
-        const issuer = contractIssuer(contract);
-        return issuer.kind === 'character' && standingFor
-          ? standingLabel(t, standingFor(contract, issuer.id))
-          : null;
-      },
+      value: (contract) => standingOf(contract, contractIssuer(contract)),
     },
     {
       header: t('contracts.receiver'),
@@ -67,12 +67,7 @@ export function contractsCsvColumns(
     },
     {
       header: t('contracts.csvReceiverStanding'),
-      value: (contract) => {
-        const receiver = receiverOf(contract);
-        return receiver?.kind === 'character' && standingFor
-          ? standingLabel(t, standingFor(contract, receiver.id))
-          : null;
-      },
+      value: (contract) => standingOf(contract, receiverOf(contract)),
     },
     {
       header: t('contracts.price'),
@@ -84,17 +79,11 @@ export function contractsCsvColumns(
     { header: t('contracts.csvBuyback'), value: (contract) => buybackFor?.(contract) ?? null },
     {
       header: t('contracts.csvCourierStartName'),
-      value: (contract) => {
-        const id = courierPlace(contract, contract.start_location_id);
-        return id === null ? null : (locationName?.(id) ?? null);
-      },
+      value: (contract) => placeNameOf(contract, contract.start_location_id),
     },
     {
       header: t('contracts.csvCourierEndName'),
-      value: (contract) => {
-        const id = courierPlace(contract, contract.end_location_id);
-        return id === null ? null : (locationName?.(id) ?? null);
-      },
+      value: (contract) => placeNameOf(contract, contract.end_location_id),
     },
     {
       header: t('contracts.csvCourierStart'),
@@ -106,10 +95,7 @@ export function contractsCsvColumns(
     },
     {
       header: t('contracts.csvCourierDeadline'),
-      value: (contract) => {
-        const deadline = courierDeliveryDeadlineMs(contract);
-        return deadline === null ? null : new Date(deadline).toISOString();
-      },
+      value: (contract) => isoTime(courierDeliveryDeadlineMs(contract)),
     },
   ];
 }

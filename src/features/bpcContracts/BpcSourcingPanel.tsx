@@ -53,7 +53,7 @@ import { type BlueprintSuggestion } from '@/features/bpcContracts/searchBpcOffer
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { BPC_SEARCH_COLUMN_IDS } from '@/features/bpcContracts/bpcSearchColumns';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
-import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
+import { bpcSourcingCsvColumns, type BpcBpoBadge } from '@/features/bpcContracts/bpcSourcingCsv';
 import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -531,11 +531,22 @@ export function BpcSourcingPanel({
     onAsk: setAskRow,
   });
 
-  // The table's own badge rule (`bpoBadgeRows`: one copy per type, none with a blueprint picked), over every row.
-  const badgedForExport = useMemo(
-    () => (selectedTypeId === null ? bpoBadgeRows(displayRows) : new Set<BpcSearchRow>()),
-    [selectedTypeId, displayRows]
-  );
+  // One badge per row the table marks (`bpoBadgeRows`), built once so each BPO column reads it.
+  const bpoBadges = useMemo(() => {
+    const badges = new Map<BpcSearchRow, BpcBpoBadge>();
+    if (selectedTypeId !== null) return badges;
+    for (const row of bpoBadgeRows(displayRows)) {
+      const bpo = bpoByType.get(row.typeId);
+      if (!bpo) continue;
+      badges.set(row, {
+        price: bpo.price,
+        locationName: bpoLocationName(bpo),
+        regionName: regionLabel(bpo.regionId),
+        mayBeCheaper: row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract),
+      });
+    }
+    return badges;
+  }, [selectedTypeId, displayRows, bpoByType, bpoLocationName, regionLabel]);
   // Every column and every badge fact, whatever the column picker shows.
   const csvColumns = useMemo(
     () =>
@@ -548,30 +559,9 @@ export function BpcSourcingPanel({
         },
         securityFor: (row) =>
           row.systemId == null ? null : (solarSystems?.get(row.systemId)?.security ?? null),
-        bpoBadgeFor: (row) => {
-          if (!badgedForExport.has(row)) return null;
-          const bpo = bpoByType.get(row.typeId);
-          return bpo
-            ? {
-                price: bpo.price,
-                locationName: bpoLocationName(bpo),
-                regionName: regionLabel(bpo.regionId),
-                mayBeCheaper: row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract),
-              }
-            : null;
-        },
+        bpoBadges,
       }),
-    [
-      t,
-      blueprintNames,
-      regionNames,
-      bpcRowJumps,
-      solarSystems,
-      bpoByType,
-      badgedForExport,
-      bpoLocationName,
-      regionLabel,
-    ]
+    [t, blueprintNames, regionNames, bpcRowJumps, solarSystems, bpoBadges]
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',

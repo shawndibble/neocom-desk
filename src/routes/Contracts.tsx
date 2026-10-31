@@ -41,7 +41,7 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
-import { useBuybackLinks } from '@/features/communities/buybackLinks';
+import { buybackCueText, useBuybackLinks } from '@/features/communities/buybackLinks';
 import { useCourierLocationNames } from '@/features/character/useCourierLocationNames';
 import { useRememberedPageTab } from '@/lib/usePageTab';
 import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
@@ -300,7 +300,11 @@ export function Contracts() {
     (contract: Contract) => (source === 'all' ? view.ownerOf(contract) : activeCharacterId),
     [source, view, activeCharacterId]
   );
-  const courierPlaceNames = useCourierLocationNames(filteredContracts, courierCharacterOf);
+  const courierPlaceNames = useCourierLocationNames(
+    contracts,
+    courierCharacterOf,
+    tab === 'history'
+  );
   const historyCsvColumns = useMemo(
     () =>
       contractsCsvColumns(t, {
@@ -319,12 +323,7 @@ export function Contracts() {
         locationName: (id) => courierPlaceNames.get(id) ?? null,
         buybackFor: (contract) => {
           const link = buybackLinks.get(contract.contract_id);
-          return link
-            ? t('contracts.buyback.cue', {
-                title: link.requestTitle,
-                community: link.communityName,
-              })
-            : null;
+          return link ? buybackCueText(t, link) : null;
         },
       }),
     [
@@ -333,8 +332,8 @@ export function Contracts() {
       selfOf,
       source,
       view,
-      characterNames,
       standingFor,
+      characterNames,
       courierPlaceNames,
       buybackLinks,
     ]

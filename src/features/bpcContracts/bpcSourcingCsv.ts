@@ -5,6 +5,7 @@ import {
   iskPerRun,
   type BpcSearchRow,
 } from '@/engine/contracts/bpcSearch';
+import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
 import { exportFlag } from '@/lib/exportFlag';
 import { BPC_SEARCH_COLUMN_IDS, type BpcSearchColumnId } from './bpcSearchColumns';
 
@@ -23,8 +24,8 @@ export interface BpcSourcingCsvContext {
   jumpsFor: (row: BpcSearchRow) => number | null;
   /** The row's solar system security, or null when it has no resolved system. */
   securityFor: (row: BpcSearchRow) => number | null;
-  /** The BPO the table's "BPO too" badge sits on for this row (one copy row per type, none with a blueprint picked), or null. */
-  bpoBadgeFor: (row: BpcSearchRow) => BpcBpoBadge | null;
+  /** The BPO the table's "BPO too" badge sits on, by row (see `bpoBadgeRows`); a row without one is absent. */
+  bpoBadges: ReadonlyMap<BpcSearchRow, BpcBpoBadge>;
 }
 
 /**
@@ -57,6 +58,7 @@ export function bpcSourcingCsvColumns(
   t: CsvTranslate,
   context: BpcSourcingCsvContext
 ): CsvColumn<BpcSearchRow>[] {
+  const badgeOf = (row: BpcSearchRow) => context.bpoBadges.get(row) ?? null;
   const byId: Record<BpcSearchColumnId, CsvColumn<BpcSearchRow>> = {
     source: {
       header: t('bpcContracts.sourceColumn'),
@@ -120,13 +122,11 @@ export function bpcSourcingCsvColumns(
     { header: t('bpcContracts.itemColumn'), value: (row) => context.nameFor(row.typeId) },
     ...BPC_SEARCH_COLUMN_IDS.map((id) => byId[id]),
     {
-      header: t('bpcContracts.auctionKindColumn'),
+      header: t('contracts.typeAuction'),
       value: (row) => {
         const contract = asContract(row);
         if (!contract?.isAuction) return null;
-        return contract.buyout !== undefined
-          ? t('contractSearch.buyoutShort')
-          : t('contractSearch.startingBidShort');
+        return auctionKindLabel(t, contract.buyout);
       },
     },
     {
@@ -153,7 +153,7 @@ export function bpcSourcingCsvColumns(
       value: (row) => (row.source === 'lp' ? row.stationName : null),
     },
     {
-      header: t('bpcContracts.securityColumn'),
+      header: t('market.securityColumn'),
       value: (row) => context.securityFor(row),
     },
     {
@@ -162,21 +162,21 @@ export function bpcSourcingCsvColumns(
     },
     {
       header: t('bpcContracts.bpoTooColumn'),
-      value: (row) => exportFlag(t, context.bpoBadgeFor(row) !== null),
+      value: (row) => exportFlag(t, badgeOf(row) !== null),
     },
-    { header: t('bpcContracts.bpoPriceColumn'), value: (row) => context.bpoBadgeFor(row)?.price },
+    { header: t('bpcContracts.bpoPriceColumn'), value: (row) => badgeOf(row)?.price },
     {
       header: t('bpcContracts.bpoLocationColumn'),
-      value: (row) => context.bpoBadgeFor(row)?.locationName,
+      value: (row) => badgeOf(row)?.locationName,
     },
     {
       header: t('bpcContracts.bpoRegionColumn'),
-      value: (row) => context.bpoBadgeFor(row)?.regionName,
+      value: (row) => badgeOf(row)?.regionName,
     },
     {
       header: t('bpcContracts.bpoMayBeCheaperColumn'),
       value: (row) => {
-        const badge = context.bpoBadgeFor(row);
+        const badge = badgeOf(row);
         return badge ? exportFlag(t, badge.mayBeCheaper) : null;
       },
     },

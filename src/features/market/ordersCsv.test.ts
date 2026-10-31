@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { openOrderRow } from '@/features/market/__fixtures__/openOrderRow';
+import { openOrderRow } from './__fixtures__/openOrderRow';
 import { ordersCsvColumns } from './ordersCsv';
 
 const t = (k: string, opts?: Record<string, unknown>) => (opts ? `${k}${JSON.stringify(opts)}` : k);

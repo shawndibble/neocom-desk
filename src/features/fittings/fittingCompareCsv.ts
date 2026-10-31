@@ -1,5 +1,6 @@
 import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
+import { joined } from '@/lib/exportSheets';
 import { typeNameOr } from '@/lib/typeNameOr';
 import type { CompareRow, ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
 import type { Translate } from '@/lib/translate';
@@ -69,10 +70,11 @@ export function fittingCompareCsvColumns(
       header: t('fittings.compare.csvBestColumn'),
       value: (row) => {
         if (isFactRow(row) || row.bestIndices.length === 0) return null;
-        return fittings
-          .filter(({ statsIndex }) => statsIndex !== null && row.bestIndices.includes(statsIndex))
-          .map(({ name }) => name)
-          .join('; ');
+        return joined(
+          fittings
+            .filter(({ statsIndex }) => statsIndex !== null && row.bestIndices.includes(statsIndex))
+            .map(({ name }) => name)
+        );
       },
     },
   ];

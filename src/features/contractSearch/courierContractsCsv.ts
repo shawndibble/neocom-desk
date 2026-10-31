@@ -2,6 +2,8 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { courierCollateral, type CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
 import { paysFarAboveGoingRate } from '@/engine/contracts/courierGoingRate';
+import { memoByRow } from '@/lib/memoByRow';
+import { joined } from '@/lib/exportSheets';
 import { exportFlag } from '@/lib/exportFlag';
 import { endpointSystemName } from './courierEndpointNames';
 import { markedEndpointRisks, RISK_COPY } from './courierRiskLabels';
@@ -28,9 +30,10 @@ export function courierContractsCsvColumns(
   t: CsvTranslate,
   lookups: CourierCsvLookups
 ): CsvColumn<CourierRouteRow>[] {
+  const multipleOf = memoByRow(lookups.goingRateMultiple);
   const riskText = (endpoint: CourierRouteRow['origin'], end: 'origin' | 'destination') => {
     const marked = markedEndpointRisks(endpoint, end);
-    return marked.length === 0 ? null : marked.map((kind) => t(RISK_COPY[kind].short)).join('; ');
+    return marked.length === 0 ? null : joined(marked.map((kind) => t(RISK_COPY[kind].short)));
   };
   return [
     { header: t('contractSearch.pickUpLabel'), value: (row) => endpointSystemName(row.origin) },
@@ -79,12 +82,12 @@ export function courierContractsCsvColumns(
     },
     {
       header: t('contractSearch.rateMultipleColumn'),
-      value: (row) => lookups.goingRateMultiple(row),
+      value: (row) => multipleOf(row),
     },
     {
       header: t('contractSearch.overRateColumn'),
       value: (row) => {
-        const multiple = lookups.goingRateMultiple(row);
+        const multiple = multipleOf(row);
         return multiple === null ? null : exportFlag(t, paysFarAboveGoingRate(multiple));
       },
     },

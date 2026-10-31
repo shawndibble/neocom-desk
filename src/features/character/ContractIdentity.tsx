@@ -9,7 +9,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useBuybackLinks } from '@/features/communities/buybackLinks';
+import { buybackCueText, useBuybackLinks } from '@/features/communities/buybackLinks';
 import { loadContractLocationName } from './contractLocationName';
 import { CONTRACT_TYPE_KEY } from './contractLabels';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -46,12 +46,7 @@ export function ContractIdentity({
 
   // A contract that is a buyback Quote's carries the Community mark (DESIGN.md 6c), not a column of its own.
   const cue = buyback && (
-    <Tooltip
-      content={t('contracts.buyback.cue', {
-        title: buyback.requestTitle,
-        community: buyback.communityName,
-      })}
-    >
+    <Tooltip content={buybackCueText(t, buyback)}>
       <span tabIndex={0} className="ml-1.5 inline-flex align-middle text-text-dim">
         <Icon.NavCommunities aria-label={t('contracts.buyback.cueLabel')} role="img" />
       </span>

@@ -17,6 +17,7 @@ import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
   type ContractSearchItemsColumnId,
 } from '@/features/contractSearch/contractSearchItemsColumns';
+import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
 import { contractSearchCsvColumns } from '@/features/contractSearch/contractSearchCsv';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
 import type { JumpsCellValue, useJumpRangeFilter } from '@/features/route/currentSystem';
@@ -48,7 +49,6 @@ interface ItemsColumnsInput {
   visibleItemsColumns: readonly ContractSearchItemsColumnId[];
   /** The marker before a row's price, or nothing: the flag judgement lives with the caller. */
   priceFlag?: (row: PublicContractOfferRow) => ReactNode;
-  /** The flag itself, for the export. */
   flagFor?: (row: PublicContractOfferRow) => ContractFlag | null;
 }
 
@@ -144,9 +144,7 @@ export function useItemsColumns({
               // An auction's number is a starting bid unless the seller set a
               // buyout, so the figure alone would read as a fixed ask.
               <span className="ml-1 text-[0.6875rem] text-text-dim uppercase">
-                {row.buyout
-                  ? t('contractSearch.buyoutShort')
-                  : t('contractSearch.startingBidShort')}
+                {auctionKindLabel(t, row.buyout)}
               </span>
             )}
             {row.requestedPlex

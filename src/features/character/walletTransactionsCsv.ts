@@ -20,11 +20,11 @@ export function marginPercentOf(
 }
 
 /** What only some wallet tables can say about a fill; each is omitted where the table doesn't have the data. */
-export interface WalletTransactionsCsvExtras {
+export interface WalletTransactionsCsvExtras<T extends WalletTransactionCommon> {
   /** The character a fill belongs to. */
-  character?: (txn: WalletTransactionCommon) => string | null;
+  character?: (txn: T) => string | null;
   /** The resolved station or structure name. */
-  location?: (txn: WalletTransactionCommon) => string | null;
+  location?: (txn: T) => string | null;
   /** Realized margins and why a sale has none (a personal wallet only). */
   margins?: {
     margins: ReadonlyMap<number, RealizedMargin>;
@@ -40,21 +40,17 @@ export interface WalletTransactionsCsvExtras {
  * not `formatIsk` strings. Margin, margin % and unit cost are blank on a buy
  * and on a sale without a margin, never 0.
  *
- * Typed on the shared fields, so the corp wallet's Transactions tab exports
- * the same six columns rather than a copy of them (issue #570) — the corp rows
- * simply lack `is_personal`, which no column here reads.
+ * Typed on the shared fields so the corp wallet's tab shares it; the
+ * personal tab adds its extras (corp has no margins, and shows no location).
  */
-export function walletTransactionsCsvColumns(
+export function walletTransactionsCsvColumns<T extends WalletTransactionCommon>(
   t: CsvTranslate,
   nameFor: (typeId: number) => string,
-  extras: WalletTransactionsCsvExtras = {}
-): CsvColumn<WalletTransactionCommon>[] {
+  extras: WalletTransactionsCsvExtras<T> = {}
+): CsvColumn<T>[] {
   const { character, location, margins } = extras;
-  const marginOf = (txn: WalletTransactionCommon) =>
-    txn.is_buy ? undefined : margins?.margins.get(txn.transaction_id);
-  const columns: CsvColumn<WalletTransactionCommon>[] = [
-    { header: t('wallet.date'), value: (txn) => txn.date },
-  ];
+  const marginOf = (txn: T) => (txn.is_buy ? undefined : margins?.margins.get(txn.transaction_id));
+  const columns: CsvColumn<T>[] = [{ header: t('wallet.date'), value: (txn) => txn.date }];
   if (character) columns.push({ header: t('wallet.character'), value: character });
   columns.push(
     { header: t('wallet.item'), value: (txn) => nameFor(txn.type_id) },

@@ -7,7 +7,8 @@ import {
   splitEach,
 } from '@/engine/market/appraisal';
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
-import type { OwnedRow } from './useAppraisalColumns';
+import type { OwnedRow } from '@/engine/market/appraisalOwned';
+import { priceMarkKey } from './priceStateLabel';
 
 interface AppraisalCsvOptions {
   /**
@@ -62,29 +63,30 @@ export function appraisalCsvColumns(
       {
         header: t('market.appraisal.columnPriceState'),
         // Only a price that is not live carries a mark on screen.
-        value: (row) =>
-          row.priceState === 'cached'
-            ? t('market.appraisal.live.markCached')
-            : row.priceState === 'failed'
-              ? t('market.appraisal.live.markFailed')
-              : null,
+        value: (row) => {
+          const key = priceMarkKey(row.priceState);
+          return key === null ? null : t(key);
+        },
       }
     );
   }
   if (fees !== undefined) {
+    // Blank until the skills are known, never a base-rate guess.
+    const feeCell =
+      (figure: (row: OwnedRow, fees: AppraisalNetFees) => number | null) => (row: OwnedRow) =>
+        fees === null ? null : figure(row, fees);
     columns.push(
       {
         header: t('market.appraisal.columnSalesTax'),
-        value: (row) => (fees === null ? null : sellSalesTax(row, fees.accountingLevel)),
+        value: feeCell((row, f) => sellSalesTax(row, f.accountingLevel)),
       },
       {
         header: t('market.appraisal.columnBrokerFee'),
-        value: (row) =>
-          fees === null ? null : sellBrokerFee(row, fees.brokerRelationsLevel, fees.standing),
+        value: feeCell((row, f) => sellBrokerFee(row, f.brokerRelationsLevel, f.standing)),
       },
       {
         header: t('market.appraisal.columnSellAfterFees'),
-        value: (row) => (fees === null ? null : sellAfterFees(row, fees)),
+        value: feeCell(sellAfterFees),
       }
     );
   }

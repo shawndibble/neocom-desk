@@ -2,12 +2,8 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { ContractItem } from '@/esi/endpoints';
 
 /**
- * CSV columns for one contract's item list. The detail modal splits the items
- * into Included and Requested tables, but each export holds every item of the
- * contract, so the Side column (Included: the issuer hands it over; Requested:
- * the acceptor supplies it) says which table a row came from. Item name, then
- * quantity as a raw number. An unresolved type id reads `#id`, the table's own
- * spelling.
+ * CSV columns for one contract's whole item list; Side says which table (Included or
+ * Requested) a row sits in. An unresolved type id reads `#id`, as the table does.
  */
 export function contractItemsCsvColumns(
   t: CsvTranslate,

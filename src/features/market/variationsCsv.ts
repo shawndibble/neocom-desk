@@ -1,7 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
-import { priceComparison } from '@/engine/market/orderBookDepth';
-import type { VariationRow } from './variations';
+import { comparisonPct } from '@/engine/market/orderBookDepth';
+import { versusSelf, type VariationRow } from './variations';
 
 /**
  * CSV columns for the Variations table: name, tier, best sell/buy, the best
@@ -21,11 +21,6 @@ export function variationsCsvColumns(
     scopeName: string;
   }
 ): CsvColumn<VariationRow>[] {
-  const versusSelf = (row: VariationRow) =>
-    priceComparison(
-      context.selfSummary?.bestSell ?? null,
-      prices.get(row.typeId)?.bestSell ?? null
-    );
   return [
     { header: t('market.variations.name'), value: (row) => row.name },
     { header: t('market.variations.tier'), value: (row) => row.tier },
@@ -33,14 +28,11 @@ export function variationsCsvColumns(
     { header: t('market.variations.buy'), value: (row) => prices.get(row.typeId)?.bestBuy },
     {
       header: t('market.variations.versus', { name: context.selfName }),
-      value: (row) => versusSelf(row)?.delta ?? null,
+      value: (row) => versusSelf(context.selfSummary, prices, row.typeId)?.delta ?? null,
     },
     {
       header: t('market.variations.versusPct', { name: context.selfName }),
-      value: (row) => {
-        const ratio = versusSelf(row)?.ratio;
-        return ratio === undefined ? null : ratio * 100;
-      },
+      value: (row) => comparisonPct(versusSelf(context.selfSummary, prices, row.typeId)),
     },
     { header: t('market.variations.pricedAtColumn'), value: () => context.scopeName },
   ];

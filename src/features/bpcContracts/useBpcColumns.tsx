@@ -15,6 +15,7 @@ import {
   iskPerRun,
   type BpcSearchRow,
 } from '@/engine/contracts/bpcSearch';
+import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
 import { canAskToCopy } from '@/engine/communities/askToCopy';
 import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
 import { CommunityOfferCell } from '@/features/bpcContracts/CommunityOfferCell';
@@ -287,9 +288,7 @@ export function useBpcColumns({
             <>
               <IskAmount value={contract.buyout ?? contract.price} />
               <span className="ml-1 text-[0.6875rem] font-normal text-text-dim uppercase">
-                {contract.buyout !== undefined
-                  ? t('contractSearch.buyoutShort')
-                  : t('contractSearch.startingBidShort')}
+                {auctionKindLabel(t, contract.buyout)}
               </span>
             </>
           ) : (

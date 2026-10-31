@@ -59,6 +59,12 @@ import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
  * (`?f=…&f=…&f=…`) — copying the address bar reproduces the same comparison.
  * Phone shows two columns at a time with paging.
  */
+const VERDICT_TONE_CLASS = {
+  good: 'text-success',
+  bad: 'text-danger',
+  unknown: 'text-text-dim',
+} as const;
+
 export function FittingCompare() {
   const { t } = useTranslation();
   const [codes, setCodes] = useCompareCodes();
@@ -271,17 +277,7 @@ export function FittingCompare() {
           <span className={fits.overBudget ? 'text-danger' : 'text-success'}>{fits.text}</span>
         )}
         {flyVerdict && (
-          <span
-            className={
-              flyVerdict.tone === 'good'
-                ? 'text-success'
-                : flyVerdict.tone === 'bad'
-                  ? 'text-danger'
-                  : 'text-text-dim'
-            }
-          >
-            {flyVerdict.text}
-          </span>
+          <span className={VERDICT_TONE_CLASS[flyVerdict.tone]}>{flyVerdict.text}</span>
         )}
         {slot.fitting && characterOptions.length > 1 && (
           <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />

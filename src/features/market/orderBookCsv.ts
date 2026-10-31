@@ -7,7 +7,12 @@ import {
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import { orderFees, type OrderFeeContext } from '@/engine/market/orderFees';
-import { priceComparison, sellOutlierMultiple } from '@/engine/market/orderBookDepth';
+import {
+  comparisonPct,
+  priceComparison,
+  sellOutlierMultiple,
+} from '@/engine/market/orderBookDepth';
+import { memoByRow } from '@/lib/memoByRow';
 import { exportFlag } from '@/lib/exportFlag';
 import { formatOrderLocationText } from './format';
 
@@ -50,6 +55,11 @@ export function orderBookCsvColumns(
   t: CsvTranslate,
   { npcStations, solarSystems, isBuy, jumpsFor, feeContext, myOrderIds, best }: OrderBookCsvOptions
 ): CsvColumn<RegionOrder>[] {
+  // Two columns read each of these per order: work them out once.
+  const feesOf = memoByRow((order: RegionOrder) =>
+    feeContext === null ? null : orderFees(order, feeContext)
+  );
+  const versusBest = memoByRow((order: RegionOrder) => priceComparison(best, order.price));
   const columns: CsvColumn<RegionOrder>[] = [
     { header: t('market.price'), value: (order) => order.price },
     { header: t('market.quantity'), value: (order) => order.volume_remain },
@@ -68,11 +78,11 @@ export function orderBookCsvColumns(
     { header: t('market.jumpsColumn'), value: (order) => jumpsFor(order.system_id) },
     {
       header: t('market.feesColumn'),
-      value: (order) => (feeContext === null ? null : orderFees(order, feeContext).fees),
+      value: (order) => feesOf(order)?.fees ?? null,
     },
     {
       header: t('market.finalPriceColumn'),
-      value: (order) => (feeContext === null ? null : orderFees(order, feeContext).finalPrice),
+      value: (order) => feesOf(order)?.finalPrice ?? null,
     },
     {
       header: t('market.exportMyOrder'),
@@ -86,14 +96,11 @@ export function orderBookCsvColumns(
     },
     {
       header: t('market.exportVsBest'),
-      value: (order) => priceComparison(best, order.price)?.delta ?? null,
+      value: (order) => versusBest(order)?.delta ?? null,
     },
     {
       header: t('market.exportVsBestPct'),
-      value: (order) => {
-        const ratio = priceComparison(best, order.price)?.ratio;
-        return ratio === undefined ? null : ratio * 100;
-      },
+      value: (order) => comparisonPct(versusBest(order)),
     },
     { header: t('market.expiry'), value: (order) => orderExpiry(order).toISOString() },
   ];

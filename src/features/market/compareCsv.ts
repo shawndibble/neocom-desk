@@ -2,9 +2,8 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { CompareRow } from './useCompareRows';
 
 /**
- * CSV columns for the Compare Drawer: item, best sell/buy, spread, spread %,
- * spread after the Character's fees, available volume. Prices/spread are raw numbers (`summary.*`), not `formatIsk`
- * strings — same convention as `orderBookCsvColumns`/`variationsCsvColumns`.
+ * CSV columns for the Compare Drawer. Prices and spread are raw numbers (`summary.*`), not
+ * `formatIsk` strings — same convention as `orderBookCsvColumns`/`variationsCsvColumns`.
  * A row still loading, or whose fetch failed, exports its price cells empty
  * rather than the drawer's `…`/`—` display placeholders.
  */

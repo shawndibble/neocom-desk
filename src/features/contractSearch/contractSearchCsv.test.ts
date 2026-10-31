@@ -45,8 +45,8 @@ describe('contractSearchCsvColumns', () => {
       'contractSearch.itemsJumpsColumn',
       'contractSearch.regionColumn',
       'contractSearch.expiresColumn',
-      'contractSearch.auctionKindColumn',
-      'contractSearch.securityColumn',
+      'contracts.typeAuction',
+      'market.securityColumn',
       'contractSearch.priceFlagColumn',
       'contractSearch.priceFlagMultipleColumn',
       'contractSearch.priceFlagReferenceColumn',
@@ -86,7 +86,7 @@ describe('contractSearchCsvColumns', () => {
 
   it('names an auction as buyout or starting bid, blank for a plain sale', () => {
     const kind = contractSearchCsvColumns(t, lookups).find(
-      (c) => c.header === 'contractSearch.auctionKindColumn'
+      (c) => c.header === 'contracts.typeAuction'
     )!;
     expect(kind.value(offer())).toBeNull();
     expect(kind.value(offer({ isAuction: true, buyout: 900 }))).toBe('contractSearch.buyoutShort');

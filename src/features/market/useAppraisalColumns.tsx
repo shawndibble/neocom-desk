@@ -11,10 +11,9 @@ import {
   sellBrokerFee,
   sellSalesTax,
   splitEach,
-  type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
-import { subtractOwned, type WithOwned } from '@/engine/market/appraisalOwned';
+import { subtractOwned, type OwnedRow } from '@/engine/market/appraisalOwned';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { removeItemFromPaste } from '@/engine/market/appraisalPaste';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
@@ -35,8 +34,6 @@ import { ItemContextMenu } from './ItemContextMenu';
 import { PriceMark } from './LivePriceStatus';
 import { MarketItemLink } from './MarketItemLink';
 import type { AppraisalController } from './useAppraisal';
-
-export type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | 'need'>>;
 
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';

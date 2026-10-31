@@ -86,10 +86,8 @@ interface HaulingTableInput {
   suggestedProfitOf: ReadonlyMap<number, number>;
   overrides: ReadonlyMap<number, TripOverride>;
   patchOverride: (typeId: number, patch: TripOverride | null) => void;
-  /** Rows added by the fill, and the category each came from. */
-  addedIds: ReadonlySet<number>;
-  addedCategoryOf: ReadonlyMap<number, number> | null | undefined;
-  categoryName: (id: number) => string;
+  /** The category a row was added from by the fill, or null. */
+  addedFromOf: (typeId: number) => string | null;
   limitTextOf: (row: HaulingViewRow) => string | undefined;
 }
 
@@ -104,9 +102,7 @@ export function useHaulingTable({
   suggestedProfitOf,
   overrides,
   patchOverride,
-  addedIds,
-  addedCategoryOf,
-  categoryName,
+  addedFromOf,
   limitTextOf,
 }: HaulingTableInput) {
   const { t } = useTranslation();
@@ -157,10 +153,7 @@ export function useHaulingTable({
       sortValue: (row) => row.name.toLowerCase(),
       render: (row) => {
         // The name is the row's handle, not a link: the row click is its action (§6c).
-        const addedCategory = addedIds.has(row.typeId)
-          ? addedCategoryOf?.get(row.typeId)
-          : undefined;
-        const added = addedCategory === undefined ? null : categoryName(addedCategory);
+        const added = addedFromOf(row.typeId);
         // The name wraps (two lines at most on a card) and the notes go under it, so neither cuts the name.
         const nameAndNotes = (
           <span className="flex min-w-0 flex-col">

@@ -1,17 +1,12 @@
+import { isoTime } from '@/lib/exportSheets';
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import { orderDoThisText, rowFixCall } from '@/features/market/orderDoThis';
-import { shownFloorPrice } from '@/features/market/orderRowFormat';
+import type { OpenOrderRow } from './openOrdersModel';
+import { orderDoThisText, rowFixCall } from './orderDoThis';
+import { shownFloorPrice } from './orderRowFormat';
 
 /**
- * CSV columns for the Open Orders fix list, one row per `OpenOrderRow`: item,
- * side, price, remaining and total volume (two numeric columns, not the
- * table's "N / M" string), issued, and every fact the fix list shows or keeps
- * in its sub-line and detail: station, owning character, expiry and days
- * left, floor, station cheapest, ISK tied up, what is wrong and what to do.
- * Raw figures; `issued` as the ESI ISO string. Floor is the price as shown
- * (rounded up to a legal price). Station cheapest is blank unless a rival
- * beats the order, as on screen.
+ * CSV columns for the Open Orders fix list, one row per `OpenOrderRow`: raw figures, `issued`
+ * as the ESI ISO string, floor as shown (rounded up), station cheapest blank unless a rival beats the order.
  */
 export function ordersCsvColumns(t: CsvTranslate): CsvColumn<OpenOrderRow>[] {
   return [
@@ -28,7 +23,7 @@ export function ordersCsvColumns(t: CsvTranslate): CsvColumn<OpenOrderRow>[] {
     { header: t('orders.issued'), value: (row) => row.issued },
     {
       header: t('orders.expires'),
-      value: (row) => (row.expiry ? new Date(row.expiry.expiresAt).toISOString() : null),
+      value: (row) => isoTime(row.expiry?.expiresAt),
     },
     { header: t('orders.csvDaysLeft'), value: (row) => row.expiry?.daysLeft ?? null },
     {

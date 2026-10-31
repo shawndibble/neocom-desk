@@ -25,11 +25,9 @@ export interface HaulingCsvOptions {
 }
 
 /**
- * CSV columns for the Hauling table, in its on-screen order, plus the facts
- * the table keeps in sub-lines (the category a row was added from) and its tick
- * box. Prices, profit, margin (percent), ISK/m³, hold m³ and days to sell are raw numbers — not the table's "99+"
- * or signed-percent display — and the Bring column is what the current trip
- * plan loads, overrides included.
+ * CSV columns for the Hauling table, in its on-screen order, plus the facts it keeps in
+ * sub-lines (added-from category) and its tick box. Figures are raw numbers — not the
+ * table's "99+" or signed-percent display — and Bring is what the trip plan loads.
  */
 export function haulingCsvColumns(
   t: CsvTranslate,

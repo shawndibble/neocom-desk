@@ -1,15 +1,11 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { TRADE_HUBS } from '@/market/hubs';
+import { getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import type { CompareHubRow } from './compareHubsRows';
 import type { HubId } from './useCompareHubs';
 
 /**
- * CSV columns for the Trade hubs view: item, then per hub its best sell, best
- * buy, jumps from the pilot and a status that tells "Unreachable" (the read
- * failed) from "No sellers"/"No buyers"/"No orders" (it answered, nobody is
- * trading); then which hub has the lowest sell and highest buy, and the
- * pilot's own market hub. Raw numbers, empty while loading or without orders,
- * like `compareCsvColumns`.
+ * CSV columns for the Trade hubs view. Per hub a status tells "Unreachable" (the read failed)
+ * from "No sellers" (it answered, nobody is trading). Raw numbers, empty while loading.
  */
 export function compareHubsCsvColumns(
   t: CsvTranslate,
@@ -19,7 +15,7 @@ export function compareHubsCsvColumns(
   }
 ): CsvColumn<CompareHubRow>[] {
   const hubName = (id: HubId | null) =>
-    id === null ? null : (TRADE_HUBS.find((hub) => hub.id === id)?.systemName ?? null);
+    id === null ? null : (getTradeHub(id)?.systemName ?? null);
   return [
     { header: t('market.compare.columnItem'), value: (row) => row.itemName },
     ...TRADE_HUBS.flatMap((hub): CsvColumn<CompareHubRow>[] => [

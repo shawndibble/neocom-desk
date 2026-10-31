@@ -286,12 +286,12 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   const characterNames = useCharacterNames();
   const csvColumns = useMemo(
     () =>
-      walletTransactionsCsvColumns(t, nameFor, {
+      walletTransactionsCsvColumns<WalletTransaction>(t, nameFor, {
         character: (txn) =>
           allScope
             ? (txn as PooledTransaction).characterName
             : (characterNames.get(activeCharacterId ?? 0) ?? null),
-        location: (txn) => placeNameFor(txn as WalletTransaction),
+        location: placeNameFor,
         margins: { margins, gaps },
       }),
     [t, nameFor, allScope, characterNames, activeCharacterId, placeNameFor, margins, gaps]
