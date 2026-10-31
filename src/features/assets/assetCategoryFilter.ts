@@ -102,8 +102,9 @@ export function buildCategoryIndex(
 /**
  * The index with every option no owned type falls under removed, and any heading
  * left empty. An option already ticked stays so a shared link never shows a pick
- * the picker cannot untick. `optionByTypeId` and `blueprintOptionIds` are kept
- * whole: filtering still reads them.
+ * the picker cannot untick. `optionByTypeId` is kept whole. The result is for
+ * display only: toggle against the full index so an `'all'` pick keeps meaning
+ * "everything", including a category that shows up later.
  */
 export function pruneCategoryIndex(
   index: AssetCategoryIndex,
@@ -116,7 +117,9 @@ export function pruneCategoryIndex(
   const headings = index.headings
     .map((heading) => ({ ...heading, options: heading.options.filter((o) => keep(o.id)) }))
     .filter((heading) => heading.options.length > 0);
-  return { ...index, headings };
+  const shown = new Set(headings.flatMap((h) => h.options.map((o) => o.id)));
+  const blueprintOptionIds = new Set([...index.blueprintOptionIds].filter((id) => shown.has(id)));
+  return { ...index, headings, blueprintOptionIds };
 }
 
 export function allOptionIds(index: AssetCategoryIndex): number[] {

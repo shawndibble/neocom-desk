@@ -161,3 +161,12 @@ describe('pruneCategoryIndex', () => {
     expect(pruned.headings[0].options.map((o) => o.name)).toEqual(['Cruisers', 'Frigates']);
   });
 });
+
+describe('pruneCategoryIndex blueprints', () => {
+  it('drops blueprint options nobody owns, so the Blueprints select hides', () => {
+    const pruned = pruneCategoryIndex(index, [100], 'all');
+    expect(pruned.blueprintOptionIds.size).toBe(0);
+    expect(blueprintsTicked(pruned, 'all')).toBe(false);
+    expect(blueprintsTicked(pruneCategoryIndex(index, [200], 'all'), 'all')).toBe(true);
+  });
+});
