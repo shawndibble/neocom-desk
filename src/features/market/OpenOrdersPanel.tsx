@@ -300,6 +300,23 @@ export function OpenOrdersPanel({
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
+  // The ceiling is per Character, so the figure shows for exactly one: the picked Character, or
+  // the only one with orders. Never a sum, and never under the Corporation source.
+  const orderSlots = useMemo(() => {
+    if (!snapshot || corporation) return undefined;
+    const ids =
+      filter.characterIds.length > 0
+        ? filter.characterIds
+        : snapshot.openOrders.entries.map((e) => e.characterId);
+    if (ids.length !== 1) return undefined;
+    const entry = snapshot.openOrders.entries.find((e) => e.characterId === ids[0]);
+    if (!entry) return undefined;
+    return {
+      used: entry.orders.length,
+      breakdown: snapshot.orderSlotsByCharacter?.get(entry.characterId) ?? null,
+    };
+  }, [snapshot, corporation, filter.characterIds]);
+
   const fixList = useMemo(() => buildOpenOrdersView(allRows, rowsFilter), [allRows, rowsFilter]);
 
   const entriesWithOrders = useMemo(
@@ -632,6 +649,7 @@ export function OpenOrdersPanel({
           ) : (
             <>
               <FixListSummary
+                orderSlots={orderSlots}
                 actCount={fixList.act.length}
                 actIskTiedUp={fixList.actIskTiedUp}
                 watchCount={fixList.watch.length}

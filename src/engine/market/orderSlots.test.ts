@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { TrainedSkill } from '@/engine/types';
-import { BASE_ORDER_SLOTS, ORDER_SLOT_SKILLS, maxMarketOrders } from './orderSlots';
+import {
+  BASE_ORDER_SLOTS,
+  ORDER_SLOT_SKILLS,
+  maxMarketOrders,
+  orderSlotBreakdown,
+  orderSlotTone,
+} from './orderSlots';
 
 function trained(levels: Record<number, number>): Map<number, TrainedSkill> {
   return new Map(
@@ -47,5 +53,38 @@ describe('maxMarketOrders', () => {
   it('clamps a level outside 0-5 rather than trusting it', () => {
     expect(maxMarketOrders(trained({ [TRADE]: 9 }))).toBe(5 + 20);
     expect(maxMarketOrders(trained({ [TRADE]: -2 }))).toBe(BASE_ORDER_SLOTS);
+  });
+});
+
+describe('orderSlotBreakdown', () => {
+  it("lists base plus each skill's contribution, summing to the ceiling", () => {
+    const map = trained({ [TRADE]: 5, [RETAIL]: 3, [TYCOON]: 6 });
+    const b = orderSlotBreakdown(map);
+    expect(b.base).toBe(BASE_ORDER_SLOTS);
+    expect(b.skills).toEqual([
+      { typeID: TRADE, level: 5, slots: 20 },
+      { typeID: RETAIL, level: 3, slots: 24 },
+      { typeID: ORDER_SLOT_SKILLS[2].typeID, level: 0, slots: 0 },
+      { typeID: TYCOON, level: 5, slots: 160 },
+    ]);
+    expect(b.total).toBe(maxMarketOrders(map));
+    expect(b.total).toBe(5 + 20 + 24 + 160);
+  });
+});
+
+describe('orderSlotTone', () => {
+  it('is ok below 95% of the ceiling', () => {
+    expect(orderSlotTone(144, 305)).toBe('default');
+  });
+  it('turns warning at 95%', () => {
+    expect(orderSlotTone(290, 305)).toBe('warning');
+    expect(orderSlotTone(289, 305)).toBe('default');
+  });
+  it('turns danger at the cap and beyond', () => {
+    expect(orderSlotTone(305, 305)).toBe('danger');
+    expect(orderSlotTone(310, 305)).toBe('danger');
+  });
+  it('treats a zero ceiling as no signal rather than dividing by it', () => {
+    expect(orderSlotTone(0, 0)).toBe('danger');
   });
 });
