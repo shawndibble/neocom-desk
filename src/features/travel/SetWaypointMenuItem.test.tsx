@@ -89,11 +89,11 @@ describe('SetWaypointMenuItem', () => {
     );
     fireEvent.contextMenu(screen.getByText('row'));
 
-    const item = await screen.findByRole('menuitem', { name: 'Add as next stop in game' });
+    const item = await screen.findByRole('menuitem', { name: 'Add waypoint in game' });
     await waitFor(() => expect(item).not.toHaveAttribute('aria-disabled'));
     await userEvent.click(item);
 
-    expect(await screen.findByRole('status')).toHaveTextContent(`${PLACE} added as the next stop`);
+    expect(await screen.findByRole('status')).toHaveTextContent(`${PLACE} added to your route`);
     expect(postAutopilotWaypointMock.mock.calls).toEqual([
       [ONE, JITA_4_4, { clearOtherWaypoints: false }],
     ]);

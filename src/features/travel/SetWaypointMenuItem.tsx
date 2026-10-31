@@ -29,7 +29,7 @@ export function SetWaypointMenuItem({
   /** An NPC station, player structure or solar system id — never an item id (see `useSetDestination`). */
   locationId: number;
   placeName: string;
-  /** `add` queues the place as the next stop, keeping the client's route; no View route item. */
+  /** `add` adds the place to the end of the route, keeping the client's route; no View route item. */
   mode?: 'set' | 'add';
 }) {
   const { t } = useTranslation();

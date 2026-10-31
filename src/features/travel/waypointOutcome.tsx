@@ -22,7 +22,7 @@ export function waypointOutcome(
   result: SetWaypointsResult,
   placeName: string,
   t: TFunction,
-  /** The place was queued as the next stop, not made the destination. */
+  /** The place was added to the end of the route, not made the destination. */
   added = false
 ): WaypointOutcome {
   if (result.ok) {

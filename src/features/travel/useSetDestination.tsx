@@ -38,7 +38,7 @@ interface SetDestination {
 export function useSetDestination(
   locationId: number,
   placeName: string,
-  /** `false` adds the place as the next stop instead of replacing the route. */
+  /** `false` adds the place to the end of the route instead of replacing the route. */
   clearOthers = true
 ): SetDestination {
   const { t } = useTranslation();

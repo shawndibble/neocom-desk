@@ -16220,9 +16220,9 @@
     "waypoints": {
       "action": "Set waypoints in game",
       "menuItem": "Set waypoint in game",
-      "addMenuItem": "Add as next stop in game",
-      "addMenuSending": "Adding next stop…",
-      "nextStopAdded": "{{placeName}} added as the next stop",
+      "addMenuItem": "Add waypoint in game",
+      "addMenuSending": "Adding waypoint…",
+      "nextStopAdded": "{{placeName}} added to your route",
       "viewRoute": "View route",
       "viewRouteTo": "View route to {{placeName}}",
       "viewRouteResolving": "Finding route…",
