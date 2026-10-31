@@ -6,7 +6,7 @@ import { Pill, type PillTone } from '@/components/ui/Pill';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
-import type { SrpClaimState } from '../srpTypes';
+import { SRP_STATE_RANK, type SrpClaimState } from '../srpTypes';
 import {
   MEMBER_CLAIM_COLUMN_IDS,
   useVisibleMemberClaimColumns,
@@ -20,9 +20,6 @@ const STATE_TONE: Record<SrpClaimState, PillTone> = {
   paid: 'success',
   rejected: 'danger',
 };
-
-/** Lifecycle order: waiting on an officer, approved, paid, then turned down. */
-const STATE_RANK: Record<SrpClaimState, number> = { pending: 0, approved: 1, paid: 2, rejected: 3 };
 
 const COLUMN_HEADER_KEYS: Record<MemberClaimColumnId, string> = {
   state: 'srpMember.claims.status',
@@ -120,7 +117,7 @@ export function MemberClaimsList({
         id: 'state',
         header: t('srpMember.claims.status'),
         cardCorner: true,
-        sortValue: (c) => STATE_RANK[c.state],
+        sortValue: (c) => SRP_STATE_RANK[c.state],
         sortFirst: 'asc',
         render: (c) => <ClaimStatePill state={c.state} />,
       },

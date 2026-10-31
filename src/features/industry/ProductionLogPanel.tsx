@@ -647,6 +647,7 @@ export function ProductionLogPanel({
                     store={useVisibleProductionLogItemColumns}
                     ids={PRODUCTION_LOG_ITEM_COLUMN_IDS}
                     columns={columns}
+                    size="sm"
                   />
                 </span>
               </div>
@@ -656,7 +657,7 @@ export function ProductionLogPanel({
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
                 label={t('industry.byItem')}
-                sort={knownSort(itemSort, columns)}
+                sort={knownSort(itemSort, shownItemColumns)}
                 onSortChange={setItemSort}
                 mobileSort
                 density="compact"
@@ -676,6 +677,7 @@ export function ProductionLogPanel({
                     store={useVisibleProductionLogRunColumns}
                     ids={PRODUCTION_LOG_RUN_COLUMN_IDS}
                     columns={runColumns}
+                    size="sm"
                   />
                 </span>
               }
@@ -694,7 +696,7 @@ export function ProductionLogPanel({
                   rows={runRows}
                   rowKey={(r) => r.run.id}
                   label={t('industry.allProductionRuns')}
-                  sort={knownSort(runSort, runColumns)}
+                  sort={knownSort(runSort, shownRunColumns)}
                   onSortChange={setRunSort}
                   mobileSort
                   density="compact"

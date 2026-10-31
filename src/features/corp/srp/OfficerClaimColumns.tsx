@@ -7,6 +7,7 @@ import { Button, type DataTableColumn } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import type { SrpClaim } from '../srpClaimTypes';
+import { SRP_STATE_RANK } from '../srpTypes';
 import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
 import {
   AmountCell,
@@ -25,14 +26,6 @@ import { claimBasisLine, decidedLine } from './srpClaimText';
 import { canBulkApprove } from './srpQueue';
 
 const when = (ctx: ClaimColumnsContext, ms: number) => formatTimestamp(new Date(ms), ctx.zone);
-
-/** Claim lifecycle order, so State sorts as the claim moves, not A to Z. */
-const STATE_RANK: Record<SrpClaim['state'], number> = {
-  pending: 0,
-  approved: 1,
-  paid: 2,
-  rejected: 3,
-};
 
 const hullColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'hull',
@@ -188,7 +181,7 @@ export function historyColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
     {
       id: 'state',
       header: ctx.t('srp.officer.columns.state'),
-      sortValue: (row) => STATE_RANK[row.state],
+      sortValue: (row) => SRP_STATE_RANK[row.state],
       sortFirst: 'asc',
       render: (row) => <ClaimStatePill claim={row} ctx={ctx} />,
     },

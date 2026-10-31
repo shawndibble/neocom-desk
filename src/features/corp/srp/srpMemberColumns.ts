@@ -12,4 +12,5 @@ export type MemberClaimColumnId = (typeof MEMBER_CLAIM_COLUMN_IDS)[number];
 export const useVisibleMemberClaimColumns = createColumnVisibilitySetting({
   key: 'srpMemberClaimsVisibleColumns',
   ids: MEMBER_CLAIM_COLUMN_IDS,
+  allowEmpty: true,
 });
