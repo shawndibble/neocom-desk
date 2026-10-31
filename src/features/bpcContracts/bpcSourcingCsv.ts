@@ -8,6 +8,14 @@ import {
 import { exportFlag } from '@/lib/exportFlag';
 import { BPC_SEARCH_COLUMN_IDS, type BpcSearchColumnId } from './bpcSearchColumns';
 
+/** What the "BPO too" badge says about a row's blueprint original. */
+export interface BpcBpoBadge {
+  price: number;
+  locationName: string | null;
+  regionName: string;
+  mayBeCheaper: boolean;
+}
+
 export interface BpcSourcingCsvContext {
   nameFor: (typeId: number) => string;
   regionName: (regionId: number) => string;
@@ -15,8 +23,8 @@ export interface BpcSourcingCsvContext {
   jumpsFor: (row: BpcSearchRow) => number | null;
   /** The row's solar system security, or null when it has no resolved system. */
   securityFor: (row: BpcSearchRow) => number | null;
-  /** Whether the BPO of this row's blueprint is also on offer (the table's "BPO too" badge). */
-  bpoTooFor: (row: BpcSearchRow) => boolean;
+  /** The BPO the table's "BPO too" badge sits on for this row (one copy row per type, none with a blueprint picked), or null. */
+  bpoBadgeFor: (row: BpcSearchRow) => BpcBpoBadge | null;
 }
 
 /**
@@ -117,8 +125,8 @@ export function bpcSourcingCsvColumns(
         const contract = asContract(row);
         if (!contract?.isAuction) return null;
         return contract.buyout !== undefined
-          ? t('bpcContracts.auctionBuyout')
-          : t('bpcContracts.auctionStartingBid');
+          ? t('contractSearch.buyoutShort')
+          : t('contractSearch.startingBidShort');
       },
     },
     {
@@ -154,7 +162,23 @@ export function bpcSourcingCsvColumns(
     },
     {
       header: t('bpcContracts.bpoTooColumn'),
-      value: (row) => exportFlag(t, context.bpoTooFor(row)),
+      value: (row) => exportFlag(t, context.bpoBadgeFor(row) !== null),
+    },
+    { header: t('bpcContracts.bpoPriceColumn'), value: (row) => context.bpoBadgeFor(row)?.price },
+    {
+      header: t('bpcContracts.bpoLocationColumn'),
+      value: (row) => context.bpoBadgeFor(row)?.locationName,
+    },
+    {
+      header: t('bpcContracts.bpoRegionColumn'),
+      value: (row) => context.bpoBadgeFor(row)?.regionName,
+    },
+    {
+      header: t('bpcContracts.bpoMayBeCheaperColumn'),
+      value: (row) => {
+        const badge = context.bpoBadgeFor(row);
+        return badge ? exportFlag(t, badge.mayBeCheaper) : null;
+      },
     },
     {
       header: t('bpcContracts.ownedColumn'),

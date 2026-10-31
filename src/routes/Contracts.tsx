@@ -41,6 +41,8 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
+import { useBuybackLinks } from '@/features/communities/buybackLinks';
+import { useCourierLocationNames } from '@/features/character/useCourierLocationNames';
 import { useRememberedPageTab } from '@/lib/usePageTab';
 import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
 import { useRememberedUrlParams, useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -242,15 +244,16 @@ export function Contracts() {
     [t]
   );
 
-  const { columns, optionalColumns, columnVisibility, receiverFor } = useContractsHistoryColumns({
-    ownerOf: view.ownerOf,
-    standingIndexFor: view.standingIndexFor,
-    characterNameOf: view.characterNameOf,
-    issuerNames,
-    receiverCategories: view.receiverCategories,
-    issuerAffiliations: view.issuerAffiliations,
-    onOpen: openContract,
-  });
+  const { columns, optionalColumns, columnVisibility, receiverFor, standingFor } =
+    useContractsHistoryColumns({
+      ownerOf: view.ownerOf,
+      standingIndexFor: view.standingIndexFor,
+      characterNameOf: view.characterNameOf,
+      issuerNames,
+      receiverCategories: view.receiverCategories,
+      issuerAffiliations: view.issuerAffiliations,
+      onOpen: openContract,
+    });
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
   // hides it, ready to take effect again the moment it's shown back
@@ -291,19 +294,50 @@ export function Contracts() {
     [contracts, rowsFilter, issuerNames, selfOf]
   );
   const characterNames = useCharacterNames();
+  const buybackLinks = useBuybackLinks(activeCharacterId);
+  // Whose ESI reads a row's places run as: its owner, or the active Character.
+  const courierCharacterOf = useCallback(
+    (contract: Contract) => (source === 'all' ? view.ownerOf(contract) : activeCharacterId),
+    [source, view, activeCharacterId]
+  );
+  const courierPlaceNames = useCourierLocationNames(filteredContracts, courierCharacterOf);
   const historyCsvColumns = useMemo(
     () =>
-      contractsCsvColumns(
-        t,
-        (id) => issuerNames.get(id) ?? `#${id}`,
-        selfOf,
-        (contract) => {
-          if (view.characterNameOf) return view.characterNameOf(contract);
-          const owner = view.ownerOf(contract);
-          return owner === null ? null : (characterNames.get(owner) ?? null);
-        }
-      ),
-    [t, issuerNames, selfOf, view, characterNames]
+      contractsCsvColumns(t, {
+        nameFor: (id) => issuerNames.get(id) ?? `#${id}`,
+        selfId: selfOf,
+        // The corporation's contracts have no character owner: `ownerOf` is the corporation.
+        characterNameFor:
+          source === 'corporation'
+            ? undefined
+            : (contract) => {
+                if (view.characterNameOf) return view.characterNameOf(contract);
+                const owner = view.ownerOf(contract);
+                return owner === null ? null : (characterNames.get(owner) ?? null);
+              },
+        standingFor,
+        locationName: (id) => courierPlaceNames.get(id) ?? null,
+        buybackFor: (contract) => {
+          const link = buybackLinks.get(contract.contract_id);
+          return link
+            ? t('contracts.buyback.cue', {
+                title: link.requestTitle,
+                community: link.communityName,
+              })
+            : null;
+        },
+      }),
+    [
+      t,
+      issuerNames,
+      selfOf,
+      source,
+      view,
+      characterNames,
+      standingFor,
+      courierPlaceNames,
+      buybackLinks,
+    ]
   );
   const historyExport = useTableExport({
     surface: 'contracts',

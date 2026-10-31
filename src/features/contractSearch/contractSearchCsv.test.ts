@@ -49,13 +49,14 @@ describe('contractSearchCsvColumns', () => {
       'contractSearch.securityColumn',
       'contractSearch.priceFlagColumn',
       'contractSearch.priceFlagMultipleColumn',
+      'contractSearch.priceFlagReferenceColumn',
     ]);
   });
 
   it('writes numbers raw, names as text and the expiry as a UTC date', () => {
     const csv = toCsv([offer()], contractSearchCsvColumns(t, lookups));
     expect(csv.split('\r\n')[1]).toBe(
-      '"Damage Control II",3,1500000,,"Jita",4,"The Forge",2026-09-30 12:00:00,,0.95,,'
+      '"Damage Control II",3,1500000,,"Jita",4,"The Forge",2026-09-30 12:00:00,,0.95,,,'
     );
   });
 
@@ -70,7 +71,7 @@ describe('contractSearchCsvColumns', () => {
       contractSearchCsvColumns(t, lookups)
     );
     expect(csv.split('\r\n')[1]).toBe(
-      '"Damage Control II",3,,,,,"The Forge",2026-09-30 12:00:00,,,,'
+      '"Damage Control II",3,,,,,"The Forge",2026-09-30 12:00:00,,,,,'
     );
   });
 
@@ -100,6 +101,9 @@ describe('contractSearchCsvColumns', () => {
     expect(multiple.value(offer({ contractId: 9 }))).toBe(25);
     expect(flag.value(offer({ contractId: 8 }))).toBe('contractSearch.flag.copyLabel');
     expect(multiple.value(offer({ contractId: 8 }))).toBe(2.5);
+    const reference = columns.find((c) => c.header === 'contractSearch.priceFlagReferenceColumn')!;
+    expect(reference.value(offer({ contractId: 9 }))).toBe(300);
+    expect(reference.value(offer({ contractId: 8 }))).toBe(100);
     expect(flag.value(offer())).toBeNull();
     expect(multiple.value(offer())).toBeNull();
   });

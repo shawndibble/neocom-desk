@@ -271,5 +271,5 @@ export function useContractsHistoryColumns({
     [t, optionalColumns, columnVisibility.isVisible, ownerOf, characterNameOf, onOpen]
   );
 
-  return { columns, optionalColumns, columnVisibility, receiverFor };
+  return { columns, optionalColumns, columnVisibility, receiverFor, standingFor };
 }

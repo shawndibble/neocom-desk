@@ -7,6 +7,26 @@ import type { ContractFlag } from '@/engine/contracts/contractFlags';
 import { formatCount } from '@/lib/formatCount';
 import { CONTRACT_ISK_CENTS_BELOW, formatContractIsk, formatIskAuto } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
+import type { Translate } from '@/lib/translate';
+
+/** The short name of the flag: the Price cell mark's accessible name, and the export's Price flag cell. */
+export function flagLabel(flag: ContractFlag, t: Translate): string {
+  return t(
+    flag.kind === 'overpriced'
+      ? 'contractSearch.flag.overpricedLabel'
+      : 'contractSearch.flag.copyLabel'
+  );
+}
+
+/** How many times the reference price the contract asks: the hub sell of every unit, or the original's price. */
+export function flagMultiple(flag: ContractFlag): number {
+  return flag.kind === 'overpriced' ? flag.multiple : flag.asking / flag.original;
+}
+
+/** The price the multiple is measured against: the hub sell of every unit the contract carries, or the original's. */
+export function flagReferencePrice(flag: ContractFlag): number {
+  return flag.kind === 'overpriced' ? flag.hubSell * flag.quantity : flag.original;
+}
 
 /** The short tooltip sentence: the condition and its multiple, never a verdict. */
 export function flagHint(flag: ContractFlag, hub: TradeHub, t: TFunction): string {
@@ -16,7 +36,7 @@ export function flagHint(flag: ContractFlag, hub: TradeHub, t: TFunction): strin
         hub: hub.systemName,
       })
     : t('contractSearch.flag.copyHint', {
-        times: (Math.round((flag.asking / flag.original) * 10) / 10).toString(),
+        times: (Math.round(flagMultiple(flag) * 10) / 10).toString(),
         region: hub.regionName,
         price: formatIskAuto(flag.original, CONTRACT_ISK_CENTS_BELOW),
       });

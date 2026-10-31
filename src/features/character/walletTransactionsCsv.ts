@@ -35,7 +35,7 @@ export interface WalletTransactionsCsvExtras {
 /**
  * CSV columns for wallet transactions: date, item, side, quantity, unit
  * price, total, then whatever `extras` supplies, in the table's order:
- * character, margin, margin %, unit cost, margin gap, location. `date`
+ * character, margin, margin %, unit cost, sales tax, margin gap, location. `date`
  * passes through as the raw ISO string; prices and totals are raw numbers,
  * not `formatIsk` strings. Margin, margin % and unit cost are blank on a buy
  * and on a sale without a margin, never 0.
@@ -71,6 +71,7 @@ export function walletTransactionsCsvColumns(
         value: (txn) => marginPercentOf(txn, marginOf(txn)),
       },
       { header: t('wallet.unitCost'), value: (txn) => marginOf(txn)?.unitCost ?? null },
+      { header: t('wallet.csvSalesTax'), value: (txn) => marginOf(txn)?.salesTax ?? null },
       {
         header: t('wallet.csvMarginGap'),
         value: (txn) => {

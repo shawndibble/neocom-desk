@@ -13,13 +13,17 @@ import { exportFlag } from '@/lib/exportFlag';
  */
 export function loyaltyOfferCsvColumns(
   t: CsvTranslate,
-  /**
-   * The corporation's CONCORD LP exchange rate, or `null` (none, or still
-   * loading). The screen shows ISK per CONCORD LP instead of ISK per LP when
-   * the pilot picked that basis, so both are exported, as separate columns;
-   * the CONCORD one is blank without a rate, as the screen shows no figure.
-   */
-  concordRate: number | null = null
+  {
+    concordRate = null,
+  }: {
+    /**
+     * The corporation's CONCORD LP exchange rate, or `null` (none, or still
+     * loading). The screen shows ISK per CONCORD LP instead of ISK per LP when
+     * the pilot picked that basis, so both are exported, as separate columns;
+     * the CONCORD one is blank without a rate, as the screen shows no figure.
+     */
+    concordRate?: number | null;
+  } = {}
 ): CsvColumn<LoyaltyOfferRow>[] {
   return [
     { header: t('loyaltyStore.colItem'), value: (row) => row.itemName },

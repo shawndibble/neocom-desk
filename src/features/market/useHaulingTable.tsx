@@ -11,7 +11,7 @@ import {
 import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { cx } from '@/lib/cx';
-import type { TripLine, TripOverride } from '@/engine/market/haulingPlan';
+import { isOnTrip, type TripLine, type TripOverride } from '@/engine/market/haulingPlan';
 import { HAULING_THRESHOLDS, type DemandKind } from '@/engine/market/haulingMarket';
 import { formatIsk, formatMarketIsk, marketIskDecimals } from '@/lib/isk';
 import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
@@ -136,7 +136,7 @@ export function useHaulingTable({
         <label className={touchCheckboxLabelClassName}>
           <Checkbox
             aria-label={t('market.hauling.selectRow', { item: row.name })}
-            checked={overrides.get(row.typeId)?.selected !== false}
+            checked={isOnTrip(overrides, row.typeId)}
             onChange={(event) => patchOverride(row.typeId, { selected: event.target.checked })}
           />
         </label>
@@ -371,7 +371,7 @@ export function useHaulingTable({
             card={cards}
             label={t('market.hauling.bringRow', { item: row.name })}
             title={limitTextOf(row)}
-            value={overrides.get(row.typeId)?.selected === false ? '' : formatVolume(line.quantity)}
+            value={!isOnTrip(overrides, row.typeId) ? '' : formatVolume(line.quantity)}
             onCommit={(quantity) =>
               patchOverride(
                 row.typeId,

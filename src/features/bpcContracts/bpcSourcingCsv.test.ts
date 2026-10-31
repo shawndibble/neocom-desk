@@ -77,7 +77,10 @@ const context: BpcSourcingCsvContext = {
   regionName: (regionId) => (regionId === 10000002 ? 'The Forge' : `#${regionId}`),
   jumpsFor: (row) => (row.systemId === null ? null : 3),
   securityFor: (row) => (row.systemId === null ? null : 0.9),
-  bpoTooFor: (row) => row.typeId === 1000 && row.runs !== -1,
+  bpoBadgeFor: (row) =>
+    row.typeId === 1000 && row.runs !== -1
+      ? { price: 9_000_000, locationName: 'Amarr VIII', regionName: 'Domain', mayBeCheaper: true }
+      : null,
 };
 
 const lpRow: BpcSearchRow = {
@@ -140,6 +143,10 @@ describe('bpcSourcingCsvColumns', () => {
       'bpcContracts.securityColumn': 0.9,
       'bpcContracts.atTradeHubColumn': null,
       'bpcContracts.bpoTooColumn': 'common.exportFlagYes',
+      'bpcContracts.bpoPriceColumn': 9_000_000,
+      'bpcContracts.bpoLocationColumn': 'Amarr VIII',
+      'bpcContracts.bpoRegionColumn': 'Domain',
+      'bpcContracts.bpoMayBeCheaperColumn': 'common.exportFlagYes',
       'bpcContracts.ownedColumn': 'common.exportFlagNo',
     });
   });
@@ -182,8 +189,8 @@ describe('bpcSourcingCsvColumns', () => {
   it('names an auction as buyout or starting bid, and exports the PLEX ask and whole-contract flag', () => {
     const kind = (patch: Partial<BpcContractRow>) =>
       valuesOf(contractRow(patch))['bpcContracts.auctionKindColumn'];
-    expect(kind({ isAuction: true, buyout: 9 })).toBe('bpcContracts.auctionBuyout');
-    expect(kind({ isAuction: true })).toBe('bpcContracts.auctionStartingBid');
+    expect(kind({ isAuction: true, buyout: 9 })).toBe('contractSearch.buyoutShort');
+    expect(kind({ isAuction: true })).toBe('contractSearch.startingBidShort');
     const barter = valuesOf(contractRow({ price: 0, requestedPlex: 500, isMultiType: true }));
     expect(barter['bpcContracts.plexAskColumn']).toBe(500);
     expect(barter['bpcContracts.wholeContractColumn']).toBe('common.exportFlagYes');

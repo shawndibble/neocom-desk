@@ -60,6 +60,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { BpoCard } from '@/features/bpcContracts/BpoCard';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
 import {
+  bpoBadgeRows,
   bpoMayBeCheaper,
   cheapestComparableCopy,
   cheapestSourcingCard,
@@ -530,6 +531,11 @@ export function BpcSourcingPanel({
     onAsk: setAskRow,
   });
 
+  // The table's own badge rule (`bpoBadgeRows`: one copy per type, none with a blueprint picked), over every row.
+  const badgedForExport = useMemo(
+    () => (selectedTypeId === null ? bpoBadgeRows(displayRows) : new Set<BpcSearchRow>()),
+    [selectedTypeId, displayRows]
+  );
   // Every column and every badge fact, whatever the column picker shows.
   const csvColumns = useMemo(
     () =>
@@ -542,14 +548,30 @@ export function BpcSourcingPanel({
         },
         securityFor: (row) =>
           row.systemId == null ? null : (solarSystems?.get(row.systemId)?.security ?? null),
-        // A copy of a blueprint whose original is also on offer; originals and LP/Community rows never carry the badge.
-        bpoTooFor: (row) =>
-          row.runs !== -1 &&
-          row.source !== 'lp' &&
-          row.source !== 'community' &&
-          bpoByType.has(row.typeId),
+        bpoBadgeFor: (row) => {
+          if (!badgedForExport.has(row)) return null;
+          const bpo = bpoByType.get(row.typeId);
+          return bpo
+            ? {
+                price: bpo.price,
+                locationName: bpoLocationName(bpo),
+                regionName: regionLabel(bpo.regionId),
+                mayBeCheaper: row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract),
+              }
+            : null;
+        },
       }),
-    [t, blueprintNames, regionNames, bpcRowJumps, solarSystems, bpoByType]
+    [
+      t,
+      blueprintNames,
+      regionNames,
+      bpcRowJumps,
+      solarSystems,
+      bpoByType,
+      badgedForExport,
+      bpoLocationName,
+      regionLabel,
+    ]
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',

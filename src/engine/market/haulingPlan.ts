@@ -79,6 +79,11 @@ export interface TripOverride {
   quantity?: number;
 }
 
+/** A row is on the trip unless the user unticked it (no override at all means ticked). */
+export function isOnTrip(overrides: ReadonlyMap<number, TripOverride>, typeId: number): boolean {
+  return overrides.get(typeId)?.selected !== false;
+}
+
 export type QuantityLimit = 'sales' | 'supply' | 'space' | 'budget' | 'edited' | 'none';
 
 export interface TripLine {

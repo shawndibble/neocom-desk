@@ -675,16 +675,13 @@ export function Market() {
     () => (feeSkills ? { ...feeSkills, standing: hubStanding } : null),
     [feeSkills, hubStanding]
   );
-  // A row's distance from the Current System, for the export; the Jumps column's own rule.
+  const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
+  // A row's distance from the Current System, for the export: the Jumps column's own rule.
   const exportJumpsFor = useCallback(
-    (systemId: number) =>
-      jumpRangeFilter.jumpsStatus === 'ready'
-        ? (jumpRangeFilter.jumps?.get(systemId) ?? null)
-        : null,
-    [jumpRangeFilter]
+    (systemId: number) => knownJumps?.get(systemId) ?? null,
+    [knownJumps]
   );
-  // Every row, not the ROW_CAP the tables mount before "Show all" — hence
-  // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
+  // Every row, not the ROW_CAP the tables mount before "Show all"; every column, not the picker's.
   const sellCsvColumns = useMemo(
     () =>
       orderBookCsvColumns(t, {
@@ -692,19 +689,11 @@ export function Market() {
         solarSystems: solarSystemMap,
         isBuy: false,
         jumpsFor: exportJumpsFor,
-        feeContext: feeContext,
+        feeContext,
         myOrderIds,
-        best: loadedView?.summary.bestSell ?? null,
+        best: bookBestSell,
       }),
-    [
-      t,
-      npcStationMap,
-      solarSystemMap,
-      exportJumpsFor,
-      feeContext,
-      myOrderIds,
-      loadedView?.summary.bestSell,
-    ]
+    [t, npcStationMap, solarSystemMap, exportJumpsFor, feeContext, myOrderIds, bookBestSell]
   );
   const buyCsvColumns = useMemo(
     () =>
@@ -713,7 +702,7 @@ export function Market() {
         solarSystems: solarSystemMap,
         isBuy: true,
         jumpsFor: exportJumpsFor,
-        feeContext: feeContext,
+        feeContext,
         myOrderIds,
         best: loadedView?.summary.bestBuy ?? null,
       }),
@@ -852,7 +841,6 @@ export function Market() {
 
   // What the scope bar says the book is reading. Distances are known at every
   // range, so the hub's own distance shows even with no range set.
-  const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
   const bookStationCount = new Set([...sortedSell, ...sortedBuy].map((o) => o.location_id)).size;
   const bookScope: OrderBookScope =
     rangeAcross && browserFilterValue.jumps !== 'any'

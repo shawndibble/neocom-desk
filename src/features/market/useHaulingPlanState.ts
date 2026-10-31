@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { planTrip, type TripOverride } from '@/engine/market/haulingPlan';
+import { isOnTrip, planTrip, type TripOverride } from '@/engine/market/haulingPlan';
 import type { CargoHold } from '@/engine/market/cargoHolds';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -87,8 +87,7 @@ export function useHaulingPlanState({
   const clearAll = () =>
     setOverrides(new Map(tableRows.map((r) => [r.typeId, { selected: false }])));
 
-  const allSelected =
-    tableRows.length > 0 && tableRows.every((r) => overrides.get(r.typeId)?.selected !== false);
+  const allSelected = tableRows.length > 0 && tableRows.every((r) => isOnTrip(overrides, r.typeId));
 
   return {
     overrides,
@@ -143,11 +142,11 @@ export function useHaulingExport({
           const category = addedIds.has(row.typeId) ? addedCategoryOf?.get(row.typeId) : undefined;
           return category === undefined ? null : categoryName(category);
         },
-        selectedFor: (row) => overrides.get(row.typeId)?.selected !== false,
+        selectedFor: (row) => isOnTrip(overrides, row.typeId),
         flagText: (flag) => t(`market.hauling.flags.${HAULING_FLAG_KEY[flag]}`),
         bringFor: (row) => {
           const line = lineOf.get(row.typeId);
-          if (!line || overrides.get(row.typeId)?.selected === false) return null;
+          if (!line || !isOnTrip(overrides, row.typeId)) return null;
           return line.quantity;
         },
       }),

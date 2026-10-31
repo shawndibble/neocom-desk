@@ -1,6 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
+import { flagLabel, flagMultiple, flagReferencePrice } from './contractFlagText';
 import type { ContractFlag } from '@/engine/contracts/contractFlags';
 
 /** The panel's own spellings, so the export names things the way the table does. */
@@ -64,20 +65,21 @@ export function contractSearchCsvColumns(
       header: t('contractSearch.priceFlagColumn'),
       value: (row) => {
         const flag = lookups.flagFor(row);
-        if (!flag) return null;
-        return t(
-          flag.kind === 'overpriced'
-            ? 'contractSearch.flag.overpricedLabel'
-            : 'contractSearch.flag.copyLabel'
-        );
+        return flag ? flagLabel(flag, t) : null;
       },
     },
     {
       header: t('contractSearch.priceFlagMultipleColumn'),
       value: (row) => {
         const flag = lookups.flagFor(row);
-        if (!flag) return null;
-        return flag.kind === 'overpriced' ? flag.multiple : flag.asking / flag.original;
+        return flag ? flagMultiple(flag) : null;
+      },
+    },
+    {
+      header: t('contractSearch.priceFlagReferenceColumn'),
+      value: (row) => {
+        const flag = lookups.flagFor(row);
+        return flag ? flagReferencePrice(flag) : null;
       },
     },
   ];

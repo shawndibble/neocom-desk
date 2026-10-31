@@ -1,7 +1,7 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { roundPriceUp } from '@/engine/market/priceTick';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { orderDoThisText, rowFixCall } from '@/features/market/orderDoThis';
+import { shownFloorPrice } from '@/features/market/orderRowFormat';
 
 /**
  * CSV columns for the Open Orders fix list, one row per `OpenOrderRow`: item,
@@ -32,16 +32,16 @@ export function ordersCsvColumns(t: CsvTranslate): CsvColumn<OpenOrderRow>[] {
     },
     { header: t('orders.csvDaysLeft'), value: (row) => row.expiry?.daysLeft ?? null },
     {
-      header: t('orders.csvFloor'),
-      value: (row) => (row.floor ? (roundPriceUp(row.floor.relist) ?? row.floor.relist) : null),
+      header: t('market.orders.floorLabel'),
+      value: (row) => (row.floor ? shownFloorPrice(row.floor) : null),
     },
     {
-      header: t('orders.csvStationCheapest'),
+      header: t('market.orders.fixList.colStationCheapest'),
       value: (row) => (row.station.beatsMe ? row.station.bestPrice : null),
     },
-    { header: t('orders.csvIskTiedUp'), value: (row) => row.iskTiedUp },
+    { header: t('market.orders.fixList.colIskTiedUp'), value: (row) => row.iskTiedUp },
     {
-      header: t('orders.csvProblem'),
+      header: t('market.orders.fixList.colProblem'),
       value: (row) => {
         const { badge } = rowFixCall(row).advice;
         if (!badge) return null;
@@ -49,6 +49,6 @@ export function ordersCsvColumns(t: CsvTranslate): CsvColumn<OpenOrderRow>[] {
         return badge.detail ? `${label} ${badge.detail}` : label;
       },
     },
-    { header: t('orders.csvDoThis'), value: (row) => orderDoThisText(t, row) },
+    { header: t('market.orders.fixList.colDoThis'), value: (row) => orderDoThisText(t, row) },
   ];
 }

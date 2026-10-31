@@ -62,7 +62,7 @@ describe('loyaltyOfferCsvColumns', () => {
 
 describe('loyaltyOfferCsvColumns CONCORD basis and blueprints', () => {
   it('exports ISK per CONCORD LP at the rate, beside the plain ISK/LP', () => {
-    const columns = loyaltyOfferCsvColumns(t, 0.5);
+    const columns = loyaltyOfferCsvColumns(t, { concordRate: 0.5 });
     const values = Object.fromEntries(columns.map((c) => [c.header, c.value(offer(1, 1000))]));
     expect(values['loyaltyStore.colIskPerLp']).toBe(1000);
     expect(values['loyaltyStore.colIskPerConcordLp']).toBe(500);

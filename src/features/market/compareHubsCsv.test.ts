@@ -63,7 +63,7 @@ describe('compareHubsCsvColumns', () => {
     });
     expect(valuesOf(unreachable)[status]).toBe('market.compare.exportUnreachable');
     const noSellers = row({ quotes: { ...row().quotes, [first.id]: quote(null, 50) } });
-    expect(valuesOf(noSellers)[status]).toBe('market.compare.noSellers');
+    expect(valuesOf(noSellers)[status]).toBe('market.compare.exportNoSellers');
     const loading = row({ quotes: { ...row().quotes, [first.id]: quote(null, null, true) } });
     expect(valuesOf(loading)[status]).toBeNull();
     expect(valuesOf(row())[status]).toBeNull();

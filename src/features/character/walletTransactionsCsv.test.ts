@@ -98,6 +98,7 @@ describe('walletTransactionsCsvColumns extras', () => {
       'wallet.margin',
       'wallet.marginPercent',
       'wallet.unitCost',
+      'wallet.csvSalesTax',
       'wallet.csvMarginGap',
       'wallet.location',
     ]);
@@ -107,6 +108,7 @@ describe('walletTransactionsCsvColumns extras', () => {
     const sale = txn({ transaction_id: 2, is_buy: false, quantity: 5 });
     expect(at('wallet.margin', sale)).toBe(9);
     expect(at('wallet.unitCost', sale)).toBe(8);
+    expect(at('wallet.csvSalesTax', sale)).toBe(1);
     expect(at('wallet.marginPercent', sale)).toBeCloseTo(22.5);
     expect(at('wallet.csvMarginGap', sale)).toBeNull();
     expect(at('wallet.margin', txn({ transaction_id: 2, is_buy: true }))).toBeNull();

@@ -22,7 +22,7 @@ import {
   compareWindow,
   modulesThatDiffer,
 } from '@/engine/fittings/fittingCompare';
-import { firstResourceOverage } from '@/engine/fittings/skillGaps';
+import { canFlyVerdict, fitVerdict } from '@/features/fittings/compareVerdicts';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -53,7 +53,6 @@ import {
   fittingCompareModulesCsvColumns,
 } from '@/features/fittings/fittingCompareCsv';
 import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
-import { fixed0 } from '@/lib/fixedFormat';
 
 /**
  * Fitting vs Fitting compare: up to three Fittings, entirely in the URL
@@ -178,27 +177,13 @@ export function FittingCompare() {
     () =>
       slots.map((slot, index) => {
         const position = okSlots.indexOf(index);
-        const fitStats = stats.values[index];
-        const overage = fitStats ? firstResourceOverage(fitStats) : null;
-        const flies = canFly.values[index];
         return {
           name: slot?.fitting?.name ?? '',
           statsIndex: position === -1 ? null : position,
           // The header's verdicts, in the words it prints under the name.
-          fits: fitStats
-            ? overage
-              ? t('fittings.compare.overBy', {
-                  resource: t(`fittings.list.${overage.resource}`),
-                  amount: fixed0(overage.amount),
-                })
-              : t('fittings.compare.fitsYes')
-            : null,
+          fits: fitVerdict(t, stats.values[index])?.text ?? null,
           canFly:
-            flies !== null && flies !== undefined
-              ? t(flies ? 'fittings.compare.canFlyYes' : 'fittings.compare.canFlyNo')
-              : canFly.failed[index]
-                ? t('fittings.compare.canFlyUnknown')
-                : null,
+            canFlyVerdict(t, canFly.values[index], Boolean(canFly.failed[index]))?.text ?? null,
         };
       }),
     [slots, okSlots, stats.values, canFly.values, canFly.failed, t]
@@ -259,11 +244,10 @@ export function FittingCompare() {
         </div>
       );
     }
-    const flies = canFly.values[index];
-    const fitStats = stats.values[index];
     // Whole-fit CPU/PG/calibration budget — additional to "Can fly" (a skills check), not a
     // replacement: a fit can fly but not fit (over budget), and the two must read distinctly.
-    const overage = fitStats ? firstResourceOverage(fitStats) : null;
+    const fits = fitVerdict(t, stats.values[index]);
+    const flyVerdict = canFlyVerdict(t, canFly.values[index], Boolean(canFly.failed[index]));
     const name = slot.fitting?.name ?? '';
     const code = codes[index];
     return (
@@ -283,23 +267,21 @@ export function FittingCompare() {
         {stats.failed[index] && (
           <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
         )}
-        {fitStats && (
-          <span className={overage ? 'text-danger' : 'text-success'}>
-            {overage
-              ? t('fittings.compare.overBy', {
-                  resource: t(`fittings.list.${overage.resource}`),
-                  amount: fixed0(overage.amount),
-                })
-              : t('fittings.compare.fitsYes')}
-          </span>
+        {fits && (
+          <span className={fits.overBudget ? 'text-danger' : 'text-success'}>{fits.text}</span>
         )}
-        {flies !== null && flies !== undefined && (
-          <span className={flies ? 'text-success' : 'text-danger'}>
-            {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
+        {flyVerdict && (
+          <span
+            className={
+              flyVerdict.tone === 'good'
+                ? 'text-success'
+                : flyVerdict.tone === 'bad'
+                  ? 'text-danger'
+                  : 'text-text-dim'
+            }
+          >
+            {flyVerdict.text}
           </span>
-        )}
-        {canFly.failed[index] && (
-          <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
         )}
         {slot.fitting && characterOptions.length > 1 && (
           <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />

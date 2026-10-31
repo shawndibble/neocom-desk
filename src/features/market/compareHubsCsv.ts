@@ -42,7 +42,7 @@ export function compareHubsCsvColumns(
           if (quote.loading) return null;
           if (row.unreachable[hub.id]) return t('market.compare.exportUnreachable');
           if (quote.sell === null && quote.buy === null) return t('market.compare.exportNoOrders');
-          if (quote.sell === null) return t('market.compare.noSellers');
+          if (quote.sell === null) return t('market.compare.exportNoSellers');
           if (quote.buy === null) return t('market.compare.exportNoBuyers');
           return null;
         },

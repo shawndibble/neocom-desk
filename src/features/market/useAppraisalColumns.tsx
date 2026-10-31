@@ -36,7 +36,7 @@ import { PriceMark } from './LivePriceStatus';
 import { MarketItemLink } from './MarketItemLink';
 import type { AppraisalController } from './useAppraisal';
 
-type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | 'need'>>;
+export type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | 'need'>>;
 
 /** `lg` up to (not including) `xl`: paste card and results share a row but the results card is narrow. A min-and-max pair never matches under the test `matchMedia` stub, so tests see the full default. */
 const COMPACT_RESULTS_QUERY = '(min-width: 64rem) and (max-width: 79.999rem)';
@@ -155,22 +155,24 @@ export function useAppraisalColumns({
   // the picker, as Refine does without refine data.
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
-  const feeInputs =
-    accountingLevel === null || brokerRelationsLevel === null
-      ? null
-      : { accountingLevel, brokerRelationsLevel, standing };
+  const feeInputs = useMemo(
+    () =>
+      accountingLevel === null || brokerRelationsLevel === null
+        ? null
+        : { accountingLevel, brokerRelationsLevel, standing },
+    [accountingLevel, brokerRelationsLevel, standing]
+  );
   // Every column, whichever the picker shows; fees blank until the skills load.
   const csvColumns = useMemo(
-    () =>
-      appraisalCsvColumns(t, {
-        fees:
-          accountingLevel === null || brokerRelationsLevel === null
-            ? null
-            : { accountingLevel, brokerRelationsLevel, standing },
-      }),
-    [t, accountingLevel, brokerRelationsLevel, standing]
+    () => appraisalCsvColumns(t, { fees: feeInputs, live: true }),
+    [t, feeInputs]
   );
-  const tableExport = useTableExport({ surface: 'market-appraisal', rows, columns: csvColumns });
+  // The rows as the table holds them (need/owned, covered lines last), in the table's sort.
+  const tableExport = useTableExport({
+    surface: 'market-appraisal',
+    rows: tableRows,
+    columns: csvColumns,
+  });
   const taxFor = (row: OwnedRow) =>
     accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
   const brokerFor = (row: OwnedRow) =>

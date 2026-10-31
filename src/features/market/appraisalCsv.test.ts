@@ -89,7 +89,7 @@ describe('appraisalCsvColumns', () => {
     r: Parameters<ReturnType<typeof appraisalCsvColumns>[number]['value']>[0],
     fees?: Parameters<typeof appraisalCsvColumns>[1]
   ) =>
-    appraisalCsvColumns(t, fees)
+    appraisalCsvColumns(t, { live: true, ...fees })
       .find((c) => c.header === header)
       ?.value(r);
 
@@ -131,5 +131,12 @@ describe('appraisalCsvColumns', () => {
     expect(at('market.appraisal.columnSalesTax', row(), fees)).toBeGreaterThan(0);
     expect(at('market.appraisal.columnSellAfterFees', row(), fees)).toBeLessThan(600);
     expect(at('market.appraisal.columnSalesTax', row({ sellTotal: null }), fees)).toBeNull();
+  });
+
+  it('leaves the live-only columns out of a Shared Appraisal export', () => {
+    const headers = appraisalCsvColumns(t).map((c) => c.header);
+    expect(headers).toHaveLength(9);
+    expect(headers).not.toContain('market.appraisal.columnRefineTotal');
+    expect(headers).not.toContain('market.appraisal.columnPriceState');
   });
 });

@@ -1,11 +1,10 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { courierCollateral, type CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
-import { endpointRisks } from '@/engine/contracts/courierRisk';
 import { paysFarAboveGoingRate } from '@/engine/contracts/courierGoingRate';
 import { exportFlag } from '@/lib/exportFlag';
 import { endpointSystemName } from './courierEndpointNames';
-import { MARKED_RISKS, RISK_COPY } from './courierRiskLabels';
+import { markedEndpointRisks, RISK_COPY } from './courierRiskLabels';
 
 /** The board's own spellings and distances, so the export matches what is drawn. */
 export interface CourierCsvLookups {
@@ -30,7 +29,7 @@ export function courierContractsCsvColumns(
   lookups: CourierCsvLookups
 ): CsvColumn<CourierRouteRow>[] {
   const riskText = (endpoint: CourierRouteRow['origin'], end: 'origin' | 'destination') => {
-    const marked = endpointRisks(endpoint, end).filter((kind) => MARKED_RISKS.includes(kind));
+    const marked = markedEndpointRisks(endpoint, end);
     return marked.length === 0 ? null : marked.map((kind) => t(RISK_COPY[kind].short)).join('; ');
   };
   return [
