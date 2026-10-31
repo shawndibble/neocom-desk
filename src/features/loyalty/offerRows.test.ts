@@ -611,4 +611,67 @@ describe('computeLoyaltyOfferRows', () => {
       }
     });
   });
+  describe('recent trades (Traded Price Ceiling)', () => {
+    const base = {
+      catalog: makeCatalog(),
+      adjustedPrices: null,
+      systemCostIndex: null,
+      skills: {},
+      materialSourcing: undefined,
+      liquidationBasis: 'order' as const,
+      playerLp: null,
+    };
+    const traded = (price: number) => ({
+      recentSalePrice: price,
+      latestDay: { date: '2026-10-28', highest: price, lowest: price },
+    });
+
+    it('counts a sale at recent trades when one order lists far above them', () => {
+      const [checked] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [probes],
+        hubPrices: { [PROBE_ID]: 50_000 },
+        tradedPrices: new Map([[PROBE_ID, traded(1_800)]]),
+      });
+      const [plain] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [probes],
+        hubPrices: { [PROBE_ID]: 1_800 },
+      });
+      expect(checked.revenueCheck).toEqual({ price: 1_800, listed: 50_000, capped: true });
+      expect(checked.profit.iskPerLp).toBeCloseTo(plain.profit.iskPerLp!);
+    });
+
+    it("checks a blueprint's product, not the blueprint", () => {
+      const [row] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [astero],
+        hubPrices: { [ASTERO_ID]: 500_000_000, [TRITANIUM_ID]: 5 },
+        tradedPrices: new Map([[ASTERO_ID, traded(50_000_000)]]),
+      });
+      expect(row.revenueCheck?.capped).toBe(true);
+      expect(row.revenueCheck?.price).toBe(50_000_000);
+    });
+
+    it('leaves turn-ins at their listed price', () => {
+      const withTurnIn = { ...probes, required_items: [{ type_id: TRITANIUM_ID, quantity: 10 }] };
+      const [row] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [withTurnIn],
+        hubPrices: { [PROBE_ID]: 1_800, [TRITANIUM_ID]: 900 },
+        tradedPrices: new Map([[TRITANIUM_ID, traded(5)]]),
+      });
+      expect(row.requiredItemsCost).toBe(9_000);
+      expect(row.revenueCheck?.capped).toBe(false);
+    });
+
+    it('has no check without trade data', () => {
+      const [row] = computeLoyaltyOfferRows({
+        ...base,
+        offers: [probes],
+        hubPrices: { [PROBE_ID]: 50_000 },
+      });
+      expect(row.revenueCheck).toEqual({ price: 50_000, listed: 50_000, capped: false });
+    });
+  });
 });

@@ -149,6 +149,7 @@ const ITEM_ROW: LoyaltyOfferRow = {
   sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
+  revenueCheck: null,
 };
 
 const BLUEPRINT_ROW: LoyaltyOfferRow = {
@@ -162,6 +163,7 @@ const BLUEPRINT_ROW: LoyaltyOfferRow = {
   sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
+  revenueCheck: null,
 };
 
 const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
@@ -175,6 +177,7 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   sellsPerDay: null,
   requiredItems: [],
   requiredItemsCost: 0,
+  revenueCheck: null,
 };
 
 describe('LoyaltyStore LP Value cog', () => {
@@ -605,6 +608,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
       { typeId: 40_001, name: 'Shadow Serpentis Gold Tag', quantity: 1, unitPrice: 5_000_000 },
     ],
     requiredItemsCost: 5_800_000,
+    revenueCheck: null,
   };
 
   const UNPRICED_REQUIRED_ITEM_ROW: LoyaltyOfferRow = {
@@ -618,6 +622,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     sellsPerDay: null,
     requiredItems: [{ typeId: 40_002, name: 'Unpriced Faction Tag', quantity: 3, unitPrice: null }],
     requiredItemsCost: null,
+    revenueCheck: null,
   };
 
   const UNPRICED_MATERIAL_ROW: LoyaltyOfferRow = {
@@ -631,6 +636,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     sellsPerDay: null,
     requiredItems: [],
     requiredItemsCost: 0,
+    revenueCheck: null,
   };
 
   function mockRows(rows: LoyaltyOfferRow[]) {

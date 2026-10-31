@@ -31,6 +31,11 @@ import type {
 } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import {
+  checkListedPrice,
+  type ListedPriceCheck,
+  type TradedPrices,
+} from '@/engine/market/tradedPriceCheck';
+import {
   loyaltyOfferProfit,
   rankByIskPerLp,
   type LoyaltyOfferProfit,
@@ -77,6 +82,11 @@ export interface LoyaltyOfferRow {
    * has no hub price (mirrors `profit.profit`'s own null in that case).
    */
   requiredItemsCost: number | null;
+  /**
+   * The sale's unit price as counted, checked against recent trades (the
+   * product's, for a blueprint offer); null when the sale is unpriced.
+   */
+  revenueCheck: ListedPriceCheck | null;
 }
 
 export interface LoyaltyOfferComputeInputs {
@@ -137,6 +147,21 @@ export interface LoyaltyOfferComputeInputs {
   playerLp: number | null;
   /** Units per day by type at the hub region (`lpStoreVolume.ts`); absent or null when unavailable. */
   sellsPerDayByType?: LpStoreVolume | null;
+  /**
+   * Recent trades by type at the hub region (the daily demand object): a sale
+   * listed far above them counts at the **Traded Price Ceiling**. Absent or
+   * null, every sale counts at its listing.
+   */
+  tradedPrices?: ReadonlyMap<number, TradedPrices> | null;
+}
+
+/** The sale's unit price as counted, or null when nothing lists it. */
+function checkedRevenuePrice(
+  inputs: LoyaltyOfferComputeInputs,
+  typeId: number
+): ListedPriceCheck | null {
+  const listed = (inputs.revenueHubPrices ?? inputs.hubPrices)[typeId];
+  return listed === undefined ? null : checkListedPrice(listed, inputs.tradedPrices?.get(typeId));
 }
 
 /** Null when the volume data is unavailable; 0 when it loaded and this type never traded. */
@@ -226,18 +251,17 @@ function computeBlueprintRow(
   // toggle can price the built product on its own basis without touching
   // material sourcing. `entry.blueprint.products[0]` is the same product
   // `buildVsBuy` read to compute `build.revenue` — see toIndustryBlueprint.
-  const revenuePrices = inputs.revenueHubPrices ?? inputs.hubPrices;
   const product = entry.blueprint.products[0];
-  const productPrice = product ? revenuePrices[product.typeID] : undefined;
+  const revenueCheck = product ? checkedRevenuePrice(inputs, product.typeID) : null;
   // A material with no hub price silently costs 0 in `build.materialCost`
   // (src/engine/industry/sourcing.ts) — `build.unpricedMaterials` is what
   // actually says so, so an unpriced-materials build must not be read as a
   // priced revenue either, regardless of whether the product itself priced.
   const materialsUnpriceable = build.unpricedMaterials.length > 0;
   const revenue =
-    materialsUnpriceable || !product || productPrice === undefined
+    materialsUnpriceable || !product || revenueCheck === null
       ? null
-      : product.quantity * productPrice; // 1 run, same as `runs: 1` above
+      : product.quantity * revenueCheck.price; // 1 run, same as `runs: 1` above
 
   const profit = loyaltyOfferProfit({
     iskCost: offer.isk_cost,
@@ -266,6 +290,7 @@ function computeBlueprintRow(
     sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, entry.productTypeID),
     requiredItems,
     requiredItemsCost: itemsCost,
+    revenueCheck,
   };
 }
 
@@ -276,8 +301,8 @@ function computeItemRow(
   itemsCost: number | null,
   requiredItems: RequiredItemLine[]
 ): LoyaltyOfferRow {
-  const revenuePrice = (inputs.revenueHubPrices ?? inputs.hubPrices)[offer.type_id];
-  const revenue = revenuePrice === undefined ? null : revenuePrice * offer.quantity;
+  const revenueCheck = checkedRevenuePrice(inputs, offer.type_id);
+  const revenue = revenueCheck === null ? null : revenueCheck.price * offer.quantity;
   const profit = loyaltyOfferProfit({
     iskCost: offer.isk_cost,
     lpCost: offer.lp_cost,
@@ -300,6 +325,7 @@ function computeItemRow(
     sellsPerDay: sellsPerDayOf(inputs.sellsPerDayByType, offer.type_id),
     requiredItems,
     requiredItemsCost: itemsCost,
+    revenueCheck,
   };
 }
 

@@ -12,7 +12,8 @@ import type { DemandAggregate } from './haulingMarket';
 /** A listing up to this many times the ceiling still counts as the market's price. */
 export const LISTED_ABOVE_TRADES_FACTOR = 1.25;
 
-type TradedPrices = Pick<DemandAggregate, 'recentSalePrice' | 'latestDay'>;
+/** What a type recently traded at: the daily demand object's two price facts. */
+export type TradedPrices = Pick<DemandAggregate, 'recentSalePrice' | 'latestDay'>;
 
 /** Null when the item has no recent trades to go on. */
 export function tradedPriceCeiling(traded: TradedPrices | undefined): number | null {
