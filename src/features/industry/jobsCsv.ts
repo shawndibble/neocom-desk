@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { activityI18nKey, type ActiveJob } from './jobs';
+import { activityI18nKey, isCompletingSoon, isJobDone, type ActiveJob } from './jobs';
 import { isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
 
 /** An `ActiveJob` plus the Character and owner the panel tags each row with (`JobRow`). */
@@ -20,9 +20,22 @@ export type JobCsvRow = ActiveJob & {
  * Typed on `ActiveJob`, the structural subset the panel renders, so the same
  * export serves both a Character's jobs and its corporation's (issue #298).
  */
+const OWNER_KEY = {
+  personal: 'industry.csvJobOwnerPersonal',
+  corporation: 'industry.csvJobOwnerCorporation',
+} as const;
+
+export interface JobsCsvOptions {
+  /** Job History: the End date is the delivery, and a clock-derived state means nothing. */
+  delivered?: boolean;
+  /** The clock the State column reads, at export time. */
+  now?: () => number;
+}
+
 export function jobsCsvColumns(
   t: CsvTranslate,
-  nameFor: (blueprintTypeId: number) => string
+  nameFor: (blueprintTypeId: number) => string,
+  { delivered = false, now = Date.now }: JobsCsvOptions = {}
 ): CsvColumn<JobCsvRow>[] {
   return [
     {
@@ -46,7 +59,7 @@ export function jobsCsvColumns(
       value: (job) => job.start_date,
     },
     {
-      header: t('industry.csvJobEnd'),
+      header: delivered ? t('industry.historyColDelivered') : t('industry.csvJobEnd'),
       value: (job) => job.end_date,
     },
     {
@@ -57,6 +70,19 @@ export function jobsCsvColumns(
       header: t('industry.csvJobStatus'),
       value: (job) => job.status,
     },
+    ...(delivered
+      ? []
+      : [
+          {
+            // The table's Done / Completing soon pill, derived from the clock, beside ESI's own status.
+            header: t('industry.csvJobState'),
+            value: (job: JobCsvRow) => {
+              const at = now();
+              if (isJobDone(job, at)) return t('industry.jobsDone');
+              return isCompletingSoon(job, at) ? t('industry.jobsCompletingSoon') : null;
+            },
+          },
+        ]),
     {
       header: t('industry.csvJobProduct'),
       value: (job) => (job.product_type_id != null ? nameFor(job.product_type_id) : null),
@@ -68,12 +94,7 @@ export function jobsCsvColumns(
     },
     {
       header: t('industry.csvJobOwner'),
-      value: (job) =>
-        job.owner === 'corporation'
-          ? t('industry.csvJobOwnerCorporation')
-          : job.owner === 'personal'
-            ? t('industry.csvJobOwnerPersonal')
-            : null,
+      value: (job) => (job.owner ? t(OWNER_KEY[job.owner]) : null),
     },
   ];
 }
@@ -89,12 +110,8 @@ export function jobHistoryCsvColumns(
   states: ReadonlyMap<number, HistoryJobState>,
   dismissedJobIds: ReadonlySet<number>
 ): CsvColumn<JobCsvRow>[] {
-  const delivered = t('industry.csvJobEnd');
-  const base = jobsCsvColumns(t, nameFor).map((column) =>
-    column.header === delivered ? { ...column, header: t('industry.historyColDelivered') } : column
-  );
   return [
-    ...base,
+    ...jobsCsvColumns(t, nameFor, { delivered: true }),
     {
       header: t('industry.csvJobLogState'),
       value: (job) => {

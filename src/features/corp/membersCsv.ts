@@ -1,4 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import { label } from '@/engine/corp/members';
 import type { RosterRow } from './CorpRoster';
 import { rolesText } from './roles';
@@ -45,15 +46,15 @@ export function membersCsvColumns(t: CsvTranslate): CsvColumn<RosterRow>[] {
     // The member cell's tags, as columns a spreadsheet can filter on.
     {
       header: t('corp.members.csvCeo'),
-      value: (row) => (row.isCeo ? t('corp.members.csvYes') : t('corp.members.csvNo')),
+      value: (row) => exportFlag(t, row.isCeo),
     },
     {
       header: t('corp.members.csvYou'),
-      value: (row) => (row.isSelf ? t('corp.members.csvYes') : t('corp.members.csvNo')),
+      value: (row) => exportFlag(t, row.isSelf),
     },
     {
       header: t('corp.members.csvDark'),
-      value: (row) => (row.standing.isDark ? t('corp.members.csvYes') : t('corp.members.csvNo')),
+      value: (row) => exportFlag(t, row.standing.isDark),
     },
   ];
 }

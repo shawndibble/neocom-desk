@@ -1,6 +1,7 @@
 /**
  * Units and plain-text naming the Goal Planner's result sections share.
  */
+import type { Translate } from '@/lib/translate';
 import type { TFunction } from 'i18next';
 import type { PiData } from '@/sde/types';
 import type { FitLimit, FlowEnd, PlanetType } from '@/engine/pi/goalTypes';
@@ -30,7 +31,7 @@ export function signedCompact(perDay: number): string {
 }
 
 /** Planet types as alternatives: "Gas or Ice". */
-export function planetTypesText(types: readonly PlanetType[], t: TFunction): string {
+export function planetTypesText(types: readonly PlanetType[], t: Translate): string {
   return types.map((type) => t(`pi.planetType.${type}`)).join(t('piPlan.or'));
 }
 

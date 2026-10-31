@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { TFunction } from 'i18next';
 import type { DemandLine } from '@/engine/pi/goalTypes';
 import { flowCsvColumns, haulingCsvColumns, type LegRow } from './planExportColumns';
 import type { PlanNames } from './format';
 
-const t = ((k: string) => k) as unknown as TFunction;
+const t = (k: string) => k;
 const pi = {
   schematics: {
     '100': { name: 'Robotics', inputs: [{ typeID: 200 }] },
@@ -57,7 +56,7 @@ describe('haulingCsvColumns', () => {
     to: 'hub',
     typeId: 100,
     name: 'Robotics',
-    m3PerTrip: 12.34,
+    m3PerTrip: 12.340000000000002,
     jumps,
   });
 

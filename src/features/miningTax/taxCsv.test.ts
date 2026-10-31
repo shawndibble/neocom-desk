@@ -42,7 +42,7 @@ describe('taxCsvColumns', () => {
       'miningTax.estimatedValueColumn',
       'miningTax.taxOwedColumn',
       'miningTax.statusColumn',
-      'miningTax.csvCombinedGroup',
+      'miningTax.csvCombinedEntry',
       'miningTax.csvTaxPct',
       'miningTax.csvNeedsReview',
       'miningTax.csvCorpOverlap',
@@ -79,7 +79,7 @@ describe('taxCsvColumns', () => {
       'miningTax.status.outstanding',
       'g1',
       10,
-      'miningTax.csvNo',
+      'common.exportFlagNo',
       null,
       null,
     ]);
@@ -91,7 +91,7 @@ describe('taxCsvColumns', () => {
       taxCsvColumns(t, { ...context, taxOwed: () => null })
     );
     expect(csv.split('\r\n')[1]).toBe(
-      '"Miner One","2026-09-04","Jita",0.4,"Corp Tax",,,1234567.5,,"miningTax.status.unassigned",,,"miningTax.csvNo",,'
+      '"Miner One","2026-09-04","Jita",0.4,"Corp Tax",,,1234567.5,,"miningTax.status.unassigned",,,"common.exportFlagNo",,'
     );
   });
 });

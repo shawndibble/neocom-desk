@@ -1,4 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { allMembers, type DisplayRow } from './groupRows';
 
@@ -46,9 +47,6 @@ export function expandCombinedRows(rows: readonly DisplayRow[]): DisplayRow[] {
   );
 }
 
-const yesNo = (t: CsvTranslate, value: boolean) =>
-  value ? t('miningTax.csvYes') : t('miningTax.csvNo');
-
 /** Export columns for the Mining Tax table, in its column order (the select and edit columns carry no data). Feed it `expandCombinedRows`. */
 export function taxCsvColumns(
   t: CsvTranslate,
@@ -89,17 +87,18 @@ export function taxCsvColumns(
     },
     {
       // Joined days share an id; blank on a row that was never joined.
-      header: t('miningTax.csvCombinedGroup'),
+      header: t('miningTax.csvCombinedEntry'),
       value: (dr) => dr.assignment?.groupId ?? null,
     },
     { header: t('miningTax.csvTaxPct'), value: (dr) => dr.assignment?.taxPct ?? null },
     {
       header: t('miningTax.csvNeedsReview'),
-      value: (dr) => yesNo(t, dr.status === 'needs-review'),
+      value: (dr) => exportFlag(t, dr.status === 'needs-review'),
     },
     {
       header: t('miningTax.csvCorpOverlap'),
-      value: (dr) => (dr.corp?.kind === 'row' ? yesNo(t, Boolean(dr.corp.view.overlap)) : null),
+      value: (dr) =>
+        dr.corp?.kind === 'row' ? exportFlag(t, Boolean(dr.corp.view.overlap)) : null,
     },
     {
       header: t('miningTax.csvCorrectedFrom'),

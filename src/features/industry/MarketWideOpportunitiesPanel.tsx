@@ -51,7 +51,7 @@ import { MARKET_WIDE_PAGE_SIZE, topRows } from './marketWidePage';
 import { MobileMarketWideList } from './MobileMarketWideList';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { MarketWideFilterBar } from './MarketWideFilterBar';
-import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
+import { marketWideOpportunitiesCsvColumns, skillGateExport } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { SORT_VALUE, useMarketWideColumns } from './useMarketWideColumns';
@@ -170,12 +170,10 @@ export function MarketWideOpportunitiesPanel({
 
   const csvColumns = useMemo(
     () =>
-      marketWideOpportunitiesCsvColumns(t, {
-        verdictFor: (productTypeID) =>
-          productTypeID === null ? undefined : skillGateByProductTypeID.get(productTypeID),
-        nameForSkill: (typeID) => (catalog ? nameForType(catalog, typeID) : `#${typeID}`),
-        nameForCharacter: (id) => characterNames.get(id) ?? `#${id}`,
-      }),
+      marketWideOpportunitiesCsvColumns(
+        t,
+        skillGateExport(skillGateByProductTypeID, catalog, characterNames)
+      ),
     [t, skillGateByProductTypeID, catalog, characterNames]
   );
   // `visibleRows`, not the table's `shownRows`: the table mounts the first

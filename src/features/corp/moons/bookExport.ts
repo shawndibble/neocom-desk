@@ -15,6 +15,7 @@ import type { Adjustment, Statement, StatementLine } from '@/engine/corpTaxBook/
 import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import {
   byKey,
   isoTime,
@@ -248,10 +249,7 @@ export function bookExportSheets(
         ['lastMailed', (s) => s.lastMailedAt],
         ['issuedBy', (s) => character(s.issuedBy)],
         ['issuedById', (s) => s.issuedBy],
-        [
-          'remindersStopped',
-          (s) => (s.remindersStopped === undefined ? null : s.remindersStopped ? yes : no),
-        ],
+        ['remindersStopped', (s) => exportFlag(t, s.remindersStopped)],
         ['manualReminders', (s) => s.manualRemindersSent],
         ['storedMinerName', (s) => s.minerName],
       ]

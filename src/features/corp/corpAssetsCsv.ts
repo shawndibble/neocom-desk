@@ -11,6 +11,7 @@
  * show is lost, and nothing is counted twice.
  */
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import type { AssetNameMap } from '@/engine/assetNames';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import {
@@ -31,8 +32,14 @@ export interface CorpAssetItemCsvContext {
 
 export function corpAssetItemCsvColumns(
   t: CsvTranslate,
-  { labels, assetNames, blueprintTypeIds }: CorpAssetItemCsvContext
+  { labels, assetNames, blueprintTypeIds }: CorpAssetItemCsvContext,
+  /** The rows exported: a type with more stacks than one cell holds spills into "Stacks (2)", … */
+  rows: readonly ItemTableRow[] = []
 ): CsvColumn<ItemTableRow>[] {
+  const stackColumns = Math.max(
+    1,
+    ...rows.map((row) => stackParts(row, t, labels, assetNames).length)
+  );
   return [
     { header: t('corp.assets.column.item'), value: (r) => r.name },
     {
@@ -62,22 +69,55 @@ export function corpAssetItemCsvColumns(
     },
     { header: t('corp.assets.column.value'), value: (r) => r.ledger.estimatedValue },
     { header: t('corp.assets.column.volume'), value: (r) => r.ledger.volume },
-    { header: t('corp.assets.column.group'), value: (r) => r.categoryName ?? '' },
-    {
-      header: t('corp.assets.csv.stacks'),
-      value: (r) =>
-        r.ledger.stacks
-          .map((stack) => {
-            const name = assetNames[stack.itemId];
-            const state =
-              stack.isSingleton === null
-                ? ''
-                : ` (${stack.isSingleton ? t('corp.assets.assembled') : t('corp.assets.packaged')})`;
-            return `${name === undefined ? '' : `${name} · `}${stackPathText(stack, labels)} ×${stack.quantity}${state}`;
-          })
-          .join('; '),
-    },
+    { header: t('corp.assets.column.group'), value: (r) => r.categoryName ?? null },
+    ...Array.from({ length: stackColumns }, (_, part) => ({
+      header:
+        part === 0
+          ? t('corp.assets.csv.stacks')
+          : t('corp.assets.csv.stacksMore', { part: part + 1 }),
+      value: (r: ItemTableRow) => stackParts(r, t, labels, assetNames)[part] ?? null,
+    })),
   ];
+}
+
+/** An .xlsx cell holds 32,767 characters; stay under it with room for the join. */
+const MAX_STACK_CELL = 32_000;
+
+function stackTexts(
+  row: ItemTableRow,
+  t: CsvTranslate,
+  labels: LedgerLabels,
+  assetNames: AssetNameMap
+): string[] {
+  return row.ledger.stacks.map((stack) => {
+    const name = assetNames[stack.itemId];
+    const state =
+      stack.isSingleton === null
+        ? ''
+        : ` (${stack.isSingleton ? t('corp.assets.assembled') : t('corp.assets.packaged')})`;
+    return `${name === undefined ? '' : `${name} · `}${stackPathText(stack, labels)} ×${stack.quantity}${state}`;
+  });
+}
+
+/** The row's stacks, `; `-joined and cut between stacks into cells that fit a workbook cell. */
+function stackParts(
+  row: ItemTableRow,
+  t: CsvTranslate,
+  labels: LedgerLabels,
+  assetNames: AssetNameMap
+): string[] {
+  const parts: string[] = [];
+  let current = '';
+  for (const text of stackTexts(row, t, labels, assetNames)) {
+    if (current !== '' && current.length + 2 + text.length > MAX_STACK_CELL) {
+      parts.push(current);
+      current = text;
+    } else {
+      current = current === '' ? text : `${current}; ${text}`;
+    }
+  }
+  if (current !== '') parts.push(current);
+  return parts;
 }
 
 export function corpAssetLocationCsvColumns(
@@ -101,7 +141,7 @@ export function corpAssetLocationCsvColumns(
     { header: t('corp.assets.csv.divisionsInUse'), value: (r) => r.groupDivisionsInUse },
     {
       header: t('corp.assets.csv.emptyOffice'),
-      value: (r) => (r.groupEmpty ? t('corp.assets.csv.yes') : t('corp.assets.csv.no')),
+      value: (r) => exportFlag(t, r.groupEmpty),
     },
   ];
 }

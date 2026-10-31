@@ -1,6 +1,8 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import type { MarketWideDayRow } from './marketWideOpportunities';
 import type { OpportunityRow } from './opportunities';
+import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
 import { stockCoverage, unitMargin } from './opportunityMetrics';
 import { romanLevel } from '@/engine/projection';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
@@ -24,6 +26,20 @@ export interface SkillGateExport {
   nameForCharacter: (characterId: number) => string;
 }
 
+/** The one skill-gate resolver both opportunity panels hand their export: verdicts by product, names from the catalog. */
+export function skillGateExport(
+  verdicts: ReadonlyMap<number, SkillGateVerdict>,
+  catalog: BlueprintCatalog | null,
+  characterNames: ReadonlyMap<number, string>
+): SkillGateExport {
+  return {
+    verdictFor: (productTypeID) =>
+      productTypeID === null ? undefined : verdicts.get(productTypeID),
+    nameForSkill: (typeID) => (catalog ? nameForType(catalog, typeID) : `#${typeID}`),
+    nameForCharacter: (id) => characterNames.get(id) ?? `#${id}`,
+  };
+}
+
 /** The three skill-gate columns every opportunity table carries: gated, what is missing, and who is closest. */
 function skillGateColumns<R>(
   t: CsvTranslate,
@@ -36,7 +52,7 @@ function skillGateColumns<R>(
       header: t('industry.csvSkillGated'),
       value: (row) => {
         const verdict = verdictOf(row);
-        return verdict ? (verdict.gated ? t('industry.csvYes') : t('industry.csvNo')) : null;
+        return exportFlag(t, verdict?.gated);
       },
     },
     {
@@ -47,7 +63,7 @@ function skillGateColumns<R>(
         return verdict.shortfall
           .map(
             (s) =>
-              `${gate.nameForSkill(s.typeID)} ${romanLevel(s.needLevel)} (${t('industry.csvHaveLevel', { level: s.haveLevel })})`
+              `${gate.nameForSkill(s.typeID)} ${romanLevel(s.needLevel)} (${t('industry.csvHaveLevel', { level: romanLevel(s.haveLevel) })})`
           )
           .join('; ');
       },
@@ -98,7 +114,11 @@ export function opportunitiesCsvColumns(
     },
     // The loss tooltip's figures, for every row (the tooltip only opens on a loss).
     { header: t('industry.csvProfit'), value: (row) => row.result.profit },
-    { header: t('industry.csvTotalCost'), value: (row) => row.result.totalCost },
+    // A floor while a material is unpriced, so blank like Profit and Revenue.
+    {
+      header: t('industry.csvTotalCost'),
+      value: (row) => (row.result.unpriceable ? null : row.result.totalCost),
+    },
     { header: t('industry.csvRevenue'), value: (row) => row.result.revenue },
     { header: t('industry.csvForgoneSale'), value: (row) => row.forgoneSale },
     ...skillGateColumns<OpportunityRow>(t, (row) => row.candidate.catalogEntry.productTypeID, gate),
@@ -128,7 +148,7 @@ export function marketWideOpportunitiesCsvColumns(
     },
     {
       header: t('industry.csvPriceCapped'),
-      value: (row) => (row.priceCapped ? t('industry.csvYes') : t('industry.csvNo')),
+      value: (row) => exportFlag(t, row.priceCapped),
     },
     ...skillGateColumns<MarketWideDayRow>(t, (row) => row.productTypeID, gate),
   ];

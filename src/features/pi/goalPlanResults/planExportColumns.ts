@@ -4,15 +4,14 @@
  * blocked goal) or a placeholder (a leg's distance still being counted, or
  * not routable) are columns of their own and testable without rendering.
  */
-import type { TFunction } from 'i18next';
-import type { CsvColumn } from '@/lib/csv';
+import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { DemandLine, FlowEnd, PlanetType } from '@/engine/pi/goalTypes';
 import { piTier } from '@/engine/pi/chain';
 import { commodityName } from '../goalPlannerFormat';
 import { HOURS_PER_DAY, endName, planetTypesText, type PlanNames } from './format';
 
 export function flowCsvColumns(
-  t: TFunction,
+  t: CsvTranslate,
   pi: PlanNames['pi'],
   typeGaps: ReadonlyMap<number, readonly PlanetType[]>,
   sourceLabel: (line: DemandLine) => string
@@ -57,25 +56,34 @@ export interface LegRow {
   jumps: number | null | undefined;
 }
 
-export function haulingCsvColumns(t: TFunction, names: PlanNames): CsvColumn<LegRow>[] {
+type RouteState = 'pending' | 'none' | 'sameSystem' | 'routed';
+
+const ROUTE_KEY: Record<RouteState, string> = {
+  pending: 'piPlan.csvRoute.pending',
+  none: 'piPlan.csvRoute.none',
+  sameSystem: 'piPlan.csvRoute.sameSystem',
+  routed: 'piPlan.csvRoute.routed',
+};
+
+function routeState(jumps: LegRow['jumps']): RouteState {
+  if (jumps === undefined) return 'pending';
+  if (jumps === null) return 'none';
+  return jumps === 0 ? 'sameSystem' : 'routed';
+}
+
+export function haulingCsvColumns(t: CsvTranslate, names: PlanNames): CsvColumn<LegRow>[] {
   return [
     { header: t('piPlan.legFromCsv'), value: (row) => endName(row.from, names) },
     { header: t('piPlan.legToCsv'), value: (row) => endName(row.to, names) },
     { header: t('piPlan.flowTier'), value: (row) => `P${piTier(row.typeId, names.pi)}` },
     { header: t('piPlan.legItem'), value: (row) => row.name },
-    { header: t('piPlan.legM3'), value: (row) => row.m3PerTrip },
+    // Rounded to cents: the flow arithmetic leaves float dust a spreadsheet would show.
+    { header: t('piPlan.legM3'), value: (row) => Math.round(row.m3PerTrip * 100) / 100 },
     { header: t('piPlan.legJumps'), value: (row) => row.jumps ?? null },
     {
       // A blank Jumps cell is either "still counting" or "no route"; this says which.
       header: t('piPlan.csvRouteStatus'),
-      value: (row) =>
-        row.jumps === undefined
-          ? t('piPlan.csvRoute.pending')
-          : row.jumps === null
-            ? t('piPlan.csvRoute.none')
-            : row.jumps === 0
-              ? t('piPlan.csvRoute.sameSystem')
-              : t('piPlan.csvRoute.routed'),
+      value: (row) => t(ROUTE_KEY[routeState(row.jumps)]),
     },
   ];
 }

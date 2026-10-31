@@ -303,7 +303,7 @@ describe('bookExportSheets', () => {
       at('manualReminders'),
       at('storedMinerName'),
     ]).toEqual([2, '2026-04-02T00:00:00Z', 'Char 7', 1, 'Pilot']);
-    expect(at('remindersStopped')).toBe('corpTaxBook.export.yes');
+    expect(at('remindersStopped')).toBe('common.exportFlagYes');
   });
 
   it('lists a Miner with every character it groups', () => {

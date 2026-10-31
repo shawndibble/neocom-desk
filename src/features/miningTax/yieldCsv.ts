@@ -1,5 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
+import { nothingPriced, type OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumUnits } from './oreBreakdown';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -26,12 +26,6 @@ export interface YieldOverviewCsvContext {
 
 function typeLabel(typeNames: ReadonlyMap<number, string>, typeId: number): string {
   return typeNames.get(typeId) ?? `#${typeId}`;
-}
-
-/** True when the row has ore lines and none carries a value for this side. */
-function noLinePriced(row: MiningYieldRow, pick: (line: OreLineValuation) => number): boolean {
-  const { lines } = row.valuation;
-  return lines.length > 0 && lines.every((line) => pick(line) === 0);
 }
 
 export function yieldOverviewCsvColumns(
@@ -82,12 +76,21 @@ export function yieldOverviewCsvColumns(
     {
       // Nothing priced is blank, never a 0 that reads as worthless.
       header: t('miningTax.overview.rawSellValue'),
-      value: (row) => (noLinePriced(row, (line) => line.rawValue) ? null : row.valuation.rawValue),
+      value: (row) => (nothingPriced(row.valuation) ? null : row.valuation.rawValue),
     },
     showRefining && {
       header: t('miningTax.overview.refineValue'),
-      value: (row) =>
-        noLinePriced(row, (line) => line.refineValue) ? null : row.valuation.refineValue,
+      value: (row) => (nothingPriced(row.valuation) ? null : row.valuation.refineValue),
+    },
+    {
+      // With some ores unpriced the values are floors; this names them so a floor never reads as exact.
+      header: t('miningTax.csvUnpricedOres'),
+      value: (row) => {
+        const unpriced = row.valuation.lines.filter((line) => line.rawValue === 0);
+        return unpriced.length === 0
+          ? null
+          : [...new Set(unpriced.map((line) => typeLabel(typeNames, line.typeId)))].join('; ');
+      },
     },
     {
       // Every ore with its units — the table's two-name summary drops the rest.

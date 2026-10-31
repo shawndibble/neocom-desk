@@ -73,6 +73,7 @@ describe('yieldOverviewCsvColumns', () => {
       'miningTax.csvVolumeUnknownFor',
       'miningTax.overview.rawSellValue',
       'miningTax.overview.refineValue',
+      'miningTax.csvUnpricedOres',
       'miningTax.overview.oreBreakdownColumn',
       'miningTax.overview.unitsColumn',
       'miningTax.overview.pricingColumn',
@@ -120,6 +121,22 @@ describe('yieldOverviewCsvColumns', () => {
     );
     expect(byHeader['miningTax.overview.rawSellValue']).toBeNull();
     expect(byHeader['miningTax.overview.refineValue']).toBeNull();
+  });
+
+  it('names the unpriced ores of a partly priced row, so its values read as floors', () => {
+    const row = yieldRow({
+      valuation: {
+        rawValue: 50,
+        refineValue: 60,
+        pricedAll: false,
+        lines: [oreLine(1230, 10, 50, 60), oreLine(1228, 5, 0, 0)],
+      },
+    } as unknown as Partial<MiningYieldRow>);
+    const byHeader = Object.fromEntries(
+      yieldOverviewCsvColumns(t, context).map((c) => [c.header, c.value(row)])
+    );
+    expect(byHeader['miningTax.csvUnpricedOres']).toBe('Scordite');
+    expect(byHeader['miningTax.overview.rawSellValue']).toBe(50);
   });
 
   it('exports raw numbers for volume, values and units', () => {

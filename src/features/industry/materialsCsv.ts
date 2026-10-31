@@ -1,4 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
+import type { DepthPrice } from '@/engine/industry/depthPrice';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type { MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
 import { rowVolume } from '@/engine/industry/materialVolume';
@@ -40,8 +42,15 @@ export function materialsCsvColumns(
   sourcing: MaterialSourcingMap | undefined,
   pricesReady: boolean,
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>,
-  volumeFor?: (typeID: number) => number | null
+  volumeFor?: (typeID: number) => number | null,
+  depthFor?: (typeID: number) => DepthPrice | undefined
 ): CsvColumn<MaterialCsvRow>[] {
+  const isBuilt = (material: MaterialCsvRow) => (material.subBuilds?.length ?? 0) > 0;
+  const overridden = (material: MaterialCsvRow) =>
+    sourcing?.[material.typeID]?.overridePrice !== undefined;
+  /** The table's walked-book line: not shown on a built row or one the pilot priced themselves. */
+  const depthOf = (material: MaterialCsvRow) =>
+    isBuilt(material) || overridden(material) ? undefined : depthFor?.(material.typeID);
   return [
     {
       header: t('industry.csvMaterial'),
@@ -68,7 +77,11 @@ export function materialsCsvColumns(
     },
     {
       header: t('industry.errands.haveColumn'),
-      value: (material) => material.ownedQuantity,
+      // What the Have field shows: the typed quantity, which can exceed the need (the engine clamps its own).
+      value: (material) =>
+        material.acquisitionTier
+          ? material.ownedQuantity
+          : (sourcing?.[material.typeID]?.ownedQuantity ?? 0),
     },
     {
       // A built row is not bought at all.
@@ -95,12 +108,16 @@ export function materialsCsvColumns(
     },
     {
       header: t('industry.csvPriceSource'),
+      // The cell the table shows, in its order. Unknown while market data is loading.
       value: (material) => {
-        if ((material.subBuilds?.length ?? 0) > 0) return null;
+        if (isBuilt(material)) {
+          return material.unpriced ? t('industry.csvPriceSources.unpriced') : null;
+        }
         const state = materialRowState(material, sourcing, pricesReady);
         if (state.priceSource === 'override') return t('industry.csvPriceSources.override');
-        if (state.fullyOwned) return t('industry.csvPriceSources.owned');
-        return t(`industry.csvPriceSources.${state.priceSource === 'hub' ? 'hub' : 'unpriced'}`);
+        if (!pricesReady) return null;
+        if (state.unitPrice !== null) return t('industry.csvPriceSources.hub');
+        return t(`industry.csvPriceSources.${state.fullyOwned ? 'owned' : 'unpriced'}`);
       },
     },
     {
@@ -119,6 +136,32 @@ export function materialsCsvColumns(
         if (!tier) return null;
         if (tier.community) return tier.community.memberName;
         return tier.invented ? t('industry.csvBlueprintInvented') : null;
+      },
+    },
+    {
+      header: t('industry.csvBlueprintSourceStale'),
+      value: (material) => {
+        const community = material.acquisitionTier?.community;
+        return community ? exportFlag(t, community.stale) : null;
+      },
+    },
+    { header: t('industry.csvDepthBest'), value: (material) => depthOf(material)?.best ?? null },
+    { header: t('industry.csvDepthAvg'), value: (material) => depthOf(material)?.avg ?? null },
+    {
+      header: t('industry.csvDepthCovered'),
+      value: (material) => exportFlag(t, depthOf(material)?.covered),
+    },
+    {
+      // What building saves over buying, on the rows the table words "saves X vs buying".
+      header: t('industry.csvSavesVsBuying'),
+      value: (material) => {
+        const advice = makeOrBuy?.get(material.typeID);
+        return isBuilt(material) &&
+          advice?.verdict === 'build' &&
+          advice.savings > 0 &&
+          material.remainingQuantity > 0
+          ? advice.savings
+          : null;
       },
     },
   ];

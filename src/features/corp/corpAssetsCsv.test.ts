@@ -92,12 +92,39 @@ describe('corpAssetLocationCsvColumns', () => {
       groupDivisionsInUse: 0,
       cell: { itemCount: 0, topStacks: [], estimatedValue: 0, volume: null },
     } as unknown as LocationRow;
-    expect(columns.slice(6).map((c) => c.value(row))).toEqual([12, 3000, 0, 'corp.assets.csv.yes']);
+    expect(columns.slice(6).map((c) => c.value(row))).toEqual([
+      12,
+      3000,
+      0,
+      'common.exportFlagYes',
+    ]);
     expect(columns.slice(6).map((c) => c.header)).toEqual([
       'corp.assets.csv.groupItems',
       'corp.assets.csv.groupValue',
       'corp.assets.csv.divisionsInUse',
       'corp.assets.csv.emptyOffice',
     ]);
+  });
+});
+
+describe('corpAssetItemCsvColumns stack overflow', () => {
+  it('spills a type with more stacks than one cell holds into further Stacks columns, losing none', () => {
+    const many = {
+      ...item,
+      ledger: {
+        ...item.ledger,
+        stacks: Array.from({ length: 1500 }, (_, i) => stack(1000 + i, 1, true)),
+      },
+    } as unknown as ItemTableRow;
+    const columns = corpAssetItemCsvColumns(t, { labels, assetNames: {}, blueprintTypeIds: null }, [
+      many,
+      item,
+    ]);
+    const stackCols = columns.filter((c) => c.header.startsWith('corp.assets.csv.stacks'));
+    expect(stackCols.length).toBeGreaterThan(1);
+    const cells = stackCols.map((c) => c.value(many) as string | null);
+    expect(cells.every((cell) => cell === null || cell.length < 32_767)).toBe(true);
+    expect(cells.join('; ').split('; ')).toHaveLength(1500);
+    expect(stackCols[1].value(item)).toBeNull();
   });
 });

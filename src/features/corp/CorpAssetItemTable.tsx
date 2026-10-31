@@ -102,8 +102,8 @@ export function CorpAssetItemTable({
   const sortProps = useUrlSort('sort', below ? BY_SHORT_BY : BY_VALUE, SORTABLE_IDS);
 
   const csvColumns = useMemo(
-    () => corpAssetItemCsvColumns(t, { labels, assetNames, blueprintTypeIds }),
-    [t, labels, assetNames, blueprintTypeIds]
+    () => corpAssetItemCsvColumns(t, { labels, assetNames, blueprintTypeIds }, rows),
+    [t, labels, assetNames, blueprintTypeIds, rows]
   );
   const tableExport = useTableExport({
     surface: 'corp-assets',

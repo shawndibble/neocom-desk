@@ -33,6 +33,7 @@ describe('jobsCsvColumns', () => {
       'industry.csvJobEnd',
       'industry.csvJobCostIsk',
       'industry.csvJobStatus',
+      'industry.csvJobState',
       'industry.csvJobProduct',
       'industry.csvCharacter',
       'industry.csvJobOwner',
@@ -127,7 +128,7 @@ describe('jobsCsvColumns character and owner', () => {
       characterName: 'Pilot',
       owner: 'corporation' as const,
     };
-    expect(columns.slice(8).map((c) => c.value(row))).toEqual([
+    expect(columns.slice(9).map((c) => c.value(row))).toEqual([
       'Item 77',
       'Pilot',
       'industry.csvJobOwnerCorporation',
@@ -136,7 +137,7 @@ describe('jobsCsvColumns character and owner', () => {
 
   it('leaves them blank on a bare job', () => {
     const columns = jobsCsvColumns(t, nameFor);
-    expect(columns.slice(8).map((c) => c.value(job()))).toEqual([null, null, null]);
+    expect(columns.slice(9).map((c) => c.value(job()))).toEqual([null, null, null]);
   });
 });
 
@@ -162,5 +163,17 @@ describe('jobHistoryCsvColumns', () => {
     expect(state(3)).toBe('industry.csvJobNotLogged');
     expect(columns.at(-1)!.value(logged(1))).toBe('p1');
     expect(columns.at(-1)!.value(logged(3))).toBeNull();
+  });
+});
+
+describe('jobsCsvColumns State', () => {
+  const at = Date.parse('2026-08-30T11:30:00Z');
+  const columns = jobsCsvColumns(t, nameFor, { now: () => at });
+  const state = (end: string) => columns[8].value(job({ end_date: end }));
+
+  it('reads Completing soon, Done or blank off the clock, beside ESI status', () => {
+    expect(state('2026-08-30T12:00:00Z')).toBe('industry.jobsCompletingSoon');
+    expect(state('2026-08-30T11:00:00Z')).toBe('industry.jobsDone');
+    expect(state('2026-08-31T12:00:00Z')).toBeNull();
   });
 });

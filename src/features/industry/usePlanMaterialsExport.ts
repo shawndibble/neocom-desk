@@ -13,7 +13,8 @@ export function usePlanMaterialsExport(
   catalog: BlueprintCatalog,
   visibleMaterials: readonly MaterialTableRow[],
   pricesReady: boolean,
-  materialAdvice: ReturnType<typeof usePlanMaterials>['materialAdvice']
+  materialAdvice: ReturnType<typeof usePlanMaterials>['materialAdvice'],
+  boughtDepth: ReturnType<typeof usePlanMaterials>['boughtDepth']
 ) {
   const { t } = useTranslation();
   const materialsCsv = useMemo(
@@ -24,9 +25,10 @@ export function usePlanMaterialsExport(
         plan.materialSourcing,
         pricesReady,
         materialAdvice,
-        (typeID) => volumeForType(catalog, typeID)
+        (typeID) => volumeForType(catalog, typeID),
+        (typeID) => boughtDepth.get(typeID)
       ),
-    [t, catalog, plan.materialSourcing, pricesReady, materialAdvice]
+    [t, catalog, plan.materialSourcing, pricesReady, materialAdvice, boughtDepth]
   );
   return useTableExport({
     surface: 'build-materials',

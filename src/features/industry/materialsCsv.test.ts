@@ -36,6 +36,11 @@ describe('materialsCsvColumns', () => {
       'industry.csvBlueprintMe',
       'industry.csvBlueprintTe',
       'industry.csvBlueprintSource',
+      'industry.csvBlueprintSourceStale',
+      'industry.csvDepthBest',
+      'industry.csvDepthAvg',
+      'industry.csvDepthCovered',
+      'industry.csvSavesVsBuying',
     ]);
   });
 
@@ -153,6 +158,11 @@ describe('materialsCsvColumns shopping-list facts', () => {
       null,
       null,
       null,
+      null,
+      null,
+      null,
+      null,
+      null,
     ]);
   });
 
@@ -166,7 +176,7 @@ describe('materialsCsvColumns shopping-list facts', () => {
     expect(extra(line(99, 10, 10, {}))[5]).toBe('industry.csvPriceSources.unpriced');
   });
 
-  it('exports a built row with its summed runs and no buy, volume or price source', () => {
+  it('exports a built row with its summed runs and no buy or volume, and an unpriced warning', () => {
     const built = {
       ...line(35, 10, 10, {}),
       subBuilds: [{ runs: 2 }, { runs: 3 }],
@@ -177,6 +187,11 @@ describe('materialsCsvColumns shopping-list facts', () => {
       null,
       'industry.errands.building',
       5,
+      'industry.csvPriceSources.unpriced',
+      null,
+      null,
+      null,
+      null,
       null,
       null,
       null,
@@ -191,6 +206,51 @@ describe('materialsCsvColumns shopping-list facts', () => {
     };
     const values = extra(bp);
     expect(values[3]).toBe('industry.errands.blueprint');
-    expect(values.slice(6)).toEqual([10, 20, 'Ally']);
+    expect(values.slice(6, 10)).toEqual([10, 20, 'Ally', 'common.exportFlagNo']);
+  });
+
+  it('shows the typed Have, not the engine-clamped one, and blanks the price source until prices load', () => {
+    const over: MaterialSourcingMap = { 34: { ownedQuantity: 1500 } };
+    const row = line(34, 1000, 1000, { 34: 5 }, over);
+    const ready = materialsCsvColumns(t, nameFor, over, true);
+    const loading = materialsCsvColumns(t, nameFor, over, false);
+    expect(ready[5].value(row)).toBe(1500);
+    expect(ready[10].value(row)).toBe('industry.csvPriceSources.hub');
+    expect(loading[10].value(row)).toBeNull();
+  });
+
+  it('keeps the unpriced warning on a built row, and exports depth and savings', () => {
+    const depth = { best: 5, avg: 6, need: 10, filled: 10, listed: 100, covered: true, levels: [] };
+    const cols = materialsCsvColumns(
+      t,
+      nameFor,
+      undefined,
+      true,
+      new Map([
+        [
+          35,
+          {
+            method: 'manufacturing',
+            verdict: 'build',
+            makeUnitPrice: 1,
+            buyUnitPrice: 2,
+            savings: 50,
+            me: 0,
+            blueprintCost: 0,
+          } as const,
+        ],
+      ]),
+      undefined,
+      (id) => (id === 34 ? depth : undefined)
+    );
+    const built = {
+      ...line(35, 10, 10, { 35: 1 }),
+      unpriced: true,
+      subBuilds: [{ runs: 1 }],
+    } as unknown as Parameters<(typeof cols)[number]['value']>[0];
+    expect(cols[10].value(built)).toBe('industry.csvPriceSources.unpriced');
+    expect(cols.at(-1)!.value(built)).toBe(50);
+    const bought = line(34, 10, 10, { 34: 5 });
+    expect(cols.slice(-4, -1).map((c) => c.value(bought))).toEqual([5, 6, 'common.exportFlagYes']);
   });
 });

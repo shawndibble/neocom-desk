@@ -1,4 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialCostLine } from '@/engine/industry/types';
 
@@ -27,8 +28,7 @@ export function groupMaterialsCsvColumns(
     {
       // The table flags a still-to-buy line with no price; its cost is then not in any total.
       header: t('industry.csvUnpriced'),
-      value: (row) =>
-        row.unpriced && row.buyToShow > 0 ? t('industry.csvYes') : t('industry.csvNo'),
+      value: (row) => exportFlag(t, row.unpriced && row.buyToShow > 0),
     },
   ];
 }

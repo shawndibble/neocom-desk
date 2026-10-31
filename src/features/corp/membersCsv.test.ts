@@ -99,10 +99,10 @@ describe('membersCsvColumns', () => {
       ])
     );
     expect(values['corp.members.columnRoles']).toBe('Accountant, Director');
-    expect(values['corp.members.csvCeo']).toBe('corp.members.csvYes');
-    expect(values['corp.members.csvYou']).toBe('corp.members.csvYes');
-    expect(values['corp.members.csvDark']).toBe('corp.members.csvYes');
+    expect(values['corp.members.csvCeo']).toBe('common.exportFlagYes');
+    expect(values['corp.members.csvYou']).toBe('common.exportFlagYes');
+    expect(values['corp.members.csvDark']).toBe('common.exportFlagYes');
     expect(columns[5].value(row())).toBeNull();
-    expect(columns[6].value(row())).toBe('corp.members.csvNo');
+    expect(columns[6].value(row())).toBe('common.exportFlagNo');
   });
 });

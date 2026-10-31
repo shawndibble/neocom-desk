@@ -1,23 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { BuildResult } from '@/engine/industry/types';
 import { buildPlanCompareCsvColumns } from './buildPlanCompareCsv';
+import { buildResult, comparedRow } from './exportFixtures.testutil';
+import type { BuildResult } from '@/engine/industry/types';
 import type { ComparedBuildRow } from './useComparedBuildResults';
 
-const t = (k: string) => k;
+const row = (result: Partial<BuildResult> | null, extra: Partial<ComparedBuildRow> = {}) =>
+  comparedRow({ result: result === null ? null : buildResult(result), ...extra });
 
-function row(result: Partial<BuildResult> | null, extra: Partial<ComparedBuildRow> = {}) {
-  return {
-    planId: 'p1',
-    planName: 'Rifter run',
-    productName: 'Rifter',
-    runs: 10,
-    loading: false,
-    result: result as BuildResult | null,
-    groupResult: null,
-    error: null,
-    ...extra,
-  } satisfies ComparedBuildRow;
-}
+const t = (k: string) => k;
 
 const HEADERS = [
   'industry.comparePlanColumn',
@@ -54,7 +44,7 @@ describe('buildPlanCompareCsvColumns', () => {
         row({
           seconds: 3600,
           materialCost: 900_000,
-          jobFee: { total: 100_000 },
+          jobFee: { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 100_000 },
           totalCost: 1_000_000,
           revenue: 1_250_000.5,
           profit: 250_000.5,
@@ -62,7 +52,7 @@ describe('buildPlanCompareCsvColumns', () => {
           iskPerHour: 250_000.5,
           breakEvenPrice: 80_000,
           buyCost: 950_000,
-        } as unknown as Partial<BuildResult>)
+        })
       )
     );
     expect(values).toEqual([
@@ -91,13 +81,13 @@ describe('buildPlanCompareCsvColumns', () => {
   it('blanks the figures of a row still loading, failed, or unpriceable', () => {
     const unpriced = row({
       seconds: 60,
-      jobFee: { total: 1 },
+      jobFee: { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 1 },
       totalCost: 5,
       profit: null,
       marginPct: null,
       iskPerHour: null,
       breakEvenPrice: null,
-    } as unknown as Partial<BuildResult>);
+    });
     expect(columns.slice(8, 12).map((c) => c.value(unpriced))).toEqual([null, null, null, null]);
     const failed = row(null, { error: 'boom' });
     expect(columns.slice(3, 13).map((c) => c.value(failed))).toEqual(Array(10).fill(null));

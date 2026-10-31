@@ -31,7 +31,7 @@ describe('groupMaterialsCsvColumns', () => {
 
   it('exports raw numbers — quantity, m3 volume, owned and still to buy', () => {
     const values = columns.map((c) => c.value(row(34, 1000, 600)));
-    expect(values).toEqual(['Item 34', 1000, 10, 400, 600, 'industry.csvNo']);
+    expect(values).toEqual(['Item 34', 1000, 10, 400, 600, 'common.exportFlagNo']);
   });
 
   it('leaves an unresolvable volume and an unclaimed owned quantity blank', () => {
@@ -45,7 +45,7 @@ describe('groupMaterialsCsvColumns', () => {
   });
 
   it('flags a line still to buy with no price', () => {
-    expect(columns[5].value(row(99, 10, 10))).toBe('industry.csvYes');
-    expect(columns[5].value(row(99, 10, 0))).toBe('industry.csvNo');
+    expect(columns[5].value(row(99, 10, 10))).toBe('common.exportFlagYes');
+    expect(columns[5].value(row(99, 10, 0))).toBe('common.exportFlagNo');
   });
 });

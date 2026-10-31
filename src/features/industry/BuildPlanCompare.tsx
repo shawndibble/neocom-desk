@@ -8,7 +8,7 @@
  */
 import { createNumberFormat } from '@/lib/numberLocale';
 import { formatCount } from '@/lib/formatCount';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { onPlanLinkClick, planHref } from './planLinkClick';
@@ -162,21 +162,18 @@ export function BuildPlanCompare({
     }
     return byPlan;
   }, [pricedPlans, catalog]);
-  // The export holds the hub columns even while the picker hides them. Their
-  // fetches (one Fuzzwork call per hub, one cached ESI history read per
-  // product) start when the pilot first reaches for the export menu, not on
-  // every visit; a file taken before they settle is marked `-partial`.
-  const [exportArmed, setExportArmed] = useState(false);
-  const arm = () => setExportArmed(true);
-  const wantBook = showBookColumns || exportArmed;
-  const wantDaily = isVisible('hubOrdersPerDay') || exportArmed;
-  const hubOrders = useHubOrderCounts([...targets.values()], wantBook);
+  // The export holds the hub columns even while the picker hides them, so both
+  // reads run once any plan has resolved: one Fuzzwork call per hub, and ESI
+  // history reads the cache holds to the daily rollover.
+  const anyResolved = rows.some((row) => !row.loading);
+  const wantHub = anyResolved || showBookColumns;
+  const hubOrders = useHubOrderCounts([...targets.values()], wantHub);
   const hubCountsFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);
     return target ? hubOrders.counts.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
   };
 
-  const dailyOrders = useHubDailyOrders([...targets.values()], wantDaily);
+  const dailyOrders = useHubDailyOrders([...targets.values()], wantHub);
   const ordersPerDayFor = (row: ComparedBuildRow) => {
     const target = targets.get(row.planId);
     return target ? dailyOrders.perDay.get(hubOrderKey(target.hubId, target.typeId)) : undefined;
@@ -187,13 +184,12 @@ export function BuildPlanCompare({
     ordersPerDay: ordersPerDayFor,
     unresolvedReason: (row) => unresolvedReason(row, t),
   });
-  const hubDataSettled =
-    wantBook && wantDaily && !hubOrders.loading && !hubOrders.failed && !dailyOrders.loading;
   const compareExport = useTableExport({
     surface: 'build-plan-compare',
     rows,
     columns: csvColumns,
-    truncated: !hubDataSettled,
+    // Partial only while a read is still in flight; one that failed leaves its cells blank.
+    truncated: hubOrders.loading || dailyOrders.loading,
   });
 
   /** A hub-book cell: "…" while loading, "—" when the plan has no product or the read failed. */
@@ -463,14 +459,7 @@ export function BuildPlanCompare({
             menuTitle={t('common.columnsMenuTitle')}
             resetLabel={t('common.resetColumns')}
           />
-          <span
-            onPointerDownCapture={arm}
-            onKeyDownCapture={arm}
-            onFocusCapture={arm}
-            className="inline-flex"
-          >
-            <TableActionsMenu name={t('industry.compareTitle')} tableExport={compareExport} />
-          </span>
+          <TableActionsMenu name={t('industry.compareTitle')} tableExport={compareExport} />
           <Button size="sm" onClick={onDone}>
             {t('industry.compareDone')}
           </Button>
