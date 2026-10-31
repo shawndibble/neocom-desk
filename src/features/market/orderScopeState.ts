@@ -143,7 +143,14 @@ export function scopeCsvRow(
   t: Translate,
   where: { stationName?: string | null; distance?: string; jumps?: JumpsAwayResult }
 ): ScopeOrderCsvRow {
-  const base = { scope: scopeLabelText(scope, t), price: null, gapIsk: null, gapPct: null };
+  const base = {
+    scope: scopeLabelText(scope, t),
+    price: null,
+    gapIsk: null,
+    gapPct: null,
+    ordersBeatingMe: null,
+    unitsBeatingMe: null,
+  };
   if (state.kind !== 'rival') {
     const seller =
       state.kind === 'unavailable'
@@ -154,8 +161,12 @@ export function scopeCsvRow(
     return { ...base, seller, distance: null };
   }
   const { rival } = state;
+  // The station tier is an aggregate price with no order count (filled with 0): blank, as on screen.
+  const countsKnown = rival.ordersBeatingMe > 0;
   return {
     ...base,
+    ordersBeatingMe: countsKnown ? rival.ordersBeatingMe : null,
+    unitsBeatingMe: countsKnown ? rival.unitsBeatingMe : null,
     seller: where.stationName ?? t('market.unknownStructure'),
     price: rival.price,
     gapIsk: rival.gapIsk,

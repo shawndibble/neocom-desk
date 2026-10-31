@@ -517,7 +517,16 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
     return `${unit}${holdsText}${t(`market.hauling.limit.${line.limitedBy}`)}`;
   };
 
-  const tableExport = useHaulingExport({ mode, anyEnd, tableRows, lineOf, overrides });
+  const tableExport = useHaulingExport({
+    mode,
+    anyEnd,
+    tableRows,
+    lineOf,
+    overrides,
+    addedIds: fill.addedIds,
+    addedCategoryOf: fill.categoryOf,
+    categoryName,
+  });
 
   const { columnVisibility, hideableColumnsById, availableColumnIds, visibleColumns } =
     useHaulingTable({

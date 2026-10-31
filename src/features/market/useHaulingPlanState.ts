@@ -109,8 +109,12 @@ interface HaulingExportInput {
   mode: HaulMode;
   anyEnd: HaulingAnyEnd;
   tableRows: readonly HaulingViewRow[];
-  lineOf: ReadonlyMap<number, { quantity: number }>;
+  lineOf: ReadonlyMap<number, { quantity: number; profit: number; volumeM3: number }>;
   overrides: ReadonlyMap<number, TripOverride>;
+  /** Rows added by the fill, and the category each came from. */
+  addedIds: ReadonlySet<number>;
+  addedCategoryOf: ReadonlyMap<number, number> | null | undefined;
+  categoryName: (id: number) => string;
 }
 
 /** The table's CSV/clipboard export: Bring is the planned quantity, blank for an unticked row. */
@@ -120,6 +124,9 @@ export function useHaulingExport({
   tableRows,
   lineOf,
   overrides,
+  addedIds,
+  addedCategoryOf,
+  categoryName,
 }: HaulingExportInput) {
   const { t } = useTranslation();
   const csvColumns = useMemo(
@@ -127,6 +134,16 @@ export function useHaulingExport({
       haulingCsvColumns(t, {
         mode,
         anyEnd,
+        profitFor: (row) => {
+          const line = lineOf.get(row.typeId);
+          return !line || line.quantity === 0 ? null : line.profit;
+        },
+        holdM3For: (row) => lineOf.get(row.typeId)?.volumeM3 ?? null,
+        addedFromFor: (row) => {
+          const category = addedIds.has(row.typeId) ? addedCategoryOf?.get(row.typeId) : undefined;
+          return category === undefined ? null : categoryName(category);
+        },
+        selectedFor: (row) => overrides.get(row.typeId)?.selected !== false,
         flagText: (flag) => t(`market.hauling.flags.${HAULING_FLAG_KEY[flag]}`),
         bringFor: (row) => {
           const line = lineOf.get(row.typeId);
@@ -134,7 +151,7 @@ export function useHaulingExport({
           return line.quantity;
         },
       }),
-    [t, mode, anyEnd, lineOf, overrides]
+    [t, mode, anyEnd, lineOf, overrides, addedIds, addedCategoryOf, categoryName]
   );
   return useTableExport({ surface: 'hauling', rows: tableRows, columns: csvColumns });
 }

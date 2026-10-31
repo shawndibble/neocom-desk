@@ -25,27 +25,35 @@ function row(overrides: Partial<HaulingViewRow> = {}): HaulingViewRow {
 const options = {
   flagText: (flag: string) => `flag:${flag}`,
   bringFor: (r: HaulingViewRow) => (r.typeId === 34 ? 400 : null),
+  profitFor: (r: HaulingViewRow) => (r.typeId === 34 ? 1500 : null),
+  holdM3For: (r: HaulingViewRow) => (r.typeId === 34 ? 4 : null),
+  addedFromFor: (r: HaulingViewRow) => (r.typeId === 34 ? 'Minerals' : null),
+  selectedFor: (r: HaulingViewRow) => r.typeId === 34,
 };
 
 describe('haulingCsvColumns', () => {
-  it('mirrors the table: item, buy, sell, margin, ISK/m³, days, demand, heads up, bring', () => {
+  it('mirrors the table, plus profit, hold m³, added-from and the trip tick', () => {
     expect(haulingCsvColumns(t, options).map((c) => c.header)).toEqual([
       'market.hauling.columns.item',
       'market.hauling.columns.buy',
       'market.hauling.columns.expected',
+      'market.hauling.columns.profit',
       'market.hauling.columns.margin',
       'market.hauling.columns.iskPerM3',
+      'market.hauling.columns.m3',
       'market.hauling.columns.days',
       'market.hauling.columns.demand',
       'market.hauling.columns.flags',
+      'market.hauling.columns.addedFromColumn',
       'market.hauling.columns.bring',
+      'market.hauling.columns.onTripColumn',
     ]);
   });
 
   it('writes raw numbers and plain-text labels', () => {
     const csv = toCsv([row()], haulingCsvColumns(t, options));
     expect(csv.split('\r\n')[1]).toBe(
-      '"Tritanium",4.5,5.25,12.345,40,2.4,"market.hauling.demand.most-days","flag:crowded; flag:thin",400'
+      '"Tritanium",4.5,5.25,1500,12.345,40,4,2.4,"market.hauling.demand.most-days","flag:crowded; flag:thin","Minerals",400,"common.exportFlagYes"'
     );
   });
 
@@ -55,7 +63,7 @@ describe('haulingCsvColumns', () => {
       haulingCsvColumns(t, options)
     );
     expect(csv.split('\r\n')[1]).toBe(
-      '"Tritanium",,5.25,12.345,40,2.4,"market.hauling.demand.most-days",,'
+      '"Tritanium",,5.25,,12.345,40,,2.4,"market.hauling.demand.most-days",,,,"common.exportFlagNo"'
     );
   });
 
@@ -65,16 +73,22 @@ describe('haulingCsvColumns', () => {
       'market.hauling.columns.item',
       'market.hauling.columns.buy',
       'market.hauling.columns.buyOrder',
+      'market.hauling.columns.profit',
       'market.hauling.columns.margin',
       'market.hauling.columns.iskPerM3',
+      'market.hauling.columns.m3',
       'market.hauling.columns.flags',
+      'market.hauling.columns.addedFromColumn',
       'market.hauling.columns.bring',
+      'market.hauling.columns.onTripColumn',
     ]);
     const csv = toCsv(
       [row({ mode: 'instant', price: 5.1, flags: [] } as Partial<HaulingViewRow>)],
       columns
     );
-    expect(csv.split('\r\n')[1]).toBe('"Tritanium",4.5,5.1,12.345,40,,400');
+    expect(csv.split('\r\n')[1]).toBe(
+      '"Tritanium",4.5,5.1,1500,12.345,40,4,,"Minerals",400,"common.exportFlagYes"'
+    );
   });
 
   it('with Any hub at one end, names the hub each row uses there, after the item', () => {
