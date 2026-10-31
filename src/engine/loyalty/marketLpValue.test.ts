@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { blueprintLpRate, lpRate, marketLpValue } from './marketLpValue';
 
-const offer = (iskPerLp: number | null, sellVolume = 100, quantity = 1) => ({
+const offer = (
+  iskPerLp: number | null,
+  sellVolume = 100,
+  quantity = 1,
+  soldPerDay: number | null = null
+) => ({
   iskPerLp,
   sellVolume,
   quantity,
+  soldPerDay,
 });
 
 describe('marketLpValue', () => {
@@ -25,6 +31,20 @@ describe('marketLpValue', () => {
     // 9,000 ISK/LP on 3 units for sale is one lucky order, not a rate.
     const value = marketLpValue([offer(9000, 3), offer(1500), offer(1400), offer(1300)]);
     expect(value).toBe(1400);
+  });
+
+  it('ignores an offer whose item sells under a unit a day, however deep its listings', () => {
+    const value = marketLpValue([
+      offer(9000, 100, 1, 0.2),
+      offer(1500, 100, 1, 40),
+      offer(1400, 100, 1, 5),
+      offer(1300, 100, 1, 1),
+    ]);
+    expect(value).toBe(1400);
+  });
+
+  it('trusts an offer whose sales are unknown', () => {
+    expect(marketLpValue([offer(1500), offer(1400), offer(1300)])).toBe(1400);
   });
 
   it('counts depth in redemptions, not units', () => {

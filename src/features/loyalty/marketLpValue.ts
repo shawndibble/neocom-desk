@@ -11,6 +11,7 @@
  */
 import { marketLpValue } from '@/engine/loyalty/marketLpValue';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { loadMarketSnapshots, type MarketSnapshot } from '@/features/industry/marketData';
 import type { TradeHub } from '@/market/hubs';
@@ -49,6 +50,10 @@ function valueOf(
         iskPerLp: row.profit.iskPerLp,
         sellVolume: snapshot.hubSellVolumes[sold] ?? 0,
         quantity: product ? product.quantity : row.offer.quantity,
+        // A type absent from a loaded demand object never traded in the window.
+        soldPerDay: demand
+          ? (demand.types.get(sold)?.volume ?? 0) / HAULING_THRESHOLDS.historyDays
+          : null,
       };
     })
   );
@@ -57,12 +62,18 @@ function valueOf(
 /** Offers by corporation the caller already holds (the LP Store landing's snapshot). */
 export type HeldLpOffers = ReadonlyMap<number, readonly LoyaltyStoreOffer[]>;
 
+interface PricedStores {
+  values: Map<number, number | null>;
+  /** False when recent trades were unavailable: the values are unchecked, so they are not remembered. */
+  checked: boolean;
+}
+
 /** Prices every store in one market fetch, so materials they share are fetched once. */
 async function computeMany(
   corporationIds: number[],
   hub: TradeHub,
   held: HeldLpOffers | undefined
-): Promise<Map<number, number | null>> {
+): Promise<PricedStores> {
   const [catalog, demand, offersByCorp] = await Promise.all([
     loadBlueprintCatalog(),
     loadHaulingDemand(hub.regionId),
@@ -84,7 +95,7 @@ async function computeMany(
       values.set(store.id, valueOf(store.offers, catalog, await snapshots[i]!, demand));
     })
   );
-  return values;
+  return { values, checked: demand !== null };
 }
 
 /**
@@ -106,12 +117,15 @@ export async function loadMarketLpValues(
   if (stale.length > 0) {
     const batch = computeMany(stale, hub, held);
     for (const id of stale) {
-      const value = batch.then((values) => values.get(id) ?? null);
+      const value = batch.then(({ values }) => values.get(id) ?? null);
       remembered.set(keyOf(id), { at: now(), value });
-      // A failure is answered null now and asked again next time.
-      batch.catch(() => {
+      // A failure, or a value priced without recent trades, is answered now and asked again next time.
+      const forget = () => {
         if (remembered.get(keyOf(id))?.value === value) remembered.delete(keyOf(id));
-      });
+      };
+      batch.then((priced) => {
+        if (!priced.checked) forget();
+      }, forget);
     }
   }
   const values = await Promise.all(

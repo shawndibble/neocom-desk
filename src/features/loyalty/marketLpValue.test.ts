@@ -101,6 +101,23 @@ describe('loadMarketLpValues', () => {
     const offers = new Map([
       [60, [itemOffer(1, 61, 100), itemOffer(2, 62, 100), itemOffer(3, 63, 100)]],
     ]);
+    // Recent trades known, so the value is remembered.
+    vi.mocked(loadHaulingDemand).mockResolvedValueOnce({
+      asOf: '2026-10-29',
+      lastSyncedAt: 1,
+      types: new Map(
+        [61, 62, 63].map((id) => [
+          id,
+          {
+            volume: 300,
+            daysWithTrades: 30,
+            orderSum: 300,
+            recentSalePrice: 200_000,
+            latestDay: { date: '2026-10-29', highest: 200_000, lowest: 100_000 },
+          },
+        ])
+      ),
+    });
     const values = await loadMarketLpValues([60], JITA, { held: offers });
     expect(loadLoyaltyStoreOffers).not.toHaveBeenCalled();
     expect(values.get(60)).toBeGreaterThan(1_300);
@@ -132,6 +149,7 @@ describe('loadMarketLpValues against recent trades', () => {
       types: new Map([
         [71, traded(200_000)],
         [72, traded(150_000)],
+        [73, traded(100_000)],
       ]),
     });
     const offers = new Map([
@@ -141,6 +159,60 @@ describe('loadMarketLpValues against recent trades', () => {
     // Two of three listings far above their trades: counted at the trades, not 50M and 40M.
     expect(values.get(70)).toBeGreaterThan(1_300);
     expect(values.get(70)).toBeLessThan(1_500);
+  });
+});
+
+describe('loadMarketLpValues against thin markets', () => {
+  const prices = { 81: 9_000_000, 82: 200_000, 83: 150_000, 84: 100_000 };
+  const volumes = { 81: 50, 82: 50, 83: 50, 84: 50 };
+  const storeOffers = [
+    itemOffer(1, 81, 100),
+    itemOffer(2, 82, 100),
+    itemOffer(3, 83, 100),
+    itemOffer(4, 84, 100),
+  ];
+  // Each test its own corporation: a priced store is remembered.
+  const offers = (corporationId: number) => new Map([[corporationId, storeOffers]]);
+  const demandOf = (perMonth: Record<number, number>) => ({
+    asOf: '2026-10-29',
+    lastSyncedAt: 1,
+    types: new Map(
+      Object.entries(perMonth).map(([id, volume]) => {
+        const price = prices[Number(id) as keyof typeof prices];
+        return [
+          Number(id),
+          {
+            volume,
+            daysWithTrades: 30,
+            orderSum: 300,
+            recentSalePrice: price,
+            latestDay: { date: '2026-10-29', highest: price, lowest: price },
+          },
+        ];
+      })
+    ),
+  });
+
+  beforeEach(() => {
+    vi.mocked(loadMarketSnapshots).mockImplementation((requests) =>
+      requests.map(() => Promise.resolve(snapshot(prices, volumes)))
+    );
+  });
+
+  it('leaves out an offer whose item barely trades, however high its price', async () => {
+    // 81 trades 3 units a month: its 9M listing is a real price nobody buys at.
+    vi.mocked(loadHaulingDemand).mockResolvedValue(demandOf({ 81: 3, 82: 300, 83: 300, 84: 300 }));
+    const values = await loadMarketLpValues([80], JITA, { held: offers(80) });
+    expect(values.get(80)).toBeLessThan(1_500);
+  });
+
+  it('does not remember a value priced without recent trades', async () => {
+    vi.mocked(loadHaulingDemand).mockResolvedValueOnce(null);
+    await loadMarketLpValues([90], JITA, { held: offers(90) });
+    vi.mocked(loadHaulingDemand).mockResolvedValue(demandOf({ 81: 3, 82: 300, 83: 300, 84: 300 }));
+    const values = await loadMarketLpValues([90], JITA, { held: offers(90) });
+    expect(loadHaulingDemand).toHaveBeenCalledTimes(2);
+    expect(values.get(90)).toBeLessThan(1_500);
   });
 });
 
