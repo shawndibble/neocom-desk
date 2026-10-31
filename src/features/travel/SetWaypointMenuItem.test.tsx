@@ -75,6 +75,31 @@ describe('SetWaypointMenuItem', () => {
     ]);
   });
 
+  it('adds the place as the next stop without clearing the route or offering View route', async () => {
+    await seed([WAYPOINT_SCOPE]);
+    render(
+      <MemoryRouter>
+        <RowActionsMenu
+          name="row"
+          items={<SetWaypointMenuItem locationId={JITA_4_4} placeName={PLACE} mode="add" />}
+        >
+          <div>row</div>
+        </RowActionsMenu>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByText('row'));
+
+    const item = await screen.findByRole('menuitem', { name: 'Add waypoint in game' });
+    await waitFor(() => expect(item).not.toHaveAttribute('aria-disabled'));
+    await userEvent.click(item);
+
+    expect(await screen.findByRole('status')).toHaveTextContent(`${PLACE} added to your route`);
+    expect(postAutopilotWaypointMock.mock.calls).toEqual([
+      [ONE, JITA_4_4, { clearOtherWaypoints: false }],
+    ]);
+    expect(screen.queryByRole('menuitem', { name: /view route/i })).toBeNull();
+  });
+
   it('reports a refusal in the menu rather than failing silently', async () => {
     await seed([WAYPOINT_SCOPE]);
     const { EsiError } = await import('@/esi/errors');

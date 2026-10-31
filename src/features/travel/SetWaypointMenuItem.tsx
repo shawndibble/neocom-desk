@@ -24,20 +24,25 @@ import { ViewRouteMenuItem } from './ViewRouteMenuItem';
 export function SetWaypointMenuItem({
   locationId,
   placeName,
+  mode = 'set',
 }: {
   /** An NPC station, player structure or solar system id — never an item id (see `useSetDestination`). */
   locationId: number;
   placeName: string;
+  /** `add` adds the place to the end of the route, keeping the client's route; no View route item. */
+  mode?: 'set' | 'add';
 }) {
   const { t } = useTranslation();
   const { blockedReason, offline, missingGroups, sending, outcome, send } = useSetDestination(
     locationId,
-    placeName
+    placeName,
+    mode === 'set'
   );
-  const label = t('travel.waypoints.menuItem');
+  const add = mode === 'add';
+  const label = t(add ? 'travel.waypoints.addMenuItem' : 'travel.waypoints.menuItem');
   // Kept when the connection drops mid-send, so the result is still shown in the blocked branch.
   const content = sending ? (
-    t('travel.waypoints.menuSending')
+    t(add ? 'travel.waypoints.addMenuSending' : 'travel.waypoints.menuSending')
   ) : outcome ? (
     <span role={outcome.tone} className={outcome.tone === 'alert' ? 'text-danger' : 'text-success'}>
       {outcome.text}
@@ -60,7 +65,7 @@ export function SetWaypointMenuItem({
         >
           {offline ? content : label}
         </DisabledMenuItem>
-        <ViewRouteMenuItem locationId={locationId} />
+        {!add && <ViewRouteMenuItem locationId={locationId} />}
         {missingGroups.length > 0 && <GrantMissingMenuItem groups={missingGroups} />}
       </>
     );
@@ -76,7 +81,7 @@ export function SetWaypointMenuItem({
       >
         {content}
       </MenuItem>
-      <ViewRouteMenuItem locationId={locationId} />
+      {!add && <ViewRouteMenuItem locationId={locationId} />}
     </>
   );
 }

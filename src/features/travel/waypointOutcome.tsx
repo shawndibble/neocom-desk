@@ -21,10 +21,17 @@ export interface WaypointOutcome {
 export function waypointOutcome(
   result: SetWaypointsResult,
   placeName: string,
-  t: TFunction
+  t: TFunction,
+  /** The place was added to the end of the route, not made the destination. */
+  added = false
 ): WaypointOutcome {
   if (result.ok) {
-    return { tone: 'status', text: t('market.orderDetail.destinationSet', { placeName }) };
+    return {
+      tone: 'status',
+      text: t(added ? 'travel.waypoints.nextStopAdded' : 'market.orderDetail.destinationSet', {
+        placeName,
+      }),
+    };
   }
   if (result.offline) {
     return {
