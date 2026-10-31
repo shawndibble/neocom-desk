@@ -6,7 +6,9 @@
  * A group keeps the id of the Miner it grows from (`solo:<id>` included), so
  * its Statements, payments and dismissals stay with it.
  */
+import { latestCorporationOf, standingOf, type MinerRow } from './bookView';
 import type { Miner } from './charges';
+import type { ObservedMiningEntry } from './types';
 
 export type GroupingEdit =
   | { action: 'setMiner'; minerId: string; characterIds: number[]; mainCharacterId: number }
@@ -85,5 +87,42 @@ export function planAutoGroups(input: {
       : free[0];
   return [
     { action: 'setMiner', minerId: `solo:${main}`, characterIds: free, mainCharacterId: main },
+  ];
+}
+
+/** A Miner the group dialog can fold in: who it is, and whether it is outside the corp (D26b). */
+export type MinerChoice = Pick<MinerRow, 'id' | 'mainCharacterId' | 'characterIds' | 'standing'>;
+
+/**
+ * Every Miner the book knows, without the ledger maths (#5704): each stored group, then a
+ * `solo:` Miner for every ungrouped character with a ledger row on or after the start date.
+ * The Miner page reads one Miner only, so its group dialog builds the list from this.
+ */
+export function minerChoices(input: {
+  corporationId: number;
+  startDate?: string;
+  miners: readonly Miner[];
+  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'date' | 'recordedCorporationId'>[];
+  memberIds?: ReadonlySet<number>;
+}): MinerChoice[] {
+  const latestCorp = latestCorporationOf(input.entries);
+  const grouped = new Set(input.miners.flatMap((m) => m.characterIds));
+  const solo = [
+    ...new Set(
+      input.entries
+        .filter((e) => input.startDate === undefined || e.date >= input.startDate)
+        .map((e) => e.characterId)
+        .filter((id) => !grouped.has(id))
+    ),
+  ].sort((a, b) => a - b);
+  const choice = (id: string, characterIds: number[], mainCharacterId: number): MinerChoice => ({
+    id,
+    mainCharacterId,
+    characterIds,
+    standing: standingOf(characterIds, latestCorp, input),
+  });
+  return [
+    ...input.miners.map((m) => choice(m.id, [...m.characterIds], m.mainCharacterId)),
+    ...solo.map((c) => choice(`solo:${c}`, [c], c)),
   ];
 }

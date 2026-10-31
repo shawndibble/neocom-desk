@@ -1,7 +1,8 @@
 // Firestore side of the Miner running totals (issue #5255, ADR 0032). The maths and the
 // scope rules are in corpTaxBookMinerTotals.ts; this loads a book's records, writes the
-// docs that changed, and runs the scheduled verifier. Shadow mode: nothing reads the docs,
-// so every failure here is logged and swallowed, never thrown into the edit that caused it.
+// docs that changed, and runs the scheduled verifier. The Miner page reads the docs (#5258):
+// a failure here is logged, the docs it left stale are deleted, and nothing is thrown into
+// the edit that caused it.
 
 import { FieldValue, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import {
@@ -182,27 +183,47 @@ async function resolveMiners(db: Firestore, corporationId: number, scope: Scope)
 }
 
 /**
- * Brings the totals in line after an event. Best effort: a failure is logged, and the
- * verifier repairs it.
+ * Brings the totals in line after an event. Best effort: a failure is logged and the docs it
+ * could not refresh are deleted, so the Miner page computes its header instead of trusting a
+ * stale one (#5704). The verifier rebuilds them.
  */
 export async function refreshAfterEvent(
   db: Firestore,
   corporationId: number,
   scope: Scope | readonly string[]
 ): Promise<void> {
+  const full: Scope = Array.isArray(scope)
+    ? { minerIds: [...scope], statementIds: [], paymentIds: [], all: false }
+    : (scope as Scope);
+  let minerIds: readonly string[] | 'all' = full.all ? 'all' : full.minerIds;
   try {
-    const full: Scope = Array.isArray(scope)
-      ? { minerIds: [...scope], statementIds: [], paymentIds: [], all: false }
-      : (scope as Scope);
-    if (full.all) {
+    if (minerIds === 'all') {
       await reconcileMinerTotals(db, corporationId, 'all');
       return;
     }
-    const minerIds = await resolveMiners(db, corporationId, full);
+    minerIds = await resolveMiners(db, corporationId, full);
     if (minerIds.length > 0) await reconcileMinerTotals(db, corporationId, minerIds);
   } catch (e) {
     console.error('miner totals refresh failed', e instanceof Error ? e.message : e);
+    await invalidateMinerTotals(db, corporationId, minerIds).catch(() => undefined);
   }
+}
+
+/** Removes the totals docs of `minerIds` (or every Miner's). */
+async function invalidateMinerTotals(
+  db: Firestore,
+  corporationId: number,
+  minerIds: readonly string[] | 'all'
+): Promise<void> {
+  const totals = sub(db, corporationId, MINER_TOTALS);
+  const refs =
+    minerIds === 'all' ? await totals.listDocuments() : minerIds.map((id) => totals.doc(id));
+  await apply(db, corporationId, {
+    writes: [],
+    deletes: refs.map((r) => r.id),
+    mismatches: [],
+    checked: 0,
+  });
 }
 
 // --- The scheduled verifier ---------------------------------------------------

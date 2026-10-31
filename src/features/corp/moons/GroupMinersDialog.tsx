@@ -6,11 +6,13 @@ import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { planRegroup } from '@/engine/corpTaxBook/grouping';
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { useBook } from './useBook';
+import { useMinerChoices } from './useMinerChoices';
 
 /**
  * Group other Miners' characters into this one (D18, issue #4194): an officer
  * picks the Miners to fold in and which character gets the mail. A guest's
  * character waits for their confirmation (D26b); the page shows it as pending.
+ * The list is every Miner in the book, even on a one-Miner page (#5704).
  */
 export function GroupMinersDialog({
   open,
@@ -22,20 +24,21 @@ export function GroupMinersDialog({
   miner: MinerRow;
 }) {
   const { t } = useTranslation();
-  const { view, names, edit, data } = useBook();
+  const { names, edit } = useBook();
+  const { choices, stored, name } = useMinerChoices();
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [main, setMain] = useState(String(miner.mainCharacterId));
 
   const others = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return view.miners.filter(
+    return choices.filter(
       (m) =>
         m.id !== miner.id &&
-        (q === '' || m.characterIds.some((c) => names.character(c).toLowerCase().includes(q)))
+        (q === '' || m.characterIds.some((c) => name(c).toLowerCase().includes(q)))
     );
-  }, [view.miners, miner.id, query, names]);
-  const absorb = view.miners.filter((m) => picked.has(m.id));
+  }, [choices, miner.id, query, name]);
+  const absorb = choices.filter((m) => picked.has(m.id));
   const characterIds = [...miner.characterIds, ...absorb.flatMap((m) => m.characterIds)];
   const outsiders = absorb.filter((m) => m.standing === 'guest').length;
   const mainValid = characterIds.includes(Number(main));
@@ -51,7 +54,7 @@ export function GroupMinersDialog({
       canConfirm={absorb.length > 0 && mainValid}
       run={async () => {
         const plan = planRegroup({
-          miners: data.state.miners,
+          miners: stored,
           targetId: miner.id,
           targetCharacterIds: miner.characterIds,
           absorb,
@@ -82,7 +85,7 @@ export function GroupMinersDialog({
                 }
               />
               <span>
-                {names.character(m.mainCharacterId)}
+                {name(m.mainCharacterId)}
                 {m.characterIds.length > 1 &&
                   ` ${t('corpTaxBook.moons.moreCharacters', { count: m.characterIds.length - 1 })}`}
                 {m.standing === 'guest' && (
@@ -102,7 +105,7 @@ export function GroupMinersDialog({
             label={t('corpTaxBook.moons.grouping.mailMain')}
             value={main}
             onChange={setMain}
-            options={characterIds.map((c) => ({ value: String(c), label: names.character(c) }))}
+            options={characterIds.map((c) => ({ value: String(c), label: name(c) }))}
             uppercase={false}
           />
         </Label>
