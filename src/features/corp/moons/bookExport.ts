@@ -11,10 +11,11 @@ import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { deriveModeChanges, deriveOwnerRateHistory } from '@/engine/corpTaxBook/feederAccrual';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment, Statement, StatementLine } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { CsvTranslate } from '@/lib/csv';
+import { exportFlag } from '@/lib/exportFlag';
 import {
   byKey,
   isoTime,
@@ -26,6 +27,7 @@ import {
   type SheetColumns,
 } from '@/lib/exportSheets';
 import type { AnyXlsxSheet } from '@/lib/xlsx';
+import { oreLinesText } from '../../miningTax/oreBreakdown';
 import type {
   AuditEntry,
   BookDeclaration,
@@ -99,8 +101,6 @@ function settingsRows(
 ): SettingRow[] {
   const s = input.settings;
   const scheduled = input.scheduledSync ?? null;
-  const yes = t('corpTaxBook.export.yes');
-  const no = t('corpTaxBook.export.no');
   const label = (key: string, options?: Record<string, unknown>) =>
     t(`corpTaxBook.export.setting.${key}`, options);
   const cadence =
@@ -108,7 +108,7 @@ function settingsRows(
       ? label('cadenceMonthly')
       : label('cadenceDays', { days: s.cadence.days, anchor: s.cadence.anchor });
   return [
-    [label('active'), s.active ? yes : no],
+    [label('active'), exportFlag(t, s.active)],
     [label('startDate'), s.startDate],
     [label('hub'), s.hubId],
     [label('oreForm'), s.oreForm],
@@ -147,8 +147,6 @@ export function bookExportSheets(
   names: BookExportNames,
   t: CsvTranslate
 ): AnyXlsxSheet[] {
-  const yes = t('corpTaxBook.export.yes');
-  const no = t('corpTaxBook.export.no');
   const minerById = new Map(input.miners.map((m) => [m.id, m]));
   const minerIdOf = new Map(input.miners.flatMap((m) => m.characterIds.map((c) => [c, m.id])));
   /** A grouped Miner by its main character; a `solo:<id>` one by its only character. */
@@ -162,6 +160,31 @@ export function bookExportSheets(
   const minerOf = (characterId: number) => minerIdOf.get(characterId) ?? `solo:${characterId}`;
   const character = (id: number | null | undefined) =>
     typeof id === 'number' ? names.character(id) : null;
+  const statementLines = [...input.statements]
+    .sort(
+      byKey(
+        (s) => s.issuedAt,
+        (s) => s.id
+      )
+    )
+    .flatMap((statement) =>
+      statement.lines.map((line): { statement: Statement; line: StatementLine } => ({
+        statement,
+        line,
+      }))
+    );
+  /** "Ore: value" for each ore of a Statement line that has one in `byType`. */
+  const perOre = <V>(
+    line: StatementLine,
+    byType: Readonly<Record<number, V>> | undefined,
+    format: (value: V) => string | number
+  ) =>
+    joined(
+      line.oreLines.flatMap((ore) => {
+        const value = byType?.[ore.typeId];
+        return value === undefined ? [] : [`${names.ore(ore.typeId)}: ${format(value)}`];
+      })
+    );
   const statementMiner = new Map(input.statements.map((s) => [s.id, s.minerId]));
   const payouts = input.feeders.flatMap((f) =>
     f.payouts.map((payout) => ({ feeder: f.corporationId, payout }))
@@ -230,9 +253,46 @@ export function bookExportSheets(
         ['oreForm', (s) => s.oreForm],
         ['lines', (s) => s.lines.length],
         ['amount', (s) => s.amount],
-        ['settled', (s) => (input.paidStatementIds.has(s.id) ? yes : no)],
+        ['settled', (s) => exportFlag(t, input.paidStatementIds.has(s.id))],
+        ['mailsSent', (s) => s.mailsSent],
+        ['lastMailed', (s) => s.lastMailedAt],
+        ['issuedBy', (s) => character(s.issuedBy)],
+        ['issuedById', (s) => s.issuedBy],
+        ['remindersStopped', (s) => exportFlag(t, s.remindersStopped)],
+        ['manualReminders', (s) => s.manualRemindersSent],
+        ['storedMinerName', (s) => s.minerName],
       ]
     ),
+    // Every line of every Statement: the Statements sheet only counts them.
+    sheet(t, 'statementLines', statementLines, [
+      ['statementId', (l) => l.statement.id],
+      ['miner', (l) => minerName(l.statement.minerId)],
+      ['minerId', (l) => l.statement.minerId],
+      ['date', (l) => l.line.date],
+      ['character', (l) => character(l.line.characterId)],
+      ['characterId', (l) => l.line.characterId],
+      [
+        'refinery',
+        (l) => (l.line.structureId === undefined ? null : names.refinery(l.line.structureId)),
+      ],
+      ['refineryId', (l) => l.line.structureId],
+      ['ore', (l) => oreLinesText(l.line.oreLines, names.ore)],
+      ['unitPrices', (l) => perOre(l.line, l.line.unitPrices, (price) => price)],
+      [
+        'priceSources',
+        (l) =>
+          perOre(l.line, l.line.priceSources, (source) =>
+            t(`corpTaxBook.export.priceSource.${source}`)
+          ),
+      ],
+      ['taxPct', (l) => l.line.taxPct],
+      ['rateEffectiveFrom', (l) => l.line.rateEffectiveFrom],
+      ['estimatedValue', (l) => l.line.estimatedValue],
+      ['tax', (l) => l.line.tax],
+      ['reason', (l) => l.line.reason],
+      ['kind', (l) => t(`corpTaxBook.export.lineKind.${l.line.kind}`)],
+      ['adjustmentId', (l) => l.line.adjustmentId],
+    ]),
     sheet(
       t,
       'payments',
@@ -360,7 +420,7 @@ export function bookExportSheets(
         ['minerId', (r) => r.minerId],
         ['fromDate', (r) => r.fromDate],
         ['reason', (r) => r.reason],
-        ['memberRebill', (r) => (r.memberRebill ? yes : no)],
+        ['memberRebill', (r) => exportFlag(t, r.memberRebill)],
         ['by', (r) => character(r.by)],
         ['byId', (r) => r.by],
         ['time', (r) => r.at],
@@ -418,10 +478,7 @@ export function bookExportSheets(
         ['naturalDecay', (x) => x.naturalDecayTime],
         ['laserFired', (x) => x.laserFiredAt],
         ['cancelled', (x) => x.cancelledAt],
-        [
-          'ore',
-          (x) => joined((x.oreLines ?? []).map((l) => `${names.ore(l.typeId)} × ${l.quantity}`)),
-        ],
+        ['ore', (x) => oreLinesText(x.oreLines ?? [], names.ore)],
         ['surveyId', (x) => x.surveyId],
       ]
     ),
@@ -483,7 +540,7 @@ export function bookExportSheets(
         ['method', (p) => t(`${PAYOUT_LABELS}.method.${p.payout.method}`)],
         ['status', (p) => t(`${PAYOUT_LABELS}.state.${p.payout.status}`)],
         ['journalRef', (p) => p.payout.journalRef],
-        ['notAPayout', (p) => (p.payout.notAPayout ? yes : no)],
+        ['notAPayout', (p) => exportFlag(t, p.payout.notAPayout)],
       ]
     ),
     sheet(

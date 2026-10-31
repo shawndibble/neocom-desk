@@ -44,6 +44,21 @@ export function allMembers(dr: DisplayRow): GroupMember[] {
   return [{ row: dr.row, assignment: dr.assignment }, ...(dr.groupMembers ?? [])];
 }
 
+/** One row per member day for a combined row, so an export loses no day; other rows pass through. */
+export function expandCombinedRows(rows: readonly DisplayRow[]): DisplayRow[] {
+  return rows.flatMap((dr) =>
+    dr.groupMembers
+      ? allMembers(dr).map(({ row, assignment }) => ({
+          key: assignment.id,
+          row,
+          assignment,
+          status: assignment.status,
+          ...(dr.corp ? { corp: dr.corp } : {}),
+        }))
+      : [dr]
+  );
+}
+
 // Worst-first: a joined group's combined status is whichever member most
 // needs attention, so a group with one outstanding and one paid member still
 // shows (and filters) as Outstanding rather than quietly reading as Paid.

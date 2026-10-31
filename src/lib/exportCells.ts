@@ -5,6 +5,9 @@
  * real date, everything else is text.
  */
 
+/** Excel's limit for one cell's text; past it the file opens only through a repair prompt. */
+export const MAX_CELL_TEXT = 32_767;
+
 export type ExportValue = string | number | null | undefined;
 
 export type ExportCell =

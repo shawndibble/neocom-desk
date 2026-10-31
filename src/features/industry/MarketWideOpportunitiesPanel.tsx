@@ -51,7 +51,7 @@ import { MARKET_WIDE_PAGE_SIZE, topRows } from './marketWidePage';
 import { MobileMarketWideList } from './MobileMarketWideList';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { MarketWideFilterBar } from './MarketWideFilterBar';
-import { marketWideOpportunitiesCsvColumns } from './opportunitiesCsv';
+import { marketWideOpportunitiesCsvColumns, skillGateExport } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { SORT_VALUE, useMarketWideColumns } from './useMarketWideColumns';
@@ -168,11 +168,21 @@ export function MarketWideOpportunitiesPanel({
   const { skillGateByProductTypeID, commonGate, gatedCount, dailySales, visibleRows } =
     useMarketWideRanking({ rows, hasRun, hub, catalog, characterIds, filter });
 
-  const csvColumns = useMemo(() => marketWideOpportunitiesCsvColumns(t), [t]);
+  const csvColumns = useMemo(
+    () =>
+      marketWideOpportunitiesCsvColumns(
+        t,
+        skillGateExport(skillGateByProductTypeID, catalog, characterNames)
+      ),
+    [t, skillGateByProductTypeID, catalog, characterNames]
+  );
+  // `visibleRows`, not the table's `shownRows`: the table mounts the first
+  // page behind "Show more", the file holds every row the filter keeps.
   const marketWideExport = useTableExport({
     surface: 'market-wide-opportunities',
     rows: visibleRows,
     columns: csvColumns,
+    source: 'sorted-rows',
   });
 
   const startPlanFor = (row: MarketWideResultRow) => {

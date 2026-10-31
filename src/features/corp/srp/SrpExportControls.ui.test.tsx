@@ -23,6 +23,7 @@ vi.mock('../srpClient', () => ({ readSrpSettings: reads.settings }));
 vi.mock('../srpOfficerClient', () => ({
   readAllSrpClaims: reads.claims,
   readSrpActivity: reads.activity,
+  SRP_READ_CAP: 3,
 }));
 vi.mock('../srpDoctrineClient', () => ({ readSrpDoctrines: reads.doctrines }));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: () => Promise.resolve({}) }));
@@ -50,6 +51,17 @@ describe('SrpExportButton', () => {
     expect(reads.activity).toHaveBeenCalledWith(ME, CORP, null);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-srp-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
     expect(done).toHaveTextContent(/· 4 sheets, 1 row$/);
+  });
+});
+
+describe('SrpExportButton at the read cap', () => {
+  it('marks the file partial when a read came back full, since the cap hides what lies past it', async () => {
+    const save = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {});
+    reads.claims.mockResolvedValue([{}, {}, {}]);
+    render(<SrpExportButton />);
+    await userEvent.click(button());
+    await screen.findByRole('status');
+    expect(save.mock.calls[0][0]).toMatch(/-partial\.xlsx$/);
   });
 });
 

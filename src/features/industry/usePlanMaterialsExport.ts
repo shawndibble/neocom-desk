@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BuildPlanRecord } from '@/db';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
+import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import { materialsCsvColumns } from './materialsCsv';
 import type { MaterialTableRow } from './subBuildPlan';
 import type { usePlanMaterials } from './usePlanMaterials';
@@ -13,7 +13,8 @@ export function usePlanMaterialsExport(
   catalog: BlueprintCatalog,
   visibleMaterials: readonly MaterialTableRow[],
   pricesReady: boolean,
-  materialAdvice: ReturnType<typeof usePlanMaterials>['materialAdvice']
+  materialAdvice: ReturnType<typeof usePlanMaterials>['materialAdvice'],
+  boughtDepth: ReturnType<typeof usePlanMaterials>['boughtDepth']
 ) {
   const { t } = useTranslation();
   const materialsCsv = useMemo(
@@ -23,9 +24,11 @@ export function usePlanMaterialsExport(
         (typeID) => nameForType(catalog, typeID),
         plan.materialSourcing,
         pricesReady,
-        materialAdvice
+        materialAdvice,
+        (typeID) => volumeForType(catalog, typeID),
+        (typeID) => boughtDepth.get(typeID)
       ),
-    [t, catalog, plan.materialSourcing, pricesReady, materialAdvice]
+    [t, catalog, plan.materialSourcing, pricesReady, materialAdvice, boughtDepth]
   );
   return useTableExport({
     surface: 'build-materials',

@@ -36,6 +36,10 @@ describe('membersCsvColumns', () => {
       'corp.members.columnShip',
       'corp.members.columnLocation',
       'corp.members.columnJoined',
+      'corp.members.columnRoles',
+      'corp.members.csvCeo',
+      'corp.members.csvYou',
+      'corp.members.csvDark',
     ]);
   });
 
@@ -71,5 +75,34 @@ describe('membersCsvColumns', () => {
     );
     expect(values['corp.members.columnShip']).toBeNull();
     expect(values['corp.members.columnLocation']).toBeNull();
+  });
+
+  it('exports roles, the CEO tag, the you tag and the dark flag', () => {
+    const columns = membersCsvColumns(t);
+    const values = Object.fromEntries(
+      columns.map((c) => [
+        c.header,
+        c.value(
+          row({
+            roles: ['Director', 'Accountant'],
+            isCeo: true,
+            isSelf: true,
+            standing: {
+              characterId: 1001,
+              lastSeenMs: 1,
+              neverSeen: false,
+              darkForMs: 9,
+              isDark: true,
+            },
+          })
+        ),
+      ])
+    );
+    expect(values['corp.members.columnRoles']).toBe('Accountant, Director');
+    expect(values['corp.members.csvCeo']).toBe('common.exportFlagYes');
+    expect(values['corp.members.csvYou']).toBe('common.exportFlagYes');
+    expect(values['corp.members.csvDark']).toBe('common.exportFlagYes');
+    expect(columns[5].value(row())).toBeNull();
+    expect(columns[6].value(row())).toBe('common.exportFlagNo');
   });
 });

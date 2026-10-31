@@ -40,7 +40,7 @@ import {
 } from '@/engine/corp/members';
 import { useDarkThreshold } from './darkThreshold';
 import { CharacterRowMenu } from './corpRowMenus';
-import { corpRoleLabel } from './roles';
+import { rolesText } from './roles';
 import {
   CORP_ROSTER_COLUMN_IDS,
   CORP_ROSTER_DEFAULT_COLUMNS,
@@ -126,18 +126,6 @@ export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
       />
     </StatChips>
   );
-}
-
-/**
- * A member's roles as one line; null when there are none to print. Sorted
- * because ESI's order is not, and one role set must print and sort one way.
- */
-function rolesText(roles: readonly string[] | null): string | null {
-  if (roles === null || roles.length === 0) return null;
-  return roles
-    .map(corpRoleLabel)
-    .sort((a, b) => a.localeCompare(b))
-    .join(', ');
 }
 
 /** Solar system ids sit in 30,000,000-32,000,000; stations and structures do not. */

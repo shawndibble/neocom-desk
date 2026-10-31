@@ -13,6 +13,7 @@ import { TierChip } from '../DirectiveRow';
 import { commodityName, formatUnits } from '../goalPlannerFormat';
 import { piProductHref } from '../piPlanLink';
 import { HOURS_PER_DAY, formatPercent, planetTypesText, type PlanNames } from './format';
+import { flowCsvColumns } from './planExportColumns';
 
 /** Under this short of one, a made fraction is float dust. */
 const WHOLE = 0.995;
@@ -149,17 +150,14 @@ export function Flow({
     ],
     [t, pi]
   );
+  const flowCsv = useMemo(
+    () => flowCsvColumns(t, pi, typeGaps, (line) => sourceLabel(line, t)),
+    [t, pi, typeGaps]
+  );
   const tableExport = useTableExport({
     surface: 'pi-plan-flow',
     rows,
-    columns: [
-      { header: t('piPlan.flowTier'), value: (line) => `P${line.tier}` },
-      { header: t('piPlan.flowItem'), value: (line) => commodityName(line.typeId, pi) },
-      { header: t('piPlan.flowPerDay'), value: (line) => line.unitsPerHour * HOURS_PER_DAY },
-      { header: t('piPlan.flowPerHour'), value: (line) => line.unitsPerHour },
-      { header: t('piPlan.flowFactories'), value: (line) => line.factories ?? '' },
-      { header: t('piPlan.flowSource'), value: (line) => sourceLabel(line, t) },
-    ],
+    columns: flowCsv,
   });
   if (demand.length === 0) return null;
   return (

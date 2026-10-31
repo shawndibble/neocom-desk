@@ -1,22 +1,31 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { activityI18nKey, type ActiveJob } from './jobs';
+import type { JobRow } from './activeJobColumns';
+import { activityI18nKey, isCompletingSoon, isJobDone } from './jobs';
+import { isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
+
+const OWNER_KEY = {
+  personal: 'industry.csvJobOwnerPersonal',
+  corporation: 'industry.csvJobOwnerCorporation',
+} as const;
+
+export interface JobsCsvOptions {
+  /** Job History: the End date is the delivery, and a clock-derived state means nothing. */
+  delivered?: boolean;
+  /** The clock the State column reads, at export time. */
+  now?: () => number;
+}
 
 /**
- * CSV columns for the active-jobs list: activity, blueprint, blueprint type
- * id, runs, start, end, cost, status. Dates and numbers pass through raw —
- * the panel's localized/formatted renderings (duration countdown, locale
- * date string, progress percent) are display-only and never leak into the
- * export. `cost` is blank (not 0, not a placeholder string) when the job has
- * none, matching ESI's optional field; an actual 0 cost stays 0 (`??`, not
- * `||`).
- *
- * Typed on `ActiveJob`, the structural subset the panel renders, so the same
- * export serves both a Character's jobs and its corporation's (issue #298).
+ * CSV columns for the jobs lists: the job's own fields (dates and numbers
+ * raw, never the panel's formatted renderings), ESI's status beside the
+ * clock-derived State, and the installer and owner each row is tagged with.
+ * `cost` is blank when ESI sent none; a real 0 stays 0.
  */
 export function jobsCsvColumns(
   t: CsvTranslate,
-  nameFor: (blueprintTypeId: number) => string
-): CsvColumn<ActiveJob>[] {
+  nameFor: (blueprintTypeId: number) => string,
+  { delivered = false, now = Date.now }: JobsCsvOptions = {}
+): CsvColumn<JobRow>[] {
   return [
     {
       header: t('industry.csvJobActivity'),
@@ -39,7 +48,7 @@ export function jobsCsvColumns(
       value: (job) => job.start_date,
     },
     {
-      header: t('industry.csvJobEnd'),
+      header: delivered ? t('industry.historyColDelivered') : t('industry.csvJobEnd'),
       value: (job) => job.end_date,
     },
     {
@@ -49,6 +58,65 @@ export function jobsCsvColumns(
     {
       header: t('industry.csvJobStatus'),
       value: (job) => job.status,
+    },
+    ...(delivered
+      ? []
+      : [
+          {
+            // The table's Done / Completing soon pill, derived from the clock, beside ESI's own status.
+            header: t('industry.csvJobState'),
+            value: (job: JobRow) => {
+              const at = now();
+              if (isJobDone(job, at)) return t('industry.jobsDone');
+              return isCompletingSoon(job, at) ? t('industry.jobsCompletingSoon') : null;
+            },
+          },
+        ]),
+    {
+      header: t('industry.csvJobProduct'),
+      value: (job) => (job.product_type_id != null ? nameFor(job.product_type_id) : null),
+    },
+    {
+      // The Character the job belongs to; for a corporation job, its installer.
+      header: t('industry.csvCharacter'),
+      value: (job) => job.characterName || null,
+    },
+    {
+      header: t('industry.csvJobOwner'),
+      value: (job) => (job.owner ? t(OWNER_KEY[job.owner]) : null),
+    },
+  ];
+}
+
+/**
+ * Job History's export: the same facts as the Active list (its End date is the
+ * delivery) plus whether the Production Log holds the delivery. Blank where a
+ * job is not one the log can hold (not a manufacturing delivery).
+ */
+export function jobHistoryCsvColumns(
+  t: CsvTranslate,
+  nameFor: (blueprintTypeId: number) => string,
+  states: ReadonlyMap<number, HistoryJobState>,
+  dismissedJobIds: ReadonlySet<number>
+): CsvColumn<JobRow>[] {
+  return [
+    ...jobsCsvColumns(t, nameFor, { delivered: true }),
+    {
+      header: t('industry.csvJobLogState'),
+      value: (job) => {
+        if (!isLoggableHistoryJob(job)) return null;
+        if (states.get(job.job_id)?.kind === 'logged') return t('industry.historyLogged');
+        return dismissedJobIds.has(job.job_id)
+          ? t('industry.historyDismissed')
+          : t('industry.csvJobNotLogged');
+      },
+    },
+    {
+      header: t('industry.csvJobLoggedPlanId'),
+      value: (job) => {
+        const state = states.get(job.job_id);
+        return state?.kind === 'logged' ? state.buildPlanId : null;
+      },
     },
   ];
 }
