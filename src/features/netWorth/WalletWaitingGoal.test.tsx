@@ -92,10 +92,19 @@ describe('WalletWaitingGoal', () => {
     expect(await screen.findByText(/Pick an ISK target/)).toBeInTheDocument();
   });
 
-  it('draws nothing before the first snapshot exists', async () => {
+  it('keeps the Goal, without ISK waiting, before the first snapshot exists', async () => {
     await db.netWorthSnapshots.clear();
     renderPanels();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByRole('heading', { name: 'ISK waiting' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Goal' })).toBeInTheDocument();
+  });
+
+  it('refuses a target too big to edit again', async () => {
+    const user = userEvent.setup();
+    renderPanels();
+    await user.click(await screen.findByRole('button', { name: 'Set goal' }));
+    await user.type(screen.getByLabelText('Target (ISK)'), '999999999999b');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 });

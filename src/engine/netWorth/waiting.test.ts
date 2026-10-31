@@ -27,16 +27,43 @@ describe('iskWaiting', () => {
       row('2026-10-30', { escrow: 10, sellStock: 20, contractStock: 30 }),
       row('2026-10-30', { escrow: 1, sellStock: 2, contractStock: 3 }, 2),
     ];
-    expect(iskWaiting(rows)).toEqual({ sellOrders: 22, escrow: 11, contracts: 33, total: 66 });
+    expect(iskWaiting(rows, '2026-10-31')).toEqual({
+      sellOrders: 22,
+      escrow: 11,
+      contracts: 33,
+      total: 66,
+    });
   });
 
   it('reads a layer an older row lacks as zero', () => {
     const rows = [row('2026-10-30', { sellStock: undefined, contractStock: undefined })];
-    expect(iskWaiting(rows)).toEqual({ sellOrders: 0, escrow: 10, contracts: 0, total: 10 });
+    expect(iskWaiting(rows, '2026-10-31')).toEqual({
+      sellOrders: 0,
+      escrow: 10,
+      contracts: 0,
+      total: 10,
+    });
   });
 
   it('is all zeros with no snapshot', () => {
-    expect(iskWaiting([])).toEqual({ sellOrders: 0, escrow: 0, contracts: 0, total: 0 });
+    expect(iskWaiting([], '2026-10-31')).toEqual({
+      sellOrders: 0,
+      escrow: 0,
+      contracts: 0,
+      total: 0,
+    });
+  });
+});
+
+describe('stale Characters', () => {
+  it('leaves out a Character whose newest snapshot is over a week old', () => {
+    const rows = [
+      row('2026-10-30', { escrow: 10, sellStock: 0, contractStock: 0, wallet: 100 }),
+      row('2026-08-01', { escrow: 500, sellStock: 500, contractStock: 500, wallet: 9000 }, 2),
+    ];
+    expect(iskWaiting(rows, '2026-10-31').total).toBe(10);
+    expect(goalProgress({ target: 1000, rows, today: '2026-10-31' }).current).toBe(100);
+    expect(walletChange(rows, '2026-10-31')).toBeNull();
   });
 });
 

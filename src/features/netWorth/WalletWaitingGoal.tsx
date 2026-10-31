@@ -12,8 +12,8 @@ import {
   TextInput,
   textActionClassName,
 } from '@/components/ui';
-import { goalProgress, iskWaiting, walletChange } from '@/engine/netWorth/waiting';
-import { utcDay } from '@/engine/netWorth/snapshot';
+import { utcDay } from '@/engine/localDay';
+import { GOAL_MAX_TARGET, goalProgress, iskWaiting, walletChange } from '@/engine/netWorth/waiting';
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useNetWorthData } from './useNetWorthData';
@@ -42,16 +42,17 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
     [characterIds, data.snapshotsByCharacter]
   );
   const [today] = useState(() => utcDay(Date.now()));
-  const waiting = useMemo(() => iskWaiting(rows), [rows]);
+  const waiting = useMemo(() => iskWaiting(rows, today), [rows, today]);
   const change = useMemo(() => walletChange(rows, today), [rows, today]);
   const progress = useMemo(
     () => (goal ? goalProgress({ target: goal.target, rows, today }) : null),
     [goal, rows, today]
   );
 
-  if (!data.ready || rows.length === 0) return null;
+  if (!data.ready) return null;
 
   const target = parseIskAmount(amount);
+  const targetOk = target !== null && target > 0 && target <= GOAL_MAX_TARGET;
   const projected = progress?.projectedDay
     ? new Intl.DateTimeFormat(i18n.language, {
         day: 'numeric',
@@ -66,8 +67,8 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
     setEditing(true);
   };
   const save = () => {
-    if (target === null || target <= 0) return;
-    setGoal({ name: name.trim(), target });
+    if (!targetOk) return;
+    setGoal({ name: name.trim(), target: target! });
     setEditing(false);
   };
 
@@ -79,26 +80,28 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panel title={t('wallet.waiting.title')}>
-        <ul className="divide-y divide-line text-sm">
-          {waitingRows.map(([key, isk]) => (
-            <li key={key} className="flex justify-between py-2">
-              <span>{t(`wallet.waiting.${key}`)}</span>
-              <span className="tabular-nums">{formatIsk(isk)} ISK</span>
-            </li>
-          ))}
-        </ul>
-        {change !== null && (
-          <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-            <span className="text-text-dim">
-              {t('wallet.waiting.change')} <IskDelta amount={change} decimals={0} /> ISK
-            </span>
-            <Link to="/wallet/journal" className={textActionClassName()}>
-              {t('wallet.waiting.openJournal')}
-            </Link>
-          </p>
-        )}
-      </Panel>
+      {rows.length > 0 && (
+        <Panel title={t('wallet.waiting.title')}>
+          <ul className="divide-y divide-line text-sm">
+            {waitingRows.map(([key, isk]) => (
+              <li key={key} className="flex justify-between py-2">
+                <span>{t(`wallet.waiting.${key}`)}</span>
+                <span className="tabular-nums">{formatIsk(isk)} ISK</span>
+              </li>
+            ))}
+          </ul>
+          {change !== null && (
+            <p className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+              <span className="text-text-dim">
+                {t('wallet.waiting.change')} <IskDelta amount={change} decimals={0} /> ISK
+              </span>
+              <Link to="/wallet/journal" className={textActionClassName()}>
+                {t('wallet.waiting.openJournal')}
+              </Link>
+            </p>
+          )}
+        </Panel>
+      )}
       <Panel
         title={
           goal?.name ? t('wallet.goal.titleNamed', { name: goal.name }) : t('wallet.goal.title')
@@ -159,7 +162,7 @@ export function WalletWaitingGoal({ characterIds }: WalletWaitingGoalProps) {
             <Button variant="ghost" onClick={() => setEditing(false)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="primary" onClick={save} disabled={target === null || target <= 0}>
+            <Button variant="primary" onClick={save} disabled={!targetOk}>
               {t('common.save')}
             </Button>
           </>

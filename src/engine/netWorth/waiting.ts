@@ -17,26 +17,34 @@ export interface IskWaiting {
 
 /** Days a Character's snapshots must span before a pace is worked out from them. */
 export const GOAL_MIN_SPAN_DAYS = 7;
+/** A Character whose newest snapshot is older than this many days is left out of the figures. */
+export const WAITING_STALE_DAYS = 7;
+/** Largest Goal target: past it the amount no longer round-trips through its text field. */
+export const GOAL_MAX_TARGET = 1e15;
 /** How far back the pace looks. */
 export const GOAL_WINDOW_DAYS = 30;
 
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
 
-function byCharacter(rows: readonly NetWorthSnapshotRow[]) {
+function byCharacter(rows: readonly NetWorthSnapshotRow[], today: string) {
+  const staleBefore = shiftUtcDate(today, -WAITING_STALE_DAYS);
   const map = new Map<number, NetWorthSnapshotRow[]>();
   for (const row of rows) {
     const list = map.get(row.characterId) ?? [];
     list.push(row);
     map.set(row.characterId, list);
   }
-  for (const list of map.values()) list.sort((a, b) => a.day.localeCompare(b.day));
+  for (const [id, list] of map) {
+    list.sort((a, b) => a.day.localeCompare(b.day));
+    if (list[list.length - 1]!.day < staleBefore) map.delete(id);
+  }
   return map;
 }
 
-/** ISK parked in sell orders, buy-order escrow and contracts, at each Character's newest day. */
-export function iskWaiting(rows: readonly NetWorthSnapshotRow[]): IskWaiting {
+/** ISK parked in sell orders, buy-order escrow and contracts, at each fresh Character's newest day. */
+export function iskWaiting(rows: readonly NetWorthSnapshotRow[], today: string): IskWaiting {
   const out = { sellOrders: 0, escrow: 0, contracts: 0, total: 0 };
-  for (const list of byCharacter(rows).values()) {
+  for (const list of byCharacter(rows, today).values()) {
     const values = layerValues(list[list.length - 1]!);
     out.sellOrders += values.sellOrders;
     out.escrow += values.escrow;
@@ -70,7 +78,7 @@ export function goalProgress(input: {
   let perDay = 0;
   let paced = false;
   let newestDay = '';
-  for (const list of byCharacter(rows).values()) {
+  for (const list of byCharacter(rows, today).values()) {
     const latest = list[list.length - 1]!;
     current += latest.wallet;
     if (latest.day > newestDay) newestDay = latest.day;
@@ -107,7 +115,7 @@ export function walletChange(rows: readonly NetWorthSnapshotRow[], today: string
   const floor = shiftUtcDate(today, -GOAL_WINDOW_DAYS);
   let change = 0;
   let any = false;
-  for (const list of byCharacter(rows).values()) {
+  for (const list of byCharacter(rows, today).values()) {
     const first = list.find((row) => row.day >= floor);
     const latest = list[list.length - 1]!;
     if (!first || first.day === latest.day) continue;
