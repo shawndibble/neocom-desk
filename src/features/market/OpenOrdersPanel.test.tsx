@@ -329,7 +329,7 @@ describe('OpenOrdersPanel', () => {
     expect(screen.getByRole('button', { name: 'All (3)' })).toBeInTheDocument();
   });
 
-  it("shows the viewed Character's used / max order slots, red at the cap", async () => {
+  it("shows the viewed Character's used / max order slots, uncoloured below the cap", async () => {
     mockedSkills.mockResolvedValue({
       ...skillsFixture([[3443, 0]]),
       skillsResult: {} as CorrectedSkills['skillsResult'],
@@ -340,7 +340,7 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
 
-    const figure = await screen.findByText('Orders 3 / 5');
+    const figure = await screen.findByText('Order slots 3 / 5');
     expect(figure).not.toHaveClass('text-danger');
   });
 
@@ -362,7 +362,7 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
 
-    expect(await screen.findByText('Orders 5 / 5')).toHaveClass('text-danger');
+    expect(await screen.findByText('Order slots 5 / 5')).toHaveClass('text-danger');
   });
 
   it('hides the slot figure and says why when skills are unavailable', async () => {
@@ -371,7 +371,7 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
 
     expect(await screen.findByText(/Order slots are hidden/)).toBeInTheDocument();
-    expect(screen.queryByText(/^Orders \d+ \/ \d+$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Order slots \d+ \/ \d+$/)).not.toBeInTheDocument();
   });
 
   it('shows Watch and All one segment away, and remembers the pick in the URL', async () => {
