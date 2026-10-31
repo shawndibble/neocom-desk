@@ -1,13 +1,10 @@
 // The Moon owners tab reads each moon owner's server-built view summary instead of every ledger
-// row it recorded (issue #5717, ADR 0032). These tests build the summary with the server's own
-// `buildFeederView` and prove the row it gives equals the row the entries give, and that a summary
-// behind the record is never used.
+// row it recorded (issue #5717, ADR 0032). The summary is assembled here from the functions
+// mirror of the engine (`buildFeederView` sits in a module that needs the functions runtime, which
+// the root install lacks) the way the server does, and the row it gives must equal the row the
+// entries give. A summary behind its record is never used.
 import { describe, expect, it } from 'vitest';
-import {
-  buildFeederView,
-  priceKey,
-  type FeederViewRecord,
-} from '../../../functions/src/corpTaxBookFeederView';
+import * as server from '../../../functions/src/corpTaxBookEngine';
 import {
   buildMoonOwners,
   summaryFor,
@@ -73,39 +70,56 @@ const PRICE = 123.45;
 /** The summary the server writes for `f`, from the same rows, prices and payouts. */
 function serverSummary(
   f: MoonOwnerFeeder,
-  entries: readonly ObservedMiningEntry[],
-  now = NOW_MS
+  entries: readonly ObservedMiningEntry[]
 ): MoonOwnerSummary {
   const rows = entries
     .filter((e) => e.sourceCorporationId === f.corporationId)
     .flatMap((e) =>
-      e.oreLines.map((l) => ({
-        structureId: e.structureId,
-        characterId: e.characterId,
-        typeId: l.typeId,
-        date: e.date,
-        quantity: l.quantity,
-      }))
+      e.oreLines.map((l) => ({ structureId: e.structureId, date: e.date, quantity: l.quantity }))
     );
-  const prices = new Map(rows.map((r) => [priceKey(r.typeId, r.date), { buy: PRICE, sell: null }]));
-  const { lastReadWellAt, ...rest } = f;
-  const record = {
-    ...rest,
-    ...(lastReadWellAt ? { lastReadWellAt: Date.parse(lastReadWellAt) } : {}),
-  } as unknown as FeederViewRecord;
-  return buildFeederView({
-    now,
-    feederCorporationId: f.corporationId,
-    collectorCorporationId: BOOK,
-    collectorName: null,
-    record,
-    graceHours: 6,
-    oreForm: 'raw',
-    compressedByRaw: {},
-    rows,
-    prices,
-    payouts: f.payouts,
-  }).summary as MoonOwnerSummary;
+  const unit = server.moonOwnerUnitPrice({ buy: PRICE, sell: null });
+  const history = server.deriveOwnerRateHistory(f);
+  const modeChanges = server.deriveModeChanges(f);
+  const byDay = new Map<string, number>();
+  let mined = 0;
+  for (const r of rows) {
+    if (!server.isDayCovered(f.coveragePeriods, r.date)) continue;
+    mined += r.quantity * unit;
+    byDay.set(r.date, (byDay.get(r.date) ?? 0) + r.quantity * unit);
+  }
+  const accrual = server.accrueValuedDays(
+    [...byDay].map(([date, value]) => ({ date, value })),
+    {
+      coveragePeriods: f.coveragePeriods,
+      ownerRateHistory: history,
+      modeChanges,
+      isBillable: server.feederBillableRule(
+        f.lastReadWellAt ? Date.parse(f.lastReadWellAt) : undefined,
+        6
+      ),
+    }
+  );
+  const settled = modeChanges.some(
+    (c) => c.from <= NOW.slice(0, 10) && c.mode === 'settled-otherwise'
+  );
+  const { display } = server.feederBalance(accrual.accrued, f.payouts, settled);
+  const periods = [...f.coveragePeriods].sort((a, b) => a.from.localeCompare(b.from));
+  return {
+    schemaVersion: 1,
+    status: f.status,
+    builtAt: NOW_MS,
+    coverageFrom: periods[0]?.from ?? null,
+    coverageTo: periods.at(-1)?.to ?? null,
+    lastReadWellAt: f.lastReadWellAt ? Date.parse(f.lastReadWellAt) : null,
+    rateHistory: history,
+    minedValueIsk: mined,
+    accruedIsk: accrual.accrued,
+    paidIsk: f.payouts.reduce((sum, p) => (p.notAPayout ? sum : sum + p.amount), 0),
+    balanceKind: display.kind,
+    balanceIsk: display.isk,
+    refineryCount: new Set(rows.map((r) => r.structureId)).size,
+    unpricedDays: 0,
+  };
 }
 
 function input(
