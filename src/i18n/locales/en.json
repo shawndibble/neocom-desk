@@ -7145,10 +7145,13 @@
       "dialogTitleNew": "Add goal",
       "nameLabel": "Name (optional)",
       "targetLabel": "Target",
-      "fittingLabel": "Or aim at a fitting",
-      "fittingNone": "No fitting",
-      "fittingHint": "Leave the target blank to aim at a fitting's sell price at {{hub}}; it follows the market.",
-      "fittingNeedsBlank": "Clear the target to pick a fitting."
+      "modeAmount": "Amount",
+      "modeFitting": "Fitting price",
+      "amountLabel": "Amount",
+      "fittingLabel": "Fitting",
+      "fittingPlaceholder": "Pick a fitting",
+      "noFittings": "No saved or in-game fittings for this character yet.",
+      "fittingHint": "The target is the fitting's sell price at {{hub}}, and it follows the market."
     },
     "journalBreakdownTitle": "Where the ISK went",
     "journalFlowHeading": "Daily flow",
