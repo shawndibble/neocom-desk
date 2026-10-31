@@ -1,6 +1,6 @@
 // The Overview and Miners tab read models (issue #5259, ADR 0032): two docs under
-// `corps/{id}/readModels`, built from the book's frozen records. The screens read them while
-// src/features/corp/taxBook/readModelSwitch.ts is on.
+// `corps/{id}/readModels`, built from the book's frozen records. The screens read them, and fall
+// back to the whole-book view while they are missing.
 //
 // They hold inputs, never time-derived figures. Overdue days, paused, standing, the
 // "Pops in 7 days" window, billable-through and the open set (unbilled, pending, unrated)
