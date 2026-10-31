@@ -530,22 +530,26 @@ export function BpcSourcingPanel({
     onAsk: setAskRow,
   });
 
-  // Item plus the visible columns, like the table itself.
+  // Every column and every badge fact, whatever the column picker shows.
   const csvColumns = useMemo(
     () =>
-      bpcSourcingCsvColumns(
-        t,
-        {
-          nameFor: (typeId) => blueprintNames.get(typeId) ?? `#${typeId}`,
-          regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
-          jumpsFor: (row) => {
-            const cell = bpcRowJumps(row);
-            return cell.kind === 'value' ? cell.count : null;
-          },
+      bpcSourcingCsvColumns(t, {
+        nameFor: (typeId) => blueprintNames.get(typeId) ?? `#${typeId}`,
+        regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
+        jumpsFor: (row) => {
+          const cell = bpcRowJumps(row);
+          return cell.kind === 'value' ? cell.count : null;
         },
-        visibleColumns
-      ),
-    [t, blueprintNames, regionNames, bpcRowJumps, visibleColumns]
+        securityFor: (row) =>
+          row.systemId == null ? null : (solarSystems?.get(row.systemId)?.security ?? null),
+        // A copy of a blueprint whose original is also on offer; originals and LP/Community rows never carry the badge.
+        bpoTooFor: (row) =>
+          row.runs !== -1 &&
+          row.source !== 'lp' &&
+          row.source !== 'community' &&
+          bpoByType.has(row.typeId),
+      }),
+    [t, blueprintNames, regionNames, bpcRowJumps, solarSystems, bpoByType]
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',

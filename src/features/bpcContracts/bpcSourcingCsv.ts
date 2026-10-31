@@ -5,6 +5,7 @@ import {
   iskPerRun,
   type BpcSearchRow,
 } from '@/engine/contracts/bpcSearch';
+import { exportFlag } from '@/lib/exportFlag';
 import { BPC_SEARCH_COLUMN_IDS, type BpcSearchColumnId } from './bpcSearchColumns';
 
 export interface BpcSourcingCsvContext {
@@ -12,6 +13,10 @@ export interface BpcSourcingCsvContext {
   regionName: (regionId: number) => string;
   /** The row's settled jump count; null while pending, unmeasurable, or unplaced. */
   jumpsFor: (row: BpcSearchRow) => number | null;
+  /** The row's solar system security, or null when it has no resolved system. */
+  securityFor: (row: BpcSearchRow) => number | null;
+  /** Whether the BPO of this row's blueprint is also on offer (the table's "BPO too" badge). */
+  bpoTooFor: (row: BpcSearchRow) => boolean;
 }
 
 /**
@@ -35,14 +40,14 @@ function regionIdOf(row: BpcSearchRow): number | null {
 }
 
 /**
- * Export columns for BPC Sourcing's table: Item, then whichever optional
- * columns the pilot has visible, in the table's order. Every figure raw; a
- * BPO's -1 runs, and every cell the table fills with "n/a", is blank.
+ * Export columns for BPC Sourcing's table: Item, then every column the table
+ * can show (whether or not the pilot has it visible), then the facts the table
+ * keeps in badges and sub-lines. Every figure raw; a BPO's -1 runs, and every
+ * cell the table fills with "n/a", is blank.
  */
 export function bpcSourcingCsvColumns(
   t: CsvTranslate,
-  context: BpcSourcingCsvContext,
-  visibleColumns: readonly BpcSearchColumnId[]
+  context: BpcSourcingCsvContext
 ): CsvColumn<BpcSearchRow>[] {
   const byId: Record<BpcSearchColumnId, CsvColumn<BpcSearchRow>> = {
     source: {
@@ -105,6 +110,55 @@ export function bpcSourcingCsvColumns(
   };
   return [
     { header: t('bpcContracts.itemColumn'), value: (row) => context.nameFor(row.typeId) },
-    ...BPC_SEARCH_COLUMN_IDS.filter((id) => visibleColumns.includes(id)).map((id) => byId[id]),
+    ...BPC_SEARCH_COLUMN_IDS.map((id) => byId[id]),
+    {
+      header: t('bpcContracts.auctionKindColumn'),
+      value: (row) => {
+        const contract = asContract(row);
+        if (!contract?.isAuction) return null;
+        return contract.buyout !== undefined
+          ? t('bpcContracts.auctionBuyout')
+          : t('bpcContracts.auctionStartingBid');
+      },
+    },
+    {
+      header: t('bpcContracts.plexAskColumn'),
+      value: (row) => asContract(row)?.requestedPlex ?? null,
+    },
+    {
+      header: t('bpcContracts.wholeContractColumn'),
+      value: (row) => {
+        const contract = asContract(row);
+        return contract ? exportFlag(t, contract.isMultiType) : null;
+      },
+    },
+    {
+      header: t('bpcContracts.lpIskColumn'),
+      value: (row) => (row.source === 'lp' ? row.iskCost : null),
+    },
+    {
+      header: t('bpcContracts.lpCostColumn'),
+      value: (row) => (row.source === 'lp' ? row.lpCost : null),
+    },
+    {
+      header: t('bpcContracts.stationColumn'),
+      value: (row) => (row.source === 'lp' ? row.stationName : null),
+    },
+    {
+      header: t('bpcContracts.securityColumn'),
+      value: (row) => context.securityFor(row),
+    },
+    {
+      header: t('bpcContracts.atTradeHubColumn'),
+      value: (row) => (row.source === 'market' ? exportFlag(t, row.atHub) : null),
+    },
+    {
+      header: t('bpcContracts.bpoTooColumn'),
+      value: (row) => exportFlag(t, context.bpoTooFor(row)),
+    },
+    {
+      header: t('bpcContracts.ownedColumn'),
+      value: (row) => exportFlag(t, row.source === 'owned'),
+    },
   ];
 }

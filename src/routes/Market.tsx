@@ -1,5 +1,14 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { named, preloadFrom } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -647,41 +656,6 @@ export function Market() {
   const sellRowCap = sellShowAll ? undefined : ROW_CAP;
   const buyRowCap = buyShowAll ? undefined : ROW_CAP;
 
-  // Every row, not the ROW_CAP the tables mount before "Show all" — hence
-  // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
-  const sellCsvColumns = useMemo(
-    () =>
-      orderBookCsvColumns(t, {
-        npcStations: npcStationMap,
-        solarSystems: solarSystemMap,
-        isBuy: false,
-      }),
-    [t, npcStationMap, solarSystemMap]
-  );
-  const buyCsvColumns = useMemo(
-    () =>
-      orderBookCsvColumns(t, {
-        npcStations: npcStationMap,
-        solarSystems: solarSystemMap,
-        isBuy: true,
-      }),
-    [t, npcStationMap, solarSystemMap]
-  );
-  const sellExport = useTableExport({
-    surface: 'market-sell',
-    rows: sortedSell,
-    columns: sellCsvColumns,
-    truncated: loadedView?.truncated ?? false,
-    source: 'sorted-rows',
-  });
-  const buyExport = useTableExport({
-    surface: 'market-buy',
-    rows: sortedBuy,
-    columns: buyCsvColumns,
-    truncated: loadedView?.truncated ?? false,
-    source: 'sorted-rows',
-  });
-
   // The order book's own width picks columns or two-line cards: a phone,
   // and a desktop whose finder column leaves the book too narrow for the
   // columns the pilot has picked and the figures on screen, both get the
@@ -701,6 +675,73 @@ export function Market() {
     () => (feeSkills ? { ...feeSkills, standing: hubStanding } : null),
     [feeSkills, hubStanding]
   );
+  // A row's distance from the Current System, for the export; the Jumps column's own rule.
+  const exportJumpsFor = useCallback(
+    (systemId: number) =>
+      jumpRangeFilter.jumpsStatus === 'ready'
+        ? (jumpRangeFilter.jumps?.get(systemId) ?? null)
+        : null,
+    [jumpRangeFilter]
+  );
+  // Every row, not the ROW_CAP the tables mount before "Show all" — hence
+  // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
+  const sellCsvColumns = useMemo(
+    () =>
+      orderBookCsvColumns(t, {
+        npcStations: npcStationMap,
+        solarSystems: solarSystemMap,
+        isBuy: false,
+        jumpsFor: exportJumpsFor,
+        feeContext: feeContext,
+        myOrderIds,
+        best: loadedView?.summary.bestSell ?? null,
+      }),
+    [
+      t,
+      npcStationMap,
+      solarSystemMap,
+      exportJumpsFor,
+      feeContext,
+      myOrderIds,
+      loadedView?.summary.bestSell,
+    ]
+  );
+  const buyCsvColumns = useMemo(
+    () =>
+      orderBookCsvColumns(t, {
+        npcStations: npcStationMap,
+        solarSystems: solarSystemMap,
+        isBuy: true,
+        jumpsFor: exportJumpsFor,
+        feeContext: feeContext,
+        myOrderIds,
+        best: loadedView?.summary.bestBuy ?? null,
+      }),
+    [
+      t,
+      npcStationMap,
+      solarSystemMap,
+      exportJumpsFor,
+      feeContext,
+      myOrderIds,
+      loadedView?.summary.bestBuy,
+    ]
+  );
+  const sellExport = useTableExport({
+    surface: 'market-sell',
+    rows: sortedSell,
+    columns: sellCsvColumns,
+    truncated: loadedView?.truncated ?? false,
+    source: 'sorted-rows',
+  });
+  const buyExport = useTableExport({
+    surface: 'market-buy',
+    rows: sortedBuy,
+    columns: buyCsvColumns,
+    truncated: loadedView?.truncated ?? false,
+    source: 'sorted-rows',
+  });
+
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const withholding = { hideLocation: singleStationBook, feeContext };
   // A held-back column can't be ticked, so the picker doesn't offer it.
