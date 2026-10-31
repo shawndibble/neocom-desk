@@ -91,6 +91,8 @@ export function EmploymentSummaryChips({
       {longest && (
         <StatChip
           label={t('employmentHistory.summary.longest')}
+          // A corporation name can outgrow a phone; the timeline below has it in full.
+          truncate
           value={
             <>
               {formatTenure(longest.seconds)}{' '}

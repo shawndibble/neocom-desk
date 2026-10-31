@@ -20,6 +20,13 @@ interface StatChipProps {
   testId?: string;
   /** The one figure a group leads with: larger and full-strength text; the rest stay body weight. */
   emphasis?: boolean;
+  /**
+   * For a value holding free text (a corporation name) that can outgrow a
+   * phone: the chip caps at its row's width and the value ends in an ellipsis
+   * instead of pushing the page sideways. Put the part that must stay whole
+   * first, since the cut falls at the end.
+   */
+  truncate?: boolean;
 }
 
 /**
@@ -37,6 +44,7 @@ export function StatChip({
   tooltipGlyph,
   testId,
   emphasis = false,
+  truncate = false,
 }: StatChipProps) {
   const { t } = useTranslation();
   return (
@@ -47,7 +55,7 @@ export function StatChip({
       // squeezes it until the label wraps under the value. `shrink-0` +
       // `whitespace-nowrap` make the chip indivisible, so a wrapping strip
       // moves the whole chip to the next line instead.
-      className={`inline-flex h-7 shrink-0 items-center gap-1.5 text-[0.6875rem] whitespace-nowrap ${className}`}
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 text-[0.6875rem] whitespace-nowrap ${truncate ? 'max-w-full' : ''} ${className}`}
     >
       <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
       {tooltip && (
@@ -58,7 +66,7 @@ export function StatChip({
         />
       )}
       <span
-        className={`tabular-nums ${emphasis ? 'text-sm font-semibold' : 'font-medium'} ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}
+        className={`tabular-nums ${emphasis ? 'text-sm font-semibold' : 'font-medium'} ${truncate ? 'min-w-0 truncate' : ''} ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}
       >
         {value}
       </span>
