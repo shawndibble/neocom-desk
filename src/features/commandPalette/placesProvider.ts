@@ -48,6 +48,9 @@ interface PlaceRow {
   kind: 'station' | 'structure';
 }
 
+/** Stations and structures need a query this long, so a short word lists systems only. */
+const STATION_MIN_QUERY_LENGTH = 4;
+
 export function createPlacesProvider(options: PlacesProviderOptions): PaletteProvider {
   return {
     id: 'places',
@@ -56,11 +59,20 @@ export function createPlacesProvider(options: PlacesProviderOptions): PalettePro
     minQueryLength: 2,
     async search(query) {
       const nicknames = options.nicknames();
-      const [systems, found, nicknamed] = await Promise.all([
+      const wantStations = query.trim().length >= STATION_MIN_QUERY_LENGTH;
+      const [systems, searched, nicknamed] = await Promise.all([
         options.loadSystems(),
-        options.searchPlaces(query, GROUP_LIMIT),
+        wantStations ? options.searchPlaces(query, GROUP_LIMIT) : Promise.resolve([]),
         resolveNicknamed(query, nicknames, options),
       ]);
+      // An NPC station's name starts with its system's, so a broad word would
+      // bury the systems under dozens of stations that merely mention it: only a
+      // name the query is the start of counts. The few structures this device
+      // knows are the pilot's own, so any word of their name finds them.
+      const prefix = query.trim().toLowerCase();
+      const found = searched.filter(
+        (place) => place.kind === 'structure' || place.name.toLowerCase().startsWith(prefix)
+      );
       const systemById = new Map(systems.map((system) => [system.id, system]));
 
       // One row per location id: a nickname hit and a name hit are the same place.
@@ -105,13 +117,7 @@ export function createPlacesProvider(options: PlacesProviderOptions): PalettePro
           run: () => options.setWaypoint(place.id, place.name),
         },
       }));
-      // Systems first when the query names one exactly; otherwise stations lead
-      // (a station name contains its system's, so they would always bury it).
-      const exact =
-        systemResults.length > 0 && systemResults[0].label.toLowerCase() === query.toLowerCase();
-      return (
-        exact ? [...systemResults, ...placeResults] : [...placeResults, ...systemResults]
-      ).slice(0, GROUP_LIMIT);
+      return [...systemResults, ...placeResults].slice(0, GROUP_LIMIT);
     },
   };
 }

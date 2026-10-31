@@ -14434,7 +14434,6 @@
     "resultsLabel": "Results",
     "noResults": "Nothing matches.",
     "loadingGroup": "Searching…",
-    "groupCapped": "Top {{count}} shown. Keep typing to narrow.",
     "groupError": "Couldn't load these results.",
     "itemSearchNeedsDownload": "Item search needs a one-time download — connect once.",
     "resultsCount_one": "{{count}} result",

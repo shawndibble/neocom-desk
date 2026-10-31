@@ -328,8 +328,14 @@ describe('CommandPalette', () => {
     const names = groups.map((id) => document.getElementById(id!)!.textContent);
     expect(names).toEqual(['Pages', 'Commands']);
 
-    const pageOptions = within(screen.getByRole('group', { name: 'Pages' })).getAllByRole('option');
-    for (let i = 0; i < pageOptions.length; i++) await user.keyboard('{ArrowDown}');
+    const pagesGroup = () => within(screen.getByRole('group', { name: 'Pages' }));
+    // Two sections match, so Pages starts at three rows; arrowing past them opens the rest.
+    expect(pagesGroup().getAllByRole('option')).toHaveLength(3);
+    for (let i = 0; i < 3; i++) await user.keyboard('{ArrowDown}');
+    const pageOptions = pagesGroup().getAllByRole('option');
+    expect(pageOptions.length).toBeGreaterThan(3);
+    expect(pageOptions[3]).toHaveAttribute('aria-selected', 'true');
+    for (let i = 3; i < pageOptions.length; i++) await user.keyboard('{ArrowDown}');
     const command = within(screen.getByRole('group', { name: 'Commands' })).getAllByRole(
       'option'
     )[0];
@@ -440,15 +446,29 @@ describe('CommandPalette', () => {
     ).toBeInTheDocument();
   });
 
-  it('hides the capped note from the listbox and announces it in the status region', async () => {
+  it('shows a count in each section header and no footer note, and announces results', async () => {
     const user = userEvent.setup();
     renderShell();
     await user.keyboard('{Control>}k{/Control}');
-    await user.type(await screen.findByRole('combobox'), 'a');
+    await user.type(await screen.findByRole('combobox'), 'settings');
 
-    const note = await screen.findByText(/keep typing to narrow/i, { selector: 'div' });
-    expect(note).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText(/results?\. Top \d+ shown/i)).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByText(/keep typing to narrow/i)).not.toBeInTheDocument();
+    const heading = document.getElementById(
+      screen.getByRole('group', { name: 'Pages' }).getAttribute('aria-labelledby')!
+    )!;
+    expect(heading.parentElement).toHaveTextContent(/^Pages\d+\+?$/);
+    expect(screen.getByRole('status')).toHaveTextContent(/\d+ results?/);
+  });
+
+  it('keeps the search field outside the scrolling results', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.keyboard('{Control>}k{/Control}');
+    const input = await screen.findByRole('combobox');
+    await user.type(input, 'settings');
+    const list = screen.getByRole('listbox');
+    expect(list).toHaveClass('overflow-y-auto');
+    expect(list).not.toContainElement(input);
   });
 
   it('opens Item Detail over the current page and hands focus back on close', async () => {
