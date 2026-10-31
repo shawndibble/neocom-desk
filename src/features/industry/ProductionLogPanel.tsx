@@ -43,6 +43,15 @@ import { summarizeProductionRun, type ProductionRunSummary } from './productionR
 import { productionLogItemsCsvColumns, productionLogRunsCsvColumns } from './productionRunsCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import { ProductionColumnPicker } from './ProductionColumnPicker';
+import {
+  PRODUCTION_LOG_ITEM_COLUMN_IDS,
+  PRODUCTION_LOG_RUN_COLUMN_IDS,
+  shownProductionColumns,
+  useVisibleProductionLogItemColumns,
+  useVisibleProductionLogRunColumns,
+} from './productionColumnVisibility';
 import {
   loggedAtColumn,
   quantityColumn,
@@ -326,6 +335,14 @@ export function ProductionLogPanel({
   // The per-run ledger folds away by default: "By item" is the read that
   // says what is making money, the run list is the audit trail behind it.
   const [runsExpanded, setRunsExpanded] = useState(false);
+  const itemColumnsShown = useColumnVisibility(
+    useVisibleProductionLogItemColumns,
+    PRODUCTION_LOG_ITEM_COLUMN_IDS
+  );
+  const runColumnsShown = useColumnVisibility(
+    useVisibleProductionLogRunColumns,
+    PRODUCTION_LOG_RUN_COLUMN_IDS
+  );
 
   const { runs, saleLinks, orderWatches, losses } = useProductionLedger(characterId);
 
@@ -531,6 +548,16 @@ export function ProductionLogPanel({
   } = rollup;
 
   const runColumns = [...baseRunColumns, soldActionsColumn(sale, runLoss)];
+  const shownItemColumns = shownProductionColumns(
+    columns,
+    PRODUCTION_LOG_ITEM_COLUMN_IDS,
+    itemColumnsShown.isVisible
+  );
+  const shownRunColumns = shownProductionColumns(
+    runColumns,
+    PRODUCTION_LOG_RUN_COLUMN_IDS,
+    runColumnsShown.isVisible
+  );
 
   return (
     <Panel
@@ -614,11 +641,18 @@ export function ProductionLogPanel({
             <div>
               <div className="flex items-center justify-between gap-2 border-b border-line pb-1">
                 <h3 className={eyebrowClassName}>{t('industry.byItem')}</h3>
-                <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
+                <span className="flex items-center gap-2">
+                  <TableActionsMenu name={t('industry.byItem')} tableExport={itemsExport} />
+                  <ProductionColumnPicker
+                    store={useVisibleProductionLogItemColumns}
+                    ids={PRODUCTION_LOG_ITEM_COLUMN_IDS}
+                    columns={columns}
+                  />
+                </span>
               </div>
               <DataTable
                 {...itemsExport.tableProps}
-                columns={columns}
+                columns={shownItemColumns}
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
                 label={t('industry.byItem')}
@@ -633,7 +667,17 @@ export function ProductionLogPanel({
               title={t('industry.allProductionRuns')}
               meta={<span className="text-xs tabular-nums text-text-dim">{runRows.length}</span>}
               actions={
-                <TableActionsMenu name={t('industry.allProductionRuns')} tableExport={runsExport} />
+                <span className="flex items-center gap-2">
+                  <TableActionsMenu
+                    name={t('industry.allProductionRuns')}
+                    tableExport={runsExport}
+                  />
+                  <ProductionColumnPicker
+                    store={useVisibleProductionLogRunColumns}
+                    ids={PRODUCTION_LOG_RUN_COLUMN_IDS}
+                    columns={runColumns}
+                  />
+                </span>
               }
               expanded={runsExpanded}
               onToggle={() => setRunsExpanded((open) => !open)}
@@ -646,7 +690,7 @@ export function ProductionLogPanel({
               <div className="overflow-x-auto">
                 <DataTable
                   {...runsExport.tableProps}
-                  columns={runColumns}
+                  columns={shownRunColumns}
                   rows={runRows}
                   rowKey={(r) => r.run.id}
                   label={t('industry.allProductionRuns')}

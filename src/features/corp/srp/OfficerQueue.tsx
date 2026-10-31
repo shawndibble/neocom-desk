@@ -419,6 +419,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 onRowClick={(row) => setOpenId(row.killmailId)}
                 selectedRowKey={openId}
                 stackLayout={phone ? 'dense' : 'labelled'}
+                mobileSort
                 // Phone: tick box, title, amount and ⋮ share line one (Hauling's card).
                 className="dt-dense-tight"
                 rowContextMenu={
