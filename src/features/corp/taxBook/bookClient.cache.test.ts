@@ -37,6 +37,7 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
 import { db } from '@/db';
+import { READ_MODELS_SCHEMA } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { clearBookCache } from './bookCache';
 import { mergeBookData, readBookData, readBookState, readRebills } from './bookClient';
 
@@ -57,7 +58,10 @@ const COLLECTIONS = [
   'readModels',
 ];
 // The Overview and Miners tab docs (#5259), read with every book under their own stamp.
-const MODELS = { minerList: { schema: 1, miners: [] }, overview: { schema: 1 } };
+const MODELS = {
+  minerList: { schema: READ_MODELS_SCHEMA, miners: [] },
+  overview: { schema: READ_MODELS_SCHEMA },
+};
 const MODEL_DOCS = [`${BOOK}/readModels/minerList`, `${BOOK}/readModels/overview`];
 
 function stamped(overrides: Record<string, string> = {}): Data {
@@ -329,10 +333,12 @@ describe('readBookData and the Overview/Miners read models (#5259)', () => {
   });
 
   it('opens the book without them, wiping nothing, when the rules refuse the docs', async () => {
-    store.denied.add(MODEL_DOCS[0]!);
-    store.denied.add(MODEL_DOCS[1]!);
     await readBookData(7, CORP);
     clearBookCache();
+    store.denied.add(MODEL_DOCS[0]!);
+    store.denied.add(MODEL_DOCS[1]!);
+    // A moved stamp, so the held copy is not served and the refused docs are read.
+    store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
 
     const data = await readBookData(7, CORP);
     expect(data?.readModels).toBeUndefined();
