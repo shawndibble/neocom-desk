@@ -13068,6 +13068,20 @@
       "errorHint": "Try again, or reload the page."
     },
     "orders": {
+      "slots": {
+        "label": "Order slots",
+        "value": "{{label}} {{used}} / {{max}}",
+        "tooltip": "Open orders against the most you can keep open: {{detail}}.",
+        "base": "{{count}} base",
+        "skill": "{{name}} {{level}} adds {{count}}",
+        "skillName": {
+          "3443": "Trade",
+          "3444": "Retail",
+          "16596": "Wholesale",
+          "18580": "Tycoon"
+        },
+        "unavailable": "Order slots are hidden: this Character's skills have not loaded, or the skills scope is not granted."
+      },
       "corp": {
         "issuedBy": "Issued by",
         "reauthTitle": "Corp orders need a new grant",
