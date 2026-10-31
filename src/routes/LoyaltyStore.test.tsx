@@ -677,6 +677,20 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
     expect(screen.getByText('5,800,000')).toBeInTheDocument();
   });
 
+  it('says when a sale counts at recent trades, not the listing far above them', async () => {
+    mockRows([
+      { ...ITEM_ROW, revenueCheck: { price: 17_300_000, listed: 1_000_000_000, capped: true } },
+    ]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText('Scourge Fury Heavy Missile').closest('tr')!);
+
+    expect(screen.getByText(/Counted at recent trades/)).toHaveTextContent(
+      'Counted at recent trades, 17,300,000 ISK each: the cheapest listing asks 1,000,000,000 ISK'
+    );
+  });
+
   it('shows no Required items line for an offer with none', async () => {
     mockRows([ITEM_ROW]);
     const user = userEvent.setup();

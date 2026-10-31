@@ -252,6 +252,19 @@ export function OfferDetail({
             {profit.revenue === null ? '—' : formatIsk(profit.revenue)}
           </dd>
         </div>
+        {row.revenueCheck?.capped && !walked?.output.moved && (
+          <div className="text-right text-[0.6875rem] text-warning">
+            {t(
+              priceBasis === 'buy'
+                ? 'loyaltyStore.revenueCappedBuy'
+                : 'loyaltyStore.revenueCappedSell',
+              {
+                price: formatIsk(row.revenueCheck.price),
+                listed: formatIsk(row.revenueCheck.listed),
+              }
+            )}
+          </div>
+        )}
         {walked && walked.output.unsold > 0 && (
           <div className="text-right text-[0.6875rem] text-warning">
             {t('loyaltyStore.unsoldUnits', { count: walked.output.unsold })}
