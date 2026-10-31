@@ -8426,7 +8426,9 @@
       "unpinned": "Pin to top",
       "character": "Pinned for this character",
       "account": "Pinned for all characters",
-      "ariaLabel": "Pin toggle for {{station}}: {{state}}"
+      "pinCharacter": "Pin for this character",
+      "pinAccount": "Pin for all characters",
+      "unpin": "Unpin"
     },
     "jumpsAway": {
       "value_one": "{{count}} jump",
