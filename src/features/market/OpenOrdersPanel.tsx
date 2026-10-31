@@ -355,25 +355,12 @@ export function OpenOrdersPanel({
     [fixList.matching, sortColumn, tableSort]
   );
 
-  // Every row the funnel matched, whichever segment shows, exported as the ESI
-  // orders behind them — hence `source: 'rows'`.
-  const csvRows = useMemo(
-    () => sortedRows.filter((row) => ordersByOrderId.has(row.orderId)),
-    [sortedRows, ordersByOrderId]
-  );
-  const csvColumns = useMemo<CsvColumn<OpenOrderRow>[]>(
-    () =>
-      ordersCsvColumns(t, (typeId) => snapshot?.typeNames.get(typeId) ?? `Type #${typeId}`).map(
-        (column) => ({
-          header: column.header,
-          value: (row) => column.value(ordersByOrderId.get(row.orderId)!),
-        })
-      ),
-    [t, snapshot, ordersByOrderId]
-  );
+  // Every row the funnel matched, whichever segment shows, with every fact
+  // the fix list holds (`OpenOrderRow`), not only the raw ESI order.
+  const csvColumns = useMemo<CsvColumn<OpenOrderRow>[]>(() => ordersCsvColumns(t), [t]);
   const ordersExport = useTableExport({
     surface: 'orders-open',
-    rows: csvRows,
+    rows: sortedRows,
     columns: csvColumns,
     source: 'rows',
   });
