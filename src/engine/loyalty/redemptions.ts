@@ -16,6 +16,7 @@ import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import type { SkillLevels } from '@/engine/industry/types';
 import { walkSellIntoBuys, type ReachableBuyOrder } from '@/engine/market/buyReach';
 import type { HubOrder } from '@/engine/market/haulingMarket';
+import { capListedPrice } from '@/engine/market/tradedPriceCheck';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { loyaltyOfferProfit, type LoyaltyOfferProfit } from './offerProfit';
 
@@ -40,6 +41,8 @@ export interface RedemptionsInput {
   outputBasis: 'order' | 'instant';
   /** Buy orders that reach the station; undefined while the book is loading. */
   buyOrders: readonly ReachableBuyOrder[] | undefined;
+  /** The output's **Traded Price Ceiling**: a bid far above it counts at it (margin-trading bait). */
+  outputPriceCeiling?: number | null;
   liquidationBasis: LiquidationBasis;
   skills: SkillLevels;
   standing?: ResolvedStandings;
@@ -114,7 +117,15 @@ function priceOutput(input: RedemptionsInput): RedemptionsOutput {
   };
   if (input.outputBasis !== 'instant' || input.buyOrders === undefined) return atTop;
   if (units === 0) return atTop;
-  const walk = walkSellIntoBuys(input.buyOrders, units);
+  const ceiling = input.outputPriceCeiling ?? null;
+  const bids =
+    ceiling === null
+      ? input.buyOrders
+      : input.buyOrders.map((order) => ({
+          ...order,
+          price: capListedPrice(order.price, ceiling).price,
+        }));
+  const walk = walkSellIntoBuys(bids, units);
   return {
     units,
     filled: walk.filled,

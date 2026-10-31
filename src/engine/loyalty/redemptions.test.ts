@@ -76,6 +76,19 @@ describe('priceRedemptions', () => {
     expect(r.output.unsold).toBe(0);
   });
 
+  it('counts a bid far above recent trades at the trades', () => {
+    const r = priceRedemptions(
+      input({
+        outputBasis: 'instant',
+        liquidationBasis: 'instant',
+        buyOrders: [bid(900_000, 2), bid(4000, 100)],
+        outputPriceCeiling: 5000,
+      })
+    );
+    // 2 @ the 5000 ceiling (bid 900k is bait) + 8 @ 4000
+    expect(r.output.revenue).toBe(42000);
+  });
+
   it('states output units the buy book cannot take', () => {
     const r = priceRedemptions(
       input({ outputBasis: 'instant', liquidationBasis: 'instant', buyOrders: [bid(5000, 4)] })

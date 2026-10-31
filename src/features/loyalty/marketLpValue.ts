@@ -14,6 +14,7 @@ import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { loadMarketSnapshots, type MarketSnapshot } from '@/features/industry/marketData';
 import type { TradeHub } from '@/market/hubs';
+import { loadHaulingDemand, type HaulingDemand } from '@/features/market/haulingDemand';
 import { computeLoyaltyOfferRows, offerPriceTypeIds } from './offerRows';
 import { loadLoyaltyStoreOffers } from './store';
 
@@ -24,7 +25,8 @@ const remembered = new Map<string, { at: number; value: Promise<number | null> }
 function valueOf(
   offers: readonly LoyaltyStoreOffer[],
   catalog: BlueprintCatalog,
-  snapshot: MarketSnapshot
+  snapshot: MarketSnapshot,
+  demand: HaulingDemand | null
 ): number | null {
   const rows = computeLoyaltyOfferRows({
     offers,
@@ -36,6 +38,7 @@ function valueOf(
     materialSourcing: undefined,
     liquidationBasis: 'order',
     playerLp: 0,
+    tradedPrices: demand?.types,
   });
   return marketLpValue(
     rows.map((row) => {
@@ -60,8 +63,9 @@ async function computeMany(
   hub: TradeHub,
   held: HeldLpOffers | undefined
 ): Promise<Map<number, number | null>> {
-  const [catalog, offersByCorp] = await Promise.all([
+  const [catalog, demand, offersByCorp] = await Promise.all([
     loadBlueprintCatalog(),
+    loadHaulingDemand(hub.regionId),
     Promise.all(
       corporationIds.map(
         async (id) => held?.get(id) ?? (await loadLoyaltyStoreOffers(id))?.data ?? []
@@ -77,7 +81,7 @@ async function computeMany(
   const values = new Map<number, number | null>(corporationIds.map((id) => [id, null]));
   await Promise.all(
     priced.map(async (store, i) => {
-      values.set(store.id, valueOf(store.offers, catalog, await snapshots[i]!));
+      values.set(store.id, valueOf(store.offers, catalog, await snapshots[i]!, demand));
     })
   );
   return values;

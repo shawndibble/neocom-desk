@@ -120,6 +120,7 @@ export function useRedemptionPricing({
       sellBooks,
       outputBasis: instant ? 'instant' : 'order',
       buyOrders,
+      outputPriceCeiling: row.revenueCheck?.ceiling ?? null,
       liquidationBasis: instant ? 'instant' : 'order',
       skills,
       standing,
