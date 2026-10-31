@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { StationHeading } from './StationHeading';
 import { PlaceName } from './PlaceName';
 import { usePlaceNicknames, usePlaceNicknameMap } from './placeNicknames';
+import { RENAME_PLACE_STATE } from './renamePlaceState';
 
 const STRUCTURE_ID = 1_040_000_000_001;
 const REAL = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
@@ -33,7 +35,11 @@ beforeEach(async () => {
 
 describe('StationHeading', () => {
   it('shows the real name until a nickname is set, then both; clearing restores it', async () => {
-    render(<Harness />);
+    render(
+      <MemoryRouter>
+        <Harness />
+      </MemoryRouter>
+    );
     expect(screen.getByRole('heading', { name: REAL })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: `Rename ${REAL}` }));
@@ -56,5 +62,14 @@ describe('StationHeading', () => {
     fireEvent.keyDown(again, { key: 'Enter' });
     expect(await screen.findByRole('heading', { name: REAL })).toBeVisible();
     expect(screen.queryByText('Home market')).not.toBeInTheDocument();
+  });
+
+  it('opens the nickname field on arrival from the row menu Rename', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/assets', state: RENAME_PLACE_STATE }]}>
+        <Harness />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('textbox', { name: 'Place nickname' })).toBeVisible();
   });
 });
