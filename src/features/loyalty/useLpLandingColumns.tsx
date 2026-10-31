@@ -278,7 +278,9 @@ export function useLpLandingOfferColumns({
               {t('loyaltyStore.landing.turnInsNone')}
             </span>
           ) : (
+            // desktopOnly: no tap-reveal, so a click here opens the store like the rest of the row.
             <HintText
+              desktopOnly
               content={row.requiredItems
                 .map((line) => `${formatCount(line.quantity)} × ${line.name}`)
                 .join(', ')}
