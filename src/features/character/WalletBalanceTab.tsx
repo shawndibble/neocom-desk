@@ -219,7 +219,7 @@ export function WalletBalanceTab({
         />
       )}
 
-      <CashFlowPanel characters={scopeCharacters} />
+      <CashFlowPanel key={scopeIds.join(',')} characters={scopeCharacters} />
       <WalletWaitingGoal characterIds={scopeIds} />
     </div>
   );

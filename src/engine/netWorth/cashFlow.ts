@@ -20,10 +20,29 @@ export interface CashFlow {
   days: JournalDayFlow[];
   /** Earned in the window just before this one; null when the history does not reach back that far. */
   earnedBefore: number | null;
-  /** The oldest journal day held, or null with no lines. */
+  /** The newest of each Character's oldest journal day (see `coveredFromAll`), or null with no lines. */
   coveredFrom: string | null;
   /** The history starts inside the window, so the figures undercount. */
   partial: boolean;
+}
+
+/**
+ * The newest "oldest day held" over the Characters in `rows`: a period counts
+ * as covered only when every Character's history reaches back to it. Rows
+ * without a `characterId` are one group.
+ */
+function coveredFromAll(rows: readonly JournalRow[]): string | null {
+  const oldest = new Map<number | undefined, string>();
+  for (const row of rows) {
+    const at = parseInstant(row.date);
+    if (at === null) continue;
+    const day = utcDay(at);
+    const held = oldest.get(row.characterId);
+    if (held === undefined || day < held) oldest.set(row.characterId, day);
+  }
+  let newest: string | null = null;
+  for (const day of oldest.values()) if (newest === null || day > newest) newest = day;
+  return newest;
 }
 
 export function cashFlow(
@@ -36,13 +55,7 @@ export function cashFlow(
   const earned = days.reduce((sum, day) => sum + day.in, 0);
   const spent = days.reduce((sum, day) => sum + day.out, 0);
 
-  let coveredFrom: string | null = null;
-  for (const row of rows) {
-    const at = parseInstant(row.date);
-    if (at === null) continue;
-    const day = utcDay(at);
-    if (coveredFrom === null || day < coveredFrom) coveredFrom = day;
-  }
+  const coveredFrom = coveredFromAll(rows);
 
   const beforeFrom = shiftUtcDate(from, -length);
   const earnedBefore =

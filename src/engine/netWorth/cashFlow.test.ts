@@ -49,6 +49,18 @@ describe('cashFlow', () => {
     expect(flow.coveredFrom).toBe('2026-10-26');
   });
 
+  it('judges coverage by the Character whose history is shortest', () => {
+    const rows = [
+      line('2026-08-01', 10, { characterId: 1 }),
+      line('2026-10-28', 10, { characterId: 1 }),
+      line('2026-10-25', 10, { characterId: 2 }),
+    ];
+    const flow = cashFlow(rows, 30, '2026-10-31');
+    expect(flow.coveredFrom).toBe('2026-10-25');
+    expect(flow.partial).toBe(true);
+    expect(flow.earnedBefore).toBeNull();
+  });
+
   it('is all zeros, not partial-flagged, with no lines at all', () => {
     expect(cashFlow([], 30, '2026-10-31')).toMatchObject({
       earned: 0,
