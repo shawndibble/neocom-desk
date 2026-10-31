@@ -1,25 +1,8 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import { activityI18nKey, isCompletingSoon, isJobDone, type ActiveJob } from './jobs';
+import type { JobRow } from './activeJobColumns';
+import { activityI18nKey, isCompletingSoon, isJobDone } from './jobs';
 import { isLoggableHistoryJob, type HistoryJobState } from './jobHistory';
 
-/** An `ActiveJob` plus the Character and owner the panel tags each row with (`JobRow`). */
-export type JobCsvRow = ActiveJob & {
-  characterName?: string;
-  owner?: 'personal' | 'corporation';
-};
-
-/**
- * CSV columns for the active-jobs list: activity, blueprint, blueprint type
- * id, runs, start, end, cost, status. Dates and numbers pass through raw —
- * the panel's localized/formatted renderings (duration countdown, locale
- * date string, progress percent) are display-only and never leak into the
- * export. `cost` is blank (not 0, not a placeholder string) when the job has
- * none, matching ESI's optional field; an actual 0 cost stays 0 (`??`, not
- * `||`).
- *
- * Typed on `ActiveJob`, the structural subset the panel renders, so the same
- * export serves both a Character's jobs and its corporation's (issue #298).
- */
 const OWNER_KEY = {
   personal: 'industry.csvJobOwnerPersonal',
   corporation: 'industry.csvJobOwnerCorporation',
@@ -32,11 +15,17 @@ export interface JobsCsvOptions {
   now?: () => number;
 }
 
+/**
+ * CSV columns for the jobs lists: the job's own fields (dates and numbers
+ * raw, never the panel's formatted renderings), ESI's status beside the
+ * clock-derived State, and the installer and owner each row is tagged with.
+ * `cost` is blank when ESI sent none; a real 0 stays 0.
+ */
 export function jobsCsvColumns(
   t: CsvTranslate,
   nameFor: (blueprintTypeId: number) => string,
   { delivered = false, now = Date.now }: JobsCsvOptions = {}
-): CsvColumn<JobCsvRow>[] {
+): CsvColumn<JobRow>[] {
   return [
     {
       header: t('industry.csvJobActivity'),
@@ -76,7 +65,7 @@ export function jobsCsvColumns(
           {
             // The table's Done / Completing soon pill, derived from the clock, beside ESI's own status.
             header: t('industry.csvJobState'),
-            value: (job: JobCsvRow) => {
+            value: (job: JobRow) => {
               const at = now();
               if (isJobDone(job, at)) return t('industry.jobsDone');
               return isCompletingSoon(job, at) ? t('industry.jobsCompletingSoon') : null;
@@ -88,7 +77,7 @@ export function jobsCsvColumns(
       value: (job) => (job.product_type_id != null ? nameFor(job.product_type_id) : null),
     },
     {
-      // The installer for a corp job.
+      // The Character the job belongs to; for a corporation job, its installer.
       header: t('industry.csvCharacter'),
       value: (job) => job.characterName || null,
     },
@@ -109,7 +98,7 @@ export function jobHistoryCsvColumns(
   nameFor: (blueprintTypeId: number) => string,
   states: ReadonlyMap<number, HistoryJobState>,
   dismissedJobIds: ReadonlySet<number>
-): CsvColumn<JobCsvRow>[] {
+): CsvColumn<JobRow>[] {
   return [
     ...jobsCsvColumns(t, nameFor, { delivered: true }),
     {

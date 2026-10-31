@@ -163,8 +163,8 @@ export function BuildPlanCompare({
     return byPlan;
   }, [pricedPlans, catalog]);
   // The export holds the hub columns even while the picker hides them, so both
-  // reads run once any plan has resolved: one Fuzzwork call per hub, and ESI
-  // history reads the cache holds to the daily rollover.
+  // reads run once a plan has resolved: one Fuzzwork call per hub, and one ESI
+  // history read per product (cached until the daily rollover).
   const anyResolved = rows.some((row) => !row.loading);
   const wantHub = anyResolved || showBookColumns;
   const hubOrders = useHubOrderCounts([...targets.values()], wantHub);

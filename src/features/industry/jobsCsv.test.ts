@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '@/lib/csv';
-import type { IndustryJob } from '@/esi/endpoints';
+import type { JobRow } from './activeJobColumns';
 import { jobHistoryCsvColumns, jobsCsvColumns } from './jobsCsv';
 
 const t = (k: string) => k;
 const nameFor = (typeID: number) => `Item ${typeID}`;
 
-function job(overrides: Partial<IndustryJob> = {}): IndustryJob {
+function job(overrides: Partial<JobRow> = {}): JobRow {
   return {
+    characterId: 1,
+    characterName: '',
+    owner: 'personal',
     job_id: 1,
     activity_id: 1,
     blueprint_type_id: 100,
-    facility_id: 60003760,
-    station_id: 60003760,
     runs: 5,
     start_date: '2026-08-29T12:00:00Z',
     end_date: '2026-08-30T12:00:00Z',
@@ -135,9 +136,13 @@ describe('jobsCsvColumns character and owner', () => {
     ]);
   });
 
-  it('leaves them blank on a bare job', () => {
+  it('leaves product and installer blank on a bare job', () => {
     const columns = jobsCsvColumns(t, nameFor);
-    expect(columns.slice(9).map((c) => c.value(job()))).toEqual([null, null, null]);
+    expect(columns.slice(9).map((c) => c.value(job()))).toEqual([
+      null,
+      null,
+      'industry.csvJobOwnerPersonal',
+    ]);
   });
 });
 

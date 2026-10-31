@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { toCsv } from '@/lib/csv';
 import type { DisplayRow } from './groupRows';
-import { expandCombinedRows, taxCsvColumns, type TaxCsvContext } from './taxCsv';
+import { taxCsvColumns, type TaxCsvContext } from './taxCsv';
 
 const t = (k: string) => k;
 
@@ -73,7 +73,7 @@ describe('taxCsvColumns', () => {
       0.4,
       'Corp Tax',
       'Athanor',
-      'Veldspar 500',
+      'Veldspar × 500',
       1234567.5,
       123456.75,
       'miningTax.status.outstanding',
@@ -93,29 +93,5 @@ describe('taxCsvColumns', () => {
     expect(csv.split('\r\n')[1]).toBe(
       '"Miner One","2026-09-04","Jita",0.4,"Corp Tax",,,1234567.5,,"miningTax.status.unassigned",,,"common.exportFlagNo",,'
     );
-  });
-});
-
-describe('expandCombinedRows', () => {
-  const member = (id: string, date: string, status: string) => ({
-    row: { characterName: 'Miner One', entry: { date, solarSystemId: 1 } },
-    assignment: { id, groupId: 'g1', status, taxOwed: 10, oreLines: [] },
-  });
-
-  it('turns a combined row into one row per member day, keeping ordinary rows', () => {
-    const first = member('a', '2026-09-04', 'outstanding');
-    const second = member('b', '2026-09-05', 'paid');
-    const combined = displayRow({
-      key: 'a',
-      row: first.row,
-      assignment: first.assignment,
-      groupMembers: [second],
-    } as unknown as Partial<DisplayRow>);
-    const plain = displayRow({ key: 'z' });
-    const out = expandCombinedRows([combined, plain]);
-    expect(out.map((r) => r.key)).toEqual(['a', 'b', 'z']);
-    expect(out[0].groupMembers).toBeUndefined();
-    expect(out[1].status).toBe('paid');
-    expect(out[1].row.entry.date).toBe('2026-09-05');
   });
 });

@@ -5,11 +5,11 @@ import type { RosterRow } from './CorpRoster';
 import { rolesText } from './roles';
 
 /**
- * CSV columns for the corp members roster export (issue #421): member, last
- * seen, ship, location, joined, roles — the table's own columns, in the table's own
- * order, plus the CEO / you / dark tags the member cell carries. `lastSeenMs`/`startMs` pass through as epoch ms rather than the
- * table's localized span/date string: the export is data, not a screenshot
- * of the rendering.
+ * CSV columns for the corp members roster export: member, last seen, ship,
+ * location, joined and roles in the table's order, plus the CEO, you and dark
+ * tags the member cell carries. `lastSeenMs`/`startMs` pass through as epoch
+ * ms rather than the table's localized strings: the export is data, not a
+ * screenshot of the rendering.
  *
  * The member column reuses the table's own `label()` — `characterId` is
  * never null, so it always degrades to `#id` rather than `label()`'s DASH

@@ -1,17 +1,16 @@
 /**
- * Export columns for the Corp assets ledger's two tables. Every column the
- * table can offer, whatever the picker hides, plus the facts the screen keeps
- * in the expanded row (the by-item view's stacks) or the group header (the
- * by-location view's totals).
+ * Export columns for the Corp assets ledger's two tables: every column the
+ * table can offer, plus what the screen keeps in the expanded row (stacks) or
+ * the group header (location totals).
  *
- * The by-item file stays one row per item type, so its Quantity, Value and
- * Volume still add up to the corporation's holdings. Its Stacks column lists
- * every stack of that type (the screen caps the expanded list at 100) with its
- * full path, quantity and assembled/packaged state — nothing the expand rows
- * show is lost, and nothing is counted twice.
+ * By item stays one row per type, so Quantity, Value and Volume still add up;
+ * Stacks lists every stack with its path, quantity and state, and a type with
+ * more stacks than one workbook cell holds continues in "Stacks (2)", ….
  */
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
+import { joined } from '@/lib/exportSheets';
+import { MAX_CELL_TEXT } from '@/lib/exportCells';
 import type { AssetNameMap } from '@/engine/assetNames';
 import { assetBlueprintKind } from '@/engine/blueprintKind';
 import {
@@ -36,14 +35,20 @@ export function corpAssetItemCsvColumns(
   /** The rows exported: a type with more stacks than one cell holds spills into "Stacks (2)", … */
   rows: readonly ItemTableRow[] = []
 ): CsvColumn<ItemTableRow>[] {
-  const stackColumns = Math.max(
-    1,
-    ...rows.map((row) => stackParts(row, t, labels, assetNames).length)
-  );
+  // One build per row, shared by the column count and every Stacks cell.
+  const parts = new WeakMap<ItemTableRow, string[]>();
+  const partsOf = (row: ItemTableRow): string[] => {
+    let cached = parts.get(row);
+    if (!cached) {
+      cached = stackParts(row, t, labels, assetNames);
+      parts.set(row, cached);
+    }
+    return cached;
+  };
+  const stackColumns = Math.max(1, ...rows.map((row) => partsOf(row).length));
   return [
     { header: t('corp.assets.column.item'), value: (r) => r.name },
     {
-      // BPO and BPC both, not only the copy.
       header: t('corp.assets.csv.kind'),
       value: (r) => {
         const kind = assetBlueprintKind(
@@ -63,9 +68,11 @@ export function corpAssetItemCsvColumns(
     {
       header: t('corp.assets.column.where'),
       value: (r) =>
-        placementLabels(r.ledger.placements, labels)
-          .map((text, i) => `${text} ×${r.ledger.placements[i].quantity}`)
-          .join('; '),
+        joined(
+          placementLabels(r.ledger.placements, labels).map(
+            (text, i) => `${text} ×${r.ledger.placements[i].quantity}`
+          )
+        ),
     },
     { header: t('corp.assets.column.value'), value: (r) => r.ledger.estimatedValue },
     { header: t('corp.assets.column.volume'), value: (r) => r.ledger.volume },
@@ -75,31 +82,12 @@ export function corpAssetItemCsvColumns(
         part === 0
           ? t('corp.assets.csv.stacks')
           : t('corp.assets.csv.stacksMore', { part: part + 1 }),
-      value: (r: ItemTableRow) => stackParts(r, t, labels, assetNames)[part] ?? null,
+      value: (r: ItemTableRow) => partsOf(r)[part] ?? null,
     })),
   ];
 }
 
-/** An .xlsx cell holds 32,767 characters; stay under it with room for the join. */
-const MAX_STACK_CELL = 32_000;
-
-function stackTexts(
-  row: ItemTableRow,
-  t: CsvTranslate,
-  labels: LedgerLabels,
-  assetNames: AssetNameMap
-): string[] {
-  return row.ledger.stacks.map((stack) => {
-    const name = assetNames[stack.itemId];
-    const state =
-      stack.isSingleton === null
-        ? ''
-        : ` (${stack.isSingleton ? t('corp.assets.assembled') : t('corp.assets.packaged')})`;
-    return `${name === undefined ? '' : `${name} · `}${stackPathText(stack, labels)} ×${stack.quantity}${state}`;
-  });
-}
-
-/** The row's stacks, `; `-joined and cut between stacks into cells that fit a workbook cell. */
+/** The row's stacks `; `-joined, cut between stacks into cells that fit a workbook cell. */
 function stackParts(
   row: ItemTableRow,
   t: CsvTranslate,
@@ -108,12 +96,18 @@ function stackParts(
 ): string[] {
   const parts: string[] = [];
   let current = '';
-  for (const text of stackTexts(row, t, labels, assetNames)) {
-    if (current !== '' && current.length + 2 + text.length > MAX_STACK_CELL) {
+  for (const stack of row.ledger.stacks) {
+    const name = assetNames[stack.itemId];
+    const state =
+      stack.isSingleton === null
+        ? ''
+        : ` (${stack.isSingleton ? t('corp.assets.assembled') : t('corp.assets.packaged')})`;
+    const text = `${name === undefined ? '' : `${name} · `}${stackPathText(stack, labels)} ×${stack.quantity}${state}`;
+    if (current !== '' && current.length + 2 + text.length > MAX_CELL_TEXT) {
       parts.push(current);
       current = text;
     } else {
-      current = current === '' ? text : `${current}; ${text}`;
+      current = current === '' ? text : joined([current, text]);
     }
   }
   if (current !== '') parts.push(current);
@@ -131,7 +125,7 @@ export function corpAssetLocationCsvColumns(
     {
       header: t('corp.assets.column.largest'),
       value: (r) =>
-        r.cell.topStacks.map((s) => `${labels.typeName(s.typeId)} ×${s.quantity}`).join('; '),
+        joined(r.cell.topStacks.map((s) => `${labels.typeName(s.typeId)} ×${s.quantity}`)),
     },
     { header: t('corp.assets.column.value'), value: (r) => r.cell.estimatedValue },
     { header: t('corp.assets.column.volume'), value: (r) => r.cell.volume },

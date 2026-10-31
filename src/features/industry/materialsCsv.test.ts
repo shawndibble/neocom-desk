@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '@/lib/csv';
 import { materialCostLines } from '@/engine/industry/sourcing';
-import type { HubPrices, MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
+import type { HubPrices, MaterialSourcingMap } from '@/engine/industry/types';
+import type { MaterialTableRow } from './subBuildPlan';
 import { materialsCsvColumns } from './materialsCsv';
 
 const t = (k: string) => k;
@@ -14,8 +15,9 @@ function line(
   quantity: number,
   hubPrices: HubPrices = {},
   sourcing?: MaterialSourcingMap
-): MaterialCostLine {
-  return materialCostLines([{ typeID, baseQuantity, quantity }], hubPrices, sourcing)[0];
+): MaterialTableRow {
+  const [cost] = materialCostLines([{ typeID, baseQuantity, quantity }], hubPrices, sourcing);
+  return { ...cost, subBuilds: [] };
 }
 
 describe('materialsCsvColumns', () => {
@@ -154,7 +156,7 @@ describe('materialsCsvColumns shopping-list facts', () => {
       10,
       'industry.errands.toBuy',
       null,
-      'industry.csvPriceSources.hub',
+      'industry.csvPriceSourceHub',
       null,
       null,
       null,
@@ -171,23 +173,23 @@ describe('materialsCsvColumns shopping-list facts', () => {
     expect(extra(line(34, 1000, 1000, {}, owned)).slice(3, 6)).toEqual([
       'industry.errands.have',
       null,
-      'industry.csvPriceSources.owned',
+      'industry.priceSourceOwned',
     ]);
-    expect(extra(line(99, 10, 10, {}))[5]).toBe('industry.csvPriceSources.unpriced');
+    expect(extra(line(99, 10, 10, {}))[5]).toBe('industry.unpriced');
   });
 
   it('exports a built row with its summed runs and no buy or volume, and an unpriced warning', () => {
     const built = {
       ...line(35, 10, 10, {}),
-      subBuilds: [{ runs: 2 }, { runs: 3 }],
-    } as unknown as Parameters<(typeof columns)[number]['value']>[0];
+      subBuilds: [{ runs: 2 }, { runs: 3 }] as unknown as MaterialTableRow['subBuilds'],
+    };
     expect(extra(built)).toEqual([
       0,
       null,
       null,
       'industry.errands.building',
       5,
-      'industry.csvPriceSources.unpriced',
+      'industry.unpriced',
       null,
       null,
       null,
@@ -215,7 +217,7 @@ describe('materialsCsvColumns shopping-list facts', () => {
     const ready = materialsCsvColumns(t, nameFor, over, true);
     const loading = materialsCsvColumns(t, nameFor, over, false);
     expect(ready[5].value(row)).toBe(1500);
-    expect(ready[10].value(row)).toBe('industry.csvPriceSources.hub');
+    expect(ready[10].value(row)).toBe('industry.csvPriceSourceHub');
     expect(loading[10].value(row)).toBeNull();
   });
 
@@ -246,9 +248,9 @@ describe('materialsCsvColumns shopping-list facts', () => {
     const built = {
       ...line(35, 10, 10, { 35: 1 }),
       unpriced: true,
-      subBuilds: [{ runs: 1 }],
-    } as unknown as Parameters<(typeof cols)[number]['value']>[0];
-    expect(cols[10].value(built)).toBe('industry.csvPriceSources.unpriced');
+      subBuilds: [{ runs: 1 }] as unknown as MaterialTableRow['subBuilds'],
+    };
+    expect(cols[10].value(built)).toBe('industry.unpriced');
     expect(cols.at(-1)!.value(built)).toBe(50);
     const bought = line(34, 10, 10, { 34: 5 });
     expect(cols.slice(-4, -1).map((c) => c.value(bought))).toEqual([5, 6, 'common.exportFlagYes']);

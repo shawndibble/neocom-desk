@@ -93,7 +93,9 @@ describe('yieldOverviewCsvColumns', () => {
       yieldOverviewCsvColumns(t, context).map((c) => [c.header, c.value(yieldRow())])
     );
     expect(byHeader['miningTax.csvSecurity']).toBe(0.9);
-    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe('Veldspar 1000; Scordite 500');
+    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe(
+      'Veldspar × 1000; Scordite × 500'
+    );
     expect(byHeader['miningTax.csvVolumeUnknownFor']).toBeNull();
   });
 
@@ -149,7 +151,9 @@ describe('yieldOverviewCsvColumns', () => {
     expect(byHeader['miningTax.overview.volumeColumn']).toBeCloseTo(175);
     expect(byHeader['miningTax.overview.rawSellValue']).toBe(123456.5);
     expect(byHeader['miningTax.overview.refineValue']).toBe(150000);
-    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe('Veldspar 1000; Scordite 500');
+    expect(byHeader['miningTax.overview.oreBreakdownColumn']).toBe(
+      'Veldspar × 1000; Scordite × 500'
+    );
     expect(byHeader['miningTax.overview.unitsColumn']).toBe(1500);
     expect(byHeader['miningTax.overview.pricingColumn']).toBe('miningTax.overview.pricingFull');
   });

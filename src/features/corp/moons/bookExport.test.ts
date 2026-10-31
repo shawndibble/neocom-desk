@@ -237,7 +237,7 @@ describe('bookExportSheets', () => {
     const [header, row] = sheet('corpTaxBook.export.sheets.statements');
     const at = (col: string) => row[header.indexOf(`corpTaxBook.export.cols.${col}`)];
     expect(at('miner')).toBe('Char 3');
-    expect(at('settled')).toBe('corpTaxBook.export.yes');
+    expect(at('settled')).toBe('common.exportFlagYes');
     expect(at('amount')).toBe(1000);
     expect(at('issued')).toBe('2026-04-01T00:00:00Z');
   });
@@ -360,11 +360,11 @@ describe('bookExportSheets', () => {
     expect(at(first, 'moonOwnerId')).toBe(60);
     expect(at(first, 'date')).toBe('2026-03-01');
     expect(at(first, 'method')).toBe('corpTaxBook.moons.moonOwners.page.payouts.method.other');
-    expect(at(first, 'notAPayout')).toBe('corpTaxBook.export.yes');
+    expect(at(first, 'notAPayout')).toBe('common.exportFlagYes');
     expect(at(second, 'amount')).toBe(500);
     expect(at(second, 'status')).toBe('corpTaxBook.moons.moonOwners.page.payouts.state.matched');
     expect(at(second, 'journalRef')).toBe(123);
-    expect(at(second, 'notAPayout')).toBe('corpTaxBook.export.no');
+    expect(at(second, 'notAPayout')).toBe('common.exportFlagNo');
   });
 
   it("writes each moon owner's rate history, oldest first", () => {
@@ -434,7 +434,7 @@ describe('bookExportSheets', () => {
     expect(at('miner')).toBe('Char 1');
     expect(at('fromDate')).toBe('2026-03-01');
     expect(at('by')).toBe('Char 7');
-    expect(at('memberRebill')).toBe('corpTaxBook.export.yes');
+    expect(at('memberRebill')).toBe('common.exportFlagYes');
   });
 
   it("writes a guest's grouping answer with the character and Miner named", () => {

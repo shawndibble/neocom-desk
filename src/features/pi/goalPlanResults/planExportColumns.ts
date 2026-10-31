@@ -1,10 +1,10 @@
 /**
- * Export columns for the goal plan's Flow and Hauling tables. Pulled out of
- * the components so the facts the screen keeps in a group header (what blocks a
- * blocked goal) or a placeholder (a leg's distance still being counted, or
- * not routable) are columns of their own and testable without rendering.
+ * Export columns for the goal plan's Flow and Hauling tables, including the
+ * facts the screen words once in a group header (what blocks a blocked goal)
+ * or a placeholder (a leg's distance pending, or not routable).
  */
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
+import { joined } from '@/lib/exportSheets';
 import type { DemandLine, FlowEnd, PlanetType } from '@/engine/pi/goalTypes';
 import { piTier } from '@/engine/pi/chain';
 import { commodityName } from '../goalPlannerFormat';
@@ -24,26 +24,28 @@ export function flowCsvColumns(
     { header: t('piPlan.flowFactories'), value: (line) => line.factories },
     { header: t('piPlan.flowSource'), value: sourceLabel },
     {
-      // The P0 a blocked goal lacks a planet for — the screen words it once in the group header.
       header: t('piPlan.csvBlockedBy'),
-      value: (line) =>
-        line.source === 'blocked' && line.blockedBy?.length
-          ? line.blockedBy.map((p0) => commodityName(p0, pi)).join('; ')
-          : null,
+      value: (line) => {
+        const p0s = blockedP0s(line);
+        return p0s.length > 0 ? joined(p0s.map((p0) => commodityName(p0, pi))) : null;
+      },
     },
     {
       header: t('piPlan.csvPlanetTypesNeeded'),
       value: (line) => {
-        if (line.source !== 'blocked' || !line.blockedBy?.length) return null;
-        const needs = line.blockedBy.flatMap((p0) => {
+        const needs = blockedP0s(line).flatMap((p0) => {
           const types = typeGaps.get(p0);
           return types?.length ? [`${commodityName(p0, pi)}: ${planetTypesText(types, t)}`] : [];
         });
-        return needs.length > 0 ? needs.join('; ') : null;
+        return needs.length > 0 ? joined(needs) : null;
       },
     },
   ];
 }
+
+/** The P0 resources a blocked goal lacks a planet for; empty for any other line. */
+const blockedP0s = (line: DemandLine): readonly number[] =>
+  line.source === 'blocked' ? (line.blockedBy ?? []) : [];
 
 export interface LegRow {
   key: string;
@@ -56,16 +58,10 @@ export interface LegRow {
   jumps: number | null | undefined;
 }
 
-type RouteState = 'pending' | 'none' | 'sameSystem' | 'routed';
+export type RouteState = 'pending' | 'none' | 'sameSystem' | 'routed';
 
-const ROUTE_KEY: Record<RouteState, string> = {
-  pending: 'piPlan.csvRoute.pending',
-  none: 'piPlan.csvRoute.none',
-  sameSystem: 'piPlan.csvRoute.sameSystem',
-  routed: 'piPlan.csvRoute.routed',
-};
-
-function routeState(jumps: LegRow['jumps']): RouteState {
+/** Where a leg's distance stands: still counting, unroutable, within one system, or a jump count. */
+export function routeState(jumps: LegRow['jumps']): RouteState {
   if (jumps === undefined) return 'pending';
   if (jumps === null) return 'none';
   return jumps === 0 ? 'sameSystem' : 'routed';
@@ -83,7 +79,7 @@ export function haulingCsvColumns(t: CsvTranslate, names: PlanNames): CsvColumn<
     {
       // A blank Jumps cell is either "still counting" or "no route"; this says which.
       header: t('piPlan.csvRouteStatus'),
-      value: (row) => t(ROUTE_KEY[routeState(row.jumps)]),
+      value: (row) => t(`piPlan.csvRoute.${routeState(row.jumps)}`),
     },
   ];
 }

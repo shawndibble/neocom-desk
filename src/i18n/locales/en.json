@@ -3749,12 +3749,7 @@
     "csvErrand": "Section",
     "csvSubBuildRuns": "Build runs",
     "csvPriceSource": "Price source",
-    "csvPriceSources": {
-      "override": "Your price",
-      "hub": "Hub price",
-      "owned": "Owned",
-      "unpriced": "Unpriced"
-    },
+    "csvPriceSourceHub": "Hub price",
     "csvBlueprintMe": "Blueprint ME",
     "csvBlueprintTe": "Blueprint TE",
     "csvBlueprintSource": "Blueprint source",
@@ -17761,8 +17756,6 @@
       "firstHint": "Keep a copy: one Excel workbook with every record the book holds, a sheet per kind. SRP isn't part of the book and is kept.",
       "action": "Download the book (.xlsx)",
       "sheetList": "Sheets: Mining lines, Statements, Statement lines, Payments, Adjustments, Write-offs, Dismissals, Declarations, Rebills, Miners, Grouping answers, Extractions, Moon owners, Moon owner payments, Moon owner rates, Settings, Activity log.",
-      "yes": "Yes",
-      "no": "No",
       "sheets": {
         "miningLines": "Mining lines",
         "statements": "Statements",
@@ -18666,8 +18659,6 @@
       "hint": "One Excel workbook, a sheet per kind. A copy to keep or work in: it can't be imported back.",
       "sheetList": "Sheets: Settings, SRP Claims (every state), SRP log, Doctrine Fits.",
       "action": "Download SRP data (.xlsx)",
-      "yes": "Yes",
-      "no": "No",
       "never": "Never turned on",
       "amountSource": {
         "typed": "Typed by an officer",

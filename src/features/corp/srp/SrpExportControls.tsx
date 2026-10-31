@@ -44,7 +44,7 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
       },
       t
     );
-    // Each read stops at the cap with no sign of what lies past it, so a full read may be cut short.
+    // A read that comes back at the cap may have more behind it, so the file is marked partial.
     return downloadWorkbook('corp-srp', sheets, {
       qualifier: ticker,
       truncated: claims.length >= SRP_READ_CAP || audit.length >= SRP_READ_CAP,

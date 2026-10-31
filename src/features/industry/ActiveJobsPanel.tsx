@@ -615,7 +615,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     rows: filteredJobs,
     columns: jobsCsv,
   });
-  // Every delivery the picker names, in the table's sort.
+  // Every delivered job of the picked Characters, in the table's sort.
   const historyCsv = useMemo(
     () => jobHistoryCsvColumns(t, nameForBlueprint, historyStates, dismissedJobIds),
     [t, nameForBlueprint, historyStates, dismissedJobIds]

@@ -2,39 +2,41 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
-import type { MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
+import type { MaterialSourcingMap } from '@/engine/industry/types';
 import { rowVolume } from '@/engine/industry/materialVolume';
-import { materialRowState } from './materialRow';
+import {
+  buildSavings,
+  isBuilt,
+  materialPriceTag,
+  materialRowState,
+  shownDepth,
+  type PriceTag,
+} from './materialRow';
 import { materialErrand } from './materialErrands';
 import { ERRAND_LABEL_KEY } from './materialsTableStyle';
 import type { MaterialTableRow } from './subBuildPlan';
 
-/** A materials row as the table holds it; `subBuilds` is absent on a plain cost line (bought). */
-export type MaterialCsvRow = MaterialCostLine & {
-  subBuilds?: MaterialTableRow['subBuilds'];
+/** The words the table's Price cell uses; a plain hub price, which it leaves untagged, is named here. */
+const PRICE_TAG_KEY: Record<PriceTag, string> = {
+  override: 'industry.priceSourceOverride',
+  hub: 'industry.csvPriceSourceHub',
+  owned: 'industry.priceSourceOwned',
+  unpriced: 'industry.unpriced',
 };
 
-const asTableRow = (row: MaterialCsvRow): MaterialTableRow => ({
-  ...row,
-  subBuilds: row.subBuilds ?? [],
-});
-
 /**
- * CSV columns for the materials list: name, effective (post-ME) quantity,
- * unit price, line total. The price columns come from `materialRowState`, the
- * same decision MaterialsTable renders, so an export can't disagree with the
- * table it was taken from — an override price exports as the unit price, and
- * an owned portion is already out of the line total.
+ * CSV columns for the materials list: what the table shows (quantity, Have,
+ * To buy, price, volume, line total, section), plus the facts its rows carry
+ * in tags and sub-lines (price source, build runs and savings, blueprint
+ * tier, depth price). Price and tag rules come from `materialRow.ts`, the
+ * same ones MaterialsTable renders, so a file cannot disagree with its table.
  *
- * The make-or-buy verdict exports as the same one-word Build/Buy the row's
- * marker announces, so a materials list taken into a spreadsheet still says
- * which lines are worth producing. Only the verdict, not the quote behind it:
- * the sub-job's own cost is not actionable without the rest of that job.
+ * The make-or-buy verdict exports as the one-word Build/Buy the row's marker
+ * announces; the sub-job's own quote is left out as not actionable alone.
  *
- * A cell with nothing to say is blank (not a display string like "No price"):
- * a blank lets a spreadsheet SUM() skip the row, a string would poison the
- * column into text. A fully owned row is the exception — it costs zero whether
- * or not anything is priced, so it exports a real 0.
+ * A cell with nothing to say is blank, not a display string: a blank lets a
+ * spreadsheet SUM() skip the row. A fully owned row costs zero, so it
+ * exports a real 0.
  */
 export function materialsCsvColumns(
   t: CsvTranslate,
@@ -44,13 +46,7 @@ export function materialsCsvColumns(
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>,
   volumeFor?: (typeID: number) => number | null,
   depthFor?: (typeID: number) => DepthPrice | undefined
-): CsvColumn<MaterialCsvRow>[] {
-  const isBuilt = (material: MaterialCsvRow) => (material.subBuilds?.length ?? 0) > 0;
-  const overridden = (material: MaterialCsvRow) =>
-    sourcing?.[material.typeID]?.overridePrice !== undefined;
-  /** The table's walked-book line: not shown on a built row or one the pilot priced themselves. */
-  const depthOf = (material: MaterialCsvRow) =>
-    isBuilt(material) || overridden(material) ? undefined : depthFor?.(material.typeID);
+): CsvColumn<MaterialTableRow>[] {
   return [
     {
       header: t('industry.csvMaterial'),
@@ -86,38 +82,33 @@ export function materialsCsvColumns(
     {
       // A built row is not bought at all.
       header: t('industry.errands.buyColumn'),
-      value: (material) =>
-        (material.subBuilds?.length ?? 0) > 0 ? null : material.remainingQuantity,
+      value: (material) => (isBuilt(material) ? null : material.remainingQuantity),
     },
     {
       // Blank for a built row (its inputs carry the volume) and an unknown size.
       header: t('industry.volume'),
       value: (material) =>
-        !volumeFor || (material.subBuilds?.length ?? 0) > 0 ? null : rowVolume(material, volumeFor),
+        !volumeFor || isBuilt(material) ? null : rowVolume(material, volumeFor),
     },
     {
       header: t('industry.csvErrand'),
-      value: (material) => t(ERRAND_LABEL_KEY[materialErrand(asTableRow(material))]),
+      value: (material) => t(ERRAND_LABEL_KEY[materialErrand(material)]),
     },
     {
       header: t('industry.csvSubBuildRuns'),
       value: (material) => {
-        const builds = material.subBuilds ?? [];
-        return builds.length === 0 ? null : builds.reduce((sum, build) => sum + build.runs, 0);
+        return isBuilt(material)
+          ? material.subBuilds.reduce((sum, build) => sum + build.runs, 0)
+          : null;
       },
     },
     {
       header: t('industry.csvPriceSource'),
-      // The cell the table shows, in its order. Unknown while market data is loading.
+      // The tag the table shows; a market price is still named, and all but a typed override wait for prices.
       value: (material) => {
-        if (isBuilt(material)) {
-          return material.unpriced ? t('industry.csvPriceSources.unpriced') : null;
-        }
-        const state = materialRowState(material, sourcing, pricesReady);
-        if (state.priceSource === 'override') return t('industry.csvPriceSources.override');
-        if (!pricesReady) return null;
-        if (state.unitPrice !== null) return t('industry.csvPriceSources.hub');
-        return t(`industry.csvPriceSources.${state.fullyOwned ? 'owned' : 'unpriced'}`);
+        const tag = materialPriceTag(material, sourcing, pricesReady);
+        if (tag === null || (tag !== 'override' && !isBuilt(material) && !pricesReady)) return null;
+        return t(PRICE_TAG_KEY[tag]);
       },
     },
     {
@@ -145,24 +136,23 @@ export function materialsCsvColumns(
         return community ? exportFlag(t, community.stale) : null;
       },
     },
-    { header: t('industry.csvDepthBest'), value: (material) => depthOf(material)?.best ?? null },
-    { header: t('industry.csvDepthAvg'), value: (material) => depthOf(material)?.avg ?? null },
+    {
+      header: t('industry.csvDepthBest'),
+      value: (material) => shownDepth(material, sourcing, depthFor)?.best ?? null,
+    },
+    {
+      header: t('industry.csvDepthAvg'),
+      value: (material) => shownDepth(material, sourcing, depthFor)?.avg ?? null,
+    },
     {
       header: t('industry.csvDepthCovered'),
-      value: (material) => exportFlag(t, depthOf(material)?.covered),
+      value: (material) => exportFlag(t, shownDepth(material, sourcing, depthFor)?.covered),
     },
     {
       // What building saves over buying, on the rows the table words "saves X vs buying".
       header: t('industry.csvSavesVsBuying'),
-      value: (material) => {
-        const advice = makeOrBuy?.get(material.typeID);
-        return isBuilt(material) &&
-          advice?.verdict === 'build' &&
-          advice.savings > 0 &&
-          material.remainingQuantity > 0
-          ? advice.savings
-          : null;
-      },
+      value: (material) =>
+        isBuilt(material) ? buildSavings(material, makeOrBuy?.get(material.typeID)) : null,
     },
   ];
 }

@@ -1,19 +1,20 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
-import { allMembers, type DisplayRow } from './groupRows';
+import type { DisplayRow } from './groupRows';
+import { oreLinesText } from './oreBreakdown';
 
 /**
  * How the Tax table reads each row — handed in by `TaxTab`, whose own cells
  * use the same functions, so an export cannot disagree with what is on
- * screen (a joined row's summed value, a dismissal's Payee label).
+ * screen (a dismissal's Payee label, a Corp Tax Book state).
  */
 export interface TaxCsvContext {
   /** An ore type's name, for the Ore column. */
   oreName: (typeId: number) => string;
   /** The row's system security status; undefined while the system is unread. */
   securityOf: (row: DisplayRow) => number | undefined;
-  /** The row's date, or a joined row's date range. */
+  /** The row's date. */
   dateLabel: (row: DisplayRow) => string;
   systemName: (row: DisplayRow) => string;
   /** Null for a row with no Assignment — the table's dash. */
@@ -25,29 +26,7 @@ export interface TaxCsvContext {
   statusLabel?: (row: DisplayRow) => string | undefined;
 }
 
-/**
- * The rows an export holds: a combined (joined) row stands for several days'
- * Assignments, so it becomes one row per member — each with its own date,
- * ore, value, tax and status, and its group id in the Combined group column —
- * and the file's sums reconcile with the table's combined totals. Every other
- * row passes through untouched, so the result still sorts by the table's own
- * column sort values.
- */
-export function expandCombinedRows(rows: readonly DisplayRow[]): DisplayRow[] {
-  return rows.flatMap((dr) =>
-    dr.groupMembers
-      ? allMembers(dr).map(({ row, assignment }) => ({
-          key: assignment.id,
-          row,
-          assignment,
-          status: assignment.status,
-          ...(dr.corp ? { corp: dr.corp } : {}),
-        }))
-      : [dr]
-  );
-}
-
-/** Export columns for the Mining Tax table, in its column order (the select and edit columns carry no data). Feed it `expandCombinedRows`. */
+/** Export columns for the Mining Tax table, in its column order (the select and edit columns carry no data). Feed it rows from `expandCombinedRows`. */
 export function taxCsvColumns(
   t: CsvTranslate,
   {
@@ -71,13 +50,7 @@ export function taxCsvColumns(
     {
       // Every type with its units, not only the icons the table has room for.
       header: t('miningTax.oreColumn'),
-      value: (dr) =>
-        (dr.assignment
-          ? allMembers(dr).flatMap((m) => m.assignment.oreLines)
-          : dr.row.unassignedOreLines
-        )
-          .map((line) => `${oreName(line.typeId)} ${line.quantity}`)
-          .join('; ') || null,
+      value: (dr) => oreLinesText(dr.assignment?.oreLines ?? dr.row.unassignedOreLines, oreName),
     },
     { header: t('miningTax.estimatedValueColumn'), value: estimatedValue },
     { header: t('miningTax.taxOwedColumn'), value: taxOwed },

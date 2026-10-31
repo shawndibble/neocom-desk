@@ -5,7 +5,8 @@ import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlSort } from '@/lib/useUrlState';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import { statusColumnWidthClass } from '@/features/miningTax/statusColumnWidth';
-import { expandCombinedRows, taxCsvColumns } from '@/features/miningTax/taxCsv';
+import { expandCombinedRows } from '@/features/miningTax/groupRows';
+import { taxCsvColumns } from '@/features/miningTax/taxCsv';
 import { dateLabel, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import { statusLabel, useTaxColumns } from '@/features/miningTax/useTaxColumns';
 import { TAX_COLUMN_IDS, useVisibleTaxColumns } from './taxColumns';
@@ -113,16 +114,26 @@ export function useTaxTables({
       corpStateLabel,
     ]
   );
-  // A combined row exports as one row per day, so no member's figures are lost.
-  const exportRows = useMemo(() => expandCombinedRows(visibleRows), [visibleRows]);
-  const taxExport = useTableExport({
+  const baseExport = useTableExport({
     surface: 'mining-tax',
-    rows: exportRows,
+    rows: visibleRows,
     columns: csvColumns,
     // Open and History are two tables; the default reads only the mounted
     // Open one, so the file would drop every settled record.
     source: 'sorted-rows',
   });
+  // Combined rows are split into their days when the export reads them, not on every render.
+  const taxExport = useMemo(() => {
+    const getRows = () => expandCombinedRows(baseExport.getRows());
+    return {
+      ...baseExport,
+      getRows,
+      tableProps: {
+        ...baseExport.tableProps,
+        exportable: { ...baseExport.tableProps.exportable, getRows },
+      },
+    };
+  }, [baseExport]);
 
   return {
     showCharacterColumn,

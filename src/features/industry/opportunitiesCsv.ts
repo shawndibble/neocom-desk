@@ -1,5 +1,6 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { exportFlag } from '@/lib/exportFlag';
+import { joined } from '@/lib/exportSheets';
 import type { MarketWideDayRow } from './marketWideOpportunities';
 import type { OpportunityRow } from './opportunities';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
@@ -50,22 +51,19 @@ function skillGateColumns<R>(
   return [
     {
       header: t('industry.csvSkillGated'),
-      value: (row) => {
-        const verdict = verdictOf(row);
-        return exportFlag(t, verdict?.gated);
-      },
+      value: (row) => exportFlag(t, verdictOf(row)?.gated),
     },
     {
       header: t('industry.csvMissingSkills'),
       value: (row) => {
         const verdict = verdictOf(row);
         if (!gate || !verdict?.gated) return null;
-        return verdict.shortfall
-          .map(
+        return joined(
+          verdict.shortfall.map(
             (s) =>
               `${gate.nameForSkill(s.typeID)} ${romanLevel(s.needLevel)} (${t('industry.csvHaveLevel', { level: romanLevel(s.haveLevel) })})`
           )
-          .join('; ');
+        );
       },
     },
     {

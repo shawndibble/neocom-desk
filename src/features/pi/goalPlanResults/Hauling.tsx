@@ -19,7 +19,7 @@ import { commodityName, formatUnits } from '../goalPlannerFormat';
 import { piProductHref } from '../piPlanLink';
 import { ColonyLink } from './ColonyLink';
 import { endName, type PlanNames } from './format';
-import { haulingCsvColumns, type LegRow } from './planExportColumns';
+import { haulingCsvColumns, routeState, type LegRow } from './planExportColumns';
 
 function EndLink({ end, names }: { end: FlowEnd; names: PlanNames }) {
   return end === 'hub' ? <>{names.hub.systemName}</> : <ColonyLink planetId={end} names={names} />;
@@ -122,7 +122,8 @@ export function Hauling({
         sortFirst: 'asc',
         sortValue: (row) => row.jumps ?? undefined,
         render: (row) => {
-          if (row.jumps === undefined) {
+          const state = routeState(row.jumps);
+          if (state === 'pending') {
             return (
               <span className="text-text-dim" title={t('piPlan.legJumpsPending')}>
                 <span aria-hidden="true">…</span>
@@ -130,7 +131,7 @@ export function Hauling({
               </span>
             );
           }
-          if (row.jumps === null) {
+          if (state === 'none') {
             return (
               <span className="text-text-dim" title={t('jumpRange.distanceUnavailable')}>
                 <span aria-hidden="true">—</span>
@@ -140,7 +141,7 @@ export function Hauling({
           }
           const to = endSystem(row.to, names);
           const from = endSystem(row.from, names);
-          if (row.jumps === 0)
+          if (state === 'sameSystem')
             return <span className="text-text-dim">{t('piPlan.legSameSystem')}</span>;
           return to === undefined ? (
             String(row.jumps)

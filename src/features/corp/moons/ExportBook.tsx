@@ -52,7 +52,7 @@ function useExportBook(): () => Promise<WorkbookDownload> {
       names,
       t
     );
-    // The audit read stops at the cap with no sign of what lies past it, so a full read is "may be cut short".
+    // A read that comes back at the cap may have more behind it, so the file is marked partial.
     return downloadWorkbook('corp-tax-book', sheets, {
       qualifier: ticker,
       truncated: audit.length >= EXPORT_AUDIT_LIMIT,

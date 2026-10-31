@@ -1,8 +1,9 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import { nothingPriced, type OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
-import { sumUnits } from './oreBreakdown';
-import { sumVolume, volumeDisplayMode } from './volume';
+import { joined } from '@/lib/exportSheets';
+import { oreLinesText, sumUnits } from './oreBreakdown';
+import { sumVolume, volumeDisplayMode, type VolumeSum } from './volume';
 
 /**
  * Export columns for the Mining Yield Overview table and the two tables in
@@ -32,6 +33,21 @@ export function yieldOverviewCsvColumns(
   t: CsvTranslate,
   { showRefining, systemNames, systemSecurity, typeNames, typeVolumes }: YieldOverviewCsvContext
 ): CsvColumn<MiningYieldRow>[] {
+  // Volume and "volume unknown for" read the same sum; one per row.
+  const volumes = new WeakMap<MiningYieldRow, VolumeSum>();
+  const volumeOf = (row: MiningYieldRow): VolumeSum => {
+    let volume = volumes.get(row);
+    if (!volume) {
+      volume = sumVolume(
+        row.entry.oreLines,
+        (line) => line.typeId,
+        (line) => line.quantity,
+        typeVolumes
+      );
+      volumes.set(row, volume);
+    }
+    return volume;
+  };
   const columns: (CsvColumn<MiningYieldRow> | false)[] = [
     { header: t('miningTax.dateColumn'), value: (row) => row.entry.date },
     {
@@ -50,27 +66,17 @@ export function yieldOverviewCsvColumns(
       // Only the ores whose size is known add up: with any unknown this is a floor, and the next column names them.
       header: t('miningTax.overview.volumeColumn'),
       value: (row) => {
-        const volume = sumVolume(
-          row.entry.oreLines,
-          (line) => line.typeId,
-          (line) => line.quantity,
-          typeVolumes
-        );
+        const volume = volumeOf(row);
         return volumeDisplayMode(volume).kind === 'unknown' ? null : volume.m3;
       },
     },
     {
       header: t('miningTax.csvVolumeUnknownFor'),
       value: (row) => {
-        const { missingTypeIds } = sumVolume(
-          row.entry.oreLines,
-          (line) => line.typeId,
-          (line) => line.quantity,
-          typeVolumes
-        );
+        const { missingTypeIds } = volumeOf(row);
         return missingTypeIds.length === 0
           ? null
-          : [...new Set(missingTypeIds)].map((id) => typeLabel(typeNames, id)).join('; ');
+          : joined([...new Set(missingTypeIds)].map((id) => typeLabel(typeNames, id)));
       },
     },
     {
@@ -89,17 +95,13 @@ export function yieldOverviewCsvColumns(
         const unpriced = row.valuation.lines.filter((line) => line.rawValue === 0);
         return unpriced.length === 0
           ? null
-          : [...new Set(unpriced.map((line) => typeLabel(typeNames, line.typeId)))].join('; ');
+          : joined([...new Set(unpriced.map((line) => typeLabel(typeNames, line.typeId)))]);
       },
     },
     {
       // Every ore with its units — the table's two-name summary drops the rest.
       header: t('miningTax.overview.oreBreakdownColumn'),
-      value: (row) =>
-        [...row.entry.oreLines]
-          .sort((a, b) => b.quantity - a.quantity)
-          .map((line) => `${typeLabel(typeNames, line.typeId)} ${line.quantity}`)
-          .join('; ') || null,
+      value: (row) => oreLinesText(row.entry.oreLines, (id) => typeLabel(typeNames, id)),
     },
     {
       header: t('miningTax.overview.unitsColumn'),
@@ -114,7 +116,7 @@ export function yieldOverviewCsvColumns(
   return columns.filter((c): c is CsvColumn<MiningYieldRow> => c !== false);
 }
 
-/** A line with whole batches, left-over units or outputs has reprocessing data; none of them means there was nothing to refine. */
+/** False for a type that cannot be refined at all, where "left over" would claim a refine that never existed. */
 function hasReprocessing(line: OreLineValuation): boolean {
   return line.batches > 0 || line.unitsLeftOver > 0 || line.refineOutputs.length > 0;
 }
