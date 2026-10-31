@@ -8,7 +8,8 @@
  * the detail modal spells out. Neither asserts the hauler cannot complete the
  * contract — see `engine/contracts/courierRisk.ts` for why that bound exists.
  */
-import type { CourierRiskKind } from '@/engine/contracts/courierRisk';
+import { endpointRisks, type CourierRiskKind } from '@/engine/contracts/courierRisk';
+import type { CourierEndpoint } from '@/engine/contracts/courierSearch';
 
 /**
  * Which risks earn a marker on the row.
@@ -26,6 +27,14 @@ export const MARKED_RISKS: readonly CourierRiskKind[] = [
   'over-rate',
   'gank-chokepoint',
 ];
+
+/** The risks one end of a haul wears as a marker on the row: the table's markers and the export's warnings read this one list. */
+export function markedEndpointRisks(
+  endpoint: CourierEndpoint,
+  end: 'origin' | 'destination'
+): CourierRiskKind[] {
+  return endpointRisks(endpoint, end).filter((kind) => MARKED_RISKS.includes(kind));
+}
 
 /**
  * Which risks head the modal's list with a warning rather than a note: every

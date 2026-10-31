@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Disclosure } from '@/components/ui';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { formatMarketIsk } from '@/lib/isk';
-import { roundPriceUp } from '@/engine/market/priceTick';
+import { shownFloorPrice } from './orderRowFormat';
 import { StructureFeeLine } from './StructureFeeLine';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderDetailView } from './orderDetailView';
@@ -32,7 +32,7 @@ export function OrderCostSection({
   // to the nearest legal price (issue #1421): safe to type into an order,
   // never below the exact break-even — `belowFloor` detection elsewhere still
   // compares against the exact `row.floor.relist`, never this.
-  const floorShown = row.floor ? (roundPriceUp(row.floor.relist) ?? row.floor.relist) : null;
+  const floorShown = row.floor ? shownFloorPrice(row.floor) : null;
 
   const costTrailing =
     floorShown !== null

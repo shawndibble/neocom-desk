@@ -13,11 +13,10 @@ import { IskAmount, TypeIcon } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
-import { priceComparison } from '@/engine/market/orderBookDepth';
 import { formatIskCompact, marketIskDecimals } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
-import type { VariationRow } from './variations';
+import { versusSelf, type VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
 import type { Translate } from '@/lib/translate';
 
@@ -83,7 +82,10 @@ export function VariationsTable({
   scopeName,
 }: VariationsTableProps) {
   const { t } = useTranslation();
-  const csvColumns = useMemo(() => variationsCsvColumns(t, prices), [t, prices]);
+  const csvColumns = useMemo(
+    () => variationsCsvColumns(t, prices, { selfName, selfSummary, scopeName }),
+    [t, prices, selfName, selfSummary, scopeName]
+  );
   const tableExport = useTableExport({ surface: 'market-variations', rows, columns: csvColumns });
 
   if (rows.length === 0) return null;
@@ -97,8 +99,6 @@ export function VariationsTable({
   }
 
   /** A row's best sell against the item it varies. */
-  const versusSelf = (row: VariationRow) =>
-    priceComparison(selfSummary?.bestSell ?? null, prices.get(row.typeId)?.bestSell ?? null);
 
   // Sibling-fallback rows carry no meta-group classification, so the column would be all dashes.
   const hasTier = rows.some((row) => row.tier !== null);
@@ -161,9 +161,9 @@ export function VariationsTable({
       headerTooltip: t('market.variations.versusHint', { name: selfName }),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => versusSelf(row)?.delta,
+      sortValue: (row) => versusSelf(selfSummary, prices, row.typeId)?.delta,
       render: (row) => {
-        const delta = versusSelf(row);
+        const delta = versusSelf(selfSummary, prices, row.typeId);
         if (delta === null) return <span className="text-text-dim">—</span>;
         return (
           // Cheaper than the item you opened reads as good news.

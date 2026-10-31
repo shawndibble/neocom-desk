@@ -11,11 +11,13 @@ import { COL_DATETIME, COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/da
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import type { ContractFlag } from '@/engine/contracts/contractFlags';
 import { isUnpricedOffer, offerAskingPrice } from '@/engine/contracts/contractSearch';
 import {
   CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
   type ContractSearchItemsColumnId,
 } from '@/features/contractSearch/contractSearchItemsColumns';
+import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
 import { contractSearchCsvColumns } from '@/features/contractSearch/contractSearchCsv';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
 import type { JumpsCellValue, useJumpRangeFilter } from '@/features/route/currentSystem';
@@ -47,6 +49,7 @@ interface ItemsColumnsInput {
   visibleItemsColumns: readonly ContractSearchItemsColumnId[];
   /** The marker before a row's price, or nothing: the flag judgement lives with the caller. */
   priceFlag?: (row: PublicContractOfferRow) => ReactNode;
+  flagFor?: (row: PublicContractOfferRow) => ContractFlag | null;
 }
 
 export function useItemsColumns({
@@ -57,6 +60,7 @@ export function useItemsColumns({
   plexPrice,
   visibleItemsColumns,
   priceFlag,
+  flagFor,
 }: ItemsColumnsInput) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -140,9 +144,7 @@ export function useItemsColumns({
               // An auction's number is a starting bid unless the seller set a
               // buyout, so the figure alone would read as a fixed ask.
               <span className="ml-1 text-[0.6875rem] text-text-dim uppercase">
-                {row.buyout
-                  ? t('contractSearch.buyoutShort')
-                  : t('contractSearch.startingBidShort')}
+                {auctionKindLabel(t, row.buyout)}
               </span>
             )}
             {row.requestedPlex
@@ -273,8 +275,10 @@ export function useItemsColumns({
           return cell.kind === 'value' ? cell.count : null;
         },
         plexPrice,
+        security: (row) => offerLocations.get(row.locationId)?.security ?? null,
+        flagFor: (row) => flagFor?.(row) ?? null,
       }),
-    [t, typeNames, regionNames, offerLocations, offerJumps, plexPrice]
+    [t, typeNames, regionNames, offerLocations, offerJumps, plexPrice, flagFor]
   );
 
   return { columns, itemsColumnsById, itemsCsvColumns, offerJumps, plexAskLabel };

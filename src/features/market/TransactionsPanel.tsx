@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useCharacterCount } from '@/features/character/useCharacters';
+import { useCharacterCount, useCharacterNames } from '@/features/character/useCharacters';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -45,7 +45,7 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { formatMarketIsk } from '@/lib/isk';
 import { splitTimestamp } from '@/lib/timestamp';
 import { HintText } from '@/components/ui/HintText';
-import type { MarginGap, RealizedMargin } from '@/engine/market/realizedMargin';
+import type { MarginGap } from '@/engine/market/realizedMargin';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -58,6 +58,7 @@ import {
   type TransactionsColumnId,
 } from './transactionsColumns';
 import {
+  marginPercentOf,
   transactionTotal,
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
@@ -94,16 +95,6 @@ const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
 const GAP_LABEL_CH_PER_CHAR = 0.85;
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
-
-/** Margin over what the sold units cost, as a percent; null when the sale has no margin. */
-function marginPercentOf(
-  txn: WalletTransaction,
-  margin: RealizedMargin | undefined
-): number | null {
-  if (!margin) return null;
-  const cost = margin.unitCost * txn.quantity;
-  return cost > 0 ? (margin.margin / cost) * 100 : null;
-}
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -242,14 +233,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince, gaps),
     [filteredTransactions, margins, gaps, journal, rowsFilter, archiveSince]
   );
-  const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
-  const transactionsExport = useTableExport({
-    surface: 'wallet-transactions',
-    rows: filteredTransactions,
-    columns: csvColumns,
-    truncated: transactionsTruncated,
-  });
-
   /**
    * The alert names the *item*; the table is keyed by transaction. Resolving
    * one to the other is this panel's job because only it knows that rule —
@@ -297,6 +280,28 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         ?.name ?? t('wallet.locationFallback', { id: txn.location_id }),
     [placeDetails, placeOwnerOf, t]
   );
+
+  // Every column the table can show, whichever the picker has ticked, plus the
+  // character a fill belongs to (the table only draws it under All).
+  const characterNames = useCharacterNames();
+  const csvColumns = useMemo(
+    () =>
+      walletTransactionsCsvColumns<WalletTransaction>(t, nameFor, {
+        character: (txn) =>
+          allScope
+            ? (txn as PooledTransaction).characterName
+            : (characterNames.get(activeCharacterId ?? 0) ?? null),
+        location: placeNameFor,
+        margins: { margins, gaps },
+      }),
+    [t, nameFor, allScope, characterNames, activeCharacterId, placeNameFor, margins, gaps]
+  );
+  const transactionsExport = useTableExport({
+    surface: 'wallet-transactions',
+    rows: filteredTransactions,
+    columns: csvColumns,
+    truncated: transactionsTruncated,
+  });
 
   // One name per location id: grouping and filtering key on the id alone, so
   // under All the first Character's resolved name stands for the station.

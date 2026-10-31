@@ -11,6 +11,7 @@
  * are out of scope.
  */
 import { isShipBayFlag } from '../assetTree';
+import type { AppraisalRow } from './appraisal';
 
 export interface OwnedAsset {
   item_id: number;
@@ -104,6 +105,9 @@ export type WithOwned<T> = T & {
   /** Units still to buy; 0 when the line is fully covered. */
   need: number;
 };
+
+/** An Appraisal line that carries what the pilot owns only once `subtractOwned` ran. */
+export type OwnedRow = AppraisalRow & Partial<Pick<WithOwned<AppraisalRow>, 'owned' | 'need'>>;
 
 export function subtractOwned<T extends { typeId: number; quantity: number }>(
   items: readonly T[],

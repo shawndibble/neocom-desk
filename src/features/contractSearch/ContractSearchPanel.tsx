@@ -825,6 +825,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     plexPrice,
     visibleItemsColumns,
     priceFlag,
+    flagFor,
   });
 
   const itemsSortProps = useUrlSort(

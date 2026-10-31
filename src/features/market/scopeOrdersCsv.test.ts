@@ -10,6 +10,8 @@ const RIVAL: ScopeOrderCsvRow = {
   price: 1234.5,
   gapIsk: 15.25,
   gapPct: 1.2,
+  ordersBeatingMe: 4,
+  unitsBeatingMe: 900,
   distance: '3 jumps',
 };
 
@@ -19,6 +21,8 @@ const NOT_CHECKED: ScopeOrderCsvRow = {
   price: null,
   gapIsk: null,
   gapPct: null,
+  ordersBeatingMe: null,
+  unitsBeatingMe: null,
   distance: null,
 };
 
@@ -30,17 +34,21 @@ describe('scopeOrdersCsvColumns', () => {
       'market.orders.scopeTheirPrice',
       'market.orders.scopeOverBy',
       'market.orders.scopeOverByPct',
+      'market.orders.scopeOrdersBeating',
+      'market.orders.scopeUnitsBeating',
       'market.orders.scopeDistance',
     ]);
   });
 
   it('splits the on-screen "ISK · %" gap into two raw numbers', () => {
     const csv = toCsv([RIVAL], scopeOrdersCsvColumns(t));
-    expect(csv.split('\r\n')[1]).toBe('"Region","Jita IV - Moon 4",1234.5,15.25,1.2,"3 jumps"');
+    expect(csv.split('\r\n')[1]).toBe(
+      '"Region","Jita IV - Moon 4",1234.5,15.25,1.2,4,900,"3 jumps"'
+    );
   });
 
   it('leaves the figures empty on a scope with no rival, its state in the seller column', () => {
     const csv = toCsv([NOT_CHECKED], scopeOrdersCsvColumns(t));
-    expect(csv.split('\r\n')[1]).toBe('"System","Not checked",,,,');
+    expect(csv.split('\r\n')[1]).toBe('"System","Not checked",,,,,,');
   });
 });

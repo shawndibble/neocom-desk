@@ -53,13 +53,14 @@ import { type BlueprintSuggestion } from '@/features/bpcContracts/searchBpcOffer
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { BPC_SEARCH_COLUMN_IDS } from '@/features/bpcContracts/bpcSearchColumns';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
-import { bpcSourcingCsvColumns } from '@/features/bpcContracts/bpcSourcingCsv';
+import { bpcSourcingCsvColumns, type BpcBpoBadge } from '@/features/bpcContracts/bpcSourcingCsv';
 import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { BpoCard } from '@/features/bpcContracts/BpoCard';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
 import {
+  bpoBadgeRows,
   bpoMayBeCheaper,
   cheapestComparableCopy,
   cheapestSourcingCard,
@@ -530,22 +531,37 @@ export function BpcSourcingPanel({
     onAsk: setAskRow,
   });
 
-  // Item plus the visible columns, like the table itself.
+  // One badge per row the table marks (`bpoBadgeRows`), built once so each BPO column reads it.
+  const bpoBadges = useMemo(() => {
+    const badges = new Map<BpcSearchRow, BpcBpoBadge>();
+    if (selectedTypeId !== null) return badges;
+    for (const row of bpoBadgeRows(displayRows)) {
+      const bpo = bpoByType.get(row.typeId);
+      if (!bpo) continue;
+      badges.set(row, {
+        price: bpo.price,
+        locationName: bpoLocationName(bpo),
+        regionName: regionLabel(bpo.regionId),
+        mayBeCheaper: row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract),
+      });
+    }
+    return badges;
+  }, [selectedTypeId, displayRows, bpoByType, bpoLocationName, regionLabel]);
+  // Every column and every badge fact, whatever the column picker shows.
   const csvColumns = useMemo(
     () =>
-      bpcSourcingCsvColumns(
-        t,
-        {
-          nameFor: (typeId) => blueprintNames.get(typeId) ?? `#${typeId}`,
-          regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
-          jumpsFor: (row) => {
-            const cell = bpcRowJumps(row);
-            return cell.kind === 'value' ? cell.count : null;
-          },
+      bpcSourcingCsvColumns(t, {
+        nameFor: (typeId) => blueprintNames.get(typeId) ?? `#${typeId}`,
+        regionName: (regionId) => regionNames.get(regionId) ?? `#${regionId}`,
+        jumpsFor: (row) => {
+          const cell = bpcRowJumps(row);
+          return cell.kind === 'value' ? cell.count : null;
         },
-        visibleColumns
-      ),
-    [t, blueprintNames, regionNames, bpcRowJumps, visibleColumns]
+        securityFor: (row) =>
+          row.systemId == null ? null : (solarSystems?.get(row.systemId)?.security ?? null),
+        bpoBadges,
+      }),
+    [t, blueprintNames, regionNames, bpcRowJumps, solarSystems, bpoBadges]
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',

@@ -456,7 +456,9 @@ describe('OpenOrdersPanel', () => {
     await waitFor(() => expect(spy).toHaveBeenCalledOnce());
     expect(spy.mock.calls[0][0]).toMatch(/^neocom-orders-open-\d{4}-\d{2}-\d{2}\.csv$/);
     const csv = spy.mock.calls[0][1] as string;
-    expect(csv).toContain('"Tritanium","Sell",500,');
+    // The fix-list facts ride along: station, character, problem and the call.
+    expect(csv).toMatch(/"Tritanium","Sell","[^"]+","[^"]+",500,/);
+    expect(csv).toContain('"Do this"');
     expect(csv).toContain(`"${TYPE_NAMES.get(EXPIRING_ORDER.type_id)}","Sell",`);
     expect(csv).toContain(`"${TYPE_NAMES.get(NO_COST_BASIS_ORDER.type_id)}","Sell",`);
     spy.mockRestore();

@@ -14,9 +14,9 @@
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
-import { endpointRisks, type CourierRiskKind } from '@/engine/contracts/courierRisk';
+import type { CourierRiskKind } from '@/engine/contracts/courierRisk';
 import type { CourierEndpoint } from '@/engine/contracts/courierSearch';
-import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
+import { markedEndpointRisks, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
 
 /**
  * The markers for one end of a haul, beside the end they describe — so "this
@@ -35,7 +35,7 @@ export function EndpointRiskMarkers({
   endpoint: CourierEndpoint;
   end: 'origin' | 'destination';
 }) {
-  const marked = endpointRisks(endpoint, end).filter((kind) => MARKED_RISKS.includes(kind));
+  const marked = markedEndpointRisks(endpoint, end);
   if (marked.length === 0) return null;
 
   return (

@@ -7,6 +7,8 @@
  */
 import { adviseOrder, type OrderAdvice, type OrderAdviceInput } from './orderAdvice';
 import type { OpenOrderRow } from './openOrdersModel';
+import type { Translate } from '@/lib/translate';
+import { formatMarketIsk } from '@/lib/isk';
 
 export type OrderDoThis =
   | { kind: 'raisePrice'; price: number | null }
@@ -80,4 +82,25 @@ export function doThisPrice(call: OrderDoThis): number | null {
   return call.kind === 'raisePrice' || call.kind === 'undercutTo' || call.kind === 'bid'
     ? call.price
     : null;
+}
+
+/** The row's call in words, as the fix list's "Do this" cell and the export read it; null when a fix-now row has no badge to speak for it. */
+export function orderDoThisText(t: Translate, row: OpenOrderRow): string | null {
+  const {
+    call,
+    advice: { badge },
+  } = rowFixCall(row);
+  switch (call.kind) {
+    case 'raisePrice':
+      return call.price === null
+        ? t('market.orders.fixList.doThis.raisePrice')
+        : t('market.orders.fixList.doThis.raisePriceTo', { price: formatMarketIsk(call.price) });
+    case 'undercutTo':
+    case 'bid':
+      return t(`market.orders.fixList.doThis.${call.kind}`, { price: formatMarketIsk(call.price) });
+    case 'badgeAdvice':
+      return badge ? t(`market.orders.badge.${badge.kind}Action`) : null;
+    default:
+      return t(`market.orders.fixList.doThis.${call.kind}`);
+  }
 }

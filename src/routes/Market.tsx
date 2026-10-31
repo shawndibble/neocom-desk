@@ -1,5 +1,14 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { named, preloadFrom } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -647,16 +656,40 @@ export function Market() {
   const sellRowCap = sellShowAll ? undefined : ROW_CAP;
   const buyRowCap = buyShowAll ? undefined : ROW_CAP;
 
-  // Every row, not the ROW_CAP the tables mount before "Show all" — hence
-  // `source: 'sorted-rows'` (every row, in the order the table is sorted by).
+  const bookBestSell = loadedView?.summary.bestSell ?? null;
+  // One station, already named by the scope bar: no Location column to repeat it.
+  const singleStationBook =
+    !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
+  const feeSkills = useOrderFeeSkills(activeCharacterId);
+  // Broker fee standings come from the selected hub's station owner; a region
+  // or structure book has no single owner, so it prices with none.
+  const hubStanding =
+    effectiveLocation.mode === 'hub'
+      ? tradeHubStanding(tradeHubStandings, effectiveHub.id)
+      : ZERO_STANDINGS;
+  const feeContext = useMemo<OrderFeeContext | null>(
+    () => (feeSkills ? { ...feeSkills, standing: hubStanding } : null),
+    [feeSkills, hubStanding]
+  );
+  const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
+  // A row's distance from the Current System, for the export: the Jumps column's own rule.
+  const exportJumpsFor = useCallback(
+    (systemId: number) => knownJumps?.get(systemId) ?? null,
+    [knownJumps]
+  );
+  // Every row, not the ROW_CAP the tables mount before "Show all"; every column, not the picker's.
   const sellCsvColumns = useMemo(
     () =>
       orderBookCsvColumns(t, {
         npcStations: npcStationMap,
         solarSystems: solarSystemMap,
         isBuy: false,
+        jumpsFor: exportJumpsFor,
+        feeContext,
+        myOrderIds,
+        best: bookBestSell,
       }),
-    [t, npcStationMap, solarSystemMap]
+    [t, npcStationMap, solarSystemMap, exportJumpsFor, feeContext, myOrderIds, bookBestSell]
   );
   const buyCsvColumns = useMemo(
     () =>
@@ -664,8 +697,20 @@ export function Market() {
         npcStations: npcStationMap,
         solarSystems: solarSystemMap,
         isBuy: true,
+        jumpsFor: exportJumpsFor,
+        feeContext,
+        myOrderIds,
+        best: loadedView?.summary.bestBuy ?? null,
       }),
-    [t, npcStationMap, solarSystemMap]
+    [
+      t,
+      npcStationMap,
+      solarSystemMap,
+      exportJumpsFor,
+      feeContext,
+      myOrderIds,
+      loadedView?.summary.bestBuy,
+    ]
   );
   const sellExport = useTableExport({
     surface: 'market-sell',
@@ -682,30 +727,15 @@ export function Market() {
     source: 'sorted-rows',
   });
 
-  // The order book's own width picks columns or two-line cards: a phone,
-  // and a desktop whose finder column leaves the book too narrow for the
-  // columns the pilot has picked and the figures on screen, both get the
-  // card. Short of that, Location narrows first, so fewer widths need cards.
-  const bookBestSell = loadedView?.summary.bestSell ?? null;
-  // One station, already named by the scope bar: no Location column to repeat it.
-  const singleStationBook =
-    !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
-  const feeSkills = useOrderFeeSkills(activeCharacterId);
-  // Broker fee standings come from the selected hub's station owner; a region
-  // or structure book has no single owner, so it prices with none.
-  const hubStanding =
-    effectiveLocation.mode === 'hub'
-      ? tradeHubStanding(tradeHubStandings, effectiveHub.id)
-      : ZERO_STANDINGS;
-  const feeContext = useMemo<OrderFeeContext | null>(
-    () => (feeSkills ? { ...feeSkills, standing: hubStanding } : null),
-    [feeSkills, hubStanding]
-  );
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const withholding = { hideLocation: singleStationBook, feeContext };
   // A held-back column can't be ticked, so the picker doesn't offer it.
   const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
     ids.filter((id) => !isColumnWithheld(id, withholding));
+  // The order book's own width picks columns or two-line cards: a phone,
+  // and a desktop whose finder column leaves the book too narrow for the
+  // columns the pilot has picked and the figures on screen, both get the
+  // card. Short of that, Location narrows first, so fewer widths need cards.
   const orderBookWidths = orderBookWidthsRem(
     pickedOrderColumns.filter((id) => !isColumnWithheld(id, withholding)),
     orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)
@@ -811,7 +841,6 @@ export function Market() {
 
   // What the scope bar says the book is reading. Distances are known at every
   // range, so the hub's own distance shows even with no range set.
-  const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
   const bookStationCount = new Set([...sortedSell, ...sortedBuy].map((o) => o.location_id)).size;
   const bookScope: OrderBookScope =
     rangeAcross && browserFilterValue.jumps !== 'any'

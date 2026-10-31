@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '@/lib/csv';
 import type { WalletTransaction } from '@/esi/endpoints';
-import { transactionTotal, walletTransactionsCsvColumns } from './walletTransactionsCsv';
+import {
+  marginPercentOf,
+  transactionTotal,
+  walletTransactionsCsvColumns,
+} from './walletTransactionsCsv';
 
 const t = (k: string) => k;
 const nameFor = (typeId: number) => `Item ${typeId}`;
@@ -66,5 +70,56 @@ describe('walletTransactionsCsvColumns', () => {
     expect(fields[3]).toBe('3');
     expect(fields[4]).toBe('12.5');
     expect(fields[5]).toBe('37.5');
+  });
+});
+
+describe('walletTransactionsCsvColumns extras', () => {
+  const margins = {
+    margins: new Map([[2, { unitCost: 8, salesTax: 1, margin: 9 }]]),
+    gaps: new Map<number, 'noBuy' | 'outside' | 'noTax'>([[3, 'noBuy']]),
+  };
+  const columns = walletTransactionsCsvColumns(t, nameFor, {
+    character: () => 'Alpha',
+    location: (row) => `Station ${row.location_id}`,
+    margins,
+  });
+  const at = (header: string, row: WalletTransaction) =>
+    columns.find((c) => c.header === header)!.value(row);
+
+  it('adds character, margin, margin %, unit cost, gap and location in table order', () => {
+    expect(columns.map((c) => c.header)).toEqual([
+      'wallet.date',
+      'wallet.character',
+      'wallet.item',
+      'wallet.side',
+      'wallet.quantity',
+      'wallet.unitPrice',
+      'wallet.total',
+      'wallet.margin',
+      'wallet.marginPercent',
+      'wallet.unitCost',
+      'wallet.csvSalesTax',
+      'wallet.csvMarginGap',
+      'wallet.location',
+    ]);
+  });
+
+  it('exports a sale margin, percent and unit cost; blank on a buy or a sale with no margin', () => {
+    const sale = txn({ transaction_id: 2, is_buy: false, quantity: 5 });
+    expect(at('wallet.margin', sale)).toBe(9);
+    expect(at('wallet.unitCost', sale)).toBe(8);
+    expect(at('wallet.csvSalesTax', sale)).toBe(1);
+    expect(at('wallet.marginPercent', sale)).toBeCloseTo(22.5);
+    expect(at('wallet.csvMarginGap', sale)).toBeNull();
+    expect(at('wallet.margin', txn({ transaction_id: 2, is_buy: true }))).toBeNull();
+    const gapSale = txn({ transaction_id: 3, is_buy: false });
+    expect(at('wallet.margin', gapSale)).toBeNull();
+    expect(at('wallet.csvMarginGap', gapSale)).toBe('wallet.marginGap.noBuy');
+    expect(at('wallet.location', sale)).toBe('Station 60003760');
+    expect(at('wallet.character', sale)).toBe('Alpha');
+  });
+
+  it('marginPercentOf is blank without a margin', () => {
+    expect(marginPercentOf({ quantity: 1 }, undefined)).toBeNull();
   });
 });
