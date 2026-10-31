@@ -14,20 +14,27 @@ function row(overrides: Partial<CompareRow> = {}): CompareRow {
   return { typeId: 1, itemName: 'Rifter', loading: false, summary: summary(), ...overrides };
 }
 
+const marginFor = (r: CompareRow) => ({
+  spreadPct: r.summary ? 25 : null,
+  afterFees: r.summary ? 80 : null,
+});
+
 describe('compareCsvColumns', () => {
   it('orders columns item, best sell, best buy, spread, volume', () => {
-    const columns = compareCsvColumns(t);
+    const columns = compareCsvColumns(t, marginFor);
     expect(columns.map((c) => c.header)).toEqual([
       'market.compare.columnItem',
       'market.compare.columnBestSell',
       'market.compare.columnBestBuy',
       'market.compare.columnSpread',
+      'market.compare.columnSpreadPct',
+      'market.compare.columnAfterFees',
       'market.compare.columnVolume',
     ]);
   });
 
   it('emits raw numbers for price/spread/volume, not formatted strings', () => {
-    const columns = compareCsvColumns(t);
+    const columns = compareCsvColumns(t, marginFor);
     const csv = toCsv(
       [
         row({
@@ -42,13 +49,13 @@ describe('compareCsvColumns', () => {
       columns
     );
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['"Rifter"', '12345.5', '12000', '345.5', '7']);
+    expect(fields).toEqual(['"Rifter"', '12345.5', '12000', '345.5', '25', '80', '7']);
   });
 
   it('exports empty cells for a row still loading or whose fetch failed', () => {
-    const columns = compareCsvColumns(t);
+    const columns = compareCsvColumns(t, marginFor);
     const csv = toCsv([row({ loading: true, summary: null })], columns);
     const fields = csv.split('\r\n')[1].split(',');
-    expect(fields).toEqual(['"Rifter"', '', '', '', '']);
+    expect(fields).toEqual(['"Rifter"', '', '', '', '', '', '']);
   });
 });

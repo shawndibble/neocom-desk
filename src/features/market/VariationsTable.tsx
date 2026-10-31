@@ -83,7 +83,10 @@ export function VariationsTable({
   scopeName,
 }: VariationsTableProps) {
   const { t } = useTranslation();
-  const csvColumns = useMemo(() => variationsCsvColumns(t, prices), [t, prices]);
+  const csvColumns = useMemo(
+    () => variationsCsvColumns(t, prices, { selfName, selfSummary, scopeName }),
+    [t, prices, selfName, selfSummary, scopeName]
+  );
   const tableExport = useTableExport({ surface: 'market-variations', rows, columns: csvColumns });
 
   if (rows.length === 0) return null;
