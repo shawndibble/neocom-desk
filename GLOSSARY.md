@@ -61,7 +61,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
-- **Asset Category**: The top-level market group an item sits under ("Ships", "Ship Equipment", "Blueprints & Reactions"), as Assets and Corp Assets filter and label it. Not EVE's own inventory category. An item outside the market tree has none and reads "Not on the market".
+- **Asset Category**: The top-level market group an item sits under ("Ships", "Ship Equipment", "Blueprints & Reactions"), as Assets, Corp Assets and the LP Store landing's Category filter use it. Not EVE's own inventory category. An item outside the market tree has none and reads "Not on the market".
 - **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore) to
   a Payee, snapshotting the tax % and ISK value at assignment time. It acts
   like an invoice thereafter: a later price move or an edited Payee default

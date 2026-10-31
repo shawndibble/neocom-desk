@@ -215,6 +215,8 @@ export async function installEsiMock(page: Page): Promise<void> {
     // offers at all; a spec that needs real rows should override these.
     if (path === `/characters/${CHARACTER_ID}/loyalty/points`) return json([]);
     if (/^\/loyalty\/stores\/\d+\/offers\/$/.test(path)) return json([]);
+    // The LP Store landing reads every faction for names and Faction Warfare militias.
+    if (path === '/universe/factions') return json([]);
 
     // Station lookup for a location the SDE snapshot cannot name. Broker-fee
     // standings no longer come through here (issue #1675 — they read the

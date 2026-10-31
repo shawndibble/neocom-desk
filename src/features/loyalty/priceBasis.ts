@@ -10,6 +10,8 @@
  * a device-local UI preference, not Editable Data, so it's never synced
  * (GLOSSARY.md).
  */
+import type { HubPrices } from '@/engine/industry/types';
+import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export type PriceBasis = 'sell' | 'buy';
@@ -23,3 +25,17 @@ export const usePriceBasis = createLocalSetting<PriceBasis>({
   defaultValue: DEFAULT_PRICE_BASIS,
   parse: (raw) => (raw === 'sell' || raw === 'buy' ? raw : null),
 });
+
+/**
+ * The revenue side of `computeLoyaltyOfferRows` for a basis, shared by every
+ * caller so one offer never shows two ISK/LP: "sell" lists an order at the
+ * hub's sell price, "buy" dumps into its standing buy orders.
+ */
+export function revenuePricing(
+  snapshot: { hubPrices: HubPrices; hubBuyPrices: HubPrices },
+  basis: PriceBasis
+): { revenueHubPrices: HubPrices; liquidationBasis: LiquidationBasis } {
+  return basis === 'buy'
+    ? { revenueHubPrices: snapshot.hubBuyPrices, liquidationBasis: 'instant' }
+    : { revenueHubPrices: snapshot.hubPrices, liquidationBasis: 'order' };
+}

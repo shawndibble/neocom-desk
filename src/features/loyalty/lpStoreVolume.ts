@@ -5,6 +5,7 @@
  * One small object per hub region, read whole, so opening a store costs one
  * cached request, never a history call per row. `null` means unavailable.
  */
+import { useEffect, useState } from 'react';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { R2_SNAPSHOT_ORIGIN, fetchJson } from '@/features/contractSearch/r2OfferSnapshot';
 import { HOUR_MS } from '@/lib/age';
@@ -51,4 +52,31 @@ export async function loadLpStoreVolume(regionId: number): Promise<LpStoreVolume
   } catch {
     return null;
   }
+}
+
+/**
+ * A hub region's volume, tagged with its region so a hub change never reads
+ * the previous hub's. `regionId` null (the hub setting not hydrated yet)
+ * loads nothing: the default hub's volume would be the wrong number.
+ * `settled` once this region's read is done, `volume` null for good when it failed.
+ */
+export function useLpStoreVolume(regionId: number | null): {
+  volume: LpStoreVolume | null;
+  settled: boolean;
+} {
+  const [loaded, setLoaded] = useState<{ regionId: number; volume: LpStoreVolume | null } | null>(
+    null
+  );
+  useEffect(() => {
+    if (regionId === null) return;
+    let cancelled = false;
+    void loadLpStoreVolume(regionId).then((volume) => {
+      if (!cancelled) setLoaded({ regionId, volume });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [regionId]);
+  const settled = loaded !== null && loaded.regionId === regionId;
+  return { volume: settled ? loaded.volume : null, settled };
 }

@@ -88,6 +88,24 @@ describe('loadMarketLpValues', () => {
     expect(values.get(10)).toBeLessThan(1_500);
     expect(values.get(20)!).toBeGreaterThan(values.get(10)!);
   });
+  it('prices offers the caller already holds without asking ESI for them', async () => {
+    vi.mocked(loadMarketSnapshots).mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve(
+          snapshot({ 61: 200_000, 62: 150_000, 63: 100_000 }, { 61: 50, 62: 50, 63: 50 })
+        )
+      )
+    );
+    const offers = new Map([
+      [60, [itemOffer(1, 61, 100), itemOffer(2, 62, 100), itemOffer(3, 63, 100)]],
+    ]);
+    const values = await loadMarketLpValues([60], JITA, { held: offers });
+    expect(loadLoyaltyStoreOffers).not.toHaveBeenCalled();
+    expect(values.get(60)).toBeGreaterThan(1_300);
+    // Remembered like any other read: the ESI path answers it next.
+    expect(await loadMarketLpValue(60, JITA)).toBe(values.get(60));
+    expect(loadLoyaltyStoreOffers).not.toHaveBeenCalled();
+  });
 });
 
 describe('loadMarketLpValue', () => {

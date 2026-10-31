@@ -22,6 +22,7 @@ import type { PriceBasis } from '@/features/loyalty/priceBasis';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { useColumnVisibility } from '@/lib/columnVisibility';
 import { TradeHubSelect } from '@/features/loyalty/TradeHubSelect';
+import { PriceBasisSelect } from '@/features/loyalty/PriceBasisSelect';
 import type { TradeHub } from '@/market/hubs';
 
 export interface LoyaltyOfferFilterValue {
@@ -87,44 +88,11 @@ export function LoyaltyOfferFilterBar({
               onValueChange={(hubId) => setDraft({ ...draft, hubId })}
             />
           </FilterField>
-          {/*
-  Radix rather than `NativeSelect`, the one thing a real `<select>`
-  can't do: the trigger shows just "Sell"/"Buy" while the open list
-  spells out what each basis means. A native option's text is the same
-  in both places, so the closed box had to carry "(list order)" —
-  twelve characters of explanation sitting permanently in a filter row.
-*/}
           <FilterField label={t('loyaltyStore.priceBasisLabel')}>
-            <Select
+            <PriceBasisSelect
               value={draft.priceBasis}
-              onValueChange={(value) => setDraft({ ...draft, priceBasis: value as PriceBasis })}
-            >
-              {/*
-      An `aria-label` on the trigger ends name computation, so nothing
-      inside it is ever announced — including the selection. The visible
-      text is deliberately short here, so the label carries the long form
-      and the current basis itself.
-    */}
-              <SelectTrigger
-                aria-label={`${t('loyaltyStore.priceBasisLabel')}: ${t(
-                  draft.priceBasis === 'buy'
-                    ? 'loyaltyStore.priceBasisBuy'
-                    : 'loyaltyStore.priceBasisSell'
-                )}`}
-              >
-                <SelectValue>
-                  {t(
-                    draft.priceBasis === 'buy'
-                      ? 'loyaltyStore.priceBasisBuyShort'
-                      : 'loyaltyStore.priceBasisSellShort'
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
-                <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
-              </SelectContent>
-            </Select>
+              onValueChange={(priceBasis) => setDraft({ ...draft, priceBasis })}
+            />
           </FilterField>
           <FilterField label={t('loyaltyStore.lpBasisLabel')}>
             <Select
