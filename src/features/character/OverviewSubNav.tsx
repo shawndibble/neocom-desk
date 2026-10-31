@@ -71,11 +71,10 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
 
   // On a phone the strip outgrows its frame and opens at scroll 0, so landing
   // on a later view cut its own tab off (or hid SRP entirely). Slide the
-  // current link into view on landing, on every route change, and when the
-  // strip or its tabs resize: the `trailing` data-age badge arrives with the
-  // data and narrows the strip after landing. A no-op when the link already
-  // fits, and a swipe resizes nothing, so it never fights the reader.
-  // `srpVisible` too: the SRP tab mounts after landing.
+  // current link into view on landing, on every route change, and on resize
+  // (the data-age badge arrives with the data and narrows the strip; the SRP
+  // tab mounts late) — but only until the reader moves the strip themselves:
+  // the ticking badge changes width, and must not snap a swipe back.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -88,7 +87,14 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
     observer?.observe(scroller);
     const list = scroller.firstElementChild;
     if (list) observer?.observe(list);
-    return () => observer?.disconnect();
+    const stop = () => observer?.disconnect();
+    scroller.addEventListener('pointerdown', stop, { passive: true });
+    scroller.addEventListener('wheel', stop, { passive: true });
+    return () => {
+      stop();
+      scroller.removeEventListener('pointerdown', stop);
+      scroller.removeEventListener('wheel', stop);
+    };
   }, [pathname, srpVisible]);
 
   return (

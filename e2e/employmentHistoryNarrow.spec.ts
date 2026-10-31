@@ -6,6 +6,7 @@
 import { test, expect, PHONE } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
+import { expectNoPageOverflow } from './support/overflow';
 
 const LONG_NAME = 'The Extraordinarily Long Named Corporation Of Many Many Words Indeed';
 
@@ -47,11 +48,7 @@ test('a long Longest-stay corporation name does not widen the page at 390px', as
   const chip = page.getByText('Longest stay', { exact: true }).locator('..');
   await expect(chip).toContainText('Extraordinarily');
 
-  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  await expectNoPageOverflow(page);
 
   const box = (await chip.boundingBox())!;
   expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
@@ -70,4 +67,8 @@ test('the current sub-nav tab is fully inside the strip at 390px', async ({ page
     expect(tab.x).toBeGreaterThanOrEqual(strip.x - 0.5);
     expect(tab.x + tab.width).toBeLessThanOrEqual(strip.x + strip.width + 0.5);
   }).toPass();
+
+  // The data-age badge sits outside the scroller, so it stays on screen too.
+  const badge = page.getByText('Data updated');
+  await expect(badge).toBeInViewport({ ratio: 1 });
 });

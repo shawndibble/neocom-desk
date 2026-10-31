@@ -1,8 +1,8 @@
 /**
- * The pointer-only half of a scrolling `Tabs` bar: which ends still have tabs
- * beyond them, how a vertical wheel maps onto the bar, and how far a chevron
- * click travels. Pure so the rules are testable without a laid-out DOM; only
- * `revealInScroller` reads the DOM, as a thin wrapper over its pure delta.
+ * Scroll rules for a sideways tab bar (`Tabs`, and the route sub-navs): which
+ * ends still have tabs beyond them, how a vertical wheel maps onto the bar,
+ * how far a chevron click travels, and how far to slide to reveal a tab. Pure
+ * so they are testable without a laid-out DOM; only `revealInScroller` reads it.
  */
 
 export interface ScrollMetrics {
