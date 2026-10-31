@@ -159,6 +159,17 @@ describe('LoyaltyStoreLanding', () => {
     );
   });
 
+  it('opens the store when the turn-ins count is clicked', async () => {
+    const user = userEvent.setup();
+    const withItems = offer(NAVY, 23, 'Navy Turn-in Thing', 900, 20);
+    withItems.row.requiredItems = [{ typeId: 34, name: 'Tritanium', quantity: 5 }] as never;
+    landing.mockReturnValue(state({ offers: [withItems] }));
+    renderLanding('?view=offers');
+    await user.click(screen.getByText('1 item'));
+    expect(probe.pathname).toBe('/wallet/lp-store/2');
+    expect(probe.search).toBe('?offer=23');
+  });
+
   it('narrows the offers by the search box, by item or store name', async () => {
     const user = userEvent.setup();
     renderLanding('?view=offers');

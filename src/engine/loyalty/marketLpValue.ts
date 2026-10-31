@@ -3,7 +3,7 @@
  * offers turn a loyalty point into at a Trade Hub, after fees — the same
  * ISK/LP the LP Store page ranks its offers by. Read off the store's best
  * offers rather than its single best, and only from offers the hub could
- * absorb a few redemptions of, so one thin, lucky order can't set the rate.
+ * absorb a few redemptions of and that trade every day, so one thin, lucky order can't set the rate.
  */
 
 import { upperMedian } from '../math';
@@ -16,10 +16,14 @@ export interface LpValueCandidate {
   sellVolume: number;
   /** Units one redemption hands out. */
   quantity: number;
+  /** Units of it traded a day lately; null when that is not known. */
+  soldPerDay: number | null;
 }
 
 /** An offer counts only when the hub has this many redemptions' worth for sale. */
 export const MIN_DEPTH_REDEMPTIONS = 5;
+/** An offer counts only when what it hands out trades at least this many units a day. */
+export const MIN_SOLD_PER_DAY = 1;
 /** How many of the best offers the rate is the median of. */
 const TOP_OFFERS = 5;
 /** Fewer qualifying offers than this is too little to call a rate. */
@@ -31,7 +35,8 @@ export function marketLpValue(candidates: readonly LpValueCandidate[]): number |
       (c) =>
         c.iskPerLp !== null &&
         c.iskPerLp > 0 &&
-        c.sellVolume >= MIN_DEPTH_REDEMPTIONS * Math.max(1, c.quantity)
+        c.sellVolume >= MIN_DEPTH_REDEMPTIONS * Math.max(1, c.quantity) &&
+        (c.soldPerDay === null || c.soldPerDay >= MIN_SOLD_PER_DAY)
     )
     .map((c) => c.iskPerLp!)
     .sort((a, b) => b - a)
